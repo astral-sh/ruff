@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.16.7
+
+Released on 2026-09-10.
+
+### Preview features
+
+- [`ruff`] Add rule for default values on method receivers (`RUF077`) ([#26700](https://github.com/astral-sh/ruff/pull/26700))
+- [`ruff`] Recognize `re.prefixmatch` (`RUF039`, `RUF055`) ([#28311](https://github.com/astral-sh/ruff/pull/28311))
+
+### Bug fixes
+
+- Alternate nested quotes inside format spec interpolations ([#28259](https://github.com/astral-sh/ruff/pull/28259))
+- [`flake8-implicit-str-concat`] Mark fix unsafe when it creates a docstring (`ISC003`) ([#27981](https://github.com/astral-sh/ruff/pull/27981))
+- [`flake8-tidy-imports`] Skip fixes for multi-member imports (`TID254`) ([#26584](https://github.com/astral-sh/ruff/pull/26584))
+- [`pylint`] Gate `ImportCycleError` on Python 3.15 (`PLW0133`) ([#28310](https://github.com/astral-sh/ruff/pull/28310))
+
+### Rule changes
+
+- Correct `D211` and `D203` rule conflict diagnostic ([#28444](https://github.com/astral-sh/ruff/pull/28444))
+- Recognize `slice` and `frozendict` generics ([#28477](https://github.com/astral-sh/ruff/pull/28477))
+- Stop defining `__cached__` for Python 3.15 ([#28476](https://github.com/astral-sh/ruff/pull/28476))
+- [`pyupgrade`] Stop recommending removed `typing.no_type_check_decorator` (`UP035`) ([#28475](https://github.com/astral-sh/ruff/pull/28475))
+
+### Performance
+
+- Reuse parser name lookups when interning ([#28399](https://github.com/astral-sh/ruff/pull/28399))
+- Speed up inherited configuration resolution ([#28299](https://github.com/astral-sh/ruff/pull/28299))
+
+### Documentation
+
+- Fix `line-length` path in `--config` example ([#28392](https://github.com/astral-sh/ruff/pull/28392))
+- Remove the "Who’s Using Ruff?" list ([#28455](https://github.com/astral-sh/ruff/pull/28455))
+
+### Other changes
+
+- Embed archive checksums in the shell installer ([#28281](https://github.com/astral-sh/ruff/pull/28281))
+- Use paid GitHub-hosted runners for Linux ([#28478](https://github.com/astral-sh/ruff/pull/28478))
+- Use the shared release smoke-test action ([#28288](https://github.com/astral-sh/ruff/pull/28288))
+
+### Contributors
+
+- [@zanieb](https://github.com/zanieb)
+- [@jogo-openai](https://github.com/jogo-openai)
+- [@nightt5879](https://github.com/nightt5879)
+- [@mdiniz97](https://github.com/mdiniz97)
+- [@jonathandung](https://github.com/jonathandung)
+- [@zsol](https://github.com/zsol)
+- [@The-Compiler](https://github.com/The-Compiler)
+- [@qatcod](https://github.com/qatcod)
+- [@gorewilliams](https://github.com/gorewilliams)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@RafaelJohn9](https://github.com/RafaelJohn9)
+- [@ntBre](https://github.com/ntBre)
+- [@MichaReiser](https://github.com/MichaReiser)
+
 ## 0.16.6
 
 Released on 2026-09-03.
@@ -285,104 +340,99 @@ guide and overview of the changes!
 ### Breaking changes
 
 - Ruff now enables a much larger set of rules by default (413, up from 59). See the blog post for
-    more details and the new [Default Rules](https://docs.astral.sh/ruff/default-rules/) page for a
-    full listing of the enabled rules. Note that this is primarily an expansion, but 18 of the more
-    opinionated pycodestyle (`E`) and pyflakes (`F`) rules have been removed from the default set:
-    `E401`, `E402`, `E701`, `E702`, `E703`, `E711`, `E712`, `E713`, `E714`, `E721`, `E731`, `E741`,
-    `E742`, `E743`, `F403`, `F405`, `F406`, and `F722`.
-
+more details and the new [Default Rules](https://docs.astral.sh/ruff/default-rules/) page for a
+full listing of the enabled rules. Note that this is primarily an expansion, but 18 of the more
+opinionated pycodestyle (`E`) and pyflakes (`F`) rules have been removed from the default set:
+`E401`, `E402`, `E701`, `E702`, `E703`, `E711`, `E712`, `E713`, `E714`, `E721`, `E731`, `E741`,
+`E742`, `E743`, `F403`, `F405`, `F406`, and `F722`.
 - Ruff can now format Python code blocks in Markdown files and will do this by default. See the
-    [documentation](https://docs.astral.sh/ruff/formatter/#markdown-code-formatting) for more details.
-
+[documentation](https://docs.astral.sh/ruff/formatter/#markdown-code-formatting) for more details.
 - Ruff now supports `ruff: ignore` comments at the ends of lines, like `noqa` comments, or on the line preceding a diagnostic. For example, these both suppress an [`unused-import`](https://docs.astral.sh/ruff/rules/unused-import/) (`F401`) diagnostic:
 
-    ```py
-    import math  # ruff: ignore[F401]
-
-    # ruff: ignore[F401]
-    import os
-    ```
-
+  ```py
+  import math  # ruff: ignore[F401]
+  
+  # ruff: ignore[F401]
+  import os
+  ```
 - Fixes are now shown in `check` and `format --check` output:
 
-    ````console
-    ❯ ruff format --check .
-    unformatted: File would be reformatted
-     --> try.md:1:1
-      |
-    1 | ```python
-      - import   math
-    2 + import math
-    3 | ```
-      |
+  ```console
+  ❯ ruff format --check .
+  unformatted: File would be reformatted
+   --> try.md:1:1
+    |
+  1 | ```python
+    - import   math
+  2 + import math
+  3 | ```
+    |
+  
+  1 file would be reformatted
+  ```
 
-    1 file would be reformatted
-    ````
-
-    This example also shows off the Markdown formatting.
-
+  This example also shows off the Markdown formatting.
 - `format --check` now supports the same output formats as the linter, including the `github` and
-    `gitlab` outputs for rendering annotations in CI:
+`gitlab` outputs for rendering annotations in CI:
 
-    ```console
-    ❯ ruff format --check --output-format github .
-    ::error title=ruff (unformatted),file=try.md,line=2,col=8,endLine=2,endColumn=10::try.md:2:8: unformatted: File would be reformatted
-    ```
+  ```console
+  ❯ ruff format --check --output-format github .
+  ::error title=ruff (unformatted),file=try.md,line=2,col=8,endLine=2,endColumn=10::try.md:2:8: unformatted: File would be reformatted
+  ```
 
-    See the CLI help or [documentation](https://docs.astral.sh/ruff/settings/#output-format) for the
-    full list of supported formats.
-
+  See the CLI help or [documentation](https://docs.astral.sh/ruff/settings/#output-format) for the
+full list of supported formats.
 - The `filename`, `location`, `end_location`, `fix.edits[].location`, and `fix.edits[].end_location`
-    fields in the JSON output format may now be `null` rather than defaulting to the empty string and
-    row 1, column 1, respectively.
+fields in the JSON output format may now be `null` rather than defaulting to the empty string and
+row 1, column 1, respectively.
 
 ### Stabilization
 
 The following rules have been stabilized and are no longer in preview:
 
 - [`airflow3-incompatible-function-signature`](https://docs.astral.sh/ruff/rules/airflow3-incompatible-function-signature)
-    (`AIR303`)
+(`AIR303`)
 - [`missing-copyright-notice`](https://docs.astral.sh/ruff/rules/missing-copyright-notice)
-    (`CPY001`)
+(`CPY001`)
 - [`unnecessary-from-float`](https://docs.astral.sh/ruff/rules/unnecessary-from-float) (`FURB164`)
 - [`sorted-min-max`](https://docs.astral.sh/ruff/rules/sorted-min-max) (`FURB192`)
 - [`implicit-string-concatenation-in-collection-literal`](https://docs.astral.sh/ruff/rules/implicit-string-concatenation-in-collection-literal)
-    (`ISC004`)
+(`ISC004`)
 - [`log-exception-outside-except-handler`](https://docs.astral.sh/ruff/rules/log-exception-outside-except-handler)
-    (`LOG004`)
+(`LOG004`)
 - [`invalid-bool-return-type`](https://docs.astral.sh/ruff/rules/invalid-bool-return-type)
-    (`PLE0304`)
+(`PLE0304`)
 - [`too-many-positional-arguments`](https://docs.astral.sh/ruff/rules/too-many-positional-arguments)
-    (`PLR0917`)
+(`PLR0917`)
 - [`stop-iteration-return`](https://docs.astral.sh/ruff/rules/stop-iteration-return) (`PLR1708`)
 - [`none-not-at-end-of-union`](https://docs.astral.sh/ruff/rules/none-not-at-end-of-union)
-    (`RUF036`)
+(`RUF036`)
 - [`access-annotations-from-class-dict`](https://docs.astral.sh/ruff/rules/access-annotations-from-class-dict)
-    (`RUF063`)
+(`RUF063`)
 - [`duplicate-entry-in-dunder-all`](https://docs.astral.sh/ruff/rules/duplicate-entry-in-dunder-all)
-    (`RUF068`)
+(`RUF068`)
 
 The following behaviors have been stabilized:
 
 - [`blind-except`](https://docs.astral.sh/ruff/rules/blind-except) (`BLE001`) is now suppressed when
-    the exception is logged via `logging` methods other than `critical`, `error` and `exception`.
+the exception is logged via `logging` methods other than `critical`, `error` and `exception`.
 - [`future-required-type-annotation`](https://docs.astral.sh/ruff/rules/future-required-type-annotation)
-    (`FA102`) now checks for additional [PEP 585](https://peps.python.org/pep-0585/)-compatible
-    APIs, such as those from `collections.abc`.
+(`FA102`) now checks for additional [PEP 585](https://peps.python.org/pep-0585/)-compatible
+APIs, such as those from `collections.abc`.
 - [`f-string-in-get-text-func-call`](https://docs.astral.sh/ruff/rules/f-string-in-get-text-func-call)
-    (`INT001`),
-    [`format-in-get-text-func-call`](https://docs.astral.sh/ruff/rules/format-in-get-text-func-call)
-    (`INT002`), and
-    [`printf-in-get-text-func-call`](https://docs.astral.sh/ruff/rules/printf-in-get-text-func-call)
-    (`INT003`) now check for additional common ways of using the `gettext` module, such as assigning
-    it to `builtins._`.
+(`INT001`),
+[`format-in-get-text-func-call`](https://docs.astral.sh/ruff/rules/format-in-get-text-func-call)
+(`INT002`), and
+[`printf-in-get-text-func-call`](https://docs.astral.sh/ruff/rules/printf-in-get-text-func-call)
+(`INT003`) now check for additional common ways of using the `gettext` module, such as assigning
+it to `builtins._`.
 - [`suspicious-url-open-usage`](https://docs.astral.sh/ruff/rules/suspicious-url-open-usage)
-    (`S310`) now resolves local string literal bindings to avoid more false positives.
+(`S310`) now resolves local string literal bindings to avoid more false positives.
 - [`snmp-insecure-version`](https://docs.astral.sh/ruff/rules/snmp-insecure-version) (`S508`) and
-    [`snmp-weak-cryptography`](https://docs.astral.sh/ruff/rules/snmp-weak-cryptography) (`S509`) now
-    support the recommended API from newer versions of PySNMP.
+[`snmp-weak-cryptography`](https://docs.astral.sh/ruff/rules/snmp-weak-cryptography) (`S509`) now
+support the recommended API from newer versions of PySNMP.
 - [`typing-text-str-alias`](https://docs.astral.sh/ruff/rules/typing-text-str-alias) (`UP019`) now
-    recognizes `typing_extensions.Text` in addition to `typing.Text`.
+recognizes `typing_extensions.Text` in addition to `typing.Text`.
 
 ### Preview features
 

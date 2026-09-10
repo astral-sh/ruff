@@ -53,7 +53,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Options
 /// - `lint.pep8-naming.classmethod-decorators`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Suspicious)]
+#[violation_metadata(preview_since = "0.16.7", category = Category::Suspicious)]
 pub(crate) struct MethodReceiverDefault;
 
 impl Violation for MethodReceiverDefault {
