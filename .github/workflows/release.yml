@@ -385,12 +385,12 @@ jobs:
     # not block the rest of the release.
     if: ${{ always() && needs.host.result == 'success' && needs.release-gate.result == 'success' && (needs.custom-publish-pypi.result == 'skipped' || needs.custom-publish-pypi.result == 'success') && (needs.custom-publish-wasm.result == 'skipped' || needs.custom-publish-wasm.result == 'success') }}
     runs-on: "depot-ubuntu-24.04-4"
+    environment:
+      name: release
     permissions:
       "attestations": "write"
-      "contents": "write"
+      "contents": "read"
       "id-token": "write"
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
@@ -416,8 +416,20 @@ jobs:
             artifacts/*.ps1
             artifacts/*.zip
             artifacts/*.tar.gz
+      - name: Get release token
+        id: release-token
+        uses: open-security-tools/ost-simple-sts@974a63a2daaaa40f7c6dec40d334f3da4421469e
+        with:
+          exchange-url: ${{ secrets.STS_API_URL }}/exchange
+          audience: ${{ secrets.STS_API_URL }}
+          repository: astral-sh/ruff
+          # Workflow permission is required to create a release tag after `main` advances across workflow changes.
+          permissions: |
+            contents: write
+            workflows: write
       - name: Create GitHub Release
         env:
+          GH_TOKEN: ${{ steps.release-token.outputs.token }}
           PRERELEASE_FLAG: "${{ fromJson(needs.host.outputs.val).announcement_is_prerelease && '--prerelease' || '' }}"
           ANNOUNCEMENT_TITLE: "${{ fromJson(needs.host.outputs.val).announcement_title }}"
           ANNOUNCEMENT_BODY: "${{ fromJson(needs.host.outputs.val).announcement_github_body }}"
