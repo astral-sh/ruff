@@ -321,6 +321,11 @@ impl Violation for LoggingStringConcat {
 /// logging.info("%s - Something happened", user)
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if the message,
+/// or the parentheses around it, contain comments,
+/// since the rewrite replaces that whole range and would delete them.
+///
 /// ## Options
 /// - `lint.logger-objects`
 ///
