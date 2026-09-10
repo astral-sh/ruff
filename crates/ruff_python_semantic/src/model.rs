@@ -155,7 +155,7 @@ pub struct SemanticModel<'a> {
     /// Modules that have been seen by the semantic model.
     pub seen: Modules,
 
-    /// The value of the most recently visited module-level `__lazy_modules__` assignment.
+    /// The module names from the most recently visited module-level `__lazy_modules__` assignment.
     ///
     /// A declaration affects subsequent imports, without changing earlier imports:
     ///
@@ -164,7 +164,7 @@ pub struct SemanticModel<'a> {
     /// __lazy_modules__ = ["json", "pathlib"]
     /// import pathlib  # Lazy.
     /// ```
-    pub lazy_modules: Option<&'a Expr>,
+    pub lazy_modules: Option<LazyModules<'a>>,
 
     /// Exceptions that are handled by the current `try` block.
     ///
@@ -2433,27 +2433,35 @@ impl<'a> SemanticModel<'a> {
     /// Test exact module membership in the current `__lazy_modules__` declaration.
     /// Returns [`ImportLaziness::Unknown`] when the declaration is not a literal collection of strings.
     pub fn module_laziness(&self, module: &str) -> ImportLaziness {
-        let Some(value) = self.lazy_modules else {
-            return ImportLaziness::Eager;
-        };
-        let (Expr::List(ast::ExprList { elts: elements, .. })
-        | Expr::Tuple(ast::ExprTuple { elts: elements, .. })
-        | Expr::Set(ast::ExprSet { elts: elements, .. })) = value
-        else {
-            return ImportLaziness::Unknown;
-        };
-        if !elements.iter().all(Expr::is_string_literal_expr) {
-            return ImportLaziness::Unknown;
+        match &self.lazy_modules {
+            None => ImportLaziness::Eager,
+            Some(LazyModules::Unknown) => ImportLaziness::Unknown,
+            Some(LazyModules::Known(modules)) => {
+                if modules.contains(&module) {
+                    ImportLaziness::Lazy
+                } else {
+                    ImportLaziness::Eager
+                }
+            }
         }
-        if elements.iter().any(|element| {
-            element
-                .as_string_literal_expr()
-                .is_some_and(|literal| literal.value.to_str() == module)
-        }) {
-            ImportLaziness::Lazy
-        } else {
-            ImportLaziness::Eager
-        }
+    }
+
+    /// Extract literal module names when visiting a `__lazy_modules__` assignment.
+    pub fn set_lazy_modules(&mut self, value: &'a Expr) {
+        let names = match value {
+            Expr::List(ast::ExprList { elts, .. })
+            | Expr::Tuple(ast::ExprTuple { elts, .. })
+            | Expr::Set(ast::ExprSet { elts, .. }) => elts
+                .iter()
+                .map(|element| {
+                    element
+                        .as_string_literal_expr()
+                        .map(|literal| literal.value.to_str())
+                })
+                .collect::<Option<Vec<_>>>(),
+            _ => None,
+        };
+        self.lazy_modules = Some(names.map_or(LazyModules::Unknown, LazyModules::Known));
     }
 
     /// Return the module tested for membership in `__lazy_modules__`.
@@ -2475,6 +2483,31 @@ impl<'a> SemanticModel<'a> {
             _ => None,
         }
     }
+}
+
+/// Statically known module names in a `__lazy_modules__` declaration.
+#[derive(Debug)]
+pub enum LazyModules<'a> {
+    /// A literal list, set, or tuple that can be analyzed.
+    ///
+    /// For example:
+    ///
+    /// ```py
+    /// __lazy_modules__ = ["a", "list"]
+    /// ```
+    Known(Vec<&'a str>),
+
+    /// The declaration is present but not a literal collection that can be analyzed.
+    ///
+    /// For example:
+    ///
+    /// ```py
+    /// class LazyImporter:
+    ///     def __contains__(self, name): return True
+    ///
+    /// __lazy_modules__ = LazyImporter()
+    /// ```
+    Unknown,
 }
 
 /// Whether an import is lazy, as determined statically.

@@ -2874,7 +2874,7 @@ impl<'a> Checker<'a> {
                     if let [Expr::Name(name)] = targets.as_slice()
                         && name.id == id =>
                 {
-                    self.semantic.lazy_modules = Some(value);
+                    self.semantic.set_lazy_modules(value);
                 }
                 Stmt::AnnAssign(ast::StmtAnnAssign {
                     target,
@@ -2883,7 +2883,7 @@ impl<'a> Checker<'a> {
                 }) if let Expr::Name(name) = target.as_ref()
                     && name.id == id =>
                 {
-                    self.semantic.lazy_modules = Some(value);
+                    self.semantic.set_lazy_modules(value);
                 }
                 _ => {}
             }
