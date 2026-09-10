@@ -17,10 +17,63 @@ class Pair:
     def copy_from(self, other: "Pair"):
         self.value = other.value[:]
 
-# TODO: Infer the whole tuple as `tuple[int, str]` when recursive assignments include slicing.
-reveal_type(Pair().value)  # revealed: tuple[int, str] | tuple[Divergent, str]
+reveal_type(Pair().value)  # revealed: tuple[int, str]
 reveal_type(Pair().value[0])  # revealed: int
 reveal_type(Pair().value[1])  # revealed: str
+```
+
+The inferred tuple also retains its element types when reversing it or selecting every other
+element.
+
+```py
+reveal_type(Pair().value[::-1])  # revealed: tuple[str, int]
+reveal_type(Pair().value[::2])  # revealed: tuple[int]
+```
+
+## Copying different sequence types
+
+A full slice with an explicit start of zero and a step of one preserves the sequence's type. Both
+initial sequence types and the tuples constructed from their elements remain possible after copying.
+
+```py
+class Container:
+    def __init__(self, values: list[int] | range):
+        self.values = values
+
+    def update(self, other: "Container"):
+        self.values = (other.values[0],)
+
+    def copy_from(self, other: "Container"):
+        self.values = other.values[0::1]
+
+def inspect(container: Container):
+    reveal_type(container.values)  # revealed: list[int] | range | tuple[int]
+    reveal_type(container.values[0])  # revealed: int
+```
+
+## Slicing a tuple or a user-defined container
+
+A full slice preserves a tuple's type, but a user-defined container can return a different type.
+When both are possible, the result includes the sliced tuple and the custom method's return type.
+
+```py
+class Pair:
+    def __init__(self):
+        self.value = (0, "start")
+
+    def update(self, other: "Pair"):
+        self.value = (other.value[0], "next")
+
+    def copy_from(self, other: "Pair"):
+        self.value = other.value[:]
+
+class Values:
+    def __getitem__(self, index: slice) -> tuple[bytes]:
+        return (b"",)
+
+def inspect(pair: Pair, choice: bool):
+    values = pair.value if choice else Values()
+    reveal_type(values[:])  # revealed: tuple[bytes] | tuple[int, str]
 ```
 
 ## Indexing through two tuple levels

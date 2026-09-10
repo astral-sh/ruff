@@ -379,7 +379,7 @@ impl<'db> RecursiveInputs<'db> {
         ))
     }
 
-    /// Resolve query references for diagnostics without inserting solutions into equations.
+    /// Resolve query references without inserting their solutions into equations.
     pub(in crate::types) fn resolve(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
