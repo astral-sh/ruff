@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "repositories": {
+    "ruff": {
+      "name": "astral-sh/ruff",
+      "id": 523043277,
+      "oidc_subject": "legacy"
+    }
+  },
+  "rules": [
+    {
+      "caller": "ruff",
+      "environment": "automations",
+      "caller_workflow": "release-prepare.yml",
+      "on": ["workflow_dispatch"],
+      "permissions": { "contents": "write", "pull_requests": "write" },
+      "target": "ruff"
+    }
+  ]
+}
