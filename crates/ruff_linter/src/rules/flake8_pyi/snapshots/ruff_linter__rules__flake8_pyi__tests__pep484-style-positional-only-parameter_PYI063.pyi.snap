@@ -90,31 +90,42 @@ PYI063 Use PEP 570 syntax for positional-only parameters
 29 |     @classmethod
 30 |     def not_good(cls, __foo: int) -> None: ...  # PYI063
    |                       ^^^^^
-31 |
-32 |     # The first non-self argument isn't positional-only, so logically the second can't be either:
+31 |     def __new__(cls, __name: str, __later: str) -> Self: ...  # PYI063
    |
 help: Add `/` to function signature
 
 PYI063 Use PEP 570 syntax for positional-only parameters
-  --> PYI063.pyi:52:23
+  --> PYI063.pyi:31:22
    |
-50 | class Metaclass(type):
-51 |     @classmethod
-52 |     def __new__(mcls, __name: str, __bases: tuple[type, ...], __namespace: dict, **kwds) -> Self: ...  # PYI063
+29 |     @classmethod
+30 |     def not_good(cls, __foo: int) -> None: ...  # PYI063
+31 |     def __new__(cls, __name: str, __later: str) -> Self: ...  # PYI063
+   |                      ^^^^^^
+32 |
+33 |     # The first non-self argument isn't positional-only, so logically the second can't be either:
+   |
+help: Add `/` to function signature
+
+PYI063 Use PEP 570 syntax for positional-only parameters
+  --> PYI063.pyi:53:23
+   |
+51 | class Metaclass(type):
+52 |     @classmethod
+53 |     def __new__(mcls, __name: str, __bases: tuple[type, ...], __namespace: dict, **kwds) -> Self: ...  # PYI063
    |                       ^^^^^^
-53 |
-54 | class Metaclass2(type):
+54 |
+55 | class Metaclass2(type):
    |
 help: Add `/` to function signature
 
 PYI063 Use PEP 570 syntax for positional-only parameters
-  --> PYI063.pyi:56:26
+  --> PYI063.pyi:57:26
    |
-54 | class Metaclass2(type):
-55 |     @classmethod
-56 |     def __new__(metacls, __name: str, __bases: tuple[type, ...], __namespace: dict, **kwds) -> Self: ...  # PYI063
+55 | class Metaclass2(type):
+56 |     @classmethod
+57 |     def __new__(metacls, __name: str, __bases: tuple[type, ...], __namespace: dict, **kwds) -> Self: ...  # PYI063
    |                          ^^^^^^
-57 |
-58 | class GoodMetaclass(type):
+58 |
+59 | class GoodMetaclass(type):
    |
 help: Add `/` to function signature
