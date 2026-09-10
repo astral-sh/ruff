@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
+use camino::Utf8PathBuf;
 use compact_str::{CompactString, format_compact};
 use ruff_db::files::directory_listing;
 use ruff_db::system::FileType;
@@ -127,11 +128,10 @@ impl<'db> ModuleSearchCursor<'_, 'db> {
         // directories already visited and their non-symlink children; otherwise,
         // check the candidate's full path.
         let is_listable = |candidate: &ModuleResolutionCandidate| {
-            let path = candidate.directory.path();
             prefix.is_none()
                 || listable_directories
                     .iter()
-                    .any(|directory| directory.path() == path || directory.is_child_directory(path))
+                    .any(|directory| directory.is_same_or_child_directory(&candidate.directory))
                 || is_listable(candidate)
         };
         let mut listing = ModuleListing::default();
@@ -176,7 +176,7 @@ impl<'db> ModuleSearchCursor<'_, 'db> {
                         context.resolver_environment,
                         Cow::Owned(name),
                         ModuleKind::Module,
-                        directory.path().search_path().clone(),
+                        directory.search_path().clone(),
                     ));
                 }
                 continue;
@@ -298,11 +298,10 @@ fn select_candidate_for_listing<'db>(
 /// This supports symlinked search roots and top-level package aliases while preventing
 /// recursive enumeration from following directory cycles indefinitely.
 fn is_listable_location(db: &dyn Db, candidate: &ModuleResolutionCandidate) -> bool {
-    let path = candidate.directory.path();
-    let Some(search_root) = path.search_path().as_system_path() else {
+    let Some(search_root) = candidate.directory.search_path().as_system_path() else {
         return true;
     };
-    let Some(directory) = path.to_system_path() else {
+    let Some(directory) = candidate.directory.to_system_path() else {
         return false;
     };
     let Ok(relative) = directory.strip_prefix(search_root) else {
@@ -369,17 +368,14 @@ fn child_directory_names<'db>(
     parent: Option<ModuleNameIngredient<'db>>,
 ) -> Box<[String]> {
     let context = ResolverContext::new(db, mode.resolver_environment(db), mode.mode(db));
+    let relative_path: Utf8PathBuf = parent
+        .map(|parent| parent.name(db).components().collect())
+        .unwrap_or_default();
     let mut names = BTreeSet::new();
 
     for search_path in search_paths(db, context.resolver_environment, context.mode) {
-        let mut path = search_path.to_module_path();
-        if let Some(parent) = parent {
-            for component_name in parent.name(db).components() {
-                path.push(component_name);
-            }
-        }
-
-        let directory = ModuleDirectory::new(&context, path);
+        let directory =
+            ModuleDirectory::from_parts(&context, search_path.clone(), relative_path.clone());
         directory.for_each_entry(db, |name, kind| {
             if matches!(kind, FileType::Directory | FileType::Symlink)
                 && is_identifier(name)
