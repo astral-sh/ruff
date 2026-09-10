@@ -1644,17 +1644,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_simplify::rules::double_negation(checker, expr, *op, operand);
             }
         }
-        Expr::Compare(
-            compare @ ast::ExprCompare {
-                ops,
-                operands,
-                range: _,
-                node_index: _,
-            },
-        ) => {
-            let Some((left, comparators)) = operands.split_first() else {
-                return;
-            };
+        Expr::Compare(compare) => {
+            let left = compare.first_operand();
+            let comparators = compare.comparators();
+            let ops = &*compare.ops;
             if checker.any_rule_enabled(&[Rule::NoneComparison, Rule::TrueFalseComparison]) {
                 pycodestyle::rules::literal_comparisons(checker, compare);
             }
@@ -1681,22 +1674,22 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 );
             }
             if checker.is_rule_enabled(Rule::ComparisonWithItself) {
-                pylint::rules::comparison_with_itself(checker, left, ops, comparators);
+                pylint::rules::comparison_with_itself(checker, compare);
             }
             if checker.is_rule_enabled(Rule::LiteralMembership) {
                 pylint::rules::literal_membership(checker, compare);
             }
             if checker.is_rule_enabled(Rule::ComparisonOfConstant) {
-                pylint::rules::comparison_of_constant(checker, left, ops, comparators);
+                pylint::rules::comparison_of_constant(checker, compare);
             }
             if checker.is_rule_enabled(Rule::CompareToEmptyString) {
-                pylint::rules::compare_to_empty_string(checker, left, ops, comparators);
+                pylint::rules::compare_to_empty_string(checker, compare);
             }
             if checker.is_rule_enabled(Rule::MagicValueComparison) {
-                pylint::rules::magic_value_comparison(checker, left, comparators);
+                pylint::rules::magic_value_comparison(checker, &compare.operands);
             }
             if checker.is_rule_enabled(Rule::NanComparison) {
-                pylint::rules::nan_comparison(checker, left, comparators);
+                pylint::rules::nan_comparison(checker, &compare.operands);
             }
             if checker.is_rule_enabled(Rule::InEmptyCollection) {
                 ruff::rules::in_empty_collection(checker, compare);

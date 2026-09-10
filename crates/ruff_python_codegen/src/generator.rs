@@ -1166,16 +1166,11 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(value, precedence::MAX);
                 });
             }
-            Expr::Compare(ast::ExprCompare {
-                ops,
-                operands,
-                range: _,
-                node_index: _,
-            }) => {
+            Expr::Compare(compare) => {
                 group_if!(precedence::CMP, {
                     let new_lvl = precedence::CMP + 1;
-                    self.unparse_expr(&operands[0], new_lvl);
-                    for (op, cmp) in ops.iter().zip(&operands[1..]) {
+                    self.unparse_expr(compare.first_operand(), new_lvl);
+                    for (_, op, cmp) in compare.iter() {
                         let op = match op {
                             CmpOp::Eq => " == ",
                             CmpOp::NotEq => " != ",

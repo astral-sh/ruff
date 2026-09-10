@@ -48,7 +48,7 @@ impl<'a> BinaryLike<'a> {
 
             rec(
                 Operand::Left {
-                    expression: &compare.operands[0],
+                    expression: compare.first_operand(),
                     leading_comments,
                 },
                 comments,
@@ -62,7 +62,7 @@ impl<'a> BinaryLike<'a> {
                 "Compare expression with an unbalanced number of comparators and operations."
             );
 
-            if let Some((last_expression, middle_expressions)) = compare.operands[1..].split_last()
+            if let Some((last_expression, middle_expressions)) = compare.comparators().split_last()
             {
                 let (last_operator, middle_operators) = compare.ops.split_last().unwrap();
 

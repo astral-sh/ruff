@@ -978,9 +978,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let candidates = match operand {
             ast::Expr::Name(_) => [Some(operand), None],
-            ast::Expr::Compare(compare) if compare.ops.len() == 1 => {
-                [compare.operands.first(), compare.operands.get(1)]
-            }
+            ast::Expr::Compare(compare) if compare.ops.len() == 1 => [
+                Some(compare.first_operand()),
+                Some(compare.second_operand()),
+            ],
             ast::Expr::Call(call) => [call.arguments.args.first(), None],
             _ => return None,
         };

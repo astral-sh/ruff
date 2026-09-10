@@ -4054,10 +4054,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         let inference = infer_expression_types(db, expression, TypeContext::default());
 
-        let comparator_tuples = operands
-            .iter()
-            .tuple_windows::<(&ruff_python_ast::Expr, &ruff_python_ast::Expr)>();
         let mut constraints = NarrowingConstraints::default();
+        let left = expr_compare.first_operand();
+        let right = expr_compare.second_operand();
 
         // Narrow unions of tuples based on element checks. For example:
         //
@@ -4065,8 +4064,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         //         if t[0] is not None:
         //             reveal_type(t)  # tuple[int, int]
         if matches!(&**ops, [ast::CmpOp::Is | ast::CmpOp::IsNot])
-            && let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is)
-            && let ast::Expr::Subscript(subscript) = operands[0].expression_value()
+            && let is_positive_check =
+                is_positive == (expr_compare.first_operator() == ast::CmpOp::Is)
+            && let ast::Expr::Subscript(subscript) = left.expression_value()
             && let Type::Union(union) = inference
                 .expression_type(&*subscript.value)
                 .resolve_type_alias(db)
@@ -4075,7 +4075,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 .expression_type(&*subscript.slice)
                 .as_int_literal()
             && let Ok(index) = i32::try_from(index)
-            && let rhs_ty = inference.expression_type(&operands[1])
+            && let rhs_ty = inference.expression_type(right)
         {
             let filtered = union.filter(db, |elem| {
                 elem.tuple_instance_spec(db, &self.env)
@@ -4133,15 +4133,15 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 };
 
             // E.g., `len(items) == 2`
-            if let ast::Expr::Call(call) = operands[0].expression_value() {
-                narrow_len_call(call, inference.expression_type(&operands[1]), comparison);
+            if let ast::Expr::Call(call) = left.expression_value() {
+                narrow_len_call(call, inference.expression_type(right), comparison);
             }
 
             // E.g., `2 == len(items)`
-            if let ast::Expr::Call(call) = operands[1].expression_value() {
+            if let ast::Expr::Call(call) = right.expression_value() {
                 narrow_len_call(
                     call,
-                    inference.expression_type(&operands[0]),
+                    inference.expression_type(left),
                     comparison.reflected(),
                 );
             }
@@ -4162,7 +4162,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         if matches!(&**ops, [ast::CmpOp::Eq | ast::CmpOp::NotEq]) {
             // For `==`, we use equality semantics on the `if` branch (is_positive=true).
             // For `!=`, we use equality semantics on the `else` branch (is_positive=false).
-            let is_equality = is_positive == (ops[0] == ast::CmpOp::Eq);
+            let is_equality = is_positive == (expr_compare.first_operator() == ast::CmpOp::Eq);
 
             let mut narrow_subscript = |subscript: &ast::ExprSubscript, other_type: Type<'db>| {
                 let value_type = inference.expression_type(&*subscript.value);
@@ -4187,12 +4187,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 }
             };
 
-            if let ast::Expr::Subscript(subscript) = operands[0].expression_value() {
-                narrow_subscript(subscript, inference.expression_type(&operands[1]));
+            if let ast::Expr::Subscript(subscript) = left.expression_value() {
+                narrow_subscript(subscript, inference.expression_type(right));
             }
 
-            if let ast::Expr::Subscript(subscript) = operands[1].expression_value() {
-                narrow_subscript(subscript, inference.expression_type(&operands[0]));
+            if let ast::Expr::Subscript(subscript) = right.expression_value() {
+                narrow_subscript(subscript, inference.expression_type(left));
             }
         }
 
@@ -4223,17 +4223,17 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 }
             };
 
-            if let ast::Expr::Attribute(attribute) = &operands[0]
-                && operands[1].as_named_expr().is_none_or(|named| {
+            if let ast::Expr::Attribute(attribute) = left
+                && right.as_named_expr().is_none_or(|named| {
                     PlaceExpr::try_from_expr(&named.target)
                         != PlaceExpr::try_from_expr(&attribute.value)
                 })
             {
-                narrow_attribute(attribute, inference.expression_type(&operands[1]));
+                narrow_attribute(attribute, inference.expression_type(right));
             }
 
-            if let ast::Expr::Attribute(attribute) = &operands[1] {
-                narrow_attribute(attribute, inference.expression_type(&operands[0]));
+            if let ast::Expr::Attribute(attribute) = right {
+                narrow_attribute(attribute, inference.expression_type(left));
             }
         }
 
@@ -4250,16 +4250,16 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         //     if "foo" not in u:
         //         reveal_type(u)  # revealed: Bar
         if matches!(&**ops, [ast::CmpOp::In | ast::CmpOp::NotIn])
-            && let Some(key) = inference.expression_type(&operands[0]).as_string_literal()
-            && let rhs_expr = operands[1].expression_value()
-            && let rhs_type = inference.expression_type(&operands[1])
+            && let Some(key) = inference.expression_type(left).as_string_literal()
+            && let rhs_expr = right.expression_value()
+            && let rhs_type = inference.expression_type(right)
             && is_or_contains_typeddict(db, rhs_type)
         {
             let key = key.value(db);
             let apply_constraint =
                 |constraints: &mut NarrowingConstraints<'db>,
                  constraint: NarrowingConstraint<'db>| {
-                    let comparator_place = PlaceExpr::try_from_expr(&operands[1])
+                    let comparator_place = PlaceExpr::try_from_expr(right)
                         .and_then(|place_expr| self.places().place_id(&place_expr));
                     if let Some(place) = comparator_place {
                         constraints.insert(place, constraint.clone());
@@ -4274,7 +4274,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     }
                 };
 
-            if is_positive == (ops[0] == ast::CmpOp::In) {
+            if is_positive == (expr_compare.first_operator() == ast::CmpOp::In) {
                 let narrowed = self.narrow_with_present_key(rhs_type, key);
                 if narrowed != rhs_type.resolve_type_alias(db) {
                     apply_constraint(&mut constraints, NarrowingConstraint::replacement(narrowed));
@@ -4343,7 +4343,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         };
         let mut last_rhs_ty: Option<Type> = None;
 
-        for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
+        for (left, op, right) in expr_compare.iter() {
             let lhs_ty = last_rhs_ty.unwrap_or_else(|| expression_type(left, &self.env));
             let rhs_ty = expression_type(right, &self.env);
             let lhs_narrowing_rhs_ty = if matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn) {

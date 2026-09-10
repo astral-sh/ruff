@@ -2,7 +2,7 @@
 
 use crate::AtomicNodeIndex;
 use crate::generated::{
-    ExprBytesLiteral, ExprCall, ExprDict, ExprFString, ExprList, ExprName, ExprSet,
+    ExprBytesLiteral, ExprCall, ExprCompare, ExprDict, ExprFString, ExprList, ExprName, ExprSet,
     ExprStringLiteral, ExprTString, ExprTuple, PatternMatchAs, PatternMatchOr, StmtClassDef,
 };
 use std::borrow::Cow;
@@ -99,6 +99,62 @@ impl Expr {
     /// Return the [`OperatorPrecedence`] of this expression
     pub fn precedence(&self) -> OperatorPrecedence {
         OperatorPrecedence::from(self)
+    }
+}
+
+impl ExprCompare {
+    /// Returns the initial operand (`a` in `a < b <= c`).
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are no operands. The parser always produces at least two operands,
+    /// synthesizing an invalid name expression for a missing operand during error recovery.
+    pub fn first_operand(&self) -> &Expr {
+        self.operands
+            .first()
+            .expect("A comparison has a left operand")
+    }
+
+    /// Returns the right operand of the first comparison (`b` in `a < b <= c`).
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are fewer than two operands. See [`Self::first_operand`].
+    pub fn second_operand(&self) -> &Expr {
+        self.operands
+            .get(1)
+            .expect("A comparison has a right operand")
+    }
+
+    /// Returns the first comparison operator (`<` in `a < b <= c`).
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are no operators. The parser always produces at least one operator.
+    pub fn first_operator(&self) -> CmpOp {
+        *self.ops.first().expect("A comparison has an operator")
+    }
+
+    /// Returns all operands after the initial operand (`[b, c]` in `a < b <= c`).
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are no operands. See [`Self::first_operand`].
+    pub fn comparators(&self) -> &[Expr] {
+        &self.operands[1..]
+    }
+
+    /// Iterates over each comparison as `(left, operator, right)`.
+    ///
+    /// For `a < b <= c`, yields `(a, <, b)` followed by `(b, <=, c)`.
+    pub fn iter(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (&Expr, &CmpOp, &Expr)> + ExactSizeIterator {
+        self.operands
+            .iter()
+            .zip(self.ops.iter())
+            .zip(self.operands.iter().skip(1))
+            .map(|((left, op), right)| (left, op, right))
     }
 }
 

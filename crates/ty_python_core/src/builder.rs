@@ -3633,16 +3633,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         || !Self::condition_evaluation_is_known_safe(&unary.operand),
                 );
             }
-            ast::Expr::Compare(ast::ExprCompare { ops, operands, .. }) => {
-                if let Some((left, comparators)) = operands.split_first() {
-                    self.visit_expr(left);
-                    for (op, comparator) in ops.iter().zip(comparators) {
-                        self.visit_expr(comparator);
-                        self.record_exception_checkpoint_if(!matches!(
-                            op,
-                            ast::CmpOp::Is | ast::CmpOp::IsNot
-                        ));
-                    }
+            ast::Expr::Compare(compare) => {
+                self.visit_expr(compare.first_operand());
+                for (_, op, right) in compare.iter() {
+                    self.visit_expr(right);
+                    self.record_exception_checkpoint_if(!matches!(
+                        op,
+                        ast::CmpOp::Is | ast::CmpOp::IsNot
+                    ));
                 }
             }
             ast::Expr::BoolOp(node) => self.visit_bool_expression(node, context),

@@ -213,19 +213,14 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
     let mut diagnostics = vec![];
 
     // Check `left`.
-    let Some((left, comparators)) = compare.operands.split_first() else {
-        return;
-    };
+    let left = compare.first_operand();
+    let comparators = compare.comparators();
     let mut comparator = left;
-    let [op, ..] = &*compare.ops else {
-        return;
-    };
-    let [next, ..] = comparators else {
-        return;
-    };
+    let op = compare.first_operator();
+    let next = compare.second_operand();
 
     if !helpers::is_constant_non_singleton(next) {
-        if let Some(op) = EqCmpOp::try_from(*op) {
+        if let Some(op) = EqCmpOp::try_from(op) {
             if checker.is_rule_enabled(Rule::NoneComparison) && comparator.is_none_literal_expr() {
                 match op {
                     EqCmpOp::Eq => {
