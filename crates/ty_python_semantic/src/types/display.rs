@@ -1327,23 +1327,36 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                             .as_function_literal()
                             .map(|function| &**function.name(db)),
                     ),
-                    KnownBoundMethodType::FunctionTypeDunderCall(function) => (
-                        KnownClass::FunctionType.to_class_literal(db, self.env),
-                        "__call__",
-                        "function",
-                        Type::FunctionLiteral(function),
-                        Some(&**function.name(db)),
-                    ),
+                    KnownBoundMethodType::DunderCall(callable) => {
+                        let callable = callable.inner(db);
+                        let (class_name, name) = match callable {
+                            Type::BoundMethod(method) => (
+                                "method",
+                                method.function(db).map(|function| &**function.name(db)),
+                            ),
+                            _ => (
+                                match callable.function_like_kind(db) {
+                                    Some(CallableTypeKind::StaticMethodLike) => "staticmethod",
+                                    Some(CallableTypeKind::ClassMethodLike) => "classmethod",
+                                    Some(CallableTypeKind::FunctionLike) => "function",
+                                    _ => "callable",
+                                },
+                                callable
+                                    .as_function_literal()
+                                    .map(|function| &**function.name(db)),
+                            ),
+                        };
+                        (
+                            callable.to_meta_type(db, self.env),
+                            "__call__",
+                            class_name,
+                            callable,
+                            name,
+                        )
+                    }
                     KnownBoundMethodType::MethodTypeDunderGet(method) => (
                         KnownClass::MethodType.to_class_literal(db, self.env),
                         "__get__",
-                        "method",
-                        Type::BoundMethod(method),
-                        method.function(db).map(|function| &**function.name(db)),
-                    ),
-                    KnownBoundMethodType::MethodTypeDunderCall(method) => (
-                        KnownClass::MethodType.to_class_literal(db, self.env),
-                        "__call__",
                         "method",
                         Type::BoundMethod(method),
                         method.function(db).map(|function| &**function.name(db)),

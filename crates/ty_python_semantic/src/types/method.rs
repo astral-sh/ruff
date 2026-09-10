@@ -426,12 +426,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 pub enum KnownBoundMethodType<'db> {
     /// Method wrapper for `some_function.__get__`
     FunctionTypeDunderGet(InternedType<'db>),
-    /// Method wrapper for `some_function.__call__`
-    FunctionTypeDunderCall(FunctionType<'db>),
+    /// Native `__call__` wrapper for a function, bound method, or staticmethod descriptor.
+    /// Retains the original callable so its receiver and signature are checked when called.
+    DunderCall(InternedType<'db>),
     /// Native `types.MethodType.__get__`, which preserves the captured receiver.
     MethodTypeDunderGet(BoundMethodType<'db>),
-    /// Method wrapper for a bound method's `__call__`, retaining its precise signature.
-    MethodTypeDunderCall(BoundMethodType<'db>),
     /// Method wrapper for `some_property.__get__`
     PropertyDunderGet(PropertyInstanceType<'db>),
     /// Method wrapper for `some_property.__set__`
@@ -467,14 +466,11 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
     visitor: &V,
 ) {
     match method_wrapper {
-        KnownBoundMethodType::FunctionTypeDunderGet(function) => {
+        KnownBoundMethodType::FunctionTypeDunderGet(function)
+        | KnownBoundMethodType::DunderCall(function) => {
             visitor.visit_type(db, function.inner(db));
         }
-        KnownBoundMethodType::FunctionTypeDunderCall(function) => {
-            visitor.visit_function_type(db, function);
-        }
-        KnownBoundMethodType::MethodTypeDunderGet(method)
-        | KnownBoundMethodType::MethodTypeDunderCall(method) => {
+        KnownBoundMethodType::MethodTypeDunderGet(method) => {
             visitor.visit_type(db, Type::BoundMethod(method));
         }
         KnownBoundMethodType::PropertyDunderGet(property) => {
@@ -525,18 +521,16 @@ impl<'db> KnownBoundMethodType<'db> {
                         .recursive_type_normalized_impl(db, env, div, nested)?,
                 )),
             ),
-            KnownBoundMethodType::FunctionTypeDunderCall(function) => {
-                Some(KnownBoundMethodType::FunctionTypeDunderCall(
-                    function.recursive_type_normalized_impl(db, env, div, nested)?,
-                ))
+            KnownBoundMethodType::DunderCall(callable) => {
+                Some(KnownBoundMethodType::DunderCall(InternedType::new(
+                    db,
+                    callable
+                        .inner(db)
+                        .recursive_type_normalized_impl(db, env, div, nested)?,
+                )))
             }
             KnownBoundMethodType::MethodTypeDunderGet(method) => {
                 Some(KnownBoundMethodType::MethodTypeDunderGet(
-                    method.recursive_type_normalized_impl(db, env, div, nested)?,
-                ))
-            }
-            KnownBoundMethodType::MethodTypeDunderCall(method) => {
-                Some(KnownBoundMethodType::MethodTypeDunderCall(
                     method.recursive_type_normalized_impl(db, env, div, nested)?,
                 ))
             }
@@ -576,9 +570,8 @@ impl<'db> KnownBoundMethodType<'db> {
     pub(super) fn class(self) -> KnownClass {
         match self {
             KnownBoundMethodType::FunctionTypeDunderGet(_)
-            | KnownBoundMethodType::FunctionTypeDunderCall(_)
+            | KnownBoundMethodType::DunderCall(_)
             | KnownBoundMethodType::MethodTypeDunderGet(_)
-            | KnownBoundMethodType::MethodTypeDunderCall(_)
             | KnownBoundMethodType::PropertyDunderGet(_)
             | KnownBoundMethodType::PropertyDunderSet(_)
             | KnownBoundMethodType::PropertyDunderDelete(_) => KnownClass::MethodWrapperType,
@@ -601,17 +594,21 @@ impl<'db> KnownBoundMethodType<'db> {
         }
     }
 
-    /// Return the signatures of this bound method type.
-    ///
-    /// If the bound method type is overloaded, it may have multiple signatures.
-    pub(super) fn signatures(
+    /// Return the call signatures, preserving union alternatives of the captured callable.
+    pub(super) fn callables(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-    ) -> impl Iterator<Item = Signature<'db>> {
+    ) -> Option<CallableTypes<'db>> {
         let object_type_form = || TypeFormType::from_type_expression(db, Type::object());
 
-        match self {
+        let signatures = match self {
+            KnownBoundMethodType::DunderCall(callable) => {
+                return callable
+                    .inner(db)
+                    .try_upcast_to_callable(db, env)
+                    .map(|callables| callables.map(|callable| callable.into_regular(db)));
+            }
             // Here, we dynamically model the overloaded function signature of `types.FunctionType.__get__`.
             // This is required because we need to return more precise types than what the signature in
             // typeshed provides:
@@ -636,7 +633,7 @@ impl<'db> KnownBoundMethodType<'db> {
             // with the `self` parameters removed.
             KnownBoundMethodType::FunctionTypeDunderGet(_)
             | KnownBoundMethodType::PropertyDunderGet(_)
-            | KnownBoundMethodType::MethodTypeDunderGet(_) => Either::Left(Either::Left(
+            | KnownBoundMethodType::MethodTypeDunderGet(_) => Either::Left(
                 [
                     Signature::new(
                         Parameters::standard([
@@ -674,13 +671,7 @@ impl<'db> KnownBoundMethodType<'db> {
                     ),
                 ]
                 .into_iter(),
-            )),
-            KnownBoundMethodType::FunctionTypeDunderCall(function) => Either::Left(Either::Right(
-                function.signature(db).overloads.iter().cloned(),
-            )),
-            KnownBoundMethodType::MethodTypeDunderCall(method) => Either::Left(Either::Right(
-                method.bound_signatures(db).overloads.iter().cloned(),
-            )),
+            ),
             KnownBoundMethodType::PropertyDunderSet(_) => {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::standard([
@@ -881,7 +872,12 @@ impl<'db> KnownBoundMethodType<'db> {
                     KnownClass::ConstraintSet.to_instance(db, env),
                 )))
             }
-        }
+        };
+        Some(CallableTypes::one(CallableType::new(
+            db,
+            CallableSignature::from_overloads(signatures),
+            CallableTypeKind::Regular,
+        )))
     }
 }
 
@@ -899,17 +895,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             ) => self.check_type_pair(db, source_function.inner(db), target_function.inner(db)),
 
             (
-                KnownBoundMethodType::FunctionTypeDunderCall(source_function),
-                KnownBoundMethodType::FunctionTypeDunderCall(target_function),
-            ) => self.check_function_pair(db, source_function, target_function),
+                KnownBoundMethodType::DunderCall(source_callable),
+                KnownBoundMethodType::DunderCall(target_callable),
+            ) => self.check_type_pair(db, source_callable.inner(db), target_callable.inner(db)),
 
             (
                 KnownBoundMethodType::MethodTypeDunderGet(source_method),
                 KnownBoundMethodType::MethodTypeDunderGet(target_method),
-            )
-            | (
-                KnownBoundMethodType::MethodTypeDunderCall(source_method),
-                KnownBoundMethodType::MethodTypeDunderCall(target_method),
             ) => self.check_bound_method_pair(db, source_method, target_method),
 
             (
@@ -984,9 +976,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             (
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
-                | KnownBoundMethodType::FunctionTypeDunderCall(_)
+                | KnownBoundMethodType::DunderCall(_)
                 | KnownBoundMethodType::MethodTypeDunderGet(_)
-                | KnownBoundMethodType::MethodTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::PropertyDunderDelete(_)
@@ -1005,9 +996,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 | KnownBoundMethodType::ConstraintSetSolutions(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
-                | KnownBoundMethodType::FunctionTypeDunderCall(_)
+                | KnownBoundMethodType::DunderCall(_)
                 | KnownBoundMethodType::MethodTypeDunderGet(_)
-                | KnownBoundMethodType::MethodTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::PropertyDunderDelete(_)

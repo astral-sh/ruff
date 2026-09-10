@@ -320,17 +320,12 @@ impl<'db> Type<'db> {
                 .value_type(db)
                 .try_upcast_to_callable_with_policy_and_context(db, env, policy, context),
 
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function))
-                if context.is_recursive_reference(db, function) =>
-            {
-                Some(CallableTypes::one(CallableType::bottom(db)))
-            }
+            Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(callable)) => callable
+                .inner(db)
+                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)
+                .map(|callables| callables.map(|callable| callable.into_regular(db))),
 
-            Type::KnownBoundMethod(method) => Some(CallableTypes::one(CallableType::new(
-                db,
-                CallableSignature::from_overloads(method.signatures(db, env)),
-                CallableTypeKind::Regular,
-            ))),
+            Type::KnownBoundMethod(method) => method.callables(db, env),
 
             Type::WrapperDescriptor(wrapper_descriptor) => {
                 Some(CallableTypes::one(CallableType::new(

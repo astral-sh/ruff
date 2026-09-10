@@ -780,13 +780,13 @@ fn evaluate_structural_comparison<'db>(
         (
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(left_function)),
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(right_function)),
+        )
+        | (
+            Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(left_function)),
+            Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(right_function)),
         ) if left_function.inner(db).is_function_literal() && left_function == right_function => {
             operator.result_from_equality(true)
         }
-        (
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(left_function)),
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(right_function)),
-        ) if left_function == right_function => operator.result_from_equality(true),
         (left, right)
             if has_known_identity_comparison_semantics(db, env, left, operator)
                 && has_known_identity_comparison_semantics(db, env, right, operator) =>

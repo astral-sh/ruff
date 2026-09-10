@@ -563,6 +563,19 @@ reveal_type(Explicit.class_method.__func__)  # revealed: Wrapper
 reveal_type(Explicit.class_method.__call__(1))  # revealed: int
 ```
 
+Extracting `__call__` produces a method-wrapper that retains the bound class when stored elsewhere.
+
+```py
+from types import MethodWrapperType
+
+class Stored:
+    call = Explicit.class_method.__call__
+
+wrapper: MethodWrapperType = Stored().call
+reveal_type(Stored().call("a"))  # revealed: str
+Stored().call(None)  # error: [no-matching-overload]
+```
+
 ## Checking the receiver of a wrapped classmethod
 
 Calling a classmethod passes the owner class to its wrapped callable. That implicit argument must be
@@ -578,6 +591,7 @@ class C:
 
 C.method()  # error: [invalid-argument-type]
 C().method()  # error: [invalid-argument-type]
+C.method.__call__()  # error: [invalid-argument-type]
 ```
 
 Receiver checking also selects the appropriate overload for the class used to access the method. The
@@ -731,6 +745,9 @@ def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
     return function
 
 class Source:
+    def plain(self, value: int) -> str:
+        return str(value)
+
     @preserve
     def method(self, value: int) -> str:
         return str(value)
@@ -747,6 +764,42 @@ reveal_type(method(1))  # revealed: str
 reveal_type(method.__call__(1))  # revealed: str
 method("wrong")  # error: [invalid-argument-type]
 callback: Callable[[int], str] = method
+```
+
+Extracting `__call__` also preserves the binding of ordinary and decorated methods. An unbound
+function's `__call__` keeps its explicit receiver parameter when stored on another class.
+
+```py
+class Calls:
+    plain = Source().plain.__call__
+    decorated = method.__call__
+    unbound = Source.method.__call__
+
+reveal_type(Calls().plain(1))  # revealed: str
+reveal_type(Calls().decorated(1))  # revealed: str
+reveal_type(Calls().unbound(Source(), 1))  # revealed: str
+Calls().decorated("wrong")  # error: [invalid-argument-type]
+```
+
+## Extracted staticmethod calls
+
+An explicit `staticmethod` object's `__call__` is a method-wrapper. Accessing it through another
+instance preserves its signature without binding another receiver.
+
+```py
+from types import MethodWrapperType
+
+def stringify(value: int) -> str:
+    return str(value)
+
+class Stored:
+    call = staticmethod(stringify).__call__
+
+wrapper: MethodWrapperType = Stored().call
+reveal_type(Stored().call.__name__)  # revealed: str
+reveal_type(bool(Stored().call))  # revealed: Literal[True]
+reveal_type(Stored().call(1))  # revealed: str
+Stored().call("wrong")  # error: [invalid-argument-type]
 ```
 
 ## Assigning compatible bound callbacks

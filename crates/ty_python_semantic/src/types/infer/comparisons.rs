@@ -341,20 +341,15 @@ impl<'db> Type<'db> {
                             )),
                             NegativeRetention::Unstable,
                         ),
-                        KnownBoundMethodType::FunctionTypeDunderCall(function) => (
-                            KnownBoundMethodType::FunctionTypeDunderCall(unspecialized_function(
-                                db, function,
+                        KnownBoundMethodType::DunderCall(callable) => (
+                            KnownBoundMethodType::DunderCall(InternedType::new(
+                                db,
+                                upcast(db, env, callable.inner(db), visitor).ty,
                             )),
                             NegativeRetention::Unstable,
                         ),
                         KnownBoundMethodType::MethodTypeDunderGet(method) => (
                             KnownBoundMethodType::MethodTypeDunderGet(upcast_bound_method(
-                                db, env, method, visitor,
-                            )),
-                            NegativeRetention::Unstable,
-                        ),
-                        KnownBoundMethodType::MethodTypeDunderCall(method) => (
-                            KnownBoundMethodType::MethodTypeDunderCall(upcast_bound_method(
                                 db, env, method, visitor,
                             )),
                             NegativeRetention::Unstable,

@@ -844,7 +844,7 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    /// Set the overall receiver without replacing individual constructor callables.
+    /// Set the overall receiver without replacing individual callables.
     pub(crate) fn with_callable_type(mut self, callable_type: Type<'db>) -> Self {
         self.callable_type = callable_type;
         for element in &mut self.elements {
@@ -4514,10 +4514,7 @@ impl<'db> CallableBinding<'db> {
         db: &'db dyn Db,
     ) -> impl Iterator<Item = OverloadLiteral<'db>> + Clone {
         let signature_type = match self.signature_type {
-            Type::BoundMethod(bound)
-            | Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderCall(bound)) => {
-                bound.func(db)
-            }
+            Type::BoundMethod(bound) => bound.func(db),
             ty => ty,
         };
         if let Type::Callable(callable) = signature_type {
