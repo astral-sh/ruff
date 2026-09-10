@@ -64,6 +64,9 @@ jobs:
           GITHUB_TOKEN: ${{ steps.token.outputs.token }}
           INPUT_VERSION: ${{ inputs.version }}
 
+      - name: "Install Rust toolchain"
+        run: rustup component add rustfmt
+
       - name: "Format and check release changes"
         shell: bash
         run: |
