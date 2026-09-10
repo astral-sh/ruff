@@ -14,7 +14,7 @@ pub(super) use tuple_length::TupleLengthAnalysis;
 
 use std::cell::{Cell, RefCell};
 
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
@@ -80,12 +80,6 @@ impl<'db> RecursiveVar<'db> {
             .arguments(db)
             .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
         let target = match (self.target(db), substitution) {
-            (
-                RecursiveVarTarget::Graph { depth, .. },
-                RecursiveSubstitution::Approximate(divergent),
-            ) if depth == visitor.recursive_depth => {
-                return *divergent;
-            }
             (RecursiveVarTarget::Alias(cycle), RecursiveSubstitution::Unfold(recursive))
                 if Some(cycle) == substitution.alias_cycle(db) =>
             {
@@ -125,7 +119,7 @@ enum RecursiveSubstitution<'a, 'db> {
     Unfold(RecursiveType<'db>),
     Bind(RecursiveBinding<'db>),
     Replace(&'a [(Type<'db>, Type<'db>)]),
-    Approximate(Type<'db>),
+    Approximate(&'a RecursiveApproximation<'a, 'db>),
     Reindex(&'a [usize]),
     Rebuild(&'a [Type<'db>]),
     Extract(&'a RecursiveGraphBuilder<'db>),
@@ -175,18 +169,60 @@ impl<'db> RecursiveBinding<'db> {
     }
 }
 
+/// A finite projection of query equations, sharing completed approximations.
+#[derive(Debug, PartialEq, Eq)]
+struct RecursiveApproximation<'a, 'db> {
+    divergent: Type<'db>,
+    equations: &'a FxIndexMap<InferenceKey<'db>, Type<'db>>,
+    cache: RefCell<FxHashMap<InferenceKey<'db>, Type<'db>>>,
+}
+
+impl get_size2::GetSize for RecursiveApproximation<'_, '_> {}
+
+impl<'db> RecursiveApproximation<'_, 'db> {
+    fn apply(
+        &self,
+        db: &'db dyn Db,
+        key: InferenceKey<'db>,
+        mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        if let Some(ty) = self.cache.borrow().get(&key) {
+            return *ty;
+        }
+        // Seed active equations with the cycle marker, then reuse their completed
+        // projections. Enumerating every path through shared cycles grows factorially.
+        self.cache.borrow_mut().insert(key, self.divergent);
+        let ty = self.equations.get(&key).map_or(self.divergent, |body| {
+            body.apply_type_mapping_impl(db, mapping, tcx, &visitor.fresh())
+        });
+        self.cache.borrow_mut().insert(key, ty);
+        ty
+    }
+}
+
 impl<'db> RecursiveMapping<'_, 'db> {
-    /// Replace anonymous recursive backedges without requesting inference or discarding constructors.
+    /// Follow available equations, cutting active or unavailable recursive backedges.
+    /// This never requests inference; cycle recovery can supply an empty equation map.
     pub(super) fn approximate_inference(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
         divergent: Type<'db>,
+        equations: &FxIndexMap<InferenceKey<'db>, Type<'db>>,
     ) -> Type<'db> {
+        let approximation = RecursiveApproximation {
+            divergent,
+            equations,
+            cache: RefCell::default(),
+        };
         ty.apply_type_mapping(
             db,
             env,
-            &TypeMapping::Recursive(Self(RecursiveSubstitution::Approximate(divergent))),
+            &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Approximate(
+                &approximation,
+            ))),
             TypeContext::default(),
         )
     }
@@ -678,13 +714,15 @@ impl<'db> RecursiveType<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         match mapping {
-            TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Approximate(_)))
-                if self.alias(db).is_none() =>
-            {
-                // The stored body starts at depth zero inside this closed binder.
-                let visitor = ApplyTypeMappingVisitor::new(visitor.env);
-                self.body(db)
-                    .apply_type_mapping_impl(db, mapping, tcx, &visitor)
+            TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Approximate(
+                approximation,
+            ))) if let Some(key) = self.inference_key(db) => {
+                approximation.apply(db, key, mapping, tcx, visitor)
+            }
+            TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Approximate(
+                approximation,
+            ))) if matches!(self.origin(db), RecursiveOrigin::InferenceCycle { .. }) => {
+                approximation.divergent
             }
             TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(binding)))
                 if binding.matches(db, self) =>
@@ -734,9 +772,11 @@ impl<'db> RecursiveType<'db> {
             TypeMapping::Promote(mode, kind) if self.inference_key(db).is_some() => {
                 Type::Recursive(self.with_operation(db, RecursiveOperation::Promote(*mode, *kind)))
             }
-            // Until mappings can retain an equation's input, use the ordinary cycle
-            // approximation instead of repeatedly specializing provisional solutions.
-            _ if let Some(key) = self.inference_key(db) => key.fallback(),
+            // Map the finite approximation so specialization and materialization retain
+            // known constructors without embedding a provisional recursive solution.
+            _ if let Some(key) = self.inference_key(db) => key
+                .approximate(db)
+                .apply_type_mapping_impl(db, mapping, tcx, visitor),
             _ if matches!(self.origin(db), RecursiveOrigin::InferenceCycle { .. }) => {
                 Type::Recursive(self)
             }

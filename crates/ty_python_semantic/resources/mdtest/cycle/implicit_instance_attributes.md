@@ -45,16 +45,16 @@ class Tree:
         value = 0
         for _ in range(count):
             value = (value, 1)
-        # revealed: (μa0. tuple[a0 | Literal[0], Literal[1]]) | Literal[0]
+        # revealed: (μ$0. tuple[$0 | Literal[0], Literal[1]]) | Literal[0]
         reveal_type(value)
         self.value = value
 
-reveal_type(Tree(1).value)  # revealed: μa0. tuple[a0, int] | int
+reveal_type(Tree(1).value)  # revealed: μ$0. tuple[$0, int] | int
 
 def inspect(tree: Tree):
     value = tree.value
     if isinstance(value, tuple):
-        reveal_type(value[0])  # revealed: int | (μa0. tuple[a0 | int, int])
+        reveal_type(value[0])  # revealed: int | (μ$0. tuple[$0 | int, int])
         reveal_type(value[1])  # revealed: int
         wrong: str = value[0]  # error: [invalid-assignment]
 ```
@@ -74,7 +74,7 @@ class Classes:
             value = (value, Token)
         self.value = value
 
-reveal_type(Classes(1).value)  # revealed: μa0. tuple[a0, type[Token]] | type[Token]
+reveal_type(Classes(1).value)  # revealed: μ$0. tuple[$0, type[Token]] | type[Token]
 ```
 
 ## Class literals in self-referential instance attributes
@@ -89,13 +89,13 @@ class Nested:
     def update(self, other: "Nested"):
         self.value = (other.value, Token, 1)
 
-reveal_type(Nested().value)  # revealed: μa0. tuple[a0, type[Token], int]
+reveal_type(Nested().value)  # revealed: μ$0. tuple[$0, type[Token], int]
 reveal_type(Nested().value[0][1])  # revealed: type[Token]
 reveal_type(Nested().value[0][2])  # revealed: int
 
 class Child(Nested): ...
 
-reveal_type(Child().value)  # revealed: μa0. tuple[a0, type[Token], int]
+reveal_type(Child().value)  # revealed: μ$0. tuple[$0, type[Token], int]
 ```
 
 ## Self-referential class attributes
@@ -111,7 +111,7 @@ class Nested:
     def update(cls):
         cls.value = (cls.value, Token, 1)
 
-# revealed: tuple[μa0. tuple[a0, type[Token], int], <class 'Token'>, int]
+# revealed: tuple[μ$0. tuple[$0, type[Token], int], <class 'Token'>, int]
 reveal_type(Nested.value)
 reveal_type(Nested.value[0][1])  # revealed: type[Token]
 reveal_type(Nested.value[0][2])  # revealed: int
@@ -275,8 +275,8 @@ class Same:
         self.left = (other.right,)
         self.right = (other.left,)
 
-reveal_type(Same().left)  # revealed: μa0. tuple[a0] | int
-reveal_type(Same().right)  # revealed: μa0. tuple[a0] | int
+reveal_type(Same().left)  # revealed: μ$0. tuple[$0] | int
+reveal_type(Same().right)  # revealed: μ$0. tuple[$0] | int
 ```
 
 ## Self-reference and mutual references
@@ -302,8 +302,8 @@ class Branches:
         self.a = (other.a, other.b)
         self.b = (other.a,)
 
-reveal_type(Branches().a)  # revealed: μa0. tuple[a0, tuple[a0] | str] | int
-reveal_type(Branches().b)  # revealed: μ{a0; a1 = tuple[a1, a0] | int}. tuple[a1] | str
+reveal_type(Branches().a)  # revealed: μ$0. tuple[$0, tuple[$0] | str] | int
+reveal_type(Branches().b)  # revealed: μ{$0; $1 = tuple[$1, $0] | int}. tuple[$1] | str
 
 type A = int | tuple[A, B]
 type B = str | tuple[A]
@@ -807,4 +807,38 @@ class Cached:
         return self._metadata
 
 reveal_type(Cached().metadata)  # revealed: int
+```
+
+## Shared mutually recursive attributes
+
+Several attributes can share recursive dependencies and gradual items. Their fixed tuple items
+retain their types when the attributes are materialized.
+
+```py
+from typing import Any
+from ty_extensions import Top
+from ty_extensions._internal import TypeOf
+
+class Graph:
+    def set_0(self, other: "Graph", extra: Any):
+        self.x0 = (other.x1, other.x2, other.x3, other.x4, other.x5, other.x6, other.x7, 1, extra)
+    def set_1(self, other: "Graph", extra: Any):
+        self.x1 = (other.x0, other.x2, other.x3, other.x4, other.x5, other.x6, other.x7, 1, extra)
+    def set_2(self, other: "Graph", extra: Any):
+        self.x2 = (other.x0, other.x1, other.x3, other.x4, other.x5, other.x6, other.x7, 1, extra)
+    def set_3(self, other: "Graph", extra: Any):
+        self.x3 = (other.x0, other.x1, other.x2, other.x4, other.x5, other.x6, other.x7, 1, extra)
+    def set_4(self, other: "Graph", extra: Any):
+        self.x4 = (other.x0, other.x1, other.x2, other.x3, other.x5, other.x6, other.x7, 1, extra)
+    def set_5(self, other: "Graph", extra: Any):
+        self.x5 = (other.x0, other.x1, other.x2, other.x3, other.x4, other.x6, other.x7, 1, extra)
+    def set_6(self, other: "Graph", extra: Any):
+        self.x6 = (other.x0, other.x1, other.x2, other.x3, other.x4, other.x5, other.x7, 1, extra)
+    def set_7(self, other: "Graph", extra: Any):
+        self.x7 = (other.x0, other.x1, other.x2, other.x3, other.x4, other.x5, other.x6, 1, extra)
+
+def inspect(graph: Graph):
+    def bound(value: Top[TypeOf[graph.x0]]):
+        reveal_type(value[7])  # revealed: int
+        wrong: str = value[7]  # error: [invalid-assignment]
 ```

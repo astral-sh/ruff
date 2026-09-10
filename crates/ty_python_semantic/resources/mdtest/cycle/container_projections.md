@@ -17,7 +17,8 @@ class Pair:
     def copy_from(self, other: "Pair"):
         self.value = other.value[:]
 
-reveal_type(Pair().value)  # revealed: tuple[int, str]
+# TODO: Infer the whole tuple as `tuple[int, str]` when recursive assignments include slicing.
+reveal_type(Pair().value)  # revealed: tuple[int, str] | tuple[Divergent, str]
 reveal_type(Pair().value[0])  # revealed: int
 reveal_type(Pair().value[1])  # revealed: str
 ```
@@ -52,7 +53,7 @@ class Nested:
         self.value = (other.value[0], (other.value[1],))
 
 reveal_type(Nested().value[0])  # revealed: int
-reveal_type(Nested().value[1])  # revealed: μa0. tuple[a0] | str
+reveal_type(Nested().value[1])  # revealed: μ$0. tuple[$0] | str
 ```
 
 ## Checking subscripts in a recursive assignment

@@ -116,7 +116,7 @@ use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::visitor::{
     any_over_type, any_over_type_including_alias_arguments, dynamic_content,
 };
-use crate::{Db, FxOrderSet, HasType, NameKind, Program, SemanticModel};
+use crate::{Db, FxIndexMap, FxOrderSet, HasType, NameKind, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator, SlotDescriptorType};
 use instance::Protocol;
@@ -2336,8 +2336,20 @@ impl<'db> Type<'db> {
             // An inner cycle can disappear while an enclosing cycle still needs to converge.
             let divergent = Type::Divergent(DivergentType::from_inference(cycle.id()));
             (
-                recursive::RecursiveMapping::approximate_inference(db, env, self, divergent),
-                recursive::RecursiveMapping::approximate_inference(db, env, previous, divergent),
+                recursive::RecursiveMapping::approximate_inference(
+                    db,
+                    env,
+                    self,
+                    divergent,
+                    &FxIndexMap::default(),
+                ),
+                recursive::RecursiveMapping::approximate_inference(
+                    db,
+                    env,
+                    previous,
+                    divergent,
+                    &FxIndexMap::default(),
+                ),
             )
         } else {
             (self, previous)
