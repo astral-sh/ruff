@@ -651,7 +651,7 @@ pub struct LintOptions {
     ///
     #[option(
         default = "{}",
-        value_type = "{ base-classes = { runtime = list[str], ambiguous = list[str]}, decorators = { runtime = list[str], ambiguous = list[str] }}",
+        value_type = "{ base-classes = { required = list[str], ambiguous = list[str]}, decorators = { required = list[str], ambiguous = list[str] }}",
         scope = "runtime-evaluated-annotations",
         example = r#"
             base-classes = { required = ["pydantic.BaseModel"], ambiguous = ["sqlalchemy.orm.DeclarativeBase"] }
