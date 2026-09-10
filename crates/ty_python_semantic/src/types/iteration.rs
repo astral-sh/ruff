@@ -42,9 +42,11 @@ impl IterationProjection {
         if let Type::Recursive(recursive) = ty
             && recursive.inference_key(db).is_some()
         {
-            return Type::Recursive(
-                recursive.with_operation(db, RecursiveOperation::Iterate(mode, self)),
-            );
+            return Type::Recursive(recursive.with_operation(
+                db,
+                env,
+                RecursiveOperation::Iterate(mode, self),
+            ));
         }
         if self != Self::ALL
             && let Type::Union(union) = ty
@@ -406,6 +408,7 @@ impl<'db> Type<'db> {
             return Ok(Cow::Owned(TupleSpec::homogeneous(Type::Recursive(
                 recursive.with_operation(
                     db,
+                    env,
                     RecursiveOperation::Iterate(mode, IterationProjection::ALL),
                 ),
             ))));

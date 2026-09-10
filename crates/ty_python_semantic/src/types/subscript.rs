@@ -558,45 +558,6 @@ fn typed_dict_subscript<'db>(
     )
 }
 
-impl SliceLiteral {
-    /// Whether this slice preserves the input type, including every union alternative.
-    fn is_identity_for(&self, db: &dyn Db, env: &ProgramEnvironment, ty: Type) -> bool {
-        if !matches!(self.start, None | Some(0))
-            || self.stop.is_some()
-            || !matches!(self.step, None | Some(1))
-        {
-            return false;
-        }
-        let ty = match ty.resolve_type_alias(db) {
-            Type::Union(union) => union.expand_aliases(db, env),
-            ty => ty,
-        };
-        let elements = match ty {
-            Type::Union(union) => union.elements(db),
-            _ => std::slice::from_ref(&ty),
-        };
-        // User-defined classes, including subclasses, can change the type in `__getitem__`.
-        elements.iter().all(|ty| match ty {
-            Type::NominalInstance(instance) => matches!(
-                instance.known_class(db),
-                Some(
-                    KnownClass::Tuple
-                        | KnownClass::List
-                        | KnownClass::Str
-                        | KnownClass::Bytes
-                        | KnownClass::Bytearray
-                        | KnownClass::Range
-                        | KnownClass::Memoryview
-                )
-            ),
-            Type::LiteralValue(literal) => {
-                literal.is_string() || literal.is_bytes() || literal.is_literal_string()
-            }
-            _ => false,
-        })
-    }
-}
-
 impl<'db> Type<'db> {
     pub(super) fn subscript(
         self,
@@ -618,12 +579,8 @@ impl<'db> Type<'db> {
         resolved
             .subscript_impl(db, env, index, context)
             .map(|_| {
-                // Retain the input equation for identity slices instead of accumulating
-                // another deferred subscript on every recursive assignment.
                 if context == ast::ExprContext::Load
-                    && let Type::NominalInstance(index) = index
-                    && let Some(slice) = index.slice_literal(db)
-                    && slice.is_identity_for(db, env, resolved)
+                    && RecursiveOperation::Subscript(index).is_identity_for(db, env, resolved)
                 {
                     self
                 } else {
@@ -669,6 +626,7 @@ impl<'db> Type<'db> {
                 if recursive.inference_key(db).is_some() && expr_context == ast::ExprContext::Load {
                     Ok(Type::Recursive(recursive.with_operation(
                         db,
+                        env,
                         RecursiveOperation::Subscript(slice_ty),
                     )))
                 } else {

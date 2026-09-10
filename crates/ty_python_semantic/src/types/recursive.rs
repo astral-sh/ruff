@@ -770,7 +770,11 @@ impl<'db> RecursiveType<'db> {
                 ))
             }
             TypeMapping::Promote(mode, kind) if self.inference_key(db).is_some() => {
-                Type::Recursive(self.with_operation(db, RecursiveOperation::Promote(*mode, *kind)))
+                Type::Recursive(self.with_operation(
+                    db,
+                    visitor.env,
+                    RecursiveOperation::Promote(*mode, *kind),
+                ))
             }
             // Map the finite approximation so specialization and materialization retain
             // known constructors without embedding a provisional recursive solution.
