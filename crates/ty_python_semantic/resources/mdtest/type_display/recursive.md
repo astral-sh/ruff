@@ -25,7 +25,7 @@ def show(n: int):
     for _ in range(n):
         recursive = (recursive,)
     if isinstance(recursive, tuple):
-        reveal_type(recursive)  # revealed: tuple[(μa0. tuple[a0 | Literal[0]]) | Literal[0]]
+        reveal_type(recursive)  # revealed: tuple[(μ$0. tuple[$0 | Literal[0]]) | Literal[0]]
         def contexts[T](
             array: list[TypeOf[recursive]],
             pair: tuple[TypeOf[recursive], TypeOf[recursive]],
@@ -34,12 +34,12 @@ def show(n: int):
             complement: Not[TypeOf[recursive]],
             callback: Callable[[TypeOf[recursive]], TypeOf[recursive]],
         ):
-            reveal_type(array)  # revealed: list[μa0. tuple[a0 | Literal[0]]]
-            reveal_type(pair)  # revealed: tuple[μa0. tuple[a0 | Literal[0]], μa0. tuple[a0 | Literal[0]]]
-            reveal_type(union)  # revealed: (μa0. tuple[a0 | Literal[0]]) | int
-            reveal_type(intersection)  # revealed: (μa0. tuple[a0 | Literal[0]]) & T@contexts
-            reveal_type(complement)  # revealed: ~(μa0. tuple[a0 | Literal[0]])
-            reveal_type(callback)  # revealed: (μa0. tuple[a0 | Literal[0]], /) -> μa0. tuple[a0 | Literal[0]]
+            reveal_type(array)  # revealed: list[μ$0. tuple[$0 | Literal[0]]]
+            reveal_type(pair)  # revealed: tuple[μ$0. tuple[$0 | Literal[0]], μ$0. tuple[$0 | Literal[0]]]
+            reveal_type(union)  # revealed: (μ$0. tuple[$0 | Literal[0]]) | int
+            reveal_type(intersection)  # revealed: (μ$0. tuple[$0 | Literal[0]]) & T@contexts
+            reveal_type(complement)  # revealed: ~(μ$0. tuple[$0 | Literal[0]])
+            reveal_type(callback)  # revealed: (μ$0. tuple[$0 | Literal[0]], /) -> μ$0. tuple[$0 | Literal[0]]
 ```
 
 ## Unions containing recursive types
@@ -52,9 +52,9 @@ def outer(flag: bool, values: list[int]):
     value = 0
     for _ in values:
         value = (value,)
-    # revealed: tuple[(μa0. tuple[a0 | Literal[0]]) | Literal[0]] | Literal["other"]
+    # revealed: tuple[(μ$0. tuple[$0 | Literal[0]]) | Literal[0]] | Literal["other"]
     reveal_type((value,) if flag else "other")
-    # revealed: tuple[(μa0. tuple[a0 | Literal[0]]) | Literal[0]] | Literal["other"]
+    # revealed: tuple[(μ$0. tuple[$0 | Literal[0]]) | Literal[0]] | Literal["other"]
     reveal_type("other" if flag else (value,))
 ```
 
@@ -80,7 +80,7 @@ class Container:
         self.value = (self.value,)
 
 def inspect(container: Container, flag: bool):
-    # error: [invalid-assignment] "tuple[μa0. tuple[a0] | A | B | ... omitted 4 union elements] | z"
+    # error: [invalid-assignment] "tuple[μ$0. tuple[$0] | A | B | ... omitted 4 union elements] | z"
     value: str = (container.value,) if flag else z()
 ```
 
@@ -101,5 +101,5 @@ class Container:
         self.value = (self.value,)
 
 def inspect(container: Container):
-    reveal_type(container.value)  # revealed: μa0. tuple[a0] | type[A | B]
+    reveal_type(container.value)  # revealed: μ$0. tuple[$0] | type[A | B]
 ```

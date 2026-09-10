@@ -159,6 +159,7 @@ pub struct DisplaySettings<'db> {
     visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
     /// Anonymous binders surrounding the displayed closed unfolding. Repeated
     /// occurrences refer to their binder instead of unfolding indefinitely.
+    /// Their `$`-prefixed names cannot collide with Python identifiers.
     recursive_binders: Rc<[RecursiveType<'db>]>,
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
@@ -1718,13 +1719,15 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 )
             }
             Type::Recursive(recursive) => {
+                // Anonymous recursive binders are not Python type annotation syntax.
+                f.set_invalid_type_annotation();
                 if let Some(index) = self
                     .settings
                     .recursive_binders
                     .iter()
                     .position(|binder| *binder == recursive)
                 {
-                    return write!(f.with_type(self.ty), "a{index}");
+                    return write!(f.with_type(self.ty), "${index}");
                 }
                 let members = recursive.members(db);
                 let mut settings = self.settings.clone();
@@ -1736,11 +1739,11 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     .chain(members.iter().copied())
                     .collect();
                 if members.len() == 1 {
-                    write!(f, "μa{offset}. ")?;
+                    write!(f, "μ${offset}. ")?;
                 } else {
-                    write!(f, "μ{{a{offset}")?;
+                    write!(f, "μ{{${offset}")?;
                     for (index, member) in members.into_iter().enumerate().skip(1) {
-                        write!(f, "; a{} = ", offset + index)?;
+                        write!(f, "; ${} = ", offset + index)?;
                         member
                             .unfold(db, self.env)
                             .display_with(db, self.env, settings.clone())
@@ -3634,7 +3637,7 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'_, 'db> {
         match display.ty {
             // A recursive binder extends to the end of its body, more loosely
             // than unions, intersections, negation, or member access. A reference
-            // to an enclosing binder is just an atomic name such as `a0`.
+            // to an enclosing binder is just an atomic name such as `$0`.
             Type::Recursive(recursive)
                 if recursive.alias(db).is_none()
                     && !self.settings.recursive_binders.contains(&recursive) =>

@@ -786,5 +786,5 @@ def update():
     global value
     value = (value,)
 
-reveal_type(value)  # revealed: (μa0. tuple[a0 | Literal[0]]) | Literal[0]
+reveal_type(value)  # revealed: (μ$0. tuple[$0 | Literal[0]]) | Literal[0]
 ```
