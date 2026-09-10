@@ -3680,14 +3680,26 @@ impl<'db> Type<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> Option<PlaceAndQualifiers<'db>> {
+        self.find_name_in_mro_with_policy_and_receiver(db, env, name, policy, None)
+    }
+
+    fn find_name_in_mro_with_policy_and_receiver(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        policy: MemberLookupPolicy,
+        receiver: Option<Type<'db>>,
+    ) -> Option<PlaceAndQualifiers<'db>> {
         if let Some(fallback) = (*self).materialized_divergent_fallback() {
-            return fallback.find_name_in_mro_with_policy(db, env, name, policy);
+            return fallback
+                .find_name_in_mro_with_policy_and_receiver(db, env, name, policy, receiver);
         }
 
         match self {
             Type::Union(union) => {
                 Some(union.map_with_boundness_and_qualifiers(db, env, |elem| {
-                    elem.find_name_in_mro_with_policy(db, env, name, policy)
+                    elem.find_name_in_mro_with_policy_and_receiver(db, env, name, policy, receiver)
                         // If some elements are classes, and some are not, we simply fall back to `Unbound` for the non-class
                         // elements instead of short-circuiting the whole result to `None`. We would need a more detailed
                         // return type otherwise, and since `find_name_in_mro` is usually called via `class_member`, this is
@@ -3697,7 +3709,7 @@ impl<'db> Type<'db> {
             }
             Type::Intersection(inter) => {
                 Some(inter.map_with_boundness_and_qualifiers(db, env, |elem| {
-                    elem.find_name_in_mro_with_policy(db, env, name, policy)
+                    elem.find_name_in_mro_with_policy_and_receiver(db, env, name, policy, receiver)
                         // Fall back to Unbound, similar to the union case (see above).
                         .unwrap_or_default()
                 }))
@@ -3767,7 +3779,7 @@ impl<'db> Type<'db> {
             ),
 
             Type::SubclassOf(subclass_of_ty) => {
-                subclass_of_ty.find_name_in_mro_with_policy(db, env, name, policy)
+                subclass_of_ty.find_name_in_mro_with_policy(db, env, name, policy, receiver)
             }
 
             // Note: `super(pivot, owner).__class__` is `builtins.super`, not the owner's class.
@@ -3792,7 +3804,7 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => alias
                 .value_type(db)
-                .find_name_in_mro_with_policy(db, env, name, policy),
+                .find_name_in_mro_with_policy_and_receiver(db, env, name, policy, receiver),
 
             Type::FunctionLiteral(_)
             | Type::Callable(_)
@@ -4019,8 +4031,21 @@ impl<'db> Type<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        self.class_object_member_with_receiver(db, env, name, policy, None)
+    }
+
+    /// Bind structural protocol methods to the full receiver during member lookup. Namespace
+    /// inspection leaves the receiver unspecified so explicit receiver constraints remain open.
+    fn class_object_member_with_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        policy: MemberLookupPolicy,
+        receiver: Option<Type<'db>>,
+    ) -> PlaceAndQualifiers<'db> {
         let class_attr = self
-            .find_name_in_mro_with_policy(db, env, name, policy)
+            .find_name_in_mro_with_policy_and_receiver(db, env, name, policy, receiver)
             .expect(
                 "Calling `class_object_member` on class literals and subclass-of types \
                 should always find an MRO",
@@ -6020,7 +6045,13 @@ impl<'db> Type<'db> {
                         .into();
                     }
 
-                    let class_attr_plain = this.class_object_member(db, env, name_str, policy);
+                    let class_attr_plain = this.class_object_member_with_receiver(
+                        db,
+                        env,
+                        name_str,
+                        policy,
+                        Some(receiver),
+                    );
 
                     let self_instance = receiver.to_instance_approximation(db, env).expect(
                         "The receiver for a class-object lookup should always be instantiable",

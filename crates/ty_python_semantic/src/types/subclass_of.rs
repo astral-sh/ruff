@@ -260,9 +260,10 @@ impl<'db> SubclassOfType<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
+        receiver: Option<Type<'db>>,
     ) -> Option<PlaceAndQualifiers<'db>> {
         if let SubclassOfInner::Protocol(protocol) = self.subclass_of
-            && let Some(member) = protocol.interface(db).meta_member(db, env, name)
+            && let Some(member) = protocol.interface(db).meta_member(db, env, name, receiver)
         {
             return Some(member);
         }
@@ -282,7 +283,7 @@ impl<'db> SubclassOfType<'db> {
             }
         };
 
-        class_like.find_name_in_mro_with_policy(db, env, name, policy)
+        class_like.find_name_in_mro_with_policy_and_receiver(db, env, name, policy, receiver)
     }
 
     pub(super) fn recursive_type_normalized_impl(

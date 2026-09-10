@@ -505,6 +505,55 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
+    /// Binds a method receiver, specializing receiver-determined type variables and filtering
+    /// overloads whose explicit receiver annotation is incompatible.
+    ///
+    /// `typing_self_type` replaces `typing.Self` and can differ from the runtime receiver type
+    /// for class methods.
+    pub(crate) fn bind_method(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> Self {
+        let [signature] = self.overloads.as_slice() else {
+            if !self
+                .overloads
+                .iter()
+                .any(Signature::has_explicit_positional_receiver_annotation)
+            {
+                return Self::from_overloads(self.overloads.iter().map(|signature| {
+                    signature.bind_self_with_receiver(
+                        db,
+                        env,
+                        Some(receiver_type),
+                        Some(typing_self_type),
+                    )
+                }));
+            }
+
+            return Self::from_overloads(
+                self.overloads
+                    .iter()
+                    .filter_map(|signature| {
+                        signature.bind_self_if_compatible(db, env, receiver_type, typing_self_type)
+                    })
+                    .flat_map(|signature| signature.overloads),
+            );
+        };
+
+        let specialized = if signature.has_receiver_determined_method_typevar(db, env) {
+            signature.specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
+        } else {
+            None
+        };
+
+        specialized
+            .unwrap_or_else(|| Self::single(signature.clone()))
+            .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type))
+    }
+
     pub(crate) fn has_parameters(&self) -> bool {
         self.overloads
             .iter()

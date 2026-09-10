@@ -286,7 +286,8 @@ impl<'db> BoundMethodType<'db> {
 
         self.callable_with_signatures(
             db,
-            self.bound_signatures_with_receiver(db, &env, receiver_type, typing_self_type),
+            self.unbound_signatures(db)
+                .bind_method(db, &env, receiver_type, typing_self_type),
         )
     }
 
@@ -300,7 +301,8 @@ impl<'db> BoundMethodType<'db> {
     ) -> CallableType<'db> {
         self.callable_with_signatures(
             db,
-            self.bound_signatures_with_receiver(db, env, receiver_type, typing_self_type),
+            self.unbound_signatures(db)
+                .bind_method(db, env, receiver_type, typing_self_type),
         )
     }
 
@@ -318,55 +320,6 @@ impl<'db> BoundMethodType<'db> {
     /// Shares the signatures retained in the method's interned callable.
     pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> &'db CallableSignature<'db> {
         self.into_callable_type(db).signatures(db)
-    }
-
-    fn bound_signatures_with_receiver(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        receiver_type: Type<'db>,
-        typing_self_type: Type<'db>,
-    ) -> CallableSignature<'db> {
-        let function_signature = self.unbound_signatures(db);
-
-        let [signature] = function_signature.overloads.as_slice() else {
-            if !function_signature
-                .overloads
-                .iter()
-                .any(Signature::has_explicit_positional_receiver_annotation)
-            {
-                return CallableSignature::from_overloads(function_signature.overloads.iter().map(
-                    |signature| {
-                        signature.bind_self_with_receiver(
-                            db,
-                            env,
-                            Some(receiver_type),
-                            Some(typing_self_type),
-                        )
-                    },
-                ));
-            }
-
-            return CallableSignature::from_overloads(
-                function_signature
-                    .overloads
-                    .iter()
-                    .filter_map(|signature| {
-                        signature.bind_self_if_compatible(db, env, receiver_type, typing_self_type)
-                    })
-                    .flat_map(|signature| signature.overloads),
-            );
-        };
-
-        let specialized = if signature.has_receiver_determined_method_typevar(db, env) {
-            signature.specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
-        } else {
-            None
-        };
-
-        specialized
-            .unwrap_or_else(|| CallableSignature::single(signature.clone()))
-            .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type))
     }
 
     pub(super) fn recursive_type_normalized_impl(

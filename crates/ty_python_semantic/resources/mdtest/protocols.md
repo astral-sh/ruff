@@ -4859,6 +4859,139 @@ def _(factory: type[ClassObjectFactory]) -> None:
     exact_factory(factory)
 ```
 
+## Class-method callable assignments with explicit receivers
+
+A protocol class method with an explicit receiver annotation can only satisfy a `Callable`
+annotation when the class object satisfies that receiver annotation. Matching the visible parameters
+and return type is not enough, including when the class object is an intersection:
+
+```py
+from collections.abc import Callable
+from typing import Protocol
+from ty_extensions import Intersection
+
+class Factory(Protocol):
+    @classmethod
+    def make(cls: type[int]) -> str: ...
+
+class Mixin: ...
+
+def ordinary(cls: type[Factory]) -> Callable[[], str]:
+    return cls.make  # error: [invalid-return-type]
+
+def intersection(cls: Intersection[type[Factory], type[Mixin]]) -> Callable[[], str]:
+    return cls.make  # error: [invalid-return-type]
+
+def compatible(cls: Intersection[type[Factory], type[int]]) -> Callable[[], str]:
+    return cls.make
+```
+
+## Class-method overloads with explicit receivers
+
+Only overloads whose receiver annotation accepts the class object contribute to the bound method's
+signature. Here the class object can use the integer overload:
+
+```py
+from collections.abc import Callable
+from typing import Protocol, overload
+from ty_extensions import Intersection
+
+class Factory(Protocol):
+    @classmethod
+    @overload
+    def make(cls: type[int], value: int) -> int: ...
+    @classmethod
+    @overload
+    def make(cls: type[str], value: str) -> str: ...
+
+def use_int_factory(cls: Intersection[type[Factory], type[int]]) -> Callable[[int], int]:
+    reveal_type(cls.make)  # revealed: (value: int) -> int
+    reveal_type(cls.make(1))  # revealed: int
+    wrong: Callable[[str], str] = cls.make  # error: [invalid-assignment]
+    return cls.make
+```
+
+## Callable attributes on protocol class objects
+
+A callable attribute retains its complete parameter list when accessed through a protocol class
+object. Unlike a class-method declaration, it has no implicit class receiver to substitute:
+
+```py
+from collections.abc import Callable
+from typing import ClassVar, Protocol
+from ty_extensions import Intersection
+
+class Callbacks(Protocol):
+    callback: ClassVar[Callable[[int], str]]
+
+class Mixin: ...
+
+def use_callbacks(cls: Intersection[type[Callbacks], type[Mixin]]) -> Callable[[int], str]:
+    callback = cls.callback
+    reveal_type(callback)  # revealed: (int, /) -> str
+    reveal_type(callback(1))  # revealed: str
+    reveal_type(callback.__call__(1))  # revealed: str
+    callback()  # error: [missing-argument]
+    return callback
+```
+
+## Bound protocol methods stored on another class
+
+Storing a bound method on another class does not change its receiver. A method whose original
+receiver is incompatible with its annotation cannot satisfy a `Callable` annotation, even if the
+class that stores it would satisfy that receiver annotation.
+
+The top materialization of this protocol has an `object` return type, but its method still requires
+a class object as its receiver:
+
+```py
+from collections.abc import Callable
+from typing import Any, Protocol
+from ty_extensions import Intersection, Top
+
+class Method(Protocol):
+    def method(self: type) -> Any: ...
+
+class Mixin: ...
+
+def stored_method(value: Intersection[Top[Method], Mixin]) -> Callable[[], object]:
+    class Holder:
+        callback = value.method
+
+    return Holder.callback  # error: [invalid-return-type]
+
+def direct_method(value: Intersection[Top[Method], Mixin]) -> Callable[[], object]:
+    return value.method  # error: [invalid-return-type]
+```
+
+## Static implementations of protocol class methods
+
+A static method with a compatible signature can implement a protocol class method. Calls through the
+protocol therefore rely on the bound signature without requiring a nominal bound-method object:
+
+```py
+from typing import Protocol
+
+class Factory(Protocol):
+    @classmethod
+    def make(cls, value: int) -> str: ...
+
+class StaticFactory:
+    @staticmethod
+    def make(value: int) -> str:
+        return str(value)
+
+def invoke(factory: type[Factory]) -> str:
+    method = factory.make
+    reveal_type(method)  # revealed: (value: int) -> str
+    reveal_type(method.__call__(1))  # revealed: str
+    method.__self__  # error: [unresolved-attribute]
+    method.__func__  # error: [unresolved-attribute]
+    return method(1)
+
+reveal_type(invoke(StaticFactory))  # revealed: str
+```
+
 ## Class objects and `Self`-returning instance-method protocol members
 
 A class object can satisfy a protocol with a regular instance-method member if the class object's
