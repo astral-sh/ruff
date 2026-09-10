@@ -92,11 +92,11 @@ use crate::types::tuple::TupleSpec;
 use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
 use crate::types::visitor::non_any_dynamic_content;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType, ClassBase,
-    ClassLiteral, ClassType, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownClass,
-    KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
-    TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType, binding_type,
-    definition_expression_type, walk_signature,
+    ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
+    CallableType, ClassBase, ClassLiteral, ClassType, FindLegacyTypeVarsVisitor,
+    IntersectionBuilder, KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner,
+    SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    UnionBuilder, UnionType, binding_type, definition_expression_type, walk_signature,
 };
 use crate::{Db, FxIndexMap, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -1103,8 +1103,8 @@ impl AbstractMethodKind {
 
 /// Contains potentially modified signatures for a function literal.
 ///
-/// This uncommon payload is boxed so that ordinary function types only retain the literal and one
-/// optional pointer.
+/// This uncommon payload is boxed so that ordinary function types only retain the literal, an
+/// optional pointer, and descriptor state.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct UpdatedFunctionSignatures<'db> {
     /// Contains a potentially modified signature for this function literal, in case certain
@@ -1137,13 +1137,19 @@ impl<'db> UpdatedFunctionSignatures<'db> {
 
 /// Represents a function type, which might be a non-generic function, or a specialization of a
 /// generic function.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct FunctionType<'db> {
     #[returns(copy)]
     pub(crate) literal: FunctionLiteral<'db>,
 
     #[returns(ref)]
     updated_signatures: Option<Box<UpdatedFunctionSignatures<'db>>>,
+
+    /// The runtime descriptor kind after applying decorators or descriptor access. The
+    /// declaration retains all decorators for signature inference and diagnostics, including
+    /// wrappers that have not yet been applied while checking an inner decorator.
+    #[returns(copy)]
+    descriptor_kind: Option<CallableTypeKind>,
 }
 
 // The Salsa heap is tracked separately.
@@ -1168,6 +1174,43 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
+    pub(crate) fn new(
+        db: &'db dyn Db,
+        literal: FunctionLiteral<'db>,
+        updated_signatures: Option<Box<UpdatedFunctionSignatures<'db>>>,
+    ) -> Self {
+        Self::new_internal(db, literal, updated_signatures, None)
+    }
+
+    /// The ordinary function exposed by a method wrapper or its bound method's `__func__`.
+    pub(super) fn underlying_function(self, db: &'db dyn Db) -> Self {
+        if self.is_classmethod(db) || self.is_staticmethod(db) {
+            self.with_descriptor_kind(db, CallableTypeKind::FunctionLike)
+        } else {
+            self
+        }
+    }
+
+    pub(super) fn with_descriptor_kind(self, db: &'db dyn Db, kind: CallableTypeKind) -> Self {
+        // Keep the original representation when wrapping and unwrapping returns to
+        // the declaration's kind, so the same function retains a single identity.
+        let declared = Self::new_internal(db, self.literal(db), self.updated_signatures(db), None);
+        if declared.callable_type_kind(db) == kind {
+            return declared;
+        }
+        Self::new_internal(
+            db,
+            self.literal(db),
+            self.updated_signatures(db),
+            Some(kind),
+        )
+    }
+
+    /// Erase signature substitutions without changing the represented runtime object.
+    pub(super) fn without_updated_signatures(self, db: &'db dyn Db) -> Self {
+        Self::new_internal(db, self.literal(db), None, self.descriptor_kind(db))
+    }
+
     pub(super) fn updated_signature(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
         self.updated_signatures(db)
             .as_deref()
@@ -1209,13 +1252,14 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         implementation_callables: Box<[CallableType<'db>]>,
     ) -> Self {
-        Self::new(
+        Self::new_internal(
             db,
             self.literal(db),
             UpdatedFunctionSignatures::new(
                 self.updated_signature(db).cloned(),
                 Some(implementation_callables),
             ),
+            self.descriptor_kind(db),
         )
     }
 
@@ -1241,13 +1285,14 @@ impl<'db> FunctionType<'db> {
                 })
                 .collect()
         });
-        Self::new(
+        Self::new_internal(
             db,
             literal,
             UpdatedFunctionSignatures::new(
                 Some(updated_signature),
                 updated_implementation_callables,
             ),
+            self.descriptor_kind(db),
         )
     }
 
@@ -1300,10 +1345,11 @@ impl<'db> FunctionType<'db> {
         if updated_signature.is_none() && updated_implementation_callables.is_none() {
             self
         } else {
-            Self::new(
+            Self::new_internal(
                 db,
                 literal,
                 UpdatedFunctionSignatures::new(updated_signature, updated_implementation_callables),
+                self.descriptor_kind(db),
             )
         }
     }
@@ -1322,7 +1368,7 @@ impl<'db> FunctionType<'db> {
                 .with_dataclass_transformer_params(db, params),
             ..literal
         };
-        Self::new(db, literal, None)
+        Self::new_internal(db, literal, None, self.descriptor_kind(db))
     }
 
     pub(crate) fn with_deprecated(
@@ -1337,7 +1383,12 @@ impl<'db> FunctionType<'db> {
             last_definition: literal.last_definition.with_deprecated(db, deprecated),
             ..literal
         };
-        Self::new(db, literal, self.updated_signatures(db))
+        Self::new_internal(
+            db,
+            literal,
+            self.updated_signatures(db),
+            self.descriptor_kind(db),
+        )
     }
 
     /// Returns the [`File`] in which this function is defined.
@@ -1391,6 +1442,9 @@ impl<'db> FunctionType<'db> {
     /// Returns true if every definition of this method uses `@classmethod`, or is implicitly a
     /// classmethod. An inconsistently applied decorator does not affect method binding.
     pub(crate) fn is_classmethod(self, db: &'db dyn Db) -> bool {
+        if let Some(kind) = self.descriptor_kind(db) {
+            return kind == CallableTypeKind::ClassMethodLike;
+        }
         let mut overloads = self.iter_overloads_and_implementation(db);
         // Overload discovery can return no definitions during cycle recovery.
         overloads
@@ -1402,6 +1456,15 @@ impl<'db> FunctionType<'db> {
     /// Returns true if every definition of this method uses `@staticmethod`, or is implicitly a
     /// static method. An inconsistently applied decorator does not affect method binding.
     pub(crate) fn is_staticmethod(self, db: &'db dyn Db) -> bool {
+        self.descriptor_kind(db).map_or_else(
+            || self.has_staticmethod_declaration(db),
+            |kind| kind == CallableTypeKind::StaticMethodLike,
+        )
+    }
+
+    /// Whether this function was declared as a staticmethod, even if descriptor access has
+    /// already exposed the ordinary function. Diagnostics can still use its declaration kind.
+    pub(super) fn has_staticmethod_declaration(self, db: &'db dyn Db) -> bool {
         let mut overloads = self.iter_overloads_and_implementation(db);
         // Overload discovery can return no definitions during cycle recovery.
         overloads
@@ -1658,105 +1721,28 @@ impl<'db> FunctionType<'db> {
         }
     }
 
+    pub(super) fn runtime_class(self, db: &'db dyn Db) -> KnownClass {
+        if self.is_classmethod(db) {
+            KnownClass::Classmethod
+        } else if self.is_staticmethod(db) {
+            KnownClass::Staticmethod
+        } else {
+            KnownClass::FunctionType
+        }
+    }
+
     /// Convert the `FunctionType` into a [`CallableType`].
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         CallableType::new(db, self.signature(db), self.callable_type_kind(db))
     }
 
-    /// Bind this function's signatures to a receiver while preserving overload selection and `Self`.
-    #[salsa::tracked(
-        returns(copy),
-        cycle_initial=|db, _, _, _, _| CallableType::bottom(db),
-        heap_size=ruff_memory_usage::heap_size
-    )]
-    pub(crate) fn into_bound_callable(
+    /// Convert the `FunctionType` into a [`BoundMethodType`].
+    pub(crate) fn into_bound_method_type(
         self,
         db: &'db dyn Db,
-        receiver_type: Type<'db>,
-        typing_self_type: Type<'db>,
-    ) -> CallableType<'db> {
-        let env = ProgramEnvironment::from_scope(self.literal(db).last_definition.body_scope(db));
-
-        CallableType::new(
-            db,
-            self.bound_signatures_with_receiver(db, &env, receiver_type, typing_self_type),
-            CallableTypeKind::FunctionLike,
-        )
-    }
-
-    /// Bind this function using the caller's environment and separate receiver and `Self` types.
-    pub(crate) fn into_bound_callable_with_receiver(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        receiver_type: Type<'db>,
-        typing_self_type: Type<'db>,
-    ) -> CallableType<'db> {
-        CallableType::new(
-            db,
-            self.bound_signatures_with_receiver(db, env, receiver_type, typing_self_type),
-            CallableTypeKind::FunctionLike,
-        )
-    }
-
-    /// Shares the signatures retained in the function's interned bound callable.
-    pub(crate) fn bound_signatures(
-        self,
-        db: &'db dyn Db,
-        receiver_type: Type<'db>,
-        typing_self_type: Type<'db>,
-    ) -> &'db CallableSignature<'db> {
-        self.into_bound_callable(db, receiver_type, typing_self_type)
-            .signatures(db)
-    }
-
-    fn bound_signatures_with_receiver(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        receiver_type: Type<'db>,
-        typing_self_type: Type<'db>,
-    ) -> CallableSignature<'db> {
-        let function_signature = self.signature(db);
-
-        let [signature] = function_signature.overloads.as_slice() else {
-            if !function_signature
-                .overloads
-                .iter()
-                .any(Signature::has_explicit_positional_receiver_annotation)
-            {
-                return CallableSignature::from_overloads(function_signature.overloads.iter().map(
-                    |signature| {
-                        signature.bind_self_with_receiver(
-                            db,
-                            env,
-                            Some(receiver_type),
-                            Some(typing_self_type),
-                        )
-                    },
-                ));
-            }
-
-            return CallableSignature::from_overloads(
-                function_signature
-                    .overloads
-                    .iter()
-                    .filter_map(|signature| {
-                        signature.bind_self_if_compatible(db, env, receiver_type, typing_self_type)
-                    })
-                    .flat_map(|signature| signature.overloads),
-            );
-        };
-
-        let specialized = if signature.has_receiver_determined_method_typevar(db, env) {
-            signature.specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
-        } else {
-            None
-        };
-
-        specialized
-            .unwrap_or_else(|| CallableSignature::single(signature.clone()))
-            .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type))
+        self_instance: Type<'db>,
+    ) -> BoundMethodType<'db> {
+        BoundMethodType::new(db, self, self_instance)
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -1804,13 +1790,14 @@ impl<'db> FunctionType<'db> {
                         ),
                         None => None,
                     };
-                Some(Self::new(
+                Some(Self::new_internal(
                     db,
                     literal,
                     UpdatedFunctionSignatures::new(
                         updated_signature,
                         updated_implementation_callables,
                     ),
+                    self.descriptor_kind(db),
                 ))
             },
         )
@@ -1832,7 +1819,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: FunctionType<'db>,
         target: FunctionType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if source.literal(db) != target.literal(db) {
+        if source.literal(db) != target.literal(db)
+            || source.descriptor_kind(db) != target.descriptor_kind(db)
+        {
             return self.never();
         }
         self.check_callable_signature_pair(db, source.signature(db), target.signature(db))

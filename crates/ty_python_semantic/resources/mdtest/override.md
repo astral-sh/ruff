@@ -138,8 +138,8 @@ class Invalid:
     @lossy_decorator
     def lossy2(self): ...  # error: [invalid-explicit-override]
 
-# TODO: all overrides in this class should cause us to emit *Liskov* violations,
-# but not `@override` violations
+# TODO: The property/method replacements should cause us to emit Liskov violations,
+# but not `@override` violations.
 class LiskovViolatingButNotOverrideViolating(Parent):
     @override
     @property
@@ -147,12 +147,11 @@ class LiskovViolatingButNotOverrideViolating(Parent):
     @override
     def my_property1(self) -> int: ...
 
-    # TODO: This maybe shouldn't be a Liskov violation? Whether called on the type or
-    # on an instance, it will behave the same from the caller's perspective. The only difference
-    # is whether the method body gets access to `cls`, which is not a concern of Liskov.
+    # Class and static methods can override each other when the exposed signatures
+    # accept the same calls through both the class and its instances.
     @staticmethod
     @override
-    def class_method1() -> int: ...  # error: [invalid-method-override]
+    def class_method1() -> int: ...
     @classmethod
     @override
     def static_method1(cls) -> int: ...

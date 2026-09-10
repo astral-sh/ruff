@@ -1013,10 +1013,15 @@ fn method_override_types<'db>(
 ) -> Option<(Type<'db>, Type<'db>)> {
     let (subclass_type, superclass_type) = match (subclass_type, superclass_type) {
         (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method))
-            if let Some(subclass_function) = subclass_method.function(db)
-                && let Some(superclass_function) = superclass_method.function(db) =>
+            if matches!(
+                subclass_method.func(db),
+                Type::FunctionLiteral(_) | Type::Callable(_)
+            ) && matches!(
+                superclass_method.func(db),
+                Type::FunctionLiteral(_) | Type::Callable(_)
+            ) =>
         {
-            let superclass_signature = superclass_function.signature(db);
+            let superclass_signature = superclass_method.unbound_signatures(db);
             let explicit_receiver = match superclass_signature.overloads.as_slice() {
                 [signature] => signature
                     .parameters()
@@ -1043,13 +1048,13 @@ fn method_override_types<'db>(
             // Both signatures describe calls on the subclass. In particular, inherited `Self`
             // annotations refer to the subclass even when the receiver is implicitly annotated.
             (
-                Type::Callable(subclass_function.into_bound_callable_with_receiver(
+                Type::Callable(subclass_method.into_callable_type_with_receiver(
                     db,
                     env,
                     receiver,
                     typing_self_type,
                 )),
-                Type::Callable(superclass_function.into_bound_callable_with_receiver(
+                Type::Callable(superclass_method.into_callable_type_with_receiver(
                     db,
                     env,
                     receiver,
@@ -1059,7 +1064,9 @@ fn method_override_types<'db>(
         }
         _ => (subclass_type, superclass_type),
     };
-    let superclass_callable = superclass_type.try_upcast_to_callable(db, env)?;
+    let superclass_callable = superclass_type
+        .try_upcast_to_callable(db, env)?
+        .map(|callable| callable.into_regular(db));
 
     Some((subclass_type, superclass_callable.into_type(db, env)))
 }
