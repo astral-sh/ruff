@@ -260,10 +260,12 @@ impl<'db> Type<'db> {
     fn subtyping_is_always_reflexive(self, db: &'db dyn Db) -> bool {
         match self {
             Type::BoundMethod(method)
-            | Type::KnownBoundMethod(
-                KnownBoundMethodType::MethodTypeDunderGet(method)
-                | KnownBoundMethodType::MethodTypeDunderCall(method),
-            ) => method.function(db).is_some(),
+            | Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(method)) => {
+                method.function(db).is_some()
+            }
+            Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(callable)) => {
+                callable.inner(db).subtyping_is_always_reflexive(db)
+            }
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 function.inner(db).is_function_literal()
             }
@@ -271,8 +273,7 @@ impl<'db> Type<'db> {
             | Type::FunctionLiteral(..)
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(
-                KnownBoundMethodType::FunctionTypeDunderCall(_)
-                | KnownBoundMethodType::StrStartswith(_)
+                KnownBoundMethodType::StrStartswith(_)
                 | KnownBoundMethodType::ConstraintSetLowerBound
                 | KnownBoundMethodType::ConstraintSetUpperBound
                 | KnownBoundMethodType::ConstraintSetEquality
@@ -3528,6 +3529,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(left)),
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(right)),
+            )
+            | (
+                Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(left)),
+                Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(right)),
             ) => nontrivial_check(self, || {
                 self.check_type_pair(db, left.inner(db), right.inner(db))
             }),
@@ -3535,10 +3540,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (
                 Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(left)),
                 Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(right)),
-            )
-            | (
-                Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderCall(left)),
-                Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderCall(right)),
             ) => nontrivial_check(self, || {
                 self.check_type_pair(db, Type::BoundMethod(left), Type::BoundMethod(right))
             }),
