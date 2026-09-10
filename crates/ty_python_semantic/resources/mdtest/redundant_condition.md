@@ -38,6 +38,7 @@ warning[redundant-condition]: Function `func` is always truthy
   |
 3 | if func:  # snapshot: redundant-condition
   |    ^^^^ Did you mean to call this function?
+help: Replace with `func()`
   |
 2 |
   - if func:  # snapshot: redundant-condition
@@ -65,6 +66,7 @@ warning[redundant-condition]: Method `Foo.bar` is always truthy
    |
 10 |         if self.bar:  # snapshot: redundant-condition
    |            ^^^^^^^^ Did you mean to call this method?
+help: Replace with `self.bar()`
    |
 9  |     def baz(self):
    -         if self.bar:  # snapshot: redundant-condition
@@ -420,6 +422,23 @@ info: `Pattern` instances are always truthy because `Pattern` cannot be subclass
     | |______________________________^ `Pattern` defined here
 ```
 
+## Classmethods wrapping callable objects
+
+A bound classmethod is always truthy even when it wraps a callable instance instead of a Python
+function. Testing the method does not call the wrapped object.
+
+```py
+class CallableObject:
+    def __call__(self, cls: type[object]) -> bool:
+        return False
+
+class C:
+    method = classmethod(CallableObject())
+
+if C.method:  # error: [redundant-condition] "Object of type `MethodType[CallableObject]` is always truthy"
+    pass
+```
+
 ## Enum instances
 
 An enum with members is implicitly final, so its instances are always truthy if the enum defines
@@ -764,6 +783,7 @@ warning[redundant-condition]: Function `func` is always truthy
   |
 3 |     if flag and func:  # snapshot: redundant-condition
   |                 ^^^^ Did you mean to call this function?
+help: Replace with `func()`
   |
 2 | def compound_statement_conditions(flag: bool, other: bool):
   -     if flag and func:  # snapshot: redundant-condition
@@ -778,6 +798,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 19 |     selected = True if flag and func else False  # snapshot: redundant-condition
    |                                 ^^^^ Did you mean to call this function?
+help: Replace with `func()`
    |
 18 | def compound_expression_conditions(flag: bool):
    -     selected = True if flag and func else False  # snapshot: redundant-condition
@@ -792,6 +813,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 24 |     assert flag and func  # snapshot: redundant-condition
    |                     ^^^^ Did you mean to call this function?
+help: Replace with `func()`
    |
 23 | def compound_assertion_condition(flag: bool):
    -     assert flag and func  # snapshot: redundant-condition
@@ -976,6 +998,7 @@ warning[redundant-condition]: Function `coroutine` is always truthy
   |
 3 |     if coroutine:  # snapshot: redundant-condition
   |        ^^^^^^^^^ Did you mean to `await` and call this function?
+help: Replace with `await coroutine()`
   |
 2 | async def inspect_async_function():
   -     if coroutine:  # snapshot: redundant-condition
@@ -1014,6 +1037,7 @@ warning[redundant-condition]: Function `always_truthy` is always truthy
   |
 7 |     if always_truthy:  # snapshot: redundant-condition
   |        ^^^^^^^^^^^^^ Did you mean to call this function?
+help: Replace with `always_truthy()`
   |
 6 | def inspect_truthy_function():
   -     if always_truthy:  # snapshot: redundant-condition
@@ -1028,6 +1052,7 @@ warning[redundant-condition]: Function `always_truthy_coro` is always truthy
    |
 14 |     if always_truthy_coro:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^^^^^^ Did you mean to `await` and call this function?
+help: Replace with `await always_truthy_coro()`
    |
 13 | async def foo():
    -     if always_truthy_coro:  # snapshot: redundant-condition
@@ -1061,6 +1086,7 @@ warning[redundant-condition]: Function `wut` is always truthy
   |
 3 | if wut:  # snapshot: redundant-condition
   |    ^^^ Did you mean to call this function?
+help: Replace with `wut(...)`
   |
 2 |
   - if wut:  # snapshot: redundant-condition
@@ -1075,6 +1101,7 @@ warning[redundant-condition]: Function `wuttt` is always truthy
   |
 8 |     if wuttt:  # snapshot: redundant-condition
   |        ^^^^^ Did you mean to `await` and call this function?
+help: Replace with `await wuttt(...)`
   |
 7 | async def bar():
   -     if wuttt:  # snapshot: redundant-condition
@@ -1110,6 +1137,7 @@ warning[redundant-condition]: Function `asynchronous` is always truthy
    |
 11 |     if asynchronous:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^ Did you mean to `await` and call this function?
+help: Replace with `await asynchronous(...)`
    |
 10 | async def inspect_asynchronous_overloads():
    -     if asynchronous:  # snapshot: redundant-condition
@@ -1141,6 +1169,7 @@ warning[redundant-condition]: Function `mixed` is always truthy
    |
 21 |     if mixed:  # snapshot: redundant-condition
    |        ^^^^^ Did you mean to call this function?
+help: Replace with `mixed(...)`
    |
 20 | async def inspect_mixed_overloads():
    -     if mixed:  # snapshot: redundant-condition
@@ -1190,6 +1219,7 @@ warning[redundant-condition]: Function `unannotated` is always truthy
    |
 18 |     if unannotated:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^ Did you mean to call this function?
+help: Replace with `unannotated()`
    |
 17 | async def check_synchronous_functions():
    -     if unannotated:  # snapshot: redundant-condition
@@ -1204,6 +1234,7 @@ warning[redundant-condition]: Function `dynamic` is always truthy
    |
 20 |     if dynamic:  # snapshot: redundant-condition
    |        ^^^^^^^ Did you mean to call this function?
+help: Replace with `dynamic()`
    |
 19 |         pass
    -     if dynamic:  # snapshot: redundant-condition
@@ -1218,6 +1249,7 @@ warning[redundant-condition]: Function `terminate` is always truthy
    |
 22 |     if terminate:  # snapshot: redundant-condition
    |        ^^^^^^^^^ Did you mean to call this function?
+help: Replace with `terminate()`
    |
 21 |         pass
    -     if terminate:  # snapshot: redundant-condition
@@ -1232,6 +1264,7 @@ warning[redundant-condition]: Function `terminate_via_alias` is always truthy
    |
 24 |     if terminate_via_alias:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^^^^^^^ Did you mean to call this function?
+help: Replace with `terminate_via_alias()`
    |
 23 |         pass
    -     if terminate_via_alias:  # snapshot: redundant-condition
@@ -1275,6 +1308,7 @@ warning[redundant-condition]: Function `make_coroutine` is always truthy
    |
 11 |     if make_coroutine:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^^ Did you mean to `await` and call this function?
+help: Replace with `await make_coroutine()`
    |
 10 | async def check_coroutine_factory():
    -     if make_coroutine:  # snapshot: redundant-condition
@@ -2426,6 +2460,55 @@ def short_circuit(value: object):
         pass
 ```
 
+We normally suppress `redundant-condition-strict` on a complete condition if any subexpression would
+trigger `redundant-condition`, to avoid reporting the same mistake twice. An unreachable
+subexpression is different: we would suppress its diagnostic because Python never evaluates it.
+Suppressing the outer diagnostic as well would leave no warning at all, so we still report the
+complete condition in these cases.
+
+When Python checks `falsy and flag` in the below example, it checks `falsy` first. Since that is
+false, the whole condition is false, and Python skips checking `flag`. Replacing `flag` with
+`"yes"`, as in the second `if` test, does not change this: the `and` condition can still be
+determined to always be false without checking the truthiness of the string.
+
+The `or` condition works the other way around. Since `truthy` is true, `truthy or ""` can be
+determined to be always true without checking the truthiness of the empty string.
+
+The strings `"yes"` and `""` would normally trigger `redundant-condition`, since one always counts
+as true and the other always counts as false. Because neither is reached here, we report only
+`redundant-condition-strict` on each complete condition:
+
+```py
+from typing import Literal
+
+def unreachable_operands(falsy: Literal[False], truthy: Literal[True], flag: bool):
+    if falsy and flag:  # error: [redundant-condition-strict] "Condition `falsy and flag` is always false"
+        pass
+    if falsy and "yes":  # error: [redundant-condition-strict] "Condition `falsy and "yes"` is always false"
+        pass
+    if truthy or "":  # error: [redundant-condition-strict] "Condition `truthy or ""` is always true"
+        pass
+```
+
+The same applies to the strings in the inline `if` expressions below. Python's `a if test else b`
+syntax chooses between two values: it evaluates `a` if `test` is true, and `b` otherwise. The other
+expression is not evaluated. The chosen value is then checked by the outer `if` statement to decide
+whether to run its body.
+
+In `False if True else "yes"`, the middle `True` selects `False`, so the first `if` body never runs.
+In `"yes" if False else True`, the middle `False` selects the `True` after `else`, so the second
+`if` body always runs. We report both complete conditions under `redundant-condition-strict`. As
+with the `and` and `or` examples above, neither string is evaluated, so we do not report a warning
+on the string or let its presence hide the warning about the complete condition:
+
+```py
+def unreachable_branches():
+    if False if True else "yes":  # error: [redundant-condition-strict] "Condition `False if True else "yes"` is always false"
+        pass
+    if "yes" if False else True:  # error: [redundant-condition-strict] "Condition `"yes" if False else True` is always true"
+        pass
+```
+
 ## Boolean tests inside value expressions
 
 A call's arguments compute values, but can contain their own boolean tests. Those tests are checked
@@ -2487,6 +2570,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 28 |     selected = not func if flag else not func
    |                    ^^^^ Did you mean to call this function?
+help: Replace with `func()`
    |
 27 |     # snapshot: redundant-condition
    -     selected = not func if flag else not func
@@ -2501,6 +2585,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 28 |     selected = not func if flag else not func
    |                                          ^^^^ Did you mean to call this function?
+help: Replace with `func()`
    |
 27 |     # snapshot: redundant-condition
    -     selected = not func if flag else not func

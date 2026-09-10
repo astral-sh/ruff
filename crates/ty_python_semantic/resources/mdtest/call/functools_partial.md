@@ -607,6 +607,32 @@ def test_union_partial(flag: bool) -> None:
     bad: Callable[[bytes, bytes], int] = p  # error: [invalid-assignment]
 ```
 
+### Union of partials with different wrapped functions
+
+The boolean-returning `partial` instance in the below example can be selected when `flag` is true.
+Its call signature is a subtype of the integer-returning `partial`'s signature, but each wraps a
+different function. Discarding `bool_partial` from the union would incorrectly make
+`selected is bool_partial` appear impossible:
+
+```py
+from functools import partial
+
+def integer() -> int:
+    return 1
+
+def boolean() -> bool:
+    return True
+
+int_partial = partial(integer)
+bool_partial = partial(boolean)
+
+def choose(flag: bool) -> None:
+    selected = bool_partial if flag else int_partial
+    reveal_type(selected)  # revealed: partial[() -> bool] | partial[() -> int]
+    reveal_type(selected.func)  # revealed: (def boolean() -> bool) | (def integer() -> int)
+    reveal_type(selected is bool_partial)  # revealed: bool
+```
+
 ### Keyword-bound overload filtering
 
 ```py

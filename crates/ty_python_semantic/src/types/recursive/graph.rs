@@ -12,7 +12,7 @@ use ty_python_core::scope::FileScopeId;
 
 use super::{
     RecursiveGraph, RecursiveMapping, RecursiveOrigin, RecursiveReferences, RecursiveSubstitution,
-    RecursiveType, RecursiveVar,
+    RecursiveType, RecursiveVar, RecursiveVarTarget,
 };
 use crate::types::graph::DependencyGraph;
 use crate::types::set_theoretic::NegativeIntersectionElements;
@@ -52,7 +52,11 @@ impl<'db> RecursiveGraphBuilder<'db> {
             _ => ty,
         };
         let (index, _) = self.inputs.borrow_mut().insert_full(ty);
-        Type::RecursiveVar(RecursiveVar::new_internal(db, 0, index, None))
+        Type::RecursiveVar(RecursiveVar::new_internal(
+            db,
+            RecursiveVarTarget::Graph { depth: 0, index },
+            None,
+        ))
     }
 
     /// Build and minimize the reachable regular graph, then close each cyclic component.
@@ -148,8 +152,14 @@ impl<'db> RecursiveGraphBuilder<'db> {
             let cyclic = graph.is_cyclic(&component);
             if cyclic {
                 for (local, global) in component.iter().enumerate() {
-                    closed[*global] =
-                        Type::RecursiveVar(RecursiveVar::new_internal(db, 0, local, None));
+                    closed[*global] = Type::RecursiveVar(RecursiveVar::new_internal(
+                        db,
+                        RecursiveVarTarget::Graph {
+                            depth: 0,
+                            index: local,
+                        },
+                        None,
+                    ));
                     recursive_roots[*global] = true;
                 }
             }
@@ -217,8 +227,11 @@ impl<'db> RecursiveGraphBuilder<'db> {
                 if !path.insert(current) {
                     return None;
                 }
-                debug_assert_eq!(reference.depth(db), 0);
-                current = reference.index(db);
+                let RecursiveVarTarget::Graph { depth, index } = reference.target(db) else {
+                    unreachable!("an alias reference cannot forward a graph equation");
+                };
+                debug_assert_eq!(depth, 0);
+                current = index;
             };
             targets[current] = Some(target);
             for index in path {
@@ -448,9 +461,11 @@ impl<'db> ShapeKeyData<'db> {
         ty: Type<'db>,
     ) -> Self {
         match ty {
-            Type::RecursiveVar(reference) => {
-                Self::Reference(reference.depth(db), reference.index(db))
-            }
+            Type::RecursiveVar(reference) => match reference.target(db) {
+                RecursiveVarTarget::Graph { depth, index } => Self::Reference(depth, index),
+                // Cycle identities are query-local, so they cannot supply a structural sort key.
+                RecursiveVarTarget::Alias(_) => Self::Opaque,
+            },
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::LiteralString => Self::LiteralString,
                 LiteralValueTypeKind::Bool(value) => Self::Bool(value),

@@ -1794,7 +1794,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
     ) -> ControlFlow<L::Break, (NodeId, Option<SourceOrderId>)> {
-        match self.typevar(db).require_bound_or_constraints(db, env) {
+        match self.require_bound_or_constraints(db, env) {
             TypeVarBoundOrConstraints::UpperBound(_) => ControlFlow::Continue((ALWAYS_TRUE, None)),
             TypeVarBoundOrConstraints::Constraints(constraints) => {
                 let mut domain = ALWAYS_FALSE;
@@ -4555,10 +4555,7 @@ impl<'db> PathBounds<'db> {
                         return None;
                     }
                 }
-                let declared = bound
-                    .bound_typevar
-                    .typevar(db)
-                    .require_bound_or_constraints(db, env);
+                let declared = bound.bound_typevar.require_bound_or_constraints(db, env);
                 let when_declared = match declared {
                     TypeVarBoundOrConstraints::UpperBound(upper) => {
                         let upper = upper
@@ -4643,10 +4640,7 @@ impl<'db> PathBounds<'db> {
         let bound_typevar = path_bound.bound_typevar;
         let lower = path_bound.effective_lower(db, env);
 
-        match bound_typevar
-            .typevar(db)
-            .require_bound_or_constraints(db, env)
-        {
+        match bound_typevar.require_bound_or_constraints(db, env) {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 let declared_upper = bound.top_materialization(db, env);
 

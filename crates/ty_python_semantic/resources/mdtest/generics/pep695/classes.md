@@ -1415,5 +1415,44 @@ class Ok1[T, *Ts]: ...
 class Ok3[*Ts]: ...
 ```
 
+## Decorated methods on generic classes
+
+A decorator can wrap a method in a callable object that retains its return type. An outer
+`classmethod` supplies the class argument and permits access through the generic class.
+
+```py
+from collections.abc import Callable
+
+class Wrapper[R]:
+    def __init__(self, function: Callable[..., R]) -> None:
+        self.function = function
+
+    def __call__(self, argument: object) -> R:
+        return self.function(argument)
+
+class Box[T]:
+    @classmethod
+    @Wrapper
+    def make(cls) -> "Box[T]":
+        return cls()
+
+reveal_type(Box.make())  # revealed: Box[Unknown]
+reveal_type(Box[int].make())  # revealed: Box[int]
+```
+
+A `staticmethod` permits access without supplying a receiver. The wrapper's parameter accepts
+`object`, so an unspecialized class does not infer its type argument from the call's argument.
+
+```py
+class C[T]:
+    @staticmethod
+    @Wrapper
+    def identity(value: T) -> T:
+        return value
+
+reveal_type(C.identity(1))  # revealed: Unknown
+reveal_type(C[int].identity(1))  # revealed: int
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
