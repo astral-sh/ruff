@@ -22,8 +22,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// The rule also recognizes imports made lazy by a literal `__lazy_modules__`
 /// declaration, including when the target version is older than Python 3.15.
-/// This declaration allows a module to use lazy imports on Python 3.15 and later
-/// while retaining eager imports on older versions.
+/// This declaration allows a module to use lazy imports on Python 3.15 and
+/// later while retaining eager imports on older versions. Dynamic assignments
+/// to `__lazy_modules__` (e.g. `__lazy_modules__ = non_literal()`) are ignored,
+/// as their effects cannot be determined statically.
 ///
 /// This rule ignores contexts in which `lazy import` is invalid, such as
 /// functions, classes, `try`/`except` blocks, `__future__` imports, and
