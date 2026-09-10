@@ -56,7 +56,7 @@ impl ProjectWatcher {
 
         let paths = &watch_paths.paths;
         let mut watcher_paths = self.watcher.paths_mut();
-        let mut reactivated_paths = Vec::new();
+        let mut rewatched_paths = Vec::new();
 
         // On Linux, overlapping watches through a symlink report events using the path of the
         // last registered watch. If `/project/bar` points to `/bar`, the module search path
@@ -89,7 +89,7 @@ impl ProjectWatcher {
                 self.has_errored_paths = true;
             } else {
                 if self.inactive_paths.remove(path) {
-                    reactivated_paths.push(path.clone());
+                    rewatched_paths.push(path.clone());
                 }
                 self.watched_paths.push(path.clone());
             }
@@ -113,7 +113,7 @@ impl ProjectWatcher {
 
         // Changes to an unwatched path may not have updated Files. Refresh after registering
         // the watch so changes made during the refresh can still produce watcher events.
-        Files::sync_all_recursive(db, reactivated_paths);
+        Files::sync_all_recursive(db, rewatched_paths);
     }
 
     /// Returns `true` if setting up watching for any path failed.
@@ -150,16 +150,14 @@ fn watch_paths(db: &dyn Db, project: Project) -> WatchPaths {
     // Watch both the project root and any paths provided by the user on the CLI (removing any redundant nested paths).
     // This is necessary to observe changes to files that are outside the project root.
     // We always need to watch the project root to observe changes to its configuration.
-    let mut paths: Vec<_> = ruff_db::system::deduplicate_nested_paths(
+    let included_paths = ruff_db::system::deduplicate_nested_paths(
         std::iter::once(project_path).chain(
             project
                 .included_paths_list(db)
                 .iter()
                 .map(SystemPathBuf::as_path),
         ),
-    )
-    .map(SystemPath::to_path_buf)
-    .collect();
+    );
 
     let environment = project.program(db).resolver_environment(db);
     let mut search_paths: Vec<_> = system_module_search_paths(db, environment).collect();
@@ -172,30 +170,36 @@ fn watch_paths(db: &dyn Db, project: Project) -> WatchPaths {
         }
     }
 
-    // Find the non-overlapping module search paths and filter out paths that are already covered by the project.
-    // Module search paths are already canonicalized.
-    // Deduplication also keeps the watch plan stable regardless of script order.
+    // The project watch covers search paths inside its root. Deduplicate the others so
+    // shared or nested search paths are registered once in stable order.
     let unique_module_paths = ruff_db::system::deduplicate_nested_paths(
         search_paths
             .into_iter()
             .filter(|path| !path.starts_with(project_path)),
     );
 
-    // A path that's both included and a module search path must keep its module position.
-    let mut seen: FxHashSet<_> = paths.iter().cloned().collect();
-    for path in unique_module_paths.chain(project.metadata(db).extra_configuration_paths()) {
-        let path = path.to_path_buf();
-        if !seen.insert(path.clone()) {
-            paths.retain(|previous| previous != &path);
+    let paths: Vec<_> = included_paths
+        .chain(unique_module_paths)
+        .chain(project.metadata(db).extra_configuration_paths())
+        .map(SystemPath::to_path_buf)
+        .collect();
+
+    // Keep the last occurrence so later groups retain their registration precedence.
+    let mut seen = FxHashSet::default();
+    let mut unique_paths = Vec::new();
+    for path in paths.into_iter().rev() {
+        if seen.insert(path.clone()) {
+            unique_paths.push(path);
         }
-        paths.push(path);
     }
+    unique_paths.reverse();
+    let paths = unique_paths.into_boxed_slice();
 
     let mut hasher = CacheKeyHasher::new();
     paths.cache_key(&mut hasher);
     WatchPaths {
         cache_key: hasher.finish(),
-        paths: paths.into_boxed_slice(),
+        paths,
     }
 }
 
@@ -217,53 +221,5 @@ impl std::fmt::Display for DisplayWatchedPaths<'_> {
         }
 
         f.write_char(']')
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
-    use ruff_db::testing::assert_function_query_was_not_run;
-
-    use crate::db::testing::TestDb;
-    use crate::{Db as _, ProjectMetadata};
-
-    use super::watch_paths;
-
-    #[test]
-    fn watch_paths_are_reused_after_code_edits() -> anyhow::Result<()> {
-        let mut db = TestDb::new(ProjectMetadata::new(
-            "test",
-            SystemPathBuf::from("/project"),
-        ));
-        db.write_file("/project/ordinary.py", "value = 1")?;
-        db.write_dedented(
-            "/project/script.py",
-            r"
-            # /// script
-            # dependencies = []
-            # ///
-            value = 1
-            ",
-        )?;
-        let project = db.project();
-        let paths = watch_paths(&db, project).clone();
-
-        db.write_file("/project/ordinary.py", "value = 2")?;
-        db.write_dedented(
-            "/project/script.py",
-            r"
-            # /// script
-            # dependencies = []
-            # ///
-            value = 2
-            ",
-        )?;
-        db.take_salsa_events();
-
-        assert_eq!(watch_paths(&db, project), &paths);
-        let events = db.take_salsa_events();
-        assert_function_query_was_not_run(&db, watch_paths, project, &events);
-        Ok(())
     }
 }

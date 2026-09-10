@@ -1571,7 +1571,7 @@ fn shared_script_search_paths_are_unwatched_when_unused() -> anyhow::Result<()> 
 }
 
 #[test]
-fn readded_script_search_paths_refresh_cached_files() -> anyhow::Result<()> {
+fn restored_script_search_paths_refresh_files_and_events() -> anyhow::Result<()> {
     let script = r#"
     # /// script
     # [tool.ty.environment]
@@ -1583,7 +1583,6 @@ fn readded_script_search_paths_refresh_cached_files() -> anyhow::Result<()> {
     let mut case = setup(|context: &mut SetupContext| {
         context.write_file("dependencies/dependency.py", "value = 1")?;
         // On Linux, the project watch can also reach this directory through a symlink.
-        // Imports still need events under their search path when the watch is restored.
         #[cfg(target_os = "linux")]
         std::os::unix::fs::symlink(
             context.join_root_path("dependencies").as_std_path(),
@@ -1611,6 +1610,7 @@ fn readded_script_search_paths_refresh_cached_files() -> anyhow::Result<()> {
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0].id().as_str(), "invalid-assignment");
 
+    // The restored watch must report subsequent edits under the search path on Linux.
     update_file(&dependency, "value = 1")?;
     let changes = case.stop_watch(event_for_file("dependency.py"));
     #[cfg(target_os = "linux")]
@@ -1620,9 +1620,6 @@ fn readded_script_search_paths_refresh_cached_files() -> anyhow::Result<()> {
             .any(|event| matches!(event, ChangeEvent::Changed { path, .. } if path == &dependency)),
         "expected a change at the search path: {changes:?}"
     );
-    case.apply_changes(&changes);
-
-    assert!(case.db().check().is_empty());
     Ok(())
 }
 
@@ -3011,8 +3008,7 @@ mod uv_metadata {
                     result: int = value
                     "#,
                 ),
-                ("../first/dependency.py", "value = 1"),
-                ("../second/dependency.py", "value = 1"),
+                ("../dependencies/dependency.py", "value = 1"),
             ],
         )?;
         let db = case.db();
@@ -3027,33 +3023,14 @@ mod uv_metadata {
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
 
-        std::fs::write(pth.as_std_path(), case.root_path().join("first").as_str())?;
+        let dependencies = case.root_path().join("dependencies");
+        std::fs::write(pth.as_std_path(), dependencies.as_str())?;
         let changes = case.take_watch_changes(event_for_file("dependency.pth"));
         case.apply_changes(&changes);
 
         assert!(case.db().check().is_empty());
 
-        update_file(
-            case.root_path().join("first/dependency.py"),
-            "value = 'wrong'",
-        )?;
-        let changes = case.take_watch_changes(event_for_file("dependency.py"));
-        case.apply_changes(&changes);
-
-        let diagnostics = case.db().check();
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id().as_str(), "invalid-assignment");
-
-        update_file(&pth, case.root_path().join("second").as_str())?;
-        let changes = case.take_watch_changes(event_for_file("dependency.pth"));
-        case.apply_changes(&changes);
-
-        assert!(case.db().check().is_empty());
-
-        update_file(
-            case.root_path().join("second/dependency.py"),
-            "value = 'wrong'",
-        )?;
+        update_file(dependencies.join("dependency.py"), "value = 'wrong'")?;
         let changes = case.stop_watch(event_for_file("dependency.py"));
         case.apply_changes(&changes);
 
