@@ -1662,6 +1662,70 @@ def forward_nominal_reversed(specific: Callable[[SNominal], None], redundant: Ca
     return result
 ```
 
+## Reconstructing inferred recursive trees
+
+The callback below gives an inferred tree type whose leaves are integers. Reconstructing one or two
+tuple levels preserves that recursive type. The result is not assignable to `str`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, TypeVar
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def fixed(callback: Callable[[T], tuple[T] | int]) -> T:
+    raise NotImplementedError
+
+def identity(value: U) -> U:
+    return value
+
+root = fixed(identity)
+reveal_type(root)  # revealed: μ$0. tuple[$0] | int
+
+def reconstruct(value: TypeOf[root], flag: bool, leaf: int):
+    once = (value,) if flag else leaf
+    twice = (once,) if flag else leaf
+    reveal_type(once)  # revealed: μ$0. tuple[$0] | int
+    reveal_type(twice)  # revealed: μ$0. tuple[$0] | int
+    reveal_type(is_equivalent_to(TypeOf[value], TypeOf[once]))  # revealed: ConstraintSet[Literal[True]]
+    reveal_type(is_equivalent_to(TypeOf[value], TypeOf[twice]))  # revealed: ConstraintSet[Literal[True]]
+    wrong: str = twice  # error: [invalid-assignment]
+```
+
+## Reconstructing inferred tuple-only recursive types
+
+Without an integer alternative, the callback gives a tuple-only recursive type. Wrapping it in
+another tuple preserves the same recursive type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def fixed(callback: Callable[[T], tuple[T]]) -> T:
+    raise NotImplementedError
+
+def identity(value: U) -> U:
+    return value
+
+root = fixed(identity)
+reveal_type(root)  # revealed: μ$0. tuple[$0]
+reveal_type((root,))  # revealed: μ$0. tuple[$0]
+reveal_type(((root,),))  # revealed: μ$0. tuple[$0]
+```
+
 ## Incompatible constraint sets
 
 But a constrained TypeVar with constraints not satisfied by the formal TypeVar should still error:

@@ -277,6 +277,30 @@ reveal_type(is_equivalent_to(A, Prefix))  # revealed: ConstraintSet[Literal[True
 reveal_type(is_equivalent_to(A, Strings))  # revealed: ConstraintSet[Literal[False]]
 ```
 
+## Implicit recursive tuples with fixed ends
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Implicit aliases describe the same nonempty trees regardless of whether the required element appears
+at the start or end of the tuple. Integer and string leaves still distinguish different tree types.
+
+```py
+from ty_extensions._internal import is_equivalent_to
+
+A = int | tuple[*tuple["A", ...], "B"]
+B = int | tuple[*tuple["B", ...], "A"]
+Prefix = int | tuple["Prefix", *tuple["Prefix", ...]]
+Strings = str | tuple[*tuple["Strings", ...], "Strings"]
+
+reveal_type(is_equivalent_to(A, B))  # revealed: ConstraintSet[Literal[True]]
+reveal_type(is_equivalent_to(B, A))  # revealed: ConstraintSet[Literal[True]]
+reveal_type(is_equivalent_to(A, Prefix))  # revealed: ConstraintSet[Literal[True]]
+reveal_type(is_equivalent_to(A, Strings))  # revealed: ConstraintSet[Literal[False]]
+```
+
 ## Tuples containing equivalent but differently ordered unions/intersections are equivalent
 
 ```pyi
