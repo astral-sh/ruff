@@ -3494,11 +3494,29 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 bound_typevar,
                 argument,
             }),
-            TypeVarBoundOrConstraints::Constraints(_) => (!path_bound.has_upper_evidence())
-                .then_some(SpecializationError::MismatchedConstraint {
-                    bound_typevar,
-                    argument,
-                }),
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                // The overall constraint set is not satisfiable. Only report a mismatched
+                // constraint diagnostic if we can show that none of the typevar constraints can
+                // individually satisfy the constraints.
+                let lower_matches_any_constraint =
+                    constraints.elements(db).iter().copied().any(|constraint| {
+                        !argument
+                            .when_assignable_to(
+                                db,
+                                self.env,
+                                constraint,
+                                self.constraints,
+                                self.inferable,
+                            )
+                            .is_never_satisfied(db, self.env)
+                    });
+                (!lower_matches_any_constraint).then_some(
+                    SpecializationError::MismatchedConstraint {
+                        bound_typevar,
+                        argument,
+                    },
+                )
+            }
         }?;
         Some(ConstraintFailure { error, variance })
     }
