@@ -1103,8 +1103,7 @@ impl AbstractMethodKind {
 
 /// Contains potentially modified signatures for a function literal.
 ///
-/// This uncommon payload is boxed so that ordinary function types only retain the literal, an
-/// optional pointer, and descriptor state.
+/// This uncommon payload is boxed to keep ordinary function types small.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct UpdatedFunctionSignatures<'db> {
     /// Contains a potentially modified signature for this function literal, in case certain
@@ -1182,7 +1181,6 @@ impl<'db> FunctionType<'db> {
         Self::new_internal(db, literal, updated_signatures, None)
     }
 
-    /// The ordinary function exposed by a method wrapper or its bound method's `__func__`.
     pub(super) fn underlying_function(self, db: &'db dyn Db) -> Self {
         if self.is_classmethod(db) || self.is_staticmethod(db) {
             self.with_descriptor_kind(db, CallableTypeKind::FunctionLike)
@@ -1206,7 +1204,6 @@ impl<'db> FunctionType<'db> {
         )
     }
 
-    /// Erase signature substitutions without changing the represented runtime object.
     pub(super) fn without_updated_signatures(self, db: &'db dyn Db) -> Self {
         Self::new_internal(db, self.literal(db), None, self.descriptor_kind(db))
     }
@@ -1736,7 +1733,6 @@ impl<'db> FunctionType<'db> {
         CallableType::new(db, self.signature(db), self.callable_type_kind(db))
     }
 
-    /// Convert the `FunctionType` into a [`BoundMethodType`].
     pub(crate) fn into_bound_method_type(
         self,
         db: &'db dyn Db,
