@@ -1,6 +1,5 @@
 //! Internal abstractions for differentiating between different kinds of search paths.
 
-use std::assert_matches;
 use std::fmt;
 use std::sync::Arc;
 
@@ -17,152 +16,20 @@ use crate::module_name::ModuleName;
 use crate::resolve::{PyTyped, ResolverContext};
 use crate::typeshed::TypeshedVersionsQueryResult;
 
-/// A path that points to a Python module.
+/// An immutable path describing a possible Python module.
 ///
-/// A `ModulePath` is made up of two elements:
-/// - The [`SearchPath`] that was used to find this module.
-///   This could point to a directory on disk or a directory
-///   in the vendored zip archive.
-/// - A relative path from the search path to the file
-///   that contains the source code of the Python module in question.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// Combines a [`SearchPath`] with a relative path on disk or in the vendored archive.
+/// Converting it to a module name does not check whether that module exists or whether
+/// another location shadows it. [`ModuleDirectory`] handles filesystem access;
+/// the resolver selects the module for a name.
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ModulePath {
     search_path: SearchPath,
     relative_path: Utf8PathBuf,
 }
 
 impl ModulePath {
-    #[must_use]
-    fn is_standard_library_stub(&self) -> bool {
-        matches!(
-            &*self.search_path.0,
-            SearchPathInner::StandardLibraryCustom(_) | SearchPathInner::StandardLibraryVendored(_)
-        )
-    }
-
-    pub(crate) fn push(&mut self, component: &str) {
-        if let Some(component_extension) = camino::Utf8Path::new(component).extension() {
-            assert!(
-                self.relative_path.extension().is_none(),
-                "Cannot push part {component} to {self:?}, which already has an extension"
-            );
-            if self.is_standard_library_stub() {
-                assert_eq!(
-                    component_extension, "pyi",
-                    "Extension must be `pyi`; got `{component_extension}`"
-                );
-            } else {
-                assert_matches!(
-                    component_extension,
-                    "pyi" | "py",
-                    "Extension must be `py` or `pyi`; got `{component_extension}`"
-                );
-            }
-        }
-        self.relative_path.push(component);
-    }
-
-    pub(super) fn search_path(&self) -> &SearchPath {
-        &self.search_path
-    }
-
-    #[must_use]
-    pub(super) fn is_directory(&self, resolver: &ResolverContext) -> bool {
-        let ModulePath {
-            search_path,
-            relative_path,
-        } = self;
-        match &*search_path.0 {
-            SearchPathInner::Extra(search_path)
-            | SearchPathInner::FirstParty(search_path)
-            | SearchPathInner::SitePackages(search_path)
-            | SearchPathInner::Editable(search_path)
-            | SearchPathInner::StandardLibraryReal(search_path) => {
-                system_path_is_directory(resolver.db, &search_path.join(relative_path))
-            }
-            SearchPathInner::StandardLibraryCustom(stdlib_root) => {
-                match query_stdlib_version(relative_path, resolver) {
-                    TypeshedVersionsQueryResult::DoesNotExist => false,
-                    TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => {
-                        system_path_is_directory(resolver.db, &stdlib_root.join(relative_path))
-                    }
-                }
-            }
-            SearchPathInner::StandardLibraryVendored(stdlib_root) => {
-                match query_stdlib_version(relative_path, resolver) {
-                    TypeshedVersionsQueryResult::DoesNotExist => false,
-                    TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => resolver
-                        .vendored()
-                        .is_directory(stdlib_root.join(relative_path)),
-                }
-            }
-        }
-    }
-
-    /// Get the `py.typed` info for this package (not considering parent packages)
-    pub(super) fn py_typed(&self, resolver: &ResolverContext) -> PyTyped {
-        let Some(py_typed_file) = self.to_system_path().and_then(|path| {
-            if !directory_contains_file(resolver.db, &path, &["py.typed"]) {
-                return None;
-            }
-            let py_typed_path = path.join("py.typed");
-            system_path_to_file(resolver.db, py_typed_path).ok()
-        }) else {
-            return PyTyped::Untyped;
-        };
-
-        // Different module names revisit the same package. Share the tracked contents instead of
-        // reading its marker from disk again for every module resolution.
-        let py_typed_contents = source_text(resolver.db, py_typed_file);
-        // If we fail to read it let's say that's like it doesn't exist
-        // (right now the difference between Untyped and Full is academic)
-        if py_typed_contents.read_error().is_some() {
-            return PyTyped::Untyped;
-        }
-
-        // The python typing spec says to look for "partial\n" but in the wild we've seen:
-        //
-        // * PARTIAL\n
-        // * partial\\n (as in they typed "\n")
-        // * partial/n
-        //
-        // since the py.typed file never really grew any other contents, let's be permissive
-        if py_typed_contents.to_ascii_lowercase().contains("partial") {
-            PyTyped::Partial
-        } else {
-            PyTyped::Full
-        }
-    }
-
-    pub(super) fn to_system_path(&self) -> Option<SystemPathBuf> {
-        let ModulePath {
-            search_path,
-            relative_path,
-        } = self;
-        match &*search_path.0 {
-            SearchPathInner::Extra(search_path)
-            | SearchPathInner::FirstParty(search_path)
-            | SearchPathInner::SitePackages(search_path)
-            | SearchPathInner::Editable(search_path) => Some(search_path.join(relative_path)),
-            SearchPathInner::StandardLibraryReal(stdlib_root)
-            | SearchPathInner::StandardLibraryCustom(stdlib_root) => {
-                Some(stdlib_root.join(relative_path))
-            }
-            SearchPathInner::StandardLibraryVendored(_) => None,
-        }
-    }
-
-    /// Returns the path within the vendored filesystem, if this is a vendored module.
-    pub(crate) fn to_vendored_path(&self) -> Option<VendoredPathBuf> {
-        Some(
-            self.search_path
-                .as_vendored_path()?
-                .join(&self.relative_path),
-        )
-    }
-
+    /// Derives a candidate module name without performing filesystem access or resolution.
     #[must_use]
     pub(crate) fn to_module_name(&self) -> Option<ModuleName> {
         fn strip_stubs(component: &str) -> &str {
@@ -173,7 +40,7 @@ impl ModulePath {
             search_path: _,
             relative_path,
         } = self;
-        if self.is_standard_library_stub() {
+        if self.search_path.is_standard_library_stub() {
             stdlib_path_to_module_name(relative_path)
         } else {
             let parent = relative_path.parent()?;
@@ -253,21 +120,23 @@ impl PartialEq<ModulePath> for VendoredPathBuf {
     }
 }
 
-/// Models a directory that participates in the module resolution process.
+/// A location in which to look up or enumerate Python modules.
+///
+/// Owns directory navigation, filesystem probes, and the cached system listing.
+/// A location may be missing or inaccessible; constructing it does not establish
+/// that it is a package or select it over other search locations.
 #[derive(Debug, Clone)]
 pub(crate) struct ModuleDirectory<'db> {
-    // The path to the directory.
-    path: ModulePath,
+    search_path: SearchPath,
+    relative_path: Utf8PathBuf,
     // The contents of the directory.
     listing: Option<&'db DirectoryListing>,
 }
 
 impl<'db> ModuleDirectory<'db> {
-    pub(crate) fn new(context: &ResolverContext<'db>, path: ModulePath) -> Self {
-        let listing = path
-            .to_system_path()
-            .and_then(|path| directory_listing(context.db, &path).ok());
-        Self { path, listing }
+    /// Opens the directory at the root of a search path.
+    pub(crate) fn new(context: &ResolverContext<'db>, search_path: SearchPath) -> Self {
+        Self::from_parts(context, search_path, Utf8PathBuf::new())
     }
 
     /// Returns an existing child directory and retrieves its listing without
@@ -279,19 +148,33 @@ impl<'db> ModuleDirectory<'db> {
         context: &ResolverContext<'db>,
         name: &str,
     ) -> Option<Self> {
-        let mut path = self.path.clone();
-        path.push(name);
-        path.is_directory(context).then(|| Self::new(context, path))
+        let relative_path = self.relative_path.join(name);
+        Self::exists_at(context, &self.search_path, &relative_path)
+            .then(|| Self::from_parts(context, self.search_path.clone(), relative_path))
     }
 
-    /// Returns the directory's path without permitting it to change.
-    pub(crate) fn path(&self) -> &ModulePath {
-        &self.path
+    /// Returns the search root containing this directory.
+    pub(crate) fn search_path(&self) -> &SearchPath {
+        &self.search_path
     }
 
     /// Consumes the directory and returns its search root.
     pub(crate) fn into_search_path(self) -> SearchPath {
-        self.path.search_path
+        self.search_path
+    }
+
+    /// Returns the directory's system path, if it is not vendored.
+    pub(crate) fn to_system_path(&self) -> Option<SystemPathBuf> {
+        self.search_path
+            .as_system_path()
+            .map(|root| root.join(&self.relative_path))
+    }
+
+    /// Returns the directory's path within the vendored filesystem, if applicable.
+    pub(crate) fn to_vendored_path(&self) -> Option<VendoredPathBuf> {
+        self.search_path
+            .as_vendored_path()
+            .map(|root| root.join(&self.relative_path))
     }
 
     /// Returns the cached listing from [`System`], or `None` for an inaccessible directory
@@ -302,10 +185,75 @@ impl<'db> ModuleDirectory<'db> {
 
     /// Returns whether or not this directory might contain the given entry.
     pub(crate) fn may_contain_name(&self, name: &str) -> bool {
-        self.path.search_path.as_vendored_path().is_some()
+        self.search_path.as_vendored_path().is_some()
             || self
                 .listing
                 .is_some_and(|listing| listing.contains_name_with_prefix(name))
+    }
+
+    /// Checks a relative directory path without reading that directory's contents.
+    ///
+    /// System paths use their parent's listing; vendored and custom typeshed paths
+    /// also respect the configured Python version.
+    pub(crate) fn exists_at(
+        context: &ResolverContext,
+        search_path: &SearchPath,
+        relative_path: &Utf8Path,
+    ) -> bool {
+        if search_path.is_standard_library_stub()
+            && matches!(
+                query_stdlib_version(relative_path, context),
+                TypeshedVersionsQueryResult::DoesNotExist
+            )
+        {
+            return false;
+        }
+
+        match search_path.as_path() {
+            SystemOrVendoredPathRef::System(root) => {
+                system_path_is_directory(context.db, &root.join(relative_path))
+            }
+            SystemOrVendoredPathRef::Vendored(root) => {
+                context.vendored().is_directory(root.join(relative_path))
+            }
+        }
+    }
+
+    /// Returns this package's `py.typed` information without considering parent packages.
+    pub(crate) fn py_typed(&self, context: &ResolverContext) -> PyTyped {
+        let Some(py_typed_file) = self.to_system_path().and_then(|path| {
+            if !self
+                .listing
+                .is_some_and(|listing| listing.entry_is_file(context.db, &path, "py.typed"))
+            {
+                return None;
+            }
+            system_path_to_file(context.db, path.join("py.typed")).ok()
+        }) else {
+            return PyTyped::Untyped;
+        };
+
+        // Different module names revisit the same package. Share the tracked contents instead of
+        // reading its marker from disk again for every module resolution.
+        let py_typed_contents = source_text(context.db, py_typed_file);
+        // If we fail to read it let's say that's like it doesn't exist
+        // (right now the difference between Untyped and Full is academic)
+        if py_typed_contents.read_error().is_some() {
+            return PyTyped::Untyped;
+        }
+
+        // The python typing spec says to look for "partial\n" but in the wild we've seen:
+        //
+        // * PARTIAL\n
+        // * partial\\n (as in they typed "\n")
+        // * partial/n
+        //
+        // since the py.typed file never really grew any other contents, let's be permissive
+        if py_typed_contents.to_ascii_lowercase().contains("partial") {
+            PyTyped::Partial
+        } else {
+            PyTyped::Full
+        }
     }
 
     /// Resolves one exact filename in this directory, validating file status,
@@ -320,14 +268,14 @@ impl<'db> ModuleDirectory<'db> {
         }
 
         // Do not resolve runtime modules for standard library stubs.
-        if path.extension() == Some("py") && self.path.is_standard_library_stub() {
+        if path.extension() == Some("py") && self.search_path.is_standard_library_stub() {
             return None;
         }
 
         // Verify that the directory listing contains a file or symlink entry
         // with the correct name. Symlink targets and vendored paths are
         // validated further down.
-        if self.path.search_path.as_vendored_path().is_none()
+        if self.search_path.as_vendored_path().is_none()
             && !matches!(
                 self.listing.and_then(|listing| listing.file_type(filename)),
                 Some(FileType::File | FileType::Symlink)
@@ -336,9 +284,9 @@ impl<'db> ModuleDirectory<'db> {
             return None;
         }
 
-        let relative_path = self.path.relative_path.join(filename);
+        let relative_path = self.relative_path.join(filename);
 
-        match &*self.path.search_path.0 {
+        match &*self.search_path.0 {
             SearchPathInner::Extra(root)
             | SearchPathInner::FirstParty(root)
             | SearchPathInner::SitePackages(root)
@@ -366,16 +314,21 @@ impl<'db> ModuleDirectory<'db> {
             }
         }
     }
-}
 
-fn directory_contains_file(db: &dyn Db, directory: &SystemPath, names: &[&str]) -> bool {
-    let Ok(listing) = directory_listing(db, directory) else {
-        return false;
-    };
-
-    names
-        .iter()
-        .any(|name| listing.entry_is_file(db, directory, name))
+    fn from_parts(
+        context: &ResolverContext<'db>,
+        search_path: SearchPath,
+        relative_path: Utf8PathBuf,
+    ) -> Self {
+        let listing = search_path
+            .as_system_path()
+            .and_then(|root| directory_listing(context.db, &root.join(&relative_path)).ok());
+        Self {
+            search_path,
+            relative_path,
+            listing,
+        }
+    }
 }
 
 fn system_path_is_directory(db: &dyn Db, path: &SystemPath) -> bool {
@@ -557,14 +510,6 @@ impl SearchPath {
         ))))
     }
 
-    #[must_use]
-    pub(crate) fn to_module_path(&self) -> ModulePath {
-        ModulePath {
-            search_path: self.clone(),
-            relative_path: Utf8PathBuf::new(),
-        }
-    }
-
     /// Does this search path point to the standard library?
     #[must_use]
     pub fn is_standard_library(&self) -> bool {
@@ -573,6 +518,13 @@ impl SearchPath {
             SearchPathInner::StandardLibraryCustom(_)
                 | SearchPathInner::StandardLibraryVendored(_)
                 | SearchPathInner::StandardLibraryReal(_)
+        )
+    }
+
+    fn is_standard_library_stub(&self) -> bool {
+        matches!(
+            &*self.0,
+            SearchPathInner::StandardLibraryCustom(_) | SearchPathInner::StandardLibraryVendored(_)
         )
     }
 
@@ -864,21 +816,6 @@ mod tests {
 
     use super::*;
 
-    impl ModulePath {
-        #[must_use]
-        fn join(&self, component: &str) -> ModulePath {
-            let mut result = self.clone();
-            result.push(component);
-            result
-        }
-    }
-
-    impl SearchPath {
-        fn join(&self, component: &str) -> ModulePath {
-            self.to_module_path().join(component)
-        }
-    }
-
     #[test]
     fn resolve_file_rejects_runtime_files_in_typeshed() {
         const TYPESHED: MockedTypeshed = MockedTypeshed {
@@ -896,7 +833,7 @@ value = 1
             ResolverEnvironment::new(&db, PythonVersion::PY312, db.search_paths()),
             ModuleResolveMode::Typing,
         );
-        let directory = ModuleDirectory::new(&resolver, stdlib_path.to_module_path());
+        let directory = ModuleDirectory::new(&resolver, stdlib_path);
 
         assert_eq!(directory.resolve_file(&resolver, "foo.py"), None);
     }
@@ -928,7 +865,7 @@ value = 1
         );
         let search_path =
             SearchPath::first_party(db.system(), root.clone()).expect("Existing source directory");
-        let directory = ModuleDirectory::new(&resolver, search_path.to_module_path());
+        let directory = ModuleDirectory::new(&resolver, search_path);
 
         // Require exact filename casing even when the filesystem is case-insensitive.
         assert_eq!(directory.resolve_file(&resolver, "tools.py"), None);
@@ -939,17 +876,65 @@ value = 1
     }
 
     #[test]
+    fn child_directory_preserves_parent_and_reads_typing_marker() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[
+                (
+                    "package/tools.py",
+                    r#"
+value = 1
+"#,
+                ),
+                (
+                    "package/py.typed",
+                    r#"
+partial
+"#,
+                ),
+            ])
+            .build();
+        let context =
+            ResolverContext::new(&db, db.resolver_environment(), ModuleResolveMode::Typing);
+        let search_path =
+            SearchPath::first_party(db.system(), src.clone()).expect("Existing source directory");
+        let parent = ModuleDirectory::new(&context, search_path);
+        let child = parent
+            .child_directory(&context, "package")
+            .expect("Existing package directory");
+
+        assert_eq!(parent.to_system_path(), Some(src.clone()));
+        assert_eq!(parent.py_typed(&context), PyTyped::Untyped);
+        assert_eq!(child.py_typed(&context), PyTyped::Partial);
+        let file = child
+            .resolve_file(&context, "tools.py")
+            .expect("Resolve a file in the child directory");
+        assert_eq!(file.path(&db), &src.join("package/tools.py"));
+    }
+
+    #[test]
+    fn module_path_does_not_require_existing_module() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new().build();
+        let search_path =
+            SearchPath::first_party(db.system(), src.clone()).expect("Existing source directory");
+        let path = search_path
+            .relativize_system_path(&src.join("missing.pyi"))
+            .expect("Path beneath the search root");
+        assert_eq!(path.to_module_name(), ModuleName::new("missing"));
+
+        let context =
+            ResolverContext::new(&db, db.resolver_environment(), ModuleResolveMode::Typing);
+        let directory = ModuleDirectory::new(&context, search_path);
+        assert!(directory.resolve_file(&context, "missing.pyi").is_none());
+    }
+
+    #[test]
     fn module_name_1_part() {
         let TestCase { db, src, .. } = TestCaseBuilder::new().build();
         let src_search_path = SearchPath::first_party(db.system(), src).unwrap();
         let foo_module_name = ModuleName::new_static("foo").unwrap();
 
         assert_eq!(
-            src_search_path
-                .to_module_path()
-                .join("foo")
-                .to_module_name()
-                .as_ref(),
+            src_search_path.join("foo").to_module_name().as_ref(),
             Some(&foo_module_name)
         );
 
@@ -1024,50 +1009,6 @@ value = 1
                 .as_ref(),
             Some(&foo_bar_baz_module_name)
         );
-    }
-
-    #[test]
-    #[should_panic(expected = "Extension must be `pyi`; got `py`")]
-    fn stdlib_path_invalid_join_py() {
-        let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_mocked_typeshed(MockedTypeshed::default())
-            .build();
-        SearchPath::custom_stdlib(db.system(), stdlib.parent().unwrap())
-            .unwrap()
-            .to_module_path()
-            .push("bar.py");
-    }
-
-    #[test]
-    #[should_panic(expected = "Extension must be `pyi`; got `rs`")]
-    fn stdlib_path_invalid_join_rs() {
-        let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_mocked_typeshed(MockedTypeshed::default())
-            .build();
-        SearchPath::custom_stdlib(db.system(), stdlib.parent().unwrap())
-            .unwrap()
-            .to_module_path()
-            .push("bar.rs");
-    }
-
-    #[test]
-    #[should_panic(expected = "Extension must be `py` or `pyi`; got `rs`")]
-    fn non_stdlib_path_invalid_join_rs() {
-        let TestCase { db, src, .. } = TestCaseBuilder::new().build();
-        SearchPath::first_party(db.system(), src)
-            .unwrap()
-            .to_module_path()
-            .push("bar.rs");
-    }
-
-    #[test]
-    #[should_panic(expected = "already has an extension")]
-    fn too_many_extensions() {
-        let TestCase { db, src, .. } = TestCaseBuilder::new().build();
-        SearchPath::first_party(db.system(), src)
-            .unwrap()
-            .join("foo.py")
-            .push("bar.py");
     }
 
     #[test]
@@ -1156,7 +1097,11 @@ value = 1
         );
 
         let asyncio_regular_package = stdlib_path.join("asyncio");
-        assert!(asyncio_regular_package.is_directory(&resolver));
+        assert!(ModuleDirectory::exists_at(
+            &resolver,
+            &asyncio_regular_package.search_path,
+            &asyncio_regular_package.relative_path,
+        ));
         // Paths to directories don't resolve to VfsFiles
         assert_eq!(asyncio_regular_package.to_file(&resolver), None);
         assert!(
@@ -1170,7 +1115,11 @@ value = 1
         // according to the `VERSIONS` file in our typeshed mock:
         let asyncio_tasks_module = stdlib_path.join("asyncio/tasks.pyi");
         assert_eq!(asyncio_tasks_module.to_file(&resolver), None);
-        assert!(!asyncio_tasks_module.is_directory(&resolver));
+        assert!(!ModuleDirectory::exists_at(
+            &resolver,
+            &asyncio_tasks_module.search_path,
+            &asyncio_tasks_module.relative_path,
+        ));
     }
 
     #[test]
@@ -1188,12 +1137,20 @@ value = 1
         );
 
         let xml_namespace_package = stdlib_path.join("xml");
-        assert!(xml_namespace_package.is_directory(&resolver));
+        assert!(ModuleDirectory::exists_at(
+            &resolver,
+            &xml_namespace_package.search_path,
+            &xml_namespace_package.relative_path,
+        ));
         // Paths to directories don't resolve to VfsFiles
         assert_eq!(xml_namespace_package.to_file(&resolver), None);
 
         let xml_etree = stdlib_path.join("xml/etree.pyi");
-        assert!(!xml_etree.is_directory(&resolver));
+        assert!(!ModuleDirectory::exists_at(
+            &resolver,
+            &xml_etree.search_path,
+            &xml_etree.relative_path,
+        ));
         assert!(xml_etree.to_file(&resolver).is_some());
     }
 
@@ -1213,7 +1170,11 @@ value = 1
 
         let functools_module = stdlib_path.join("functools.pyi");
         assert!(functools_module.to_file(&resolver).is_some());
-        assert!(!functools_module.is_directory(&resolver));
+        assert!(!ModuleDirectory::exists_at(
+            &resolver,
+            &functools_module.search_path,
+            &functools_module.relative_path,
+        ));
     }
 
     #[test]
@@ -1232,7 +1193,11 @@ value = 1
 
         let collections_regular_package = stdlib_path.join("collections");
         assert_eq!(collections_regular_package.to_file(&resolver), None);
-        assert!(!collections_regular_package.is_directory(&resolver));
+        assert!(!ModuleDirectory::exists_at(
+            &resolver,
+            &collections_regular_package.search_path,
+            &collections_regular_package.relative_path,
+        ));
     }
 
     #[test]
@@ -1251,11 +1216,19 @@ value = 1
 
         let importlib_namespace_package = stdlib_path.join("importlib");
         assert_eq!(importlib_namespace_package.to_file(&resolver), None);
-        assert!(!importlib_namespace_package.is_directory(&resolver));
+        assert!(!ModuleDirectory::exists_at(
+            &resolver,
+            &importlib_namespace_package.search_path,
+            &importlib_namespace_package.relative_path,
+        ));
 
         let importlib_abc = stdlib_path.join("importlib/abc.pyi");
         assert_eq!(importlib_abc.to_file(&resolver), None);
-        assert!(!importlib_abc.is_directory(&resolver));
+        assert!(!ModuleDirectory::exists_at(
+            &resolver,
+            &importlib_abc.search_path,
+            &importlib_abc.relative_path,
+        ));
     }
 
     #[test]
@@ -1274,7 +1247,11 @@ value = 1
 
         let non_existent = stdlib_path.join("doesnt_even_exist");
         assert_eq!(non_existent.to_file(&resolver), None);
-        assert!(!non_existent.is_directory(&resolver));
+        assert!(!ModuleDirectory::exists_at(
+            &resolver,
+            &non_existent.search_path,
+            &non_existent.relative_path,
+        ));
     }
 
     #[test]
@@ -1306,7 +1283,11 @@ value = 1
         // Since we've set the target version to Py39,
         // `collections` should now exist as a directory, according to VERSIONS...
         let collections_regular_package = stdlib_path.join("collections");
-        assert!(collections_regular_package.is_directory(&resolver));
+        assert!(ModuleDirectory::exists_at(
+            &resolver,
+            &collections_regular_package.search_path,
+            &collections_regular_package.relative_path,
+        ));
         // (This is still `None`, as directories don't resolve to `Vfs` files)
         assert_eq!(collections_regular_package.to_file(&resolver), None);
         assert!(
@@ -1319,7 +1300,11 @@ value = 1
         // ...and so should the `asyncio.tasks` submodule (though it's still not a directory):
         let asyncio_tasks_module = stdlib_path.join("asyncio/tasks.pyi");
         assert!(asyncio_tasks_module.to_file(&resolver).is_some());
-        assert!(!asyncio_tasks_module.is_directory(&resolver));
+        assert!(!ModuleDirectory::exists_at(
+            &resolver,
+            &asyncio_tasks_module.search_path,
+            &asyncio_tasks_module.relative_path,
+        ));
     }
 
     #[test]
@@ -1338,13 +1323,21 @@ value = 1
 
         // The `importlib` directory now also exists
         let importlib_namespace_package = stdlib_path.join("importlib");
-        assert!(importlib_namespace_package.is_directory(&resolver));
+        assert!(ModuleDirectory::exists_at(
+            &resolver,
+            &importlib_namespace_package.search_path,
+            &importlib_namespace_package.relative_path,
+        ));
         // (This is still `None`, as directories don't resolve to `Vfs` files)
         assert_eq!(importlib_namespace_package.to_file(&resolver), None);
 
         // Submodules in the `importlib` namespace package also now exist:
         let importlib_abc = importlib_namespace_package.join("abc.pyi");
-        assert!(!importlib_abc.is_directory(&resolver));
+        assert!(!ModuleDirectory::exists_at(
+            &resolver,
+            &importlib_abc.search_path,
+            &importlib_abc.relative_path,
+        ));
         assert!(importlib_abc.to_file(&resolver).is_some());
     }
 
@@ -1365,22 +1358,28 @@ value = 1
         // The `xml` package no longer exists on py39:
         let xml_namespace_package = stdlib_path.join("xml");
         assert_eq!(xml_namespace_package.to_file(&resolver), None);
-        assert!(!xml_namespace_package.is_directory(&resolver));
+        assert!(!ModuleDirectory::exists_at(
+            &resolver,
+            &xml_namespace_package.search_path,
+            &xml_namespace_package.relative_path,
+        ));
 
         let xml_etree = xml_namespace_package.join("etree.pyi");
         assert_eq!(xml_etree.to_file(&resolver), None);
-        assert!(!xml_etree.is_directory(&resolver));
+        assert!(!ModuleDirectory::exists_at(
+            &resolver,
+            &xml_etree.search_path,
+            &xml_etree.relative_path,
+        ));
     }
 
     #[test]
     fn strip_not_top_level_stubs_suffix() {
         let TestCase { db, src, .. } = TestCaseBuilder::new().build();
-        let sp = SearchPath::first_party(db.system(), src).unwrap();
-        let mut mp = sp.to_module_path();
-        mp.push("foo-stubs");
-        mp.push("quux");
+        let search_path = SearchPath::first_party(db.system(), src).unwrap();
+        let module_path = search_path.join("foo-stubs/quux");
         assert_eq!(
-            mp.to_module_name(),
+            module_path.to_module_name(),
             Some(ModuleName::new_static("foo.quux").unwrap())
         );
     }
@@ -1394,11 +1393,10 @@ value = 1
     #[test]
     fn strip_top_level_stubs_suffix() {
         let TestCase { db, src, .. } = TestCaseBuilder::new().build();
-        let sp = SearchPath::first_party(db.system(), src).unwrap();
-        let mut mp = sp.to_module_path();
-        mp.push("foo-stubs");
+        let search_path = SearchPath::first_party(db.system(), src).unwrap();
+        let module_path = search_path.join("foo-stubs");
         assert_eq!(
-            mp.to_module_name(),
+            module_path.to_module_name(),
             Some(ModuleName::new_static("foo").unwrap())
         );
     }
@@ -1409,26 +1407,39 @@ value = 1
     #[test]
     fn no_strip_with_extension() {
         let TestCase { db, src, .. } = TestCaseBuilder::new().build();
-        let sp = SearchPath::first_party(db.system(), src).unwrap();
-        let mut mp = sp.to_module_path();
-        mp.push("foo-stubs.pyi");
-        assert_eq!(mp.to_module_name(), None);
+        let search_path = SearchPath::first_party(db.system(), src).unwrap();
+        let module_path = search_path.join("foo-stubs.pyi");
+        assert_eq!(module_path.to_module_name(), None);
     }
 
     impl ModulePath {
+        fn join(&self, component: &str) -> Self {
+            Self {
+                search_path: self.search_path.clone(),
+                relative_path: self.relative_path.join(component),
+            }
+        }
+
         /// Resolves this path through the same directory validation used by the resolver.
         fn to_file(&self, context: &ResolverContext) -> Option<File> {
             let filename = self.relative_path.file_name()?;
             let parent = self.relative_path.parent()?;
-            let directory = ModuleDirectory::new(
+            let directory = ModuleDirectory::from_parts(
                 context,
-                ModulePath {
-                    search_path: self.search_path.clone(),
-                    relative_path: parent.to_path_buf(),
-                },
+                self.search_path.clone(),
+                parent.to_path_buf(),
             );
 
             directory.resolve_file(context, filename)
+        }
+    }
+
+    impl SearchPath {
+        fn join(&self, relative_path: &str) -> ModulePath {
+            ModulePath {
+                search_path: self.clone(),
+                relative_path: Utf8PathBuf::from(relative_path),
+            }
         }
     }
 }

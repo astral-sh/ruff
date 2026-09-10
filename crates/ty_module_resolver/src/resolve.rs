@@ -54,7 +54,7 @@ use ruff_python_ast::{
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::{ImportingFile, ModuleName};
-use crate::path::{ModuleDirectory, ModulePath, SearchPath, SystemOrVendoredPathRef};
+use crate::path::{ModuleDirectory, SearchPath, SystemOrVendoredPathRef};
 use crate::strategy::MisconfigurationStrategy;
 use crate::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::{ResolverEnvironment, ResolverFile, SearchPathSettings, SearchPathSettingsError};
@@ -1326,7 +1326,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
         precedence: CandidatePrecedence,
     ) -> Self {
         Self {
-            directory: ModuleDirectory::new(context, search_path.to_module_path()),
+            directory: ModuleDirectory::new(context, search_path.clone()),
             module: ResolvedModule::NamespacePackage,
             py_typed: PyTyped::Untyped,
             precedence,
@@ -1418,7 +1418,6 @@ impl<'db> ModuleResolutionCandidate<'db> {
         match self.module {
             ResolvedModule::NamespacePackage => Cow::Owned(
                 self.directory
-                    .path()
                     .to_system_path()
                     .unwrap_or_default()
                     .to_string(),
@@ -1502,9 +1501,8 @@ impl<'db> NameResolver<'db> {
                 resolve_stub_package_in_search_path(context, search_path, stub_name)
             }));
             // Defer file probes after stdlib until we know that stdlib does not win.
-            pending_stub_paths.extend(stub_paths.after_stdlib.iter().filter(|search_path| {
-                ModuleDirectory::new(context, search_path.to_module_path())
-                    .may_contain_name(stub_name)
+            pending_stub_paths.extend(stub_paths.after_stdlib.iter().filter(|&search_path| {
+                ModuleDirectory::new(context, search_path.clone()).may_contain_name(stub_name)
             }));
         }
 
@@ -1685,13 +1683,13 @@ fn resolve_component<'db>(
             resolve_file_module_with_filter(subdirectory, context, "__init__", file_filter)
     {
         // Check for a regular package first (highest priority).
-        candidate.module = if is_legacy_namespace_package(subdirectory.path(), context, init) {
+        candidate.module = if is_legacy_namespace_package(context, subdirectory.search_path(), init)
+        {
             ResolvedModule::LegacyNamespacePackage(init)
         } else {
             ResolvedModule::RegularPackage(init)
         };
         candidate.py_typed = subdirectory
-            .path()
             .py_typed(context)
             .inherit_parent(candidate.py_typed);
     } else if let Some(file_module) =
@@ -1722,11 +1720,10 @@ fn resolve_component<'db>(
         // A namespace package is not backed by a file, so it cannot satisfy a stub-only lookup.
         if file_filter != ComponentFileFilter::StubOnly
             && let Some(subdirectory) = &subdirectory
-            && !subdirectory.path().search_path().is_standard_library()
+            && !subdirectory.search_path().is_standard_library()
         {
             candidate.module = ResolvedModule::NamespacePackage;
             candidate.py_typed = subdirectory
-                .path()
                 .py_typed(context)
                 .inherit_parent(candidate.py_typed);
         } else {
@@ -1790,12 +1787,12 @@ fn resolve_file_module_with_filter(
 /// contents, they all "need" to have the legacy namespace idiom (we do nothing to enforce that,
 /// we will just get confused if you mess it up).
 fn is_legacy_namespace_package(
-    package_path: &ModulePath,
     context: &ResolverContext,
+    search_path: &SearchPath,
     init: File,
 ) -> bool {
     // Just an optimization, the stdlib and typeshed are never legacy namespace packages
-    if package_path.search_path().is_standard_library() {
+    if search_path.is_standard_library() {
         return false;
     }
 
