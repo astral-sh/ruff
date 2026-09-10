@@ -2400,7 +2400,6 @@ pub(super) fn report_bad_dunder_set_call<'db>(
     dunder_set_failure: &CallError<'db>,
     object_type: Type<'db>,
     descriptor_type: Type<'db>,
-    includes_descriptor_argument: bool,
     target: &ast::ExprAttribute,
     value: &ast::Expr,
 ) {
@@ -2428,11 +2427,7 @@ pub(super) fn report_bad_dunder_set_call<'db>(
             ));
         }
     } else {
-        let argument_ranges = if includes_descriptor_argument {
-            &[target.range(), target.value.range(), value.range()][..]
-        } else {
-            &[target.value.range(), value.range()][..]
-        };
+        let argument_ranges = &[target.value.range(), value.range()];
         dunder_set_failure.report_diagnostics_with_override(
             context,
             target.into(),
@@ -2571,7 +2566,7 @@ pub(super) fn report_dynamic_function_decorator_return<'db>(
 
     let decorator_function = match decorator_binding.signature_type {
         Type::FunctionLiteral(function) => function,
-        Type::BoundMethod(method) => method.function(db),
+        Type::BoundMethod(method) if let Some(function) = method.function(db) => function,
         _ => return,
     };
 
@@ -4325,6 +4320,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         diagnostic.set_primary_annotation_message(format_args!(
                             "Did you mean {quoted_suggestion}?"
                         ));
+                        diagnostic.help(format_args!("Replace with {quoted_suggestion}"));
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             quoted_suggestion,
                             key_node.range(),
@@ -5018,7 +5014,7 @@ pub(super) fn report_invalid_method_override<'db>(
 
                 let superclass_function_span = match superclass_type {
                     Type::FunctionLiteral(function) => Some(signature_span(function)),
-                    Type::BoundMethod(method) => Some(signature_span(method.function(db))),
+                    Type::BoundMethod(method) => method.function(db).map(signature_span),
                     _ => None,
                 };
 

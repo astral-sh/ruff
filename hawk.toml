@@ -136,6 +136,22 @@ reason = "preserves the public syntax-validity predicate API"
 
 [[override]]
 lint = "hawk::unnecessary_public"
+crate = "ruff_python_parser"
+item = "lexer::Lexer::<'src>::current_range"
+kind = "inherent_method"
+level = "expect"
+reason = "lets downstream lexer callers inspect the current token range"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_parser"
+item = "lexer::Lexer::<'src>::current_flags"
+kind = "inherent_method"
+level = "expect"
+reason = "lets downstream lexer callers inspect the current token flags"
+
+[[override]]
+lint = "hawk::unnecessary_public"
 crate = "ruff_workspace"
 item = "settings::FormatterSettings::resolve_target_version"
 kind = "inherent_method"

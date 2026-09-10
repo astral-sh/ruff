@@ -45,6 +45,7 @@ pub(crate) use self::infer::{
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
+use self::known_instance::MethodWrapperKind;
 pub(crate) use self::match_pattern::{
     ClassPatternPositionalSource, callable_pattern_type, class_pattern_positional_sources,
     definite_match_pattern_type, definite_match_pattern_type_for_subject,
@@ -97,9 +98,7 @@ pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDes
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
-use crate::types::signatures::{
-    ConcatenateTail, walk_signature, walk_signature_without_return_type,
-};
+use crate::types::signatures::{ConcatenateTail, walk_signature};
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
@@ -4494,12 +4493,11 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db, env) {
-                    None => Type::object().instance_member(db, env, name),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                match bound_typevar.require_bound_or_constraints(db, env) {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
                         bound.instance_member(db, env, name)
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    TypeVarBoundOrConstraints::Constraints(constraints) => constraints
                         .map_with_boundness_and_qualifiers(db, env, |constraint| {
                             constraint.instance_member(db, env, name)
                         }),
@@ -4613,7 +4611,7 @@ impl<'db> Type<'db> {
                     );
                 }
                 Type::BoundMethod(method) => {
-                    collect(db, Type::FunctionLiteral(method.function(db)), functions);
+                    collect(db, method.func(db), functions);
                 }
                 Type::Union(union) => {
                     for element in union.elements(db) {
@@ -4769,6 +4767,18 @@ impl<'db> Type<'db> {
             }
 
             match ty {
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
+                    let return_type = match wrapper.kind(db) {
+                        MethodWrapperKind::Staticmethod => wrapper.wrapped(db),
+                        MethodWrapperKind::Classmethod => Type::BoundMethod(
+                            BoundMethodType::from_callable(db, wrapper.wrapped(db), owner, owner),
+                        ),
+                    };
+                    return Ok(Some(DescriptorGetResult {
+                        return_type,
+                        kind: AttributeKind::NormalOrNonDataDescriptor,
+                    }));
+                }
                 Type::Callable(callable) if callable.is_staticmethod_like(db) => {
                     // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
                     // The underlying function is returned as-is, without binding self.
@@ -5500,6 +5510,14 @@ impl<'db> Type<'db> {
             _ => std::slice::from_ref(&ty),
         };
         alternatives.iter().any(|ty| {
+            // Synthesized methods bind through `try_call_dunder_get` without necessarily
+            // exposing a `__get__` member on their meta-type.
+            if let Type::Callable(callable) = ty
+                && callable.is_method_like(db)
+            {
+                return false;
+            }
+
             // Descriptors define their own class-access behavior, but do not exempt other
             // alternatives in a union from the restriction on generic instance storage.
             ty.class_member(db, env, "__get__").is_undefined()
@@ -5927,10 +5945,22 @@ impl<'db> Type<'db> {
                 {
                     Place::bound(wrapper).into()
                 }
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => match name_str {
+                    "__func__" | "__wrapped__" => Place::bound(wrapper.wrapped(db)).into(),
+                    "__call__" if let Some(callables) = wrapper.callables(db, env) => {
+                        Place::bound(callables.into_type(db, env)).into()
+                    }
+                    _ => wrapper
+                        .instance_fallback(db, env)
+                        .member_lookup_with_policy_and_receiver(
+                            db, env, name_str, policy, receiver,
+                        ),
+                },
                 Type::BoundMethod(bound_method) => match name_str {
                     "__self__" => Place::bound(bound_method.self_instance(db)).into(),
-                    "__func__" => {
-                        Place::bound(Type::FunctionLiteral(bound_method.function(db))).into()
+                    "__func__" => Place::bound(bound_method.func(db)).into(),
+                    "__call__" if let Some(callables) = bound_method.callables(db, env) => {
+                        Place::bound(callables.into_type(db, env)).into()
                     }
                     _ => {
                         let result = KnownClass::MethodType
@@ -5943,7 +5973,8 @@ impl<'db> Type<'db> {
                             // it will be looked up on the underlying function object. This
                             // changes the lookup object, so do not forward the bound-method
                             // receiver.
-                            Type::FunctionLiteral(bound_method.function(db))
+                            bound_method
+                                .func(db)
                                 .member_lookup_with_policy_and_receiver(
                                     db, env, name_str, policy, None,
                                 )
@@ -6498,25 +6529,45 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db, env) {
-                    None => CallableBinding::not_callable(self).into(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                match bound_typevar.require_bound_or_constraints(db, env) {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
                         bound.bindings_impl(db, env, recursion_guard)
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        Bindings::from_union(
-                            self,
-                            constraints
-                                .elements(db)
-                                .iter()
-                                .map(|ty| ty.bindings_impl(db, env, recursion_guard)),
-                        )
-                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => Bindings::from_union(
+                        self,
+                        constraints
+                            .elements(db)
+                            .iter()
+                            .map(|ty| ty.bindings_impl(db, env, recursion_guard)),
+                    ),
                 }
             }
 
             Type::BoundMethod(bound_method) => {
-                let signature = bound_method.function(db).signature(db);
+                let Some(function) = bound_method.function(db) else {
+                    return bound_method
+                        .func(db)
+                        .try_upcast_to_callable(db, env)
+                        .map_or_else(
+                            || CallableBinding::not_callable(self).into(),
+                            |callables| {
+                                // Retain the receiver parameter so ordinary argument checking can
+                                // validate the captured class as well as the explicit arguments.
+                                Bindings::from_union(
+                                    self,
+                                    callables.iter().map(|callable| {
+                                        CallableBinding::from_overloads(
+                                            self,
+                                            callable.signatures(db).overloads.iter().cloned(),
+                                        )
+                                        .with_bound_type(bound_method.signature_receiver(db))
+                                        .into()
+                                    }),
+                                )
+                            },
+                        );
+                };
+                let signature = function.signature(db);
                 let self_instance = bound_method.self_instance(db);
                 let signature_receiver = bound_method.signature_receiver(db);
                 // Class-based protocol member lookup has already specialized the method for this
@@ -6771,7 +6822,7 @@ impl<'db> Type<'db> {
                 ),
                 SubclassOfInner::TypeVar(tvar) => {
                     let constructor_instance_type = Type::TypeVar(tvar);
-                    let bindings = match tvar.typevar(db).require_bound_or_constraints(db, env) {
+                    let bindings = match tvar.require_bound_or_constraints(db, env) {
                         TypeVarBoundOrConstraints::UpperBound(bound) => {
                             let constructor = bound.constructor_for_typevar_bound(db, env);
                             if let Type::ClassLiteral(class) = constructor
@@ -6949,6 +7000,17 @@ impl<'db> Type<'db> {
                 KnownInstanceType::FunctoolsPartial(partial)
                 | KnownInstanceType::FunctoolsPartialCall(partial),
             ) => Type::Callable(partial.partial(db)).bindings_impl(db, env, recursion_guard),
+
+            Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
+                wrapper.callables(db, env).map_or_else(
+                    || CallableBinding::not_callable(self).into(),
+                    |callables| {
+                        callables
+                            .into_type(db, env)
+                            .bindings_impl(db, env, recursion_guard)
+                    },
+                )
+            }
 
             Type::KnownInstance(known_instance) => known_instance
                 .instance_fallback(db, env)
@@ -7132,6 +7194,25 @@ impl<'db> Type<'db> {
                     .into(),
                 )
             }
+
+            // Keep the argument's full type in `MethodWrapper` instead of inferring one shared
+            // ParamSpec and return type, which would lose attributes and overload correlations.
+            KnownClass::Classmethod | KnownClass::Staticmethod => Some(
+                Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::standard([Parameter::positional_only(Some(Name::new_static(
+                            "f",
+                        )))
+                        .with_annotated_type(Type::single_callable(
+                            db,
+                            Signature::new(Parameters::gradual_form(), Type::object()),
+                        ))]),
+                        Type::unknown(),
+                    ),
+                )
+                .into(),
+            ),
 
             KnownClass::Property => {
                 let getter_signature = Signature::new(
@@ -7929,18 +8010,12 @@ impl<'db> Type<'db> {
     /// into generic types or other nested structures.
     fn flatten_typevars(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
-            Type::TypeVar(tvar) => {
-                match tvar.typevar(db).bound_or_constraints(db, env) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.flatten_typevars(db, env)
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        constraints.as_type(db, env).flatten_typevars(db, env)
-                    }
-                    // Unbounded typevar is effectively `object`.
-                    None => Type::object(),
+            Type::TypeVar(tvar) => match tvar.require_bound_or_constraints(db, env) {
+                TypeVarBoundOrConstraints::UpperBound(bound) => bound.flatten_typevars(db, env),
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                    constraints.as_type(db, env).flatten_typevars(db, env)
                 }
-            }
+            },
             Type::Union(union) => {
                 // Flatten each element and rebuild through the union builder.
                 UnionType::from_elements(
@@ -8469,6 +8544,7 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::FunctoolsPartial(_)
                 | KnownInstanceType::FunctoolsPartialCall(_)
+                | KnownInstanceType::MethodWrapper(_)
                 | KnownInstanceType::Range { .. } => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
                         *self, scope_id
@@ -9042,7 +9118,7 @@ impl<'db> Type<'db> {
 
             let signatures = match self {
                 Type::FunctionLiteral(function) => function_signatures(function),
-                Type::BoundMethod(method) => function_signatures(method.function(db)),
+                Type::BoundMethod(method) => method.function(db).and_then(function_signatures),
                 Type::Callable(callable) => Some(callable.signatures(db)),
                 _ => None,
             };
@@ -9156,11 +9232,16 @@ impl<'db> Type<'db> {
                 }
             }),
 
-            Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
+            Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::from_callable(
                 db,
-                method
-                    .function(db)
-                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                match method.func(db) {
+                    // The method retains its function identity even when types in the signature
+                    // are promoted. Promoting the function itself would erase its attributes.
+                    Type::FunctionLiteral(function) => Type::FunctionLiteral(
+                        function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    ),
+                    func => func.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                },
                 method
                     .self_instance(db)
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -9645,7 +9726,7 @@ impl<'db> Type<'db> {
                     typevars,
                     visitor,
                 );
-                method.function(db).find_legacy_typevars_impl(
+                method.func(db).find_legacy_typevars_impl(
                     db,
                     env,
                     binding_context,
@@ -9811,6 +9892,15 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeGenericAlias(ty)
                 | KnownInstanceType::LiteralStringAlias(ty) => {
                     ty.inner(db).find_legacy_typevars_impl(
+                        db,
+                        env,
+                        binding_context,
+                        typevars,
+                        visitor,
+                    );
+                }
+                KnownInstanceType::MethodWrapper(wrapper) => {
+                    wrapper.wrapped(db).find_legacy_typevars_impl(
                         db,
                         env,
                         binding_context,
@@ -10026,9 +10116,7 @@ impl<'db> Type<'db> {
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
-            Self::BoundMethod(method) => {
-                Some(TypeDefinition::Function(method.function(db).definition(db)))
-            }
+            Self::BoundMethod(method) => method.func(db).definition(db, env),
             Self::FunctionLiteral(function) => {
                 Some(TypeDefinition::Function(function.definition(db)))
             }
@@ -10189,7 +10277,7 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(function) => Some(function.parameter_span(db, parameter_index)),
             Type::BoundMethod(bound_method) => Some(
                 bound_method
-                    .function(db)
+                    .function(db)?
                     .parameter_span(db, parameter_index),
             ),
             _ => None,
@@ -10216,7 +10304,7 @@ impl<'db> Type<'db> {
     fn function_spans(&self, db: &'db dyn Db) -> Option<FunctionSpans> {
         match self {
             Type::FunctionLiteral(function) => Some(function.spans(db)),
-            Type::BoundMethod(bound_method) => Some(bound_method.function(db).spans(db)),
+            Type::BoundMethod(bound_method) => Some(bound_method.function(db)?.spans(db)),
             _ => None,
         }
     }
@@ -10482,7 +10570,20 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
 
             Type::BoundMethod(method_type) => {
                 // TODO: do we need to replace self?
-                method_type.function(db).variance_of(db, typevar)
+                let variance = method_type.func(db).variance_of(db, env, typevar);
+                if method_type.function(db).is_some() {
+                    variance
+                } else {
+                    // A callable object's type does not include the additional receiver bound
+                    // by classmethod, which is also exposed through `__self__`.
+                    VarianceTerm::join(
+                        db,
+                        [
+                            variance,
+                            method_type.self_instance(db).variance_of(db, env, typevar),
+                        ],
+                    )
+                }
             }
 
             Type::NominalInstance(nominal_instance_type) => {
@@ -11423,6 +11524,9 @@ impl<'db> InvalidTypeExpression<'db> {
             diagnostic.set_primary_annotation_message(format_args!(
                 "Did you mean to use the module's member \
                 `{module_name_final_part}.{module_name_final_part}`?"
+            ));
+            diagnostic.help(format_args!(
+                "Replace with `{module_name_final_part}.{module_name_final_part}`"
             ));
             diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                 format!(".{module_name_final_part}"),

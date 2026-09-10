@@ -1,5 +1,6 @@
 use crate::Db;
 use std::borrow::Cow;
+use std::cell::OnceCell;
 use std::fmt::Display;
 
 use itertools::{Either, Itertools};
@@ -11,7 +12,7 @@ use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::{Type, TypeContext, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
-/// in [`CallArguments::expand`].
+/// in [`CallArgumentExpansions::iter`].
 ///
 /// See: [pyright's `maxTotalOverloadArgTypeExpansionCount`][pyright]
 ///
@@ -328,116 +329,18 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         Some((bound_call_arguments, can_synthesize_signature))
     }
 
-    /// Returns an iterator on performing [argument type expansion].
-    ///
-    /// Each element of the iterator represents a set of argument lists, where each argument list
-    /// contains the same arguments, but with one or more of the argument types expanded.
-    ///
-    /// [argument type expansion]: https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion
-    pub(super) fn expand(
-        &self,
+    /// Prepares lazy argument type expansions for overload resolution.
+    pub(super) fn expansions<'s>(
+        &'s self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> impl Iterator<Item = Expansion<'a, 'db>> + '_ {
-        /// Represents the state of the expansion process.
-        enum State<'a, 'db> {
-            LimitReached(usize),
-            Expanding(ExpandingState<'a, 'db>),
+        env: &'s ProgramEnvironment<'db>,
+    ) -> CallArgumentExpansions<'s, 'a, 'db> {
+        CallArgumentExpansions {
+            arguments: self,
+            db,
+            env,
+            types: OnceCell::new(),
         }
-
-        /// Represents the expanding state with either the initial types or the expanded types.
-        ///
-        /// This is useful to avoid cloning the initial types vector if none of the types can be
-        /// expanded.
-        enum ExpandingState<'a, 'db> {
-            Initial,
-            Expanded(Vec<CallArguments<'a, 'db>>),
-        }
-
-        impl<'a, 'db> ExpandingState<'a, 'db> {
-            fn len(&self) -> usize {
-                match self {
-                    ExpandingState::Initial => 1,
-                    ExpandingState::Expanded(expanded) => expanded.len(),
-                }
-            }
-
-            fn iter<'s>(
-                &'s self,
-                initial: &'s CallArguments<'a, 'db>,
-            ) -> impl Iterator<Item = &'s CallArguments<'a, 'db>> {
-                match self {
-                    ExpandingState::Initial => Either::Left(std::iter::once(initial)),
-                    ExpandingState::Expanded(expanded) => Either::Right(expanded.iter()),
-                }
-            }
-        }
-
-        let env = env.clone();
-        let mut index = 0;
-
-        std::iter::successors(
-            Some(State::Expanding(ExpandingState::Initial)),
-            move |previous| {
-                let state = match previous {
-                    State::LimitReached(index) => return Some(State::LimitReached(*index)),
-                    State::Expanding(expanding_state) => expanding_state,
-                };
-
-                // Find the next type that can be expanded.
-                let expanded_types = loop {
-                    let arg_type = self.argument_types(index)?;
-                    // TODO: For types inferred multiple times with distinct type context, we currently only
-                    // expand the default inference. Note that direct expansion of a type inferred against a
-                    // given declared type would not likely be assignable to other declared types without
-                    // re-inference, and so a more complete implementation would likely have to re-infer the
-                    // argument type against the union a given subset of type contexts before expansion. However,
-                    // this only shows up in very convoluted instances of generic call inference across multiple
-                    // overloads, and is unlikely to happen in practice.
-                    if let Some(arg_type) = arg_type.get_default()
-                        && let Some(expanded_types) = expand_type(db, &env, arg_type)
-                    {
-                        break expanded_types;
-                    }
-                    index += 1;
-                };
-
-                let expansion_size = expanded_types.len() * state.len();
-                if expansion_size > MAX_TOTAL_EXPANSION {
-                    tracing::debug!(
-                        "Skipping argument type expansion as it would exceed the \
-                            maximum number of expansions ({MAX_TOTAL_EXPANSION})"
-                    );
-                    return Some(State::LimitReached(index));
-                }
-
-                let mut expanded_arguments = Vec::with_capacity(expansion_size);
-
-                for pre_expanded_types in state.iter(self) {
-                    for subtype in &expanded_types {
-                        let mut expanded_argument = pre_expanded_types.clone();
-                        expanded_argument.items[index].types =
-                            CallArgumentTypes::new(Some(*subtype));
-                        expanded_arguments.push(expanded_argument);
-                    }
-                }
-
-                // Increment the index to move to the next argument type for the next iteration.
-                index += 1;
-
-                Some(State::Expanding(ExpandingState::Expanded(
-                    expanded_arguments,
-                )))
-            },
-        )
-        .skip(1) // Skip the initial state, which has no expanded types.
-        .map(|state| match state {
-            State::LimitReached(index) => Expansion::LimitReached(index),
-            State::Expanding(ExpandingState::Initial) => {
-                unreachable!("initial state should be skipped")
-            }
-            State::Expanding(ExpandingState::Expanded(expanded)) => Expansion::Expanded(expanded),
-        })
     }
 
     pub(super) fn display<'env>(
@@ -497,9 +400,145 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     }
 }
 
-/// Represents a single element of the expansion process for argument types for [`expand`].
-///
-/// [`expand`]: CallArguments::expand
+type TypeExpansion<'db> = Option<Vec<Type<'db>>>;
+
+/// Shares each argument's type expansion between overload checks and argument list expansion.
+pub(super) struct CallArgumentExpansions<'s, 'a, 'db> {
+    arguments: &'s CallArguments<'a, 'db>,
+    db: &'db dyn Db,
+    env: &'s ProgramEnvironment<'db>,
+    types: OnceCell<Box<[OnceCell<TypeExpansion<'db>>]>>,
+}
+
+impl<'a, 'db> CallArgumentExpansions<'_, 'a, 'db> {
+    /// Returns the expanded alternatives of an argument, computing them at most once.
+    pub(super) fn argument_types(&self, index: usize) -> Option<&[Type<'db>]> {
+        // TODO: For types inferred multiple times with distinct type context, we currently only
+        // expand the default inference. Note that direct expansion of a type inferred against a
+        // given declared type would not likely be assignable to other declared types without
+        // re-inference, and so a more complete implementation would likely have to re-infer the
+        // argument type against the union a given subset of type contexts before expansion. However,
+        // this only shows up in very convoluted instances of generic call inference across multiple
+        // overloads, and is unlikely to happen in practice.
+        let argument_type = self.arguments.argument_types(index)?.get_default()?;
+        // Most calls need no expansion; allocate the cache only when a check asks for it.
+        let types = self.types.get_or_init(|| {
+            std::iter::repeat_with(OnceCell::new)
+                .take(self.arguments.len())
+                .collect()
+        });
+        types[index]
+            .get_or_init(|| expand_type(self.db, self.env, argument_type))
+            .as_deref()
+    }
+
+    /// Whether a starred positional argument can expand into alternative types.
+    pub(super) fn has_expandable_variadic(&self) -> bool {
+        self.arguments
+            .iter()
+            .enumerate()
+            .any(|(index, (argument, _))| {
+                matches!(argument, Argument::Variadic) && self.argument_types(index).is_some()
+            })
+    }
+
+    /// Iterates over argument lists with successively more argument types expanded.
+    ///
+    /// See [argument type expansion](https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion).
+    pub(super) fn iter(&self) -> impl Iterator<Item = Expansion<'a, 'db>> + '_ {
+        /// Represents the state of the expansion process.
+        enum State<'a, 'db> {
+            LimitReached(usize),
+            Expanding(ExpandingState<'a, 'db>),
+        }
+
+        /// Represents the expanding state with either the initial types or the expanded types.
+        ///
+        /// This is useful to avoid cloning the initial types vector if none of the types can be
+        /// expanded.
+        enum ExpandingState<'a, 'db> {
+            Initial,
+            Expanded(Vec<CallArguments<'a, 'db>>),
+        }
+
+        impl<'a, 'db> ExpandingState<'a, 'db> {
+            fn len(&self) -> usize {
+                match self {
+                    ExpandingState::Initial => 1,
+                    ExpandingState::Expanded(expanded) => expanded.len(),
+                }
+            }
+
+            fn iter<'s>(
+                &'s self,
+                initial: &'s CallArguments<'a, 'db>,
+            ) -> impl Iterator<Item = &'s CallArguments<'a, 'db>> {
+                match self {
+                    ExpandingState::Initial => Either::Left(std::iter::once(initial)),
+                    ExpandingState::Expanded(expanded) => Either::Right(expanded.iter()),
+                }
+            }
+        }
+
+        let mut index = 0;
+
+        std::iter::successors(
+            Some(State::Expanding(ExpandingState::Initial)),
+            move |previous| {
+                let state = match previous {
+                    State::LimitReached(index) => return Some(State::LimitReached(*index)),
+                    State::Expanding(expanding_state) => expanding_state,
+                };
+
+                // Find the next type that can be expanded.
+                let expanded_types = loop {
+                    self.arguments.argument_types(index)?;
+                    if let Some(expanded_types) = self.argument_types(index) {
+                        break expanded_types;
+                    }
+                    index += 1;
+                };
+
+                let expansion_size = expanded_types.len() * state.len();
+                if expansion_size > MAX_TOTAL_EXPANSION {
+                    tracing::debug!(
+                        "Skipping argument type expansion as it would exceed the \
+                            maximum number of expansions ({MAX_TOTAL_EXPANSION})"
+                    );
+                    return Some(State::LimitReached(index));
+                }
+
+                let mut expanded_arguments = Vec::with_capacity(expansion_size);
+
+                for pre_expanded_types in state.iter(self.arguments) {
+                    for subtype in expanded_types {
+                        let mut expanded_argument = pre_expanded_types.clone();
+                        expanded_argument.items[index].types =
+                            CallArgumentTypes::new(Some(*subtype));
+                        expanded_arguments.push(expanded_argument);
+                    }
+                }
+
+                // Increment the index to move to the next argument type for the next iteration.
+                index += 1;
+
+                Some(State::Expanding(ExpandingState::Expanded(
+                    expanded_arguments,
+                )))
+            },
+        )
+        .skip(1) // Skip the initial state, which has no expanded types.
+        .map(|state| match state {
+            State::LimitReached(index) => Expansion::LimitReached(index),
+            State::Expanding(ExpandingState::Initial) => {
+                unreachable!("initial state should be skipped")
+            }
+            State::Expanding(ExpandingState::Expanded(expanded)) => Expansion::Expanded(expanded),
+        })
+    }
+}
+
+/// Represents a single element of the expansion process for argument types for [`CallArgumentExpansions::iter`].
 pub(super) enum Expansion<'a, 'db> {
     /// Indicates that the expansion process has reached the maximum number of argument lists
     /// that can be generated in a single step.
@@ -531,15 +570,4 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 
         Self { items }
     }
-}
-
-/// Returns `true` if the type can be expanded into its subtypes.
-///
-/// In other words, it returns `true` if [`expand_type`] returns [`Some`] for the given type.
-pub(crate) fn is_expandable_type<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    ty: Type<'db>,
-) -> bool {
-    expand_type(db, env, ty).is_some()
 }

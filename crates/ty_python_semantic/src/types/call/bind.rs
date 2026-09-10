@@ -31,7 +31,7 @@ use crate::lint::LintMetadata;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::PyIndex;
 use crate::types::ProgramEnvironment;
-use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
+use crate::types::call::arguments::{CallArgumentExpansions, CallArgumentTypes, Expansion};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, PathBound, PathBoundSolution, PathBounds, SolutionPaths,
@@ -54,7 +54,9 @@ use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
 };
 use crate::types::infer::original_class_type;
-use crate::types::known_instance::{FieldInstance, InternedConstraintSetSolution};
+use crate::types::known_instance::{
+    FieldInstance, InternedConstraintSetSolution, MethodWrapper, MethodWrapperKind,
+};
 use crate::types::recursive::RecursiveInputs;
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
@@ -1982,9 +1984,10 @@ impl<'db> Bindings<'db> {
                     Type::BoundMethod(bound_method)
                         if let Type::PropertyInstance(property) =
                             bound_method.self_instance(db)
-                            && is_property_method(db, env, bound_method.function(db)) =>
+                            && let Some(function) = bound_method.function(db)
+                            && is_property_method(db, env, function) =>
                     {
-                        match bound_method.function(db).name(db).as_str() {
+                        match function.name(db).as_str() {
                             "setter" => {
                                 if let [Some(_), Some(setter)] = overload.parameter_types() {
                                     overload.set_return_type(Type::PropertyInstance(
@@ -2353,9 +2356,11 @@ impl<'db> Bindings<'db> {
                                         signature_generic_context(function.signature(db))
                                     }
 
-                                    Type::BoundMethod(bound_method) => signature_generic_context(
-                                        bound_method.function(db).signature(db),
-                                    ),
+                                    Type::BoundMethod(bound_method) => {
+                                        bound_method.function(db).and_then(|function| {
+                                            signature_generic_context(function.signature(db))
+                                        })
+                                    }
 
                                     Type::Callable(callable) => {
                                         signature_generic_context(callable.signatures(db))
@@ -3256,6 +3261,17 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(class @ (KnownClass::Classmethod | KnownClass::Staticmethod)) => {
+                            if let [Some(wrapped)] = overload.parameter_types() {
+                                let kind = match class {
+                                    KnownClass::Classmethod => MethodWrapperKind::Classmethod,
+                                    _ => MethodWrapperKind::Staticmethod,
+                                };
+                                overload
+                                    .set_return_type(MethodWrapper::wrap(db, env, *wrapped, kind));
+                            }
+                        }
+
                         Some(KnownClass::Property) => {
                             if let [getter, setter, deleter, ..] = overload.parameter_types() {
                                 let getter = getter.filter(|ty| !ty.is_none(db));
@@ -3793,8 +3809,9 @@ impl<'db> CallableBinding<'db> {
         // provisional. If we have an arity-2 overload and an arity-3 overload, and the call has
         // `*arg` where `arg` is a union of a 2-tuple and a 3-tuple, we shouldn't eliminate any
         // overload for arity reasons before trying argument expansion.
+        let argument_expansions = call_arguments.expansions(db, env);
         let (should_retry_after_provisional_arity, overloads_for_expansion) =
-            if self.should_retry_after_provisional_arity(db, env, call_arguments.as_ref()) {
+            if self.should_retry_after_provisional_arity(&argument_expansions) {
                 // We will retry all overloads after argument expansion.
                 (true, (0..self.overloads.len()).collect())
             } else {
@@ -3907,7 +3924,7 @@ impl<'db> CallableBinding<'db> {
 
         // Step 3: Perform "argument type expansion". Reference:
         // https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion
-        let mut expansions = call_arguments.expand(db, env).peekable();
+        let mut expansions = argument_expansions.iter().peekable();
 
         // Return early if there are no argument types to expand.
         if expansions.peek().is_none() {
@@ -3929,7 +3946,7 @@ impl<'db> CallableBinding<'db> {
             let Some(argument_type) = argument_types.get_default() else {
                 continue;
             };
-            if is_expandable_type(db, env, argument_type) {
+            if argument_expansions.argument_types(argument_index).is_some() {
                 continue;
             }
             let is_argument_assignable_to_any_overload = self.overloads.iter().any(|overload| {
@@ -4161,7 +4178,7 @@ impl<'db> CallableBinding<'db> {
         env: &ProgramEnvironment<'db>,
         call_arguments: &CallArguments<'_, 'db>,
     ) -> SmallVec<[usize; 1]> {
-        if self.should_retry_after_provisional_arity(db, env, call_arguments) {
+        if self.should_retry_after_provisional_arity(&call_arguments.expansions(db, env)) {
             (0..self.overloads.len()).collect()
         } else {
             self.matching_overloads().map(|(index, _)| index).collect()
@@ -4170,18 +4187,11 @@ impl<'db> CallableBinding<'db> {
 
     fn should_retry_after_provisional_arity(
         &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        call_arguments: &CallArguments<'_, 'db>,
+        expansions: &CallArgumentExpansions<'_, '_, 'db>,
     ) -> bool {
         self.overloads.len() > 1
             && self.matching_overloads().count() < self.overloads.len()
-            && call_arguments.iter().any(|(argument, argument_types)| {
-                matches!(argument, Argument::Variadic)
-                    && argument_types
-                        .get_default()
-                        .is_some_and(|argument_type| is_expandable_type(db, env, argument_type))
-            })
+            && expansions.has_expandable_variadic()
     }
 
     /// Filter overloads based on variadic argument to variadic parameter match.
@@ -4555,15 +4565,15 @@ impl<'db> CallableBinding<'db> {
         &self,
         db: &'db dyn Db,
     ) -> impl Iterator<Item = OverloadLiteral<'db>> + Clone {
-        if let Type::Callable(callable) = self.signature_type {
+        let signature_type = match self.signature_type {
+            Type::BoundMethod(bound) => bound.func(db),
+            ty => ty,
+        };
+        if let Type::Callable(callable) = signature_type {
             return Either::Left(callable.deprecated(db).into_iter());
         }
-        let function = match self.signature_type {
-            Type::FunctionLiteral(function) => Some(function),
-            Type::BoundMethod(bound) => Some(bound.function(db)),
-            _ => None,
-        };
-        let (overloads, implementation) = function
+        let (overloads, implementation) = signature_type
+            .as_function_literal()
             .map(|function| function.overloads_and_implementation(db))
             .unwrap_or_default();
         if let Some(implementation) =
@@ -4696,10 +4706,9 @@ impl<'db> CallableBinding<'db> {
                 // [1]: https://github.com/astral-sh/ty/issues/274#issuecomment-2881856028
                 let function_type_and_kind = match self.signature_type {
                     Type::FunctionLiteral(function) => Some((FunctionKind::Function, function)),
-                    Type::BoundMethod(bound_method) => Some((
-                        FunctionKind::BoundMethod,
-                        bound_method.function(context.db()),
-                    )),
+                    Type::BoundMethod(bound_method) => bound_method
+                        .function(context.db())
+                        .map(|function| (FunctionKind::BoundMethod, function)),
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
                         function,
                     )) => Some((FunctionKind::MethodWrapper, function)),
@@ -5970,7 +5979,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         let callable = argument_bindings.single_item()?.callable();
                         let (function, is_bound_method) = match callable.signature_type {
                             Type::FunctionLiteral(function) => (function, false),
-                            Type::BoundMethod(method) => (method.function(db), true),
+                            Type::BoundMethod(method) => (method.function(db)?, true),
                             _ => return None,
                         };
                         let source_binding = callable
@@ -7724,15 +7733,17 @@ impl<'db> Binding<'db> {
         let parameter_type = specialized_overload.signature.parameters()
             [specialized_parameter.index]
             .annotated_type();
-        let parameter_type = specialized_overload
-            .merged_specialization(db)
-            .map_or(parameter_type, |specialization| {
-                parameter_type.apply_specialization(db, specialization)
-            });
-
-        (!parameter_type.has_dynamic(db, env)
-            && !parameter_type.has_typevar_or_typevar_instance(db, env))
-        .then_some(parameter_type)
+        // Preserve gradual context such as `Callable[[int], Any]`, while marking unsolved
+        // type variables in the same way as for arguments to an ordinary generic call.
+        Some(parameter_type.apply_optional_specialization(
+            db,
+            specialized_overload.argument_type_context_specialization(
+                db,
+                env,
+                constraints,
+                call_expression_tcx,
+            ),
+        ))
     }
 
     /// Returns the expected tuple element for an argument matched to a `TypeVarTuple`.
@@ -7875,9 +7886,11 @@ impl<'db> Binding<'db> {
 
             // A `P.args`/`P.kwargs` parameter receives context from the `ParamSpec` specialization
             // checked during the previous fixpoint round.
-            if let Some(paramspec) = paramspec
-                && let Some(callable) = paramspec_callable(paramspec)
-                && let Some(specialized_parameter_type) =
+            if let Some(paramspec) = paramspec {
+                // Specializing `P.args` or `P.kwargs` directly yields the entire parameter list,
+                // which is not a valid type context for an individual argument.
+                let callable = paramspec_callable(paramspec)?;
+                let specialized_parameter_type =
                     self.paramspec_argument_context(&ParamSpecArgumentContext {
                         db,
                         env,
@@ -7887,8 +7900,7 @@ impl<'db> Binding<'db> {
                         arguments_types,
                         argument_index,
                         call_expression_tcx,
-                    })
-            {
+                    })?;
                 return Some(ArgumentTypeContext::paramspec(
                     original_parameter_type,
                     specialized_parameter_type,
@@ -7992,7 +8004,19 @@ impl<'db> Binding<'db> {
                 let argument_constraints = argument_specialization
                     .and_then(|specialization| specialization.get(db, typevar))
                     .filter(|ty| !ty.has_provisional_marker(db, env))
-                    .map(|ty| ty.promote(db, env));
+                    .map(|ty| {
+                        let promoted = ty.promote(db, env);
+                        // Context for other arguments must still satisfy the type variable's
+                        // bound. For example, `Literal["a"]` satisfies `LiteralString`, but
+                        // promoting it to `str` would violate that bound.
+                        if let Some(bound) = typevar.typevar(db).upper_bound(db, env)
+                            && !promoted.is_assignable_to(db, env, bound)
+                        {
+                            ty
+                        } else {
+                            promoted
+                        }
+                    });
 
                 // TODO: We should similarly combine both the call expression and argument constraints
                 // here. We currently only rely on argument constraints when there is no explicit declared
@@ -8608,7 +8632,7 @@ impl<'db> CallableDescription<'db> {
     ) -> Option<ClassLiteral<'db>> {
         let function = match callable_type {
             Type::FunctionLiteral(function) => function,
-            Type::BoundMethod(method) => method.function(db),
+            Type::BoundMethod(method) => method.function(db)?,
             Type::ClassLiteral(class) => return Some(class),
             _ => return None,
         };
@@ -8686,7 +8710,7 @@ impl<'db> CallableDescription<'db> {
                 })
             }
             Type::BoundMethod(bound_method) => Some({
-                let function = bound_method.function(db);
+                let function = bound_method.function(db)?;
                 let kind = if function.name(db) == "__init__" {
                     None
                 } else {

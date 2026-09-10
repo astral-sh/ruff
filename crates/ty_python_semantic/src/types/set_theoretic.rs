@@ -11,7 +11,7 @@ use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
 use crate::types::{InstanceProjection, Type, TypePair, TypeQualifiers};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Program};
 
 pub(crate) mod builder;
 mod generic_gradual_intersections;
@@ -138,6 +138,20 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
+        // Relation checks expand the same target union for many different source types.
+        self.cached_expand_aliases(db, env.program(db))
+    }
+
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, program| {
+            result.cycle_normalized(db, &ProgramEnvironment::from_program(program), *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn cached_expand_aliases(self, db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
+        let env = &ProgramEnvironment::from_program(program);
         // Expose both alias forms without expanding aliases inside containers during reduction.
         let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
         let mut pending = vec![Type::Union(self)];
@@ -267,7 +281,8 @@ impl<'db> UnionType<'db> {
         let mut iter = elements.iter().enumerate();
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty)?;
-            if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_) | Type::Recursive(_)) {
+            // The builder unpacks `TypeAlias` nodes but preserves structural recursive types.
+            if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_)) {
                 let mut builder = UnionBuilder::new(db, env);
                 for prev in &elements[..i] {
                     builder.add_in_place(*prev);
@@ -1289,19 +1304,14 @@ fn expand_intersection_typevars_and_newtypes<'db>(
     let mut builder = IntersectionBuilder::new(db, env);
     for &element in positive {
         match element {
-            Type::TypeVar(tvar) => {
-                match tvar.typevar(db).bound_or_constraints(db, env) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        builder.add_positive_in_place(bound);
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        builder.add_positive_in_place(constraints.as_type(db, env));
-                    }
-                    // Type variables without bounds or constraints implicitly have `object`
-                    // as their upper bound, and adding `object` to an intersection is always a no-op
-                    None => {}
+            Type::TypeVar(tvar) => match tvar.require_bound_or_constraints(db, env) {
+                TypeVarBoundOrConstraints::UpperBound(bound) => {
+                    builder.add_positive_in_place(bound);
                 }
-            }
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                    builder.add_positive_in_place(constraints.as_type(db, env));
+                }
+            },
             Type::NewTypeInstance(newtype) => {
                 builder.add_positive_in_place(newtype.concrete_base_type(db));
             }

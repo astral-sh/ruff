@@ -94,10 +94,10 @@ mod tests;
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
-        RecursiveType::initial(db, definition, id, parameters)
+        Type::Recursive(RecursiveType::initial(db, definition, id, parameters))
     },
-    cycle_fn=|db, _, previous: &Type<'db>, result: Type<'db>, definition: Definition<'db>, _: Option<crate::types::GenericContext<'db>>| {
-        RecursiveType::recover(db, &ProgramEnvironment::from_definition(definition), *previous, result)
+    cycle_fn=|db, cycle: &salsa::Cycle, _: &Type<'db>, result: Type<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
+        RecursiveType::recover(db, definition, cycle.id(), parameters, result)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
