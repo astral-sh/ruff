@@ -1546,6 +1546,122 @@ class C:
 reveal_type(generic_context(C.f))
 ```
 
+## Binding `Self` preserves receiver requirements
+
+Binding a method with `__get__` does not guarantee that its receiver belongs to the defining class.
+Calling the bound method still checks that requirement, whether `self` is implicitly or explicitly
+annotated with `Self`.
+
+```py
+from typing import Self
+
+class Counter:
+    value: int = 0
+
+    def increment(self) -> Self:
+        self.value += 1
+        return self
+
+    def copy(self: Self, /) -> Self:
+        return self
+
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class Child(Counter): ...
+
+reveal_type(Counter.increment.__get__(Child())())  # revealed: Child
+reveal_type(Counter.copy.__get__(Child())())  # revealed: Child
+Counter.increment.__get__(1)()  # error: [invalid-argument-type]
+Counter.copy.__get__(1)()  # error: [invalid-argument-type]
+```
+
+A classmethod requires a subclass of its defining class as its receiver.
+
+```py
+from inspect import getattr_static
+
+create = getattr_static(Counter, "create")
+reveal_type(create.__get__(None, Child)())  # revealed: Child
+create.__get__(None, int)()  # error: [invalid-argument-type]
+```
+
+## `Self` in variadic receivers
+
+A variadic parameter can receive both the bound receiver and explicit arguments. The receiver must
+belong to the defining class, and the explicit arguments must match the receiver's `Self`. These
+requirements also apply to unpacked tuple annotations.
+
+```py
+from typing import Self
+
+class Chain:
+    def first(*values: Self) -> Self:
+        return values[0]
+
+    def first_tuple(*values: *tuple[Self, ...]) -> Self:
+        return values[0]
+
+class Child(Chain): ...
+
+reveal_type(Chain.first.__get__(Child())(Child()))  # revealed: Child
+reveal_type(Chain.first_tuple.__get__(Child())(Child()))  # revealed: Child
+Chain.first.__get__(1)()  # error: [invalid-argument-type]
+Chain.first_tuple.__get__(1)()  # error: [invalid-argument-type]
+Child().first(Chain())  # error: [invalid-argument-type]
+Child().first_tuple(Chain())  # error: [invalid-argument-type]
+```
+
+## Bound `Self` with overloaded methods
+
+Each overload retains its receiver requirement. A `bool` argument can select either overload, so
+both alternatives must accept the receiver and the remaining arguments.
+
+```py
+from typing import Literal, Self, overload
+
+class Token:
+    @overload
+    def choose(self, flag: Literal[True], value: Self) -> Self: ...
+    @overload
+    def choose(self, flag: Literal[False], value: Self) -> Self: ...
+    def choose(self, flag: bool, value: Self) -> Self:
+        return value
+
+class Child(Token): ...
+
+def check(flag: bool):
+    reveal_type(Child().choose(flag, Child()))  # revealed: Child
+    Child().choose(flag, Token())  # error: [no-matching-overload]
+    Token.choose.__get__(1)(flag, 1)  # error: [no-matching-overload]
+```
+
+## Bound `Self` in overloaded callback parameters
+
+A callback is checked with the parameter type of each overload. Binding `Self` must preserve that
+distinction: a callback that returns its argument returns a `Child` for the first overload, but a
+`str` for the second.
+
+```py
+from collections.abc import Callable
+from typing import Literal, Self, overload
+
+class Mapper:
+    @overload
+    def apply(self, flag: Literal[True], callback: Callable[[Self], str]) -> str: ...
+    @overload
+    def apply(self, flag: Literal[False], callback: Callable[[str], str]) -> str: ...
+    def apply(self, flag: bool, callback: Callable[..., str]) -> str:
+        return callback(self)
+
+class Child(Mapper): ...
+
+Child().apply(True, lambda value: value)  # error: [no-matching-overload]
+reveal_type(Child().apply(False, lambda value: value))  # revealed: str
+Mapper.apply.__get__(1)(True, lambda value: "text")  # error: [no-matching-overload]
+```
+
 ## Non-positional first parameters
 
 This makes sure that we don't bind `self` if it's not a positional parameter:

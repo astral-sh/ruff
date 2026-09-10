@@ -73,9 +73,9 @@ use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
-    UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
+    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SelfBinding, SpecialFormType,
+    TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -5835,12 +5835,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         }
 
                         let parameter = &parameters[parameter_index];
-                        let declared_type = matched_parameter
-                            .expected_type
-                            .unwrap_or_else(|| parameter.annotated_type());
-                        let argument_type = matched_parameter
-                            .argument_type
-                            .or_else(|| argument_types.try_get_for_declared_type(declared_type))?;
+                        let argument_type = matched_parameter.argument_type.or_else(|| {
+                            argument_types.try_get_for_declared_type(parameter.annotated_type())
+                        })?;
 
                         Some(ArgumentRelation::new(
                             argument_index,
@@ -6524,14 +6521,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 .iter()
                 .filter(|matched| matched.index == parameter_index)
             {
-                let declared_type = matched
-                    .expected_type
-                    .unwrap_or_else(|| parameter.annotated_type());
-                actual.push(
-                    matched
-                        .argument_type
-                        .unwrap_or_else(|| argument_types.get_for_declared_type(declared_type)),
-                );
+                actual.push(matched.argument_type.unwrap_or_else(|| {
+                    argument_types.get_for_declared_type(parameter.annotated_type())
+                }));
             }
         }
 
@@ -7242,7 +7234,8 @@ pub struct MatchedParameter<'db> {
     /// matching runs.
     argument_type: Option<Type<'db>>,
 
-    /// The tuple element expected at this position in an unpacked variadic parameter.
+    /// The expected type after binding `Self` or selecting an unpacked tuple element.
+    /// Contextual argument types are still cached by the original parameter annotation.
     expected_type: Option<Type<'db>>,
 
     /// Why this parameter match exists.
@@ -8093,6 +8086,45 @@ impl<'db> Binding<'db> {
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
         self.argument_matches = matcher.finish(db, env);
+
+        if arguments
+            .iter()
+            .next()
+            .is_some_and(|(argument, _)| matches!(argument, Argument::Synthetic))
+            && let Type::BoundMethod(method) = self.callable_type
+            && method.function(db).is_some()
+        {
+            self.bind_self(db, env, method.typing_self_type(db));
+        }
+    }
+
+    /// Fixes `Self` for explicit arguments while preserving the receiver's declared type.
+    fn bind_self(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, self_type: Type<'db>) {
+        let mapping = TypeMapping::BindSelf(SelfBinding::new(
+            db,
+            env,
+            self_type,
+            self.signature.definition.map(BindingContext::Definition),
+        ));
+        // The synthetic receiver must still satisfy the original annotation and its bounds,
+        // including when it shares a variadic parameter with explicit arguments.
+        for argument in self.argument_matches.iter_mut().skip(1) {
+            for parameter in &mut argument.parameters {
+                let original = parameter.expected_type.unwrap_or_else(|| {
+                    self.signature.parameters()[parameter.index].annotated_type()
+                });
+                let bound = original.apply_type_mapping(db, env, &mapping, TypeContext::default());
+                if bound != original {
+                    parameter.expected_type = Some(bound);
+                }
+            }
+        }
+        // Constructor results can contain the caller's `Self`, which is already bound.
+        self.return_ty = self.normalized_constructor_return(db).unwrap_or_else(|| {
+            self.signature
+                .return_ty
+                .apply_type_mapping(db, env, &mapping, TypeContext::default())
+        });
     }
 
     fn check_types(

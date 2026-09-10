@@ -6393,15 +6393,6 @@ impl<'db> Type<'db> {
                         }
                     });
 
-                    // `Self` is fixed by the receiver, before other arguments can widen it.
-                    let overloads = overloads.map(|overload| {
-                        overload.apply_self_with_receiver(
-                            db,
-                            env,
-                            self_instance,
-                            bound_method.typing_self_type(db),
-                        )
-                    });
                     CallableBinding::from_overloads(self, overloads)
                         .with_bound_type(self_instance)
                         .into()
