@@ -17,6 +17,7 @@ use std::cell::OnceCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
+use camino::Utf8PathBuf;
 use compact_str::CompactString;
 use itertools::Either;
 use ruff_db::system::FileType;
@@ -278,13 +279,11 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
         &self,
     ) -> impl Iterator<Item = Cow<'_, ModuleDirectory<'db>>> {
         match &self.position {
-            Position::Root(paths) => Either::Left(paths.iter(self.context).map(|path| {
-                Cow::Owned(ModuleDirectory::new(
-                    self.context,
-                    path.to_module_path(),
-                    Some(true),
-                ))
-            })),
+            Position::Root(paths) => Either::Left(
+                paths
+                    .iter(self.context)
+                    .map(|path| Cow::Owned(ModuleDirectory::new(self.context, path.clone()))),
+            ),
             Position::Prefix(resolver) => Either::Right(
                 resolver
                     .candidates(self.context)
@@ -476,17 +475,14 @@ fn child_directory_names<'db>(db: &'db dyn Db, parent: DirectoryParent<'db>) -> 
         ),
     };
     let context = ResolverContext::new(db, resolver_environment, mode);
+    let relative_path: Utf8PathBuf = parent
+        .map(|parent| parent.components().collect())
+        .unwrap_or_default();
     let mut names = BTreeSet::new();
 
     for search_path in search_paths(db, context.resolver_environment, context.mode) {
-        let mut path = search_path.to_module_path();
-        if let Some(parent) = parent {
-            for component_name in parent.components() {
-                path.push(component_name);
-            }
-        }
-
-        let directory = ModuleDirectory::new(&context, path, None);
+        let directory =
+            ModuleDirectory::from_parts(&context, search_path.clone(), relative_path.clone(), None);
         for entry in directory.entries(db) {
             if entry.file_type() == FileType::Directory
                 && let Some(name) = entry.file_name()
@@ -571,7 +567,7 @@ struct CachedCandidate {
 impl CachedCandidate {
     fn new(db: &dyn Db, candidate: &ModuleResolutionCandidate<'_>) -> Self {
         Self {
-            path: candidate.directory.path().clone(),
+            path: candidate.directory.to_module_path(),
             enumeration_allowed: candidate.directory.enumeration_allowed(db),
             module: candidate.module,
             py_typed: candidate.py_typed,
@@ -581,9 +577,9 @@ impl CachedCandidate {
 
     fn restore<'db>(&self, context: &ResolverContext<'db>) -> ModuleResolutionCandidate<'db> {
         ModuleResolutionCandidate {
-            directory: ModuleDirectory::new(
+            directory: ModuleDirectory::from_module_path(
                 context,
-                self.path.clone(),
+                &self.path,
                 Some(self.enumeration_allowed),
             ),
             module: self.module,
@@ -1134,8 +1130,7 @@ fn discover_roots<'db, 'a>(
         }));
         // Defer file probes after stdlib until we know that stdlib does not win.
         pending_stub_paths.extend(stub_paths.after_stdlib.iter().filter(|search_path| {
-            ModuleDirectory::new(context, search_path.to_module_path(), Some(true))
-                .may_contain_name(stub_name)
+            ModuleDirectory::new(context, (*search_path).clone()).may_contain_name(stub_name)
         }));
     }
 
