@@ -1711,6 +1711,8 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 )
             }
             Type::Recursive(recursive) => {
+                // Anonymous recursive binders are not Python type annotation syntax.
+                f.set_invalid_type_annotation();
                 if let Some(index) = self
                     .settings
                     .recursive_binders
