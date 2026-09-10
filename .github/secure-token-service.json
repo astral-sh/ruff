@@ -15,6 +15,14 @@
       "on": ["workflow_dispatch"],
       "permissions": { "contents": "write", "pull_requests": "write" },
       "target": "ruff"
+    },
+    {
+      "caller": "ruff",
+      "environment": "release",
+      "caller_workflow": "release.yml",
+      "on": ["workflow_dispatch"],
+      "permissions": { "contents": "write", "workflows": "write" },
+      "target": "ruff"
     }
   ]
 }
