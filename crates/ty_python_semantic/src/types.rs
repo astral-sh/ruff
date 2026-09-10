@@ -6310,10 +6310,7 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                if !matches!(
-                    bound_method.func(db),
-                    Type::FunctionLiteral(_) | Type::Callable(_)
-                ) {
+                let Some(signature) = bound_method.function_signatures(db) else {
                     return bound_method
                         .func(db)
                         .try_upcast_to_callable(db, env)
@@ -6335,8 +6332,7 @@ impl<'db> Type<'db> {
                                 )
                             },
                         );
-                }
-                let signature = bound_method.unbound_signatures(db);
+                };
                 let self_instance = bound_method.self_instance(db);
                 let signature_receiver = bound_method.signature_receiver(db);
                 // Class-based protocol member lookup has already specialized the method for this

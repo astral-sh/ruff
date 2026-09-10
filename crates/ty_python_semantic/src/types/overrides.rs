@@ -1016,12 +1016,8 @@ fn method_override_types<'db>(
             if matches!(
                 subclass_method.func(db),
                 Type::FunctionLiteral(_) | Type::Callable(_)
-            ) && matches!(
-                superclass_method.func(db),
-                Type::FunctionLiteral(_) | Type::Callable(_)
-            ) =>
+            ) && let Some(superclass_signature) = superclass_method.function_signatures(db) =>
         {
-            let superclass_signature = superclass_method.unbound_signatures(db);
             let explicit_receiver = match superclass_signature.overloads.as_slice() {
                 [signature] => signature
                     .parameters()
@@ -1053,13 +1049,13 @@ fn method_override_types<'db>(
                     env,
                     receiver,
                     typing_self_type,
-                )),
+                )?),
                 Type::Callable(superclass_method.into_callable_type_with_receiver(
                     db,
                     env,
                     receiver,
                     typing_self_type,
-                )),
+                )?),
             )
         }
         _ => (subclass_type, superclass_type),

@@ -213,14 +213,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     function.signature(db),
                     function.name(db),
                 )),
-                Type::BoundMethod(method)
-                    if matches!(
-                        method.func(db),
-                        Type::FunctionLiteral(_) | Type::Callable(_)
-                    ) =>
-                {
+                Type::BoundMethod(method) if let Some(signatures) = method.bound_signatures(db) => {
                     Some(FunctionInfo::Method(
-                        method.bound_signatures(db),
+                        signatures,
                         method.function(db).map(|function| {
                             CallableDescription::defining_class(db, *test_type)
                                 .map(|class| {

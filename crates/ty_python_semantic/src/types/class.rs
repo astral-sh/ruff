@@ -2416,13 +2416,14 @@ impl<'db> ClassType<'db> {
             // `Color("red")`, instead of the overloaded signature of `EnumMeta.__call__` which also accounts
             // for dynamic Enum creation.
             let is_actual_enum = enum_metadata(db, self.class_literal(db)).is_some();
-            if !is_actual_enum {
-                let callable = if receiver == lookup_type {
+            if !is_actual_enum
+                && let Some(callable) = if receiver == lookup_type {
                     metaclass_dunder_call_function.into_callable_type(db)
                 } else {
                     metaclass_dunder_call_function
                         .into_callable_type_with_receiver(db, env, receiver, receiver)
-                };
+                }
+            {
                 return CallableTypes::one(callable);
             }
         }
@@ -2566,22 +2567,23 @@ impl<'db> ClassType<'db> {
                         new_function =
                             new_function.with_inherited_generic_context(db, class_generic_context);
                     }
-                    CallableTypes::one(
-                        new_function
-                            .into_bound_method_type(db, instance_type)
-                            .into_callable_type(db),
-                    )
-                } else {
-                    // Fallback if no `object.__new__` is found.
-                    CallableTypes::one(CallableType::single(
-                        db,
-                        Signature::new_generic(
-                            class_generic_context,
-                            Parameters::empty(),
-                            instance_type,
-                        ),
-                    ))
+                    if let Some(callable) = new_function
+                        .into_bound_method_type(db, instance_type)
+                        .into_callable_type(db)
+                    {
+                        return CallableTypes::one(callable);
+                    }
                 }
+
+                // Fallback if no `object.__new__` is found.
+                CallableTypes::one(CallableType::single(
+                    db,
+                    Signature::new_generic(
+                        class_generic_context,
+                        Parameters::empty(),
+                        instance_type,
+                    ),
+                ))
             }
         }
     }
