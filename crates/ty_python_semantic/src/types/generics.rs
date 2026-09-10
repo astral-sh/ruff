@@ -1421,18 +1421,17 @@ impl<'db> Specialization<'db> {
                     // An invariant type argument cannot be materialized in isolation. Keep the
                     // specialized argument and record the materialization on this specialization.
                     // Comparing both mappings distinguishes substituted gradual types from
-                    // unrelated gradual types already present in the argument. Use separate
-                    // visitors because their transformation caches are keyed only by type.
+                    // unrelated gradual types already present in the argument.
                     let specialized = ty.apply_type_mapping_impl(
                         db,
                         &TypeMapping::ApplySpecialization(*specialization),
                         tcx,
-                        &visitor.fresh(),
+                        visitor,
                     );
 
                     if new_materialization_kind.is_none() {
                         let materialized =
-                            ty.apply_type_mapping_impl(db, type_mapping, tcx, &visitor.fresh());
+                            ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
                         if specialized != materialized {
                             new_materialization_kind = Some(*materialization_kind);
                         }

@@ -997,6 +997,31 @@ A.bar(5)
 A.bar(x=10)
 ```
 
+### Staticmethods wrapping lambdas
+
+A staticmethod can wrap a lambda. Access through a class or instance returns the lambda, including
+its function attributes, without binding an instance to its first parameter.
+
+```py
+wrapper = staticmethod(lambda x: str(x))
+
+class C:
+    f = wrapper
+
+reveal_type(C.f(1))  # revealed: str
+reveal_type(C().f(1))  # revealed: str
+reveal_type(C.f.__code__)  # revealed: CodeType
+```
+
+The `staticmethod` object exposes the lambda through `__func__` and `__wrapped__`. Its `__get__`
+method can also be called explicitly.
+
+```py
+reveal_type(wrapper.__func__(1))  # revealed: str
+reveal_type(wrapper.__wrapped__(1))  # revealed: str
+wrapper.__get__(None, object)(1)
+```
+
 ### Accessing the staticmethod as a static member
 
 ```py
