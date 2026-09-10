@@ -98,7 +98,14 @@ impl ProjectDatabase {
     pub fn apply_changes(&mut self, changes: &[ChangeEvent]) -> ChangeResult {
         let project = self.project();
         let project_root = project.root(self).to_path_buf();
-        let configuration_paths = ConfigurationPaths::from_metadata(project.metadata(self));
+        let metadata = project.metadata(self);
+        let configuration_paths = ConfigurationPaths::from_metadata(metadata);
+        // The initial uv metadata request may have failed before a workspace could be discovered.
+        let uv_enabled = metadata.use_uv().workspace_discovery_enabled();
+        let uv_environment = metadata
+            .uv_workspace()
+            .and_then(|uv| uv.environment())
+            .map(SystemPath::to_path_buf);
         let program = self.project().program(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
@@ -139,11 +146,19 @@ impl ProjectDatabase {
             tracing::debug!("Handling file watcher change event: {:?}", change);
 
             if let Some(path) = change.system_path() {
+                // `pyproject.toml` defines uv workspace membership and dependencies, which can
+                // change `workspace_root`, `members`, and `resolution` in `uv workspace metadata`.
+                // A new one can also make this a uv project for the first time. `ty.toml` can
+                // change the ty project root or its settings, so both files require rediscovery.
                 if configuration_paths.is_configuration(path, &project_root) {
                     File::sync_path(self, path);
                     reload_project = true;
 
                     continue;
+                }
+
+                if uv_enabled && affects_uv_metadata(change, uv_environment.as_deref()) {
+                    reload_project = true;
                 }
 
                 if is_ignore_file(path) && project.settings(self).src().respect_ignore_files {
@@ -489,4 +504,56 @@ impl ConfigurationPaths {
 
 fn is_ignore_file(path: &SystemPath) -> bool {
     matches!(path.file_name(), Some(".gitignore" | ".ignore"))
+}
+
+fn affects_uv_metadata(change: &ChangeEvent, selected_environment: Option<&SystemPath>) -> bool {
+    let Some(path) = change.system_path() else {
+        return false;
+    };
+
+    // `uv workspace metadata` checks and may update the lockfile before exporting it. It also
+    // reads the selected environment:
+    // - `uv.lock` supplies `members` and the dependency `resolution`. For example, `uv add` can
+    //   change the lockfile before the environment is synchronized.
+    // - `uv.toml` supplies resolver settings such as package indexes. If those settings make the
+    //   lockfile stale, the metadata command can resolve again and return a different `resolution`.
+    // - `.python-version` can change the selected interpreter, and thus
+    //   `environment.python.version` or the Python-specific `resolution`.
+    // - `pyvenv.cfg` is created or replaced by `uv venv`. The reported `environment` and its
+    //   Python version can change without a lockfile update.
+    // A matching name in an unrelated watched path may also trigger a request. The event path is
+    // not passed to uv, so it cannot make ty use the other project's metadata. If this project's
+    // metadata and settings are unchanged, the false positive only costs the request.
+    if matches!(
+        path.file_name(),
+        Some("uv.lock" | "uv.toml" | ".python-version" | "pyvenv.cfg")
+    ) {
+        return matches!(
+            change,
+            ChangeEvent::Created { .. } | ChangeEvent::Changed { .. } | ChangeEvent::Deleted { .. }
+        );
+    }
+
+    if !matches!(
+        change,
+        ChangeEvent::Created { .. } | ChangeEvent::Deleted { .. }
+    ) {
+        return false;
+    }
+
+    // Removing an environment can remove `environment` from the output without a separate
+    // `pyvenv.cfg` event. Creating `.venv` can add `environment.root` and its Python version;
+    // the selected environment may also have a different directory name.
+    if path.file_name() == Some(".venv") || selected_environment == Some(path) {
+        return true;
+    }
+
+    // uv derives `module_owners` from installed distributions in `site-packages`, not just the
+    // lockfile. `uv pip uninstall` or `uv sync --frozen` can remove or create a `.dist-info`
+    // directory without updating `uv.lock`.
+    path.file_name()
+        .is_some_and(|name| name.ends_with(".dist-info"))
+        && path
+            .parent()
+            .is_some_and(|parent| parent.file_name() == Some("site-packages"))
 }

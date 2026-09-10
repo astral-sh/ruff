@@ -12,6 +12,7 @@ use ty_module_resolver::system_module_search_paths;
 use crate::Project;
 use crate::db::{Db, ProjectDatabase};
 use crate::script::Script;
+use crate::uv::UvMetadata;
 use crate::watch::Watcher;
 
 /// Wrapper around a [`Watcher`] that watches the relevant paths of a project.
@@ -178,16 +179,30 @@ impl WatchPaths {
     }
 }
 
-/// Watches are registered in project, module, then configuration order. On Linux, the last
-/// registered watch determines the path reported for overlapping symlinks.
+/// Watches are registered in uv workspace, project, uv environment, module, then configuration
+/// order. On Linux, the last registered watch determines the path reported for overlapping symlinks.
 ///
-/// Project roots and explicitly included paths come first because project files are discovered
-/// by walking them. Module search paths come next so imports are reported relative to their
+/// uv discovers the workspace root from `pyproject.toml`, so a successful metadata request tells
+/// us where to watch even if `uv.lock` is created later. A member's ty project root may be inside
+/// that workspace; changes to the lockfile at the workspace root can then change `members` and
+/// `resolution` in `uv workspace metadata`. The selected uv environment can also be outside the
+/// project root: its `pyvenv.cfg` can change the reported Python, and installed `.dist-info`
+/// directories can change `module_owners`.
+///
+/// Project roots and explicitly included paths are watched because project files are discovered
+/// by walking them. Module search paths come after them so imports are reported relative to their
 /// search roots, rather than through symlinks inside the project. Configuration paths come last
 /// so their events use the explicit paths checked for configuration changes.
 #[salsa::tracked(returns(ref))]
 pub fn watch_paths(db: &dyn Db, project: Project) -> WatchPaths {
     let project_path = project.root(db);
+    let uv_workspace = project.metadata(db).uv_workspace();
+    let workspace_root = uv_workspace
+        .map(UvMetadata::workspace_root)
+        .filter(|root| !root.starts_with(project_path));
+    let uv_environment = uv_workspace
+        .and_then(UvMetadata::environment)
+        .filter(|root| !root.starts_with(project_path));
 
     // Watch both the project root and any paths provided by the user on the CLI (removing any redundant nested paths).
     // This is necessary to observe changes to files that are outside the project root.
@@ -220,7 +235,12 @@ pub fn watch_paths(db: &dyn Db, project: Project) -> WatchPaths {
             .filter(|path| !path.starts_with(project_path)),
     );
 
-    let paths: Vec<_> = included_paths
+    // The workspace root can contain the project root. Register it first so the project watch
+    // still reports events under the project's own path.
+    let paths: Vec<_> = workspace_root
+        .into_iter()
+        .chain(included_paths)
+        .chain(uv_environment)
         .chain(unique_module_paths)
         .chain(project.metadata(db).extra_configuration_paths())
         .map(SystemPath::to_path_buf)
