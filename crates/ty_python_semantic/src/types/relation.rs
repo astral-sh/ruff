@@ -2329,9 +2329,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::Callable(target_callable)) => {
                 self.with_recursion_guard(db, source, target, || {
-                    // Inferred function-like callback types accept compatible bound
-                    // methods. Compare their signatures for assignment without making
-                    // method objects nominal subtypes of functions.
+                    // Bound methods can be assigned to inferred function-like callback types,
+                    // but are not nominal subtypes of functions.
                     let target_callable = if self.relation.is_assignability()
                         && matches!(source, Type::BoundMethod(_))
                         && target_callable.is_function_like(db)
@@ -2637,7 +2636,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, KnownClass::Bool.to_instance(db, env), target)
             }
 
-            // A known callable representation also carries its nominal runtime type.
             (Type::Callable(callable), _) if let Some(class) = callable.runtime_class(db) => {
                 self.check_type_pair(db, class.to_instance(db, env), target)
             }

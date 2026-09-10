@@ -19,8 +19,8 @@ use crate::{
 /// instance `Path("a.txt")`.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct BoundMethodType<'db> {
-    /// The callable being bound. Retaining the unbound payload separately from the receiver
-    /// preserves both its signature and its identity, when a function definition is available.
+    /// The callable being bound, exposed as `__func__`. A classmethod can bind a callable
+    /// instance as well as a Python function.
     #[returns(copy)]
     pub(crate) func: Type<'db>,
     /// Synthesized functions need not have a definition from which to obtain a program.
@@ -36,7 +36,6 @@ pub struct BoundMethodType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for BoundMethodType<'_> {}
 
-/// The captured receiver and the type used to check the method's first parameter.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum BoundMethodReceiver<'db> {
     /// The captured receiver is also used to check the signature.
@@ -162,7 +161,6 @@ impl<'db> BoundMethodType<'db> {
         self.receiver(db).self_instance()
     }
 
-    /// The receiver used to check the signature for this member-lookup alternative.
     pub(super) fn signature_receiver(self, db: &'db dyn Db) -> Type<'db> {
         self.receiver(db).signature_receiver()
     }
@@ -282,7 +280,7 @@ impl<'db> BoundMethodType<'db> {
         }
     }
 
-    /// The bound callable for an actual or synthesized function, or `None` for other payloads.
+    /// Only supports function payloads; use [`Self::callables`] for other wrapped types.
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|db, _, _| Some(CallableType::bottom(db)),
@@ -306,8 +304,6 @@ impl<'db> BoundMethodType<'db> {
         ))
     }
 
-    /// Converts this bound method into a callable using separate runtime-receiver and `Self` types.
-    /// Returns `None` if the payload is not an actual or synthesized function.
     pub(crate) fn into_callable_type_with_receiver(
         self,
         db: &'db dyn Db,
@@ -339,7 +335,6 @@ impl<'db> BoundMethodType<'db> {
         }
     }
 
-    /// Shares the signatures retained in the method's interned callable.
     pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
         Some(self.into_callable_type(db)?.signatures(db))
     }
@@ -449,7 +444,6 @@ pub enum KnownBoundMethodType<'db> {
     /// Method wrapper for `some_function.__get__`
     FunctionTypeDunderGet(InternedType<'db>),
     /// Native `__call__` wrapper for a function, bound method, or staticmethod descriptor.
-    /// Retains the original callable so its receiver and signature are checked when called.
     DunderCall(InternedType<'db>),
     /// Native `types.MethodType.__get__`, which preserves the captured receiver.
     MethodTypeDunderGet(BoundMethodType<'db>),
@@ -646,9 +640,6 @@ impl<'db> KnownBoundMethodType<'db> {
             //
             // For `builtins.property.__get__`, we use the same signature. The return types are not
             // specified yet, they will be dynamically added in `Bindings::evaluate_known_cases`.
-            // Python 3.13's native `types.MethodType.__get__` accepts the same arguments but returns
-            // the existing bound method. As with function descriptors, these overloads currently
-            // also accept `None` without an owner, although that combination fails at runtime.
             //
             // TODO: Consider merging these synthesized signatures with the ones in
             // [`WrapperDescriptorKind::signatures`], since this one is just that signature

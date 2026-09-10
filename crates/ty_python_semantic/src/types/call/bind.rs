@@ -1572,9 +1572,8 @@ impl<'db> Bindings<'db> {
             let Some(downstream_bindings) = constructor.downstream_constructor() else {
                 continue;
             };
-            // Inherited synthesized initializers can bind the same signature to several
-            // class alternatives. Deduplicate by that bound signature while retaining
-            // specializations that change the accepted arguments.
+            // Inherited initializers can have identical signatures despite different receivers.
+            // Deduplicate by bound signature to retain distinct generic specializations.
             let callable = match downstream_bindings.callable_type() {
                 Type::BoundMethod(method) if let Some(callable) = method.into_callable_type(db) => {
                     Type::Callable(callable)

@@ -21,7 +21,6 @@ use crate::{
 use ty_python_core::definition::Definition;
 
 impl<'db> Type<'db> {
-    /// The function descriptor representation, independently of its literal or synthesized payload.
     pub(super) fn function_like_kind(self, db: &'db dyn Db) -> Option<CallableTypeKind> {
         match self {
             Type::FunctionLiteral(function) => Some(function.callable_type_kind(db)),
@@ -54,7 +53,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Implements function, staticmethod and classmethod `__get__` for either payload form.
+    /// Shared by implicit descriptor access and explicit `__get__` calls.
     pub(super) fn function_like_descriptor_get(
         self,
         db: &'db dyn Db,
@@ -62,8 +61,7 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        // Specializing a stored `__get__` can expand a ParamSpec into several callable
-        // alternatives. Each retains its own receiver and signature after binding.
+        // ParamSpec specialization can produce a union of function descriptors.
         match self {
             Type::Union(union) => {
                 return union.try_map(db, env, |alternative| {
@@ -502,9 +500,7 @@ pub enum CallableTypeKind {
     /// - They use `types.FunctionType` as their owner type when constructing `super()`.
     /// - They act as [non-data descriptors][descriptor-protocol]: access through a class leaves
     ///   the signature unchanged, while access through an instance binds the first parameter
-    ///   to that instance. The result is a [`super::BoundMethodType`], retaining the unbound
-    ///   function and the captured receiver separately. It has `types.MethodType` identity
-    ///   and does not bind again on subsequent attribute access.
+    ///   to that instance, producing a [`super::BoundMethodType`] that does not bind again.
     /// - Like function literals, they defer binding `typing.Self` until the receiver is known
     ///   from the call's arguments, as illustrated below.
     ///
@@ -581,21 +577,13 @@ pub enum CallableTypeKind {
     /// represents the parameter list substituted for `P`.
     DunderParamSpec,
 
-    /// A synthesized `staticmethod` descriptor wrapping function signatures.
-    ///
-    /// Class and instance access both return a [`Self::FunctionLike`] callable with the
-    /// original signatures. The descriptor and the resulting function have distinct nominal
-    /// identities and binding behavior: accessing the descriptor never supplies a receiver,
-    /// but the function it returns can subsequently bind through its own `__get__`.
-    /// The raw descriptor exposes the function through `__func__` and `__wrapped__`.
+    /// A synthesized `staticmethod` descriptor. Class and instance access return a
+    /// [`Self::FunctionLike`] callable without binding a receiver. The extracted function
+    /// can subsequently bind through its own `__get__`.
     StaticMethodLike,
 
-    /// A synthesized `classmethod` descriptor wrapping function signatures.
-    ///
-    /// Class and instance access both produce a [`super::BoundMethodType`] whose captured
-    /// receiver is the owner class. The method's `__func__` is an ordinary function-like
-    /// callable with the unbound signatures. `Self` in the bound signatures refers to an
-    /// instance of the captured class, independently of the class-object receiver.
+    /// A synthesized `classmethod` descriptor. Class and instance access produce a
+    /// [`super::BoundMethodType`] capturing the owner class; `Self` refers to its instance type.
     ///
     /// We retain the wrapped call signatures on this descriptor for decorator inference,
     /// although an unapplied `classmethod` descriptor itself is not callable at runtime.
@@ -767,7 +755,6 @@ impl<'db> CallableType<'db> {
         matches!(self.kind(db), CallableTypeKind::FunctionLike)
     }
 
-    /// Nominal runtime identity is independent of the callable's accepted arguments.
     pub(super) fn runtime_class(self, db: &'db dyn Db) -> Option<KnownClass> {
         match self.kind(db) {
             CallableTypeKind::FunctionLike => Some(KnownClass::FunctionType),

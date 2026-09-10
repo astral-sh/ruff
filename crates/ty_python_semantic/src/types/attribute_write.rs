@@ -680,7 +680,6 @@ fn effective_write_type<'db>(
     attr_ty: Type<'db>,
 ) -> Type<'db> {
     // An instance shadows a staticmethod with the function returned by its getter.
-    // The raw descriptor is stored on the class, not on the instance.
     if matches!(object_ty, Type::NominalInstance(_))
         && attr_ty.function_like_kind(db) == Some(CallableTypeKind::StaticMethodLike)
     {

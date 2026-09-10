@@ -6346,8 +6346,7 @@ impl<'db> Type<'db> {
                         .iter()
                         .all(Signature::has_implicit_positional_receiver_annotation);
                 // Synthesized signatures can contain `Self` without a function's generic
-                // context. Substitute it when capturing the receiver, retaining parameter
-                // provenance for diagnostics.
+                // context, so substitute it when capturing the receiver.
                 if bound_method.function(db).is_none()
                     || protocol_receiver_is_specialized
                     || signature_receiver != self_instance

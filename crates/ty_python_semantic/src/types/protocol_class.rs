@@ -2834,10 +2834,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .when_some_and(db, self.constraints, |callables| {
                     callables.iter().when_all(db, self.constraints, |callable| {
                         if callable.is_function_like(db) {
-                            // Class access exposes the unbound protocol receiver. Only source
-                            // overloads that accept that positional argument can participate:
-                            // binding a zero-argument static method otherwise removes a parameter
-                            // from the protocol signature while leaving the source unchanged.
+                            // Require a positional receiver before binding: a zero-argument static
+                            // method otherwise loses no parameters while the protocol loses `self`.
                             let signatures = CallableSignature::from_overloads(
                                 callable
                                     .signatures(db)
