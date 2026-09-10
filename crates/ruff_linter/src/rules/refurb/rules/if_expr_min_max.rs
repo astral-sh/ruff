@@ -87,12 +87,12 @@ impl Violation for IfExprMinMax {
 
 /// FURB136
 pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
-    let Expr::Compare(ast::ExprCompare { ops, operands, .. }) = if_exp.test.as_ref() else {
+    let Expr::Compare(compare) = if_exp.test.as_ref() else {
         return;
     };
 
     // Ignore, e.g., `foo < bar < baz`.
-    let [op] = &**ops else {
+    let Some((left, op, right)) = compare.as_single() else {
         return;
     };
 
@@ -104,10 +104,6 @@ pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
         CmpOp::Lt => (MinMax::Min, true),
         CmpOp::LtE => (MinMax::Min, false),
         _ => return,
-    };
-
-    let [left, right] = &**operands else {
-        return;
     };
 
     let body_cmp = ComparableExpr::from(if_exp.body.as_ref());

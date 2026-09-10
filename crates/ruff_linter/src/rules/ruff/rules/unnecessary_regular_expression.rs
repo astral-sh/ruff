@@ -438,25 +438,14 @@ enum ComparisonToNone {
 /// If the regex call is compared to `None`, return the comparison and its range.
 ///    Example: `re.search("abc", s) is None`
 fn get_comparison_to_none(semantic: &SemanticModel) -> Option<(ComparisonToNone, TextRange)> {
-    let parent_expr = semantic.current_expression_parent()?;
-
-    let Expr::Compare(ExprCompare {
-        ops,
-        operands,
-        range,
-        ..
-    }) = parent_expr
-    else {
+    let compare = semantic.current_expression_parent()?.as_compare_expr()?;
+    let (_, op, Expr::NoneLiteral(_)) = compare.as_single()? else {
         return None;
     };
 
-    let Some(Expr::NoneLiteral(_)) = operands.get(1) else {
-        return None;
-    };
-
-    match ops.as_ref() {
-        [CmpOp::Is] => Some((ComparisonToNone::Is, *range)),
-        [CmpOp::IsNot] => Some((ComparisonToNone::IsNot, *range)),
+    match op {
+        CmpOp::Is => Some((ComparisonToNone::Is, compare.range())),
+        CmpOp::IsNot => Some((ComparisonToNone::IsNot, compare.range())),
         _ => None,
     }
 }

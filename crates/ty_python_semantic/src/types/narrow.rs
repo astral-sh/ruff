@@ -4055,17 +4055,15 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let inference = infer_expression_types(db, expression, TypeContext::default());
 
         let mut constraints = NarrowingConstraints::default();
-        let left = expr_compare.first_operand();
-        let right = expr_compare.second_operand();
 
         // Narrow unions of tuples based on element checks. For example:
         //
         //     def _(t: tuple[int, int] | tuple[None, None]):
         //         if t[0] is not None:
         //             reveal_type(t)  # tuple[int, int]
-        if matches!(&**ops, [ast::CmpOp::Is | ast::CmpOp::IsNot])
-            && let is_positive_check =
-                is_positive == (expr_compare.first_operator() == ast::CmpOp::Is)
+        if let Some((left, op @ (ast::CmpOp::Is | ast::CmpOp::IsNot), right)) =
+            expr_compare.as_single()
+            && let is_positive_check = is_positive == (*op == ast::CmpOp::Is)
             && let ast::Expr::Subscript(subscript) = left.expression_value()
             && let Type::Union(union) = inference
                 .expression_type(&*subscript.value)
@@ -4093,7 +4091,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
         }
 
-        if let [op] = &**ops
+        if let Some((left, op, right)) = expr_compare.as_single()
             && let Some(comparison) = LengthComparison::from_op(*op, is_positive)
         {
             let mut narrow_len_call =
@@ -4159,10 +4157,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         //
         // Importantly, `my_typeddict_union["tag"]` isn't the place we're going to constrain.
         // Instead, we're going to constrain `my_typeddict_union` itself.
-        if matches!(&**ops, [ast::CmpOp::Eq | ast::CmpOp::NotEq]) {
+        if let Some((left, op @ (ast::CmpOp::Eq | ast::CmpOp::NotEq), right)) =
+            expr_compare.as_single()
+        {
             // For `==`, we use equality semantics on the `if` branch (is_positive=true).
             // For `!=`, we use equality semantics on the `else` branch (is_positive=false).
-            let is_equality = is_positive == (expr_compare.first_operator() == ast::CmpOp::Eq);
+            let is_equality = is_positive == (*op == ast::CmpOp::Eq);
 
             let mut narrow_subscript = |subscript: &ast::ExprSubscript, other_type: Type<'db>| {
                 let value_type = inference.expression_type(&*subscript.value);
@@ -4196,9 +4196,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
         }
 
-        if let [
+        if let Some((
+            left,
             operator @ (ast::CmpOp::Eq | ast::CmpOp::NotEq | ast::CmpOp::Is | ast::CmpOp::IsNot),
-        ] = &**ops
+            right,
+        )) = expr_compare.as_single()
         {
             let comparison = if matches!(operator, ast::CmpOp::Is | ast::CmpOp::IsNot) {
                 NominalAttributeComparison::Identity
@@ -4249,7 +4251,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         // def _(u: Foo | Bar):
         //     if "foo" not in u:
         //         reveal_type(u)  # revealed: Bar
-        if matches!(&**ops, [ast::CmpOp::In | ast::CmpOp::NotIn])
+        if let Some((left, op @ (ast::CmpOp::In | ast::CmpOp::NotIn), right)) =
+            expr_compare.as_single()
             && let Some(key) = inference.expression_type(left).as_string_literal()
             && let rhs_expr = right.expression_value()
             && let rhs_type = inference.expression_type(right)
@@ -4274,7 +4277,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     }
                 };
 
-            if is_positive == (expr_compare.first_operator() == ast::CmpOp::In) {
+            if is_positive == (*op == ast::CmpOp::In) {
                 let narrowed = self.narrow_with_present_key(rhs_type, key);
                 if narrowed != rhs_type.resolve_type_alias(db) {
                     apply_constraint(&mut constraints, NarrowingConstraint::replacement(narrowed));

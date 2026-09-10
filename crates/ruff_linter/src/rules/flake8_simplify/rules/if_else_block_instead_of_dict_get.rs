@@ -130,16 +130,10 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
         return;
     };
 
-    let Expr::Compare(ast::ExprCompare {
-        ops,
-        operands,
-        range: _,
-        node_index: _,
-    }) = &**test
-    else {
+    let Expr::Compare(compare) = &**test else {
         return;
     };
-    let [test_key, test_dict] = &**operands else {
+    let Some((test_key, op, test_dict)) = compare.as_single() else {
         return;
     };
 
@@ -150,9 +144,9 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
         return;
     }
 
-    let (expected_var, expected_value, default_var, default_value) = match ops[..] {
-        [CmpOp::In] => (body_var, body_value, orelse_var, orelse_value.as_ref()),
-        [CmpOp::NotIn] => (orelse_var, orelse_value, body_var, body_value.as_ref()),
+    let (expected_var, expected_value, default_var, default_value) = match op {
+        CmpOp::In => (body_var, body_value, orelse_var, orelse_value.as_ref()),
+        CmpOp::NotIn => (orelse_var, orelse_value, body_var, body_value.as_ref()),
         _ => {
             return;
         }
@@ -257,22 +251,16 @@ pub(crate) fn if_exp_instead_of_dict_get(
     body: &Expr,
     orelse: &Expr,
 ) {
-    let Expr::Compare(ast::ExprCompare {
-        ops,
-        operands,
-        range: _,
-        node_index: _,
-    }) = test
-    else {
+    let Expr::Compare(compare) = test else {
         return;
     };
-    let [test_key, test_dict] = &**operands else {
+    let Some((test_key, op, test_dict)) = compare.as_single() else {
         return;
     };
 
-    let (body, default_value) = match &**ops {
-        [CmpOp::In] => (body, orelse),
-        [CmpOp::NotIn] => (orelse, body),
+    let (body, default_value) = match op {
+        CmpOp::In => (body, orelse),
+        CmpOp::NotIn => (orelse, body),
         _ => {
             return;
         }

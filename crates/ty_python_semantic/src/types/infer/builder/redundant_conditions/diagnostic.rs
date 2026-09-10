@@ -122,9 +122,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ));
             }
 
-            if let ast::Expr::Compare(ast::ExprCompare { ops, operands, .. }) = test
-                && ops.len() == 1
-                && let [left, single_comparator] = &**operands
+            if let ast::Expr::Compare(compare) = test
+                && let Some((left, _, single_comparator)) = compare.as_single()
             {
                 if let (Type::LiteralValue(left_type), Type::LiteralValue(right_type)) = (
                     self.expression_type(left),
@@ -619,9 +618,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let env = self.program_environment();
 
-        if let ast::Expr::Compare(ast::ExprCompare { ops, operands, .. }) = test
-            && let [single_op] = &**ops
-            && let [left, single_comparator] = &**operands
+        if let ast::Expr::Compare(compare) = test
+            && let Some((left, single_op, single_comparator)) = compare.as_single()
             && let (ast::Expr::Call(call), other) | (other, ast::Expr::Call(call)) =
                 (left, single_comparator)
             && matches!(single_op, ast::CmpOp::Eq | ast::CmpOp::NotEq)
@@ -978,10 +976,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let candidates = match operand {
             ast::Expr::Name(_) => [Some(operand), None],
-            ast::Expr::Compare(compare) if compare.ops.len() == 1 => [
-                Some(compare.first_operand()),
-                Some(compare.second_operand()),
-            ],
+            ast::Expr::Compare(compare) => {
+                let (left, _, right) = compare.as_single()?;
+                [Some(left), Some(right)]
+            }
             ast::Expr::Call(call) => [call.arguments.args.first(), None],
             _ => return None,
         };

@@ -73,16 +73,12 @@ fn password_target(target: &Expr) -> Option<&str> {
 }
 
 /// S105
-pub(crate) fn compare_to_hardcoded_password_string(
-    checker: &Checker,
-    left: &Expr,
-    comparators: &[Expr],
-) {
-    for comp in comparators {
+pub(crate) fn compare_to_hardcoded_password_string(checker: &Checker, compare: &ast::ExprCompare) {
+    for comp in compare.comparators() {
         if string_literal(comp).is_none_or(str::is_empty) {
             continue;
         }
-        let Some(name) = password_target(left) else {
+        let Some(name) = password_target(compare.first_operand()) else {
             continue;
         };
         checker.report_diagnostic(

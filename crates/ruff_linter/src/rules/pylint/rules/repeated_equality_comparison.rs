@@ -229,14 +229,8 @@ fn to_allowed_value<'a>(
     value: &'a Expr,
     semantic: &SemanticModel,
 ) -> Option<(&'a Expr, &'a Expr)> {
-    let Expr::Compare(ast::ExprCompare { ops, operands, .. }) = value else {
-        return None;
-    };
-
     // Ignore, e.g., `foo == bar == baz`.
-    let [op] = &**ops else {
-        return None;
-    };
+    let (left, op, right) = value.as_compare_expr()?.as_single()?;
 
     if match bool_op {
         BoolOp::Or => !matches!(op, CmpOp::Eq),
@@ -246,9 +240,6 @@ fn to_allowed_value<'a>(
     }
 
     // Ignore self-comparisons, e.g., `foo == foo`.
-    let [left, right] = &**operands else {
-        return None;
-    };
     if ComparableExpr::from(left) == ComparableExpr::from(right) {
         return None;
     }

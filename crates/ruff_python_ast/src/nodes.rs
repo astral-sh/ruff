@@ -144,6 +144,14 @@ impl ExprCompare {
         &self.operands[1..]
     }
 
+    /// Returns `(left, operator, right)` if there is exactly one operator and two operands.
+    pub fn as_single(&self) -> Option<(&Expr, &CmpOp, &Expr)> {
+        match (&*self.operands, &*self.ops) {
+            ([left, right], [op]) => Some((left, op, right)),
+            _ => None,
+        }
+    }
+
     /// Iterates over each comparison as `(left, operator, right)`.
     ///
     /// For `a < b <= c`, yields `(a, <, b)` followed by `(b, <=, c)`.
