@@ -474,7 +474,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             if !decorator_function_decorator.is_empty()
                 && !decorator_function_decorator
-                    .intersects(FunctionDecorators::STATICMETHOD | FunctionDecorators::CLASSMETHOD)
+                    .intersects(FunctionDecorators::CLASSMETHOD | FunctionDecorators::STATICMETHOD)
             {
                 continue;
             }

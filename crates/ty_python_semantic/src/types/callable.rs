@@ -577,16 +577,10 @@ pub enum CallableTypeKind {
     /// represents the parameter list substituted for `P`.
     DunderParamSpec,
 
-    /// A synthesized `staticmethod` descriptor. Class and instance access return a
-    /// [`Self::FunctionLike`] callable without binding a receiver. The extracted function
-    /// can subsequently bind through its own `__get__`.
+    /// A callable with the descriptor behavior of `staticmethod`.
     StaticMethodLike,
 
-    /// A synthesized `classmethod` descriptor. Class and instance access produce a
-    /// [`super::BoundMethodType`] capturing the owner class; `Self` refers to its instance type.
-    ///
-    /// We retain the wrapped call signatures on this descriptor for decorator inference,
-    /// although an unapplied `classmethod` descriptor itself is not callable at runtime.
+    /// A callable with the descriptor behavior of `classmethod`.
     ClassMethodLike,
 
     /// An internal representation of the value bound to a `typing.ParamSpec` type variable.

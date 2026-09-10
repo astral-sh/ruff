@@ -82,7 +82,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 match self {
                     FunctionInfo::Function(_, name) => write!(f, "Function `{name}`"),
                     FunctionInfo::Method(_, Some(name)) => write!(f, "Method `{name}`"),
-                    FunctionInfo::Method(_, None) => write!(f, "Method object"),
+                    FunctionInfo::Method(_, None) => write!(f, "Method"),
                     FunctionInfo::Lambda(_) => write!(f, "Function object"),
                 }
             }
