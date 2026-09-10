@@ -138,8 +138,8 @@ class Invalid:
     @lossy_decorator
     def lossy2(self): ...  # error: [invalid-explicit-override]
 
-# TODO: The property/method replacements should cause us to emit Liskov violations,
-# but not `@override` violations.
+# TODO: all overrides in this class should cause us to emit *Liskov* violations,
+# but not `@override` violations
 class LiskovViolatingButNotOverrideViolating(Parent):
     @override
     @property
@@ -147,14 +147,14 @@ class LiskovViolatingButNotOverrideViolating(Parent):
     @override
     def my_property1(self) -> int: ...
 
-    # Class and static methods can override each other when the exposed signatures
-    # accept the same calls through both the class and its instances.
+    # Class and static methods can override each other when "bound" signatures match,
+    # but here, we deliberately add a new parameter to introduce a Liskov violation
     @staticmethod
     @override
-    def class_method1() -> int: ...
+    def class_method1(x: int) -> int: ...  # error: [invalid-method-override]
     @classmethod
     @override
-    def static_method1(cls) -> int: ...
+    def static_method1(cls, x: int) -> int: ...  # error: [invalid-method-override]
 
 # Diagnostic edge case: `override` is very far away from the method definition in the source code:
 
