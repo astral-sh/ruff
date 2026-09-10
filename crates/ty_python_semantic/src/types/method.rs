@@ -398,9 +398,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // The receiver exposed by `__self__` is an already-captured value, so it is covariant.
         // However, `Self` can also appear in the remaining parameters, where binding the
         // receiver must still preserve ordinary callable contravariance.
-        self.check_type_pair(db, source.func(db), target.func(db))
+        self.check_type_pair(db, source.self_instance(db), target.self_instance(db))
             .and(db, self.constraints, || {
-                self.check_type_pair(db, source.self_instance(db), target.self_instance(db))
+                self.check_type_pair(db, source.func(db), target.func(db))
             })
             .and(db, self.constraints, || {
                 let (Some(source), Some(target)) = (
