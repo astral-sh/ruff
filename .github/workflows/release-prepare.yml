@@ -64,6 +64,16 @@ jobs:
           GITHUB_TOKEN: ${{ steps.token.outputs.token }}
           INPUT_VERSION: ${{ inputs.version }}
 
+      - name: "Format and check release changes"
+        shell: bash
+        run: |
+          mapfile -d '' files < <(git diff --name-only --diff-filter=ACMR -z HEAD)
+          if (( ${#files[@]} )); then
+            # Hooks can fix generated files and exit nonzero. Require a clean pass before committing.
+            uv run --only-dev --locked prek run --files "${files[@]}" ||
+              uv run --only-dev --locked prek run --files "${files[@]}"
+          fi
+
       - name: "Create release branch"
         run: |
           version="$(uv version --short)"
