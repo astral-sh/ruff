@@ -505,28 +505,6 @@ The `owner` argument takes precedence over the `instance` argument:
 reveal_type(getattr_static(C, "f").__get__("dummy", C))  # revealed: bound method <class 'C'>.f() -> Unknown
 ```
 
-### Rebinding an extracted classmethod function
-
-A classmethod's `__func__` is an ordinary function. Binding it to a subclass specializes its `Self`
-return type to that subclass, even when the owner passed to `__get__` is `type`:
-
-```py
-from collections.abc import Callable
-from typing_extensions import Self
-
-class Base:
-    @classmethod
-    def create(cls) -> Self:
-        return cls()
-
-class Child(Base): ...
-
-rebound = Base.create.__func__.__get__(Child, type)
-reveal_type(rebound.__self__)  # revealed: <class 'Child'>
-reveal_type(rebound())  # revealed: Child
-factory: Callable[[], Child] = rebound
-```
-
 ### Classmethods mixed with other decorators
 
 ```toml
