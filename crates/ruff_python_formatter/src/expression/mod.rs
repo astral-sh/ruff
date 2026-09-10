@@ -1436,7 +1436,7 @@ pub(crate) fn left_most<'expr>(expression: &'expr Expr, trivia: &TriviaRanges) -
             | Expr::Subscript(ast::ExprSubscript { value: left, .. }) => Some(&**left),
 
             Expr::BoolOp(expr_bool_op) => expr_bool_op.values.first(),
-            Expr::Compare(compare) => compare.operands.first(),
+            Expr::Compare(compare) => Some(compare.first_operand()),
 
             Expr::Generator(generator) if !generator.parenthesized => Some(&*generator.elt),
 

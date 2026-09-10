@@ -11542,16 +11542,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_compare_expression(&mut self, compare: &ast::ExprCompare) -> Type<'db> {
         let db = self.db();
-        let ast::ExprCompare {
-            range: _,
-            node_index: _,
-            ops,
-            operands,
-        } = compare;
-
-        if let Some(left) = operands.first() {
-            self.infer_expression(left, TypeContext::default());
-        }
+        self.infer_expression(compare.first_operand(), TypeContext::default());
         let mut last_comparison_ty = Type::unknown();
 
         // https://docs.python.org/3/reference/expressions.html#comparisons
@@ -11567,9 +11558,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = self.infer_chained_boolean_types(
             ast::BoolOp::And,
             false,
-            operands.iter().tuple_windows::<(_, _)>().zip(ops),
+            compare.iter(),
             |_| false,
-            |builder, ((left, right), op), _peer_ty| {
+            |builder, (left, op, right), _peer_ty| {
                 let left_ty = builder.expression_type(left);
                 let right_ty = builder.infer_expression(right, TypeContext::default());
 
@@ -11608,7 +11599,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             },
         );
 
-        if ops.len() > 1 {
+        if compare.ops.len() > 1 {
             // Individual comparisons within a chain have no expression nodes whose result types
             // reachability can look up later. Retain their combined condition truthiness here;
             // `and`/`or` conditions can instead be reconstructed by walking their operand nodes.

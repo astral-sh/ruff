@@ -74,19 +74,10 @@ impl ast::ExprCompare {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExprCompare {
-            ops,
-            operands,
-            range: _,
-            node_index: _,
-        } = self;
-
-        if let Some((left, comparators)) = operands.split_first() {
-            visitor.visit_expr(left);
-            for (op, comparator) in ops.iter().zip(comparators) {
-                visitor.visit_cmp_op(op);
-                visitor.visit_expr(comparator);
-            }
+        visitor.visit_expr(self.first_operand());
+        for (_, op, right) in self.iter() {
+            visitor.visit_cmp_op(op);
+            visitor.visit_expr(right);
         }
     }
 }

@@ -82,7 +82,7 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
             continue;
         };
 
-        let Some(Expr::Name(right_compare_left)) = right_compare.operands.first() else {
+        let Expr::Name(right_compare_left) = right_compare.first_operand() else {
             continue;
         };
 

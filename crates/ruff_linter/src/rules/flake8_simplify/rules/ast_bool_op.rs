@@ -458,19 +458,9 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
 }
 
 fn match_eq_target(expr: &Expr) -> Option<(&Name, &Expr)> {
-    let Expr::Compare(ast::ExprCompare {
-        ops,
-        operands,
-        range: _,
-        node_index: _,
-    }) = expr
+    let (Expr::Name(ast::ExprName { id, .. }), CmpOp::Eq, comparator) =
+        expr.as_compare_expr()?.as_single()?
     else {
-        return None;
-    };
-    if **ops != [CmpOp::Eq] {
-        return None;
-    }
-    let [Expr::Name(ast::ExprName { id, .. }), comparator] = &**operands else {
         return None;
     };
     if !comparator.is_name_expr() {

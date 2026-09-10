@@ -126,11 +126,11 @@ impl Violation for WrongTupleLengthVersionComparison {
 
 /// PYI003, PYI004, PYI005
 pub(crate) fn unrecognized_version_info(checker: &Checker, test: &Expr) {
-    let Expr::Compare(ast::ExprCompare { ops, operands, .. }) = test else {
+    let Expr::Compare(compare) = test else {
         return;
     };
 
-    let ([op], [left, comparator]) = (&**ops, &**operands) else {
+    let Some((left, op, comparator)) = compare.as_single() else {
         return;
     };
 

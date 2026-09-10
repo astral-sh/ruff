@@ -152,16 +152,10 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
     if !matches!(op, UnaryOp::Not) {
         return;
     }
-    let Expr::Compare(ast::ExprCompare {
-        ops,
-        operands,
-        range: _,
-        node_index: _,
-    }) = operand
-    else {
+    let Expr::Compare(compare) = operand else {
         return;
     };
-    if !matches!(&ops[..], [CmpOp::Eq]) {
+    if !matches!(&*compare.ops, [CmpOp::Eq]) {
         return;
     }
     if is_exception_check(checker.semantic().current_statement()) {
@@ -179,14 +173,14 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
 
     let mut diagnostic = checker.report_diagnostic(
         NegateEqualOp {
-            left: checker.generator().expr(&operands[0]),
-            right: checker.generator().expr(&operands[1]),
+            left: checker.generator().expr(compare.first_operand()),
+            right: checker.generator().expr(compare.second_operand()),
         },
         expr.range(),
     );
     let node = ast::ExprCompare {
         ops: [CmpOp::NotEq].into(),
-        operands: operands.clone(),
+        operands: compare.operands.clone(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
@@ -206,16 +200,10 @@ pub(crate) fn negation_with_not_equal_op(
     if !matches!(op, UnaryOp::Not) {
         return;
     }
-    let Expr::Compare(ast::ExprCompare {
-        ops,
-        operands,
-        range: _,
-        node_index: _,
-    }) = operand
-    else {
+    let Expr::Compare(compare) = operand else {
         return;
     };
-    if !matches!(&**ops, [CmpOp::NotEq]) {
+    if !matches!(&*compare.ops, [CmpOp::NotEq]) {
         return;
     }
     if is_exception_check(checker.semantic().current_statement()) {
@@ -233,14 +221,14 @@ pub(crate) fn negation_with_not_equal_op(
 
     let mut diagnostic = checker.report_diagnostic(
         NegateNotEqualOp {
-            left: checker.generator().expr(&operands[0]),
-            right: checker.generator().expr(&operands[1]),
+            left: checker.generator().expr(compare.first_operand()),
+            right: checker.generator().expr(compare.second_operand()),
         },
         expr.range(),
     );
     let node = ast::ExprCompare {
         ops: [CmpOp::Eq].into(),
-        operands: operands.clone(),
+        operands: compare.operands.clone(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
