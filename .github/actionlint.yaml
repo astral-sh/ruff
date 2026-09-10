@@ -21,6 +21,10 @@ self-hosted-runner:
     - codspeed-macro
 
 paths:
+  ".github/workflows/build-docker.yml":
+    ignore:
+      # actionlint doesn't yet support the `$/` syntax for reusable workflow references.
+      - '^reusable workflow call "\$/\.github/workflows/publish-docker-image\.yml" at "uses" is not following the format '
   ".github/workflows/pull-request-reviewers.yml":
     ignore:
       # actionlint doesn't yet support concurrency queues. The schema hook validates them.
