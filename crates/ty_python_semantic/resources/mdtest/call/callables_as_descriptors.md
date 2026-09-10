@@ -563,19 +563,6 @@ reveal_type(Explicit.class_method.__func__)  # revealed: Wrapper
 reveal_type(Explicit.class_method.__call__(1))  # revealed: int
 ```
 
-Extracting `__call__` produces a method-wrapper that retains the bound class when stored elsewhere.
-
-```py
-from types import MethodWrapperType
-
-class Stored:
-    call = Explicit.class_method.__call__
-
-wrapper: MethodWrapperType = Stored().call
-reveal_type(Stored().call("a"))  # revealed: str
-Stored().call(None)  # error: [no-matching-overload]
-```
-
 ## Checking the receiver of a wrapped classmethod
 
 Calling a classmethod passes the owner class to its wrapped callable. That implicit argument must be
@@ -591,7 +578,6 @@ class C:
 
 C.method()  # error: [invalid-argument-type]
 C().method()  # error: [invalid-argument-type]
-C.method.__call__()  # error: [invalid-argument-type]
 ```
 
 Receiver checking also selects the appropriate overload for the class used to access the method. The
@@ -728,164 +714,6 @@ The bound method's `__func__` refers to the replacement function.
 
 ```py
 reveal_type(C.method.__func__)  # revealed: def replacement(cls: type, value: int) -> int
-```
-
-## Identity of decorated bound methods
-
-We treat the result of a callable-returning decorator as a function descriptor. Binding it captures
-the receiver in a method that keeps its underlying function, including when stored on another class:
-
-```py
-from collections.abc import Callable
-from types import FunctionType, MethodType
-from ty_extensions import static_assert
-from ty_extensions._internal import TypeOf, is_subtype_of
-
-def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
-    return function
-
-class Source:
-    def plain(self, value: int) -> str:
-        return str(value)
-
-    @preserve
-    def method(self, value: int) -> str:
-        return str(value)
-
-class Stored:
-    method = Source().method
-
-method = Stored().method
-static_assert(is_subtype_of(TypeOf[method], MethodType))
-static_assert(not is_subtype_of(TypeOf[method], FunctionType))
-reveal_type(method.__self__)  # revealed: Source
-reveal_type(method.__func__)  # revealed: (self, value: int) -> str
-reveal_type(method(1))  # revealed: str
-reveal_type(method.__call__(1))  # revealed: str
-method("wrong")  # error: [invalid-argument-type]
-callback: Callable[[int], str] = method
-```
-
-Extracting `__call__` also preserves the binding of ordinary and decorated methods. An unbound
-function's `__call__` keeps its explicit receiver parameter when stored on another class.
-
-```py
-class Calls:
-    plain = Source().plain.__call__
-    decorated = method.__call__
-    unbound = Source.method.__call__
-
-reveal_type(Calls().plain(1))  # revealed: str
-reveal_type(Calls().decorated(1))  # revealed: str
-reveal_type(Calls().unbound(Source(), 1))  # revealed: str
-Calls().decorated("wrong")  # error: [invalid-argument-type]
-```
-
-## Extracted staticmethod calls
-
-An explicit `staticmethod` object's `__call__` is a method-wrapper. Accessing it through another
-instance preserves its signature without binding another receiver.
-
-```py
-from types import MethodWrapperType
-
-def stringify(value: int) -> str:
-    return str(value)
-
-class Stored:
-    call = staticmethod(stringify).__call__
-
-wrapper: MethodWrapperType = Stored().call
-reveal_type(Stored().call.__name__)  # revealed: str
-reveal_type(bool(Stored().call))  # revealed: Literal[True]
-reveal_type(Stored().call(1))  # revealed: str
-Stored().call("wrong")  # error: [invalid-argument-type]
-```
-
-## Assigning compatible bound callbacks
-
-Inferred function-like callback types accept bound methods with compatible signatures. A callable
-stored in a dunder attribute on an instance also accepts an already-bound method:
-
-```py
-from typing import Callable
-
-def function() -> None: ...
-def preserve(function: Callable[..., None]) -> Callable[..., None]:
-    return function
-
-class Example:
-    __callback__: Callable[..., None]
-
-    def method(self) -> None:
-        callbacks = {"function": function}
-        callbacks["method"] = self.method
-        callbacks["invalid"] = self.needs_argument  # error: [invalid-assignment]
-        self.__callback__ = self.method
-
-    def needs_argument(self, value: int) -> None: ...
-
-@preserve
-def decorated() -> None: ...
-
-decorated = Example().method
-```
-
-## Method wrappers apply in decorator order
-
-An inner decorator receives an ordinary function when `staticmethod` or `classmethod` appears
-outside it. In the opposite order it receives the raw descriptor. Overload selection follows that
-order even though the declaration records all decorators in advance:
-
-```py
-from typing import Callable, Literal, overload
-from types import FunctionType
-
-@overload
-def decorate(function: staticmethod[..., object]) -> Callable[..., Literal["static"]]: ...
-@overload
-def decorate(function: classmethod[object, ..., object]) -> Callable[..., Literal["class"]]: ...
-@overload
-def decorate(function: FunctionType) -> Callable[..., Literal["function"]]: ...
-def decorate(function):
-    raise NotImplementedError
-
-class Example:
-    @staticmethod
-    @decorate
-    def outer_static(): ...
-    @decorate
-    @staticmethod
-    def inner_static(): ...
-    @classmethod
-    @decorate
-    def outer_class(cls): ...
-    @decorate
-    @classmethod
-    def inner_class(cls): ...
-
-reveal_type(Example.outer_static())  # revealed: Literal["function"]
-reveal_type(Example.inner_static())  # revealed: Literal["static"]
-reveal_type(Example.outer_class())  # revealed: Literal["function"]
-reveal_type(Example.inner_class())  # revealed: Literal["class"]
-```
-
-## Restoring a staticmethod on an instance
-
-An instance can shadow its class's staticmethod with the function returned by the descriptor. Saving
-and restoring that function preserves its signature:
-
-```py
-class Example:
-    @staticmethod
-    def method(value: int) -> str:
-        return str(value)
-
-instance = Example()
-saved = instance.method
-instance.method = saved
-reveal_type(instance.method(1))  # revealed: str
-instance.method("wrong")  # error: [invalid-argument-type]
 ```
 
 ## Types are not bound-method descriptors

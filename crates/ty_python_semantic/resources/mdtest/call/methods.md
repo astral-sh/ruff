@@ -1217,6 +1217,44 @@ def narrowed_bound_method_attribute():
         reveal_type(method.__globals__)  # revealed: dict[str, Any]
 ```
 
+## Decorated functions and bound methods
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+We treat the result of a callable-returning decorator as a function descriptor, this means that
+`C().decorated_method` is also a `BoundMethod`, and that we can access its `__self__` and `__func__`
+attributes.
+
+```py
+from typing import Callable
+
+def identity[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class C:
+    def plain_method(self, value: int) -> str:
+        return str(value)
+
+    @identity
+    def decorated_method(self, value: int) -> str:
+        return str(value)
+
+reveal_type(type(C().plain_method))  # revealed: <class 'MethodType'>
+reveal_type(type(C().decorated_method))  # revealed: <class 'MethodType'>
+
+decorated = C().decorated_method
+
+reveal_type(decorated.__self__)  # revealed: C
+reveal_type(decorated.__func__)  # revealed: (self, value: int) -> str
+reveal_type(decorated(1))  # revealed: str
+reveal_type(decorated.__call__(1))  # revealed: str
+decorated("wrong")  # error: [invalid-argument-type]
+callback: Callable[[int], str] = decorated
+```
+
 ## Receiver rebinding does not shadow methods
 
 Assigning to `self` does not assign to its method attributes. An empty loop targeting `self`
