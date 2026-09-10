@@ -13,6 +13,7 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
+use camino::Utf8PathBuf;
 use compact_str::CompactString;
 use ruff_db::system::FileType;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -57,11 +58,10 @@ pub(crate) fn list_modules<'db>(
     // directories already visited and their non-symlink children; otherwise,
     // check the candidate's full path.
     let is_listable_location = |candidate: &ModuleResolutionCandidate| {
-        let path = candidate.directory.path();
         prefix.is_none()
             || listable_directories
                 .iter()
-                .any(|directory| directory.path() == path || directory.is_child_directory(path))
+                .any(|directory| directory.is_same_or_child_directory(&candidate.directory))
             || is_listable_location(candidate)
     };
     let mut listing = ModuleListing::default();
@@ -281,17 +281,14 @@ fn child_directory_names<'db>(db: &'db dyn Db, parent: DirectoryParent<'db>) -> 
         ),
     };
     let context = ResolverContext::new(db, resolver_environment, mode);
+    let relative_path: Utf8PathBuf = parent
+        .map(|parent| parent.components().collect())
+        .unwrap_or_default();
     let mut names = BTreeSet::new();
 
     for search_path in search_paths(db, context.resolver_environment, context.mode) {
-        let mut path = search_path.to_module_path();
-        if let Some(parent) = parent {
-            for component_name in parent.components() {
-                path.push(component_name);
-            }
-        }
-
-        let directory = ModuleDirectory::new(&context, path);
+        let directory =
+            ModuleDirectory::from_parts(&context, search_path.clone(), relative_path.clone());
         for entry in directory.entries(db) {
             if matches!(entry.file_type(), FileType::Directory | FileType::Symlink)
                 && let Some(name) = entry.file_name()

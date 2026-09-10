@@ -283,7 +283,7 @@ struct CachedCandidate {
 impl CachedCandidate {
     fn restore<'db>(&self, context: &ResolverContext<'db>) -> ModuleResolutionCandidate<'db> {
         ModuleResolutionCandidate {
-            directory: ModuleDirectory::new(context, self.path.clone()),
+            directory: ModuleDirectory::from_module_path(context, &self.path),
             module: self.module,
             py_typed: self.py_typed,
             precedence: self.precedence,
@@ -294,7 +294,7 @@ impl CachedCandidate {
 impl From<&ModuleResolutionCandidate<'_>> for CachedCandidate {
     fn from(candidate: &ModuleResolutionCandidate<'_>) -> Self {
         Self {
-            path: candidate.directory.path().clone(),
+            path: candidate.directory.to_module_path(),
             module: candidate.module,
             py_typed: candidate.py_typed,
             precedence: candidate.precedence,
