@@ -6561,10 +6561,7 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                if !matches!(
-                    bound_method.func(db),
-                    Type::FunctionLiteral(_) | Type::Callable(_)
-                ) {
+                let Some(signature) = bound_method.function_signatures(db) else {
                     return bound_method
                         .func(db)
                         .try_upcast_to_callable(db, env)
@@ -6586,8 +6583,7 @@ impl<'db> Type<'db> {
                                 )
                             },
                         );
-                }
-                let signature = bound_method.unbound_signatures(db);
+                };
                 let self_instance = bound_method.self_instance(db);
                 let signature_receiver = bound_method.signature_receiver(db);
                 // Class-based protocol member lookup has already specialized the method for this
@@ -10483,14 +10479,8 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             }
 
             Type::BoundMethod(method_type) => {
-                if let Some(function) = method_type.function(db) {
-                    function
-                        .bound_signatures(
-                            db,
-                            method_type.signature_receiver(db),
-                            method_type.typing_self_type(db),
-                        )
-                        .variance_of(db, env, typevar)
+                if let Some(signatures) = method_type.bound_signatures(db) {
+                    signatures.variance_of(db, env, typevar)
                 } else {
                     // A callable object's type does not include the additional receiver bound
                     // by classmethod, which is also exposed through `__self__`.

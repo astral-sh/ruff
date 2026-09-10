@@ -1576,13 +1576,8 @@ impl<'db> Bindings<'db> {
             // class alternatives. Deduplicate by that bound signature while retaining
             // specializations that change the accepted arguments.
             let callable = match downstream_bindings.callable_type() {
-                Type::BoundMethod(method)
-                    if matches!(
-                        method.func(context.db()),
-                        Type::FunctionLiteral(_) | Type::Callable(_)
-                    ) =>
-                {
-                    Type::Callable(method.into_callable_type(context.db()))
+                Type::BoundMethod(method) if let Some(callable) = method.into_callable_type(db) => {
+                    Type::Callable(callable)
                 }
                 ty => ty,
             };
@@ -2315,9 +2310,9 @@ impl<'db> Bindings<'db> {
                                         signature_generic_context(function.signature(db))
                                     }
 
-                                    Type::BoundMethod(bound_method) => signature_generic_context(
-                                        bound_method.unbound_signatures(db),
-                                    ),
+                                    Type::BoundMethod(bound_method) => bound_method
+                                        .function_signatures(db)
+                                        .and_then(signature_generic_context),
 
                                     Type::Callable(callable) => {
                                         signature_generic_context(callable.signatures(db))
