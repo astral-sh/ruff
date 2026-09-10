@@ -166,8 +166,8 @@ ban-lazy = ["json"]
 
 ```py
 __lazy_modules__ = ["json"]
-# error: [lazy-import-mismatch]
-# error: [lazy-import-mismatch]
+# error: [lazy-import-mismatch] "`json` should be imported eagerly"
+# error: [lazy-import-mismatch] "`pathlib` should be imported lazily"
 import json, pathlib
 ```
 
