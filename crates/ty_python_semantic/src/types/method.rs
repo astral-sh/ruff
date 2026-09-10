@@ -182,11 +182,16 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    pub(crate) fn unbound_signatures(self, db: &'db dyn Db) -> &'db CallableSignature<'db> {
+    /// The unbound signatures of an actual or synthesized function, or `None` for other payloads.
+    /// Use [`Self::callables`] to resolve the bound call interface of other wrapped callables.
+    pub(crate) fn function_signatures(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<&'db CallableSignature<'db>> {
         match self.func(db) {
-            Type::FunctionLiteral(function) => function.signature(db),
-            Type::Callable(callable) => callable.signatures(db),
-            _ => CallableType::unknown(db).signatures(db),
+            Type::FunctionLiteral(function) => Some(function.signature(db)),
+            Type::Callable(callable) => Some(callable.signatures(db)),
+            _ => None,
         }
     }
 
@@ -199,19 +204,20 @@ impl<'db> BoundMethodType<'db> {
         // Extracting a classmethod's `__func__` removes its descriptor behavior, but its
         // `type[Self]` receiver annotation still relates `Self` to an instance of the class.
         let has_class_self_receiver = is_class_method
-            || self
-                .unbound_signatures(db)
-                .overloads
-                .iter()
-                .filter_map(|signature| signature.parameters().get(0))
-                .filter(|parameter| parameter.is_positional())
-                .any(|parameter| {
-                    matches!(
-                        parameter.annotated_type().resolve_type_alias(db),
-                        Type::SubclassOf(subclass)
-                            if subclass.into_type_var().is_some_and(|typevar| typevar.typevar(db).is_self(db))
-                    )
-                });
+            || self.function_signatures(db).is_some_and(|signatures| {
+                signatures
+                    .overloads
+                    .iter()
+                    .filter_map(|signature| signature.parameters().get(0))
+                    .filter(|parameter| parameter.is_positional())
+                    .any(|parameter| {
+                        matches!(
+                            parameter.annotated_type().resolve_type_alias(db),
+                            Type::SubclassOf(subclass)
+                                if subclass.into_type_var().is_some_and(|typevar| typevar.typevar(db).is_self(db))
+                        )
+                    })
+            });
         if has_class_self_receiver {
             let env = ProgramEnvironment::from_program(self.program(db));
             self_instance = self_instance
@@ -263,45 +269,63 @@ impl<'db> BoundMethodType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<CallableTypes<'db>> {
-        match self.func(db) {
-            Type::FunctionLiteral(_) | Type::Callable(_) => {
-                Some(CallableTypes::one(self.into_callable_type(db)))
-            }
-            func => func.try_upcast_to_callable(db, env).map(|callables| {
-                callables
-                    .map(|callable| callable.bind_self(db, env, Some(self.signature_receiver(db))))
-            }),
+        if let Some(callable) = self.into_callable_type(db) {
+            Some(CallableTypes::one(callable))
+        } else {
+            self.func(db)
+                .try_upcast_to_callable(db, env)
+                .map(|callables| {
+                    callables.map(|callable| {
+                        callable.bind_self(db, env, Some(self.signature_receiver(db)))
+                    })
+                })
         }
     }
 
+    /// The bound callable for an actual or synthesized function, or `None` for other payloads.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|db, _, _| CallableType::bottom(db),
+        cycle_initial=|db, _, _| Some(CallableType::bottom(db)),
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
+        let signatures = self.function_signatures(db)?;
         let env = ProgramEnvironment::from_program(self.program(db));
         let typing_self_type = self.typing_self_type(db);
         let receiver_type = self.signature_receiver(db);
 
-        self.callable_with_signatures(
+        Some(self.callable_with_signatures(
             db,
-            self.bound_signatures_with_receiver(db, &env, receiver_type, typing_self_type),
-        )
+            Self::bound_signatures_with_receiver(
+                db,
+                &env,
+                signatures,
+                receiver_type,
+                typing_self_type,
+            ),
+        ))
     }
 
     /// Converts this bound method into a callable using separate runtime-receiver and `Self` types.
+    /// Returns `None` if the payload is not an actual or synthesized function.
     pub(crate) fn into_callable_type_with_receiver(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
-    ) -> CallableType<'db> {
-        self.callable_with_signatures(
+    ) -> Option<CallableType<'db>> {
+        let signatures = self.function_signatures(db)?;
+        Some(self.callable_with_signatures(
             db,
-            self.bound_signatures_with_receiver(db, env, receiver_type, typing_self_type),
-        )
+            Self::bound_signatures_with_receiver(
+                db,
+                env,
+                signatures,
+                receiver_type,
+                typing_self_type,
+            ),
+        ))
     }
 
     fn callable_with_signatures(
@@ -316,19 +340,17 @@ impl<'db> BoundMethodType<'db> {
     }
 
     /// Shares the signatures retained in the method's interned callable.
-    pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> &'db CallableSignature<'db> {
-        self.into_callable_type(db).signatures(db)
+    pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
+        Some(self.into_callable_type(db)?.signatures(db))
     }
 
     fn bound_signatures_with_receiver(
-        self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        function_signature: &CallableSignature<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> CallableSignature<'db> {
-        let function_signature = self.unbound_signatures(db);
-
         let [signature] = function_signature.overloads.as_slice() else {
             if !function_signature
                 .overloads
