@@ -270,63 +270,6 @@ help: Import from `collections.abc`
 42 |
    |
 
-UP035 [*] Import from `collections.abc` instead: `Callable`
-  --> UP035.py:44:1
-   |
-42 |     )
-43 |
-44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-45 |
-46 | if True: from collections import (
-   |
-help: Import from `collections.abc`
-   |
-43 |
-   - from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-44 + from typing import Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-45 + from collections.abc import Callable
-46 |
-   |
-
-UP035 [*] Import from `collections` instead: `OrderedDict`
-  --> UP035.py:44:1
-   |
-42 |     )
-43 |
-44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-45 |
-46 | if True: from collections import (
-   |
-help: Import from `collections`
-   |
-43 |
-   - from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-44 + from typing import Callable, Match, Pattern, List, AbstractSet, ContextManager
-45 + from collections import OrderedDict
-46 |
-   |
-
-UP035 [*] Import from `re` instead: `Match`, `Pattern`
-  --> UP035.py:44:1
-   |
-42 |     )
-43 |
-44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-45 |
-46 | if True: from collections import (
-   |
-help: Import from `re`
-   |
-43 |
-   - from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-44 + from typing import Callable, List, OrderedDict, AbstractSet, ContextManager
-45 + from re import Match, Pattern
-46 |
-   |
-
 UP035 `typing.List` is deprecated, use `list` instead
   --> UP035.py:44:1
    |
@@ -359,6 +302,66 @@ UP035 `typing.ContextManager` is deprecated, use `contextlib.AbstractContextMana
 45 |
 46 | if True: from collections import (
    |
+
+UP035 [*] Import from `collections.abc` instead: `Callable`
+  --> UP035.py:44:1
+   |
+42 |     )
+43 |
+44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+45 |
+46 | if True: from collections import (
+   |
+help: Import from `collections.abc`
+   |
+43 |
+   - from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+44 + from typing import Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+45 + from collections.abc import Callable
+46 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `collections` instead: `OrderedDict`
+  --> UP035.py:44:1
+   |
+42 |     )
+43 |
+44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+45 |
+46 | if True: from collections import (
+   |
+help: Import from `collections`
+   |
+43 |
+   - from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+44 + from typing import Callable, Match, Pattern, List, AbstractSet, ContextManager
+45 + from collections import OrderedDict
+46 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `re` instead: `Match`, `Pattern`
+  --> UP035.py:44:1
+   |
+42 |     )
+43 |
+44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+45 |
+46 | if True: from collections import (
+   |
+help: Import from `re`
+   |
+43 |
+   - from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+44 + from typing import Callable, List, OrderedDict, AbstractSet, ContextManager
+45 + from re import Match, Pattern
+46 |
+   |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 Import from `collections.abc` instead: `Mapping`
   --> UP035.py:46:10
@@ -401,6 +404,7 @@ help: Import from `collections`
 51 + from collections import OrderedDict
 52 | from typing_extensions import OrderedDict
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `typing` instead: `OrderedDict`
   --> UP035.py:52:1
@@ -437,6 +441,7 @@ help: Import from `collections.abc`
 53 + from collections.abc import Callable
 54 | from typing import ByteString
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `ByteString`
   --> UP035.py:54:1
@@ -455,6 +460,7 @@ help: Import from `collections.abc`
 54 + from collections.abc import ByteString
 55 | from typing import Container
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Container`
   --> UP035.py:55:1
@@ -473,6 +479,7 @@ help: Import from `collections.abc`
 55 + from collections.abc import Container
 56 | from typing import Hashable
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Hashable`
   --> UP035.py:56:1
@@ -491,6 +498,7 @@ help: Import from `collections.abc`
 56 + from collections.abc import Hashable
 57 | from typing import ItemsView
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `ItemsView`
   --> UP035.py:57:1
@@ -509,6 +517,7 @@ help: Import from `collections.abc`
 57 + from collections.abc import ItemsView
 58 | from typing import Iterable
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Iterable`
   --> UP035.py:58:1
@@ -527,6 +536,7 @@ help: Import from `collections.abc`
 58 + from collections.abc import Iterable
 59 | from typing import Iterator
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Iterator`
   --> UP035.py:59:1
@@ -545,6 +555,7 @@ help: Import from `collections.abc`
 59 + from collections.abc import Iterator
 60 | from typing import KeysView
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `KeysView`
   --> UP035.py:60:1
@@ -563,6 +574,7 @@ help: Import from `collections.abc`
 60 + from collections.abc import KeysView
 61 | from typing import Mapping
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Mapping`
   --> UP035.py:61:1
@@ -581,6 +593,7 @@ help: Import from `collections.abc`
 61 + from collections.abc import Mapping
 62 | from typing import MappingView
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `MappingView`
   --> UP035.py:62:1
@@ -599,6 +612,7 @@ help: Import from `collections.abc`
 62 + from collections.abc import MappingView
 63 | from typing import MutableMapping
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `MutableMapping`
   --> UP035.py:63:1
@@ -617,6 +631,7 @@ help: Import from `collections.abc`
 63 + from collections.abc import MutableMapping
 64 | from typing import MutableSequence
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `MutableSequence`
   --> UP035.py:64:1
@@ -635,6 +650,7 @@ help: Import from `collections.abc`
 64 + from collections.abc import MutableSequence
 65 | from typing import MutableSet
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `MutableSet`
   --> UP035.py:65:1
@@ -653,6 +669,7 @@ help: Import from `collections.abc`
 65 + from collections.abc import MutableSet
 66 | from typing import Sequence
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Sequence`
   --> UP035.py:66:1
@@ -671,6 +688,7 @@ help: Import from `collections.abc`
 66 + from collections.abc import Sequence
 67 | from typing import Sized
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Sized`
   --> UP035.py:67:1
@@ -689,6 +707,7 @@ help: Import from `collections.abc`
 67 + from collections.abc import Sized
 68 | from typing import ValuesView
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `ValuesView`
   --> UP035.py:68:1
@@ -707,6 +726,7 @@ help: Import from `collections.abc`
 68 + from collections.abc import ValuesView
 69 | from typing import Awaitable
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Awaitable`
   --> UP035.py:69:1
@@ -725,6 +745,7 @@ help: Import from `collections.abc`
 69 + from collections.abc import Awaitable
 70 | from typing import AsyncIterator
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `AsyncIterator`
   --> UP035.py:70:1
@@ -743,6 +764,7 @@ help: Import from `collections.abc`
 70 + from collections.abc import AsyncIterator
 71 | from typing import AsyncIterable
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `AsyncIterable`
   --> UP035.py:71:1
@@ -761,6 +783,7 @@ help: Import from `collections.abc`
 71 + from collections.abc import AsyncIterable
 72 | from typing import Coroutine
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Coroutine`
   --> UP035.py:72:1
@@ -779,6 +802,7 @@ help: Import from `collections.abc`
 72 + from collections.abc import Coroutine
 73 | from typing import Collection
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Collection`
   --> UP035.py:73:1
@@ -797,6 +821,7 @@ help: Import from `collections.abc`
 73 + from collections.abc import Collection
 74 | from typing import AsyncGenerator
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `AsyncGenerator`
   --> UP035.py:74:1
@@ -815,6 +840,7 @@ help: Import from `collections.abc`
 74 + from collections.abc import AsyncGenerator
 75 | from typing import Reversible
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Reversible`
   --> UP035.py:75:1
@@ -833,6 +859,7 @@ help: Import from `collections.abc`
 75 + from collections.abc import Reversible
 76 | from typing import Generator
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Generator`
   --> UP035.py:76:1
@@ -851,6 +878,7 @@ help: Import from `collections.abc`
 76 + from collections.abc import Generator
 77 | from typing import Callable
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Callable`
   --> UP035.py:77:1
@@ -868,6 +896,7 @@ help: Import from `collections.abc`
 77 + from collections.abc import Callable
 78 | from typing import cast
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `typing` instead: `SupportsIndex`
   --> UP035.py:84:1
@@ -1123,6 +1152,7 @@ help: Import from `re`
 131 + from re import Match
 132 |
     |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `re` instead: `Pattern`
    --> UP035.py:134:1
@@ -1135,4 +1165,170 @@ help: Import from `re`
 133 | # UP035 on py37+ only
     - from typing.re import Pattern
 134 + from re import Pattern
+135 |
     |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `collections.abc` instead: `Sequence`
+   --> UP035.py:141:1
+    |
+139 | from typing import TYPE_CHECKING
+140 |
+141 | from typing import Sequence as TypingOnlySequence
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+142 |
+143 | if TYPE_CHECKING:
+    |
+help: Import from `collections.abc`
+    |
+140 |
+    - from typing import Sequence as TypingOnlySequence
+141 + from collections.abc import Sequence as TypingOnlySequence
+142 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `collections.abc` instead: `Sequence`
+   --> UP035.py:146:1
+    |
+144 |     typing_only_value: TypingOnlySequence
+145 |
+146 | from typing import Sequence as RuntimeSequence
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+147 |
+148 | runtime_value = RuntimeSequence
+    |
+help: Import from `collections.abc`
+    |
+145 |
+    - from typing import Sequence as RuntimeSequence
+146 + from collections.abc import Sequence as RuntimeSequence
+147 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `collections.abc` instead: `Sequence`
+   --> UP035.py:150:1
+    |
+148 | runtime_value = RuntimeSequence
+149 |
+150 | from typing import Sequence as RuntimeAnnotationSequence
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+151 |
+152 | def runtime_annotation(value: RuntimeAnnotationSequence) -> None:
+    |
+help: Import from `collections.abc`
+    |
+149 |
+    - from typing import Sequence as RuntimeAnnotationSequence
+150 + from collections.abc import Sequence as RuntimeAnnotationSequence
+151 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `collections.abc` instead: `Sequence`
+   --> UP035.py:155:1
+    |
+153 |     pass
+154 |
+155 | from typing import Sequence as ReexportSequence
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+156 |
+157 | __all__ = ["ReexportSequence"]
+    |
+help: Import from `collections.abc`
+    |
+154 |
+    - from typing import Sequence as ReexportSequence
+155 + from collections.abc import Sequence as ReexportSequence
+156 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `collections.abc` instead: `Sequence`
+   --> UP035.py:160:5
+    |
+159 | class RuntimeClass:
+160 |     from typing import Sequence as ClassSequence
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+161 |
+162 |     value = ClassSequence
+    |
+help: Import from `collections.abc`
+    |
+159 | class RuntimeClass:
+    -     from typing import Sequence as ClassSequence
+160 +     from collections.abc import Sequence as ClassSequence
+161 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `collections.abc` instead: `Sequence`
+   --> UP035.py:167:9
+    |
+165 | def typing_only_local():
+166 |     if TYPE_CHECKING:
+167 |         from typing import Sequence as LocalTypingOnlySequence
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+168 |
+169 |         local_typing_only_value: LocalTypingOnlySequence
+    |
+help: Import from `collections.abc`
+    |
+166 |     if TYPE_CHECKING:
+    -         from typing import Sequence as LocalTypingOnlySequence
+167 +         from collections.abc import Sequence as LocalTypingOnlySequence
+168 |
+    |
+
+UP035 [*] Import from `collections.abc` instead: `Sequence`
+   --> UP035.py:173:5
+    |
+172 | def typing_only_local_with_vars():
+173 |     from typing import Sequence as LocalWithVarsSequence
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+174 |
+175 |     if TYPE_CHECKING:
+    |
+help: Import from `collections.abc`
+    |
+172 | def typing_only_local_with_vars():
+    -     from typing import Sequence as LocalWithVarsSequence
+173 +     from collections.abc import Sequence as LocalWithVarsSequence
+174 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `collections.abc` instead: `Sequence`
+   --> UP035.py:181:1
+    |
+181 | from typing import Sequence as ShadowedSequence
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+182 |
+183 | shadowed_runtime_value = ShadowedSequence
+    |
+help: Import from `collections.abc`
+    |
+180 |
+    - from typing import Sequence as ShadowedSequence
+181 + from collections.abc import Sequence as ShadowedSequence
+182 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `collections.abc` instead: `Callable`, `Sequence`
+   --> UP035.py:187:1
+    |
+187 | from typing import Callable as ShadowedCallable, Sequence as MultiTypingOnlySequence
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+188 |
+189 | shadowed_callable_runtime = ShadowedCallable
+    |
+help: Import from `collections.abc`
+    |
+186 |
+    - from typing import Callable as ShadowedCallable, Sequence as MultiTypingOnlySequence
+187 + from collections.abc import Callable as ShadowedCallable, Sequence as MultiTypingOnlySequence
+188 |
+    |
+note: This is an unsafe fix and may change runtime behavior

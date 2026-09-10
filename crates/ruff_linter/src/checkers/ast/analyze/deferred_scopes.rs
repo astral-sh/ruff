@@ -14,6 +14,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::AsyncioDanglingTask,
         Rule::BadStaticmethodArgument,
         Rule::BuiltinAttributeShadowing,
+        Rule::DeprecatedImport,
         Rule::FunctionCallInDataclassDefaultArgument,
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
@@ -87,6 +88,10 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 
     for scope_id in checker.analyze.scopes.iter().rev().copied() {
         let scope = &checker.semantic.scopes[scope_id];
+
+        if checker.is_rule_enabled(Rule::DeprecatedImport) {
+            pyupgrade::rules::deprecated_import_runtime_sensitive(checker, scope);
+        }
 
         if checker.is_rule_enabled(Rule::UndefinedLocal) {
             pyflakes::rules::undefined_local(checker, scope_id, scope);
