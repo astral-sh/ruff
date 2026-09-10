@@ -30,6 +30,9 @@ class Foo:
     def not_good(cls, __foo: int) -> None: ...  # PYI063
     def __new__(cls, __name: str, __later: str) -> Self: ...  # PYI063
 
+    @staticmethod
+    def __new__(__cls, __name: str, __later: str) -> Self: ...  # PYI063
+
     # The first non-self argument isn't positional-only, so logically the second can't be either:
     def okay1(self, x: int, __y: int) -> None: ...
     # Same here:
