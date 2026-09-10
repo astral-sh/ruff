@@ -6658,14 +6658,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.finish_expression_type(expression, ty, tcx)
     }
 
-    /// Apply context before recording an inferred expression type.
+    /// Apply context and normalization before recording an inferred expression type.
     fn finish_expression_type(
         &mut self,
         expression: &ast::Expr,
         ty: Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let ty = self.apply_type_context(expression, ty, tcx);
+        let ty = self
+            .apply_type_context(expression, ty, tcx)
+            .normalize_recursive(self.db(), self.program_environment());
         self.store_expression_type(expression, ty);
         ty
     }

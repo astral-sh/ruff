@@ -21,6 +21,7 @@ use super::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, GenericContext,
     MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, VarianceTerm,
+    any_over_type,
 };
 use crate::{Db, FxIndexMap, Program, ProgramEnvironment};
 
@@ -929,7 +930,25 @@ impl<'db> TypeVisitor<'db> for RecursiveReferences<'_, 'db> {
     }
 }
 
-impl Type<'_> {
+impl<'db> Type<'db> {
+    /// Fold constructor prefixes onto existing anonymous recursive graph entries.
+    pub(super) fn normalize_recursive(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Self {
+        if !any_over_type(
+            db,
+            env,
+            self,
+            false,
+            |ty| matches!(ty, Type::Recursive(recursive) if recursive.alias(db).is_none()),
+        ) {
+            return self;
+        }
+        RecursiveGraphBuilder::normalize(db, env, self)
+    }
+
     /// Reject a bare recursive variable at a semantic-operation boundary.
     pub(super) const fn assert_not_recursive_var(self) {
         debug_assert!(
