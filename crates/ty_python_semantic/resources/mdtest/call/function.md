@@ -1073,7 +1073,7 @@ bindings. This prevents false positive "parameter already assigned" errors.
 Regression test for <https://github.com/astral-sh/ty/issues/1584>.
 
 ```py
-from typing import TypedDict
+from typing_extensions import TypedDict
 
 def f(a: str, b: str, c: float) -> None: ...
 
@@ -1114,7 +1114,7 @@ def _(args: list[str], kwargs: dict[str, float]) -> None:
 
 # Keyword variadic with TypedDict has known keys but is still handled conservatively
 # but we could possibly improve this in the future.
-class CKwargs(TypedDict):
+class CKwargs(TypedDict, closed=True):
     c: float
 
 def _(args: list[str]) -> None:
@@ -1634,7 +1634,49 @@ def _(kwargs: dict[str, int]) -> None:
 
 f(**{"a": 1, "b": 2})
 f(**dict(a=1, b=2))
-f(**Foo(a=1, b=2))
+f(**Foo(a=1, b=2))  # error: [unknown-argument]
+```
+
+### Open TypedDicts require arbitrary keyword parameters
+
+An open `TypedDict` may contain undeclared keys, even when all its declared keys match named
+parameters. The callee must accept those additional keywords, and their values have type `object`.
+Closed `TypedDict`s have no hidden keys and can be unpacked into a fixed signature.
+
+```py
+from typing_extensions import Any, TypedDict, Unpack
+
+class Open(TypedDict):
+    value: int
+
+class Closed(TypedDict, closed=True):
+    value: int
+
+class EmptyOpen(TypedDict): ...
+class EmptyClosed(TypedDict, closed=True): ...
+
+def fixed(*, value: int) -> None: ...
+def no_keywords() -> None: ...
+def objects(*, value: int, **kwargs: object) -> None: ...
+def anything(*, value: int, **kwargs: Any) -> None: ...
+def ints(*, value: int, **kwargs: int) -> None: ...
+def unpacked_open(**kwargs: Unpack[Open]) -> None: ...
+def unpacked_closed(**kwargs: Unpack[Closed]) -> None: ...
+def _(open_value: Open, closed_value: Closed, empty_open: EmptyOpen, empty_closed: EmptyClosed) -> None:
+    # error: [unknown-argument] "Unpacked argument may contain keyword arguments that do not match any known parameter of function `fixed`"
+    fixed(**open_value)
+    fixed(**closed_value)
+
+    no_keywords(**empty_open)  # error: [unknown-argument]
+    no_keywords(**empty_closed)
+
+    objects(**open_value)
+    anything(**open_value)
+    ints(**open_value)  # error: [invalid-argument-type]
+
+    unpacked_open(**open_value)
+    unpacked_closed(**open_value)  # error: [unknown-argument]
+    unpacked_closed(**closed_value)
 ```
 
 ### Unpacked keyword values retain their individual generic types
@@ -1675,7 +1717,7 @@ def _(kwargs: dict[str, int]) -> None:
 
 f(**{"a": 1, "b": 2})
 f(**dict(a=1, b=2))
-f(**Foo(a=1, b=2))
+f(**Foo(a=1, b=2))  # error: [unknown-argument]
 ```
 
 ### Multiple keywords argument
@@ -1790,6 +1832,7 @@ def needs_known_keys(*, a: int, b: int, c: int) -> None: ...
 def takes_int_kwargs(**kwargs: int) -> None: ...
 def _(good: GoodA | GoodB, bad: BadA | BadB) -> None:
     # error: [missing-argument] "No argument provided for required parameter `c` of function `needs_known_keys`"
+    # error: [unknown-argument]
     needs_known_keys(**good)
 
     # error: [invalid-argument-type] "Argument to function `takes_int_kwargs` is incorrect: Expected `int`, found `str`"
@@ -2058,9 +2101,9 @@ explicitly-provided keyword argument. The case shown here, without the explicit 
 requires instead that we use our knowledge of the tuple length to prevent over-unpacking.)
 
 ```py
-from typing import TypedDict
+from typing_extensions import TypedDict
 
-class CKwargs(TypedDict):
+class CKwargs(TypedDict, closed=True):
     c: int
 
 def f(a: int = 0, b: int = 0, c: int = 0) -> None: ...

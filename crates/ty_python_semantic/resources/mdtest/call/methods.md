@@ -785,15 +785,15 @@ class InvalidType(Base, arg="foo"): ...  # error: [invalid-argument-type]
 Keyword splats are allowed if their type can be determined:
 
 ```py
-from typing import TypedDict
+from typing_extensions import TypedDict
 
 class RequiresKwarg:
     def __init_subclass__(cls, arg: int): ...
 
-class WrongArg(TypedDict):
+class WrongArg(TypedDict, closed=True):
     kwarg: int
 
-class InvalidType(TypedDict):
+class InvalidType(TypedDict, closed=True):
     arg: str
 
 wrong_arg: WrongArg = {"kwarg": 5}

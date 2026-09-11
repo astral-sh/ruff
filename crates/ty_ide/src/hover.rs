@@ -1321,14 +1321,16 @@ mod tests {
         class Movie(
             *,
             title: str,
-            year: int
+            year: int,
+            **kwargs: object
         )
         ---------------------------------------------
         ```python
         class Movie(
             *,
             title: str,
-            year: int
+            year: int,
+            **kwargs: object
         )
         ```
         ---------------------------------------------
@@ -1364,7 +1366,8 @@ mod tests {
             /,
             *,
             title: str = ...,
-            year: int = ...
+            year: int = ...,
+            **kwargs: object
         )
         ---------------------------------------------
         ```python
@@ -1373,7 +1376,8 @@ mod tests {
             /,
             *,
             title: str = ...,
-            year: int = ...
+            year: int = ...,
+            **kwargs: object
         )
         ```
         ---------------------------------------------
@@ -1408,7 +1412,8 @@ mod tests {
             /,
             *,
             title: str = ...,
-            year: int = ...
+            year: int = ...,
+            **kwargs: object
         )
         ---------------------------------------------
         ```python
@@ -1417,7 +1422,8 @@ mod tests {
             /,
             *,
             title: str = ...,
-            year: int = ...
+            year: int = ...,
+            **kwargs: object
         )
         ```
         ---------------------------------------------
@@ -1450,14 +1456,16 @@ mod tests {
         class Movie(
             *,
             title: str,
-            year: int = ...
+            year: int = ...,
+            **kwargs: object
         )
         ---------------------------------------------
         ```python
         class Movie(
             *,
             title: str,
-            year: int = ...
+            year: int = ...,
+            **kwargs: object
         )
         ```
         ---------------------------------------------
@@ -1490,14 +1498,16 @@ mod tests {
         class Movie(
             *,
             title: str = ...,
-            year: int = ...
+            year: int = ...,
+            **kwargs: object
         )
         ---------------------------------------------
         ```python
         class Movie(
             *,
             title: str = ...,
-            year: int = ...
+            year: int = ...,
+            **kwargs: object
         )
         ```
         ---------------------------------------------
