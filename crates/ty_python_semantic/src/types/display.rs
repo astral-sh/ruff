@@ -3873,6 +3873,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                     write!(f, "{}=", binding.bound_typevar.name(db))?;
                     binding
                         .solution
+                        .ty()
                         .display_with(db, self.env, self.settings.clone())
                         .fmt_detailed(f)?;
                 }

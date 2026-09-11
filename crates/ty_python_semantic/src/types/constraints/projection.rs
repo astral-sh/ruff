@@ -2,6 +2,7 @@
 
 use rustc_hash::FxHashSet;
 
+use super::resolution::SolutionType;
 use super::{ConstraintSet, PathBound, PathBoundSolution, PathBounds, Solutions, TypeVarSolution};
 use crate::types::typevar::TypeVarSet;
 use crate::types::{Type, TypeVarVariance};
@@ -166,7 +167,7 @@ impl<'db> ConstraintSet<'db, '_> {
         let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
         path_bounds.try_solve_with(db, env, choose, |solution| {
             for binding in solution {
-                type_budget.charge_type(db, binding.solution)?;
+                type_budget.charge_type(db, binding.solution.ty())?;
             }
             Ok(())
         })
@@ -196,7 +197,7 @@ impl<'db> ConstraintSet<'db, '_> {
         initial: T,
         fold: impl FnMut(
             T,
-            &[TypeVarSolution<'db>],
+            &[TypeVarSolution<'db, SolutionType<'db>>],
             &mut ProjectionTypeBudget,
         ) -> Result<T, ProjectionError>,
     ) -> Result<SolutionProjection<T>, ProjectionError> {
@@ -223,7 +224,7 @@ impl<'db> PathBounds<'db> {
         budget: &mut ProjectionTypeBudget,
         mut fold: impl FnMut(
             T,
-            &[TypeVarSolution<'db>],
+            &[TypeVarSolution<'db, SolutionType<'db>>],
             &mut ProjectionTypeBudget,
         ) -> Result<T, ProjectionError>,
     ) -> Result<SolutionProjection<T>, ProjectionError> {

@@ -11,7 +11,7 @@ use crate::{
         TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
         callable::CallableTypes,
         class::NamedTupleSpec,
-        constraints::{OwnedConstraintSet, TypeVarSolution},
+        constraints::{OwnedConstraintSet, TypeVarSolution, resolution::SolutionType},
         dedicated::pydantic::ConfigBoolean,
         function::FunctionDecorators,
         generics::{Specialization, walk_generic_context},
@@ -55,7 +55,7 @@ impl<'db> InternedConstraintSet<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct InternedConstraintSetSolution<'db> {
     #[returns(ref)]
-    pub(super) bindings: Box<[TypeVarSolution<'db>]>,
+    pub(super) bindings: Box<[TypeVarSolution<'db, SolutionType<'db>>]>,
 }
 
 // The Salsa heap is tracked separately.
@@ -313,7 +313,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         }
         KnownInstanceType::ConstraintSetSolution(solution) => {
             for binding in solution.bindings(db) {
-                visitor.visit_type(db, binding.solution);
+                visitor.visit_type(db, binding.solution.ty());
             }
         }
         KnownInstanceType::Field(field) => {

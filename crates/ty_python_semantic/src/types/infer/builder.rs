@@ -6815,6 +6815,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for binding in solution {
                 let inferred_ty = binding
                     .solution
+                    .ty()
                     .filter_union(db, env, |ty| !ty.has_provisional_marker(db, env));
                 if inferred_ty.has_provisional_marker(db, env) {
                     continue;
@@ -7634,7 +7635,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 let inferred_ty = builder
                                     .remove_inferable_typevar_artifacts_from_solution(
                                         binding.bound_typevar,
-                                        binding.solution,
+                                        binding.solution.ty(),
                                     );
 
                                 // Avoid inferring a preferred type based on partially specialized
@@ -8043,9 +8044,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 match &mut yield_tcx {
                     Some(accumulator) => {
-                        accumulator.add(db, env, binding.solution);
+                        accumulator.add(db, env, binding.solution.ty());
                     }
-                    None => yield_tcx = Some(UnionAccumulator::new(binding.solution)),
+                    None => yield_tcx = Some(UnionAccumulator::new(binding.solution.ty())),
                 }
             }
         }

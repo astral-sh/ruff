@@ -6128,7 +6128,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         let inferred_ty = builder
                             .remove_inferable_typevar_artifacts_from_solution(
                                 binding.bound_typevar,
-                                binding.solution,
+                                binding.solution.ty(),
                             )
                             .filter_union(db, self.env, |ty| {
                                 if ty.has_provisional_marker(db, self.env) {
@@ -7970,10 +7970,10 @@ impl<'db> Binding<'db> {
                                     db,
                                     env,
                                     *existing,
-                                    binding.solution,
+                                    binding.solution.ty(),
                                 );
                             })
-                            .or_insert(binding.solution);
+                            .or_insert(binding.solution.ty());
                     }
                 }
             }

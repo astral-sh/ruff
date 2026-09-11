@@ -105,6 +105,7 @@ use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
+use crate::types::constraints::resolution::SolutionType;
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, TypeVarSet};
 use crate::types::visitor::{
@@ -4423,11 +4424,14 @@ impl<'db> PathBounds<'db> {
         }
         // Resolve each alternative before callers merge bindings from different paths.
         let resolved = resolution::resolve_solution(db, env, inferable, &solution);
-        for (binding, resolved) in solution.iter_mut().zip(resolved) {
-            if let resolution::SolutionType::Resolved(ty) = resolved {
-                binding.solution = ty;
-            }
-        }
+        let solution = solution
+            .into_iter()
+            .zip(resolved)
+            .map(|(binding, solution)| TypeVarSolution {
+                bound_typevar: binding.bound_typevar,
+                solution,
+            })
+            .collect();
         Some((solution, exceeded_budget))
     }
 
@@ -5162,12 +5166,13 @@ impl<'db> SolutionPaths<'db> {
     }
 }
 
-pub(crate) type Solution<'db> = Vec<TypeVarSolution<'db>>;
+pub(crate) type Solution<'db> = Vec<TypeVarSolution<'db, SolutionType<'db>>>;
 
+/// A variable's selected type, or its dependency-resolution outcome after solving a path.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub struct TypeVarSolution<'db> {
+pub struct TypeVarSolution<'db, T = Type<'db>> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
-    pub(crate) solution: Type<'db>,
+    pub(crate) solution: T,
 }
 
 /// An assignment of one BDD variable to either `true` or `false`. (When evaluating a BDD, we
@@ -6204,7 +6209,11 @@ mod tests {
             Ok(Solutions::Constrained(SolutionPaths::Complete(vec![vec![
                 TypeVarSolution {
                     bound_typevar: t,
-                    solution: UnionType::from_elements(db, &env, [int, str]),
+                    solution: SolutionType::Resolved(UnionType::from_elements(
+                        db,
+                        &env,
+                        [int, str]
+                    )),
                 }
             ]])))
         );
@@ -6245,11 +6254,11 @@ mod tests {
         assert_eq!(solutions[0].len(), 2);
         assert!(solutions[0].contains(&TypeVarSolution {
             bound_typevar: t,
-            solution: int,
+            solution: SolutionType::Resolved(int),
         }));
         assert!(solutions[0].contains(&TypeVarSolution {
             bound_typevar: u,
-            solution: int,
+            solution: SolutionType::Resolved(int),
         }));
 
         let storage = builder.storage.borrow();
@@ -6431,7 +6440,7 @@ class E: ...
         let str = known_instance(db, KnownClass::Str);
         let binding = |bound_typevar, solution| TypeVarSolution {
             bound_typevar,
-            solution,
+            solution: SolutionType::Resolved(solution),
         };
 
         for lower in [None, Some(Type::any())] {
@@ -6847,10 +6856,10 @@ class E: ...
                                     db,
                                     &env,
                                     *existing,
-                                    binding.solution,
+                                    binding.solution.ty(),
                                 );
                             })
-                            .or_insert(binding.solution);
+                            .or_insert(binding.solution.ty());
                     }
                 }
             }
@@ -6878,7 +6887,7 @@ class E: ...
                                 format!(
                                     "{}={}",
                                     binding.bound_typevar.identity(db).display(db),
-                                    binding.solution.display(db, &env)
+                                    binding.solution.ty().display(db, &env)
                                 )
                             })
                             .join(", ")
@@ -7777,11 +7786,11 @@ class E: ...
         let expected = Ok(Solutions::Constrained(SolutionPaths::Complete(vec![
             vec![TypeVarSolution {
                 bound_typevar: u,
-                solution: known_instance(db, KnownClass::Int),
+                solution: SolutionType::Resolved(known_instance(db, KnownClass::Int)),
             }],
             vec![TypeVarSolution {
                 bound_typevar: u,
-                solution: known_instance(db, KnownClass::Str),
+                solution: SolutionType::Resolved(known_instance(db, KnownClass::Str)),
             }],
         ])));
 

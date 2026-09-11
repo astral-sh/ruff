@@ -25,11 +25,21 @@ use crate::{Db, FxOrderMap, ProgramEnvironment};
 ///
 /// This does not describe budget completeness or apply defaults to variables without evidence.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) enum SolutionType<'db> {
+pub enum SolutionType<'db> {
     Resolved(Type<'db>),
     /// The original selected type, retained for missing dependencies, noncontractive cycles,
     /// or type forms whose captured references cannot be substituted.
     Unresolved(Type<'db>),
+}
+
+impl<'db> SolutionType<'db> {
+    /// Return the available type, retaining symbolic dependencies when unresolved.
+    /// Match the outcome instead when a consumer requires a closed solution.
+    pub(crate) fn ty(self) -> Type<'db> {
+        match self {
+            Self::Resolved(ty) | Self::Unresolved(ty) => ty,
+        }
+    }
 }
 
 impl<'db> TypeVarSolution<'db> {

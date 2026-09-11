@@ -1050,7 +1050,7 @@ fn specialize_generic_class_from_solutions<'db>(
             solution
                 .iter()
                 .find(|binding| binding.bound_typevar == typevar)
-                .map(|binding| binding.solution)
+                .map(|binding| binding.solution.ty())
                 .or_else(|| unknown_specialization.get(db, typevar))
         })
         .collect::<Option<Vec<_>>>()?;
