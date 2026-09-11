@@ -1,8 +1,10 @@
 use std::cmp::Reverse;
 
+use ruff_python_ast::PythonVersion;
+use ruff_python_ast::StringFlags;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::visitor::transformer::{Transformer, walk_expr};
 use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags};
 use ruff_python_codegen::{Generator, Stylist};
@@ -10,7 +12,7 @@ use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
     Binding, BindingKind, Modules, NodeId, ScopeKind, SemanticModel, analyze,
 };
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::Edit;
 use crate::Locator;
@@ -314,13 +316,16 @@ pub(crate) fn is_singledispatch_implementation(
 /// - When quoting `Series` in `Series[Literal["pd.Timestamp"]]`, we want `"Series[Literal['pd.Timestamp']]"`.
 ///
 /// In general, when expanding a component of a call chain, we want to quote the entire call chain.
+///
+/// Returns `None` when the annotation has no escape-free quoted form.
 pub(crate) fn quote_annotation(
     node_id: NodeId,
     semantic: &SemanticModel,
     stylist: &Stylist,
     locator: &Locator,
     flags: StringLiteralFlags,
-) -> Edit {
+    target_version: PythonVersion,
+) -> Option<Edit> {
     let expr = semantic.expression(node_id).expect("Expression not found");
     if let Some(parent_id) = semantic.parent_expression_id(node_id) {
         match semantic.expression(parent_id) {
@@ -328,31 +333,59 @@ pub(crate) fn quote_annotation(
                 // If we're quoting the value of a subscript, we need to quote the entire
                 // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
                 // should generate `"DataFrame[int]"`.
-                return quote_annotation(parent_id, semantic, stylist, locator, flags);
+                return quote_annotation(
+                    parent_id,
+                    semantic,
+                    stylist,
+                    locator,
+                    flags,
+                    target_version,
+                );
             }
             Some(Expr::Attribute(parent)) if expr == parent.value.as_ref() => {
                 // If we're quoting the value of an attribute, we need to quote the entire
                 // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
                 // should generate `"pd.DataFrame"`.
-                return quote_annotation(parent_id, semantic, stylist, locator, flags);
+                return quote_annotation(
+                    parent_id,
+                    semantic,
+                    stylist,
+                    locator,
+                    flags,
+                    target_version,
+                );
             }
             Some(Expr::Call(parent)) if expr == parent.func.as_ref() => {
                 // If we're quoting the function of a call, we need to quote the entire
                 // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
                 // should generate `"DataFrame()"`.
-                return quote_annotation(parent_id, semantic, stylist, locator, flags);
+                return quote_annotation(
+                    parent_id,
+                    semantic,
+                    stylist,
+                    locator,
+                    flags,
+                    target_version,
+                );
             }
             Some(Expr::BinOp(parent)) if parent.op.is_bit_or() => {
                 // If we're quoting the left or right side of a binary operation, we need to
                 // quote the entire expression. For example, when quoting `DataFrame` in
                 // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
-                return quote_annotation(parent_id, semantic, stylist, locator, flags);
+                return quote_annotation(
+                    parent_id,
+                    semantic,
+                    stylist,
+                    locator,
+                    flags,
+                    target_version,
+                );
             }
             _ => {}
         }
     }
 
-    quote_type_expression(expr, semantic, stylist, locator, flags)
+    quote_type_expression(expr, semantic, stylist, locator, flags, target_version)
 }
 
 /// Wrap a type expression in quotes.
@@ -363,17 +396,25 @@ pub(crate) fn quote_annotation(
 ///
 /// In most cases you want to call [`quote_annotation`] instead, which provides
 /// that guarantee by expanding the expression before calling into this function.
+///
+/// Returns `None` when no quote style wraps the expression without an escape.
 pub(crate) fn quote_type_expression(
     expr: &Expr,
     semantic: &SemanticModel,
     stylist: &Stylist,
     locator: &Locator,
     flags: StringLiteralFlags,
-) -> Edit {
+    target_version: PythonVersion,
+) -> Option<Edit> {
     // Quote the entire expression.
-    let quote_annotator = QuoteAnnotator::new(semantic, stylist, locator, flags);
-
-    Edit::range_replacement(quote_annotator.into_annotation(expr), expr.range())
+    let quote_annotator = QuoteAnnotator::new(semantic, stylist, locator, flags, target_version);
+    let annotation = quote_annotator.into_annotation(expr)?;
+    // No wrapper removes an escape like the `\n` in `Literal["\n"]`, and a type checker
+    // rejects any escape in a forward reference.
+    if annotation.contains('\\') {
+        return None;
+    }
+    Some(Edit::range_replacement(annotation, expr.range()))
 }
 
 /// Filter out any [`Edit`]s that are completely contained by any other [`Edit`].
@@ -396,11 +437,62 @@ pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
     filtered
 }
 
+/// Pick string flags that wrap `annotation` without escaping any quote character.
+///
+/// Tries the preferred quote, then the opposite, then each of those triple-quoted.
+/// Returns `None` when none of the candidates fit, as for `Literal["'", '"', "'''", '"""']`.
+///
+/// `opposite_allowed` is `false` where a triple-quoted opposite wrapper would reuse an
+/// enclosing interpolated string's own quote character.
+fn flags_avoiding_escape_sequences(
+    annotation: &str,
+    preferred: StringLiteralFlags,
+    opposite_allowed: bool,
+) -> Option<StringLiteralFlags> {
+    let quote = preferred.quote_style();
+
+    if !annotation.contains(quote.as_char()) {
+        return Some(preferred);
+    }
+
+    let opposite = quote.opposite();
+    if !annotation.contains(opposite.as_char()) {
+        return Some(preferred.with_quote_style(opposite));
+    }
+
+    let triple = preferred.with_triple_quotes(TripleQuotes::Yes);
+    if fits_in_triple_quotes(annotation, triple) {
+        return Some(triple);
+    }
+
+    if !opposite_allowed {
+        return None;
+    }
+
+    let triple_opposite = preferred
+        .with_quote_style(opposite)
+        .with_triple_quotes(TripleQuotes::Yes);
+    if fits_in_triple_quotes(annotation, triple_opposite) {
+        return Some(triple_opposite);
+    }
+
+    None
+}
+
+/// Returns `true` if `annotation` fits between the triple-quoted delimiters of `flags`.
+///
+/// A trailing quote of the same character runs into the closing delimiter and leaves the
+/// string unterminated, so `Foo | "("` cannot go inside `"""`.
+fn fits_in_triple_quotes(annotation: &str, flags: StringLiteralFlags) -> bool {
+    !annotation.contains(flags.quote_str()) && !annotation.ends_with(flags.quote_style().as_char())
+}
+
 pub(crate) struct QuoteAnnotator<'a> {
     semantic: &'a SemanticModel<'a>,
     stylist: &'a Stylist<'a>,
     locator: &'a Locator<'a>,
     flags: StringLiteralFlags,
+    target_version: PythonVersion,
 }
 
 impl<'a> QuoteAnnotator<'a> {
@@ -409,29 +501,33 @@ impl<'a> QuoteAnnotator<'a> {
         stylist: &'a Stylist<'a>,
         locator: &'a Locator<'a>,
         flags: StringLiteralFlags,
+        target_version: PythonVersion,
     ) -> Self {
         Self {
             semantic,
             stylist,
             locator,
             flags,
+            target_version,
         }
     }
 
-    fn into_annotation(self, expr: &Expr) -> String {
+    fn into_annotation(self, expr: &Expr) -> Option<String> {
         let mut expr_without_forward_references = expr.clone();
         self.visit_expr(&mut expr_without_forward_references);
-        let generator = Generator::from(self.stylist);
-        // we first generate the annotation with the inverse quote, so we can
-        // generate the string literal with the preferred quote
         let subgenerator = Generator::new(self.stylist.indentation(), self.stylist.line_ending());
         let annotation = subgenerator.expr(&expr_without_forward_references);
-        generator.expr(&Expr::from(ast::StringLiteral {
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            value: annotation.into_boxed_str(),
-            flags: self.flags,
-        }))
+        // Before PEP 701 an interpolated string cannot reuse its own quote character. `flags`
+        // already holds the reversed quote inside one, so only the opposite-quote wrapper
+        // would collide with the enclosing delimiter.
+        let opposite_allowed =
+            !self.semantic.in_interpolated_string() || self.target_version.supports_pep_701();
+        // Wrap by hand instead of generating a string literal. The generator escapes a quote
+        // character even inside `"""..."""`, and a type checker rejects that escape in a
+        // forward reference.
+        let flags = flags_avoiding_escape_sequences(&annotation, self.flags, opposite_allowed)?;
+        let quote = flags.quote_str();
+        Some(format!("{quote}{annotation}{quote}"))
     }
 
     fn visit_annotated_slice(&self, slice: &mut Expr) {

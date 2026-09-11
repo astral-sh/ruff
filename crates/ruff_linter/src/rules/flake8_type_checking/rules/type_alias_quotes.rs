@@ -40,10 +40,12 @@ use ruff_python_ast::token::parenthesized_range;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is currently always marked as unsafe, since runtime
-/// typing libraries may try to access/resolve the type alias in a way
-/// that we can't statically determine during analysis and relies on the
-/// type alias not containing any forward references.
+/// This rule's fix is marked as unsafe, since runtime typing libraries may try to
+/// access/resolve the type alias in a way that we can't statically determine during
+/// analysis and relies on the type alias not containing any forward references.
+///
+/// No fix is offered when the type alias cannot be quoted without an escape sequence,
+/// which a type checker rejects in a forward reference.
 ///
 /// ## References
 /// - [PEP 613 – Explicit Type Aliases](https://peps.python.org/pep-0613/)
@@ -54,7 +56,7 @@ use ruff_python_ast::token::parenthesized_range;
 pub(crate) struct UnquotedTypeAlias;
 
 impl Violation for UnquotedTypeAlias {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -185,11 +187,14 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) {
         checker.stylist(),
         checker.locator(),
         checker.default_string_flags(),
+        checker.target_version(),
     );
     for name in names {
         let mut diagnostic = checker.report_diagnostic(UnquotedTypeAlias, name.range());
         diagnostic.set_parent(parent);
-        diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
+        if let Some(edit) = &edit {
+            diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
+        }
     }
 }
 
