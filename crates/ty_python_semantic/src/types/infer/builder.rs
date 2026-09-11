@@ -100,6 +100,7 @@ use crate::types::generics::{
 use crate::types::infer::builder::binary_expressions::BinaryInferenceState;
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
+use crate::types::infer::builder::subscript::SubscriptAssignmentKind;
 use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeAndRange,
     TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
@@ -3400,6 +3401,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.validate_subscript_assignment(
                         subscript_expr,
                         value,
+                        SubscriptAssignmentKind::Ordinary,
                         object_ty,
                         &mut infer_slice_ty,
                         infer_assigned_ty,
@@ -4883,7 +4885,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_definition(assignment);
         } else {
             // Non-name assignment targets are inferred as ordinary expressions, not definitions.
-            if let Ok(result_ty) = self.infer_augment_assignment(assignment) {
+            // A divergent result is provisional cycle recovery, not a value that can constrain a
+            // collection initializer or satisfy a concrete write contract.
+            if let Ok(result_ty) = self.infer_augment_assignment(assignment)
+                && !any_over_type(
+                    self.db(),
+                    self.program_environment(),
+                    result_ty,
+                    false,
+                    |ty| ty.is_divergent(),
+                )
+            {
                 let target = assignment.target.as_ref();
                 match target {
                     ast::Expr::Attribute(attribute) => {
@@ -4903,6 +4915,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.validate_subscript_assignment(
                             subscript,
                             target,
+                            SubscriptAssignmentKind::Augmented,
                             object_ty,
                             &mut |_, _| slice_ty,
                             &mut |_, _| result_ty,
