@@ -513,8 +513,8 @@ pub(in crate::types) fn is_model_instance(
         .is_some_and(|(class, _)| is_model(db, class))
 }
 
-/// Whether an instance uses Pydantic's setter with an effective `frozen=True` configuration.
-pub(in crate::types) fn has_frozen_setattr(
+/// Whether an instance has an effective `frozen=True` configuration and uses `BaseModel.__setattr__`.
+pub(in crate::types) fn is_frozen_with_default_setattr(
     db: &dyn Db,
     env: &ProgramEnvironment<'_>,
     ty: Type<'_>,

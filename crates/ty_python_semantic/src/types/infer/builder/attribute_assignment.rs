@@ -599,7 +599,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 && pydantic::is_private_attribute(self.attribute)
                 && pydantic::is_model_instance(db, env, object_ty);
 
-        let is_frozen_pydantic_model = pydantic::has_frozen_setattr(db, env, object_ty);
+        let is_frozen_pydantic_model = pydantic::is_frozen_with_default_setattr(db, env, object_ty);
         if (setattr_returns_never || is_frozen_pydantic_model) && !is_private_pydantic_attribute {
             if emit_diagnostics {
                 let is_read_only = is_frozen_pydantic_model
