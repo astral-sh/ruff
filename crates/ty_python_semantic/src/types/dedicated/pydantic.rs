@@ -502,35 +502,24 @@ pub(in crate::types) fn is_model<'db>(db: &'db dyn Db, class: StaticClassLiteral
         .any(|base| base.is_known(db, KnownClass::PydanticBaseModel))
 }
 
-/// Return whether `ty` is an instance of a Pydantic model.
-pub(in crate::types) fn is_model_instance(
-    db: &dyn Db,
-    env: &ProgramEnvironment<'_>,
-    ty: Type<'_>,
-) -> bool {
-    ty.nominal_class(db, env)
-        .and_then(|class| class.static_class_literal(db))
-        .is_some_and(|(class, _)| is_model(db, class))
+/// How a Pydantic model handles attribute assignments.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::types) enum SetAttrBehavior {
+    Frozen,
+    NonFrozen,
+    CustomSetAttr,
 }
 
-/// Whether an instance has an effective `frozen=True` configuration and uses `BaseModel.__setattr__`.
-pub(in crate::types) fn is_frozen_with_default_setattr(
+/// Return the model's assignment behavior, or `None` if it cannot be determined.
+pub(in crate::types) fn setattr_behavior(
     db: &dyn Db,
     env: &ProgramEnvironment<'_>,
     ty: Type<'_>,
-) -> bool {
-    let Some((class, _)) = ty
+) -> Option<SetAttrBehavior> {
+    let (class, _) = ty
         .nominal_class(db, env)
-        .and_then(|class| class.static_class_literal(db))
-    else {
-        return false;
-    };
-    if !CodeGeneratorKind::from_class(db, class.into())
-        .and_then(CodeGeneratorKind::pydantic_metadata)
-        .is_some_and(|metadata| metadata.is_frozen(db))
-    {
-        return false;
-    }
+        .and_then(|class| class.static_class_literal(db))?;
+    let metadata = CodeGeneratorKind::from_class(db, class.into())?.pydantic_metadata()?;
 
     // Pydantic checks the receiver's effective config in `BaseModel.__setattr__` rather than
     // generating a setter on each frozen model. A custom setter can replace that behavior.
@@ -538,20 +527,21 @@ pub(in crate::types) fn is_frozen_with_default_setattr(
         if matches!(base, ClassBase::Generic | ClassBase::Protocol) {
             continue;
         }
-        let Some((base, _)) = base
+        let (base, _) = base
             .into_class()
-            .and_then(|base| base.static_class_literal(db))
-        else {
-            return false;
-        };
+            .and_then(|base| base.static_class_literal(db))?;
         if base.is_known(db, KnownClass::PydanticBaseModel) {
-            return true;
+            return Some(if metadata.is_frozen(db) {
+                SetAttrBehavior::Frozen
+            } else {
+                SetAttrBehavior::NonFrozen
+            });
         }
         if !class_member(db, base.body_scope(db), "__setattr__").is_undefined() {
-            return false;
+            return Some(SetAttrBehavior::CustomSetAttr);
         }
     }
-    false
+    None
 }
 
 /// Return whether a field specifier's `default` argument provides a default value.
