@@ -98,7 +98,21 @@ class C[T: [a]](Generic[_A]): ...
 
 # Existing bounds should not be deparenthesized.
 # class C[T: (_Y := int)](Generic[_A]): ...  # TODO: Uncomment this
-# class C[T: (*a,)](Generic[_A]): ...        # TODO: Uncomment this
+
+
+# A sole starred constraint needs a trailing comma in the PEP 695 constraint tuple.
+constraints = (str, bytes)
+_H = TypeVar('_H', *constraints)
+class C[T](Generic[_H]): ...
+
+
+# Mixed constraints retain both the explicit and unpacked types.
+_I = TypeVar('_I', bool, *constraints)
+class C[T](Generic[_I]): ...
+
+
+# Existing starred constraint tuples retain their trailing comma.
+class C[T: (*constraints,)](Generic[_A]): ...
 
 
 ### No errors

@@ -429,7 +429,7 @@ help: Remove `Generic` base class
    |
 94 | # Single-element constraints should not be converted to a bound.
    - class C[T: (str,)](Generic[_A]): ...
-95 + class C[T: (str), _A]: ...
+95 + class C[T: (str,), _A]: ...
 96 | class C[T: [a]](Generic[_A]): ...
    |
 note: This is an unsafe fix and may change runtime behavior
@@ -448,4 +448,51 @@ help: Remove `Generic` base class
 96 + class C[T: [a], _A]: ...
 97 |
    |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF053 [*] Class with type parameter list inherits from `Generic`
+   --> RUF053.py:106:12
+    |
+104 | constraints = (str, bytes)
+105 | _H = TypeVar('_H', *constraints)
+106 | class C[T](Generic[_H]): ...
+    |            ^^^^^^^^^^^
+help: Remove `Generic` base class
+    |
+105 | _H = TypeVar('_H', *constraints)
+    - class C[T](Generic[_H]): ...
+106 + class C[T, _H: (*constraints,)]: ...
+107 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF053 [*] Class with type parameter list inherits from `Generic`
+   --> RUF053.py:111:12
+    |
+109 | # Mixed constraints retain both the explicit and unpacked types.
+110 | _I = TypeVar('_I', bool, *constraints)
+111 | class C[T](Generic[_I]): ...
+    |            ^^^^^^^^^^^
+help: Remove `Generic` base class
+    |
+110 | _I = TypeVar('_I', bool, *constraints)
+    - class C[T](Generic[_I]): ...
+111 + class C[T, _I: (bool, *constraints)]: ...
+112 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF053 [*] Class with type parameter list inherits from `Generic`
+   --> RUF053.py:115:29
+    |
+114 | # Existing starred constraint tuples retain their trailing comma.
+115 | class C[T: (*constraints,)](Generic[_A]): ...
+    |                             ^^^^^^^^^^^
+help: Remove `Generic` base class
+    |
+114 | # Existing starred constraint tuples retain their trailing comma.
+    - class C[T: (*constraints,)](Generic[_A]): ...
+115 + class C[T: (*constraints,), _A]: ...
+116 |
+    |
 note: This is an unsafe fix and may change runtime behavior

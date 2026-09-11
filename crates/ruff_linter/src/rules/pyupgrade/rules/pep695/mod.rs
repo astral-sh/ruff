@@ -119,6 +119,11 @@ impl Display for DisplayTypeVar<'_> {
                             f.write_str(", ")?;
                         }
                     }
+                    // A single starred expression needs a comma to form a constraint tuple:
+                    // `TypeVar("T", *constraints)` becomes `T: (*constraints,)`.
+                    if len == 1 {
+                        f.write_str(",")?;
+                    }
                     f.write_str(")")?;
                 }
             }
