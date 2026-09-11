@@ -513,6 +513,47 @@ pub(in crate::types) fn is_model_instance(
         .is_some_and(|(class, _)| is_model(db, class))
 }
 
+/// Whether an instance uses Pydantic's setter with an effective `frozen=True` configuration.
+pub(in crate::types) fn has_frozen_setattr(
+    db: &dyn Db,
+    env: &ProgramEnvironment<'_>,
+    ty: Type<'_>,
+) -> bool {
+    let Some((class, _)) = ty
+        .nominal_class(db, env)
+        .and_then(|class| class.static_class_literal(db))
+    else {
+        return false;
+    };
+    if !CodeGeneratorKind::from_class(db, class.into())
+        .and_then(CodeGeneratorKind::pydantic_metadata)
+        .is_some_and(|metadata| metadata.is_frozen(db))
+    {
+        return false;
+    }
+
+    // Pydantic checks the receiver's effective config in `BaseModel.__setattr__` rather than
+    // generating a setter on each frozen model. A custom setter can replace that behavior.
+    for base in class.iter_mro(db, None) {
+        if matches!(base, ClassBase::Generic | ClassBase::Protocol) {
+            continue;
+        }
+        let Some((base, _)) = base
+            .into_class()
+            .and_then(|base| base.static_class_literal(db))
+        else {
+            return false;
+        };
+        if base.is_known(db, KnownClass::PydanticBaseModel) {
+            return true;
+        }
+        if !class_member(db, base.body_scope(db), "__setattr__").is_undefined() {
+            return false;
+        }
+    }
+    false
+}
+
 /// Return whether a field specifier's `default` argument provides a default value.
 ///
 /// Pydantic's `Field(...)` uses the ellipsis as a required-field sentinel, so it does not provide
