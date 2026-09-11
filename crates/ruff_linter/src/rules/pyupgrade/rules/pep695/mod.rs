@@ -234,6 +234,7 @@ struct TypeVarReferenceVisitor<'a> {
     /// Tracks whether any non-TypeVars have been seen to avoid replacing generic parameters when an
     /// unknown `TypeVar` is encountered.
     any_skipped: bool,
+    has_unpacked_kwargs: bool,
 }
 
 /// Recursively collects the names of type variable references present in an expression.
@@ -267,7 +268,9 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
 
         match expr {
             Expr::Name(name) if name.ctx.is_load() => {
-                if let Some(var) = expr_name_to_type_var(self.semantic, name) {
+                if type_var_has_unpacked_kwargs(self.semantic, name) {
+                    self.has_unpacked_kwargs = true;
+                } else if let Some(var) = expr_name_to_type_var(self.semantic, name) {
                     self.vars.push(var);
                 } else {
                     self.any_skipped = true;
@@ -356,6 +359,32 @@ pub(crate) fn expr_name_to_type_var<'a>(
         _ => {}
     }
     None
+}
+
+/// Returns `true` if the name refers to a `TypeVar` with unpacked keyword arguments.
+pub(crate) fn type_var_has_unpacked_kwargs(semantic: &SemanticModel, name: &ExprName) -> bool {
+    let Some(StmtAssign { value, .. }) = semantic
+        .lookup_symbol(name.id.as_str())
+        .binding_id()
+        .and_then(|binding_id| semantic.binding(binding_id).source)
+        .map(|node_id| semantic.statement(node_id))
+        .and_then(|stmt| stmt.as_assign_stmt())
+    else {
+        return false;
+    };
+
+    let Expr::Call(ExprCall {
+        func, arguments, ..
+    }) = value.as_ref()
+    else {
+        return false;
+    };
+
+    if !semantic.match_typing_expr(func, "TypeVar") {
+        return false;
+    }
+
+    arguments.keywords.iter().any(|kw| kw.arg.is_none())
 }
 
 /// Check if the current statement is nested within another [`StmtClassDef`] or [`StmtFunctionDef`].
