@@ -1331,7 +1331,7 @@ impl<'db> Signature<'db> {
         let inferable = self.inferable_typevars(db);
 
         match when.solutions(db, env, inferable) {
-            Ok(Solutions::Unsatisfiable) => return None,
+            Ok(Solutions::Unsatisfiable(_)) => return None,
             Ok(Solutions::Unconstrained) | Err(_) => {
                 return Some(CallableSignature::single(self.clone()));
             }

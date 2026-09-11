@@ -562,7 +562,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
         matches!(
             self.solutions(db, env, inferable),
-            Ok(Solutions::Unsatisfiable)
+            Ok(Solutions::Unsatisfiable(_))
         )
     }
 
@@ -3639,7 +3639,10 @@ impl<'db> PathBounds<'db> {
         mut check_solution: impl FnMut(&Solution<'db>) -> Result<(), E>,
     ) -> Result<Solutions<'db>, E> {
         let paths = match self {
-            PathBounds::Unsatisfiable => return Ok(Solutions::Unsatisfiable),
+            PathBounds::Unsatisfiable => {
+                let solutions = SolutionPaths::Complete(Vec::default());
+                return Ok(Solutions::Unsatisfiable(solutions));
+            }
             PathBounds::Unconstrained => return Ok(Solutions::Unconstrained),
             PathBounds::Constrained(paths) => paths,
         };
@@ -3656,14 +3659,23 @@ impl<'db> PathBounds<'db> {
             solutions.push(solution);
         }
 
+        // If there are no solutions at all, the constraint set is unsatisfiable.
         if solutions.is_empty() {
-            return Ok(Solutions::Unsatisfiable);
+            let solutions = SolutionPaths::Complete(Vec::default());
+            return Ok(Solutions::Unsatisfiable(solutions));
         }
-        Ok(Solutions::Constrained(if exceeded_budget {
-            SolutionPaths::BudgetExceeded(solutions)
-        } else {
-            SolutionPaths::Complete(solutions)
-        }))
+
+        // If the only solutions we found were invalid, the constraint set is unsatisfiable.
+        let all_solutions_invalid = solutions.iter().all(|solution| !solution.is_valid());
+        if all_solutions_invalid {
+            let solutions = SolutionPaths::new(solutions, exceeded_budget);
+            return Ok(Solutions::Unsatisfiable(solutions));
+        }
+
+        // If we found any valid solutions, we can throw away the invalid ones.
+        solutions.retain(Solution::is_valid);
+        let solutions = SolutionPaths::new(solutions, exceeded_budget);
+        Ok(Solutions::Constrained(solutions))
     }
 
     /// Solves one complete path, retaining whether any of its bindings used a fallback.
@@ -3691,7 +3703,10 @@ impl<'db> PathBounds<'db> {
                 });
             }
         }
-        let solution = Solution { solved_typevars };
+        let solution = Solution {
+            solved_typevars,
+            validity: SolutionValidity::Valid,
+        };
         Some((solution, exceeded_budget))
     }
 
@@ -4379,7 +4394,7 @@ impl InteriorNode {
 /// The result of solving a constraint set for per-typevar specializations.
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum Solutions<'db> {
-    Unsatisfiable,
+    Unsatisfiable(SolutionPaths<'db>),
     Unconstrained,
     Constrained(SolutionPaths<'db>),
 }
@@ -4396,6 +4411,14 @@ pub(crate) enum SolutionPaths<'db> {
 }
 
 impl<'db> SolutionPaths<'db> {
+    fn new(solutions: Vec<Solution<'db>>, exceeded_budget: bool) -> Self {
+        if exceeded_budget {
+            SolutionPaths::BudgetExceeded(solutions)
+        } else {
+            SolutionPaths::Complete(solutions)
+        }
+    }
+
     /// Borrows the available solution paths, including fallback bindings if solving was incomplete.
     /// Match the outcome directly when completeness matters.
     pub(crate) fn as_slice(&self) -> &[Solution<'db>] {
@@ -4412,9 +4435,27 @@ impl<'db> SolutionPaths<'db> {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+pub(crate) enum SolutionValidity {
+    /// The solution is valid
+    Valid,
+    /// The solution satisfies all evidence constraints, but doesn't satisfy the validity
+    /// constraints. (This often means we've found something that _would_ be a solution, except
+    /// that it violates the declared upper bound or constraints of one or more of the typevars.)
+    #[expect(dead_code)]
+    Invalid,
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct Solution<'db> {
     pub(crate) solved_typevars: Vec<TypeVarSolution<'db>>,
+    pub(crate) validity: SolutionValidity,
+}
+
+impl Solution<'_> {
+    pub(crate) fn is_valid(&self) -> bool {
+        self.validity == SolutionValidity::Valid
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
@@ -4934,7 +4975,10 @@ mod tests {
         solved_typevars: impl IntoIterator<Item = TypeVarSolution<'db>>,
     ) -> Solution<'db> {
         let solved_typevars = solved_typevars.into_iter().collect();
-        Solution { solved_typevars }
+        Solution {
+            solved_typevars,
+            validity: SolutionValidity::Valid,
+        }
     }
 
     #[derive(Default)]
@@ -5926,7 +5970,7 @@ class E: ...
                 })
                 .join(", ");
             let paths = match &solutions {
-                Ok(Solutions::Unsatisfiable) => String::from("unsatisfiable"),
+                Ok(Solutions::Unsatisfiable(_)) => String::from("unsatisfiable"),
                 Ok(Solutions::Unconstrained) => String::from("unconstrained"),
                 Ok(Solutions::Constrained(paths)) => paths
                     .as_slice()

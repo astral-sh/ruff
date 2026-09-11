@@ -3175,7 +3175,7 @@ impl<'db> Bindings<'db> {
                                     ))
                                 }),
                             ),
-                            Ok(Solutions::Unsatisfiable) => Type::none(db, env),
+                            Ok(Solutions::Unsatisfiable(_)) => Type::none(db, env),
                             Ok(Solutions::Unconstrained) => Type::empty_tuple(db, env),
                             Err(_) => Type::unknown(),
                         };
@@ -3212,7 +3212,7 @@ impl<'db> Bindings<'db> {
                                     ))
                                 }),
                             ),
-                            Ok(Solutions::Unsatisfiable) => Type::none(db, env),
+                            Ok(Solutions::Unsatisfiable(_)) => Type::none(db, env),
                             Ok(Solutions::Unconstrained) => Type::empty_tuple(db, env),
                             Err(_) => Type::unknown(),
                         };

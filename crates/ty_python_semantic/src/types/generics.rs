@@ -2883,7 +2883,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 },
             )?;
             Ok(match solutions {
-                Solutions::Unsatisfiable => SolutionProjection::Unsatisfiable,
+                Solutions::Unsatisfiable(_) => SolutionProjection::Unsatisfiable,
                 Solutions::Unconstrained => SolutionProjection::Unconstrained,
                 Solutions::Constrained(solutions) => {
                     let mut merged_types = FxHashMap::default();
@@ -3449,7 +3449,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         );
 
         match solutions {
-            Ok(Solutions::Unsatisfiable) => ConstraintSetAnalysis::Unsatisfiable(failures),
+            Ok(Solutions::Unsatisfiable(_)) => ConstraintSetAnalysis::Unsatisfiable(failures),
             Ok(Solutions::Unconstrained) => ConstraintSetAnalysis::Unconstrained,
             Ok(Solutions::Constrained(solutions)) => ConstraintSetAnalysis::Constrained(solutions),
             Err(_) => ConstraintSetAnalysis::BudgetExceeded,
