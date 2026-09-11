@@ -151,6 +151,33 @@ reveal_mro(Baz)
 reveal_mro(Baz[int])
 ```
 
+## Inconsistent type arguments through partially gradual ancestors
+
+With three direct bases, the diagnostic identifies `First` and the third base as the sources of
+conflicting arguments. `Second` leaves the first type argument unconstrained.
+
+```py
+from typing import Any
+
+class Base[T, U]: ...
+class First(Base[int, Any]): ...
+class Second(Base[Any, str]): ...
+
+# snapshot: invalid-generic-class
+class Mixed(First, Second, Base[bytes, str]): ...
+```
+
+```snapshot
+error[invalid-generic-class]: Inconsistent type arguments for `Base` among class bases
+ --> src/mdtest_snippet.py:8:7
+  |
+8 | class Mixed(First, Second, Base[bytes, str]): ...
+  |       ^^^^^^-----^^^^^^^^^^----------------^
+  |             |              |
+  |             |              Later class base is `Base[bytes, str]`
+  |             Earlier class base inherits from `Base[int, Any]`
+```
+
 ## Class keyword arguments
 
 Class keyword arguments are evaluated inside the type-parameter scope, so they must be resolved

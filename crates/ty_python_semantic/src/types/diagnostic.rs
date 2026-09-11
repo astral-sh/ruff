@@ -4722,13 +4722,14 @@ pub(crate) fn report_invalid_typevar_default_reference<'db>(
 }
 
 /// A type parameter of a generic ancestor, independent of its specialization.
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 struct GenericBaseParameter<'db> {
     origin: StaticClassLiteral<'db>,
     parameter_index: usize,
 }
 
 /// A non-dynamic type argument and the inheritance path that supplies it.
+#[derive(Debug)]
 struct GenericBaseConstraint<'db> {
     argument: Type<'db>,
     alias: GenericAlias<'db>,

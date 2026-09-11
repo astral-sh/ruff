@@ -258,8 +258,11 @@ impl<'db> Mro<'db> {
                 let mut duplicate_dynamic_bases = false;
 
                 let duplicate_bases: Vec<DuplicateBaseError<'db>> = {
-                    let mut base_to_indices =
-                        IndexMap::<_, (ClassBase<'db>, Vec<usize>), FxBuildHasher>::default();
+                    let mut base_to_indices = IndexMap::<
+                        Type<'db>,
+                        (ClassBase<'db>, Vec<usize>),
+                        FxBuildHasher,
+                    >::default();
 
                     // We need to iterate over `original_bases` here rather than `resolved_bases`
                     // so that we get the correct index of the duplicate bases if there were any
