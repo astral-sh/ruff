@@ -118,6 +118,7 @@ use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
 pub(crate) mod paths;
 pub(crate) mod projection;
+pub(crate) mod resolution;
 mod sequents;
 mod solutions;
 mod support;
