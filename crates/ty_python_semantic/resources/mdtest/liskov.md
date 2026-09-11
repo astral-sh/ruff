@@ -1564,6 +1564,95 @@ class PreservesInvalidStr(InvalidStr):
     def __str__(self) -> int: ...
 ```
 
+## Conflicts inherited through an intermediate base
+
+A parent can inherit incompatible method signatures without defining its own override. A child that
+preserves the selected signature does not repeat that conflict. An override that changes the
+selected signature still receives an error.
+
+```pyi
+class Left:
+    def method(self, left): ...
+
+class Right:
+    def method(self, right): ...
+
+class Parent(Left, Right): ...  # error: [invalid-method-override]
+
+class Child(Parent):
+    def method(self, left): ...
+
+class ChangesSignature(Parent):
+    # error: [invalid-method-override] "Definition is incompatible with `Left.method`"
+    def method(self, right): ...
+```
+
+The existing conflict does not hide an incompatible contract introduced by another base of the
+child.
+
+```pyi
+class RequiresExtra:
+    def method(self, left, extra): ...
+
+class AddsContract(Parent, RequiresExtra):
+    # error: [invalid-method-override] "Definition is incompatible with `RequiresExtra.method`"
+    def method(self, left): ...
+```
+
+The same suppression applies when one of the inherited contracts is a static method with an optional
+argument.
+
+```pyi
+class Static:
+    @staticmethod
+    def method(left=None): ...
+
+class StaticParent(Left, Static): ...  # error: [invalid-method-override]
+
+class StaticChild(StaticParent):
+    def method(self, left): ...
+```
+
+## An earlier base can be bypassed when resolving an inherited method
+
+The first direct base need not supply the selected method. Here, `Child` uses `Override.method`
+ahead of `Base.method`, even though `Inherited` on its own uses `Base.method`. The existing
+violation on `Override` does not need another diagnostic on `Child`.
+
+```pyi
+class Base:
+    def method(self, value: int): ...
+
+class Inherited(Base): ...
+
+class Override(Base):
+    def method(self, value: str): ...  # error: [invalid-method-override]
+
+class Child(Inherited, Override):
+    def method(self, value: str): ...
+```
+
+## Inherited conflicts bind `Self` to the parent
+
+An inherited method's `Self` annotation refers to the parent whose hierarchy is being checked.
+`Parent.method` only accepts `Parent` instances, conflicting with `AcceptsBase.method`, which
+accepts any `Base` instance. Preserving that signature on `Child` does not repeat the conflict.
+
+```pyi
+from typing_extensions import Self
+
+class Base:
+    def method(self, other: Self): ...
+
+class AcceptsBase:
+    def method(self, other: Base): ...
+
+class Parent(Base, AcceptsBase): ...  # error: [invalid-method-override]
+
+class Child(Parent):
+    def method(self, other: Parent): ...
+```
+
 ## Non-generic methods on generic classes work as expected
 
 ```toml

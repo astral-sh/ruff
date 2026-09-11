@@ -1397,6 +1397,18 @@ class Grandchild(Child):
         return ""
 ```
 
+The same new conflict is reported when the first base inherits the selected method from an
+intermediate class.
+
+```py
+class Intermediate(Strings): ...
+
+class IndirectChild(Intermediate, Concrete):
+    # error: [invalid-method-override]
+    def method(self) -> str:
+        return ""
+```
+
 Specializing a generic intermediate class also specializes the inherited method's return type.
 
 ```py

@@ -96,7 +96,7 @@ pub(super) fn check_class<'db>(
             .collect();
         if !generic_bases.is_empty() {
             // Overrides must respect every inherited specialization. Keep the MRO's bases first
-            // so the immediate parent used to suppress inherited violations is unchanged.
+            // so the selected inherited method is unchanged.
             let env = &context.program_environment();
             bases.extend(
                 class_specialized
@@ -650,10 +650,9 @@ fn check_class_declaration<'db>(
     let is_private_member = is_mangled_private(member.name.as_str());
     let mut subclass_variable_kind: Option<Option<VariableKind>> = None;
 
-    // Track the first superclass that defines this method (the "immediate parent" for this method).
-    // We need this to check if parent itself already has an LSP violation with an ancestor.
-    // If so, we shouldn't report the same violation for the child class.
-    let mut immediate_parent_method: Option<(ClassType<'db>, Type<'db>)> = None;
+    // Track the first superclass that defines this method so we can distinguish inherited
+    // conflicts from violations introduced by the child.
+    let mut inherited_method_owner = None;
     let mut immediate_parent_variable_kind: Option<(ClassType<'db>, VariableKind)> = None;
 
     if !is_private_member {
@@ -732,10 +731,7 @@ fn check_class_declaration<'db>(
                 ));
             }
 
-            // Record the first superclass that defines this method as the "immediate parent method"
-            if immediate_parent_method.is_none() {
-                immediate_parent_method = Some((superclass, superclass_type));
-            }
+            inherited_method_owner.get_or_insert(superclass);
 
             if (configuration.check_final_method_overridden() && overridden_final_method.is_none())
                 || (configuration.check_final_variable_overridden()
@@ -896,37 +892,19 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            // Do not repeat a violation that already exists in the immediate parent's hierarchy.
-            // Check the parent's own ancestor specializations: a valid override of `Base[Any]`
-            // can become invalid when the child also inherits `Base[int]` through another base.
-            // Include the MRO for implicit ancestors such as `object`, and explicit inheritance
-            // paths for specializations omitted from the MRO.
+            // Do not repeat a violation that already exists in the parent's hierarchy.
             // See: https://github.com/astral-sh/ty/issues/2000
-            if let Some((immediate_parent, immediate_parent_type)) = immediate_parent_method
-                && immediate_parent != superclass
-                && !is_assignable_method_override(db, env, immediate_parent_type, superclass_type)
-                && immediate_parent
-                    .iter_mro(db)
-                    .skip(1)
-                    .filter_map(ClassBase::into_class)
-                    .chain(immediate_parent.iter_explicit_ancestors(db, env).skip(1))
-                    .filter(|ancestor| ancestor.class_literal(db) == superclass.class_literal(db))
-                    .any(|ancestor| {
-                        let Place::Defined(DefinedPlace {
-                            ty: ancestor_type, ..
-                        }) = Type::instance(db, env, ancestor)
-                            .member(db, env, &member.name)
-                            .place
-                        else {
-                            return false;
-                        };
-                        !is_assignable_method_override(
-                            db,
-                            env,
-                            immediate_parent_type,
-                            ancestor_type,
-                        )
-                    })
+            if let Some(method_owner) = inherited_method_owner
+                && method_owner != superclass
+                && is_inherited_method_violation(
+                    db,
+                    env,
+                    bases,
+                    method_owner,
+                    superclass,
+                    superclass_type,
+                    &member.name,
+                )
             {
                 continue;
             }
@@ -1014,6 +992,62 @@ fn check_class_declaration<'db>(
             superclass_definition,
         );
     }
+}
+
+/// Returns whether the selected inherited method already violates this ancestor's contract.
+///
+/// The parent can inherit the method without defining an override. Its hierarchy may already
+/// combine conflicting contracts that are absent from the method-defining class's hierarchy.
+fn is_inherited_method_violation<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    bases: &[ClassBase<'db>],
+    method_owner: ClassType<'db>,
+    superclass: ClassType<'db>,
+    superclass_type: Type<'db>,
+    name: &Name,
+) -> bool {
+    // An earlier MRO entry can select a different method in its own hierarchy. Find the closest
+    // ancestor that inherits the method actually selected by the child's MRO.
+    let parent = bases
+        .iter()
+        .filter_map(|base| base.into_class())
+        .find(|parent| {
+            parent
+                .iter_mro(db)
+                .any(|base| base == ClassBase::Class(method_owner))
+        })
+        .unwrap_or(method_owner);
+    let Place::Defined(DefinedPlace {
+        ty: parent_type, ..
+    }) = Type::instance(db, env, parent).member(db, env, name).place
+    else {
+        return false;
+    };
+    if is_assignable_method_override(db, env, parent_type, superclass_type) {
+        return false;
+    }
+
+    // Check the parent's own specializations: a valid override of `Base[Any]` can become invalid
+    // when the child also inherits `Base[int]`. Include implicit ancestors such as `object` and
+    // explicit inheritance paths for specializations omitted from the MRO.
+    parent
+        .iter_mro(db)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .chain(parent.iter_explicit_ancestors(db, env).skip(1))
+        .filter(|ancestor| ancestor.class_literal(db) == superclass.class_literal(db))
+        .any(|ancestor| {
+            let Place::Defined(DefinedPlace {
+                ty: ancestor_type, ..
+            }) = Type::instance(db, env, ancestor)
+                .member(db, env, name)
+                .place
+            else {
+                return false;
+            };
+            !is_assignable_method_override(db, env, parent_type, ancestor_type)
+        })
 }
 
 /// Checks whether a method override preserves its superclass method's callable domain.
