@@ -225,8 +225,40 @@ impl ProjectMetadata {
         path: &SystemPath,
         system: &dyn System,
     ) -> Result<Self, ProjectMetadataError> {
-        Self::discover_with_environment(path, system, ProjectEnvironment::default())
-            .map(|metadata| metadata.with_use_uv(UseUv::from_system(system)))
+        tracing::debug!("Searching for a project in '{path}'");
+
+        if !system.is_directory(path) {
+            return Err(ProjectMetadataError::NotADirectory(path.to_path_buf()));
+        }
+
+        let mut closest_project = None;
+        for project_root in path.ancestors() {
+            let Some(metadata) = Self::discover_in(project_root, system)? else {
+                continue;
+            };
+
+            if metadata
+                .configuration_file
+                .as_ref()
+                .is_some_and(DiscoveredConfigurationFile::has_ty_configuration)
+            {
+                tracing::debug!("Found project at '{}'", project_root);
+                return Ok(metadata.with_use_uv(UseUv::from_system(system)));
+            }
+
+            if closest_project.is_none() {
+                closest_project = Some(metadata);
+            }
+        }
+
+        let metadata = closest_project.unwrap_or_else(|| {
+            tracing::debug!(
+                "The ancestor directories contain no `pyproject.toml`. Falling back to a virtual project."
+            );
+            Self::new(path.file_name().unwrap_or("root"), path.to_path_buf())
+        });
+        tracing::debug!("Using project at '{}'", metadata.root());
+        Ok(metadata.with_use_uv(UseUv::from_system(system)))
     }
 
     /// Incorporates uv's workspace metadata after discovering the project configuration.
@@ -288,89 +320,6 @@ impl ProjectMetadata {
         }
 
         Ok(self.with_environment(environment))
-    }
-
-    fn discover_with_environment(
-        path: &SystemPath,
-        system: &dyn System,
-        environment: ProjectEnvironment,
-    ) -> Result<ProjectMetadata, ProjectMetadataError> {
-        tracing::debug!("Searching for a project in '{path}'");
-
-        if !system.is_directory(path) {
-            return Err(ProjectMetadataError::NotADirectory(path.to_path_buf()));
-        }
-
-        let mut closest_project: Option<ProjectMetadata> = None;
-        let mut uv_project: Option<ProjectMetadata> = None;
-        let uv_workspace_root = environment
-            .metadata
-            .as_ref()
-            .map(uv::UvMetadata::workspace_root);
-
-        for project_root in path.ancestors() {
-            let is_uv_workspace_root = uv_workspace_root == Some(project_root);
-            let Some(metadata) = Self::discover_in(project_root, system)? else {
-                if is_uv_workspace_root {
-                    uv_project = Some(Self::new(
-                        project_root.file_name().unwrap_or("root"),
-                        project_root.to_path_buf(),
-                    ));
-                }
-                continue;
-            };
-
-            if metadata
-                .configuration_file
-                .as_ref()
-                .is_some_and(DiscoveredConfigurationFile::has_ty_configuration)
-            {
-                tracing::debug!("Found project at '{}'", project_root);
-                return Ok(metadata.with_environment(environment));
-            }
-
-            if is_uv_workspace_root {
-                uv_project = Some(metadata);
-            } else if closest_project.is_none() {
-                closest_project = Some(metadata);
-            }
-        }
-
-        // Workspace members can live outside the workspace directory, so their ancestor chain may
-        // never include the workspace root.
-        if let Some(workspace_root) = uv_workspace_root
-            && !path.starts_with(workspace_root)
-        {
-            let metadata = Self::discover_in(workspace_root, system)?.unwrap_or_else(|| {
-                Self::new(
-                    workspace_root.file_name().unwrap_or("root"),
-                    workspace_root.to_path_buf(),
-                )
-            });
-            uv_project = Some(metadata);
-        }
-
-        let metadata = if let Some(uv_project) = uv_project {
-            tracing::debug!("Using uv workspace at '{}'", uv_project.root());
-
-            uv_project
-        } else if let Some(closest_project) = closest_project {
-            tracing::debug!(
-                "Project without `tool.ty` section: '{}'",
-                closest_project.root()
-            );
-
-            closest_project
-        } else {
-            tracing::debug!(
-                "The ancestor directories contain no `pyproject.toml`. Falling back to a virtual project."
-            );
-
-            // Create a project with a default configuration
-            Self::new(path.file_name().unwrap_or("root"), path.to_path_buf())
-        };
-
-        Ok(metadata.with_environment(environment))
     }
 
     fn discover_in(
@@ -503,7 +452,8 @@ impl ProjectMetadata {
             )?
             .with_environment(environment)
         } else {
-            Self::discover_with_environment(path, system, environment)?
+            Self::discover_without_uv(path, system)?
+                .with_uv_workspace_environment(system, environment)?
         };
 
         Ok(metadata.with_applied_options_from(self))
@@ -1056,40 +1006,6 @@ unclosed table, expected `]`
         let system = TestSystem::default();
         let root = SystemPathBuf::from("/app");
         let member = root.join("packages/member");
-
-        system.memory_file_system().write_files_all([
-            (root.join("pyproject.toml"), "[tool.uv.workspace]"),
-            (
-                member.join("pyproject.toml"),
-                r#"
-                [project]
-                name = "member"
-                "#,
-            ),
-        ])?;
-
-        let project = ProjectMetadata::discover_without_uv(&member, &system)?;
-        assert_eq!(project.root(), &*member);
-        assert_eq!(
-            project.configuration_file,
-            Some(DiscoveredConfigurationFile::PyProject(
-                member.join("pyproject.toml")
-            ))
-        );
-
-        let project =
-            project.with_uv_workspace_environment(&system, uv_workspace(&root, &system)?)?;
-
-        assert_eq!(project.root(), &*root);
-
-        Ok(())
-    }
-
-    #[test]
-    fn uv_workspace_selection_preserves_loaded_user_configuration() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-        let member = root.join("packages/member");
         let user_config_directory = root.join("config");
 
         system
@@ -1116,6 +1032,12 @@ unclosed table, expected `]`
         let mut project = ProjectMetadata::discover_without_uv(&member, &system)?;
         project.apply_configuration_files(&system)?;
         assert_eq!(project.root(), &*member);
+        assert_eq!(
+            project.configuration_file,
+            Some(DiscoveredConfigurationFile::PyProject(
+                member.join("pyproject.toml")
+            ))
+        );
 
         let project =
             project.with_uv_workspace_environment(&system, uv_workspace(&root, &system)?)?;
@@ -1167,63 +1089,6 @@ unclosed table, expected `]`
             project.with_uv_workspace_environment(&system, uv_workspace(&root, &system)?)?;
 
         assert_eq!(project.root(), &*root);
-
-        Ok(())
-    }
-
-    #[test]
-    fn uv_workspace_without_pyproject_is_project_root() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-        let member = root.join("packages/member");
-
-        system.memory_file_system().write_files_all([
-            (root.join("uv.toml"), ""),
-            (
-                member.join("pyproject.toml"),
-                r#"
-                [project]
-                name = "member"
-                "#,
-            ),
-        ])?;
-
-        let project = ProjectMetadata::discover_without_uv(&member, &system)?;
-        let project =
-            project.with_uv_workspace_environment(&system, uv_workspace(&root, &system)?)?;
-
-        assert_eq!(project.root(), &*root);
-
-        Ok(())
-    }
-
-    #[test]
-    fn empty_member_ty_configuration_precedes_uv_workspace() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-        let member = root.join("packages/member");
-
-        system.memory_file_system().write_files_all([
-            (root.join("pyproject.toml"), "[tool.uv.workspace]"),
-            (
-                member.join("pyproject.toml"),
-                r#"
-                [project]
-                name = "member"
-                "#,
-            ),
-            (member.join("ty.toml"), ""),
-        ])?;
-
-        let project = ProjectMetadata::discover_without_uv(&member, &system)?;
-        let project =
-            project.with_uv_workspace_environment(&system, uv_workspace(&root, &system)?)?;
-
-        assert_eq!(project.root(), &*member);
-        assert_eq!(
-            project.configuration_file,
-            Some(DiscoveredConfigurationFile::TyToml(member.join("ty.toml")))
-        );
 
         Ok(())
     }
@@ -1447,7 +1312,8 @@ unclosed table, expected `]`
         ])?;
 
         let environment = uv_workspace(&workspace, &system)?;
-        let project = ProjectMetadata::discover_with_environment(&member, &system, environment)?;
+        let project = ProjectMetadata::discover_without_uv(&member, &system)?
+            .with_uv_workspace_environment(&system, environment)?;
 
         assert_eq!(project.root(), &*root);
 
@@ -1553,8 +1419,8 @@ unclosed table, expected `]`
             )?),
             error: None,
         };
-        let mut project =
-            ProjectMetadata::discover_with_environment(&member, &system, uv_environment)?;
+        let mut project = ProjectMetadata::discover_without_uv(&member, &system)?
+            .with_uv_workspace_environment(&system, uv_environment)?;
         project.apply_fallback_options(Options::from_toml_str(
             r#"
             [environment]
