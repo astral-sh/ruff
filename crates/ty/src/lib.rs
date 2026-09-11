@@ -29,8 +29,8 @@ use salsa::Database;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{
-    ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UvSyncProgress,
-    watch,
+    ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UseUv,
+    UvSyncProgress, watch,
 };
 use ty_project::{ProjectDatabase, ProjectMetadata, ProjectReloadResult};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
@@ -146,12 +146,16 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .as_ref()
         .map(|path| SystemPath::absolute(path, &cwd));
     let force_exclude = args.force_exclude();
+    let use_uv = UseUv::from_system(&system);
 
     let mut project_metadata = match &config_file {
-        Some(config_file) => {
-            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
-        }
-        None => ProjectMetadata::discover_without_uv(&project_path, &system)?,
+        Some(config_file) => ProjectMetadata::from_config_file_with_uv(
+            config_file.clone(),
+            &project_path,
+            &system,
+            use_uv,
+        )?,
+        None => ProjectMetadata::discover_without_uv(&project_path, &system)?.with_use_uv(use_uv),
     };
 
     project_metadata.apply_configuration_files(&system)?;
