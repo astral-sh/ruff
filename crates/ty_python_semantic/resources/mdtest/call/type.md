@@ -1680,8 +1680,8 @@ reveal_type(Combined.__class__)  # revealed: <class 'DerivedMeta'>
 
 ## Sibling metaclasses with an unknown ancestor
 
-An unknown ancestor cannot make sibling metaclasses inherit from each other without a cycle. TODO:
-Gradual assignability currently misses this conflict, so the metaclass remains unknown.
+An unknown ancestor cannot make sibling metaclasses inherit from each other without a cycle. We
+report the conflict and infer an unknown metaclass.
 
 ```py
 from typing import Any
@@ -1694,11 +1694,35 @@ class RightMeta(RootMeta): ...
 class Left(metaclass=LeftMeta): ...
 class Right(metaclass=RightMeta): ...
 
-Combined = type("Combined", (Left, Right), {})
-Reversed = type("Reversed", (Right, Left), {})
+Combined = type("Combined", (Left, Right), {})  # error: [conflicting-metaclass]
+Reversed = type("Reversed", (Right, Left), {})  # error: [conflicting-metaclass]
 
 reveal_type(Combined.__class__)  # revealed: type[Unknown]
 reveal_type(type(Reversed))  # revealed: type[Unknown]
+```
+
+## Metaclasses with a separate unknown base
+
+An unknown base outside the shared ancestry can make `LeftMeta` inherit from `RightMeta`. Only
+`LeftMeta` can be the winner, regardless of the order of the bases passed to `type()`.
+
+```py
+from typing import Any
+
+class RootMeta(type): ...
+class RightMeta(RootMeta): ...
+
+extra: Any = RightMeta
+
+class LeftMeta(extra, RootMeta): ...
+class Left(metaclass=LeftMeta): ...
+class Right(metaclass=RightMeta): ...
+
+Forward = type("Forward", (Left, Right), {})
+Reverse = type("Reverse", (Right, Left), {})
+
+reveal_type(Forward.__class__)  # revealed: <class 'LeftMeta'>
+reveal_type(type(Reverse))  # revealed: <class 'LeftMeta'>
 ```
 
 ## Ambiguous metaclasses

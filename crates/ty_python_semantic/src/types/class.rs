@@ -1534,17 +1534,72 @@ impl<'db> ClassType<'db> {
             return Some(other.into());
         }
 
-        let self_instance = Type::instance(db, env, self);
-        let other_instance = Type::instance(db, env, other);
         match (
-            !other.is_final(db) && self_instance.is_assignable_to(db, env, other_instance),
-            !self.is_final(db) && other_instance.is_assignable_to(db, env, self_instance),
+            self.could_inherit_from(db, env, other),
+            other.could_inherit_from(db, env, self),
         ) {
             (true, false) => Some(self.into()),
             (false, true) => Some(other.into()),
             (true, true) => Some(SubclassOfType::subclass_of_unknown()),
             (false, false) => None,
         }
+    }
+
+    /// Whether an unknown base could supply an otherwise unproven subclass relationship.
+    ///
+    /// Call this after ruling out known subclass relationships in both directions. An unknown
+    /// base inherited through a shared ancestor cannot establish the missing relationship:
+    ///
+    /// ```python
+    /// from typing import Any
+    /// base: Any = type
+    /// class Root(base): ...
+    /// class Left(Root): ...
+    /// class Right(Root): ...
+    /// ```
+    ///
+    /// Making `Root` inherit `Right` would create a cycle. An unknown base introduced outside
+    /// their shared ancestry can still make `Left` inherit `Right`.
+    fn could_inherit_from(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Self,
+    ) -> bool {
+        if target.is_final(db)
+            || !Type::instance(db, env, self).is_assignable_to(
+                db,
+                env,
+                Type::instance(db, env, target),
+            )
+        {
+            return false;
+        }
+
+        // A cyclic MRO uses an unknown base for recovery. It need not correspond to an
+        // explicit unknown base, and rejecting it here can make recursive inference oscillate.
+        if ClassBase::Class(self).has_cyclic_mro(db) {
+            return true;
+        }
+
+        let target_ancestors: FxOrderSet<_> = target
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .map(|class| class.class_literal(db))
+            .collect();
+
+        self.iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .map(|class| class.class_literal(db))
+            .filter(|class| !target_ancestors.contains(class))
+            .any(|class| {
+                class.explicit_bases(db).iter().any(|base| {
+                    matches!(
+                        ClassBase::try_from_explicit_base(db, env, *base, Some(class)),
+                        Some(ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_))
+                    )
+                })
+            })
     }
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.

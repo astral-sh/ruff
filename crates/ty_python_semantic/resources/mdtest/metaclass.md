@@ -1068,7 +1068,7 @@ reveal_type(Reversed.__class__)  # revealed: <class 'Meta'>
 ## Sibling metaclasses with an unknown ancestor
 
 An unknown ancestor of a shared base cannot make its subclasses inherit from one another without an
-inheritance cycle.
+inheritance cycle. We report the conflict and infer an unknown metaclass.
 
 ```py
 from typing import Any
@@ -1080,13 +1080,45 @@ class LeftMeta(RootMeta): ...
 class RightMeta(RootMeta): ...
 class Left(metaclass=LeftMeta): ...
 class Right(metaclass=RightMeta): ...
-
-# TODO: Gradual assignability currently misses this conflict, so the metaclass remains unknown.
-class Combined(Left, Right): ...
-class Reversed(Right, Left): ...
+class Combined(Left, Right): ...  # error: [conflicting-metaclass]
+class Reversed(Right, Left): ...  # error: [conflicting-metaclass]
+class Explicit(Left, metaclass=RightMeta): ...  # error: [conflicting-metaclass]
 
 reveal_type(Combined.__class__)  # revealed: type[Unknown]
 reveal_type(type(Reversed))  # revealed: type[Unknown]
+```
+
+## Metaclasses with a separate unknown base
+
+An unknown base outside the shared ancestry can establish a subclass relationship. Only `LeftMeta`
+can inherit from `RightMeta` here, so it is selected regardless of the order of the bases.
+
+```py
+from typing import Any
+
+class RootMeta(type): ...
+class RightMeta(RootMeta): ...
+
+extra: Any = RightMeta
+
+class LeftMeta(extra, RootMeta): ...
+class Left(metaclass=LeftMeta): ...
+class Right(metaclass=RightMeta): ...
+class Forward(Left, Right): ...
+class Reverse(Right, Left): ...
+
+reveal_type(Forward.__class__)  # revealed: <class 'LeftMeta'>
+reveal_type(type(Reverse))  # revealed: <class 'LeftMeta'>
+```
+
+The separate unknown base can also supply this relationship for a known subclass of `LeftMeta`.
+
+```py
+class DerivedMeta(LeftMeta): ...
+class Derived(metaclass=DerivedMeta): ...
+class Inherited(Derived, Right): ...
+
+reveal_type(Inherited.__class__)  # revealed: <class 'DerivedMeta'>
 ```
 
 ## Ambiguous metaclasses
