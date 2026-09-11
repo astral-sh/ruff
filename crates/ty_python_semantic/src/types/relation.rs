@@ -258,6 +258,7 @@ impl<'db> Type<'db> {
     /// a cheap shallow check, not an exhaustive recursive check.
     const fn subtyping_is_always_reflexive(self) -> bool {
         match self {
+            Type::RecursiveVar(_) => panic!("semantic operation on an unbound recursive variable"),
             Type::Never
             | Type::FunctionLiteral(..)
             | Type::BoundMethod(_)
@@ -298,6 +299,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_)
             | Type::Divergent(_)
+            | Type::Recursive(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
             | Type::GenericAlias(_)
@@ -1659,6 +1661,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // Reflexivity and lazy constraints can bypass the RecursiveVar match arm below.
+        source.assert_not_recursive_var();
+        target.assert_not_recursive_var();
         if let Some(source) = source.materialized_divergent_fallback() {
             return self.check_type_pair(db, source, target);
         }
@@ -1726,6 +1731,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         match (source, target) {
+            (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(target)) if target.is_object() => self.always(),
             (_, Type::ProtocolInstance(target)) if target.is_equivalent_to_object(db) => {
@@ -1747,6 +1755,46 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // "too many cycle iterations" panics).
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+            }
+
+            (Type::Recursive(source_recursive), _) => {
+                // Both comparing arguments and unfolding can revisit this pair.
+                self.with_recursion_guard(db, source, target, || {
+                    let by_arguments = if let Type::Recursive(target_recursive) = target {
+                        self.when_recursive_arguments_relate(db, source_recursive, target_recursive)
+                    } else {
+                        self.never()
+                    };
+                    by_arguments.or(db, self.constraints, || {
+                        source_recursive.map_or_else(
+                            db,
+                            self.env,
+                            || {
+                                ConstraintSet::from_bool(
+                                    self.constraints,
+                                    self.relation.is_assignability(),
+                                )
+                            },
+                            |source_unfolded| self.check_type_pair(db, source_unfolded, target),
+                        )
+                    })
+                })
+            }
+
+            (_, Type::Recursive(target_recursive)) => {
+                self.with_recursion_guard(db, source, target, || {
+                    target_recursive.map_or_else(
+                        db,
+                        self.env,
+                        || {
+                            ConstraintSet::from_bool(
+                                self.constraints,
+                                self.relation.is_assignability(),
+                            )
+                        },
+                        |target_unfolded| self.check_type_pair(db, source, target_unfolded),
+                    )
+                })
             }
 
             // Instances of classes that inherit from an explicit `Any` base retain their nominal
@@ -2883,7 +2931,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         })
     }
 
-    fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
+    pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
             env: self.env,
             constraints: self.constraints,
@@ -3277,10 +3325,35 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         let env = self.env;
 
         match (left, right) {
+            (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             (Type::Never, _) | (_, Type::Never) => self.always(),
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
+
+            (Type::Recursive(left_recursive), _) => left_recursive.map_or_else(
+                db,
+                env,
+                || self.never(),
+                |left_unfolded| {
+                    self.with_recursion_guard(db, left, right, || {
+                        self.check_type_pair(db, left_unfolded, right)
+                    })
+                },
+            ),
+
+            (_, Type::Recursive(right_recursive)) => right_recursive.map_or_else(
+                db,
+                env,
+                || self.never(),
+                |right_unfolded| {
+                    self.with_recursion_guard(db, left, right, || {
+                        self.check_type_pair(db, left, right_unfolded)
+                    })
+                },
+            ),
 
             (Type::TypeAlias(alias), _) => nontrivial_check(self, || {
                 let left_alias_ty = alias.value_type(db);

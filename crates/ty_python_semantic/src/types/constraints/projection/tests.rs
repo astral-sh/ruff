@@ -556,13 +556,13 @@ type Recursive = int | Recursive
     let intersection =
         IntersectionType::from_elements(db, &env, [int, Type::int_literal(1).negate(db, &env)]);
 
-    // Existing set operations count their members; aliases cannot hide those members. A
-    // recursive alias is charged again at the cycle, but its body is expanded only once.
+    // Existing set operations count their members; aliases cannot hide those members.
+    // An invalid cyclic alias is charged for its recovered value.
     for (ty, terms) in [
         (union, 3),
         (intersection, 3),
         (alias("Alias")?, 4),
-        (alias("Recursive")?, 4),
+        (alias("Recursive")?, 2),
     ] {
         assert_eq!(
             ProjectionTypeBudget::new(terms - 1).charge_type(db, ty),

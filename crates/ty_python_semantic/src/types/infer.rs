@@ -59,7 +59,8 @@ use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
+    ClassLiteral, KnownClass, RecursiveType, StaticClassLiteral, Type, TypeAndQualifiers,
+    TypeQualifiers,
 };
 use crate::{Db, FxIndexSet};
 
@@ -73,9 +74,57 @@ use ty_python_core::unpack::Unpack;
 use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, semantic_index};
 
 mod builder;
+mod implicit_alias;
+use implicit_alias::implicit_alias_parameters;
 mod comparisons;
 #[cfg(test)]
 mod tests;
+
+/// Infer the type denoted by an implicit alias independently of its runtime value.
+///
+/// `_parameters` supplies the formal type parameters collected by [`implicit_alias_parameters`].
+/// Although the function body does not read it, Salsa's `cycle_initial` uses it to construct
+/// `μa. a` with an identity specialization (for example, `T -> T`) on both the recursive type and
+/// its self-reference. This lets recursive uses such as `Alias[int]` or `Alias[list[T]]` specialize
+/// the provisional type before inference of the alias's body is complete. `cycle_fn` then binds
+/// self-references in the inferred result through [`RecursiveType::recover`].
+///
+/// For generic aliases, the caller applies explicit type arguments or the default specialization.
+/// If inference does not encounter a cycle, the result need not contain a structural recursive type.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
+        Type::Recursive(RecursiveType::initial(db, definition, id, parameters))
+    },
+    cycle_fn=|db, cycle: &salsa::Cycle, _: &Type<'db>, result: Type<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
+        RecursiveType::recover(db, definition, cycle.id(), parameters, result)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(super) fn infer_recursive_implicit_alias<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    _parameters: Option<crate::types::GenericContext<'db>>,
+) -> Type<'db> {
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let Some(value) = definition.kind(db).value(&module) else {
+        return Type::unknown();
+    };
+    let index = semantic_index(db, program_file);
+    let env = ProgramEnvironment::from_file(program_file);
+    TypeInferenceBuilder::new(
+        db,
+        &env,
+        InferenceRegion::Definition(definition),
+        python_file.file(db),
+        program_file,
+        index,
+        &module,
+    )
+    .finish_recursive_implicit_alias(definition, value)
+}
 
 bitflags::bitflags! {
     /// Metadata for expressions inferred as type expressions.

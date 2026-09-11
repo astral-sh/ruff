@@ -575,7 +575,24 @@ impl<'db> Type<'db> {
         let value_ty = self;
 
         let inferred = match (value_ty, slice_ty) {
+            (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
+
+            (Type::Recursive(recursive), _) => Some(recursive.map_or_else(
+                db,
+                env,
+                || Ok(value_ty),
+                |unfolded| unfolded.subscript(db, env, slice_ty, expr_context),
+            )),
+
+            (_, Type::Recursive(recursive)) => Some(recursive.map_or_else(
+                db,
+                env,
+                || Ok(value_ty),
+                |unfolded| value_ty.subscript(db, env, unfolded, expr_context),
+            )),
 
             (Type::TypeAlias(alias), _) => Some(alias.value_type(db).subscript(
                 db,
@@ -586,6 +603,17 @@ impl<'db> Type<'db> {
 
             (_, Type::TypeAlias(alias)) => {
                 Some(value_ty.subscript(db, env, alias.value_type(db), expr_context))
+            }
+
+            // Expand overlapping alternatives before collecting their subscript errors.
+            (Type::Union(union), _) if union.has_aliases(db) => Some(
+                union
+                    .expand_aliases(db, env)
+                    .subscript(db, env, slice_ty, expr_context),
+            ),
+
+            (_, Type::Union(union)) if union.has_aliases(db) => {
+                Some(value_ty.subscript(db, env, union.expand_aliases(db, env), expr_context))
             }
 
             (Type::Union(union), _) => Some(map_subscript_alternatives(

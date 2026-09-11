@@ -14,7 +14,7 @@ use crate::types::tuple::{TupleElement, TupleLength, TupleSpec, TupleSpecBuilder
 use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema, TypedDictType};
 use crate::types::unpacker::collected_list_type;
 use crate::types::{
-    CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
+    CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType, CycleDetector,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
     Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
@@ -483,13 +483,51 @@ impl ClassInfoConstraintFunction {
         is_positive: bool,
         use_generic_filtering: bool,
     ) -> Option<Type<'db>> {
+        ClassInfoConstraint {
+            function: self,
+            env,
+            is_positive,
+            use_generic_filtering,
+            visitor: CycleDetector::new(is_positive.then_some(Type::Never)),
+        }
+        .generate(db, classinfo)
+    }
+}
+
+/// Collect the classes reachable through one class-info argument.
+struct ClassInfoConstraint<'a, 'db> {
+    function: ClassInfoConstraintFunction,
+    env: &'a ProgramEnvironment<'db>,
+    is_positive: bool,
+    use_generic_filtering: bool,
+    visitor: CycleDetector<'db, ClassInfoConstraintFunction, Type<'db>, Option<Type<'db>>, 1>,
+}
+
+impl<'db> ClassInfoConstraint<'_, 'db> {
+    fn generate(&self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
+        // Revisiting a finite tuple tree adds no classes. Growing arguments can add
+        // new classes at each depth, so no finite narrowing constraint covers them.
+        self.visitor
+            .try_visit(
+                db,
+                classinfo,
+                |_| true,
+                || self.generate_impl(db, classinfo),
+            )
+            .unwrap_or(None)
+    }
+
+    fn generate_impl(&self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
+        let env = self.env;
+        let is_positive = self.is_positive;
+        let use_generic_filtering = self.use_generic_filtering;
         let constraint_from_class_literal = |class: ClassLiteral<'db>| {
             let specialization = if use_generic_filtering {
                 class.unknown_specialization(db)
             } else {
                 class.top_materialization(db)
             };
-            let constraint = match self {
+            let constraint = match self.function {
                 ClassInfoConstraintFunction::IsInstance => Type::instance(db, env, specialization),
                 ClassInfoConstraintFunction::IsSubclass => {
                     SubclassOfType::from(db, env, specialization)
@@ -506,13 +544,13 @@ impl ClassInfoConstraintFunction {
         };
 
         match classinfo {
-            Type::TypeAlias(alias) => self.generate_constraint(
-                db,
-                env,
-                alias.value_type(db),
-                is_positive,
-                use_generic_filtering,
-            ),
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
+            Type::TypeAlias(alias) => self.generate(db, alias.value_type(db)),
+            Type::Recursive(recursive) => {
+                recursive.map_or_else(db, env, || None, |unfolded| self.generate(db, unfolded))
+            }
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
                 // We can't narrow negatively from a `SubclassOf` type. `if !isinstance(x, y)`
@@ -535,7 +573,7 @@ impl ClassInfoConstraintFunction {
                     //   not valid runtime class-info arguments.
                     // - A class can inhabit `type[protocol]` because its metaclass constructs
                     //   protocol-conforming objects even if its nominal instances do not conform.
-                    SubclassOfInner::Protocol(protocol) => match self {
+                    SubclassOfInner::Protocol(protocol) => match self.function {
                         ClassInfoConstraintFunction::IsInstance => {
                             let constraint = Type::ProtocolInstance(protocol);
                             Some(if use_generic_filtering {
@@ -546,7 +584,7 @@ impl ClassInfoConstraintFunction {
                         }
                         ClassInfoConstraintFunction::IsSubclass => Some(classinfo),
                     },
-                    SubclassOfInner::TypeVar(bound_typevar) => match self {
+                    SubclassOfInner::TypeVar(bound_typevar) => match self.function {
                         ClassInfoConstraintFunction::IsSubclass => Some(classinfo),
                         ClassInfoConstraintFunction::IsInstance => {
                             Some(Type::TypeVar(bound_typevar))
@@ -565,13 +603,7 @@ impl ClassInfoConstraintFunction {
                         // target) should be SKIPPED, not abort narrowing on the
                         // whole intersection. Narrowing on the remaining members
                         // is still sound.
-                        if let Some(c) = self.generate_constraint(
-                            db,
-                            env,
-                            *element,
-                            is_positive,
-                            use_generic_filtering,
-                        ) {
+                        if let Some(c) = self.generate(db, *element) {
                             builder.add_positive_in_place(c);
                             any_member = true;
                         }
@@ -586,22 +618,13 @@ impl ClassInfoConstraintFunction {
                     None
                 }
             }
-            Type::Union(union) => union.try_map(db, env, |element| {
-                self.generate_constraint(db, env, *element, is_positive, use_generic_filtering)
-            }),
+            Type::Union(union) => union.try_map(db, env, |element| self.generate(db, *element)),
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db, env)? {
-                    TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        self.generate_constraint(db, env, bound, is_positive, use_generic_filtering)
+                    TypeVarBoundOrConstraints::UpperBound(bound) => self.generate(db, bound),
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        self.generate(db, constraints.as_type(db, env))
                     }
-                    TypeVarBoundOrConstraints::Constraints(constraints) => self
-                        .generate_constraint(
-                            db,
-                            env,
-                            constraints.as_type(db, env),
-                            is_positive,
-                            use_generic_filtering,
-                        ),
                 }
             }
 
@@ -613,15 +636,9 @@ impl ClassInfoConstraintFunction {
                 UnionType::try_from_elements(
                     db,
                     env,
-                    tuple.iter_element_types(db).map(|element| {
-                        self.generate_constraint(
-                            db,
-                            env,
-                            element,
-                            is_positive,
-                            use_generic_filtering,
-                        )
-                    }),
+                    tuple
+                        .iter_element_types(db)
+                        .map(|element| self.generate(db, element)),
                 )
             }
 
@@ -638,52 +655,28 @@ impl ClassInfoConstraintFunction {
                             // which means that `isinstance(x, int | None)` works even though
                             // `None` is not a class literal.
                             if element.is_none(db) {
-                                self.generate_constraint(
-                                    db,
-                                    env,
-                                    KnownClass::NoneType.to_class_literal(db, env),
-                                    is_positive,
-                                    use_generic_filtering,
-                                )
+                                self.generate(db, KnownClass::NoneType.to_class_literal(db, env))
                             } else {
-                                self.generate_constraint(
-                                    db,
-                                    env,
-                                    element,
-                                    is_positive,
-                                    use_generic_filtering,
-                                )
+                                self.generate(db, element)
                             }
                         }),
                 )
             }
 
             Type::SpecialForm(form) => match form {
-                SpecialFormType::LegacyStdlibAlias(alias) => self.generate_constraint(
-                    db,
-                    env,
-                    alias.aliased_class().to_class_literal(db, env),
-                    is_positive,
-                    use_generic_filtering,
-                ),
-                SpecialFormType::Tuple => self.generate_constraint(
-                    db,
-                    env,
-                    KnownClass::Tuple.to_class_literal(db, env),
-                    is_positive,
-                    use_generic_filtering,
-                ),
-                SpecialFormType::Type => self.generate_constraint(
-                    db,
-                    env,
-                    KnownClass::Type.to_class_literal(db, env),
-                    is_positive,
-                    use_generic_filtering,
-                ),
+                SpecialFormType::LegacyStdlibAlias(alias) => {
+                    self.generate(db, alias.aliased_class().to_class_literal(db, env))
+                }
+                SpecialFormType::Tuple => {
+                    self.generate(db, KnownClass::Tuple.to_class_literal(db, env))
+                }
+                SpecialFormType::Type => {
+                    self.generate(db, KnownClass::Type.to_class_literal(db, env))
+                }
                 // We don't have a good meta-type for `Callable`s right now,
                 // so only apply `isinstance()` narrowing, not `issubclass()`
                 SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
-                    (self == ClassInfoConstraintFunction::IsInstance).then(|| {
+                    (self.function == ClassInfoConstraintFunction::IsInstance).then(|| {
                         if use_generic_filtering {
                             Type::Callable(CallableType::unknown(db))
                         } else {
@@ -5263,6 +5256,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 // one `TypedDict` (even if other types are also present), or a type alias to such a type.
 fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
+        Type::RecursiveVar(_) => {
+            unreachable!("semantic operation on an unbound recursive variable")
+        }
         Type::TypedDict(_) => true,
         Type::Intersection(intersection) => intersection
             .positive(db)
@@ -5273,6 +5269,11 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
             .iter()
             .any(|union_member_ty| is_or_contains_typeddict(db, *union_member_ty)),
         Type::TypeAlias(alias) => is_or_contains_typeddict(db, alias.value_type(db)),
+        Type::Recursive(recursive) => {
+            recursive.map_or(db, &recursive.environment(db), false, |unfolded| {
+                is_or_contains_typeddict(db, unfolded)
+            })
+        }
 
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -5433,6 +5434,9 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
     };
 
     match ty {
+        Type::RecursiveVar(_) => {
+            unreachable!("semantic operation on an unbound recursive variable")
+        }
         Type::TypedDict(td) => matching_field_is_literal(&td),
         Type::Union(union) => union.elements(db).iter().all(|union_member_ty| {
             !is_or_contains_typeddict(db, *union_member_ty)
@@ -5448,6 +5452,14 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
             env,
             alias.value_type(db),
             field_name,
+        ),
+        Type::Recursive(recursive) => recursive.map_or_else(
+            db,
+            env,
+            || false,
+            |unfolded| {
+                all_matching_typeddict_fields_have_literal_types(db, env, unfolded, field_name)
+            },
         ),
         Type::Intersection(intersection) => {
             intersection

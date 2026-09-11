@@ -1034,6 +1034,55 @@ cycle.
 type ThroughIdentity = Identity[ThroughIdentity]
 ```
 
+Subsequent operations recover from these cycles. Repeated applications of the helper have the same
+result.
+
+```py
+type RepeatedIdentity = Identity[Identity[RepeatedIdentity]]  # error: [cyclic-type-alias-definition]
+
+def inspect_identity(direct: ThroughIdentity, repeated: RepeatedIdentity):
+    reveal_type(direct)  # revealed: Divergent
+    reveal_type(repeated)  # revealed: Divergent
+    direct[0]
+    repeated[0]
+```
+
+A non-recursive union member remains available for recovery.
+
+```py
+type WithLeaf = int | Identity[WithLeaf]  # error: [cyclic-type-alias-definition]
+
+def inspect_union(value: WithLeaf):
+    reveal_type(value)  # revealed: int
+    value[0]  # error: [not-subscriptable]
+```
+
+### Subscribing to an unguarded recursive alias
+
+Using an invalid alias directly in an expression does not prevent reporting its cyclic definition.
+
+```py
+type Identity[T] = T
+type Cyclic = Identity[Cyclic]  # error: [cyclic-type-alias-definition]
+
+def use(value: Cyclic):
+    value[0]
+```
+
+### Subscribing to an unguarded manual alias
+
+The same recovery applies to `TypeAliasType`. Its non-recursive union member determines the
+diagnostic for the subscription.
+
+```py
+from typing_extensions import TypeAliasType
+
+Cycle = TypeAliasType("Cycle", "int | Cycle")  # error: [cyclic-type-alias-definition]
+
+def use(value: Cycle):
+    value[0]  # error: [not-subscriptable]
+```
+
 ### Finite nested applications of recursive aliases
 
 A recursive alias can appear in its own type arguments without creating a cycle in its expansion.
@@ -1525,6 +1574,32 @@ def f(x: A):
     reveal_type(x)  # revealed: list[A | str | None]
     for item in x:
         reveal_type(item)  # revealed: list[A | str | None] | str | None
+```
+
+### Recursive alias contexts in generic calls
+
+When a recursive alias appears inside a list parameter, the argument's elements supply the type
+argument for the enclosing generic function.
+
+```py
+from typing import TypeVar
+
+W = TypeVar("W")
+type Tree[T] = T | tuple[Tree[T]]
+
+def first_list(value: list[Tree[W]]) -> W:
+    raise NotImplementedError
+
+def modern_first_list[W](value: list[Tree[W]]) -> W:
+    raise NotImplementedError
+
+reveal_type(first_list([1]))  # revealed: int | tuple[Tree[int]]
+reveal_type(modern_first_list([1]))  # revealed: int | tuple[Tree[int]]
+
+# revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
+reveal_type(first_list([((1,),)]))
+# revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
+reveal_type(modern_first_list([((1,),)]))
 ```
 
 ### Tuple comparison

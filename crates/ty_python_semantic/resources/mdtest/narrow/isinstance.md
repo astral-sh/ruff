@@ -69,6 +69,182 @@ def _(x: Literal[1, "a"]):
         reveal_type(x)  # revealed: Literal["a"]
 ```
 
+## Recursive tuples as `classinfo`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A recursive tuple of integer classes narrows a successful check to `int`. An unsuccessful check does
+not exclude integers: the tuple can be empty or contain only a subclass of `int`. Implicit and PEP
+695 aliases describe the same class-info values.
+
+```py
+ClassInfo = type[int] | tuple["ClassInfo", ...]
+type ExplicitClassInfo = type[int] | tuple[ExplicitClassInfo, ...]
+
+def implicit(value: object, classes: ClassInfo):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: object
+
+def explicit(value: object, classes: ExplicitClassInfo):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: object
+```
+
+Even when the leaf class is final, a failed check does not exclude its instances: the recursive
+tuple can be empty.
+
+```py
+from typing import final
+
+@final
+class Leaf: ...
+
+FinalClasses = type[Leaf] | tuple["FinalClasses", ...]
+type ExplicitFinalClasses = type[Leaf] | tuple[ExplicitFinalClasses, ...]
+
+def final_classes(value: object, classes: FinalClasses, explicit_classes: ExplicitFinalClasses):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: Leaf
+    else:
+        reveal_type(value)  # revealed: object
+    if isinstance(value, explicit_classes):
+        reveal_type(value)  # revealed: Leaf
+    else:
+        reveal_type(value)  # revealed: object
+```
+
+A tuple tree with no class objects can only make the check fail:
+
+```py
+OnlyTuples = tuple["OnlyTuples", ...]
+type ExplicitOnlyTuples = tuple[ExplicitOnlyTuples, ...]
+
+def only_tuples(value: object, classes: OnlyTuples, explicit_classes: ExplicitOnlyTuples):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: object
+    if isinstance(value, explicit_classes):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: object
+```
+
+## `classinfo` with changing recursive arguments
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Deeper tuples can contain different classes when the recursive type arguments change. The outer
+argument `int` does not describe all the classes tested: `(list,)` is also a valid class-info value.
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+Growing: TypeAlias = type[T] | tuple["Growing[list[T]]", ...]
+type ExplicitGrowing[T] = type[T] | tuple[ExplicitGrowing[list[T]], ...]
+
+classes: Growing[int] = (list,)
+explicit_classes: ExplicitGrowing[int] = (list,)
+
+def implicit(value: object, classes: Growing[int]):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: object
+
+def explicit(value: object, classes: ExplicitGrowing[int]):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: object
+```
+
+## Validating growing recursive tuples
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Changing type arguments does not invalidate a recursive tuple whose leaves are always classes. Both
+`isinstance` and `issubclass` accept these tuples, including classes reached through another alias.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+type Identity[U] = U
+ClassInfo = Identity[type] | tuple["ClassInfo[list[T]]", ...]
+type ExplicitClassInfo[T] = Identity[type] | tuple[ExplicitClassInfo[list[T]], ...]
+
+def valid(classes: ClassInfo[int], explicit_classes: ExplicitClassInfo[int]):
+    isinstance(None, classes)
+    issubclass(int, classes)
+    isinstance(None, explicit_classes)
+    issubclass(int, explicit_classes)
+```
+
+When the argument also supplies the leaf type, a class at the outer level does not guarantee that
+all deeper leaves are classes. These aliases also admit lists, which are invalid class-info values.
+
+```py
+Invalid = T | tuple["Invalid[list[T]]", ...]
+type ExplicitInvalid[T] = T | tuple[ExplicitInvalid[list[T]], ...]
+
+def invalid(classes: Invalid[type], explicit_classes: ExplicitInvalid[type]):
+    isinstance(None, classes)  # error: [invalid-argument-type]
+    issubclass(int, classes)  # error: [invalid-argument-type]
+    isinstance(None, explicit_classes)  # error: [invalid-argument-type]
+    issubclass(int, explicit_classes)  # error: [invalid-argument-type]
+```
+
+A leaf can itself be a recursive tuple with fixed arguments. Those arguments still constrain its
+leaves, even when the enclosing alias has growing arguments.
+
+```py
+U = TypeVar("U")
+Stable = U | tuple["Stable[U]", ...]
+Nested = Stable[type] | tuple["Nested[list[T]]", ...]
+type ExplicitNested[T] = Stable[type] | tuple[ExplicitNested[list[T]], ...]
+
+def nested(classes: Nested[int], explicit_classes: ExplicitNested[int]):
+    isinstance(None, classes)
+    issubclass(int, classes)
+    isinstance(None, explicit_classes)
+    issubclass(int, explicit_classes)
+```
+
+## Recursive tuples with metaclass arguments
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Successive metaclasses are still classes. Starting with `type[int]`, these aliases therefore contain
+only valid class-info values at every depth.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+ClassInfo = T | tuple["ClassInfo[type[T]]", ...]
+type ExplicitClassInfo[T] = T | tuple[ExplicitClassInfo[type[T]], ...]
+
+def valid(classes: ClassInfo[type[int]], explicit_classes: ExplicitClassInfo[type[int]]):
+    isinstance(None, classes)
+    issubclass(int, classes)
+    isinstance(None, explicit_classes)
+    issubclass(int, explicit_classes)
+```
+
 ## `classinfo` is a PEP-604 union of types
 
 ```toml
@@ -415,11 +591,11 @@ def _(x: Literal[1, "a"]):
 from typing import Literal
 
 def _(x: Literal[1, "a"]):
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["a"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `_ClassInfo`, found `Literal["a"]"
     if isinstance(x, "a"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["int"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `_ClassInfo`, found `Literal["int"]"
     if isinstance(x, "int"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 ```

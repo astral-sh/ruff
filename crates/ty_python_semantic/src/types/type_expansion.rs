@@ -4,7 +4,7 @@ use itertools::Itertools;
 use crate::ProgramEnvironment;
 use crate::types::enums::enum_member_literals;
 use crate::types::tuple::Tuple;
-use crate::types::{KnownClass, Type};
+use crate::types::{CycleDetector, KnownClass, Type};
 
 /// Maximum number of expanded types that can be generated from a single tuple's
 /// Cartesian product in [`expand_type`].
@@ -22,75 +22,104 @@ pub(crate) fn expand_type<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> Option<Vec<Type<'db>>> {
-    match ty {
-        Type::EnumComplement(complement) => Some(complement.remaining_literal_types(db, env)),
-        Type::Intersection(intersection) => intersection.finite_alternatives(db, env),
-        Type::NominalInstance(instance) => {
-            let class = instance.class(db, env);
+    TypeExpander {
+        db,
+        env,
+        visitor: CycleDetector::new(None),
+    }
+    .expand(ty)
+}
 
-            if class.is_known(db, KnownClass::Bool) {
-                return Some(vec![Type::bool_literal(true), Type::bool_literal(false)]);
-            }
+/// Expand recursive aliases once per active specialization. A back-edge remains a tuple
+/// element so argument expansion does not enumerate an infinite recursive unfolding.
+struct TypeExpander<'a, 'db> {
+    db: &'db dyn Db,
+    env: &'a ProgramEnvironment<'db>,
+    visitor: CycleDetector<'db, (), Type<'db>, Option<Vec<Type<'db>>>, 3>,
+}
 
-            // If the class is a fixed-length tuple subtype, we expand it to its elements.
-            if let Some(spec) = instance.tuple_spec(db, env) {
-                return match &*spec {
-                    Tuple::Fixed(fixed_length_tuple) => {
-                        // Pre-expand each element and compute the total Cartesian product size.
-                        // Bail out early if the product would exceed `MAX_TUPLE_EXPANSION` to
-                        // avoid exponential blowup (e.g. a 37-element tuple with 2-element
-                        // unions would produce 2^37 types).
-                        let per_element: Vec<_> = fixed_length_tuple
-                            .iter_all_elements()
-                            .map(|element| {
-                                expand_type(db, env, element).unwrap_or_else(|| vec![element])
-                            })
-                            .collect();
+impl<'db> TypeExpander<'_, 'db> {
+    fn expand(&self, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
+        let db = self.db;
+        let env = self.env;
+        match ty {
+            Type::EnumComplement(complement) => Some(complement.remaining_literal_types(db, env)),
+            Type::Intersection(intersection) => intersection.finite_alternatives(db, env),
+            Type::NominalInstance(instance) => {
+                let class = instance.class(db, env);
 
-                        let product_size: usize = per_element
-                            .iter()
-                            .try_fold(1usize, |acc, v| acc.checked_mul(v.len()))
-                            .unwrap_or(usize::MAX);
+                if class.is_known(db, KnownClass::Bool) {
+                    return Some(vec![Type::bool_literal(true), Type::bool_literal(false)]);
+                }
 
-                        if product_size <= 1 || product_size > MAX_TUPLE_EXPANSION {
-                            None
-                        } else {
-                            let expanded = per_element
-                                .into_iter()
-                                .multi_cartesian_product()
-                                .map(|types| Type::heterogeneous_tuple(db, env, types))
-                                .collect::<Vec<_>>();
-                            Some(expanded)
+                // If the class is a fixed-length tuple subtype, we expand it to its elements.
+                if let Some(spec) = instance.tuple_spec(db, env) {
+                    return match &*spec {
+                        Tuple::Fixed(fixed_length_tuple) => {
+                            // Pre-expand each element and compute the total Cartesian product size.
+                            // Bail out early if the product would exceed `MAX_TUPLE_EXPANSION` to
+                            // avoid exponential blowup (e.g. a 37-element tuple with 2-element
+                            // unions would produce 2^37 types).
+                            let per_element: Vec<_> = fixed_length_tuple
+                                .iter_all_elements()
+                                .map(|element| {
+                                    self.expand(element).unwrap_or_else(|| vec![element])
+                                })
+                                .collect();
+
+                            let product_size: usize = per_element
+                                .iter()
+                                .try_fold(1usize, |acc, v| acc.checked_mul(v.len()))
+                                .unwrap_or(usize::MAX);
+
+                            if product_size <= 1 || product_size > MAX_TUPLE_EXPANSION {
+                                None
+                            } else {
+                                let expanded = per_element
+                                    .into_iter()
+                                    .multi_cartesian_product()
+                                    .map(|types| Type::heterogeneous_tuple(db, env, types))
+                                    .collect::<Vec<_>>();
+                                Some(expanded)
+                            }
                         }
-                    }
-                    Tuple::Variable(_) => None,
-                };
-            }
+                        Tuple::Variable(_) => None,
+                    };
+                }
 
-            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db), None) {
-                return Some(enum_members.collect());
-            }
+                if let Some(enum_members) = enum_member_literals(db, class.class_literal(db), None)
+                {
+                    return Some(enum_members.collect());
+                }
 
-            None
+                None
+            }
+            Type::Union(union) => Some(
+                union
+                    .elements(db)
+                    .iter()
+                    .flat_map(|element| match element {
+                        Type::EnumComplement(complement) => {
+                            complement.remaining_literal_types(db, env)
+                        }
+                        Type::Intersection(intersection) => intersection
+                            .finite_alternatives(db, env)
+                            .unwrap_or_else(|| vec![*element]),
+                        _ => vec![*element],
+                    })
+                    .collect(),
+            ),
+            // For type aliases, expand the underlying value type.
+            Type::TypeAlias(alias) => self
+                .visitor
+                .visit(db, ty, || self.expand(alias.value_type(db))),
+            Type::Recursive(recursive) => self.visitor.visit(db, ty, || {
+                recursive.map_or(db, env, None, |unfolded| self.expand(unfolded))
+            }),
+            // We don't handle `type[A | B]` here because it's already stored in the expanded form
+            // i.e., `type[A] | type[B]` which is handled by the `Type::Union` case.
+            _ => None,
         }
-        Type::Union(union) => Some(
-            union
-                .elements(db)
-                .iter()
-                .flat_map(|element| match element {
-                    Type::EnumComplement(complement) => complement.remaining_literal_types(db, env),
-                    Type::Intersection(intersection) => intersection
-                        .finite_alternatives(db, env)
-                        .unwrap_or_else(|| vec![*element]),
-                    _ => vec![*element],
-                })
-                .collect(),
-        ),
-        // For type aliases, expand the underlying value type.
-        Type::TypeAlias(alias) => expand_type(db, env, alias.value_type(db)),
-        // We don't handle `type[A | B]` here because it's already stored in the expanded form
-        // i.e., `type[A] | type[B]` which is handled by the `Type::Union` case.
-        _ => None,
     }
 }
 

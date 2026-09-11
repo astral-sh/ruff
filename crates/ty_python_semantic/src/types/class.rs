@@ -466,11 +466,14 @@ impl<'db> GenericAlias<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        let tcx = tcx
-            .annotation
-            .and_then(|ty| ty.specialization_of(db, visitor.env, self.origin(db)))
-            .map(|specialization| specialization.types(db))
-            .unwrap_or(&[]);
+        let tcx = if type_mapping.is_structural() {
+            &[]
+        } else {
+            tcx.annotation
+                .and_then(|ty| ty.specialization_of(db, visitor.env, self.origin(db)))
+                .map(|specialization| specialization.types(db))
+                .unwrap_or(&[])
+        };
 
         let original_specialization = self.specialization(db);
         let specialization =

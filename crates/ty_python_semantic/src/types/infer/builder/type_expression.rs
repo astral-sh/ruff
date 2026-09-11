@@ -1,4 +1,5 @@
 use itertools::Either;
+use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::helpers::is_dotted_name;
@@ -7,6 +8,7 @@ use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashSet;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
@@ -17,12 +19,15 @@ use crate::types::diagnostic::{
     report_missing_type_arguments, report_unsupported_binary_operation,
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
-use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
+use crate::types::infer::{
+    InferenceFlags, TypeExpressionFlags, implicit_alias_parameters, infer_recursive_implicit_alias,
+};
+use crate::types::inferred_declaration;
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType};
-use ty_python_core::definition::DefinitionKind;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
@@ -36,6 +41,85 @@ use crate::{FxOrderSet, SemanticModel, add_inferred_python_version_hint_to_diagn
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    fn recursive_implicit_alias_reference(
+        &self,
+        value_ty: Type<'db>,
+        definition: Option<Definition<'db>>,
+    ) -> Option<(Type<'db>, Option<GenericContext<'db>>)> {
+        let db = self.db();
+        let mut definition = definition?;
+        // A resolved non-recursive value already describes the alias. Gradual types and
+        // invalid unions can hide recursive references, so they still need inference.
+        if !any_over_type(
+            db,
+            self.program_environment(),
+            value_ty,
+            false,
+            |ty| match ty {
+                Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::TypeAlias(_) => {
+                    true
+                }
+                Type::KnownInstance(KnownInstanceType::UnionType(union)) => {
+                    union.union_type(db).is_err()
+                }
+                _ => false,
+            },
+        ) {
+            return None;
+        }
+        let mut imports = FxHashSet::default();
+        while definition.kind(db).is_import() {
+            if !imports.insert(definition) {
+                return None;
+            }
+            definition = inferred_declaration(db, definition)
+                .declared()?
+                .provenance()
+                .definition()?;
+        }
+        let module = parsed_module(db, definition.program_file(db).python_file(db)).load(db);
+        let value = definition.kind(db).value(&module)?;
+        if !matches!(
+            value,
+            ast::Expr::Name(_)
+                | ast::Expr::Attribute(_)
+                | ast::Expr::Subscript(_)
+                | ast::Expr::BinOp(_)
+                | ast::Expr::StringLiteral(_)
+        ) {
+            return None;
+        }
+        match definition.kind(db) {
+            DefinitionKind::Assignment(_) if !value.is_string_literal_expr() => {}
+            DefinitionKind::AnnotatedAssignment(assignment)
+                if crate::types::definition_expression_type(
+                    db,
+                    definition,
+                    assignment.annotation(&module),
+                )
+                .is_typealias_special_form() => {}
+            _ => return None,
+        }
+        let parameters = implicit_alias_parameters(db, definition);
+        let ty = infer_recursive_implicit_alias(db, definition, parameters);
+        any_over_type(db, self.program_environment(), ty, false, |ty| {
+            matches!(ty, Type::Recursive(_))
+        })
+        .then_some((ty, parameters))
+    }
+
+    pub(in crate::types::infer) fn finish_recursive_implicit_alias(
+        mut self,
+        definition: Definition<'db>,
+        value: &ast::Expr,
+    ) -> Type<'db> {
+        self.typevar_binding_context = Some(definition);
+        self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
+        let ty = self.infer_type_expression(value);
+        let _diagnostics = self.context.finish();
+        ty
+    }
+
     const fn type_expression_context(&self) -> &'static str {
         self.inference_flags().type_expression_context()
     }
@@ -103,13 +187,40 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             })
     }
 
+    /// Resolve a type-expression reference once, retaining its source definition.
+    pub(super) fn infer_type_expression_reference(
+        &mut self,
+        expression: &ast::Expr,
+    ) -> (Type<'db>, Option<Definition<'db>>) {
+        match expression {
+            ast::Expr::Name(name) if name.ctx.is_load() => self.infer_name_load(name),
+            ast::Expr::Attribute(attribute) if attribute.ctx.is_load() => {
+                let resolved = self.infer_attribute_load(attribute).unwrap_or_else(|ty| ty);
+                (resolved.inner_type(), resolved.provenance().definition())
+            }
+            _ => (
+                self.infer_expression(expression, TypeContext::default()),
+                None,
+            ),
+        }
+    }
+
     pub(super) fn infer_name_or_attribute_type_expression(
         &mut self,
         ty: Type<'db>,
+        definition: Option<Definition<'db>>,
         annotation: &ast::Expr,
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
+        if let Some((alias, parameters)) = self.recursive_implicit_alias_reference(ty, definition) {
+            return match parameters {
+                Some(parameters) => {
+                    alias.apply_specialization(db, parameters.default_specialization(db, None))
+                }
+                None => alias,
+            };
+        }
         if annotation.is_attribute_expr()
             && let Type::TypeVar(tvar) = ty
             && tvar.paramspec_attr(self.db()).is_some()
@@ -156,8 +267,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         match expression {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => {
-                    let ty = self.infer_name_expression(name);
-                    self.infer_name_or_attribute_type_expression(ty, expression)
+                    let (ty, definition) = self.infer_type_expression_reference(expression);
+                    self.infer_name_or_attribute_type_expression(ty, definition, expression)
                 }
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
@@ -169,8 +280,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if is_dotted_name(expression) {
                     match attribute_expression.ctx {
                         ast::ExprContext::Load => {
-                            let ty = self.infer_attribute_expression(attribute_expression);
-                            self.infer_name_or_attribute_type_expression(ty, expression)
+                            let (ty, definition) = self.infer_type_expression_reference(expression);
+                            self.infer_name_or_attribute_type_expression(ty, definition, expression)
                         }
                         ast::ExprContext::Invalid => Type::unknown(),
                         ast::ExprContext::Store | ast::ExprContext::Del => {
@@ -208,8 +319,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 } = subscript;
 
                 if is_dotted_name(value) {
-                    let value_ty = self.infer_expression(value, TypeContext::default());
-
+                    let (value_ty, definition) = self.infer_type_expression_reference(value);
+                    let value_ty =
+                        self.finish_expression_type(value, value_ty, TypeContext::default());
                     // Preserve the flag for another `Unpack` so that nested unpacking emits a
                     // diagnostic. Other subscripts are no longer the direct unpack operand.
                     let previously_in_unpack_type_argument =
@@ -222,8 +334,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, false),
                             )
                         };
-                    let ty =
-                        self.infer_subscript_type_expression_no_store(subscript, slice, value_ty);
+                    let ty = self.infer_subscript_type_expression_no_store(
+                        subscript, slice, value_ty, definition,
+                    );
                     if let Some(previously_in_unpack_type_argument) =
                         previously_in_unpack_type_argument
                     {
@@ -1145,7 +1258,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         subscript: &ast::ExprSubscript,
         slice: &ast::Expr,
         value_ty: Type<'db>,
+        definition: Option<Definition<'db>>,
     ) -> Type<'db> {
+        if let Some((alias, Some(parameters))) =
+            self.recursive_implicit_alias_reference(value_ty, definition)
+        {
+            let db = self.db();
+            return self.infer_explicit_callable_specialization(
+                subscript,
+                alias,
+                parameters,
+                &|arguments| {
+                    alias.apply_specialization(
+                        db,
+                        parameters.specialize_partial(db, arguments.iter().copied()),
+                    )
+                },
+            );
+        }
         match value_ty {
             Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {
                 Some(KnownClass::Tuple) => Type::tuple(self.infer_tuple_type_expression(subscript)),
@@ -1583,43 +1713,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let scope_id = self.scope();
         let current_typevar_binding_context = self.typevar_binding_context;
         let current_inference_flags = self.inference_flags();
-
-        // TODO
-        // If we explicitly specialize a recursive generic (PEP-613 or implicit) type alias,
-        // we currently miscount the number of type variables. For example, for a nested
-        // dictionary type alias `NestedDict = dict[K, "V | NestedDict[K, V]"]]`, we might
-        // infer `<class 'dict[K, Divergent]'>`, and therefore count just one type variable
-        // instead of two. So until we properly support these, specialize all remaining type
-        // variables with a `@Todo` type (since we don't know which of the type arguments
-        // belongs to the remaining type variables).
-        //
-        // A lazily inferred class member can contain its own unrelated recursive type, so only
-        // inspect the alias structure and generic arguments when checking whether it is recursive.
-        if any_over_type(db, env, value_ty, false, |ty| ty.is_divergent()) {
-            let value_ty = value_ty.apply_specialization(
-                db,
-                generic_context.specialize(
-                    db,
-                    std::iter::repeat_n(
-                        todo_type!("specialized recursive generic type alias"),
-                        generic_context.len(db),
-                    )
-                    .collect::<Vec<_>>(),
-                ),
-            );
-            return if in_type_expression {
-                value_ty
-                    .in_type_expression(
-                        db,
-                        scope_id,
-                        current_typevar_binding_context,
-                        current_inference_flags,
-                    )
-                    .unwrap_or_else(|_| Type::unknown())
-            } else {
-                value_ty
-            };
-        }
 
         let specialize = &|types: &[Option<Type<'db>>]| {
             let specialized = value_ty.apply_specialization(

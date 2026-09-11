@@ -36,8 +36,8 @@ use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ProtocolInstanceType, StaticClassLiteral, Type,
-    TypeAliasType, TypedDictType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, ProtocolInstanceType, RecursiveType,
+    StaticClassLiteral, Type, TypeAliasType, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -49,6 +49,7 @@ pub enum TypeIdentity<'db> {
     GrowingProtocol(Definition<'db>),
     GrowingTypeAlias(Definition<'db>),
     GrowingTypedDict(Definition<'db>),
+    GrowingRecursive(RecursiveType<'db>),
     Other(Type<'db>),
 }
 
@@ -76,6 +77,7 @@ impl<'db> Type<'db> {
             }
             (Type::TypeAlias(a), Type::TypeAlias(b)) => a.definition(db) == b.definition(db),
             (Type::TypedDict(a), Type::TypedDict(b)) => a.definition(db) == b.definition(db),
+            (Type::Recursive(a), Type::Recursive(b)) => a.constructor(db) == b.constructor(db),
             _ => false,
         }
     }
@@ -98,7 +100,10 @@ impl<'db> Type<'db> {
             // that visits stop even though no exact type repeats. Recursion that revisits one
             // exact specialization (e.g. `type RecursiveT = int | tuple[RecursiveT, ...]`) needs
             // no definition-level identity: the detectors stop on the repeated type itself.
-            Type::TypeAlias(_) | Type::ProtocolInstance(_) | Type::TypedDict(_) => {
+            Type::TypeAlias(_)
+            | Type::ProtocolInstance(_)
+            | Type::TypedDict(_)
+            | Type::Recursive(_) => {
                 let target = RecursiveDefinition::from_type(db, self)?.target;
                 if !target.may_have_unbounded_specialization(db) {
                     return None;
@@ -108,10 +113,23 @@ impl<'db> Type<'db> {
                     RecursiveDefinition::TypeAlias(_) => TypeIdentity::GrowingTypeAlias(definition),
                     RecursiveDefinition::Protocol(_) => TypeIdentity::GrowingProtocol(definition),
                     RecursiveDefinition::TypedDict(_) => TypeIdentity::GrowingTypedDict(definition),
+                    RecursiveDefinition::Structural(recursive) => {
+                        TypeIdentity::GrowingRecursive(recursive)
+                    }
                 })
             }
             _ => None,
         }
+    }
+}
+
+impl<'db> RecursiveType<'db> {
+    /// Whether revisiting this constructor can keep changing its type arguments.
+    pub(super) fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
+        matches!(
+            Type::Recursive(self).recursive_identity(db),
+            Some(TypeIdentity::GrowingRecursive(_))
+        )
     }
 }
 
@@ -121,11 +139,12 @@ enum RecursiveDefinition<'db> {
     TypeAlias(TypeAliasType<'db>),
     Protocol(StaticClassLiteral<'db>),
     TypedDict(StaticClassLiteral<'db>),
+    Structural(RecursiveType<'db>),
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum FlowKind {
-    /// The source parameter is passed directly or only through normalized set operations.
+    /// The source parameter is passed through operations that cannot accumulate structure.
     Direct,
     /// The source parameter occurs inside a type structure that can accumulate.
     Nested,
@@ -171,7 +190,8 @@ struct DefinitionUse<'db> {
 /// Whether a recursive definition can keep producing new specializations is modeled as a graph
 /// problem. The formal parameters of every reachable definition are the nodes, and each argument
 /// of a recursive reference adds an edge to the parameter it specializes from every source
-/// parameter occurring in it: [`FlowKind::Direct`] if the parameter is passed as is, and
+/// parameter occurring in it: [`FlowKind::Direct`] for direct references, normalized set operations,
+/// and metaclass projections, and
 /// [`FlowKind::Nested`] if it occurs inside a type structure that can accumulate. Arguments
 /// without source parameters add no edges and act as resets.
 ///
@@ -227,6 +247,13 @@ struct SourceParameterCollector<'a, 'db> {
 impl<'db> RecursiveDefinition<'db> {
     fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<DefinitionUse<'db>> {
         let (target, specialization) = match ty {
+            Type::Recursive(recursive) => {
+                let specialization = recursive.arguments(db)?;
+                (
+                    Self::Structural(recursive.constructor(db)),
+                    Some(specialization),
+                )
+            }
             Type::TypeAlias(alias) => (
                 Self::TypeAlias(alias.unspecialized(db)),
                 alias.specialization(db),
@@ -260,6 +287,7 @@ impl<'db> RecursiveDefinition<'db> {
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         match self {
             Self::TypeAlias(alias) => alias.definition(db),
+            Self::Structural(recursive) => recursive.definition(db),
             Self::Protocol(origin) | Self::TypedDict(origin) => origin.definition(db),
         }
     }
@@ -267,6 +295,7 @@ impl<'db> RecursiveDefinition<'db> {
     fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         match self {
             Self::TypeAlias(alias) => alias.generic_context(db),
+            Self::Structural(recursive) => recursive.parameters(db),
             Self::Protocol(origin) | Self::TypedDict(origin) => origin.generic_context(db),
         }
     }
@@ -277,7 +306,7 @@ impl<'db> RecursiveDefinition<'db> {
         generic_context: GenericContext<'db>,
     ) -> Specialization<'db> {
         let known_class = match self {
-            Self::TypeAlias(_) => None,
+            Self::TypeAlias(_) | Self::Structural(_) => None,
             Self::Protocol(origin) | Self::TypedDict(origin) => origin.known(db),
         };
         generic_context.default_specialization(db, known_class)
@@ -556,6 +585,9 @@ impl<'db> SpecializationFlowVisitor<'db> {
     /// Visits the definition with each formal parameter mapped to itself.
     fn visit_definition_body(&self, db: &'db dyn Db, source: RecursiveDefinition<'db>) -> bool {
         match source {
+            RecursiveDefinition::Structural(recursive) => {
+                self.visit_type(db, recursive.unfold(db, &self.env));
+            }
             RecursiveDefinition::TypeAlias(alias) => {
                 self.visit_type(db, alias.raw_value_type(db));
             }
@@ -720,6 +752,12 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
             }
             Type::Intersection(intersection) => {
                 self.visit_intersection_type(db, intersection);
+                return;
+            }
+            Type::SubclassOf(subclass_of) if let Some(typevar) = subclass_of.into_type_var() => {
+                // Repeated metaclass projection reaches `type`; it does not
+                // accumulate layers like `list[T]` or `tuple[T]`.
+                self.visit_type(db, Type::TypeVar(typevar));
                 return;
             }
             _ => {}

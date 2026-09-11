@@ -230,6 +230,9 @@ pub(super) fn attribute_write_requirement<'db>(
     attribute: &str,
 ) -> AttributeWriteRequirement<'db> {
     match object_ty {
+        Type::RecursiveVar(_) => {
+            unreachable!("semantic operation on an unbound recursive variable")
+        }
         Type::Union(union) => AttributeWriteRequirement::All {
             object_ty,
             element_tys: union.elements(db),
@@ -253,6 +256,12 @@ pub(super) fn attribute_write_requirement<'db>(
         Type::TypeAlias(alias) => {
             attribute_write_requirement(db, env, alias.value_type(db), attribute)
         }
+        Type::Recursive(recursive) => recursive.map_or(
+            db,
+            env,
+            AttributeWriteRequirement::Unconstrained,
+            |unfolded| attribute_write_requirement(db, env, unfolded, attribute),
+        ),
 
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
             AttributeWriteRequirement::CannotAssign
@@ -819,6 +828,9 @@ pub(super) fn assignment_attribute_members<'db>(
     );
     let receiver_fallback = if needs_receiver_fallback {
         Some(match object_ty {
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
             | Type::LiteralValue(..)
@@ -848,6 +860,7 @@ pub(super) fn assignment_attribute_members<'db>(
             Type::Union(..)
             | Type::Intersection(..)
             | Type::TypeAlias(..)
+            | Type::Recursive(_)
             | Type::Dynamic(..)
             | Type::Divergent(_)
             | Type::Never

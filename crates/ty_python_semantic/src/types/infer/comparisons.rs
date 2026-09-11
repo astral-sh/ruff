@@ -301,6 +301,14 @@ impl<'db> Type<'db> {
             visitor: &UpcastingVisitor<'db>,
         ) -> UpcastResult<'db> {
             match ty {
+                Type::Recursive(recursive) => visit_type(db, ty, visitor, || {
+                    recursive.map_or(db, env, UpcastResult::unstable(ty), |unfolded| {
+                        upcast(db, env, unfolded, visitor)
+                    })
+                }),
+                Type::RecursiveVar(_) => {
+                    unreachable!("semantic operation on an unbound recursive variable")
+                }
                 Type::TypeAlias(alias) => visit_type(db, ty, visitor, || {
                     upcast(db, env, alias.value_type(db), visitor)
                 }),
