@@ -74,6 +74,10 @@ impl TestDb {
         };
         program_settings.search_paths.try_register_static_roots(&db);
         db.program_settings = program_settings;
+        ty_python_semantic::initialize_place_load_recording(
+            &db,
+            ty_python_semantic::PlaceLoadRecordingMode::default(),
+        );
 
         db
     }
