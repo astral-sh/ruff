@@ -733,6 +733,59 @@ second_method = classmethod(second)
 static_assert(is_disjoint_from(TypeOf[first_method], TypeOf[second_method]))
 ```
 
+## Assigning wrappers to annotated descriptor types
+
+A `staticmethod` annotation constrains both the parameters and the return type of the wrapped
+callable. A wrapper returning `str` cannot satisfy a descriptor that promises to return `int`.
+
+```py
+def stringify(value: int) -> str:
+    return str(value)
+
+def consume(method: staticmethod[[int], int]) -> int:
+    return method(1) + 1
+
+wrapped = staticmethod(stringify)
+consume(wrapped)  # error: [invalid-argument-type]
+valid: staticmethod[[int], str] = wrapped
+wrong_parameter: staticmethod[[str], str] = wrapped  # error: [invalid-assignment]
+wider_return: staticmethod[[int], object] = wrapped
+```
+
+The class argument is part of a `classmethod` annotation's wrapped-callable contract.
+
+```py
+class Owner: ...
+class Other: ...
+
+def make(cls: type[Owner], value: int) -> str:
+    return str(value)
+
+class_wrapped = classmethod(make)
+valid_class: classmethod[Owner, [int], str] = class_wrapped
+wrong_return: classmethod[Owner, [int], int] = class_wrapped  # error: [invalid-assignment]
+wrong_owner: classmethod[Other, [int], str] = class_wrapped  # error: [invalid-assignment]
+wrong_kind: staticmethod[[type[Owner], int], str] = class_wrapped  # error: [invalid-assignment]
+```
+
+An overloaded wrapper can satisfy the signature selected by the descriptor annotation without
+combining unrelated overload return types.
+
+```py
+from typing import overload
+
+@overload
+def convert(value: int) -> str: ...
+@overload
+def convert(value: str) -> int: ...
+def convert(value: int | str) -> int | str:
+    return str(value) if isinstance(value, int) else len(value)
+
+int_to_str: staticmethod[[int], str] = staticmethod(convert)
+str_to_int: staticmethod[[str], int] = staticmethod(convert)
+invalid_overload: staticmethod[[int], int] = staticmethod(convert)  # error: [invalid-assignment]
+```
+
 ## Decorators returning a different function
 
 An inner decorator can replace a method with a function defined elsewhere. The outer `classmethod`

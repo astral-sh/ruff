@@ -4355,6 +4355,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 );
             }
 
+            (
+                Type::NominalInstance(formal_instance),
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)),
+            ) if formal_instance
+                .class(db, self.env)
+                .is_known(db, wrapper.class(db)) =>
+            {
+                // The descriptor relation compares its wrapped callable with the nominal
+                // annotation's `__func__`, retaining parameter and return type constraints.
+                let when = self.constraint_for_relation(formal, actual, relation_polarity);
+                return self.infer_from_constraint_set(when);
+            }
+
             (formal, Type::ProtocolInstance(actual_protocol)) => {
                 if let Type::ProtocolInstance(formal_protocol) = formal
                     && let Some(actual_origin) = actual_protocol.materialized_origin(db)
