@@ -13,7 +13,7 @@ use get_size2::StandardTracker;
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
-use ruff_db::system::System;
+use ruff_db::system::{DbWithWritableSystem, System, WritableSystem};
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
 use ty_module_resolver::system_module_search_paths;
@@ -661,6 +661,17 @@ impl SourceDb for ProjectDatabase {
 
 #[salsa::db]
 impl salsa::Database for ProjectDatabase {}
+
+impl DbWithWritableSystem for ProjectDatabase {
+    fn writable_system(&self) -> ruff_db::system::Result<&dyn WritableSystem> {
+        self.system().as_writable().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "The system does not support writing files",
+            )
+        })
+    }
+}
 
 #[salsa::db]
 impl Db for ProjectDatabase {
