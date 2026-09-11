@@ -4981,8 +4981,8 @@ class F:
 reveal_type(F().x)  # revealed: tuple[Divergent, ...]
 ```
 
-The `tuple()` call inspects its iterable argument during inference. This cycle still uses
-`Divergent`, whose gradual tuple length allows the empty tuple as a class default:
+Copying an empty tuple with `tuple()` leaves it empty, including when the source is the same
+attribute being assigned:
 
 ```py
 class G:
@@ -4991,7 +4991,19 @@ class G:
     def f(self):
         self.x = tuple(self.x)
 
-reveal_type(G().x)  # revealed: tuple[Divergent, ...]
+reveal_type(G().x)  # revealed: tuple[()]
+```
+
+Copying a nonempty tuple likewise preserves its items and length:
+
+```py
+class Nonempty:
+    x = (1, 2)
+
+    def copy(self):
+        self.x = tuple(self.x)
+
+reveal_type(Nonempty().x)  # revealed: tuple[int, int]
 ```
 
 ## Attributes of standard library modules that aren't yet defined

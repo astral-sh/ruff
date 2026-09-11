@@ -1454,5 +1454,107 @@ reveal_type(C.identity(1))  # revealed: Unknown
 reveal_type(C[int].identity(1))  # revealed: int
 ```
 
+## Specializing recursively inferred attributes
+
+Each iteration nests the previous value in a tuple with another item. Reading the attribute through
+a specialized class preserves the tuple and specializes its nonrecursive item, even when the
+recursive part is approximated.
+
+```py
+class Tree[T]:
+    def __init__(self, item: T, count: int):
+        value = item
+        for _ in range(count):
+            value = (value, item)
+        self.value = value
+
+def inspect(tree: Tree[int]):
+    reveal_type(tree.value)  # revealed: tuple[tuple[Divergent | int, int] | int, int] | int
+    if isinstance(tree.value, tuple):
+        reveal_type(tree.value[1])  # revealed: int
+        wrong: str = tree.value[1]  # error: [invalid-assignment]
+```
+
+## Specializing recursively inferred attributes containing Any
+
+An `Any` item does not erase the known type of another item in a recursively constructed tuple.
+
+```py
+from typing import Any
+
+class Tree[T]:
+    def __init__(self, item: T, extra: Any, count: int):
+        value = item
+        for _ in range(count):
+            value = (value, item, extra)
+        self.value = value
+
+def inspect(tree: Tree[int]):
+    if isinstance(tree.value, tuple):
+        reveal_type(tree.value[1])  # revealed: int
+        wrong: str = tree.value[1]  # error: [invalid-assignment]
+```
+
+## Specializing mutually recursive attributes
+
+Two accumulated values refer to one another. Specialization preserves their known tuple items,
+including the inner tuple stored in `right`.
+
+```py
+class Pair[T]:
+    def __init__(self, item: T, count: int):
+        left = item
+        right = ""
+        for _ in range(count):
+            left = (right, item)
+            right = (left, "")
+        self.left = left
+        self.right = right
+
+def inspect(pair: Pair[int]):
+    if isinstance(pair.left, tuple):
+        reveal_type(pair.left[1])  # revealed: int
+        wrong_left: str = pair.left[1]  # error: [invalid-assignment]
+    if isinstance(pair.right, tuple):
+        reveal_type(pair.right[1])  # revealed: str
+        reveal_type(pair.right[0][1])  # revealed: int
+        wrong_right: int = pair.right[1]  # error: [invalid-assignment]
+        wrong_inner: str = pair.right[0][1]  # error: [invalid-assignment]
+```
+
+## Specializing attributes with independent recursive components
+
+Approximating a recursive container does not approximate an independently inferred recursive
+component. Its materialization still applies after following that component's recursive links.
+
+```py
+from typing import Any, Callable
+from ty_extensions import Top
+from ty_extensions._internal import TypeOf
+
+def fixed[T, E](callback: Callable[[T], tuple[T, E]], element: E) -> T:
+    raise NotImplementedError
+
+def identity[T](value: T) -> T:
+    return value
+
+def unknown() -> Any: ...
+
+node = fixed(identity, unknown())
+
+class Tree[T]:
+    def __init__(self, item: T, payload: Top[TypeOf[node]], count: int):
+        value = item
+        for _ in range(count):
+            value = (value, payload)
+        self.value = value
+
+def inspect(tree: Tree[int]):
+    if isinstance(tree.value, tuple):
+        reveal_type(tree.value[1][1])  # revealed: object
+        reveal_type(tree.value[1][0][1])  # revealed: object
+        wrong: str = tree.value[1][0][1]  # error: [invalid-assignment]
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

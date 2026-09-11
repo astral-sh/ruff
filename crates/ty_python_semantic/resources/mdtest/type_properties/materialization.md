@@ -1286,6 +1286,54 @@ static_assert(is_assignable_to(Bottom[MixedConstrained[GradualInt, Any]], MixedC
 static_assert(not is_assignable_to(Bottom[MixedConstrained[GradualInt, Any]], MixedConstrained[str, int]))
 ```
 
+## Materializing recursively inferred attributes
+
+An inferred recursive tuple retains its fixed item under both materialization directions.
+Approximating the recursive item does not make the other item unknown.
+
+```py
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import TypeOf
+
+class Tree:
+    def grow(self, other: "Tree"):
+        self.value = (other.value, 1)
+
+def inspect(tree: Tree):
+    def bounds(top: Top[TypeOf[tree.value]], bottom: Bottom[TypeOf[tree.value]]):
+        reveal_type(top)  # revealed: tuple[tuple[Divergent, int], int]
+        reveal_type(bottom)  # revealed: tuple[tuple[Divergent, int], int]
+        reveal_type(top[1])  # revealed: int
+        reveal_type(bottom[1])  # revealed: int
+        wrong_top: str = top[1]  # error: [invalid-assignment]
+        wrong_bottom: str = bottom[1]  # error: [invalid-assignment]
+```
+
+## Materializing gradual items in recursively inferred attributes
+
+Materialization also transforms known gradual items in the approximation: the top bound of `Any` is
+`object`, and its bottom bound is `Never`.
+
+```py
+from typing import Any
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import TypeOf
+
+class Tree:
+    def grow(self, other: "Tree", item: Any):
+        self.value = (other.value, item)
+
+def inspect(tree: Tree):
+    def top_bound(top: Top[TypeOf[tree.value]]):
+        reveal_type(top)  # revealed: tuple[Divergent, object]
+        reveal_type(top[1])  # revealed: object
+        wrong: str = top[1]  # error: [invalid-assignment]
+
+    def bottom_bound(bottom: Bottom[TypeOf[tree.value]]):
+        reveal_type(bottom)  # revealed: tuple[Divergent, Never]
+        reveal_type(bottom[1])  # revealed: Never
+```
+
 ## Growing recursive aliases
 
 A recursive alias can keep nesting its type argument as it unfolds. This does not change the
