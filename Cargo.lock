@@ -4953,6 +4953,7 @@ dependencies = [
  "crossbeam",
  "dunce",
  "gen-lsp-types",
+ "indexmap",
  "insta",
  "jod-thread",
  "libc",

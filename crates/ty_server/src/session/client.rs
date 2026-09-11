@@ -287,15 +287,23 @@ impl Client {
 
 /// Type erased handler for client responses.
 #[expect(clippy::type_complexity)]
-pub(crate) struct ClientResponseHandler(Box<dyn FnOnce(&Client, lsp_server::Response) + Send>);
+pub(crate) struct ClientResponseHandler(
+    Box<dyn FnOnce(&Client, &mut Session, lsp_server::Response) + Send>,
+);
 
 impl ClientResponseHandler {
+    pub(crate) fn new(
+        handler: impl FnOnce(&Client, &mut Session, lsp_server::Response) + Send + 'static,
+    ) -> Self {
+        Self(Box::new(handler))
+    }
+
     fn for_request<R>(response_handler: impl FnOnce(&Client, R::Result) + Send + 'static) -> Self
     where
         R: lsp_types::Request,
     {
-        Self(Box::new(
-            move |client: &Client, response: lsp_server::Response| {
+        Self::new(
+            move |client: &Client, _session: &mut Session, response: lsp_server::Response| {
                 let _span =
                     tracing::debug_span!("client_response", id=%response.id, method = %R::METHOD)
                         .entered();
@@ -320,11 +328,16 @@ impl ClientResponseHandler {
                     },
                 }
             },
-        ))
+        )
     }
 
-    pub(crate) fn handle_response(self, client: &Client, response: lsp_server::Response) {
+    pub(crate) fn handle_response(
+        self,
+        client: &Client,
+        session: &mut Session,
+        response: lsp_server::Response,
+    ) {
         let handler = self.0;
-        handler(client, response);
+        handler(client, session, response);
     }
 }
