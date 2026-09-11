@@ -498,6 +498,46 @@ def f(val: str | bytes) -> None:
 reveal_type(accepts_callable(f))  # revealed: str | bytes
 ```
 
+## Combining inferred and declared upper bounds
+
+The declared upper bound participates in selecting the inferred upper-bound solution. Even though
+the callable accepts `int | str`, the TypeVar cannot be specialized to `int`, so we use the declared
+upper bound:
+
+```py
+from typing import Any, Callable, Generic, TypeVar
+
+StringT = TypeVar("StringT", bound=str)
+
+def infer_str(consumer: Callable[[StringT], None]) -> StringT:
+    raise NotImplementedError
+
+def consume_int_or_str(value: int | str) -> None: ...
+
+# revealed: str
+reveal_type(infer_str(consume_int_or_str))
+```
+
+A gradual declared bound restricts which specializations are valid without becoming part of a
+concrete specialization that already satisfies it:
+
+```py
+BaseT = TypeVar("BaseT")
+
+class GenericBase(Generic[BaseT]): ...
+class Child(GenericBase[int]): ...
+
+Inferred = TypeVar("Inferred", bound=GenericBase[Any])
+
+def infer_child(consumer: Callable[[Inferred], None]) -> Inferred:
+    raise NotImplementedError
+
+def consume_child(value: Child) -> None: ...
+
+# revealed: Child
+reveal_type(infer_child(consume_child))
+```
+
 ## Rejected overloaded callbacks preserve valid specializations
 
 An overloaded callback may contain one alternative whose return type violates a type variable's
