@@ -69,7 +69,6 @@ mod uv_metadata {
     use ty_project::UseUv;
     use ty_server::{ClientOptions, DiagnosticMode};
 
-    use crate::file_watching::{acknowledge_unregistration, watcher_registration_request};
     use crate::{TestServer, TestServerBuilder};
 
     #[test]
@@ -456,9 +455,9 @@ from attrs import define
             server.await_diagnostic_refresh();
 
             // Invalid metadata removes the environment watch; correcting it restores the watch.
-            let (request_id, next_id, _) = watcher_registration_request(&mut server)?;
+            let (request_id, next_id, _) = server.watcher_registration_request()?;
             server.acknowledge_request(request_id);
-            ensure!(acknowledge_unregistration(&mut server)? == registration_id);
+            ensure!(server.acknowledge_unregistration()? == registration_id);
             registration_id = next_id;
         }
 
@@ -529,7 +528,7 @@ from idna import encode
         let mut previous_id = None;
         // uv may finish after the initial project-only watch was requested.
         for _ in 0..2 {
-            let (request_id, id, watchers) = watcher_registration_request(server)?;
+            let (request_id, id, watchers) = server.watcher_registration_request()?;
             let site_packages = watchers.iter().find_map(|watcher| {
                 if let GlobPattern::RelativePattern(pattern) = &watcher.glob_pattern
                     && let BaseUri::Uri(uri) = &pattern.base_uri
@@ -542,7 +541,7 @@ from idna import encode
             });
             server.acknowledge_request(request_id);
             if let Some(previous_id) = previous_id {
-                ensure!(acknowledge_unregistration(server)? == previous_id);
+                ensure!(server.acknowledge_unregistration()? == previous_id);
             }
             if let Some(site_packages) = site_packages {
                 return Ok((id, site_packages));

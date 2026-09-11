@@ -66,18 +66,20 @@ use lsp_types::{
     DefinitionRequest, DefinitionResponse, DiagnosticClientCapabilities,
     DidChangeTextDocumentNotification, DidChangeTextDocumentParams,
     DidChangeWatchedFilesClientCapabilities, DidChangeWatchedFilesNotification,
-    DidChangeWatchedFilesParams, DidChangeWorkspaceFoldersNotification,
-    DidChangeWorkspaceFoldersParams, DidCloseTextDocumentNotification, DidCloseTextDocumentParams,
-    DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DidSaveTextDocumentNotification,
-    DidSaveTextDocumentParams, DocumentDiagnosticParams, DocumentDiagnosticReport,
-    DocumentDiagnosticRequest, ExitNotification, FileEvent, FoldingRange, FoldingRangeParams,
-    Hover, HoverParams, HoverRequest, InitializeParams, InitializeRequest, InitializeResult,
+    DidChangeWatchedFilesParams, DidChangeWatchedFilesRegistrationOptions,
+    DidChangeWorkspaceFoldersNotification, DidChangeWorkspaceFoldersParams,
+    DidCloseTextDocumentNotification, DidCloseTextDocumentParams, DidOpenTextDocumentNotification,
+    DidOpenTextDocumentParams, DidSaveTextDocumentNotification, DidSaveTextDocumentParams,
+    DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticRequest,
+    ExitNotification, FileEvent, FileSystemWatcher, FoldingRange, FoldingRangeParams, Hover,
+    HoverParams, HoverRequest, InitializeParams, InitializeRequest, InitializeResult,
     InitializedNotification, InitializedParams, InlayHint, InlayHintClientCapabilities,
     InlayHintParams, InlayHintRequest, LanguageKind, Notification, PartialResultParams, Position,
-    PrepareRenameRequest, PreviousResultId, PublishDiagnosticsClientCapabilities, Range, Request,
-    SemanticTokens, ShutdownRequest, SignatureHelp, SignatureHelpParams, SignatureHelpRequest,
-    SignatureHelpTriggerKind, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
-    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri,
+    PrepareRenameRequest, PreviousResultId, PublishDiagnosticsClientCapabilities, Range,
+    RegistrationRequest, Request, SemanticTokens, ShutdownRequest, SignatureHelp,
+    SignatureHelpParams, SignatureHelpRequest, SignatureHelpTriggerKind,
+    TextDocumentClientCapabilities, TextDocumentContentChangeEvent, TextDocumentIdentifier,
+    TextDocumentItem, TextDocumentPositionParams, UnregistrationRequest, Uri,
     VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
     WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest,
     WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
@@ -611,6 +613,37 @@ impl TestServer {
     /// Acknowledge a successful server-to-client request.
     pub(crate) fn acknowledge_request(&mut self, id: RequestId) {
         self.send(Message::Response(Response::new_ok(id, ())));
+    }
+
+    pub(crate) fn watcher_registration_request(
+        &mut self,
+    ) -> Result<(RequestId, String, Vec<FileSystemWatcher>)> {
+        let (request_id, params) = self.await_request::<RegistrationRequest>();
+        let [registration] = params.registrations.as_slice() else {
+            anyhow::bail!("expected exactly one file watcher registration");
+        };
+        anyhow::ensure!(
+            registration.method == "workspace/didChangeWatchedFiles",
+            "unexpected registration method: {}",
+            registration.method
+        );
+        let options: DidChangeWatchedFilesRegistrationOptions = serde_json::from_value(
+            registration
+                .register_options
+                .clone()
+                .context("expected file watcher options")?,
+        )?;
+        Ok((request_id, registration.id.clone(), options.watchers))
+    }
+
+    pub(crate) fn acknowledge_unregistration(&mut self) -> Result<String> {
+        let (request_id, params) = self.await_request::<UnregistrationRequest>();
+        let [unregistration] = params.unregisterations.as_slice() else {
+            anyhow::bail!("expected exactly one unregistration");
+        };
+        let registration_id = unregistration.id.clone();
+        self.acknowledge_request(request_id);
+        Ok(registration_id)
     }
 
     /// Checks server-created progress with matching begin, report, and end notifications.
