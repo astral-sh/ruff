@@ -146,17 +146,14 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .as_ref()
         .map(|path| SystemPath::absolute(path, &cwd));
     let force_exclude = args.force_exclude();
-    let use_uv = UseUv::from_system(&system);
 
     let mut project_metadata = match &config_file {
-        Some(config_file) => ProjectMetadata::from_config_file_with_uv(
-            config_file.clone(),
-            &project_path,
-            &system,
-            use_uv,
-        )?,
-        None => ProjectMetadata::discover_without_uv(&project_path, &system)?.with_use_uv(use_uv),
-    };
+        Some(config_file) => {
+            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
+        }
+        None => ProjectMetadata::discover_without_uv(&project_path, &system)?,
+    }
+    .with_use_uv(UseUv::from_system(&system));
 
     project_metadata.apply_configuration_files(&system)?;
     project_metadata.apply_override_options(args.into_options());

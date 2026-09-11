@@ -114,20 +114,12 @@ impl ProjectMetadata {
         }
     }
 
+    /// Loads an explicitly selected configuration file. uv integration is configured separately
+    /// with [`Self::with_use_uv`].
     pub fn from_config_file(
         path: SystemPathBuf,
         root: &SystemPath,
         system: &dyn System,
-    ) -> Result<Self, ProjectMetadataError> {
-        Self::from_config_file_with_uv(path, root, system, UseUv::from_system(system))
-    }
-
-    /// Loads a project from a configuration file using the explicitly configured uv integrations.
-    pub fn from_config_file_with_uv(
-        path: SystemPathBuf,
-        root: &SystemPath,
-        system: &dyn System,
-        use_uv: UseUv,
     ) -> Result<Self, ProjectMetadataError> {
         tracing::debug!("Using overridden configuration file at '{path}'");
 
@@ -151,7 +143,7 @@ impl ProjectMetadata {
             fallback_options: None,
             config_file_override: Some(path),
             environment: ProjectEnvironment::default(),
-            use_uv,
+            use_uv: UseUv::Off,
         })
     }
 
@@ -446,16 +438,10 @@ impl ProjectMetadata {
         environment: ProjectEnvironment,
     ) -> Result<Self, ProjectMetadataError> {
         let metadata = if let Some(config_file) = self.config_file_override() {
-            Self::from_config_file_with_uv(
-                config_file.to_path_buf(),
-                self.root(),
-                system,
-                self.use_uv,
-            )?
-            .with_environment(environment)
+            Self::from_config_file(config_file.to_path_buf(), self.root(), system)?
+                .with_environment(environment)
         } else {
             Self::discover_without_uv(path, system)?
-                .with_use_uv(self.use_uv)
                 .with_uv_workspace_environment(system, environment)?
         };
 
