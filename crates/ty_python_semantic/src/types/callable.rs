@@ -599,6 +599,14 @@ pub enum CallableTypeKind {
     /// materializations from ordinary callable types in type-relation checks. It does not
     /// carry the runtime `typing.ParamSpec` instance behavior of a `ParamSpec` declaration.
     ParamSpecValue,
+
+    /// Callable objects modeled as instances of Python's `types.MethodWrapperType`.
+    ///
+    /// Accessing `__call__` on a bound method or method descriptor produces a method wrapper.
+    /// It retains the original callable's precise signatures, is always truthy, and exposes
+    /// method-wrapper attributes such as `__name__`, `__qualname__`, and `__self__`. Unlike a
+    /// function-like callable, it does not bind another receiver when stored on a class.
+    MethodWrapper,
 }
 
 /// A "policy" enum that describes how `type[]` types should be upcast
@@ -750,6 +758,10 @@ impl<'db> CallableType<'db> {
         matches!(self.kind(db), CallableTypeKind::FunctionLike)
     }
 
+    pub(crate) fn is_method_wrapper(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), CallableTypeKind::MethodWrapper)
+    }
+
     fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::DunderParamSpec)
     }
@@ -778,6 +790,10 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn into_regular(self, db: &'db dyn Db) -> CallableType<'db> {
         self.with_kind(db, CallableTypeKind::Regular)
+    }
+
+    pub(crate) fn into_method_wrapper(self, db: &'db dyn Db) -> CallableType<'db> {
+        self.with_kind(db, CallableTypeKind::MethodWrapper)
     }
 
     /// Retain every parameter signature and its generic context, but erase return types
@@ -1026,6 +1042,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
         if target.is_function_like(db) && !source.is_function_like(db) {
+            return self.never();
+        }
+        if target.is_method_wrapper(db) && !source.is_method_wrapper(db) {
             return self.never();
         }
 

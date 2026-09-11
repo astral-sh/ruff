@@ -2188,7 +2188,11 @@ impl<'db> Type<'db> {
     fn supports_self_binding(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         match self {
             Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => false,
-            Type::Callable(callable) if callable.is_function_like(db) => false,
+            Type::Callable(callable)
+                if callable.is_function_like(db) || callable.is_method_wrapper(db) =>
+            {
+                false
+            }
             _ => self.contains_self(db, env),
         }
     }
@@ -5732,9 +5736,12 @@ impl<'db> Type<'db> {
                 }
                 Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => match name_str {
                     "__func__" | "__wrapped__" => Place::bound(wrapper.wrapped(db)).into(),
-                    "__call__" if let Some(callables) = wrapper.callables(db, env) => {
-                        Place::bound(callables.into_type(db, env)).into()
-                    }
+                    "__call__" if let Some(callables) = wrapper.callables(db, env) => Place::bound(
+                        callables
+                            .map(|callable| callable.into_method_wrapper(db))
+                            .into_type(db, env),
+                    )
+                    .into(),
                     _ => wrapper
                         .instance_fallback(db, env)
                         .member_lookup_with_policy_and_receiver(
@@ -5745,7 +5752,14 @@ impl<'db> Type<'db> {
                     "__self__" => Place::bound(bound_method.self_instance(db)).into(),
                     "__func__" => Place::bound(bound_method.func(db)).into(),
                     "__call__" if let Some(callables) = bound_method.callables(db, env) => {
-                        Place::bound(callables.into_type(db, env)).into()
+                        // The extracted method wrapper does not bind another receiver when
+                        // stored on a class, even if the underlying callable is function-like.
+                        Place::bound(
+                            callables
+                                .map(|callable| callable.into_method_wrapper(db))
+                                .into_type(db, env),
+                        )
+                        .into()
                     }
                     _ => {
                         let result = KnownClass::MethodType
@@ -5783,6 +5797,12 @@ impl<'db> Type<'db> {
 
                 Type::Callable(callable) if callable.is_function_like(db) => {
                     KnownClass::FunctionType
+                        .to_instance(db, env)
+                        .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver)
+                }
+
+                Type::Callable(callable) if callable.is_method_wrapper(db) => {
+                    KnownClass::MethodWrapperType
                         .to_instance(db, env)
                         .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver)
                 }
@@ -8472,6 +8492,9 @@ impl<'db> Type<'db> {
                 Type::DataclassDecorator(_) => KnownClass::FunctionType.to_class_literal(db, env),
                 Type::Callable(callable) if callable.is_function_like(db) => {
                     KnownClass::FunctionType.to_class_literal(db, env)
+                }
+                Type::Callable(callable) if callable.is_method_wrapper(db) => {
+                    KnownClass::MethodWrapperType.to_class_literal(db, env)
                 }
                 Type::Callable(_) | Type::DataclassTransformer(_) => {
                     KnownClass::Type.to_instance(db, env)
