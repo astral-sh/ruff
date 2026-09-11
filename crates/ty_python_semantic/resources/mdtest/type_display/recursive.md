@@ -25,7 +25,7 @@ def show(n: int):
     for _ in range(n):
         recursive = (recursive,)
     if isinstance(recursive, tuple):
-        reveal_type(recursive)  # revealed: tuple[(μ$0. tuple[$0 | Literal[0]]) | Literal[0]]
+        reveal_type(recursive)  # revealed: tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])]
         def contexts[T](
             array: list[TypeOf[recursive]],
             pair: tuple[TypeOf[recursive], TypeOf[recursive]],
@@ -34,34 +34,36 @@ def show(n: int):
             complement: Not[TypeOf[recursive]],
             callback: Callable[[TypeOf[recursive]], TypeOf[recursive]],
         ):
-            reveal_type(array)  # revealed: list[μ$0. tuple[$0 | Literal[0]]]
-            reveal_type(pair)  # revealed: tuple[μ$0. tuple[$0 | Literal[0]], μ$0. tuple[$0 | Literal[0]]]
-            reveal_type(union)  # revealed: (μ$0. tuple[$0 | Literal[0]]) | int
-            reveal_type(intersection)  # revealed: (μ$0. tuple[$0 | Literal[0]]) & T@contexts
-            reveal_type(complement)  # revealed: ~(μ$0. tuple[$0 | Literal[0]])
-            reveal_type(callback)  # revealed: (μ$0. tuple[$0 | Literal[0]], /) -> μ$0. tuple[$0 | Literal[0]]
+            reveal_type(array)  # revealed: list[tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])]]
+            # revealed: tuple[tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])], tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])]]
+            reveal_type(pair)
+            reveal_type(union)  # revealed: tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])] | int
+            reveal_type(intersection)  # revealed: tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])] & T@contexts
+            reveal_type(complement)  # revealed: ~tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])]
+            # revealed: (tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])], /) -> tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])]
+            reveal_type(callback)
 ```
 
 ## Unions containing recursive types
 
-A union containing an anonymous recursive type uses a consistent display order, including when the
-recursive type is nested inside a tuple. Reversing the conditional's branches preserves that order.
+A conditional expression's union follows the order of its branches, including when a branch's type
+contains an anonymous recursive type inside a tuple.
 
 ```py
 def outer(flag: bool, values: list[int]):
     value = 0
     for _ in values:
         value = (value,)
-    # revealed: tuple[(μ$0. tuple[$0 | Literal[0]]) | Literal[0]] | Literal["other"]
+    # revealed: tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])] | Literal["other"]
     reveal_type((value,) if flag else "other")
-    # revealed: tuple[(μ$0. tuple[$0 | Literal[0]]) | Literal[0]] | Literal["other"]
+    # revealed: Literal["other"] | tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])]
     reveal_type("other" if flag else (value,))
 ```
 
 ## Truncated recursive bodies
 
-Abbreviating a long recursive body in a diagnostic preserves the order of the surrounding union,
-even when the omitted alternatives contain all references to its binder.
+Abbreviating a long union inside a tuple keeps the outer alternatives visible, even when the omitted
+elements contain the recursive type.
 
 ```py
 class A: ...
@@ -80,14 +82,14 @@ class Container:
         self.value = (self.value,)
 
 def inspect(container: Container, flag: bool):
-    # error: [invalid-assignment] "tuple[μ$0. tuple[$0] | A | B | ... omitted 4 union elements] | z"
+    # error: [invalid-assignment] "tuple[A | B | C | ... omitted 4 union elements] | z"
     value: str = (container.value,) if flag else z()
 ```
 
 ## Unions of class objects
 
-Class-object alternatives inside a recursive type are displayed in a consistent order, including
-when they are grouped under a single `type[...]` annotation.
+Class-object alternatives are grouped under a single `type[...]` annotation, both outside the
+recursive tuple and within its body.
 
 ```py
 class A: ...
@@ -101,5 +103,5 @@ class Container:
         self.value = (self.value,)
 
 def inspect(container: Container):
-    reveal_type(container.value)  # revealed: μ$0. tuple[$0] | type[A | B]
+    reveal_type(container.value)  # revealed: type[B | A] | tuple[μ$0. tuple[$0] | type[A | B]]
 ```

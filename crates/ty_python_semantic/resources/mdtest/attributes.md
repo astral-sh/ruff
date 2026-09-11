@@ -4919,7 +4919,7 @@ class C:
     def f(self, other: "C"):
         self.x = (other.x, 1)
 
-reveal_type(C().x)  # revealed: μ$0. tuple[$0, int]
+reveal_type(C().x)  # revealed: tuple[μ$0. tuple[$0, int], int]
 reveal_type(C().x[0])  # revealed: μ$0. tuple[$0, int]
 reveal_type(C().x[0][1])  # revealed: int
 wrong: str = C().x[0][1]  # error: [invalid-assignment]
@@ -4935,7 +4935,7 @@ class WithInitial:
     def update(self, other: "WithInitial"):
         self.value = (other.value, "b")
 
-reveal_type(WithInitial().value)  # revealed: μ$0. tuple[$0, str] | int
+reveal_type(WithInitial().value)  # revealed: int | tuple[μ$0. tuple[$0, str] | int, str]
 ```
 
 A helper function can also construct the recursive tuple:

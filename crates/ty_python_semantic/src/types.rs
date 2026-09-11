@@ -461,8 +461,8 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
     /// Number of nested recursive binders entered during a structural substitution.
-    /// Starts at 0 in the unfolded body or closed binding input, excluding the target
-    /// binder itself. Unfolding replaces variables at this index; binding creates them.
+    /// Starts at 0 inside the target binder's body. References at this depth belong
+    /// to the target binder rather than a nested one.
     recursive_depth: u32,
     /// Closed backedges retained while transforming a simultaneous recursive binder.
     recursive_roots: Vec<RecursiveType<'db>>,
@@ -6616,15 +6616,6 @@ impl<'db> Type<'db> {
                         }
                     });
 
-                    // `Self` is fixed by the receiver, before other arguments can widen it.
-                    let overloads = overloads.map(|overload| {
-                        overload.apply_self_with_receiver(
-                            db,
-                            env,
-                            self_instance,
-                            bound_method.typing_self_type(db),
-                        )
-                    });
                     CallableBinding::from_overloads(self, overloads)
                         .with_bound_type(self_instance)
                         .into()

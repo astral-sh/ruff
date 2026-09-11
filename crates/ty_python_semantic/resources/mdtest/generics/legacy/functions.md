@@ -1662,70 +1662,6 @@ def forward_nominal_reversed(specific: Callable[[SNominal], None], redundant: Ca
     return result
 ```
 
-## Reconstructing inferred recursive trees
-
-The callback below gives an inferred tree type whose leaves are integers. Reconstructing one or two
-tuple levels preserves that recursive type. The result is not assignable to `str`.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Callable, TypeVar
-from ty_extensions._internal import TypeOf, is_equivalent_to
-
-T = TypeVar("T")
-U = TypeVar("U")
-
-def fixed(callback: Callable[[T], tuple[T] | int]) -> T:
-    raise NotImplementedError
-
-def identity(value: U) -> U:
-    return value
-
-root = fixed(identity)
-reveal_type(root)  # revealed: μ$0. tuple[$0] | int
-
-def reconstruct(value: TypeOf[root], flag: bool, leaf: int):
-    once = (value,) if flag else leaf
-    twice = (once,) if flag else leaf
-    reveal_type(once)  # revealed: μ$0. tuple[$0] | int
-    reveal_type(twice)  # revealed: μ$0. tuple[$0] | int
-    reveal_type(is_equivalent_to(TypeOf[value], TypeOf[once]))  # revealed: ConstraintSet[Literal[True]]
-    reveal_type(is_equivalent_to(TypeOf[value], TypeOf[twice]))  # revealed: ConstraintSet[Literal[True]]
-    wrong: str = twice  # error: [invalid-assignment]
-```
-
-## Reconstructing inferred tuple-only recursive types
-
-Without an integer alternative, the callback gives a tuple-only recursive type. Wrapping it in
-another tuple preserves the same recursive type.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Callable, TypeVar
-
-T = TypeVar("T")
-U = TypeVar("U")
-
-def fixed(callback: Callable[[T], tuple[T]]) -> T:
-    raise NotImplementedError
-
-def identity(value: U) -> U:
-    return value
-
-root = fixed(identity)
-reveal_type(root)  # revealed: μ$0. tuple[$0]
-reveal_type((root,))  # revealed: μ$0. tuple[$0]
-reveal_type(((root,),))  # revealed: μ$0. tuple[$0]
-```
-
 ## Incompatible constraint sets
 
 But a constrained TypeVar with constraints not satisfied by the formal TypeVar should still error:
@@ -1875,4 +1811,118 @@ def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     # TODO: We only report the first error here, but we should report both.
     # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1` does not satisfy upper bound `Base` of type variable `T`"
     reveal_type(first(x))  # revealed: Unknown
+```
+
+## Inferring recursive callback solutions
+
+Passing the identity function relates the argument and return types of the callback. The inferred
+result is an integer or a tuple containing another such value. Subscribing the tuple recovers that
+same recursive type, and the result cannot be assigned to `str`.
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def fixed(callback: Callable[[T], tuple[T] | int]) -> T:
+    raise NotImplementedError
+
+def identity(value: U) -> U:
+    return value
+
+root = fixed(identity)
+reveal_type(root)  # revealed: μ$0. tuple[$0] | int
+if isinstance(root, tuple):
+    reveal_type(root)  # revealed: tuple[μ$0. tuple[$0] | int]
+    reveal_type(root[0])  # revealed: μ$0. tuple[$0] | int
+wrong: str = root  # error: [invalid-assignment]
+```
+
+## Recursive callback solutions through implicit aliases
+
+The callback's return type contains an implicit recursive alias. Its argument can refer to the
+inferred result: the outer tuple guards that reference. Subscribing the result retains the recursive
+relationship, and the result cannot be assigned to `str`.
+
+```py
+from typing import Callable, TypeAlias, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+Repeated: TypeAlias = V | tuple["Repeated[V]"]
+
+def fixed(callback: Callable[[T], tuple[Repeated[T]] | int]) -> T:
+    raise NotImplementedError
+
+def identity(value: U) -> U:
+    return value
+
+root = fixed(identity)
+reveal_type(root)  # revealed: μ$0. tuple[Repeated[$0]] | int
+if isinstance(root, tuple):
+    reveal_type(root[0])  # revealed: μ$0. Repeated[tuple[$0] | int]
+wrong: str = root  # error: [invalid-assignment]
+```
+
+## Aliased lower bounds in recursive callbacks
+
+Passing the identity function requires `Retained[T]` to be a subtype of `T`. The intersection is
+already a subtype of `T`, so `int` is the smallest solution. We currently retain an unsolved type
+variable; introducing a recursive type here would leave a cycle outside any container.
+
+```py
+from typing import Callable, TypeVar
+from typing_extensions import TypeAliasType
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+Retained = TypeAliasType("Retained", int | Intersection[V, tuple[V]], type_params=(V,))
+
+def fixed(callback: Callable[[Retained[T]], T]) -> T:
+    raise NotImplementedError
+
+def identity(value: U) -> U:
+    return value
+
+root = fixed(identity)
+# TODO: Infer int by simplifying the lower bound.
+reveal_type(root)  # revealed: int | (T@fixed & tuple[T@fixed])
+wrong: str = root  # error: [invalid-assignment]
+```
+
+## Specializing inferred recursive values
+
+The inferred recursive attribute retains the class's type parameter. Access through a specialized
+instance substitutes that parameter throughout the recursive type, including after subscripting. The
+two specializations remain independent.
+
+```py
+from typing import Callable, Generic, TypeVar, cast
+
+T = TypeVar("T")
+E = TypeVar("E")
+U = TypeVar("U")
+
+def fixed(callback: Callable[[T], tuple[T, E] | E], leaf: E) -> T:
+    raise NotImplementedError
+
+def identity(value: U) -> U:
+    return value
+
+class Tree(Generic[E]):
+    node = fixed(identity, cast(E, None))
+    reveal_type(node)  # revealed: μ$0. tuple[$0, E@Tree] | E@Tree
+
+first = Tree[int]().node
+second = Tree[str]().node
+reveal_type(first)  # revealed: μ$0. tuple[$0, int] | int
+reveal_type(second)  # revealed: μ$0. tuple[$0, str] | str
+if isinstance(first, tuple):
+    reveal_type(first[0])  # revealed: μ$0. tuple[$0, int] | int
+    reveal_type(first[1])  # revealed: int
+wrong: str = first  # error: [invalid-assignment]
 ```

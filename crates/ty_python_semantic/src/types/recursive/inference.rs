@@ -8,8 +8,8 @@
 //! approximated rather than solved. This traversal does not force lazy alias or member definitions.
 //! These are termination limits, not tests for whether a recursive type has a solution.
 //!
-//! A solver result is used only when there is one complete solution path and its root type
-//! contains neither unresolved equation variables nor inference references. Otherwise,
+//! A solver result is used only when its root is resolved within the type budget and
+//! contains no inference references. Otherwise,
 //! unresolved backedges are replaced with `Divergent`, retaining outer constructors where
 //! possible. A solving query that still cycles after `TAINTED_CYCLES` iterations falls back
 //! to a single `Divergent` marker.
@@ -30,7 +30,8 @@ use ty_python_core::definition::Definition;
 use super::operations::RecursiveOperations;
 use super::{RecursiveMapping, RecursiveOrigin, RecursiveSubstitution, RecursiveType};
 use crate::types::class::ImplicitAttributeName;
-use crate::types::constraints::{SolutionPaths, Solutions, TypeVarSolution};
+use crate::types::constraints::TypeVarSolution;
+use crate::types::constraints::resolution::SolutionType;
 use crate::types::generics::walk_specialization_types;
 use crate::types::infer::{InferExpression, infer_definition_types, infer_expression_types_impl};
 use crate::types::visitor::{TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type};
@@ -220,7 +221,8 @@ impl<'db> InferenceKey<'db> {
 
     fn solve(self, db: &'db dyn Db) -> InferenceSolution<'db> {
         let env = self.environment(db);
-        let (equations, complete) = self.equations(db, self.equation(db));
+        let root = self.equation(db);
+        let (equations, complete) = self.equations(db, root);
         // Gradual equations still need a bound on materialization, but approximation
         // follows their dependencies to retain the known constructors.
         if !complete
@@ -260,44 +262,15 @@ impl<'db> InferenceKey<'db> {
             });
         }
         let result = match &TypeVarSolution::solve_equations(db, &env, &symbolic) {
-            Ok(Solutions::Constrained(SolutionPaths::Complete(paths)))
-                if let [solution] = paths.as_slice() =>
-            {
-                solution
-                    .iter()
-                    .find(|binding| binding.bound_typevar == variables[0])
-                    .map(|binding| binding.solution)
-            }
+            Ok(solution) if let Some(SolutionType::Resolved(ty)) = solution.first() => Some(*ty),
             _ => None,
         };
-        let result = result.filter(|ty| {
-            !any_over_type(
-                db,
-                &env,
-                *ty,
-                false,
-                |ty| matches!(ty, Type::TypeVar(variable) if variables.contains(&variable)),
-            ) && !RecursiveInputs::contains(db, &env, [*ty])
-        });
+        let result = result.filter(|ty| !RecursiveInputs::contains(db, &env, [*ty]));
         let Some(ty) = result else {
             return self.approximate_equation(db, &equations);
         };
-        // Expose constructors behind Boolean dependencies while retaining query-owned
-        // backedges, so ordinary operations do not repeatedly embed closed solutions.
-        TypeVarSolution::normalize_equations(db, &env, &mut symbolic);
-        let replacements: Vec<_> = replacements
-            .into_iter()
-            .map(|(reference, variable)| (variable, reference))
-            .collect();
-        // Structural substitution avoids solving the reinserted query references.
-        let mapping = TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Replace(
-            &replacements,
-        )));
-        let unfolded =
-            symbolic[0]
-                .solution
-                .apply_type_mapping(db, &env, &mapping, TypeContext::default());
-        InferenceSolution { ty, unfolded }
+        // Retain query-owned backedges instead of embedding the closed solution in its equation.
+        InferenceSolution { ty, unfolded: root }
     }
 }
 

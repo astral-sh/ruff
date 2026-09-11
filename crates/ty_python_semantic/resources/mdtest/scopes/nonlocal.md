@@ -834,5 +834,5 @@ def outer():
         nonlocal value
         value = (value,)
 
-    reveal_type(value)  # revealed: (μ$0. tuple[$0 | Literal[0]]) | Literal[0]
+    reveal_type(value)  # revealed: Literal[0] | (μ$0. tuple[$0 | Literal[0]])
 ```

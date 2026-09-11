@@ -205,11 +205,13 @@ def chain_stu[S, T, U]() -> None:
     static_assert(chain == linked)
 
     constraints = chain & ConstraintSet.lower_bound(int, S) & ConstraintSet.upper_bound(U, int)
-    # revealed: tuple[Solution[S=int]]
+    # TODO: inferable typevars should not remain in these concrete solutions.
+    # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_stu | T@chain_stu]]
+    # revealed: tuple[Solution[S=int | T@chain_stu | U@chain_stu]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
-    # revealed: tuple[Solution[T=int]]
+    # revealed: tuple[Solution[T=S@chain_stu | int | U@chain_stu]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
-    # revealed: tuple[Solution[U=int]]
+    # revealed: tuple[Solution[U=S@chain_stu | int | T@chain_stu]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
 
 def chain_uts[U, T, S]() -> None:
@@ -219,11 +221,13 @@ def chain_uts[U, T, S]() -> None:
     static_assert(chain == linked)
 
     constraints = chain & ConstraintSet.lower_bound(int, S) & ConstraintSet.upper_bound(U, int)
-    # revealed: tuple[Solution[S=int]]
+    # TODO: inferable typevars should not remain in these concrete solutions.
+    # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_uts | T@chain_uts]]
+    # revealed: tuple[Solution[S=int | T@chain_uts | U@chain_uts]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
-    # revealed: tuple[Solution[T=int]]
+    # revealed: tuple[Solution[T=S@chain_uts | int | U@chain_uts]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
-    # revealed: tuple[Solution[U=int]]
+    # revealed: tuple[Solution[U=S@chain_uts | int | T@chain_uts]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
 ```
 
@@ -498,7 +502,7 @@ def high_fanout[
     # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
     # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
     # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 4, 5, 6, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
-    # revealed: tuple[Solution[P=Literal[0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 1]]]
+    # revealed: tuple[Solution[P=Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]]]
     reveal_type(pivot)
 
     # TODO: sometimes: revealed tuple[Solution[R11=P@high_fanout]]

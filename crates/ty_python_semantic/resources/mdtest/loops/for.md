@@ -1823,7 +1823,7 @@ def nest(n: int):
     value = 0
     for _ in range(n):
         value = (value,)
-    reveal_type(value)  # revealed: (μ$0. tuple[$0 | Literal[0]]) | Literal[0]
+    reveal_type(value)  # revealed: Literal[0] | (μ$0. tuple[$0 | Literal[0]])
     if isinstance(value, tuple):
         reveal_type(len(value))  # revealed: Literal[1]
         if len(value) == 0:
@@ -1968,7 +1968,7 @@ def nest(initial: Any, n: int):
     value = initial
     for _ in range(n):
         value = (value,)
-    reveal_type(value)  # revealed: tuple[Divergent] | Any
+    reveal_type(value)  # revealed: Any | tuple[Divergent]
 ```
 
 ### Unpacking recursively built tuples
@@ -2000,7 +2000,7 @@ def grow(n: int):
         left = (*right, left)
         right = (*previous, 1)
     reveal_type(len(left))  # revealed: int
-    # revealed: tuple[Literal["begin"]] | tuple[*tuple[μ{$0; $1 = tuple[*tuple[$0, ...], $1 | tuple[Literal[0]]]}. $1 | Literal[0, 1, "begin"] | tuple[Literal[0]], ...], Literal[1]]
+    # revealed: tuple[Literal["begin"]] | tuple[*tuple[Literal[0, 1, "begin"] | tuple[Literal[0]] | (μ$0. tuple[*tuple[$0 | Literal[0, 1, "begin"] | tuple[Literal[0]], ...], $0 | tuple[Literal[0]]]), ...], Literal[1]]
     reveal_type(right)
     reveal_type(right[-1])  # revealed: Literal["begin", 1]
     if isinstance(left[-1], tuple):
@@ -2041,9 +2041,9 @@ def build(n: int):
         previous = left
         left = (right, 1)
         right = (previous, "end")
-    # revealed: (μ$0. tuple[tuple[$0 | Literal[1], Literal["end"]] | Literal["start"], Literal[1]]) | Literal[1]
+    # revealed: Literal[1] | (μ$0. tuple[tuple[$0 | Literal[1], Literal["end"]] | Literal["start"], Literal[1]])
     reveal_type(left)
-    # revealed: (μ$0. tuple[tuple[$0 | Literal["start"], Literal[1]] | Literal[1], Literal["end"]]) | Literal["start"]
+    # revealed: Literal["start"] | (μ$0. tuple[tuple[$0 | Literal["start"], Literal[1]] | Literal[1], Literal["end"]])
     reveal_type(right)
 ```
 

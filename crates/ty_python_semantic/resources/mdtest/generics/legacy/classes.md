@@ -1897,6 +1897,8 @@ Each iteration nests the previous value in a tuple with another item. Reading th
 a specialized class preserves the tuple and specializes its nonrecursive item, even when the
 recursive part is approximated.
 
+TODO: Preserve the recursive type when specializing the attribute.
+
 ```py
 from typing import Generic, TypeVar
 
@@ -1910,7 +1912,7 @@ class Tree(Generic[T]):
         self.value = value
 
 def inspect(tree: Tree[int]):
-    reveal_type(tree.value)  # revealed: tuple[tuple[Divergent | int, int] | int, int] | int
+    reveal_type(tree.value)  # revealed: int | tuple[int | Divergent, int]
     if isinstance(tree.value, tuple):
         reveal_type(tree.value[1])  # revealed: int
         wrong: str = tree.value[1]  # error: [invalid-assignment]

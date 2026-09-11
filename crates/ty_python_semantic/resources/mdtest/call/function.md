@@ -165,70 +165,11 @@ cn = compose(fn, fn, fn, fn, fn, fn, fn)
 reveal_type(cn)  # revealed: (int, /) -> int
 ```
 
-## Recursive callback solutions
-
-An identity callback can satisfy a signature returning a tuple of its input when the inferred input
-is a recursive tuple type. Indexing that tuple returns the same type. It remains incompatible with
-`int`, so the recursive solution is not a dynamic fallback.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from collections.abc import Callable
-
-def fixed[T](callback: Callable[[T], tuple[T]]) -> T:
-    raise NotImplementedError
-
-def identity[U](value: U) -> U:
-    return value
-
-recursive = fixed(identity)
-reveal_type(recursive)  # revealed: μ$0. tuple[$0]
-reveal_type(recursive[0])  # revealed: μ$0. tuple[$0]
-reveal_type(recursive[0][0])  # revealed: μ$0. tuple[$0]
-
-def takes_int(value: int) -> None: ...
-
-takes_int(recursive)  # error: [invalid-argument-type]
-```
-
-## Specializing recursive callback solutions
-
-A recursive solution can retain a type parameter from an enclosing class. Specializing the class
-also specializes that parameter throughout both mutually recursive types.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from collections.abc import Callable
-
-def fixed[T, U, E](callback: Callable[[T, U], tuple[tuple[T, U], list[tuple[T, U, E]]]], element: E) -> tuple[T, U]:
-    raise NotImplementedError
-
-def identity[A, B](left: A, right: B) -> tuple[A, B]:
-    return left, right
-
-class Container[E]:
-    def __init__(self, element: E):
-        self.recursive = fixed(identity, element)
-
-reveal_type(Container(1).recursive[1][0][2])  # revealed: int
-reveal_type(Container("s").recursive[1][0][2])  # revealed: str
-reveal_type(Container(1).recursive[0][1][0][2])  # revealed: int
-reveal_type(Container("s").recursive[0][1][0][2])  # revealed: str
-```
-
 ## Recursive callable constraints in constructors
 
 When inferring the generic constructor for `map`, an overloaded callable together with a gradual
-iterable can produce recursive constraints. Solving these constraints retains the `int` return type
-of the applicable addition overload.
+iterable can produce expanding recursive constraints. We should fall back rather than repeatedly
+substituting those constraints.
 
 ```py
 import operator
@@ -237,7 +178,7 @@ from typing import Any
 ints: list[int] = []
 dynamic: Any = []
 
-reveal_type(map(operator.add, ints, dynamic))  # revealed: map[int]
+reveal_type(map(operator.add, ints, dynamic))  # revealed: map[Unknown]
 ```
 
 ## Generic overloaded callable constraints in constructors

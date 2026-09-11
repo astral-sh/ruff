@@ -319,16 +319,6 @@ struct TypeDetailsWriter<'db> {
 }
 
 impl<'db> TypeDetailsWriter<'db> {
-    /// Buffer a display once so label comparisons can reuse its text and navigation ranges.
-    fn render(value: &impl FmtDetailed<'db>) -> TypeDisplayDetails<'db> {
-        let mut writer = TypeWriter::Details(Self::new());
-        value.fmt_detailed(&mut writer).unwrap();
-        match writer {
-            TypeWriter::Details(details) => details.finish_type_details(),
-            TypeWriter::Formatter(_) => unreachable!("Expected Details variant"),
-        }
-    }
-
     fn new() -> Self {
         Self {
             label: String::new(),
@@ -436,20 +426,6 @@ trait FmtDetailed<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result;
 }
 
-impl<'db> FmtDetailed<'db> for TypeDisplayDetails<'db> {
-    fn fmt_detailed(&self, writer: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        if let TypeWriter::Details(details) = writer {
-            let offset = details.label.text_len();
-            details
-                .targets
-                .extend(self.targets.iter().map(|range| *range + offset));
-            details.details.extend(self.details.iter().cloned());
-            details.is_valid_syntax &= self.is_valid_syntax;
-        }
-        writer.write_str(&self.label)
-    }
-}
-
 struct Join<'a, 'b, 'c, 'db> {
     fmt: &'c mut TypeWriter<'a, 'b, 'db>,
     separator: &'static str,
@@ -486,7 +462,6 @@ impl<'db> Join<'_, '_, '_, 'db> {
     }
 }
 
-#[derive(Clone)]
 pub enum TypeDetail<'db> {
     /// Dummy item to indicate a function signature's parameters have started
     SignatureStart,
@@ -786,7 +761,13 @@ impl<'db> DisplayType<'_, 'db> {
     }
 
     pub fn to_string_parts(&self) -> TypeDisplayDetails<'db> {
-        TypeDetailsWriter::render(self)
+        let mut f = TypeWriter::Details(TypeDetailsWriter::new());
+        self.fmt_detailed(&mut f).unwrap();
+
+        match f {
+            TypeWriter::Details(details) => details.finish_type_details(),
+            TypeWriter::Formatter(_) => unreachable!("Expected Details variant"),
+        }
     }
 }
 
@@ -3132,13 +3113,24 @@ fn subclass_of_known_class(db: &dyn Db, subclass_of: SubclassOfType<'_>) -> Opti
 
 impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        fn duplicate_ambiguous_labels<'a>(
-            element_labels: &'a [Option<TypeDisplayDetails<'_>>],
-        ) -> FxHashSet<&'a str> {
+        fn singleline_union_element_label<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            element: Type<'db>,
+            settings: &DisplaySettings<'db>,
+        ) -> String {
+            element
+                .display_with(db, env, settings.singleline())
+                .to_string()
+        }
+
+        fn duplicate_ambiguous_labels(element_labels: &[Option<String>]) -> FxHashSet<&str> {
             let mut counts: FxHashMap<&str, usize> = FxHashMap::default();
-            for display in element_labels.iter().flatten() {
-                *counts.entry(&display.label).or_default() += 1;
+
+            for label in element_labels.iter().flatten() {
+                *counts.entry(&**label).or_default() += 1;
             }
+
             counts
                 .into_iter()
                 .filter_map(|(label, count)| (count > 1).then_some(label))
@@ -3177,14 +3169,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 (self.condensable_literals(element).is_none()
                     && !element.is_subclass_of()
                     && !is_numeric_tower_element(element))
-                .then(|| {
-                    TypeDetailsWriter::render(&DisplayMaybeParenthesizedType {
-                        ty: element,
-                        db,
-                        env: self.env,
-                        settings: self.settings.singleline(),
-                    })
-                })
+                .then(|| singleline_union_element_label(db, self.env, element, &self.settings))
             })
             .collect();
         let duplicate_ambiguous_labels = duplicate_ambiguous_labels(&element_labels);
@@ -3265,22 +3250,20 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 }
             } else {
                 displayed_entries += 1;
-                if let Some(display) = label {
-                    if duplicate_ambiguous_labels.contains(display.label.as_str())
-                        && self.settings.signature_name_display != SignatureNameDisplay::Force
-                    {
-                        join.entry(&DisplayMaybeParenthesizedType {
-                            ty: *element,
-                            db,
-                            env: self.env,
-                            settings: self.settings.singleline().force_signature_name(),
-                        });
-                    } else {
-                        // Rendering again at each union would double the work for each
-                        // level of nesting. Preserve the buffered navigation ranges too.
-                        join.entry(display);
-                    }
-                }
+                let settings = if label
+                    .as_deref()
+                    .is_some_and(|label| duplicate_ambiguous_labels.contains(label))
+                {
+                    self.settings.singleline().force_signature_name()
+                } else {
+                    self.settings.singleline()
+                };
+                join.entry(&DisplayMaybeParenthesizedType {
+                    ty: *element,
+                    db,
+                    env: self.env,
+                    settings,
+                });
             }
         }
 

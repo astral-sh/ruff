@@ -1438,36 +1438,6 @@ reveal_type(D().instance_method)
 reveal_type(D.class_method)
 ```
 
-Other arguments cannot widen the receiver's fixed `Self`. A base-class receiver accepts a subclass
-argument, but a subclass receiver rejects a base-class argument:
-
-```py
-reveal_type(C().instance_method(D()))  # revealed: C
-reveal_type(D().instance_method(D()))  # revealed: D
-D().instance_method(C())  # error: [invalid-argument-type] "Expected `D`, found `C`"
-```
-
-Inside a method, the receiver may belong to a further subclass. This also applies to `Self` nested
-inside another parameter type:
-
-```py
-from collections.abc import Mapping
-
-class Parent:
-    def accept(self, other: Self) -> Self:
-        return other
-
-    def from_mapping(self, others: Mapping[str, Self]) -> Self:
-        return others["key"]
-
-class Child(Parent):
-    def check(self):
-        self.accept(Child())  # error: [invalid-argument-type]
-        self.from_mapping({"key": Child()})  # error: [invalid-argument-type]
-        self.accept(self)
-        self.from_mapping({"key": self})
-```
-
 A generic type alias does not prevent binding `Self` in the method signature:
 
 ```py

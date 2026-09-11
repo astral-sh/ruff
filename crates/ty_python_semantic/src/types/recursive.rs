@@ -28,9 +28,9 @@ use super::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, DivergentType,
     GenericContext, MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping,
-    VarianceTerm, any_over_type,
+    VarianceTerm,
 };
-use crate::{Db, FxIndexMap, Program, ProgramEnvironment};
+use crate::{Db, FxIndexMap, FxOrderSet, Program, ProgramEnvironment};
 
 /// A reference to an alias cycle or an equation in an anonymous recursive binder.
 /// An escaping reference has no type semantics; in particular, it is neither a
@@ -153,19 +153,24 @@ enum RecursiveBinding<'db> {
 impl get_size2::GetSize for RecursiveBinding<'_> {}
 
 impl<'db> RecursiveBinding<'db> {
-    fn matches(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> bool {
-        match self {
-            Self::Alias(cycle) => {
-                matches!(recursive.origin(db), RecursiveOrigin::Alias { cycle: candidate, .. } if candidate == cycle)
-                    && recursive.materialization_kind(db).is_none()
-            }
+    fn matching_alias_cycle(
+        self,
+        db: &'db dyn Db,
+        recursive: RecursiveType<'db>,
+    ) -> Option<salsa::Id> {
+        let RecursiveOrigin::Alias { cycle, .. } = recursive.origin(db) else {
+            return None;
+        };
+        let matches = match self {
+            Self::Alias(target) => cycle == target && recursive.materialization_kind(db).is_none(),
             Self::Constructor(target) => {
                 recursive.origin(db) == target.origin(db)
                     && recursive.graph(db) == target.graph(db)
                     && recursive.materialization_kind(db) == target.materialization_kind(db)
                     && recursive.operations(db) == target.operations(db)
             }
-        }
+        };
+        matches.then_some(cycle)
     }
 }
 
@@ -489,6 +494,40 @@ impl<'db> RecursiveType<'db> {
         self.graph(db).bodies(db)[self.entry(db)]
     }
 
+    /// References exposed by the constructor, before substituting its arguments.
+    /// Local graph references select bodies; references to enclosing aliases remain exposed.
+    pub(super) fn unguarded_body_references(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+        let mut pending = vec![self.entry(db)];
+        let mut visited = FxHashSet::default();
+        let mut references = FxOrderSet::default();
+        while let Some(index) = pending.pop() {
+            if !visited.insert(index) {
+                continue;
+            }
+            for reference in self.graph(db).bodies(db)[index].unguarded_references(db) {
+                let reference = match reference {
+                    Type::RecursiveVar(variable) => match variable.target(db) {
+                        RecursiveVarTarget::Alias(cycle) if matches!(self.origin(db), RecursiveOrigin::Alias { cycle: bound, .. } if cycle == bound) =>
+                        {
+                            continue;
+                        }
+                        RecursiveVarTarget::Graph { depth, index } => {
+                            // Graph extraction keeps nested constructors closed. References to
+                            // an enclosing graph occur in the application's arguments instead.
+                            debug_assert_eq!(depth, 0);
+                            pending.push(index);
+                            continue;
+                        }
+                        RecursiveVarTarget::Alias(_) => reference,
+                    },
+                    _ => reference,
+                };
+                references.insert(reference);
+            }
+        }
+        references.into_iter().collect()
+    }
+
     /// Select another closed type in this binder without expanding its body.
     fn at(
         self,
@@ -725,21 +764,16 @@ impl<'db> RecursiveType<'db> {
                 approximation.divergent
             }
             TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(binding)))
-                if binding.matches(db, self) =>
+                if let Some(cycle) = binding.matching_alias_cycle(db, self) =>
             {
                 let arguments = self
                     .arguments(db)
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
-                let target = match self.origin(db) {
-                    RecursiveOrigin::Alias { cycle, .. } => RecursiveVarTarget::Alias(cycle),
-                    RecursiveOrigin::ConstraintSolution(_)
-                    | RecursiveOrigin::Inference(_)
-                    | RecursiveOrigin::InferenceCycle { .. } => RecursiveVarTarget::Graph {
-                        depth: visitor.recursive_depth,
-                        index: self.entry(db),
-                    },
-                };
-                Type::RecursiveVar(RecursiveVar::new_internal(db, target, arguments))
+                Type::RecursiveVar(RecursiveVar::new_internal(
+                    db,
+                    RecursiveVarTarget::Alias(cycle),
+                    arguments,
+                ))
             }
             TypeMapping::Recursive(RecursiveMapping(substitution)) => {
                 let graph = if matches!(self.origin(db), RecursiveOrigin::Alias { cycle, .. }
@@ -1162,25 +1196,7 @@ impl<'db> TypeVisitor<'db> for RecursiveReferences<'_, 'db> {
     }
 }
 
-impl<'db> Type<'db> {
-    /// Fold constructor prefixes onto existing anonymous recursive graph entries.
-    pub(super) fn normalize_recursive(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Self {
-        if !any_over_type(
-            db,
-            env,
-            self,
-            false,
-            |ty| matches!(ty, Type::Recursive(recursive) if recursive.alias(db).is_none()),
-        ) {
-            return self;
-        }
-        RecursiveGraphBuilder::normalize(db, env, self)
-    }
-
+impl Type<'_> {
     /// Reject a bare recursive variable at a semantic-operation boundary.
     pub(super) const fn assert_not_recursive_var(self) {
         debug_assert!(

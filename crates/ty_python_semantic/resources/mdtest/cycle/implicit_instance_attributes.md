@@ -45,11 +45,11 @@ class Tree:
         value = 0
         for _ in range(count):
             value = (value, 1)
-        # revealed: (μ$0. tuple[$0 | Literal[0], Literal[1]]) | Literal[0]
+        # revealed: Literal[0] | (μ$0. tuple[$0 | Literal[0], Literal[1]])
         reveal_type(value)
         self.value = value
 
-reveal_type(Tree(1).value)  # revealed: μ$0. tuple[$0, int] | int
+reveal_type(Tree(1).value)  # revealed: int | (μ$0. tuple[$0 | int, int])
 
 def inspect(tree: Tree):
     value = tree.value
@@ -74,7 +74,7 @@ class Classes:
             value = (value, Token)
         self.value = value
 
-reveal_type(Classes(1).value)  # revealed: μ$0. tuple[$0, type[Token]] | type[Token]
+reveal_type(Classes(1).value)  # revealed: type[Token] | (μ$0. tuple[$0 | type[Token], type[Token]])
 ```
 
 ## Class literals in self-referential instance attributes
@@ -89,13 +89,13 @@ class Nested:
     def update(self, other: "Nested"):
         self.value = (other.value, Token, 1)
 
-reveal_type(Nested().value)  # revealed: μ$0. tuple[$0, type[Token], int]
+reveal_type(Nested().value)  # revealed: tuple[μ$0. tuple[$0, type[Token], int], type[Token], int]
 reveal_type(Nested().value[0][1])  # revealed: type[Token]
 reveal_type(Nested().value[0][2])  # revealed: int
 
 class Child(Nested): ...
 
-reveal_type(Child().value)  # revealed: μ$0. tuple[$0, type[Token], int]
+reveal_type(Child().value)  # revealed: tuple[μ$0. tuple[$0, type[Token], int], type[Token], int]
 ```
 
 ## Self-referential class attributes
@@ -262,8 +262,8 @@ static_assert(is_equivalent_to(TypeOf[Ring().d], D))  # error: [static-assert-er
 
 ## Mutually recursive attributes with the same type
 
-Two attributes can refer to each other and have the same recursive type. Each type is displayed with
-a single `μ` binder.
+Two attributes can refer to each other and have the same recursive type. Each is displayed with one
+tuple layer unfolded around the recursive type.
 
 ```py
 class Same:
@@ -275,15 +275,14 @@ class Same:
         self.left = (other.right,)
         self.right = (other.left,)
 
-reveal_type(Same().left)  # revealed: μ$0. tuple[$0] | int
-reveal_type(Same().right)  # revealed: μ$0. tuple[$0] | int
+reveal_type(Same().left)  # revealed: int | tuple[μ$0. tuple[$0] | int]
+reveal_type(Same().right)  # revealed: int | tuple[μ$0. tuple[$0] | int]
 ```
 
 ## Self-reference and mutual references
 
 An attribute can refer both to itself and to another recursively defined attribute. The inferred
-types preserve the initial values at each level. The type of `a` is displayed with one `μ` binder.
-Starting from `b`, the display uses two bound variables to name the shared recursive type of `a`.
+types preserve the initial values at each level and are equivalent to the explicit aliases below.
 
 ```toml
 [environment]
@@ -302,8 +301,9 @@ class Branches:
         self.a = (other.a, other.b)
         self.b = (other.a,)
 
-reveal_type(Branches().a)  # revealed: μ$0. tuple[$0, tuple[$0] | str] | int
-reveal_type(Branches().b)  # revealed: μ{$0; $1 = tuple[$1, $0] | int}. tuple[$1] | str
+# revealed: int | tuple[μ$0. tuple[$0, tuple[$0] | str] | int, μ{$0; $1 = tuple[$1, $0] | int}. tuple[$1] | str]
+reveal_type(Branches().a)
+reveal_type(Branches().b)  # revealed: str | tuple[μ$0. tuple[$0, tuple[$0] | str] | int]
 
 type A = int | tuple[A, B]
 type B = str | tuple[A]
