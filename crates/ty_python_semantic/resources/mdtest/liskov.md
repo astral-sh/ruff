@@ -2291,115 +2291,57 @@ info: incompatible return types: `object` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 
-Overwriting an instance method with a staticmethod, or vice versa, is an error:
+We explicitly allow overwriting between instance methods, staticmethods and classmethods, as long as
+the "bound" signatures (when accessed on an instance) are compatible. See
+<https://github.com/astral-sh/ty/issues/4341> for why this is not sound in all cases. In the future,
+we might want to consider adding a new (strict) rule to disallow overwriting of instance methods
+with classmethod/staticmethods, and vice-versa, in particular.
 
 ```pyi
-class BadChild1A(Parent):
+class GoodChild3A(Parent):
+    @staticmethod
+    def instance_method(x: int) -> int: ...
+
+class GoodChild3B(Parent):
+    @classmethod
+    def instance_method(cls, x: int) -> int: ...
+
+class GoodChild3C(Parent):
+    def class_method(self, x: int) -> int: ...
+
+class GoodChild3D(Parent):
+    @staticmethod
+    def class_method(x: int) -> int: ...
+
+class GoodChild3E(Parent):
+    def static_method(self, x: int) -> int: ...
+
+class GoodChild3F(Parent):
+    @classmethod
+    def static_method(cls, x: int) -> int: ...
+```
+
+However, if the signature does not match, we emit a useful error message:
+
+```pyi
+class BadSignature1(Parent):
     @staticmethod
     def instance_method(self, x: int) -> int: ...  # snapshot: invalid-method-override
 ```
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `instance_method`
-  --> src/mdtest_snippet.pyi:27:9
+  --> src/mdtest_snippet.pyi:48:9
    |
-27 |     def instance_method(self, x: int) -> int: ...  # snapshot: invalid-method-override
+48 |     def instance_method(self, x: int) -> int: ...  # snapshot: invalid-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.instance_method`
    |
   ::: src/mdtest_snippet.pyi:2:9
    |
  2 |     def instance_method(self, x: int) -> int: ...
    |         ------------------------------------ `Parent.instance_method` defined here
-info: `BadChild1A.instance_method` is a staticmethod but `Parent.instance_method` is an instance method
-info: This violates the Liskov Substitution Principle
-```
-
-```pyi
-class BadChild1B(Parent):
-    def static_method(x: int) -> int: ...  # snapshot: invalid-method-override
-```
-
-```snapshot
-error[invalid-method-override]: Invalid override of method `static_method`
-  --> src/mdtest_snippet.pyi:29:9
-   |
-29 |     def static_method(x: int) -> int: ...  # snapshot: invalid-method-override
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.static_method`
-   |
-  ::: src/mdtest_snippet.pyi:6:9
-   |
- 6 |     def static_method(x: int) -> int: ...
-   |         ---------------------------- `Parent.static_method` defined here
-info: `BadChild1B.static_method` is an instance method but `Parent.static_method` is a staticmethod
-info: This violates the Liskov Substitution Principle
-```
-
-Overwriting a classmethod with an instance method is also an error: Although the method has the same
-signature as `Parent.class_method` when accessed on instances, it does not have the same signature
-as `Parent.class_method` when accessed on the class object itself:
-
-```pyi
-class BadChild2A(Parent):
-    # TODO: we should emit `invalid-method-override` here.
-    def class_method(cls, x: int) -> int: ...
-```
-
-Conversely, overwriting an instance method with a classmethod is also an error: Although the method
-has the same signature as `Parent.class_method` when accessed on instances, it does not have the
-same signature as `Parent.class_method` when accessed on the class object itself.
-
-Note that whereas `BadChild2A.class_method` is reported as a Liskov violation by mypy, pyright and
-pyrefly, pyright is the only one of those three to report a Liskov violation on this method as of
-2025-11-23.
-
-```pyi
-class BadChild2B(Parent):
-    # TODO: we should emit `invalid-method-override` here.
-    @classmethod
-    def instance_method(self, x: int) -> int: ...
-```
-
-Overwriting a classmethod with a staticmethod, or vice versa, is also an error:
-
-```pyi
-class BadChild3A(Parent):
-    @staticmethod
-    def class_method(cls, x: int) -> int: ...  # snapshot: invalid-method-override
-```
-
-```snapshot
-error[invalid-method-override]: Invalid override of method `class_method`
-  --> src/mdtest_snippet.pyi:39:9
-   |
-39 |     def class_method(cls, x: int) -> int: ...  # snapshot: invalid-method-override
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.class_method`
-   |
-  ::: src/mdtest_snippet.pyi:4:9
-   |
- 4 |     def class_method(cls, x: int) -> int: ...
-   |         -------------------------------- `Parent.class_method` defined here
-info: `BadChild3A.class_method` is a staticmethod but `Parent.class_method` is a classmethod
-info: This violates the Liskov Substitution Principle
-```
-
-```pyi
-class BadChild3B(Parent):
-    @classmethod
-    def static_method(x: int) -> int: ...  # snapshot: invalid-method-override
-```
-
-```snapshot
-error[invalid-method-override]: Invalid override of method `static_method`
-  --> src/mdtest_snippet.pyi:42:9
-   |
-42 |     def static_method(x: int) -> int: ...  # snapshot: invalid-method-override
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.static_method`
-   |
-  ::: src/mdtest_snippet.pyi:6:9
-   |
- 6 |     def static_method(x: int) -> int: ...
-   |         ---------------------------- `Parent.static_method` defined here
-info: `BadChild3B.static_method` is a classmethod but `Parent.static_method` is a staticmethod
+info: `BadSignature1.instance_method` is a staticmethod but `Parent.instance_method` is an instance method
+info: the parameter named `self` does not match `x` (and can be used as a keyword parameter)
 info: This violates the Liskov Substitution Principle
 ```
 

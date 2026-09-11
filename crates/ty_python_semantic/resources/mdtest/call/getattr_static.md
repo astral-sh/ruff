@@ -149,4 +149,43 @@ def _(a: Any, tuple_of_any: tuple[Any]):
     reveal_type(inspect.getattr_static(tuple_of_any, "index", "default"))
 ```
 
+## Classmethod and staticmethod descriptors
+
+`getattr_static` returns the raw `classmethod` or `staticmethod` descriptor:
+
+```py
+from inspect import getattr_static
+
+class C:
+    @classmethod
+    def some_classmethod(cls) -> int:
+        return 1
+
+    @staticmethod
+    def some_staticmethod() -> int:
+        return 1
+
+some_classmethod = getattr_static(C, "some_classmethod")
+some_staticmethod = getattr_static(C, "some_staticmethod")
+
+reveal_type(type(some_classmethod))  # revealed: <class 'classmethod'>
+reveal_type(type(some_staticmethod))  # revealed: <class 'staticmethod'>
+```
+
+These objects expose the original function through the `__func__` attribute:
+
+```py
+reveal_type(some_classmethod.__func__)  # revealed: def some_classmethod(cls) -> int
+reveal_type(some_staticmethod.__func__)  # revealed: def some_staticmethod() -> int
+```
+
+Attributes like `__kwdefaults__`, which are available on functions, are not directly accessible on
+the raw `classmethod` or `staticmethod` descriptors (this is a regression test for
+<https://github.com/astral-sh/ty/issues/1452>):
+
+```py
+some_classmethod.__kwdefaults__  # error: [unresolved-attribute]
+some_staticmethod.__kwdefaults__  # error: [unresolved-attribute]
+```
+
 [official documentation]: https://docs.python.org/3/library/inspect.html#inspect.getattr_static

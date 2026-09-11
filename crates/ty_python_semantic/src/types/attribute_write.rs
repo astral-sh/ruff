@@ -679,6 +679,12 @@ fn effective_write_type<'db>(
     attribute: &str,
     attr_ty: Type<'db>,
 ) -> Type<'db> {
+    // An instance shadows a staticmethod with the function returned by its getter.
+    if matches!(object_ty, Type::NominalInstance(_))
+        && attr_ty.function_like_kind(db) == Some(CallableTypeKind::StaticMethodLike)
+    {
+        return attr_ty.underlying_function(db);
+    }
     if let Type::NominalInstance(instance) = object_ty
         && let Some(converter_ty) = instance
             .class(db, env)

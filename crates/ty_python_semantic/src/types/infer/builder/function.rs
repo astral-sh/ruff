@@ -4,6 +4,7 @@ use crate::{
     types::{
         DynamicType, KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner,
         SubclassOfType, Type, TypeContext, TypeVarKind, UnionType,
+        callable::CallableTypeKind,
         constraints::ConstraintSetBuilder,
         diagnostic::{
             ABSTRACT_AND_FINAL_METHOD, FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT,
@@ -436,6 +437,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
+        let mut has_transforming_decorators = false;
         let mut function_decorators = FunctionDecorators::empty();
         let mut dataclass_transformer_params = None;
         let mut final_decorator = None;
@@ -477,7 +479,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
+            has_transforming_decorators |= decorator_function_decorator.is_empty();
             decorator_types_and_nodes.push((decorator_type, decorator));
+        }
+        if !has_transforming_decorators {
+            // With only known decorators, use the complete overload set's declaration
+            // flags, including its recovery for inconsistently decorated overloads.
+            decorator_types_and_nodes.clear();
         }
 
         // Check for `@final` applied to non-method functions.
@@ -546,12 +554,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
         let function_literal = FunctionLiteral::new(db, overload_literal);
         let function_type = FunctionType::new(db, function_literal, None);
-        let has_custom_decorators = decorator_types_and_nodes
-            .iter()
-            .any(|(ty, _)| FunctionDecorators::from_decorator_type(db, *ty).is_empty());
         let is_decorated_overload_implementation =
-            has_custom_decorators && function_literal.has_separate_implementation(db);
-        let is_decorated_overload = has_custom_decorators && overload_literal.is_overload(db);
+            has_transforming_decorators && function_literal.has_separate_implementation(db);
+        let is_decorated_overload = has_transforming_decorators && overload_literal.is_overload(db);
 
         let mut inferred_ty = Type::FunctionLiteral(
             if is_decorated_overload_implementation || is_decorated_overload {
@@ -560,6 +565,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 function_type
             },
         );
+        // Explicit method wrappers apply in decorator order. Their declaration flags
+        // must not make the input to an inner decorator look already wrapped.
+        if has_transforming_decorators
+            && function_decorators
+                .intersects(FunctionDecorators::STATICMETHOD | FunctionDecorators::CLASSMETHOD)
+        {
+            inferred_ty = inferred_ty.underlying_function(db);
+        }
         if !decorator_list.is_empty() {
             self.undecorated_type = Some(inferred_ty);
         }
@@ -592,6 +605,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
+            let descriptor_kind = match decorator_ty {
+                Type::ClassLiteral(class) => match class.known(db) {
+                    Some(KnownClass::Staticmethod) => Some(CallableTypeKind::StaticMethodLike),
+                    Some(KnownClass::Classmethod) => Some(CallableTypeKind::ClassMethodLike),
+                    _ => None,
+                },
+                _ => None,
+            };
+            if let Some(kind) = descriptor_kind {
+                let wrap = |ty: Type<'db>| match ty.resolve_type_alias(db) {
+                    Type::FunctionLiteral(function)
+                        if function.callable_type_kind(db) == CallableTypeKind::FunctionLike
+                            || function.callable_type_kind(db) == kind =>
+                    {
+                        Some(Type::FunctionLiteral(
+                            function.with_descriptor_kind(db, kind),
+                        ))
+                    }
+                    Type::Callable(callable)
+                        if matches!(
+                            callable.kind(db),
+                            CallableTypeKind::Regular | CallableTypeKind::FunctionLike
+                        ) || callable.kind(db) == kind =>
+                    {
+                        Some(Type::Callable(callable.with_kind(db, kind)))
+                    }
+                    _ => None,
+                };
+                let wrapped = if let Some(union) = inferred_ty.as_union_like(db) {
+                    union.try_map(db, self.program_environment(), |ty| wrap(*ty))
+                } else {
+                    wrap(inferred_ty)
+                };
+                if let Some(wrapped) = wrapped {
+                    inferred_ty = wrapped;
+                    continue;
+                }
+            }
             if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) = decorator_ty {
                 match inferred_ty {
                     Type::FunctionLiteral(function) => {

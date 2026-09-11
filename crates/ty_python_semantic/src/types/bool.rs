@@ -243,7 +243,9 @@ impl<'db> Type<'db> {
         };
 
         let truthiness = match self {
-            Type::Callable(callable) if callable.is_function_like(db) => Truthiness::AlwaysTrue,
+            Type::Callable(callable) if callable.runtime_class(db).is_some() => {
+                Truthiness::AlwaysTrue
+            }
 
             Type::Dynamic(_)
             | Type::Divergent(_)
