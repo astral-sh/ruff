@@ -1227,10 +1227,11 @@ bitflags! {
         /// Do not call `__getattr__` during member lookup.
         const NO_GETATTR_LOOKUP = 1 << 4;
 
-        /// Ignore members that are only available through a dynamic type.
+        /// Ignore members that are only available through a dynamic type or a divergent marker.
         ///
         /// This is used when detecting descriptors. An `Any` or `Unknown` base can provide any
         /// member, but that does not mean that every subclass should be treated as a descriptor.
+        /// Likewise, a divergent marker from cyclic inference does not establish a concrete member.
         const REQUIRE_CONCRETE = 1 << 5;
     }
 }
@@ -3703,7 +3704,9 @@ impl<'db> Type<'db> {
                 }))
             }
 
-            Type::Dynamic(_) if policy.require_concrete() => Some(Place::Undefined.into()),
+            Type::Dynamic(_) | Type::Divergent(_) if policy.require_concrete() => {
+                Some(Place::Undefined.into())
+            }
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
 
