@@ -774,7 +774,8 @@ impl Session {
                 self.use_uv,
             )
         } else {
-            ProjectMetadata::discover_with_uv(workspace_directory, &system, self.use_uv)
+            ProjectMetadata::discover_without_uv(workspace_directory, &system)
+                .map(|metadata| metadata.with_use_uv(self.use_uv))
         };
 
         let project = metadata
@@ -791,6 +792,10 @@ impl Session {
                 if let Some(override_options) = workspace.settings.override_options() {
                     metadata.apply_override_options(override_options.clone());
                 }
+
+                let metadata = metadata
+                    .discover_uv_workspace(workspace_directory, &system)
+                    .context("Failed to discover uv workspace")?;
 
                 ProjectDatabase::fallible(metadata, system.clone())
             });
