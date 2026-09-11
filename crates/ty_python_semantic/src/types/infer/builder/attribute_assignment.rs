@@ -69,7 +69,7 @@ enum AssignmentAttributeWriteDiagnostic<'db> {
     CannotAssignToClassVar,
     TerminalSetAttr {
         member_exists: bool,
-        is_setattr_synthesized: bool,
+        is_read_only: bool,
     },
     TerminalDescriptor,
     BadDunderSet {
@@ -593,38 +593,38 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
         };
 
-        // We could also model this more precisely by synthesizing a `__setattr__`overload set
-        // that only disallows mutation on non-private fields, but for now, we just suppress the
-        // diagnostic here. This is much easier and faster.
+        // Pydantic permits writes to private attributes even on frozen models.
         let is_private_pydantic_attribute =
             matches!(member, InstanceAttributeWriteMember::Explicit { .. })
                 && pydantic::is_private_attribute(self.attribute)
                 && pydantic::is_model_instance(db, env, object_ty);
 
-        if setattr_returns_never && !is_private_pydantic_attribute {
+        let is_frozen_pydantic_model = pydantic::has_frozen_setattr(db, env, object_ty);
+        if (setattr_returns_never || is_frozen_pydantic_model) && !is_private_pydantic_attribute {
             if emit_diagnostics {
-                let is_setattr_synthesized = !matches!(
-                    frozen_dataclass_dispatch,
-                    Some(FrozenDataclassDispatch::Delegate(_))
-                ) && match object_ty.class_member_with_policy(
-                    db,
-                    env,
-                    "__setattr__",
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                ) {
-                    PlaceAndQualifiers {
-                        place: Place::Defined(DefinedPlace { ty, .. }),
-                        ..
-                    } => ty.is_callable_type(),
-                    _ => false,
-                };
+                let is_read_only = is_frozen_pydantic_model
+                    || !matches!(
+                        frozen_dataclass_dispatch,
+                        Some(FrozenDataclassDispatch::Delegate(_))
+                    ) && match object_ty.class_member_with_policy(
+                        db,
+                        env,
+                        "__setattr__",
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                    ) {
+                        PlaceAndQualifiers {
+                            place: Place::Defined(DefinedPlace { ty, .. }),
+                            ..
+                        } => ty.is_callable_type(),
+                        _ => false,
+                    };
                 let member_exists = !object_ty
                     .member(db, env, self.attribute)
                     .place
                     .is_undefined();
                 self.report(AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
                     member_exists,
-                    is_setattr_synthesized,
+                    is_read_only,
                 });
             }
             return false;
@@ -749,7 +749,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     if emit_diagnostics {
                         self.report(AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
                             member_exists: false,
-                            is_setattr_synthesized: false,
+                            is_read_only: false,
                         });
                     }
                     return false;
@@ -1035,7 +1035,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             }
             AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
                 member_exists,
-                is_setattr_synthesized,
+                is_read_only,
             } => {
                 if let Some(builder) = self
                     .builder
@@ -1048,7 +1048,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                             self.attribute,
                             self.object_ty.display(db, env)
                         )
-                    } else if is_setattr_synthesized {
+                    } else if is_read_only {
                         format!(
                             "Property `{}` defined in `{}` is read-only",
                             self.attribute,

@@ -1101,13 +1101,6 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Return `true` if Pydantic's effective model configuration marks this model as frozen.
-    fn is_frozen_pydantic_model(db: &'db dyn Db, field_policy: CodeGeneratorKind<'db>) -> bool {
-        field_policy
-            .pydantic_metadata()
-            .is_some_and(|metadata| metadata.is_frozen(db))
-    }
-
     /// Checks if the given dataclass parameter flag is set for this class.
     /// This checks both the `dataclass_params` and `transformer_params`.
     pub(crate) fn has_dataclass_param(
@@ -2115,14 +2108,8 @@ impl<'db> StaticClassLiteral<'db> {
 
                 signature_from_fields(vec![self_parameter], instance_ty)
             }
-            (
-                field_policy @ (CodeGeneratorKind::DataclassLike(_)
-                | CodeGeneratorKind::Pydantic(_)),
-                "__setattr__",
-            ) => {
-                if self.is_frozen_dataclass(db) == Some(true)
-                    || Self::is_frozen_pydantic_model(db, field_policy)
-                {
+            (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
+                if self.is_frozen_dataclass(db) == Some(true) {
                     let signature = Signature::new(
                         Parameters::standard([
                             Parameter::positional_or_keyword(Name::new_static("self"))
