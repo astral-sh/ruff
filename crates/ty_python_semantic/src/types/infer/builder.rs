@@ -6815,7 +6815,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut type_context_mappings: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>> =
             FxHashMap::default();
         for solution in solutions.into_vec() {
-            for binding in solution {
+            for binding in solution.solved_typevars {
                 let inferred_ty = binding
                     .solution
                     .filter_union(db, env, |ty| !ty.has_provisional_marker(db, env));
@@ -7664,7 +7664,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Solutions::Unsatisfiable | Solutions::Unconstrained => {}
                     Solutions::Constrained(solutions) => {
                         for solution in solutions.as_slice() {
-                            for binding in solution {
+                            for binding in &solution.solved_typevars {
                                 // The SequentMap's transitivity reasoning can inject
                                 // cross-typevar references into the solution bounds.
                                 // For example, `_KT ≤ str ∧ str ≤ _VT` derives `_KT ≤ _VT`,
@@ -8076,7 +8076,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut yield_tcx: Option<UnionAccumulator<'db>> = None;
         for solution in solutions.into_vec() {
-            for binding in solution {
+            for binding in solution.solved_typevars {
                 if binding.bound_typevar != yield_typevar {
                     continue;
                 }
