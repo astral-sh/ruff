@@ -740,27 +740,6 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Infer a metaclass for member lookup or `__class__`/`type()` reflection.
-    ///
-    /// [`MetaclassFallback::Disallow`] exposes failed selection as `type[Unknown]`.
-    /// [`MetaclassFallback::Allow`] retains a conflicting candidate for member lookup so
-    /// recursive attribute inference can converge.
-    pub(super) fn inferred_metaclass_with_fallback(
-        self,
-        db: &'db dyn Db,
-        fallback: MetaclassFallback,
-    ) -> ClassMetaclass<'db> {
-        match (self, fallback) {
-            (Self::Static(class), MetaclassFallback::Disallow) => class
-                .try_metaclass(db)
-                .map(|(metaclass, _)| metaclass)
-                .unwrap_or_else(
-                    |_| ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()),
-                ),
-            _ => self.inferred_metaclass(db),
-        }
-    }
-
     /// Look up a class-level member by iterating through the MRO.
     pub(crate) fn class_member(
         self,
@@ -1575,17 +1554,8 @@ impl<'db> ClassType<'db> {
     }
 
     pub(super) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
-        self.inferred_metaclass_with_fallback(db, MetaclassFallback::Allow)
-    }
-
-    /// Infer and specialize the metaclass with the requested conflict fallback.
-    pub(super) fn inferred_metaclass_with_fallback(
-        self,
-        db: &'db dyn Db,
-        fallback: MetaclassFallback,
-    ) -> ClassMetaclass<'db> {
         let (class, specialization) = self.class_literal_and_specialization(db);
-        match class.inferred_metaclass_with_fallback(db, fallback) {
+        match class.inferred_metaclass(db) {
             ClassMetaclass::Selected(metaclass) => ClassMetaclass::Selected(
                 metaclass.apply_optional_specialization(db, specialization),
             ),
@@ -3458,7 +3428,7 @@ impl<'db> ClassMetaclass<'db> {
         }
     }
 
-    pub(super) fn to_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    fn to_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
             Self::Selected(metaclass) => metaclass,
             Self::ProtocolFallback => KnownClass::ABCMeta.to_class_literal(db, env),
@@ -3476,15 +3446,6 @@ impl<'db> ClassMetaclass<'db> {
             Self::ProtocolFallback => KnownClass::Type.to_class_literal(db, env),
         }
     }
-}
-
-/// Whether a conflicting metaclass candidate can stand in for the class's metaclass.
-#[derive(Clone, Copy)]
-pub(super) enum MetaclassFallback {
-    /// Preserve the candidate for internal lookup and inference cycle recovery.
-    Allow,
-    /// Expose `type[Unknown]` through `__class__` and `type()` when selection fails.
-    Disallow,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]

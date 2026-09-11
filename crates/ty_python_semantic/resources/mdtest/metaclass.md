@@ -628,32 +628,36 @@ The metaclass of a derived class must be a (non-strict) subclass of the metaclas
 bases. ("Strict subclass" is a synonym for "proper subclass"; a non-strict subclass can be a
 subclass or the class itself.)
 
-We report the conflict and retain the candidate from the first base for attribute lookup. The
-class's metaclass remains unknown when accessed through `__class__` or `type()`.
+We report the conflict and infer an unknown metaclass. Attributes supplied by either conflicting
+metaclass are also unknown, regardless of the order of the bases.
 
 ```py
 class M1(type):
     value: int
 
-class M2(type): ...
+class M2(type):
+    value: str
+
 class A(metaclass=M1): ...
 class B(metaclass=M2): ...
 
 # error: [conflicting-metaclass] "The metaclass of a derived class (`C`) must be a subclass of the metaclasses of all its bases, but `M1` (metaclass of base class `A`) and `M2` (metaclass of base class `B`) have no subclass relationship"
 class C(A, B): ...
+class Reversed(B, A): ...  # error: [conflicting-metaclass]
 
 reveal_type(C.__class__)  # revealed: type[Unknown]
 reveal_type(type(C))  # revealed: type[Unknown]
-reveal_type(C.value)  # revealed: int
+reveal_type(C.value)  # revealed: Unknown
+reveal_type(Reversed.value)  # revealed: Unknown
 ```
 
-The same distinction applies to subclasses of `C`:
+The metaclass and its attributes are also unknown on subclasses of `C`:
 
 ```py
 def check_subclass(cls: type[C]):
     reveal_type(cls.__class__)  # revealed: type[Unknown]
     reveal_type(type(cls))  # revealed: type[Unknown]
-    reveal_type(cls.value)  # revealed: int
+    reveal_type(cls.value)  # revealed: Unknown
 ```
 
 ## Conflict (2)
@@ -662,8 +666,8 @@ The metaclass of a derived class must be a (non-strict) subclass of the metaclas
 bases. ("Strict subclass" is a synonym for "proper subclass"; a non-strict subclass can be a
 subclass or the class itself.)
 
-An explicit metaclass is retained for attribute lookup when it conflicts with a base's metaclass.
-`__class__` and `type()` still report an unknown metaclass.
+An explicit metaclass that conflicts with a base's metaclass also leaves the metaclass and its
+attributes unknown.
 
 ```py
 class M1(type): ...
@@ -678,7 +682,7 @@ class B(A, metaclass=M2): ...
 
 reveal_type(B.__class__)  # revealed: type[Unknown]
 reveal_type(type(B))  # revealed: type[Unknown]
-reveal_type(B.value)  # revealed: str
+reveal_type(B.value)  # revealed: Unknown
 ```
 
 ## Common metaclass
@@ -696,8 +700,8 @@ reveal_type(C.__class__)  # revealed: <class 'M'>
 
 ## Conflicting metaclasses through unions and intersections
 
-A union retains the known metaclass of its valid alternative. Type aliases preserve this behavior,
-while attribute lookup can use the candidate metaclass of either alternative.
+A union retains the known metaclass of its valid alternative and the unknown metaclass of its
+invalid alternative. Type aliases and attribute lookup preserve this uncertainty.
 
 ```py
 from typing import Any, TypeAlias
@@ -715,7 +719,7 @@ Classes: TypeAlias = type[Invalid] | type[Valid]
 def check_union(cls: Classes):
     reveal_type(cls.__class__)  # revealed: type[Unknown | Meta]
     reveal_type(type(cls))  # revealed: type[Unknown | Meta]
-    reveal_type(cls.value)  # revealed: int
+    reveal_type(cls.value)  # revealed: Unknown | int
 ```
 
 Narrowing the invalid class to an intersection does not make its metaclass known:
@@ -725,7 +729,7 @@ def check_intersection(other: Any):
     if Invalid is other:
         reveal_type(Invalid.__class__)  # revealed: type[Unknown]
         reveal_type(type(Invalid))  # revealed: type[Unknown]
-        reveal_type(Invalid.value)  # revealed: int & Any
+        reveal_type(Invalid.value)  # revealed: Unknown
 ```
 
 ## Protocol metaclass inheritance
@@ -1272,8 +1276,8 @@ reveal_type(A.__class__)  # revealed: type[Unknown]
 
 A stub can refer to an inherited type alias through a nested class with a custom metaclass. When an
 attribute named `type` also depends on that alias, inferring the metaclass's bases can depend on the
-metaclass being selected. Type checking completes even when temporary metaclass conflicts arise
-during this inference cycle.
+metaclass being selected. Gradual metaclass selection accepts the unresolved ancestry during
+inference, allowing type checking to converge.
 
 Regression test for [ty#4492](https://github.com/astral-sh/ty/issues/4492).
 
@@ -1307,8 +1311,8 @@ class Outer:
 ## Persistent metaclass conflict during recursive attribute inference
 
 Recursive attribute inference does not suppress a provable metaclass conflict. `OtherMeta` is final,
-so an unknown base inferred for `Meta` cannot make it a subclass of `OtherMeta`. We retain the
-explicit candidate for member lookup and report the conflict when checking the stub.
+so an unknown base inferred for `Meta` cannot make it a subclass of `OtherMeta`. We infer an unknown
+metaclass and still report the conflict when checking the stub.
 
 ```toml
 [environment]

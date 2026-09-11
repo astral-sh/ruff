@@ -1252,8 +1252,8 @@ Aliased[int].constant = 1
 
 ## Metaclasses of specialized classes
 
-Specializing a class preserves its valid metaclass. A conflicting metaclass remains unknown through
-`__class__` and `type()`, even though its candidate still supplies attributes for member lookup.
+Specializing a class preserves its valid metaclass. A conflicting metaclass and its attributes
+remain unknown after specialization.
 
 ```py
 class Meta[T](type):
@@ -1268,7 +1268,7 @@ reveal_type(Valid[int].__class__)  # revealed: <class 'Meta[str]'>
 reveal_type(type(Valid[int]))  # revealed: <class 'Meta[str]'>
 reveal_type(Invalid[int].__class__)  # revealed: type[Unknown]
 reveal_type(type(Invalid[int]))  # revealed: type[Unknown]
-reveal_type(Invalid[int].value)  # revealed: str
+reveal_type(Invalid[int].value)  # revealed: Unknown
 ```
 
 The metaclass also remains unknown when the invalid class is reached through type-variable bounds or
