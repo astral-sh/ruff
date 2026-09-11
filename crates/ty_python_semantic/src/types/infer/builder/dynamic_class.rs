@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex, name::Name};
 use ruff_text_size::Ranged;
 
-use crate::types::class::{DynamicClassLiteral, DynamicClassScopeOffset};
+use crate::types::class::{DynamicClassKind, DynamicClassLiteral, DynamicClassScopeOffset};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     CYCLIC_CLASS_DEFINITION, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_BASE,
@@ -13,27 +13,6 @@ use crate::types::enums::is_enum_class_by_inheritance;
 use crate::types::infer::builder::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
 use crate::types::{ClassBase, KnownClass, Type, extract_fixed_length_iterable_element_types};
-
-/// Whether a dynamic class is being created via `type()` or `types.new_class()`.
-///
-/// This is used to adjust validation rules and diagnostic messages for dynamic class
-/// creation. For example, `types.new_class()` properly handles metaclasses and
-/// `__mro_entries__`, so enum-specific restrictions only apply to `type()`, while
-/// `Generic` and `TypedDict` bases are rejected for both entry points.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum DynamicClassKind {
-    TypeCall,
-    NewClass,
-}
-
-impl DynamicClassKind {
-    const fn function_name(self) -> &'static str {
-        match self {
-            Self::TypeCall => "type()",
-            Self::NewClass => "types.new_class()",
-        }
-    }
-}
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Identify a dangling dynamic-class call without retaining an absolute source position.

@@ -85,6 +85,22 @@ enum DynamicClassHeaderAnchor<'db> {
     ScopeOffset(DynamicClassScopeOffset),
 }
 
+/// The runtime constructor used to create a dynamic class.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub enum DynamicClassKind {
+    TypeCall,
+    NewClass,
+}
+
+impl DynamicClassKind {
+    pub(crate) const fn function_name(self) -> &'static str {
+        match self {
+            Self::TypeCall => "type()",
+            Self::NewClass => "types.new_class()",
+        }
+    }
+}
+
 /// Identifies a dangling dynamic-class call relative to its enclosing scope.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum DynamicClassScopeOffset {
@@ -282,6 +298,10 @@ impl<'db> CodeGeneratorKind<'db> {
     }
 
     fn from_dynamic_class(db: &'db dyn Db, class: DynamicClassLiteral<'db>) -> Option<Self> {
+        if class.dataclass_params(db).is_some() {
+            return Some(Self::DataclassLike(None));
+        }
+
         #[salsa::tracked(
             returns(copy),
             cycle_initial=|_, _, _| None,
@@ -291,11 +311,6 @@ impl<'db> CodeGeneratorKind<'db> {
             db: &'db dyn Db,
             class: DynamicClassLiteral<'db>,
         ) -> Option<CodeGeneratorKind<'db>> {
-            // Check if the dynamic class was passed to `dataclass()` as a function.
-            if class.dataclass_params(db).is_some() {
-                return Some(CodeGeneratorKind::DataclassLike(None));
-            }
-
             // Dynamic classes can also inherit from classes with dataclass_transform.
             class.iter_mro(db).skip(1).find_map(|base| {
                 base.into_class().and_then(|class| {
@@ -612,7 +627,7 @@ impl<'db> GenericAlias<'db> {
     }
 }
 
-/// A class literal, either defined via a `class` statement or a `type` function call.
+/// A class object known to ty.
 #[derive(
     Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, get_size2::GetSize, salsa::SalsaValue,
 )]
@@ -647,8 +662,8 @@ impl<'db> ClassLiteral<'db> {
         nested: bool,
     ) -> Option<Self> {
         match self {
-            Self::Dynamic(dynamic) => Some(Self::Dynamic(
-                dynamic.recursive_type_normalized_impl(db, env, div, nested)?,
+            Self::Dynamic(class) => Some(Self::Dynamic(
+                class.recursive_type_normalized_impl(db, env, div, nested)?,
             )),
             Self::DynamicNamedTuple(named_tuple) => Some(Self::DynamicNamedTuple(
                 named_tuple.recursive_type_normalized_impl(db, env, div, nested)?,
