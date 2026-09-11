@@ -12,6 +12,14 @@ def test_ok():
         raise_user_warning("")
 
 
+def test_ok_positional_args():
+    with pytest.warns(UserWarning, "oops"):
+        pass
+
+    with pytest.warns(UserWarning, "oops") as warninfo:
+        pass
+
+
 def test_error_trivial():
     pytest.warns(UserWarning, raise_user_warning, "warning")
 

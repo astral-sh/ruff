@@ -133,6 +133,15 @@ pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: &ast:
         return;
     }
 
+    if let Stmt::With(ast::StmtWith { items, .. }) = semantic.current_statement() {
+        if items
+            .iter()
+            .any(|item| item.context_expr.as_call_expr() == Some(call))
+        {
+            return;
+        }
+    }
+
     let mut diagnostic =
         checker.report_diagnostic(LegacyFormPytestRaises { context_type }, call.range());
 
