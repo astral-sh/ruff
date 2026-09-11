@@ -369,3 +369,19 @@ async def read_thing_callable_dep_instance_default(query: str = Depends(Callable
 # Error: `__call__` has `other`, not `thing_id`.
 @app.get("/things/{thing_id}")
 async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...
+
+
+# Assigned `Depends` variables — ruff resolves the RHS of the assignment to
+# determine which parameters the dependency covers.
+# https://github.com/astral-sh/ruff/issues/17226
+async def find_item_by_id(item_id: int): ...
+
+AssignedDepends = Depends(find_item_by_id)
+
+# OK: `AssignedDepends` resolves to `Depends(find_item_by_id)`, which accepts `item_id`.
+@app.get("/items/{item_id}")
+async def get_item_assigned_depends(item: Annotated[str, AssignedDepends]): ...
+
+# Error: `AssignedDepends` covers `item_id`, not `other_id`.
+@app.get("/items/{other_id}")
+async def get_other_item_assigned_depends(item: Annotated[str, AssignedDepends]): ...
