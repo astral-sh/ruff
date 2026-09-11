@@ -44,6 +44,7 @@
 //! be considered a bug.)
 
 use crate::ProgramEnvironment;
+use crate::place::definitions::DefinitionResolution;
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -79,9 +80,10 @@ mod tests;
 
 /// The place-load metadata produced alongside an expression's type when recording is enabled.
 #[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-struct PlaceLoadMetadata {
+struct PlaceLoadMetadata<'db> {
     range: TextRange,
     deferred_state: DeferredExpressionState,
+    resolution: DefinitionResolution<'db>,
 }
 
 bitflags::bitflags! {
@@ -262,7 +264,7 @@ pub(crate) fn function_known_decorator_flags<'db>(
 /// function-definition inference.
 #[derive(Debug, Eq, PartialEq, Default, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct FunctionDecoratorInference<'db> {
-    place_load_metadata: Option<Box<FrozenMap<ExpressionNodeKey, PlaceLoadMetadata>>>,
+    place_load_metadata: Option<Box<FrozenMap<ExpressionNodeKey, PlaceLoadMetadata<'db>>>>,
     expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
@@ -938,7 +940,7 @@ pub(crate) struct ScopeInference<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ScopeInferenceExtra<'db> {
     /// Place-load metadata retained only for files that opted into recording.
-    place_load_metadata: Option<Box<FrozenMap<ExpressionNodeKey, PlaceLoadMetadata>>>,
+    place_load_metadata: Option<Box<FrozenMap<ExpressionNodeKey, PlaceLoadMetadata<'db>>>>,
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -1324,7 +1326,7 @@ impl<'db> DefinitionTypes<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 enum DefinitionInferenceExtra<'db> {
     /// Place-load metadata is the only extra data for some definitions.
-    PlaceLoadMetadata(FrozenMap<ExpressionNodeKey, PlaceLoadMetadata>),
+    PlaceLoadMetadata(FrozenMap<ExpressionNodeKey, PlaceLoadMetadata<'db>>),
 
     /// Type qualifiers are the only extra data for most annotated definitions.
     Qualifiers(FrozenMap<ExpressionNodeKey, TypeQualifiers>),
@@ -1363,7 +1365,7 @@ struct OtherDefinitionInferenceExtra<'db> {
     comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
 
     /// Place-load metadata retained only for files that opted into recording.
-    place_load_metadata: Option<Box<FrozenMap<ExpressionNodeKey, PlaceLoadMetadata>>>,
+    place_load_metadata: Option<Box<FrozenMap<ExpressionNodeKey, PlaceLoadMetadata<'db>>>>,
 
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
@@ -1867,7 +1869,7 @@ pub(crate) struct ExpressionInference<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ExpressionInferenceExtra<'db> {
     /// Place-load metadata retained only for files that opted into recording.
-    place_load_metadata: Option<Box<FrozenMap<ExpressionNodeKey, PlaceLoadMetadata>>>,
+    place_load_metadata: Option<Box<FrozenMap<ExpressionNodeKey, PlaceLoadMetadata<'db>>>>,
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -2115,7 +2117,7 @@ struct StatementInferenceInnerExtra<'db> {
     comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
 
     /// Place-load metadata retained only for files that opted into recording.
-    place_load_metadata: Option<Box<FrozenMap<ExpressionNodeKey, PlaceLoadMetadata>>>,
+    place_load_metadata: Option<Box<FrozenMap<ExpressionNodeKey, PlaceLoadMetadata<'db>>>>,
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
