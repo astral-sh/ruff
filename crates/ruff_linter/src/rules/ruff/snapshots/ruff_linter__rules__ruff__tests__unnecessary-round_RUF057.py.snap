@@ -242,3 +242,90 @@ help: Remove unnecessary `round` call
 82 |
    |
 note: This is an unsafe fix and may change runtime behavior
+
+RUF057 [*] Value being rounded is already an integer
+  --> RUF057.py:90:1
+   |
+89 | # Assignment expressions remain parenthesized after the call is removed.
+90 | round(value := 1)
+   | ^^^^^^^^^^^^^^^^^
+91 |
+92 | # Integer attribute access still requires parentheses.
+   |
+help: Remove unnecessary `round` call
+   |
+89 | # Assignment expressions remain parenthesized after the call is removed.
+   - round(value := 1)
+90 + (value := 1)
+91 |
+   |
+
+RUF057 [*] Value being rounded is already an integer
+  --> RUF057.py:93:1
+   |
+92 | # Integer attribute access still requires parentheses.
+93 | round(1).real
+   | ^^^^^^^^
+94 |
+95 | # Parentheses separate the replacement from adjacent keywords.
+   |
+help: Remove unnecessary `round` call
+   |
+92 | # Integer attribute access still requires parentheses.
+   - round(1).real
+93 + (1).real
+94 |
+   |
+
+RUF057 [*] Value being rounded is already an integer
+  --> RUF057.py:96:1
+   |
+95 | # Parentheses separate the replacement from adjacent keywords.
+96 | round(1)and True
+   | ^^^^^^^^
+97 |
+98 | def parenthesized_callee():
+   |
+help: Remove unnecessary `round` call
+   |
+95 | # Parentheses separate the replacement from adjacent keywords.
+   - round(1)and True
+96 + (1)and True
+97 |
+   |
+
+RUF057 [*] Value being rounded is already an integer
+   --> RUF057.py:99:11
+    |
+ 98 | def parenthesized_callee():
+ 99 |     return(round)(1)
+    |           ^^^^^^^^^^
+100 |
+101 | # Preserve comments within explicit argument parentheses.
+    |
+help: Remove unnecessary `round` call
+    |
+98  | def parenthesized_callee():
+    -     return(round)(1)
+99  +     return(1)
+100 |
+    |
+
+RUF057 [*] Value being rounded is already an integer
+   --> RUF057.py:102:1
+    |
+101 |   # Preserve comments within explicit argument parentheses.
+102 | / round((  # Keep the argument comment.
+103 | |     1
+104 | | ))
+    | |__^
+help: Remove unnecessary `round` call
+    |
+101 | # Preserve comments within explicit argument parentheses.
+    - round((  # Keep the argument comment.
+102 + (  # Keep the argument comment.
+103 |     1
+    - ))
+104 + )
+    |
+note: This is an unsafe fix and may change runtime behavior

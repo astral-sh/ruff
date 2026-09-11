@@ -1,11 +1,10 @@
 ## What it does
 
-Detects assignments that unsoundly assign a type that is not a [subtype] of the target's declared
-type.
+Detects variable assignments that unsoundly assign a type that is not a [subtype] of a variable's
+declared type.
 
-This rule is a stricter version of `invalid-assignment`. The rule currently only flags unsound
-assignments to variables (excluding attributes and subscripts), but its scope may be expanded in the
-future.
+This rule is a stricter version of `invalid-assignment`. Whereas that rule also flags assignments to
+attributes and subscripts, however, this rule is only applied to variable assignments.
 
 This rule has no effect on stub files.
 

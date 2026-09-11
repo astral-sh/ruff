@@ -587,6 +587,83 @@ def clean(value: dict[str, int] | str | None) -> None:
             value[key] = item
 ```
 
+## `dict` keyword arguments with a shadowed `typing` module
+
+An empty first-party `typing` module hides the definitions that make `dict` generic. Calls with one
+or more named keyword arguments still check their values and recover with `Unknown`, just like
+dictionary literals.
+
+`typing.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+reveal_type(dict(a=1))  # revealed: Unknown
+reveal_type(dict(a=1, b=2))  # revealed: Unknown
+reveal_type({"a": 1})  # revealed: Unknown
+
+# error: [unresolved-reference]
+dict(a=1, b=missing)
+```
+
+## Empty `dict` calls with a non-generic stub
+
+An empty call to a non-generic dictionary class is rejected if its constructor requires an argument.
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class object: ...
+class int: ...
+
+class dict:
+    def __init__(self, value: int) -> None: ...
+```
+
+```py
+dict(1)
+
+dict()  # error: [missing-argument] "No argument provided for required parameter `value`"
+```
+
+## `dict` keyword arguments that violate a type variable bound
+
+A custom typeshed can constrain dictionary values. A value that violates the bound is rejected, and
+later keyword values are still checked.
+
+```toml
+[environment]
+python-version = "3.12"
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class object: ...
+class str: ...
+class int: ...
+
+class dict[K, V: int]:
+    def __init__(self, **kwargs: V) -> None: ...
+```
+
+```py
+dict(a=1)
+
+# error: [invalid-argument-type] "does not satisfy upper bound `int`"
+# error: [unresolved-reference]
+dict(a="oops", b=missing)
+```
+
 ## Failed inner `OrderedDict` calls do not invalidate outer constructors
 
 Constructing an `OrderedDict` from a list containing both strings and floats is already rejected.

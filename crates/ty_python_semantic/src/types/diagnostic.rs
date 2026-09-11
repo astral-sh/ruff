@@ -1,3 +1,7 @@
+// The doc-comments for structs in this file are user-facing rule documentation,
+// not intended for rustdoc to render.
+#![expect(clippy::doc_link_with_quotes, clippy::doc_overindented_list_items)]
+
 use super::call::CallErrorKind;
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
@@ -5,9 +9,11 @@ use super::{
     CallArguments, CallDunderError, ClassBase, ClassLiteral, GenericAlias, KnownClass,
     ModuleLiteralType, StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
 };
+use crate::dependency::is_direct_dependency;
 use crate::diagnostic::{did_you_mean, format_enumeration};
+use crate::importer::{ImportAction, ImportRequest, MembersInScope};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
-use crate::place::{DefinedPlace, Place, place_from_bindings};
+use crate::place::{DefinedPlace, Place, imported_symbol, place_from_bindings};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::bind::CallableDescription;
 use crate::types::call::{Bindings, CallDiagnosticOverride, CallError};
@@ -44,12 +50,15 @@ use ruff_db::{
 use ruff_diagnostics::{Edit, Fix, IsolationLevel};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parentheses_iterator;
-use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, StringFlags};
+use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, PythonVersion, StringFlags};
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt::{self, Formatter};
-use ty_module_resolver::{KnownModule, Module, ModuleName, SearchPath, file_to_module};
+use ty_module_resolver::{
+    ImportingFile, KnownModule, Module, ModuleName, SearchPath, file_to_module,
+    resolve_real_shadowable_module,
+};
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_core::place::{PlaceTable, ScopedPlaceId};
 use ty_python_core::{ProgramFile, global_scope, place_table, use_def_map};
@@ -165,6 +174,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
     registry.register_lint(&STATIC_ASSERT_ERROR);
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
+    registry.register_lint(&DISJOINT_CAST);
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&REDUNDANT_FINAL_CLASSVAR);
     registry.register_lint(&UNRESOLVED_GLOBAL);
@@ -181,6 +191,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
     registry.register_lint(&INVALID_TOTAL_ORDERING);
     registry.register_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER);
+    registry.register_lint(&REDUNDANT_CONDITION);
+    registry.register_lint(&REDUNDANT_CONDITION_STRICT);
 
     // String annotations
     registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
@@ -316,7 +328,6 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[expect(clippy::doc_overindented_list_items)]
     #[doc = include_str!("../../resources/lint_docs/invalid-dataclass.md")]
     pub(crate) static INVALID_DATACLASS = {
         summary: "detects invalid `@dataclass` applications",
@@ -445,7 +456,6 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[expect(clippy::doc_link_with_quotes, clippy::doc_overindented_list_items)]
     #[doc = include_str!("../../resources/lint_docs/unsound-return-statement.md")]
     pub(crate) static UNSOUND_RETURN_STATEMENT = {
         summary: "detects return statements that unsoundly return a type that is not a subtype of the function's annotated return type",
@@ -464,7 +474,6 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[expect(clippy::doc_link_with_quotes, clippy::doc_overindented_list_items)]
     #[doc = include_str!("../../resources/lint_docs/unsound-yield.md")]
     pub(crate) static UNSOUND_YIELD = {
         summary: "detects yield expressions that unsoundly yield a type that is not a subtype of the generator's annotated yield type",
@@ -492,7 +501,6 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[expect(clippy::doc_link_with_quotes, clippy::doc_overindented_list_items)]
     #[doc = include_str!("../../resources/lint_docs/unsound-assignment.md")]
     pub(crate) static UNSOUND_ASSIGNMENT = {
         summary: "detects assignments that unsoundly assign a type that is not a subtype of the declared type",
@@ -1243,6 +1251,15 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/disjoint-cast.md")]
+    pub(crate) static DISJOINT_CAST = {
+        summary: "detects `cast` calls between disjoint types",
+        status: LintStatus::stable("0.0.78"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/redundant-cast.md")]
     pub(crate) static REDUNDANT_CAST = {
         summary: "detects redundant `cast` calls",
@@ -1324,7 +1341,6 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[expect(clippy::doc_overindented_list_items)]
     #[doc = include_str!("../../resources/lint_docs/invalid-method-override.md")]
     pub(crate) static INVALID_METHOD_OVERRIDE = {
         summary: "detects method definitions that violate the Liskov Substitution Principle",
@@ -1357,6 +1373,24 @@ declare_lint! {
         summary: "detects incorrect usage of the legacy convention for specifying positional-only parameters",
         status: LintStatus::stable("0.0.15"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/redundant-condition.md")]
+    pub(crate) static REDUNDANT_CONDITION = {
+        summary: "detects conditions that are always truthy or always falsey",
+        status: LintStatus::stable("0.0.79"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/redundant-condition-strict.md")]
+    pub(crate) static REDUNDANT_CONDITION_STRICT = {
+        summary: "detects conditions that are always truthy or always falsey (strict)",
+        status: LintStatus::stable("0.0.79"),
+        default_level: Level::Ignore,
     }
 }
 
@@ -2411,7 +2445,6 @@ pub(super) fn report_bad_dunder_set_call<'db>(
     dunder_set_failure: &CallError<'db>,
     object_type: Type<'db>,
     descriptor_type: Type<'db>,
-    includes_descriptor_argument: bool,
     target: &ast::ExprAttribute,
     value: &ast::Expr,
 ) {
@@ -2439,11 +2472,7 @@ pub(super) fn report_bad_dunder_set_call<'db>(
             ));
         }
     } else {
-        let argument_ranges = if includes_descriptor_argument {
-            &[target.range(), target.value.range(), value.range()][..]
-        } else {
-            &[target.value.range(), value.range()][..]
-        };
+        let argument_ranges = &[target.value.range(), value.range()];
         dunder_set_failure.report_diagnostics_with_override(
             context,
             target.into(),
@@ -2582,7 +2611,7 @@ pub(super) fn report_dynamic_function_decorator_return<'db>(
 
     let decorator_function = match decorator_binding.signature_type {
         Type::FunctionLiteral(function) => function,
-        Type::BoundMethod(method) => method.function(db),
+        Type::BoundMethod(method) if let Some(function) = method.function(db) => function,
         _ => return,
     };
 
@@ -3068,6 +3097,104 @@ pub(super) fn report_possibly_missing_attribute(
             object_ty.display(db, env),
         )),
     };
+}
+
+/// Selects a runtime typing module for a fix, checking declared dependencies and installed exports
+/// when the requested member needs a backport.
+pub(super) fn typing_module_for_fix(
+    context: &InferContext,
+    member: &str,
+    minimum_version: PythonVersion,
+) -> Option<KnownModule> {
+    let db = context.db();
+    let env = context.program_environment();
+    let module = if env.python_version(db) >= minimum_version {
+        KnownModule::Typing
+    } else {
+        KnownModule::TypingExtensions
+    };
+    let model = SemanticModel::new(db, context.program_file());
+    let resolved = model.resolve_module(Some(module.as_str()), 0)?;
+    if !resolved.is_known(db, module)
+        || (module == KnownModule::TypingExtensions
+            && !is_direct_dependency(db, context.program_file(), resolved))
+    {
+        return None;
+    }
+    if module == KnownModule::TypingExtensions {
+        // Bundled stubs can export a member that the installed backport does not provide.
+        // A dependency declaration alone is therefore insufficient for a runtime import.
+        let runtime_module = resolve_real_shadowable_module(
+            db,
+            ImportingFile::File(
+                context.file(),
+                context.program_file().resolver_environment(db),
+            ),
+            &module.name(),
+        )?;
+        let runtime_file = env.program(db).program_file(db, runtime_module.file(db)?);
+        if !imported_symbol(db, env, Some(runtime_file), member, None)
+            .place
+            .is_definitely_bound()
+        {
+            return None;
+        }
+    }
+    Some(module)
+}
+
+pub(super) fn import_literal_for_fix(context: &InferContext, at: TextSize) -> Option<ImportAction> {
+    let module = typing_module_for_fix(context, "Literal", PythonVersion::PY38)?;
+    context.importer().import_for_diagnostic(
+        ImportRequest::import_from(module.as_str(), "Literal"),
+        context.scope().file_scope_id(context.db()),
+        at,
+    )
+}
+
+/// Wraps a literal in `Literal[...]`, preserving its spelling, quotes, and escapes.
+/// String annotations retain their original source offsets: `parse_string_annotation` rejects
+/// contents that require unescaping, and parses accepted strings directly from the source file.
+pub(super) fn autofix_with_literal(
+    context: &InferContext,
+    diagnostic: &mut Diagnostic,
+    node: impl Ranged,
+) {
+    let Some(action) = import_literal_for_fix(context, node.start()) else {
+        return;
+    };
+    let source = source_text(context.db(), context.file());
+    diagnostic.help("Wrap in `Literal[...]`");
+    diagnostic.set_fix(Fix::unsafe_edits(
+        Edit::range_replacement(
+            format!("{}[{}]", action.symbol_text(), &source[node.range()]),
+            node.range(),
+        ),
+        action.import().cloned(),
+    ));
+}
+
+pub(super) fn report_undefined_reveal(context: &InferContext, name: &ast::ExprName) {
+    let Some(builder) = context.report_lint(&UNDEFINED_REVEAL, name) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic("`reveal_type` used without importing it");
+    diagnostic.info("This is allowed for debugging convenience but will fail at runtime");
+
+    let Some(module) = typing_module_for_fix(context, "reveal_type", PythonVersion::PY311) else {
+        return;
+    };
+    let module = module.as_str();
+    // `reveal_type` is unbound. Force a `from` import to avoid introducing a module name
+    // that might be shadowed, without querying inferred types while emitting a diagnostic.
+    let action = context.importer().import(
+        ImportRequest::import_from(module, "reveal_type").force(),
+        &MembersInScope::empty(name.start()),
+    );
+    if let Some(edit) = action.import() {
+        diagnostic.help(format_args!("Import `reveal_type` from `{module}`"));
+        diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
+    }
 }
 
 /// Add an autofix to `diagnostic` that replaces the given node with `NotImplementedError`
@@ -4238,6 +4365,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         diagnostic.set_primary_annotation_message(format_args!(
                             "Did you mean {quoted_suggestion}?"
                         ));
+                        diagnostic.help(format_args!("Replace with {quoted_suggestion}"));
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             quoted_suggestion,
                             key_node.range(),
@@ -4931,7 +5059,7 @@ pub(super) fn report_invalid_method_override<'db>(
 
                 let superclass_function_span = match superclass_type {
                     Type::FunctionLiteral(function) => Some(signature_span(function)),
-                    Type::BoundMethod(method) => Some(signature_span(method.function(db))),
+                    Type::BoundMethod(method) => method.function(db).map(signature_span),
                     _ => None,
                 };
 

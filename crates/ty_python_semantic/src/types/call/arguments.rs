@@ -81,11 +81,19 @@ impl<'db> CallArgumentTypes<'db> {
     }
 
     /// Returns the type of this argument when inferred against the provided declared type.
+    ///
+    /// If the type was not inferred against the declared type directly, this method will fall back to
+    /// [`Self::get_default`].
+    pub(crate) fn try_get_for_declared_type(&self, tcx: Type<'db>) -> Option<Type<'db>> {
+        self.types.get(&tcx).copied().or_else(|| self.get_default())
+    }
+
+    /// Returns the type of this argument when inferred against the provided declared type.
+    ///
+    /// If the type was not inferred against the declared type directly, this method will fall back to
+    /// [`Self::get_default`], or to `Unknown` if no fallback type exists.
     pub(crate) fn get_for_declared_type(&self, tcx: Type<'db>) -> Type<'db> {
-        self.types
-            .get(&tcx)
-            .copied()
-            .or_else(|| self.get_default())
+        self.try_get_for_declared_type(tcx)
             .unwrap_or(Type::unknown())
     }
 
@@ -110,7 +118,7 @@ impl<'db> CallArgumentTypes<'db> {
 impl<'a, 'db> CallArguments<'a, 'db> {
     /// Create `CallArguments` from AST arguments. We will use the provided callback to obtain the
     /// type of each splatted argument, so that we can determine its length. All other arguments
-    /// will remain uninitialized as `Unknown`.
+    /// will remain uninitialized.
     pub(crate) fn from_arguments(
         arguments: &'a ast::Arguments,
         mut infer_argument_type: impl FnMut(&ast::ArgOrKeyword, &ast::Expr) -> Type<'db>,

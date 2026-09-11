@@ -209,9 +209,9 @@ a = A(x=B(x=C(x=A(x=None))))
 reveal_type(a.x)  # revealed: B | None
 
 if a.x:
-    reveal_type(a.x and a.x.x)  # revealed: C
-    reveal_type(a.x and a.x.x.x)  # revealed: A
-    reveal_type(a.x and a.x.x.x.x)  # revealed: B | None
+    reveal_type(a.x.x)  # revealed: C
+    reveal_type(a.x.x.x)  # revealed: A
+    reveal_type(a.x.x.x.x)  # revealed: B | None
 
 A(x=42)  # error: [invalid-argument-type]
 
@@ -1241,6 +1241,36 @@ reveal_type(LegacyProperty.value)  # revealed: property
 reveal_type(LegacyProperty.value.fget)  # revealed: (self, /) -> Unknown
 reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
 reveal_type(LegacyProperty("height", 3.4).value)  # revealed: float
+```
+
+### Methods with default type parameters
+
+Methods on generic named tuples honor explicit type arguments that override their defaults,
+including when accessed through a subclass. The `_make` class method returns the specialized
+receiver type.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import NamedTuple
+
+class Box[T = int](NamedTuple):
+    value: T
+
+class Child[T = int](Box[T]):
+    pass
+
+def methods(box: Box[str], child: Child[str]) -> None:
+    reveal_type(box._asdict())  # revealed: dict[str, Any]
+    reveal_type(child._asdict())  # revealed: dict[str, Any]
+    reveal_type(Box[str]._make(("value",)))  # revealed: Box[str]
+    reveal_type(Child[str]._make(("value",)))  # revealed: Child[str]
+
+reveal_type(Box._make((1,)))  # revealed: Box[int]
+reveal_type(Child._make((1,)))  # revealed: Child[int]
 ```
 
 ### Functional syntax with generics

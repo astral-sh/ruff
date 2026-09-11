@@ -28,6 +28,72 @@ def f() -> None:
     x: T
 ```
 
+## Constructor calls require bound type variables
+
+A type argument in a constructor call must be bound in an enclosing generic scope. Assigning the
+result to a variable does not introduce a generic context, and nested type arguments follow the same
+rule.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+# error: [unbound-type-variable]
+list[T]()
+# error: [unbound-type-variable]
+items = list[T]()
+# error: [unbound-type-variable]
+list[list[T]]()
+
+class Box(Generic[T]): ...
+
+# error: [unbound-type-variable]
+Box[T]()
+```
+
+Generic functions and classes can use their own type variables when calling constructors.
+
+```py
+def make(value: T) -> list[T]:
+    result = list[T]([value])
+    reveal_type(result)  # revealed: list[T@make]
+    return result
+
+class Factory(Generic[T]):
+    def make(self, value: T) -> list[T]:
+        return list[T]([value])
+
+def modern[T](value: T) -> list[T]:
+    return list[T]([value])
+```
+
+An alias assignment or a class base can introduce a generic context. Calling a generic alias without
+explicit type arguments also remains valid.
+
+```py
+Alias = list[T]
+reveal_type(Alias[int]())  # revealed: list[int]
+Alias()
+
+class Derived(list[T]): ...
+```
+
+## Constructor calls in stubs
+
+Constructor calls in stubs follow the same scoping rules as calls in Python source files.
+
+```pyi
+from typing import TypeVar
+
+T = TypeVar("T")
+
+# error: [unbound-type-variable]
+list[T]()
+# error: [unbound-type-variable]
+items = list[T]()
+```
+
 ## Legacy typevar used multiple times
 
 > A type variable used in a generic function could be inferred to represent different types in the

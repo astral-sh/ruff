@@ -199,7 +199,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
             let node3 = Expr::Call(ast::ExprCall {
                 func: Box::new(node2),
                 arguments: Arguments {
-                    args: Box::from([node]),
+                    args: [node].into(),
                     keywords: std::iter::empty().collect(),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,

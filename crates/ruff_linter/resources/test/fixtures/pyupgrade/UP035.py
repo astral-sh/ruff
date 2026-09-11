@@ -132,3 +132,7 @@ from typing.re import Match
 
 # UP035 on py37+ only
 from typing.re import Pattern
+
+# `no_type_check_decorator` was removed from `typing` in Python 3.15.
+from typing_extensions import no_type_check_decorator
+from typing_extensions import no_type_check, no_type_check_decorator

@@ -18,6 +18,9 @@
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types simplifies to [`Type::Never`].
 //!
+//! Relation-based intersection simplifications require a non-circular proof. During inference
+//! cycles, an intersection can retain redundant or contradictory elements instead.
+//!
 //! The implication of these invariants is that a [`UnionBuilder`] does not necessarily build a
 //! [`Type::Union`]. For example, if only one type is added to the [`UnionBuilder`], `build()` will
 //! just return that type directly. The same is true for [`IntersectionBuilder`]; for example, if a
@@ -46,7 +49,7 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
-    StringLiteralType, SubclassOfType, Type, TypeVarBoundOrConstraints, UnionType,
+    StringLiteralType, SubclassOfType, Type, TypePair, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet, ProgramEnvironment};
 use rustc_hash::FxHashSet;
@@ -1386,6 +1389,143 @@ impl<'db> IntersectionBuilder<'db> {
     }
 }
 
+/// The signs of a pair of intersection elements. For `Mixed`, the first is positive.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::SalsaValue)]
+enum IntersectionPolarity {
+    Positive,
+    Negative,
+    Mixed,
+}
+
+/// Describes the signed intersection elements, so `Disjoint` also covers `S & ~T` when `S <: T`.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
+enum IntersectionSimplification {
+    Unchanged,
+    FirstRedundant,
+    SecondRedundant,
+    Disjoint,
+}
+
+fn simplify_intersection_pair<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    first: Type<'db>,
+    second: Type<'db>,
+    polarity: IntersectionPolarity,
+) -> IntersectionSimplification {
+    // Built-in literal values have no inference dependencies, so these simplifications cannot
+    // participate in a cycle and do not need an interned pair or a tracked relation query.
+    if let (Type::LiteralValue(first), Type::LiteralValue(second)) = (first, second)
+        && matches!(
+            first.kind(),
+            LiteralValueTypeKind::Int(_)
+                | LiteralValueTypeKind::Bool(_)
+                | LiteralValueTypeKind::String(_)
+                | LiteralValueTypeKind::Bytes(_)
+        )
+        && matches!(
+            second.kind(),
+            LiteralValueTypeKind::Int(_)
+                | LiteralValueTypeKind::Bool(_)
+                | LiteralValueTypeKind::String(_)
+                | LiteralValueTypeKind::Bytes(_)
+        )
+    {
+        return match (polarity, first.kind() == second.kind()) {
+            (IntersectionPolarity::Positive, true) => {
+                // Redundancy depends on promotability and full literal identity, including
+                // the recursive-definition flag. Subtyping only compares the literal values.
+                if first == second || first.is_promotable() {
+                    IntersectionSimplification::SecondRedundant
+                } else if second.is_promotable() {
+                    IntersectionSimplification::FirstRedundant
+                } else {
+                    IntersectionSimplification::Unchanged
+                }
+            }
+            (IntersectionPolarity::Positive, false) | (IntersectionPolarity::Mixed, true) => {
+                IntersectionSimplification::Disjoint
+            }
+            (IntersectionPolarity::Negative, true) | (IntersectionPolarity::Mixed, false) => {
+                IntersectionSimplification::SecondRedundant
+            }
+            (IntersectionPolarity::Negative, false) => IntersectionSimplification::Unchanged,
+        };
+    }
+
+    simplify_intersection_pair_impl(
+        db,
+        TypePair::new(db, env.program(db), first, second),
+        polarity,
+    )
+}
+
+/// Simplify a pair of intersection elements using non-circular relation checks.
+///
+/// If this simplification participates in an inference cycle, retain both signed
+/// elements. Ordinary type relations keep their usual cycle handling, including for
+/// recursive protocols.
+///
+/// ```python
+/// class C:
+///     def __init__(self):
+///         if not hasattr(self, "x"):
+///             self.x = self.__str__
+/// ```
+///
+/// Inferring `C.x` needs the guarded type of `self`. The guard cannot use that unfinished
+/// inference to prove that `C` already satisfies the protocol for `x` and erase the branch.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _, _| IntersectionSimplification::Unchanged,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn simplify_intersection_pair_impl<'db>(
+    db: &'db dyn Db,
+    types: TypePair<'db>,
+    polarity: IntersectionPolarity,
+) -> IntersectionSimplification {
+    let env = ProgramEnvironment::from_program(types.program(db));
+    let first = types.first(db);
+    let second = types.second(db);
+
+    match polarity {
+        IntersectionPolarity::Positive => {
+            // S & T = S if S <: T.
+            if first.is_redundant_with(db, &env, second) {
+                return IntersectionSimplification::SecondRedundant;
+            }
+            let first_redundant = second.is_redundant_with(db, &env, first);
+            if second.is_disjoint_from(db, &env, first) {
+                return IntersectionSimplification::Disjoint;
+            }
+            if first_redundant {
+                return IntersectionSimplification::FirstRedundant;
+            }
+        }
+        IntersectionPolarity::Negative => {
+            // ~S & ~T = ~T if S <: T; the narrower exclusion is redundant.
+            let first_redundant = first.is_redundant_with(db, &env, second);
+            if second.is_subtype_of(db, &env, first) {
+                return IntersectionSimplification::SecondRedundant;
+            }
+            if first_redundant {
+                return IntersectionSimplification::FirstRedundant;
+            }
+        }
+        IntersectionPolarity::Mixed => {
+            // S & ~T = Never if S <: T, and S & ~T = S if S and T are disjoint.
+            if first.is_subtype_of(db, &env, second) {
+                return IntersectionSimplification::Disjoint;
+            }
+            if first.is_disjoint_from(db, &env, second) {
+                return IntersectionSimplification::SecondRedundant;
+            }
+        }
+    }
+    IntersectionSimplification::Unchanged
+}
+
 #[derive(Debug, Clone, Default)]
 struct InnerIntersectionBuilder<'db> {
     positive: FxOrderSet<Type<'db>>,
@@ -1650,19 +1790,21 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         replacement = Some((index, merged));
                         break;
                     }
-                    // S & T = S if S <: T.
-                    if existing_positive.is_redundant_with(db, env, new_positive) {
-                        return;
-                    }
-                    // same rule, reverse order
-                    if new_positive.is_redundant_with(db, env, *existing_positive) {
-                        to_remove.push(index);
-                    }
-                    // A & B = Never    if A and B are disjoint
-                    if new_positive.is_disjoint_from(db, env, *existing_positive) {
-                        *self = Self::default();
-                        self.positive.insert(Type::Never);
-                        return;
+                    match simplify_intersection_pair(
+                        db,
+                        env,
+                        *existing_positive,
+                        new_positive,
+                        IntersectionPolarity::Positive,
+                    ) {
+                        IntersectionSimplification::Unchanged => {}
+                        IntersectionSimplification::SecondRedundant => return,
+                        IntersectionSimplification::FirstRedundant => to_remove.push(index),
+                        IntersectionSimplification::Disjoint => {
+                            *self = Self::default();
+                            self.positive.insert(Type::Never);
+                            return;
+                        }
                     }
                 }
                 if let Some((index, value)) = replacement {
@@ -1676,15 +1818,21 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
-                    // S & ~T = Never    if S <: T
-                    if new_positive.is_subtype_of(db, env, *existing_negative) {
-                        *self = Self::default();
-                        self.positive.insert(Type::Never);
-                        return;
-                    }
-                    // A & ~B = A    if A and B are disjoint
-                    if existing_negative.is_disjoint_from(db, env, new_positive) {
-                        to_remove.push(index);
+                    match simplify_intersection_pair(
+                        db,
+                        env,
+                        new_positive,
+                        *existing_negative,
+                        IntersectionPolarity::Mixed,
+                    ) {
+                        IntersectionSimplification::Unchanged => {}
+                        IntersectionSimplification::SecondRedundant => to_remove.push(index),
+                        IntersectionSimplification::FirstRedundant => return,
+                        IntersectionSimplification::Disjoint => {
+                            *self = Self::default();
+                            self.positive.insert(Type::Never);
+                            return;
+                        }
                     }
                 }
                 for index in to_remove.into_iter().rev() {
@@ -1792,20 +1940,29 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         continue;
                     }
 
-                    // ~S & ~T = ~T    if S <: T
-                    if existing_negative.is_redundant_with(db, env, new_negative) {
-                        to_remove.push(index);
-                    }
-                    // same rule, reverse order
-                    if new_negative.is_subtype_of(db, env, *existing_negative) {
-                        return;
+                    match simplify_intersection_pair(
+                        db,
+                        env,
+                        *existing_negative,
+                        new_negative,
+                        IntersectionPolarity::Negative,
+                    ) {
+                        IntersectionSimplification::Unchanged => {}
+                        IntersectionSimplification::SecondRedundant => return,
+                        IntersectionSimplification::FirstRedundant => to_remove.push(index),
+                        IntersectionSimplification::Disjoint => {
+                            *self = Self::default();
+                            self.positive.insert(Type::Never);
+                            return;
+                        }
                     }
                 }
                 for index in to_remove.into_iter().rev() {
                     self.negative.swap_remove_index(index);
                 }
 
-                for existing_positive in &self.positive {
+                let mut to_remove = SmallVec::<[usize; 1]>::new();
+                for (index, existing_positive) in self.positive.iter().enumerate() {
                     if let Some(new_enum) = new_negative_enum {
                         if let Some(existing_enum) = existing_positive.as_enum_literal()
                             && existing_enum.enum_class(db) == new_enum.enum_class(db)
@@ -1827,16 +1984,26 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         }
                     }
 
-                    // S & ~T = Never    if S <: T
-                    if existing_positive.is_subtype_of(db, env, new_negative) {
-                        *self = Self::default();
-                        self.positive.insert(Type::Never);
-                        return;
+                    match simplify_intersection_pair(
+                        db,
+                        env,
+                        *existing_positive,
+                        new_negative,
+                        IntersectionPolarity::Mixed,
+                    ) {
+                        IntersectionSimplification::Unchanged => {}
+                        IntersectionSimplification::SecondRedundant => return,
+                        IntersectionSimplification::FirstRedundant => to_remove.push(index),
+                        IntersectionSimplification::Disjoint => {
+                            *self = Self::default();
+                            self.positive.insert(Type::Never);
+                            return;
+                        }
                     }
-                    // A & ~B = A    if A and B are disjoint
-                    if existing_positive.is_disjoint_from(db, env, new_negative) {
-                        return;
-                    }
+                }
+
+                for index in to_remove.into_iter().rev() {
+                    self.positive.swap_remove_index(index);
                 }
 
                 self.negative.insert(new_negative);
@@ -1964,15 +2131,19 @@ impl<'db> InnerIntersectionBuilder<'db> {
 #[cfg(test)]
 mod tests {
     use super::{
-        IntersectionBuilder, MAX_NON_RECURSIVE_UNION_LITERALS, MAX_RECURSIVE_UNION_LITERALS,
-        RecursivelyDefined, Type, UnionBuilder, UnionType,
+        IntersectionBuilder, IntersectionPolarity, MAX_NON_RECURSIVE_UNION_LITERALS,
+        MAX_RECURSIVE_UNION_LITERALS, RecursivelyDefined, Type, UnionBuilder, UnionType,
+        simplify_intersection_pair, simplify_intersection_pair_impl,
     };
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::{global_symbol, known_module_symbol};
     use crate::types::enums::enum_member_literals;
     use crate::types::type_alias::TypeAliasType;
-    use crate::types::{KnownClass, KnownInstanceType, Truthiness};
+    use crate::types::{
+        BytesLiteralType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
+        StringLiteralType, Truthiness, TypePair,
+    };
 
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_module_resolver::KnownModule;
@@ -2203,6 +2374,58 @@ mod tests {
 
         let intersection = IntersectionBuilder::new(db, &env).build();
         assert_eq!(intersection, Type::object());
+    }
+
+    #[test]
+    fn literal_intersection_simplification_matches_relations() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+
+        let literals: Vec<_> = [
+            LiteralValueTypeKind::from(0),
+            LiteralValueTypeKind::from(1),
+            LiteralValueTypeKind::Bool(false),
+            LiteralValueTypeKind::Bool(true),
+            LiteralValueTypeKind::String(StringLiteralType::new(db, "a")),
+            LiteralValueTypeKind::String(StringLiteralType::new(db, "b")),
+            LiteralValueTypeKind::Bytes(BytesLiteralType::new(db, b"a".as_slice())),
+            LiteralValueTypeKind::Bytes(BytesLiteralType::new(db, b"b".as_slice())),
+        ]
+        .into_iter()
+        .flat_map(|kind| {
+            [false, true].into_iter().flat_map(move |promotable| {
+                [RecursivelyDefined::No, RecursivelyDefined::Yes]
+                    .into_iter()
+                    .map(move |recursive| {
+                        Type::LiteralValue(
+                            LiteralValueType::new(kind, promotable)
+                                .with_recursively_defined(recursive),
+                        )
+                    })
+            })
+        })
+        .collect();
+
+        for &first in &literals {
+            for &second in &literals {
+                for polarity in [
+                    IntersectionPolarity::Positive,
+                    IntersectionPolarity::Negative,
+                    IntersectionPolarity::Mixed,
+                ] {
+                    assert_eq!(
+                        simplify_intersection_pair(db, &env, first, second, polarity),
+                        simplify_intersection_pair_impl(
+                            db,
+                            TypePair::new(db, env.program(db), first, second),
+                            polarity,
+                        ),
+                        "{first:?}, {second:?}, {polarity:?}",
+                    );
+                }
+            }
+        }
     }
 
     #[test]

@@ -13,6 +13,7 @@ use ruff_text_size::{Ranged, TextRange};
 use std::borrow::Cow;
 
 use crate::comments::{leading_comments, trailing_comments};
+use crate::context::WithInterpolatedStringState;
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
 use crate::other::interpolated_string::{InterpolatedStringContext, InterpolatedStringLayout};
 use crate::other::interpolated_string_element::FormatInterpolatedElement;
@@ -332,6 +333,18 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
 
                 StringLikePart::FString(FString { elements, .. })
                 | StringLikePart::TString(TString { elements, .. }) => {
+                    let context = InterpolatedStringContext::new(
+                        self.flags,
+                        InterpolatedStringLayout::from_interpolated_string_elements(
+                            elements,
+                            f.context().source(),
+                        ),
+                    );
+                    let state = f
+                        .context()
+                        .interpolated_string_state()
+                        .enter_string(context);
+                    let f = &mut WithInterpolatedStringState::new(state, &mut *f);
                     for element in elements {
                         match element {
                             InterpolatedStringElement::Literal(literal) => {
@@ -347,14 +360,6 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                             // Formatting the expression here and in the expanded version is safe **only**
                             // because we assert that the f/t-string never contains any comments.
                             InterpolatedStringElement::Interpolation(expression) => {
-                                let context = InterpolatedStringContext::new(
-                                    self.flags,
-                                    InterpolatedStringLayout::from_interpolated_string_elements(
-                                        elements,
-                                        f.context().source(),
-                                    ),
-                                );
-
                                 FormatInterpolatedElement::new(expression, context).fmt(f)?;
                             }
                         }

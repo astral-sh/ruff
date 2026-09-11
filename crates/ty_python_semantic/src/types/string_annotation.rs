@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::declare_lint;
 use crate::lint::{Level, LintStatus};
+use crate::types::diagnostic::autofix_with_literal;
 use crate::types::infer::InferenceFlags;
 
 use super::context::InferContext;
@@ -102,6 +103,7 @@ pub(crate) fn parse_string_annotation(
                                 "Did you mean `typing.Literal[\"{}\"]`?",
                                 string_literal.as_str()
                             ));
+                            autofix_with_literal(context, &mut diagnostic, string_expr);
                         }
                     }
                 }

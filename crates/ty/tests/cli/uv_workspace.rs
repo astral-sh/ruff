@@ -7,6 +7,8 @@
 use std::{fmt::Write as _, fs::File, io::Write, path::Path, process::Command};
 
 use insta_cmd::assert_cmd_snapshot;
+#[cfg(feature = "test-uv")]
+use ty_project::uv_test_env_vars;
 use ty_static::EnvVars;
 #[cfg(feature = "test-uv")]
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
@@ -55,6 +57,8 @@ requires-python = ">=3.8"
 fn uv_command(case: &CliTest) -> Command {
     let mut command = Command::new("uv");
     command
+        .env_clear()
+        .envs(uv_test_env_vars())
         .current_dir(case.root())
         .env("UV_CACHE_DIR", case.root().join("cache"))
         .env("UV_OFFLINE", "1")
@@ -79,17 +83,13 @@ pub(super) fn uv_sync_command(
 
     let mut command = case.command();
     command
+        .envs(uv_test_env_vars())
         .env("TY_UV", "1")
         .env("UV", "uv")
         .env("UV_CACHE_DIR", case.root().join("cache"))
         .env("UV_OFFLINE", "1")
         .env("UV_PYTHON_DOWNLOADS", "never")
-        .env("TY_OUTPUT_FORMAT", "concise")
-        .env("PATH", std::env::var_os("PATH").unwrap_or_default());
-    #[cfg(windows)]
-    if let Some(path_ext) = std::env::var_os("PATHEXT") {
-        command.env("PATHEXT", path_ext);
-    }
+        .env("TY_OUTPUT_FORMAT", "concise");
     if let Some(virtual_env) = virtual_env {
         command.env("VIRTUAL_ENV", virtual_env);
     }
@@ -242,6 +242,42 @@ fn indirect_dependencies_use_uv_module_ownership() -> anyhow::Result<()> {
     ");
 
     assert_eq!(std::fs::read(case.root().join("uv.lock"))?, lockfile);
+
+    Ok(())
+}
+
+/// Dependency checks reflect changed declarations even before the environment is synchronized
+/// again. A transitive dependency can become direct without changing the installed packages.
+#[cfg(feature = "test-uv")]
+#[test]
+fn indirect_dependencies_use_updated_declarations() -> anyhow::Result<()> {
+    let case = dependency_workspace_case()?;
+    let mut command = uv_sync_command(&case, None)?;
+    // Leave the lockfile stale so ty has to refresh the dependency metadata.
+    let output = uv_command(&case)
+        .args([
+            "add",
+            "--frozen",
+            "--package",
+            "member",
+            "indirect-dependency",
+        ])
+        .output()?;
+    anyhow::ensure!(
+        output.status.success(),
+        "failed to add dependency: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    command.args(["packages/member", "--error", "missing-direct-dependency"]);
+
+    assert_cmd_snapshot!(command, @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }

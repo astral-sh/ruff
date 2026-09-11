@@ -159,7 +159,7 @@ pub enum Category {
     /// Rules that are highly opinionated or prone to false positives
     Pedantic,
 
-    /// Rules that restrict the use of basic language features
+    /// Rules that restrict the use of certain features
     Restriction,
 
     /// Internal testing rules that shouldn't be exposed to users.
@@ -1213,6 +1213,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Ruff, "073") => rules::ruff::rules::FStringPercentFormat,
         (Ruff, "074") => rules::ruff::rules::IncorrectDecoratorOrder,
         (Ruff, "075") => rules::ruff::rules::FallibleContextManager,
+        (Ruff, "077") => rules::ruff::rules::MethodReceiverDefault,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
@@ -1412,7 +1413,7 @@ mod tests {
         security: Rules that flag potential security vulnerabilities but may be prone to false positives
         formatting: Rules that flag formatting issues that do not affect semantics
         pedantic: Rules that are highly opinionated or prone to false positives
-        restriction: Rules that restrict the use of basic language features
+        restriction: Rules that restrict the use of certain features
         ");
     }
 }

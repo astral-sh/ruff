@@ -170,7 +170,7 @@ order of decreasing severity, are:
 - **Pedantic**: These rules are generally stylistic, like those in the `style` or similar
   categories, but enforce styles that are too opinionated or are too prone to false positives to fit
   into another category.
-- **Restriction**: These rules restrict the usage of basic language features in arbitrary ways.
+- **Restriction**: These rules restrict the usage of certain features in arbitrary ways.
 
 The first five categories compose the default rule set:
 

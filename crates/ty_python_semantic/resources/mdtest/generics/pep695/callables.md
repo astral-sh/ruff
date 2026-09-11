@@ -136,6 +136,33 @@ reveal_type(generic_context(into_regular_callable(C)))
 reveal_type(into_regular_callable(C)(1))
 ```
 
+## Generic `__iter__` methods with explicit receivers
+
+Binding `__iter__` to an `Unpacker[Iterable[int]]` infers `S` as `int` from the explicit
+`self: Unpacker[Iterable[S]]` annotation. Calls to `list()` and `iter()` preserve this element type,
+just as `tuple()` and `for` loops do.
+
+Regression test for <https://github.com/astral-sh/ty/issues/3598>.
+
+```py
+from collections.abc import Iterable, Iterator
+
+class Unpacker[T: Iterable[object]]:
+    def __init__(self, it: T, /) -> None:
+        self._it = it
+    def __iter__[S](self: "Unpacker[Iterable[S]]") -> Iterator[S]:
+        return iter(self._it)
+
+def integers() -> Unpacker[Iterable[int]]:
+    return Unpacker([1, 2, 3])
+
+reveal_type(tuple(integers()))  # revealed: tuple[int, ...]
+for x in integers():
+    reveal_type(x)  # revealed: int
+reveal_type(list(integers()))  # revealed: list[int]
+reveal_type(iter(integers()))  # revealed: Iterator[int]
+```
+
 ## Naming a generic `Callable`: type aliases
 
 The easiest way to refer to a generic `Callable` type directly is via a type alias:

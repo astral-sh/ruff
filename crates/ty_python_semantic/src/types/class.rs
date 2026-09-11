@@ -20,11 +20,11 @@ pub(super) use self::typed_dict::{
     DynamicTypedDictAnchor, DynamicTypedDictLiteral, synthesized_typed_dict_class_member,
 };
 use super::dedicated::pydantic;
+use super::display;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
     SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
-use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
@@ -36,18 +36,20 @@ use crate::types::generics::{GenericContext, Specialization, walk_specialization
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
+use crate::types::mro::{Mro, StaticMroError};
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
 };
-use crate::types::tuple::TupleSpec;
+use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::typevar::TypeVarSet;
+use crate::types::variance::VarianceOrigin;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
-    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypingModule,
-    UnionBuilder, VarianceInferable,
+    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams, ErrorContext,
+    ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping,
+    TypingModule, UnionBuilder, VarianceInferable, VarianceTerm,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -57,6 +59,7 @@ use crate::{
     },
     types::{MetaclassCandidate, TypeDefinition, UnionType},
 };
+use itertools::Either;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -511,25 +514,65 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
     fn variance_of(
         self,
         db: &'db dyn Db,
-        _: &ProgramEnvironment<'db>,
+        env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
-        self.variance_of_owner(db, typevar)
+    ) -> VarianceTerm<'db> {
+        match self.specialization(db).tuple(db) {
+            Some(tuple) => {
+                let elements = match tuple {
+                    Tuple::Fixed(tuple) => Either::Left(tuple.iter_all_elements()),
+                    Tuple::Variable(tuple) => Either::Right(
+                        tuple
+                            .iter_prefix_elements()
+                            .chain(std::iter::once(tuple.variable().tuple_class_type()))
+                            .chain(tuple.iter_suffix_elements()),
+                    ),
+                };
+                VarianceTerm::join(db, elements.map(|ty| ty.variance_of(db, env, typevar)))
+            }
+            None => VarianceTerm::variable(db, VarianceOrigin::GenericAlias(self), typevar),
+        }
     }
 }
 
 #[salsa::tracked]
 impl<'db> GenericAlias<'db> {
+    /// Resolve the MRO with this alias's type arguments applied to its base classes.
     #[salsa::tracked(
-        returns(copy),
-        cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
+        returns(as_ref),
+        cycle_initial=|db, _, alias: GenericAlias<'db>| {
+            let origin = alias.origin(db);
+            let env = ProgramEnvironment::from_scope(origin.body_scope(db));
+            Err(Box::new(StaticMroError::cycle(
+                db,
+                &env,
+                origin.apply_optional_specialization(db, Some(alias.specialization(db))),
+            )))
+        },
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn variance_of_owner(
+    pub(in crate::types) fn try_mro(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<Mro<'db>, Box<StaticMroError<'db>>> {
+        let origin = self.origin(db);
+        tracing::trace!("GenericAlias::try_mro: {}", origin.name(db));
+        Mro::of_static_class(db, origin, Some(self.specialization(db))).map_err(Box::new)
+    }
+
+    /// Compose each type argument's variance with its formal parameter's variance. Inferred
+    /// parameters refer to the unspecialized class equation, keeping references such as
+    /// `P[list[T]]` finite without expanding specialized class bodies.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(in crate::types) fn variance_equation(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         let origin = self.origin(db);
         let env = ProgramEnvironment::from_file(origin.program_file(db));
 
@@ -537,33 +580,32 @@ impl<'db> GenericAlias<'db> {
 
         // Note that we only care about the variance of the specialized generic alias with respect
         // to the given type variable, not the unspecialized class literal origin.
-        specialization
+        let variances = specialization
             .generic_context(db)
             .variables(db)
             .zip(specialization.types(db))
             .map(|(generic_typevar, ty)| {
-                if let Some(explicit_variance) = generic_typevar.typevar(db).explicit_variance(db) {
-                    ty.with_polarity(explicit_variance)
-                        .variance_of(db, &env, typevar)
-                } else {
-                    // `with_polarity` composes the passed variance with the
-                    // inferred one. The inference is done lazily, as we can
-                    // sometimes determine the result just from the passed
-                    // variance. This operation is commutative, so we could
-                    // infer either first.  We choose to make the `StaticClassLiteral`
-                    // variance lazy, as it is known to be expensive, requiring
-                    // that we traverse all members.
-                    //
-                    // If salsa let us look at the cache, we could check first
-                    // to see if the class literal query was already run.
-
-                    let typevar_variance_in_substituted_type = ty.variance_of(db, &env, typevar);
-                    origin
-                        .with_polarity(typevar_variance_in_substituted_type)
-                        .variance_of(db, &env, generic_typevar.identity(db))
-                }
-            })
-            .collect()
+                // Composition is commutative. Keep the argument on the left so evaluation can
+                // skip the class's potentially expensive equation when the argument is bivariant.
+                ty.variance_of(db, &env, typevar).compose_thunk(db, || {
+                    match generic_typevar.typevar(db).explicit_variance(db) {
+                        Some(explicit_variance)
+                            if generic_typevar.is_paramspec(db)
+                                || generic_typevar.is_typevartuple(db)
+                                || origin.into_protocol_class(db).is_none() =>
+                        {
+                            explicit_variance.into()
+                        }
+                        Some(explicit_variance) => VarianceTerm::variable(
+                            db,
+                            VarianceOrigin::ProtocolParameter(origin, explicit_variance),
+                            generic_typevar.identity(db),
+                        ),
+                        None => origin.variance_of(db, &env, generic_typevar.identity(db)),
+                    }
+                })
+            });
+        VarianceTerm::join(db, variances)
     }
 }
 
@@ -1416,7 +1458,7 @@ impl<'db> ClassType<'db> {
             match ty {
                 Type::FunctionLiteral(function) => function.as_abstract_method(db, defining_class),
                 Type::BoundMethod(method) => {
-                    method.function(db).as_abstract_method(db, defining_class)
+                    type_as_abstract_method(db, method.func(db), defining_class)
                 }
                 Type::PropertyInstance(property) => {
                     // A property is abstract if any of its accessors is abstract.
@@ -1670,6 +1712,7 @@ impl<'db> ClassType<'db> {
             db,
             env,
             other,
+            None,
             |this, other| this.could_exist_in_mro_of(db, env, other, constraints),
             |this, other| {
                 this.is_disjoint_from(db, env, other, constraints, TypeVarSet::None)
@@ -1695,6 +1738,7 @@ impl<'db> ClassType<'db> {
             db,
             env,
             other,
+            checker.report_context(),
             |this, other| {
                 this.could_exist_in_mro_of_with_disjointness_checker(db, env, other, checker)
             },
@@ -1711,11 +1755,13 @@ impl<'db> ClassType<'db> {
         )
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn could_coexist_in_mro_with_impl(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         other: Self,
+        context: Option<&ErrorContextTree<'db>>,
         could_exist_in_mro_of: impl Fn(Self, Self) -> bool,
         specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
         types_are_disjoint: impl Fn(Type<'db>, Type<'db>) -> bool,
@@ -1725,11 +1771,25 @@ impl<'db> ClassType<'db> {
         }
 
         if self.is_final(db) {
-            return could_exist_in_mro_of(other, self);
+            let compatible = could_exist_in_mro_of(other, self);
+            if !compatible && let Some(context) = context {
+                context.push(ErrorContext::FinalClassDisjoint {
+                    final_type: Type::instance(db, env, self),
+                    other: Type::instance(db, env, other),
+                });
+            }
+            return compatible;
         }
 
         if other.is_final(db) {
-            return could_exist_in_mro_of(self, other);
+            let compatible = could_exist_in_mro_of(self, other);
+            if !compatible && let Some(context) = context {
+                context.push(ErrorContext::FinalClassDisjoint {
+                    final_type: Type::instance(db, env, other),
+                    other: Type::instance(db, env, self),
+                });
+            }
+            return compatible;
         }
 
         // A class cannot implement two incompatible specializations of an invariant base.
@@ -1748,6 +1808,12 @@ impl<'db> ClassType<'db> {
                     })
             })
         {
+            if let Some(context) = context {
+                context.push(ErrorContext::IncompatibleClassLayouts {
+                    left: Type::instance(db, env, self),
+                    right: Type::instance(db, env, other),
+                });
+            }
             return false;
         }
 
@@ -2334,6 +2400,7 @@ impl<'db> ClassType<'db> {
             ty: Type::BoundMethod(metaclass_dunder_call_function),
             ..
         }) = metaclass_dunder_call_function_symbol
+            && let Some(function) = metaclass_dunder_call_function.function(db)
         {
             // TODO: this intentionally diverges from step 1 in
             // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
@@ -2348,10 +2415,13 @@ impl<'db> ClassType<'db> {
             let is_actual_enum = enum_metadata(db, self.class_literal(db)).is_some();
             if !is_actual_enum {
                 let callable = if receiver == lookup_type {
-                    metaclass_dunder_call_function.into_callable_type(db)
+                    function.into_bound_callable(
+                        db,
+                        metaclass_dunder_call_function.signature_receiver(db),
+                        metaclass_dunder_call_function.typing_self_type(db),
+                    )
                 } else {
-                    metaclass_dunder_call_function
-                        .into_callable_type_with_receiver(db, env, receiver, receiver)
+                    function.into_bound_callable_with_receiver(db, env, receiver, receiver)
                 };
                 return CallableTypes::one(callable);
             }
@@ -2496,11 +2566,11 @@ impl<'db> ClassType<'db> {
                         new_function =
                             new_function.with_inherited_generic_context(db, class_generic_context);
                     }
-                    CallableTypes::one(
-                        new_function
-                            .into_bound_method_type(db, instance_type)
-                            .into_callable_type(db),
-                    )
+                    CallableTypes::one(new_function.into_bound_callable(
+                        db,
+                        instance_type,
+                        instance_type,
+                    ))
                 } else {
                     // Fallback if no `object.__new__` is found.
                     CallableTypes::one(CallableType::single(
@@ -2569,7 +2639,7 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => class.variance_of(db, env, typevar),
             Self::NonGeneric(
@@ -2577,7 +2647,7 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
                 | ClassLiteral::DynamicNamedTuple(_)
                 | ClassLiteral::DynamicTypedDict(_)
                 | ClassLiteral::DynamicEnum(_),
-            ) => TypeVarVariance::Bivariant,
+            ) => VarianceTerm::BIVARIANT,
             Self::Generic(generic) => generic.variance_of(db, env, typevar),
         }
     }
@@ -2794,13 +2864,13 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         match self {
             Self::Static(class) => class.variance_of(db, env, typevar),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => TypeVarVariance::Bivariant,
+            | Self::DynamicEnum(_) => VarianceTerm::BIVARIANT,
         }
     }
 }

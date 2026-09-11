@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use std::str::FromStr;
 
 use bitflags::bitflags;
+use hashbrown::HashSet;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
@@ -11,7 +12,7 @@ use ruff_python_ast::{
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use rustc_hash::FxHashSet;
+use rustc_hash::FxBuildHasher;
 use thin_vec::ThinVec;
 use unicode_normalization::UnicodeNormalization;
 
@@ -40,7 +41,7 @@ mod tests;
 
 #[derive(Debug, Default)]
 struct NameInterner {
-    names: FxHashSet<Name>,
+    names: HashSet<Name, FxBuildHasher>,
 }
 
 impl NameInterner {
@@ -50,13 +51,9 @@ impl NameInterner {
             return name;
         }
 
-        if let Some(name) = self.names.get(text) {
-            return name.clone();
-        }
-
-        let name = Name::new_heap(text);
-        self.names.insert(name.clone());
-        name
+        self.names
+            .get_or_insert_with(text, |text| Name::new_heap(text))
+            .clone()
     }
 }
 
@@ -1466,10 +1463,7 @@ impl RecoveryContextKind {
             | RecoveryContextKind::SetElements
             | RecoveryContextKind::TupleElements(_) => p.at_expr(),
             RecoveryContextKind::DictElements => p.at(TokenKind::DoubleStar) || p.at_expr(),
-            RecoveryContextKind::SequenceMatchPattern(_) => {
-                // `+` doesn't start any pattern but is here for better error recovery.
-                p.at(TokenKind::Plus) || p.at_pattern_start()
-            }
+            RecoveryContextKind::SequenceMatchPattern(_) => p.at_pattern_start(),
             RecoveryContextKind::MatchPatternMapping => {
                 // A star pattern is invalid as a mapping key and is here only for
                 // better error recovery.

@@ -6,11 +6,6 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 cd "$SCRIPT_DIR"
 
-if ! cargo fuzz --help >&/dev/null; then
-  echo "Installing cargo-fuzz..."
-  cargo install --git https://github.com/rust-fuzz/cargo-fuzz.git --rev bf2fc668dafda5295aa6fd01825ee67b885f0f2b
-fi
-
 if [ ! -d corpus/common ]; then
   mkdir -p corpus/common
 
@@ -44,9 +39,9 @@ if [ ! -d corpus/common ]; then
 
   echo "Minifying the corpus dataset..."
   if [[ "$OSTYPE" == "darwin"* ]]; then
-    cargo +nightly fuzz cmin ruff_fix_validity corpus/common -- -timeout=5
+    uv run --only-dev cargo +nightly fuzz cmin ruff_fix_validity corpus/common -- -timeout=5
   else
-    cargo fuzz cmin -s none ruff_fix_validity corpus/common -- -timeout=5
+    uv run --only-dev cargo fuzz cmin -s none ruff_fix_validity corpus/common -- -timeout=5
   fi
 fi
 

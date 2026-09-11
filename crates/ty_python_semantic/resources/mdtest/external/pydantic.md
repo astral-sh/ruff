@@ -1442,6 +1442,39 @@ HasGenericRoot(root=GenericRoot("1"))
 HasGenericRoot(root=GenericRoot(None))
 ```
 
+## Generic models
+
+Generic models inherit model configuration with both PEP 695 and legacy generic syntax. An explicit
+`Generic[T]` base does not override the inherited configuration.
+
+```py
+from typing import Generic, TypeVar
+
+from pydantic import BaseModel, ConfigDict
+
+class ForbidExtras(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+class Model[T](ForbidExtras):
+    value: T
+
+Model[int](value=1)
+Model[int](value=1, something_else=7)  # error: [unknown-argument]
+
+T = TypeVar("T")
+
+class LegacyModel(ForbidExtras, Generic[T]):
+    value: T
+
+LegacyModel[int](value=1)
+LegacyModel[int](value=1, something_else=7)  # error: [unknown-argument]
+
+class InheritsLegacyModel(LegacyModel[int]): ...
+
+InheritsLegacyModel(value=1)
+InheritsLegacyModel(value=1, something_else=7)  # error: [unknown-argument]
+```
+
 ## Model configuration
 
 The tests in this section use `extra` as an exemplary setting, but primarily test how model

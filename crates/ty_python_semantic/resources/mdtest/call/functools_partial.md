@@ -74,6 +74,8 @@ reveal_type(p)  # revealed: partial[() -> bool]
 
 ### No args bound
 
+With no arguments bound, the partial keeps the full signature and refers to the original function.
+
 ```py
 from functools import partial
 
@@ -82,6 +84,7 @@ def f(a: int, b: str) -> bool:
 
 p = partial(f)
 reveal_type(p)  # revealed: partial[(a: int, b: str) -> bool]
+reveal_type(p.func is f)  # revealed: Literal[True]
 ```
 
 ### Positional-only params
@@ -602,6 +605,32 @@ def test_union_partial(flag: bool) -> None:
     reveal_type(p)  # revealed: partial[() -> int] | partial[(y: str) -> int]
 
     bad: Callable[[bytes, bytes], int] = p  # error: [invalid-assignment]
+```
+
+### Union of partials with different wrapped functions
+
+The boolean-returning `partial` instance in the below example can be selected when `flag` is true.
+Its call signature is a subtype of the integer-returning `partial`'s signature, but each wraps a
+different function. Discarding `bool_partial` from the union would incorrectly make
+`selected is bool_partial` appear impossible:
+
+```py
+from functools import partial
+
+def integer() -> int:
+    return 1
+
+def boolean() -> bool:
+    return True
+
+int_partial = partial(integer)
+bool_partial = partial(boolean)
+
+def choose(flag: bool) -> None:
+    selected = bool_partial if flag else int_partial
+    reveal_type(selected)  # revealed: partial[() -> bool] | partial[() -> int]
+    reveal_type(selected.func)  # revealed: (def boolean() -> bool) | (def integer() -> int)
+    reveal_type(selected is bool_partial)  # revealed: bool
 ```
 
 ### Keyword-bound overload filtering
@@ -1760,6 +1789,9 @@ if isinstance(p, PartialMarker):
 
 ### `partial.func` keeps the original callable type
 
+The `func` attribute refers to the original function object, including when some arguments are
+bound. The original function remains generic independently of those bound arguments.
+
 ```py
 from functools import partial
 from typing import TypeVar
@@ -1771,6 +1803,9 @@ def combine(a: T, b: U) -> tuple[T, U]:
     return (a, b)
 
 p = partial(combine, 1)
+reveal_type(partial(combine).func is combine)  # revealed: Literal[True]
+reveal_type(p.func is combine)  # revealed: Literal[True]
+reveal_type(p.func is not combine)  # revealed: Literal[False]
 reveal_type(p.func(2, "x"))  # revealed: tuple[Literal[2], Literal["x"]]
 ```
 

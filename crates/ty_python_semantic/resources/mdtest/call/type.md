@@ -68,6 +68,120 @@ def growing(value: Growing[int]):
     reveal_type(type(value))  # revealed: type
 ```
 
+### Classes of recursive class aliases with growing specializations
+
+The arguments of a recursive alias can grow while nested `type` specializations are resolved.
+Computing the class still terminates and retains the possible metaclasses.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Meta[T] = type[T]
+type Growing[T] = T | Meta[Growing[list[T]]]
+
+def growing_class(value: Growing[int]):
+    reveal_type(type(value))  # revealed: type[int | type]
+```
+
+### Classes of recursive class aliases with nested specializations
+
+An alias can forward a class type to another alias. Class inference also terminates when that class
+type contains a growing recursive specialization, retaining the possible metaclasses.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Meta[T] = type[T]
+type NestedMeta[T] = Meta[type[T]]
+type Growing[T] = T | NestedMeta[Growing[list[T]]]
+
+def nested_specialization(value: Growing[int]):
+    reveal_type(type(value))  # revealed: type[int | type]
+```
+
+### Classes of materialized recursive aliases
+
+Upper and lower materializations retain their different class types after recursive alias expansion.
+Interleaving queries with the original alias preserves all three results.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import Bottom, Top
+
+type Meta[T] = type[T]
+type Gradual = list[Any] | Meta[Gradual]
+
+def materialized_classes(top: Top[Gradual], bottom: Bottom[Gradual], plain: Gradual):
+    reveal_type(type(top))  # revealed: type[Top[list[Any]] | type]
+    reveal_type(type(bottom))  # revealed: type[Bottom[list[Any]] | type]
+    reveal_type(type(plain))  # revealed: type[list[Any] | type]
+    reveal_type(top.__class__)  # revealed: type[Top[list[Any]] | type]
+    reveal_type(bottom.__class__)  # revealed: type[Bottom[list[Any]] | type]
+    reveal_type(type(top))  # revealed: type[Top[list[Any]] | type]
+```
+
+### Classes with an aliased recursive type-variable bound
+
+A type variable cannot appear in its own bound, but this is not yet diagnosed when an alias hides
+the type variable. Computing a parameter's class still terminates in this case.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Meta[T] = type[T]
+
+def recursive_bound[T: Meta[T]](value: type[T]):
+    type(value)
+```
+
+### Classes with an identity alias in a recursive type-variable bound
+
+An identity alias can also hide an invalid bound that refers back to the same type variable.
+Computing a parameter's class terminates after the alias has been expanded.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Identity[T] = T
+
+def recursive_bound[T: Identity[T]](value: type[T]):
+    type(value)
+```
+
+### Classes with aliased recursive type-variable constraints
+
+An alias for `type[T]` can hide an invalid recursive constraint. Although this is not yet diagnosed,
+computing a `type[T]` parameter's class still terminates.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Meta[T] = type[T]
+
+def recursive_constraints[T: (Meta[T], int)](value: type[T]):
+    type(value)
+```
+
 ## Three-argument form (dynamic class creation)
 
 A three-argument call to `type()` creates a new class. We synthesize a class type using the name

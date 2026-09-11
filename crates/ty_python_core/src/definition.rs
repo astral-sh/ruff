@@ -1332,6 +1332,20 @@ impl ParameterDefinitionNodeKind {
             }
         }
     }
+
+    pub fn annotation<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
+        match self {
+            Self::VariadicPositionalParameter(parameter)
+            | Self::VariadicKeywordParameter(parameter) => {
+                parameter.node(module).annotation.as_deref()
+            }
+            Self::Parameter(parameter_with_default) => parameter_with_default
+                .node(module)
+                .parameter
+                .annotation
+                .as_deref(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, get_size2::GetSize)]

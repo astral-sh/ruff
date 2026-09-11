@@ -461,6 +461,11 @@ class BinaryWriter:
                 time.monotonic() * 1e6)
         """
 
+    def set_stats(
+        self, /, duration_sec: float, sample_rate: float, error_rate: float | None = None, missed_samples: float | None = None
+    ) -> None:
+        """Store measured profile statistics in the binary file."""
+
     def finalize(self) -> None:
         """Finalize and close the binary file.
 

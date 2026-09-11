@@ -1,6 +1,7 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::{TokenKind, parenthesized_range};
-use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_ast::{self as ast, Expr, Operator, Stmt};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -33,6 +34,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     "dog"
 /// )
 /// ```
+///
+/// ## Fix safety
+///
+/// The fix is marked as unsafe when it would create a docstring.
 ///
 /// ## Options
 ///
@@ -114,6 +119,42 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
     }
 }
 
+/// Returns `true` if removing the `+` operator would turn the enclosing
+/// expression statement into a docstring, which would change the program's
+/// behavior (e.g., by setting `__doc__`). See #27979.
+fn fix_creates_docstring(checker: &Checker, expr: &ast::ExprBinOp) -> bool {
+    // Only concatenations of plain string literals can produce a docstring
+    // after the fix; f-strings, byte strings, and template strings are not
+    // recognized as docstrings by Python.
+    if !matches!(
+        (expr.left.as_ref(), expr.right.as_ref()),
+        (Expr::StringLiteral(_), Expr::StringLiteral(_))
+    ) {
+        return false;
+    }
+
+    let semantic = checker.semantic();
+    let stmt = semantic.current_statement();
+    let Some(ast::StmtExpr { value, .. }) = stmt.as_expr_stmt() else {
+        return false;
+    };
+    // The concatenation must be the entire expression statement.
+    if value.range() != expr.range() {
+        return false;
+    }
+
+    // A docstring must be the first statement in the body of a module,
+    // function, or class.
+    let body = match semantic.current_statement_parent() {
+        Some(Stmt::FunctionDef(function)) => &function.body,
+        Some(Stmt::ClassDef(class)) => &class.body,
+        // No parent statement: the statement is at module level.
+        None => checker.module.python_ast,
+        _ => return false,
+    };
+    body.first() == Some(stmt)
+}
+
 fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Option<Fix> {
     let ast::ExprBinOp { left, right, .. } = expr_bin_op;
 
@@ -142,8 +183,14 @@ fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Option<Fix> 
         before_plus.trim_end_matches(is_python_whitespace)
     };
 
-    Some(Fix::safe_edit(Edit::range_replacement(
-        format!("{before_plus}{after_plus}"),
-        between_operands_range,
-    )))
+    let applicability = if fix_creates_docstring(checker, expr_bin_op) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    Some(Fix::applicable_edit(
+        Edit::range_replacement(format!("{before_plus}{after_plus}"), between_operands_range),
+        applicability,
+    ))
 }

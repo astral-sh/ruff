@@ -18,18 +18,18 @@ Module(
                         ExprCompare {
                             node_index: NodeIndex(None),
                             range: 0..20,
-                            left: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 0..1,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
                             ops: [
                                 NotIn,
                             ],
-                            comparators: [
+                            operands: [
+                                Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 0..1,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
                                 Lambda(
                                     ExprLambda {
                                         node_index: NodeIndex(None),
@@ -84,18 +84,18 @@ Module(
                         ExprCompare {
                             node_index: NodeIndex(None),
                             range: 22..34,
-                            left: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 22..23,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
                             ops: [
                                 Eq,
                             ],
-                            comparators: [
+                            operands: [
+                                Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 22..23,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
                                 Yield(
                                     ExprYield {
                                         node_index: NodeIndex(None),

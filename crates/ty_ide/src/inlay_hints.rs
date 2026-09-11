@@ -3,16 +3,14 @@ use ty_python_semantic::ProgramEnvironment;
 
 use rustc_hash::FxHashMap;
 
-use crate::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
 use crate::{Db, HasNavigationTargets, NavigationTarget};
 use ruff_db::parsed::parsed_module;
-use ruff_db::source::source_text;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
-use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::file_to_module;
 use ty_python_core::ProgramFile;
+use ty_python_semantic::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
 use ty_python_semantic::types::ide_support::inlay_hint_call_argument_details;
 use ty_python_semantic::types::{Type, TypeDetail};
 use ty_python_semantic::{HasType, SemanticModel};
@@ -297,11 +295,7 @@ pub fn inlay_hints(
     settings: &InlayHintSettings,
 ) -> Vec<InlayHint> {
     let ast = parsed_module(db, file.python_file(db)).load(db);
-    let source_file = file.file(db);
-
-    let source = source_text(db, source_file);
-    let stylist = Stylist::from_tokens(ast.tokens(), source.as_str());
-    let importer = Importer::new(db, &stylist, file, source.as_str(), &ast);
+    let importer = Importer::new(db, file, &ast);
 
     let mut visitor = InlayHintVisitor::new(db, file, importer, range, settings);
 

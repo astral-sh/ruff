@@ -26,8 +26,9 @@ This rule is disabled by default and requires uv integration.
 For projects, enable uv workspace integration (`TY_UV=1`) and use an existing, synchronized
 environment. Running [`uv check`](https://docs.astral.sh/uv/reference/cli/#uv-check) synchronizes
 the environment automatically before invoking ty, unless `--no-sync` is passed. For these checks, ty
-reads the dependency graph and module ownership returned by `uv workspace metadata` without
-installing or updating dependencies. uv 0.12.3 or later is required.
+reads the dependency graph and module ownership returned by `uv workspace metadata` without changing
+installed packages. uv may update the lockfile to match the current dependency declarations. uv
+0.12.3 or later is required.
 
 For PEP 723 scripts, enable uv script integration with `TY_UV=scripts` or `TY_UV=1`. ty synchronizes
 each script's environment and checks imports against its inline `dependencies` list. Declarations

@@ -2,9 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
-use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, Comprehension, Expr, ExprContext, Stmt, UnaryOp,
-};
+use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprContext, Stmt, UnaryOp};
 use ruff_python_codegen::Generator;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -149,44 +147,16 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                 }) = &loop_.test
                 {
                     *operand.clone()
-                } else if let Expr::Compare(ast::ExprCompare {
-                    left,
-                    ops,
-                    comparators,
-                    range: _,
-                    node_index: _,
-                }) = &loop_.test
+                } else if let Expr::Compare(compare) = &loop_.test
+                    && let Some((_, op, _)) = compare.as_single()
                 {
-                    if let ([op], [comparator]) = (&**ops, &**comparators) {
-                        let op = match op {
-                            CmpOp::Eq => CmpOp::NotEq,
-                            CmpOp::NotEq => CmpOp::Eq,
-                            CmpOp::Lt => CmpOp::GtE,
-                            CmpOp::LtE => CmpOp::Gt,
-                            CmpOp::Gt => CmpOp::LtE,
-                            CmpOp::GtE => CmpOp::Lt,
-                            CmpOp::Is => CmpOp::IsNot,
-                            CmpOp::IsNot => CmpOp::Is,
-                            CmpOp::In => CmpOp::NotIn,
-                            CmpOp::NotIn => CmpOp::In,
-                        };
-                        let node = ast::ExprCompare {
-                            left: left.clone(),
-                            ops: Box::from([op]),
-                            comparators: Box::from([comparator.clone()]),
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                        };
-                        node.into()
-                    } else {
-                        let node = ast::ExprUnaryOp {
-                            op: UnaryOp::Not,
-                            operand: Box::new(loop_.test.clone()),
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                        };
-                        node.into()
-                    }
+                    let node = ast::ExprCompare {
+                        ops: [op.negate()].into(),
+                        operands: compare.operands.clone(),
+                        range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    };
+                    node.into()
                 } else {
                     let node = ast::ExprUnaryOp {
                         op: UnaryOp::Not,
@@ -431,7 +401,7 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
     let node2 = ast::ExprCall {
         func: Box::new(node1.into()),
         arguments: Arguments {
-            args: Box::from([node.into()]),
+            args: [node.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,

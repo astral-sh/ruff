@@ -1,6 +1,7 @@
 //! A home for deferred checks that must be done after the `TypeInferenceBuilder` has done an initial
 //! inference pass over the whole scope.
 
+pub(super) mod decorator;
 pub(super) mod dynamic_class;
 pub(super) mod final_variable;
 pub(super) mod function;

@@ -52,7 +52,7 @@ use crate::{
         signatures::CallableSignature,
         tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, TypedDictType, typed_dict_params_from_class_def},
-        variance::VarianceInferable,
+        variance::{VarianceInferable, VarianceOrigin, VarianceTerm},
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
 };
@@ -448,6 +448,44 @@ impl<'db> StaticClassLiteral<'db> {
         inherited_legacy_generic_context_inner(db, self)
     }
 
+    /// Iterate through the decorators on this class, returning the span of the first one
+    /// that matches the given predicate.
+    fn find_decorator_span(
+        self,
+        db: &'db dyn Db,
+        predicate: impl Fn(Type<'db>) -> bool,
+    ) -> Option<Span> {
+        if !self.has_decorators(db) {
+            return None;
+        }
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        self.node(db, &parsed_module(db, definition.python_file(db)).load(db))
+            .decorator_list
+            .iter()
+            .find(|decorator| {
+                predicate(definition_expression_type(
+                    db,
+                    definition,
+                    &decorator.expression,
+                ))
+            })
+            .map(|decorator| Span::from(file).with_range(decorator.range))
+    }
+
+    /// Iterate through the decorators on this class, returning the span of the first one
+    /// that matches the given [`KnownFunction`].
+    pub(crate) fn find_known_decorator_span(
+        self,
+        db: &'db dyn Db,
+        needle: KnownFunction,
+    ) -> Option<Span> {
+        self.find_decorator_span(db, |ty| {
+            ty.as_function_literal()
+                .is_some_and(|f| f.is_known(db, needle))
+        })
+    }
+
     /// Returns all of the typevars that are referenced in this class's base class list.
     /// (This is used to ensure that classes do not reference typevars from enclosing
     /// generic contexts.)
@@ -790,44 +828,25 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> Result<&'db Mro<'db>, &'db StaticMroError<'db>> {
         match specialization {
             None => self.try_mro_unspecialized(db),
-            Some(specialization) => self.try_mro_specialized(db, specialization),
+            Some(specialization) => GenericAlias::new(db, self, specialization).try_mro(db),
         }
+        .map_err(Box::as_ref)
     }
 
     #[salsa::tracked(
         returns(as_ref),
         cycle_initial=|db, _, self_: StaticClassLiteral<'db>| {
             let env = ProgramEnvironment::from_scope(self_.body_scope(db));
-            Err(StaticMroError::cycle(
+            Err(Box::new(StaticMroError::cycle(
                 db, &env,
                 self_.apply_optional_specialization(db, None),
-            ))
+            )))
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn try_mro_unspecialized(self, db: &'db dyn Db) -> Result<Mro<'db>, StaticMroError<'db>> {
+    fn try_mro_unspecialized(self, db: &'db dyn Db) -> Result<Mro<'db>, Box<StaticMroError<'db>>> {
         tracing::trace!("StaticClassLiteral::try_mro: {}", self.name(db));
-        Mro::of_static_class(db, self, None)
-    }
-
-    #[salsa::tracked(
-        returns(as_ref),
-        cycle_initial=|db, _, self_: StaticClassLiteral<'db>, specialization| {
-            let env = ProgramEnvironment::from_scope(self_.body_scope(db));
-            Err(StaticMroError::cycle(
-                db, &env,
-                self_.apply_optional_specialization(db, Some(specialization)),
-            ))
-        },
-        heap_size=ruff_memory_usage::heap_size
-    )]
-    fn try_mro_specialized(
-        self,
-        db: &'db dyn Db,
-        specialization: Specialization<'db>,
-    ) -> Result<Mro<'db>, StaticMroError<'db>> {
-        tracing::trace!("StaticClassLiteral::try_mro: {}", self.name(db));
-        Mro::of_static_class(db, self, Some(specialization))
+        Mro::of_static_class(db, self, None).map_err(Box::new)
     }
 
     /// Iterate over the [method resolution order] ("MRO") of the class.
@@ -1154,7 +1173,16 @@ impl<'db> StaticClassLiteral<'db> {
     pub(in crate::types) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
         self.try_metaclass(db)
             .map(|(metaclass, _)| metaclass)
-            .unwrap_or_else(|_| ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()))
+            .unwrap_or_else(|error| match error.kind {
+                MetaclassErrorKind::Conflict { candidate, .. } => {
+                    // Keep the candidate for member lookup; `try_metaclass` still reports the
+                    // conflict during class validation. Falling back to `Unknown` here can change
+                    // attribute inference and make the conflict disappear on the next cycle
+                    // iteration, causing metaclass inference to oscillate.
+                    ClassMetaclass::Selected(candidate.metaclass.into())
+                }
+                _ => ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()),
+            })
     }
 
     /// Return the selected metaclass or protocol fallback, or an error if it cannot be inferred.
@@ -1891,8 +1919,7 @@ impl<'db> StaticClassLiteral<'db> {
                     add_parameter_with_name(field_name.clone(), default_ty);
                 } else {
                     // Use the alias name if provided, otherwise use the field name.
-                    let parameter_name =
-                        Name::new(alias.map(|alias| &**alias).unwrap_or(&**field_name));
+                    let parameter_name = alias.map_or_else(|| field_name.clone(), Name::new);
                     add_parameter_with_name(parameter_name, default_ty);
                 }
             }
@@ -2068,7 +2095,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 new_upper_bound: determine_upper_bound(
                                     db,
                                     env,
-                                    ClassLiteral::Static(self),
+                                    self.apply_optional_specialization(db, specialization),
                                     |base| {
                                         base.into_class()
                                             .is_some_and(|c| c.is_known(db, KnownClass::Tuple))
@@ -2347,12 +2374,7 @@ impl<'db> StaticClassLiteral<'db> {
         if let Some(member) = self.own_synthesized_member(db, env, specialization, None, name) {
             Place::bound(member).into()
         } else {
-            let class = match specialization {
-                Some(specialization) => {
-                    ClassType::Generic(GenericAlias::new(db, self, specialization))
-                }
-                None => self.identity_specialization(db),
-            };
+            let class = self.apply_optional_specialization(db, specialization);
             let Some(module) = self.typed_dict_module(db) else {
                 return Place::Undefined.into();
             };
@@ -3363,19 +3385,22 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
         db: &'db dyn Db,
         _: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
-        self.variance_of_owner(db, typevar)
+    ) -> VarianceTerm<'db> {
+        VarianceTerm::variable(db, VarianceOrigin::Class(self), typevar)
     }
 }
 
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
-    fn variance_of_owner(
+    /// Build a definition-site equation before substituting type arguments. Supported protocols
+    /// use their structural interface; `TypedDict` classes use their fields. Other classes retain the
+    /// ordinary attribute and base-class variance rules.
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT, heap_size=ruff_memory_usage::heap_size)]
+    pub(in crate::types) fn variance_equation(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         let env = ProgramEnvironment::from_scope(self.body_scope(db));
 
         if self.is_typed_dict(db) {
@@ -3388,7 +3413,7 @@ impl<'db> StaticClassLiteral<'db> {
             .is_some_and(|generic_context| generic_context.contains(db, typevar));
 
         if !typevar_in_generic_context {
-            return TypeVarVariance::Bivariant;
+            return VarianceTerm::BIVARIANT;
         }
 
         if self.is_protocol(db)
@@ -3505,9 +3530,7 @@ impl<'db> StaticClassLiteral<'db> {
                 })
             });
 
-        attribute_variances
-            .chain(explicit_bases_variances)
-            .collect()
+        VarianceTerm::join(db, attribute_variances.chain(explicit_bases_variances))
     }
 }
 

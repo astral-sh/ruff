@@ -2,8 +2,8 @@ use crate::{
     Db, ProgramEnvironment,
     reachability::ReachabilityConstraintsExtension,
     types::{
-        KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
-        TypeContext, TypeVarKind, UnionType,
+        DynamicType, KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner,
+        SubclassOfType, Type, TypeContext, TypeVarKind, UnionType,
         constraints::ConstraintSetBuilder,
         diagnostic::{
             ABSTRACT_AND_FINAL_METHOD, FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT,
@@ -89,7 +89,11 @@ impl MethodReceiverKind {
             return None;
         }
 
-        let decorators = function_known_decorator_flags(db, definition);
+        let decorators = if function.decorator_list.is_empty() {
+            FunctionDecorators::empty()
+        } else {
+            function_known_decorator_flags(db, definition)
+        };
         if decorators.contains(FunctionDecorators::STATICMETHOD) && function.name.id != "__new__" {
             return None;
         }
@@ -466,7 +470,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 _ => {}
             }
-            if !decorator_function_decorator.is_empty() {
+            if !decorator_function_decorator.is_empty()
+                && !decorator_function_decorator
+                    .intersects(FunctionDecorators::CLASSMETHOD | FunctionDecorators::STATICMETHOD)
+            {
                 continue;
             }
 
@@ -539,10 +546,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
         let function_literal = FunctionLiteral::new(db, overload_literal);
         let function_type = FunctionType::new(db, function_literal, None);
-        let is_decorated_overload_implementation = !decorator_types_and_nodes.is_empty()
-            && function_literal.has_separate_implementation(db);
-        let is_decorated_overload =
-            !decorator_types_and_nodes.is_empty() && overload_literal.is_overload(db);
+        let has_custom_decorators = decorator_types_and_nodes
+            .iter()
+            .any(|(ty, _)| FunctionDecorators::from_decorator_type(db, *ty).is_empty());
+        let is_decorated_overload_implementation =
+            has_custom_decorators && function_literal.has_separate_implementation(db);
+        let is_decorated_overload = has_custom_decorators && overload_literal.is_overload(db);
 
         let mut inferred_ty = Type::FunctionLiteral(
             if is_decorated_overload_implementation || is_decorated_overload {
@@ -583,33 +592,61 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
-            inferred_ty = if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) =
-                decorator_ty
-                && let Type::FunctionLiteral(function) = inferred_ty
-            {
-                Type::FunctionLiteral(function.with_deprecated(db, *deprecated))
-            } else {
-                self.apply_decorator(
-                    *decorator_ty,
-                    inferred_ty,
-                    decorator_node,
-                    (!is_decorated_overload_implementation).then_some(function),
-                )
-            };
+            if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) = decorator_ty {
+                match inferred_ty {
+                    Type::FunctionLiteral(function) => {
+                        inferred_ty =
+                            Type::FunctionLiteral(function.with_deprecated(db, *deprecated));
+                        continue;
+                    }
+                    Type::Callable(callable) => {
+                        inferred_ty = Type::Callable(callable.with_deprecated(
+                            db,
+                            overload_literal.with_deprecated(db, *deprecated),
+                        ));
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
+            inferred_ty = self.apply_decorator(
+                *decorator_ty,
+                inferred_ty,
+                decorator_node,
+                (!is_decorated_overload_implementation).then_some(function),
+            );
         }
 
         if is_decorated_overload_implementation {
-            let function_type = if let Type::FunctionLiteral(function) = inferred_ty {
+            // Overloads describe the exposed function. The implementation check compares the
+            // unbound callable, before classmethod or staticmethod descriptor binding.
+            let unwrap_method = |ty| match ty {
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
+                    wrapper.wrapped(db)
+                }
+                _ => ty,
+            };
+            let implementation_ty = match inferred_ty {
+                Type::Union(union) => {
+                    union.map(db, self.program_environment(), |ty| unwrap_method(*ty))
+                }
+                _ => unwrap_method(inferred_ty),
+            };
+            let last_definition = match inferred_ty {
+                Type::FunctionLiteral(function) => Some(function.literal(db).last_definition),
+                Type::Callable(callable) => callable.deprecated(db),
+                _ => None,
+            };
+            let function_type = if let Some(last_definition) = last_definition {
                 FunctionType::new(
                     db,
-                    function_literal
-                        .with_last_definition_metadata(db, function.literal(db).last_definition),
+                    function_literal.with_last_definition_metadata(db, last_definition),
                     None,
                 )
             } else {
                 function_type
             };
-            let implementation_callables = inferred_ty
+            let implementation_callables = implementation_ty
                 .try_upcast_to_callable(db, self.program_environment())
                 .map_or_else(Box::default, |callables| {
                     callables.iter().copied().collect()
@@ -1330,19 +1367,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
         } = parameter_with_default;
 
-        let default_expr = default.as_ref();
         let ty = if let Some(parameter_type) = self.annotated_lambda_parameter_type(index, lambda) {
             parameter_type
-        } else if let Some(default_expr) = default_expr {
+        } else if let Some(default_expr) = default {
             let default_ty = self.file_expression_type(default_expr);
             UnionType::from_two_elements(
                 db,
                 self.program_environment(),
-                Type::unknown(),
+                Type::Dynamic(DynamicType::UnknownLambdaParameter),
                 default_ty,
             )
         } else {
-            Type::unknown()
+            Type::Dynamic(DynamicType::UnknownLambdaParameter)
         };
 
         self.add_binding(parameter.into(), definition)
@@ -1364,7 +1400,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ty = if let Some(parameter_type) = self.annotated_lambda_parameter_type(index, lambda) {
             parameter_type
         } else {
-            Type::homogeneous_tuple(db, self.program_environment(), Type::unknown())
+            Type::homogeneous_tuple(
+                db,
+                self.program_environment(),
+                Type::Dynamic(DynamicType::UnknownLambdaParameter),
+            )
         };
         self.add_binding(parameter.into(), definition)
             .insert(self, ty);
@@ -1382,7 +1422,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inferred_ty = KnownClass::Dict.to_specialized_instance(
             db,
             env,
-            &[KnownClass::Str.to_instance(db, env), Type::unknown()],
+            &[
+                KnownClass::Str.to_instance(db, env),
+                Type::Dynamic(DynamicType::UnknownLambdaParameter),
+            ],
         );
 
         self.add_binding(parameter.into(), definition)
@@ -1408,12 +1451,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let parameter_type = signature.parameters().as_slice()[index as usize].annotated_type();
-        if parameter_type.is_unknown()
-            || parameter_type.has_unspecialized_type_var(db, self.program_environment())
-        {
-            None
-        } else {
-            Some(parameter_type)
-        }
+        (!parameter_type.has_provisional_marker(db, self.program_environment()))
+            .then_some(parameter_type)
     }
 }

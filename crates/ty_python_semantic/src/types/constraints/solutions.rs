@@ -114,7 +114,7 @@ impl<'db> SolutionWalker<'db> {
             for (constraint, _) in path {
                 let constraint = storage.constraint_data(constraint);
                 let typevar = constraint.typevar;
-                if let Some(lower) = constraint.bounds.lower {
+                if let Some(lower) = constraint.stored_lower_bound() {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_lower(db, env, lower);
 
@@ -124,7 +124,7 @@ impl<'db> SolutionWalker<'db> {
                     }
                 }
 
-                if let Some(upper) = constraint.bounds.upper {
+                if let Some(upper) = constraint.stored_upper_bound() {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_upper(db, env, upper);
 
