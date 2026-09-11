@@ -5,7 +5,9 @@ use ruff_python_ast::ExprCall;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::preview::is_fix_os_path_isfile_enabled;
-use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_single_arg_calls;
+use crate::rules::flake8_use_pathlib::helpers::{
+    check_os_pathlib_single_arg_calls, is_file_descriptor,
+};
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -65,6 +67,16 @@ impl Violation for OsPathIsfile {
 /// PTH113
 pub(crate) fn os_path_isfile(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     if segments != ["os", "path", "isfile"] {
+        return;
+    }
+
+    // `os.path.isfile` delegates to `os.stat`, so it also accepts a file descriptor, which
+    // `pathlib` doesn't support.
+    if call
+        .arguments
+        .find_argument_value("path", 0)
+        .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
+    {
         return;
     }
 
