@@ -297,6 +297,16 @@ struct TypeDetailsWriter<'db> {
 }
 
 impl<'db> TypeDetailsWriter<'db> {
+    /// Buffer a display once so label comparisons can reuse its text and navigation ranges.
+    fn render(value: &impl FmtDetailed<'db>) -> TypeDisplayDetails<'db> {
+        let mut writer = TypeWriter::Details(Self::new());
+        value.fmt_detailed(&mut writer).unwrap();
+        match writer {
+            TypeWriter::Details(details) => details.finish_type_details(),
+            TypeWriter::Formatter(_) => unreachable!("Expected Details variant"),
+        }
+    }
+
     fn new() -> Self {
         Self {
             label: String::new(),
@@ -348,6 +358,14 @@ impl<'db> TypeDetailsWriter<'db> {
 }
 
 impl<'a, 'b, 'db> TypeWriter<'a, 'b, 'db> {
+    /// Buffer a display with the metadata required by this output.
+    fn render(&self, value: &(impl Display + FmtDetailed<'db>)) -> BufferedTypeDisplay<'db> {
+        match self {
+            Self::Formatter(_) => BufferedTypeDisplay::Text(value.to_string()),
+            Self::Details(_) => BufferedTypeDisplay::Details(TypeDetailsWriter::render(value)),
+        }
+    }
+
     /// Indicate the given detail is about to start being written to this Writer
     ///
     /// This creates a scoped guard that when Dropped will record the given detail
@@ -404,6 +422,44 @@ trait FmtDetailed<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result;
 }
 
+/// A rendered type, retaining navigation metadata only when the output needs it.
+enum BufferedTypeDisplay<'db> {
+    Text(String),
+    Details(TypeDisplayDetails<'db>),
+}
+
+impl BufferedTypeDisplay<'_> {
+    fn label(&self) -> &str {
+        match self {
+            Self::Text(label) => label,
+            Self::Details(details) => &details.label,
+        }
+    }
+}
+
+impl<'db> FmtDetailed<'db> for BufferedTypeDisplay<'db> {
+    fn fmt_detailed(&self, writer: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        match self {
+            Self::Text(label) => writer.write_str(label),
+            Self::Details(details) => details.fmt_detailed(writer),
+        }
+    }
+}
+
+impl<'db> FmtDetailed<'db> for TypeDisplayDetails<'db> {
+    fn fmt_detailed(&self, writer: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        if let TypeWriter::Details(details) = writer {
+            let offset = details.label.text_len();
+            details
+                .targets
+                .extend(self.targets.iter().map(|range| *range + offset));
+            details.details.extend(self.details.iter().cloned());
+            details.is_valid_syntax &= self.is_valid_syntax;
+        }
+        writer.write_str(&self.label)
+    }
+}
+
 struct Join<'a, 'b, 'c, 'db> {
     fmt: &'c mut TypeWriter<'a, 'b, 'db>,
     separator: &'static str,
@@ -440,6 +496,7 @@ impl<'db> Join<'_, '_, '_, 'db> {
     }
 }
 
+#[derive(Clone)]
 pub enum TypeDetail<'db> {
     /// Dummy item to indicate a function signature's parameters have started
     SignatureStart,
@@ -707,13 +764,7 @@ impl<'db> DisplayType<'_, 'db> {
     }
 
     pub fn to_string_parts(&self) -> TypeDisplayDetails<'db> {
-        let mut f = TypeWriter::Details(TypeDetailsWriter::new());
-        self.fmt_detailed(&mut f).unwrap();
-
-        match f {
-            TypeWriter::Details(details) => details.finish_type_details(),
-            TypeWriter::Formatter(_) => unreachable!("Expected Details variant"),
-        }
+        TypeDetailsWriter::render(self)
     }
 }
 
@@ -1472,7 +1523,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     complement.remaining_literal_types_for_display(db, self.env, LITERAL_POLICY.max)
                 {
                     DisplayLiteralGroup {
-                        literals,
+                        literals: &literals,
                         db,
                         env: self.env,
                         settings: self.settings.clone(),
@@ -2988,26 +3039,33 @@ fn subclass_of_known_class(db: &dyn Db, subclass_of: SubclassOfType<'_>) -> Opti
     }
 }
 
+/// One displayed union entry after combining literals and class-object types.
+enum UnionDisplayEntry<'db> {
+    Type(Type<'db>, BufferedTypeDisplay<'db>),
+    NumericTower(KnownUnion),
+    Literals(Vec<Type<'db>>),
+    Subclasses(Vec<SubclassOfType<'db>>),
+}
+
 impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        fn singleline_union_element_label<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            element: Type<'db>,
-            settings: &DisplaySettings<'db>,
-        ) -> String {
-            element
-                .display_with(db, env, settings.singleline())
-                .to_string()
-        }
-
-        fn duplicate_ambiguous_labels(element_labels: &[Option<String>]) -> FxHashSet<&str> {
+        fn duplicate_ambiguous_labels<'a, 'db>(
+            displayed: &'a [UnionDisplayEntry<'db>],
+            omitted: impl Iterator<Item = UnionDisplayEntry<'db>>,
+        ) -> FxHashSet<&'a str> {
             let mut counts: FxHashMap<&str, usize> = FxHashMap::default();
-
-            for label in element_labels.iter().flatten() {
-                *counts.entry(&**label).or_default() += 1;
+            for entry in displayed {
+                if let UnionDisplayEntry::Type(_, display) = entry {
+                    *counts.entry(display.label()).or_default() += 1;
+                }
             }
-
+            for entry in omitted {
+                if let UnionDisplayEntry::Type(_, display) = entry
+                    && let Some(count) = counts.get_mut(display.label())
+                {
+                    *count += 1;
+                }
+            }
             counts
                 .into_iter()
                 .filter_map(|(label, count)| (count > 1).then_some(label))
@@ -3039,20 +3097,12 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
         let mut condensed_types = vec![];
         let mut condensed_element_count = 0usize;
         let mut subclass_of_types = vec![];
-        let element_labels: Vec<_> = elements
-            .iter()
-            .copied()
-            .map(|element| {
-                (self.condensable_literals(element).is_none()
-                    && !element.is_subclass_of()
-                    && !is_numeric_tower_element(element))
-                .then(|| singleline_union_element_label(db, self.env, element, &self.settings))
-            })
-            .collect();
-        let duplicate_ambiguous_labels = duplicate_ambiguous_labels(&element_labels);
+        let mut numeric_tower_element_count = 0usize;
 
         for element in elements.iter().copied() {
-            if let Some(literals) = self.condensable_literals(element) {
+            if is_numeric_tower_element(element) {
+                numeric_tower_element_count += 1;
+            } else if let Some(literals) = self.condensable_literals(element) {
                 condensed_element_count += 1;
                 for literal in literals {
                     if !condensed_types.contains(&literal) {
@@ -3064,11 +3114,6 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             }
         }
 
-        let numeric_tower_element_count = elements
-            .iter()
-            .copied()
-            .filter(|element| is_numeric_tower_element(*element))
-            .count();
         let total_entries = elements.len()
             - numeric_tower_element_count
             - condensed_element_count
@@ -3076,38 +3121,56 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             + usize::from(numeric_tower.is_some())
             + usize::from(!condensed_types.is_empty())
             + usize::from(!subclass_of_types.is_empty());
-
         assert_ne!(total_entries, 0);
-
-        // Done manually because we have a mix of FmtDetailed and Display
-        let mut join = f.join(" | ");
-
         let display_limit =
             UNION_POLICY.display_limit(total_entries, self.settings.preserve_full_unions);
 
         let mut numeric_tower = numeric_tower;
         let mut condensed_types = Some(condensed_types);
         let mut subclass_of_types = Some(subclass_of_types);
-        let mut displayed_entries = 0usize;
+        let mut entry_index = 0;
+        let mut entries = elements.iter().copied().filter_map(|element| {
+            let entry = if is_numeric_tower_element(element) {
+                UnionDisplayEntry::NumericTower(numeric_tower.take()?)
+            } else if self.condensable_literals(element).is_some() {
+                UnionDisplayEntry::Literals(condensed_types.take()?)
+            } else if element.is_subclass_of() {
+                UnionDisplayEntry::Subclasses(subclass_of_types.take()?)
+            } else {
+                let display = DisplayMaybeParenthesizedType {
+                    ty: element,
+                    db,
+                    env: self.env,
+                    settings: self.settings.singleline(),
+                };
+                let display = if entry_index < display_limit {
+                    f.render(&display)
+                } else {
+                    // Omitted entries still participate in name disambiguation, but their
+                    // navigation metadata is never emitted.
+                    BufferedTypeDisplay::Text(display.to_string())
+                };
+                UnionDisplayEntry::Type(element, display)
+            };
+            entry_index += 1;
+            Some(entry)
+        });
+        let displayed: Vec<_> = entries.by_ref().take(display_limit).collect();
+        // Only displayed labels need counts; omitted labels can be discarded after comparison.
+        let duplicate_ambiguous_labels = duplicate_ambiguous_labels(&displayed, entries);
+        let mut join = f.join(" | ");
 
-        for (element, label) in elements.iter().zip(&element_labels) {
-            if displayed_entries >= display_limit {
-                break;
-            }
-
-            if is_numeric_tower_element(*element) {
-                if let Some(union) = numeric_tower.take() {
-                    displayed_entries += 1;
+        for entry in &displayed {
+            match entry {
+                UnionDisplayEntry::NumericTower(union) => {
                     join.entry(&DisplayKnownUnion {
-                        union,
+                        union: *union,
                         db,
                         env: self.env,
                         settings: self.settings.singleline(),
                     });
                 }
-            } else if self.condensable_literals(*element).is_some() {
-                if let Some(literals) = condensed_types.take() {
-                    displayed_entries += 1;
+                UnionDisplayEntry::Literals(literals) => {
                     join.entry(&DisplayLiteralGroup {
                         literals,
                         db,
@@ -3115,9 +3178,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                         settings: self.settings.singleline(),
                     });
                 }
-            } else if element.is_subclass_of() {
-                if let Some(types) = subclass_of_types.take() {
-                    displayed_entries += 1;
+                UnionDisplayEntry::Subclasses(types) => {
                     join.entry(&DisplaySubclassOfGroup {
                         types,
                         db,
@@ -3125,27 +3186,27 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                         settings: self.settings.singleline(),
                     });
                 }
-            } else {
-                displayed_entries += 1;
-                let settings = if label
-                    .as_deref()
-                    .is_some_and(|label| duplicate_ambiguous_labels.contains(label))
-                {
-                    self.settings.singleline().force_signature_name()
-                } else {
-                    self.settings.singleline()
-                };
-                join.entry(&DisplayMaybeParenthesizedType {
-                    ty: *element,
-                    db,
-                    env: self.env,
-                    settings,
-                });
+                UnionDisplayEntry::Type(element, display) => {
+                    if duplicate_ambiguous_labels.contains(display.label())
+                        && self.settings.signature_name_display != SignatureNameDisplay::Force
+                    {
+                        join.entry(&DisplayMaybeParenthesizedType {
+                            ty: *element,
+                            db,
+                            env: self.env,
+                            settings: self.settings.singleline().force_signature_name(),
+                        });
+                    } else {
+                        // Rendering again at each union would double the work for each
+                        // level of nesting. Preserve the buffered navigation ranges too.
+                        join.entry(display);
+                    }
+                }
             }
         }
 
         if !self.settings.preserve_full_unions {
-            let omitted_entries = total_entries.saturating_sub(displayed_entries);
+            let omitted_entries = total_entries.saturating_sub(display_limit);
             if omitted_entries > 0 {
                 join.entry(&DisplayOmitted {
                     count: omitted_entries,
@@ -3195,7 +3256,7 @@ impl fmt::Debug for DisplayUnionType<'_, '_> {
 }
 
 struct DisplaySubclassOfGroup<'env, 'db> {
-    types: Vec<SubclassOfType<'db>>,
+    types: &'env [SubclassOfType<'db>],
     db: &'db dyn Db,
     env: &'env ProgramEnvironment<'db>,
     settings: DisplaySettings<'db>,
@@ -3237,7 +3298,7 @@ impl<'db> FmtDetailed<'db> for DisplaySubclassOfGroup<'_, 'db> {
         let mut numeric_tower = numeric_tower;
         let mut displayed_entries = 0usize;
 
-        for subclass_of in &self.types {
+        for subclass_of in self.types {
             if displayed_entries >= display_limit {
                 break;
             }
@@ -3312,7 +3373,7 @@ impl Display for DisplaySubclassOfGroup<'_, '_> {
 }
 
 struct DisplayLiteralGroup<'env, 'db> {
-    literals: Vec<Type<'db>>,
+    literals: &'env [Type<'db>],
     db: &'db dyn Db,
     env: &'env ProgramEnvironment<'db>,
     settings: DisplaySettings<'db>,
