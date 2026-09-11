@@ -1277,30 +1277,33 @@ derived = Derived(value=1)
 derived.value = 2  # error: [invalid-assignment]
 ```
 
-A subclass can override `frozen=True` with `frozen=False`. Both inherited fields and fields declared
-on a further subclass are writable:
+Pydantic allows a frozen model to be subclassed and then made mutable again. This is generally unsound (a violation
+of the Liskov substitution principle), but we currently support it without emitting any errors:
 
 ```py
-class Mutable(Base):
+class MutableChildOfFrozenFrozenBase(Base):
     model_config = ConfigDict(frozen=False)
 
-class Child(Mutable):
+mutable = MutableChildOfFrozenBase(value=1)
+mutable.value = 2
+```
+
+Subclasses of the mutable child (with unspecified `frozen`) are also mutable:
+
+```py
+class GrandChild(MutableChildOfFrozenBase):
     text: str
 
-mutable = Mutable(value=1)
-mutable.value = 2
-
-child = Child(value=1, text="before")
-child.value = 2
-child.text = "after"
-child.text = 3  # error: [invalid-assignment]
+grandchild = GrandChild(value=1, text="before")
+grandchild.value = 2
+grandchild.text = "after"
 ```
 
 Freezing the model again makes both fields read-only:
 
 ```py
-class FrozenAgain(Child, frozen=True):
-    pass
+class FrozenAgain(Child):
+    model_config = ConfigDict(frozen=True)
 
 frozen_again = FrozenAgain(value=1, text="before")
 frozen_again.value = 2  # error: [invalid-assignment]
