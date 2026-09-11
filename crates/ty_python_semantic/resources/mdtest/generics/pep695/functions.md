@@ -2585,6 +2585,31 @@ if isinstance(root, tuple):
 wrong: str = root  # error: [invalid-assignment]
 ```
 
+## Recursive callback solutions through implicit aliases
+
+The callback's return type contains an implicit recursive alias. Its argument can refer to the
+inferred result: the outer tuple guards that reference. Subscribing the result retains the recursive
+relationship, and the result cannot be assigned to `str`.
+
+```py
+from typing import Callable, TypeAlias, TypeVar
+
+V = TypeVar("V")
+Repeated: TypeAlias = V | tuple["Repeated[V]"]
+
+def fixed[T](callback: Callable[[T], tuple[Repeated[T]] | int]) -> T:
+    raise NotImplementedError
+
+def identity[U](value: U) -> U:
+    return value
+
+root = fixed(identity)
+reveal_type(root)  # revealed: μ$0. tuple[Repeated[$0]] | int
+if isinstance(root, tuple):
+    reveal_type(root[0])  # revealed: μ$0. Repeated[tuple[$0] | int]
+wrong: str = root  # error: [invalid-assignment]
+```
+
 ## Aliased lower bounds in recursive callbacks
 
 Passing the identity function requires `Retained[T]` to be a subtype of `T`. The intersection is

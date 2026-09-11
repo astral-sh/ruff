@@ -224,9 +224,12 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
         }
         // Recursive specialization can introduce dependencies in an alias's changing arguments.
         // Inspect them even when the recursion guard skips another visit to the alias's body.
-        if let Type::TypeAlias(alias) = ty
-            && let Some(specialization) = alias.specialization(db)
-        {
+        let specialization = match ty {
+            Type::TypeAlias(alias) => alias.specialization(db),
+            Type::Recursive(recursive) => recursive.arguments(db),
+            _ => None,
+        };
+        if let Some(specialization) = specialization {
             for argument in specialization.types(db) {
                 self.visit_type(db, *argument);
             }
@@ -249,6 +252,11 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
 
     fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
         self.visit_type(db, alias.value_type(db));
+    }
+
+    fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+        // A local alias can capture an outer type variable without having type arguments.
+        self.visit_type(db, recursive.unfold(db, self.env));
     }
 
     fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {

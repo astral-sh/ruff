@@ -22,7 +22,7 @@ use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, GenericContext,
     MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, VarianceTerm,
 };
-use crate::{Db, FxIndexMap, Program, ProgramEnvironment};
+use crate::{Db, FxIndexMap, FxOrderSet, Program, ProgramEnvironment};
 
 /// A reference to an alias cycle or an equation in an anonymous recursive binder.
 /// An escaping reference has no type semantics; in particular, it is neither a
@@ -301,6 +301,40 @@ impl<'db> RecursiveType<'db> {
 
     fn body(self, db: &'db dyn Db) -> Type<'db> {
         self.graph(db).bodies(db)[self.entry(db)]
+    }
+
+    /// References exposed by the constructor, before substituting its arguments.
+    /// Local graph references select bodies; references to enclosing aliases remain exposed.
+    pub(super) fn unguarded_body_references(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+        let mut pending = vec![self.entry(db)];
+        let mut visited = FxHashSet::default();
+        let mut references = FxOrderSet::default();
+        while let Some(index) = pending.pop() {
+            if !visited.insert(index) {
+                continue;
+            }
+            for reference in self.graph(db).bodies(db)[index].unguarded_references(db) {
+                let reference = match reference {
+                    Type::RecursiveVar(variable) => match variable.target(db) {
+                        RecursiveVarTarget::Alias(cycle) if matches!(self.origin(db), RecursiveOrigin::Alias { cycle: bound, .. } if cycle == bound) =>
+                        {
+                            continue;
+                        }
+                        RecursiveVarTarget::Graph { depth, index } => {
+                            // Graph extraction keeps nested constructors closed. References to
+                            // an enclosing graph occur in the application's arguments instead.
+                            debug_assert_eq!(depth, 0);
+                            pending.push(index);
+                            continue;
+                        }
+                        RecursiveVarTarget::Alias(_) => reference,
+                    },
+                    _ => reference,
+                };
+                references.insert(reference);
+            }
+        }
+        references.into_iter().collect()
     }
 
     /// Select another closed type in this binder without expanding its body.

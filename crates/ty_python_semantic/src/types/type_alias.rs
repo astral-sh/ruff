@@ -64,8 +64,6 @@ impl<'db> AliasCycleSummary<'db> {
 
     fn collect(db: &'db dyn Db, ty: Type<'db>, references: &mut FxOrderSet<Type<'db>>) {
         match ty {
-            // Nested recursive binders stop this walk, so a bare reference closes
-            // an unguarded cycle in the recursive body being checked.
             Type::RecursiveVar(_) | Type::TypeVar(_) => {
                 references.insert(ty);
             }
@@ -87,19 +85,15 @@ impl<'db> AliasCycleSummary<'db> {
                 // Process supplied arguments after completing the definition's summary. An
                 // exposed argument can still close a cycle in the caller, as in
                 // `type Identity[T] = T; type Cycle = Identity[Cycle]`.
-                for &reference in &summary.references {
-                    let Type::TypeVar(typevar) = reference else {
-                        continue;
-                    };
-                    if let Some(argument) =
-                        specialization.and_then(|specialization| specialization.get(db, typevar))
-                        && argument != Type::TypeVar(typevar)
-                    {
-                        Self::collect(db, argument, references);
-                    } else {
-                        references.insert(reference);
-                    }
-                }
+                Self::collect_specialized(db, &summary.references, specialization, references);
+            }
+            Type::Recursive(recursive) => {
+                Self::collect_specialized(
+                    db,
+                    &recursive.unguarded_body_references(db),
+                    recursive.arguments(db),
+                    references,
+                );
             }
             Type::Union(union) => {
                 for &element in union.elements(db) {
@@ -119,6 +113,25 @@ impl<'db> AliasCycleSummary<'db> {
                 if ty.is_divergent() {
                     references.insert(ty);
                 }
+            }
+        }
+    }
+
+    fn collect_specialized(
+        db: &'db dyn Db,
+        exposed: &[Type<'db>],
+        specialization: Option<Specialization<'db>>,
+        references: &mut FxOrderSet<Type<'db>>,
+    ) {
+        for &reference in exposed {
+            if let Type::TypeVar(typevar) = reference
+                && let Some(argument) =
+                    specialization.and_then(|specialization| specialization.get(db, typevar))
+                && argument != reference
+            {
+                Self::collect(db, argument, references);
+            } else {
+                references.insert(reference);
             }
         }
     }

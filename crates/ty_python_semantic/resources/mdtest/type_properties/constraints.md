@@ -1144,6 +1144,39 @@ def explicit[T]():
     reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=μ$0. list[Explicit[$0]]]]
 ```
 
+### Dependencies through implicit recursive aliases
+
+Solving a type variable also specializes its occurrences inside an implicit recursive alias.
+
+```py
+from typing import TypeAlias, TypeVar
+from ty_extensions._internal import ConstraintSet
+
+V = TypeVar("V")
+Repeated: TypeAlias = V | tuple["Repeated[V]"]
+
+def acyclic[T, U]():
+    constraints = ConstraintSet.equality(T, Repeated[U]) & ConstraintSet.equality(U, int)
+    # revealed: tuple[Solution[T=Repeated[int], U=int]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+A tuple can guard the recursive reference either inside the alias definition or in its supplied
+argument. Both equations have recursive solutions.
+
+```py
+Guarded: TypeAlias = tuple[V, "Guarded[V]"]
+
+def guarded[T]():
+    constraints = ConstraintSet.equality(T, Guarded[T])
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=μ$0. Guarded[$0]]]
+
+def argument_guard[T]():
+    constraints = ConstraintSet.equality(T, Repeated[tuple[T]])
+    # revealed: tuple[Solution[T=μ$0. Repeated[tuple[$0]]]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
 ### Correlation and dependent solutions
 
 Each alternative retains its own recursive solution. Variables depending on that solution are
@@ -1305,6 +1338,96 @@ def named[T]():
     reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=Repeated[T@named]]]
 ```
 
+### Implicit recursive aliases with exposed arguments
+
+`Repeated[T]` exposes `T` outside a tuple. Equating them leaves `T` unsolved, as well as any binding
+that depends on `T`. Wrapping the implicit alias in a `type` statement preserves this behavior.
+
+```py
+from typing import TypeAlias, TypeVar
+from ty_extensions._internal import ConstraintSet
+
+V = TypeVar("V")
+Repeated: TypeAlias = V | tuple["Repeated[V]"]
+type Wrapped[X] = Repeated[X]
+
+def direct[T, U]():
+    constraints = ConstraintSet.equality(T, Repeated[T]) & ConstraintSet.equality(U, list[T])
+    # revealed: tuple[Solution[T=Repeated[T@direct], U=list[T@direct]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+
+def wrapped[T, U]():
+    constraints = ConstraintSet.equality(T, Wrapped[T]) & ConstraintSet.equality(U, list[T])
+    # revealed: tuple[Solution[T=Wrapped[T@wrapped], U=list[T@wrapped]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+Nesting the alias or changing its arguments on recursive occurrences does not guard an exposed
+argument.
+
+```py
+type Nested[X] = Repeated[Repeated[X]]
+Growing: TypeAlias = V | tuple["Growing[list[V]]"]
+type WrappedGrowing[X] = Growing[X]
+
+def nested[T]():
+    constraints = ConstraintSet.equality(T, Nested[T])
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=Nested[T@nested]]]
+
+def growing[T]():
+    constraints = ConstraintSet.equality(T, WrappedGrowing[T])
+    # revealed: tuple[Solution[T=WrappedGrowing[T@growing]]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+### Captured variables in implicit recursive aliases
+
+A local alias can refer to an enclosing function's type variable without taking a type argument.
+That variable remains a dependency. If it cannot be substituted in the alias, dependent bindings
+remain unsolved too.
+
+```py
+from typing import TypeAlias
+from ty_extensions._internal import ConstraintSet
+
+def captured_self[T, U]():
+    Local: TypeAlias = T | tuple["Local"]
+    constraints = ConstraintSet.equality(T, Local) & ConstraintSet.equality(U, list[T])
+    # revealed: tuple[Solution[T=Local, U=list[T@captured_self]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+
+def captured_dependency[T, U, V]():
+    Local: TypeAlias = tuple[U, "Local"]
+    constraints = ConstraintSet.equality(T, Local) & ConstraintSet.equality(U, int) & ConstraintSet.equality(V, list[T])
+    # revealed: tuple[Solution[V=list[T@captured_dependency] | list[Local]]]
+    reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))
+```
+
+### Inferred recursive types exposed through aliases
+
+An inferred recursive type can expose a type parameter outside a tuple, just as a named recursive
+alias can. Using that type through another alias does not guard the parameter's self-reference.
+
+```py
+from typing import Callable, cast
+from ty_extensions._internal import ConstraintSet, TypeOf
+
+def fixed[T, U, E](first: Callable[[T], U | int], second: Callable[[U], tuple[T] | E], leaf: E) -> T:
+    raise NotImplementedError
+
+def identity[U](value: U) -> U:
+    return value
+
+class Tree[E]:
+    node = fixed(identity, identity, cast(E, None))
+
+type Exposed[X] = TypeOf[Tree[X].node]
+
+def inferred[T]():
+    constraints = ConstraintSet.equality(T, Exposed[T])
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=Exposed[T@inferred]]]
+```
+
 ### Intersections exposed through aliases
 
 An intersection does not guard recursion, including when it occurs through another alias or contains
@@ -1325,6 +1448,27 @@ def positive[T]():
 def negative[T]():
     constraints = ConstraintSet.lower_bound(Exclude[T], T)
     reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=Exclude[T@negative]]]
+```
+
+The same applies to intersections supplied as exposed arguments of an implicit recursive alias.
+
+```py
+from typing import TypeAlias, TypeVar
+
+V = TypeVar("V")
+Repeated: TypeAlias = V | tuple["Repeated[V]"]
+type Retained[X] = Repeated[Intersection[X, tuple[X]]]
+type Excluded[X] = Repeated[Intersection[int, Not[X]]]
+
+def implicit_positive[T]():
+    constraints = ConstraintSet.lower_bound(Retained[T], T)
+    # revealed: tuple[Solution[T=Retained[T@implicit_positive]]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+
+def implicit_negative[T]():
+    constraints = ConstraintSet.lower_bound(Excluded[T], T)
+    # revealed: tuple[Solution[T=Excluded[T@implicit_negative]]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
 ```
 
 ### Mutual dependencies through exposed alias arguments
