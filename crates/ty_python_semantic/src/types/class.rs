@@ -1437,13 +1437,24 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Visit this class and each specialization of its explicit ancestors, depth-first and
-    /// left-to-right. Cyclic classes are skipped.
+    /// Visit this class and its explicit ancestors depth-first and left-to-right, yielding each
+    /// distinct specialization once. Cyclic classes are skipped.
     ///
     /// Unlike the MRO, this traversal preserves separate specializations contributed by different
-    /// inheritance paths. For example, a class inheriting both `Base[Any]` and `Base[int]` through
-    /// intermediate classes has a single `Base` entry in its MRO, but both specializations constrain
-    /// its subclasses. Use the MRO for member lookup, where ordering determines which member wins.
+    /// inheritance paths, applying type arguments at each step:
+    ///
+    /// ```python
+    /// from typing import Any
+    ///
+    /// class Base[T]: ...
+    /// class Gradual(Base[Any]): ...
+    /// class Concrete[T](Base[T]): ...
+    /// class Child(Gradual, Concrete[int]): ...
+    /// ```
+    ///
+    /// For `Child`, this yields both `Base[Any]` and `Base[int]`, which constrain its subclasses.
+    /// Use [`Self::iter_mro`] for member lookup, where the single `Base[Any]` entry determines
+    /// which specialization to use.
     pub(super) fn iter_explicit_ancestors(
         self,
         db: &'db dyn Db,

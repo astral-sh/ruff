@@ -11,7 +11,7 @@ use ruff_db::{
 };
 use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_python_stdlib::identifiers::is_mangled_private;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     Db, ProgramEnvironment,
@@ -89,9 +89,10 @@ pub(super) fn check_class<'db>(
 
     let mut bases: Vec<_> = class_specialized.iter_mro(db).skip(1).collect();
     if configuration.check_method_liskov_violations() {
-        let generic_bases: Vec<_> = bases
+        let generic_bases: FxHashMap<_, _> = bases
             .iter()
             .filter_map(|base| base.into_class()?.into_generic_alias())
+            .map(|base| (base.origin(db), base))
             .collect();
         if !generic_bases.is_empty() {
             // Overrides must respect every inherited specialization. Keep the MRO's bases first
@@ -102,10 +103,9 @@ pub(super) fn check_class<'db>(
                     .iter_explicit_ancestors(db, env)
                     .filter_map(ClassType::into_generic_alias)
                     .filter(|ancestor| {
-                        !generic_bases.contains(ancestor)
-                            && generic_bases
-                                .iter()
-                                .any(|base| base.origin(db) == ancestor.origin(db))
+                        generic_bases
+                            .get(&ancestor.origin(db))
+                            .is_some_and(|base| base != ancestor)
                     })
                     .map(|ancestor| ClassBase::Class(ClassType::Generic(ancestor))),
             );
