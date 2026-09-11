@@ -1547,21 +1547,7 @@ impl<'db, 'name> NameResolver<'db, 'name> {
                 final_filter
             };
 
-            let mut remaining_are_shadowed = false;
-            cur_candidates.retain_mut(|candidate| {
-                if remaining_are_shadowed {
-                    return false;
-                }
-
-                let resolved =
-                    resolve_component(&self.context, candidate, component, file_filter).is_ok();
-
-                // A terminal candidate shadows every lower-priority candidate, even if resolving
-                // this component fails. Higher-priority candidates remain in play.
-                remaining_are_shadowed = candidate.missing_submodule_is_terminal();
-
-                resolved
-            });
+            cur_candidates = self.advance_candidates(cur_candidates, component, file_filter);
 
             if cur_candidates.is_empty() {
                 return None;
@@ -1636,6 +1622,31 @@ impl<'db, 'name> NameResolver<'db, 'name> {
         }
 
         cur_candidates
+    }
+
+    /// Advances candidates by one component, preserving terminal shadowing even on a failed probe.
+    fn advance_candidates(
+        &self,
+        mut candidates: ResolvedNames<'db>,
+        component: &str,
+        filter: ComponentFileFilter,
+    ) -> ResolvedNames<'db> {
+        let context = &self.context;
+        let mut remaining_are_shadowed = false;
+        candidates.retain_mut(|candidate| {
+            if remaining_are_shadowed {
+                return false;
+            }
+
+            let resolved = resolve_component(context, candidate, component, filter).is_ok();
+
+            // A terminal candidate shadows every lower-priority candidate, even if resolving
+            // this component fails. Higher-priority candidates remain in play.
+            remaining_are_shadowed = candidate.missing_submodule_is_terminal();
+
+            resolved
+        });
+        candidates
     }
 }
 
