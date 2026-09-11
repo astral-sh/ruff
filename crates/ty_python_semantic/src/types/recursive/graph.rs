@@ -111,15 +111,23 @@ impl<'db> RecursiveGraphBuilder<'db> {
         }
         let mut root_indices: Vec<_> = (0..root_count).collect();
         Self::remove_forwarding(db, env, &mut bodies, &mut root_indices)?;
+        // Aliases can expose some arguments directly while guarding others with constructors.
         let unguarded = DependencyGraph::new(
             bodies
                 .iter()
                 .map(|body| {
-                    if matches!(body, Type::Union(_) | Type::Intersection(_)) {
-                        RecursiveReferences::indices(db, env, *body)
-                    } else {
-                        Vec::new()
-                    }
+                    body.unguarded_references(db)
+                        .iter()
+                        .filter_map(|ty| match ty {
+                            Type::RecursiveVar(reference)
+                                if let RecursiveVarTarget::Graph { depth: 0, index } =
+                                    reference.target(db) =>
+                            {
+                                Some(index)
+                            }
+                            _ => None,
+                        })
+                        .collect()
                 })
                 .collect(),
         );

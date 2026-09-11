@@ -2585,6 +2585,30 @@ if isinstance(root, tuple):
 wrong: str = root  # error: [invalid-assignment]
 ```
 
+## Aliased lower bounds in recursive callbacks
+
+Passing the identity function requires `Retained[T]` to be a subtype of `T`. The intersection is
+already a subtype of `T`, so `int` is the smallest solution. We currently retain an unsolved type
+variable; introducing a recursive type here would leave a cycle outside any container.
+
+```py
+from typing import Callable
+from ty_extensions import Intersection
+
+type Retained[V] = int | Intersection[V, tuple[V]]
+
+def fixed[T](callback: Callable[[Retained[T]], T]) -> T:
+    raise NotImplementedError
+
+def identity[U](value: U) -> U:
+    return value
+
+root = fixed(identity)
+# TODO: Infer int by simplifying the lower bound.
+reveal_type(root)  # revealed: int | (T@fixed & tuple[T@fixed])
+wrong: str = root  # error: [invalid-assignment]
+```
+
 ## Specializing inferred recursive values
 
 The inferred recursive attribute retains the class's type parameter. Access through a specialized

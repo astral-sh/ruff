@@ -4,9 +4,9 @@ use std::fmt::Write;
 use crate::{
     Db, FxOrderSet,
     types::{
-        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type, TypeContext,
-        TypeMapping, TypeRecursionContext, TypingModule, UnionType, VarianceTerm,
+        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, GenericContext, KnownClass,
+        KnownInstanceType, MaterializationKind, Type, TypeContext, TypeMapping,
+        TypeRecursionContext, TypingModule, UnionType, VarianceTerm,
         cyclic::CycleDetector,
         definition_expression_type,
         display::qualified_name_components_from_scope,
@@ -26,11 +26,16 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 
 impl<'db> Type<'db> {
-    /// Returns whether expanding aliases and unions can return to the same alias without entering
-    /// another type. For example, `type A = int | A` is invalid, but
+    /// Returns whether expanding aliases, unions, and intersections can return to the same alias
+    /// without entering another type. For example, `type A = int | A` is invalid, but
     /// `type A = int | list[A]` is a valid recursive alias.
     pub(super) fn has_unguarded_alias_cycle(self, db: &'db dyn Db) -> bool {
-        AliasCycleSummary::from_type(db, self).cycle.is_some()
+        AliasCycleSummary::from_type(db, self).cycle().is_some()
+    }
+
+    /// References exposed through aliases, unions, and intersections without a type constructor.
+    pub(super) fn unguarded_references(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+        AliasCycleSummary::from_type(db, self).references
     }
 }
 
@@ -38,37 +43,40 @@ impl<'db> Type<'db> {
 /// Only arguments substituted for these variables can introduce an unguarded cycle.
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
 struct AliasCycleSummary<'db> {
-    /// The divergent marker or unbound reference that closes an unguarded cycle.
-    cycle: Option<Type<'db>>,
-    typevars: Box<[BoundTypeVarInstance<'db>]>,
+    references: Box<[Type<'db>]>,
 }
 
 impl<'db> AliasCycleSummary<'db> {
     fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
-        let mut typevars = FxOrderSet::default();
-        let cycle = Self::collect(db, ty, &mut typevars);
+        let mut references = FxOrderSet::default();
+        Self::collect(db, ty, &mut references);
         Self {
-            cycle,
-            typevars: typevars.into_iter().collect(),
+            references: references.into_iter().collect(),
         }
     }
 
-    fn collect(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-    ) -> Option<Type<'db>> {
+    fn cycle(&self) -> Option<Type<'db>> {
+        self.references
+            .iter()
+            .copied()
+            .find(|ty| !matches!(ty, Type::TypeVar(_)))
+    }
+
+    fn collect(db: &'db dyn Db, ty: Type<'db>, references: &mut FxOrderSet<Type<'db>>) {
         match ty {
             // Nested recursive binders stop this walk, so a bare reference closes
             // an unguarded cycle in the recursive body being checked.
-            Type::RecursiveVar(_) => Some(ty),
+            Type::RecursiveVar(_) | Type::TypeVar(_) => {
+                references.insert(ty);
+            }
             Type::TypeAlias(alias) => {
                 // Inspect the definition independently of its arguments. Nested applications like
                 // `Recursive[Recursive[int]]` can be finite even when `Recursive` has growing
                 // recursive references beneath a container.
                 let summary = alias.cycle_summary(db);
-                if summary.cycle.is_some() {
-                    return summary.cycle;
+                if let Some(cycle) = summary.cycle() {
+                    references.insert(cycle);
+                    return;
                 }
                 let specialization = alias.specialization(db).or_else(|| {
                     alias
@@ -79,27 +87,39 @@ impl<'db> AliasCycleSummary<'db> {
                 // Process supplied arguments after completing the definition's summary. An
                 // exposed argument can still close a cycle in the caller, as in
                 // `type Identity[T] = T; type Cycle = Identity[Cycle]`.
-                summary.typevars.iter().find_map(|&typevar| {
+                for &reference in &summary.references {
+                    let Type::TypeVar(typevar) = reference else {
+                        continue;
+                    };
                     if let Some(argument) =
                         specialization.and_then(|specialization| specialization.get(db, typevar))
                         && argument != Type::TypeVar(typevar)
                     {
-                        Self::collect(db, argument, typevars)
+                        Self::collect(db, argument, references);
                     } else {
-                        typevars.insert(typevar);
-                        None
+                        references.insert(reference);
                     }
-                })
+                }
             }
-            Type::TypeVar(typevar) => {
-                typevars.insert(typevar);
-                None
+            Type::Union(union) => {
+                for &element in union.elements(db) {
+                    Self::collect(db, element, references);
+                }
             }
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .find_map(|&element| Self::collect(db, element, typevars)),
-            _ => ty.is_divergent().then_some(ty),
+            Type::Intersection(intersection) => {
+                for &element in intersection
+                    .positive(db)
+                    .iter()
+                    .chain(intersection.negative(db))
+                {
+                    Self::collect(db, element, references);
+                }
+            }
+            _ => {
+                if ty.is_divergent() {
+                    references.insert(ty);
+                }
+            }
         }
     }
 }
@@ -445,7 +465,7 @@ impl<'db> TypeAliasType<'db> {
     fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, id, _, ()| AliasCycleSummary { cycle: Some(Type::divergent(id)), ..AliasCycleSummary::default() },
+            cycle_initial=|_, id, _, ()| AliasCycleSummary { references: Box::new([Type::divergent(id)]) },
             heap_size=ruff_memory_usage::heap_size
         )]
         fn cycle_summary<'db>(
@@ -499,7 +519,7 @@ impl<'db> TypeAliasType<'db> {
         db: &'db dyn Db,
         context: Option<&TypeRecursionContext<'db>>,
     ) -> Type<'db> {
-        if let Some(cycle) = AliasCycleSummary::from_type(db, Type::TypeAlias(self)).cycle {
+        if let Some(cycle) = AliasCycleSummary::from_type(db, Type::TypeAlias(self)).cycle() {
             let env = ProgramEnvironment::from_definition(self.definition(db));
             return AliasCycleRecovery {
                 env: &env,

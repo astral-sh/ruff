@@ -1278,6 +1278,71 @@ def partial[T, U, V]():
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 ```
 
+### Aliases with exposed type arguments
+
+An alias can expose more than one argument outside a container. Every exposed argument must be
+checked: the tuple around the first argument does not guard the reference in the second argument.
+These equations remain symbolic rather than introducing a recursive type without a constructor.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Either[V, W] = V | W
+
+def exposed[T]():
+    constraints = ConstraintSet.equality(T, Either[tuple[T], T])
+    # revealed: tuple[Solution[T=Either[tuple[T@exposed], T@exposed]]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+An alias that is itself recursive can also expose its type argument outside a container.
+
+```py
+type Repeated[V] = V | tuple[Repeated[V]]
+
+def named[T]():
+    constraints = ConstraintSet.equality(T, Repeated[T])
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=Repeated[T@named]]]
+```
+
+### Intersections exposed through aliases
+
+An intersection does not guard recursion, including when it occurs through another alias or contains
+a negated reference. These bounds retain their unsolved type variables.
+
+```py
+from ty_extensions import Intersection, Not
+from ty_extensions._internal import ConstraintSet
+
+type Restrict[V] = Intersection[V, tuple[V]]
+type Lower[V] = int | Restrict[V]
+type Exclude[V] = Intersection[int, Not[V]]
+
+def positive[T]():
+    constraints = ConstraintSet.lower_bound(Lower[T], T)
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=Lower[T@positive]]]
+
+def negative[T]():
+    constraints = ConstraintSet.lower_bound(Exclude[T], T)
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=Exclude[T@negative]]]
+```
+
+### Mutual dependencies through exposed alias arguments
+
+Following the first argument of each `Step` returns to the original variable without entering a
+tuple. The tuples in the second argument do not make that cycle a valid recursive type.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Step[V, W] = V | tuple[W]
+
+def mutual[T, U]():
+    constraints = ConstraintSet.equality(T, Step[U, T]) & ConstraintSet.equality(U, Step[T, U])
+    # revealed: tuple[Solution[T=Step[U@mutual, T@mutual], U=Step[T@mutual, U@mutual]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
 ## Other simplifications
 
 ### Ordering of intersection and union elements
