@@ -2,7 +2,6 @@ fail_fast: false
 
 exclude: |
   (?x)^(
-    .github/workflows/release.yml|
     crates/ty_vendored/vendor/.*|
     crates/ty_project/resources/.*|
     crates/ty/docs/(configuration|rules|cli|environment).md|
