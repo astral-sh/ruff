@@ -7,6 +7,7 @@ use ruff_python_semantic::analyze::typing::is_set;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -38,9 +39,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```
 ///
 /// ## References
-/// - [Python documentation: `set.discard()`](https://docs.python.org/3/library/stdtypes.html?highlight=list#frozenset.discard)
+/// - [Python documentation: `set.discard()`](https://docs.python.org/3/library/stdtypes.html#set.discard)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Complexity)]
 pub(crate) struct CheckAndRemoveFromSet {
     element: SourceCodeSnippet,
     set: String,
@@ -84,14 +85,20 @@ pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf
         return;
     };
 
-    // `
     // `set` in the check should be the same as `set` in the body
-    if check_set.id != remove_set.id
-        // `element` in the check should be the same as `element` in the body
-        || !compare(&check_element.into(), &remove_element.into())
-        // `element` shouldn't have a side effect, otherwise we might change the semantics of the program.
-        || contains_effect(check_element, |id| checker.semantic().has_builtin_binding(id))
-    {
+    if check_set.id != remove_set.id {
+        return;
+    }
+
+    // `element` in the check should be the same as `element` in the body
+    if !compare(&check_element.into(), &remove_element.into()) {
+        return;
+    }
+
+    // `element` shouldn't have a side effect, otherwise we might change the semantics of the program.
+    if contains_effect(check_element, |id| {
+        checker.semantic().has_builtin_binding(id)
+    }) {
         return;
     }
 
@@ -125,22 +132,11 @@ fn compare(lhs: &ComparableExpr, rhs: &ComparableExpr) -> bool {
 
 /// Match `if` condition to be `expr in name`, returns a tuple of (`expr`, `name`) on success.
 fn match_check(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
-    let ast::ExprCompare {
-        ops,
-        left,
-        comparators,
-        ..
-    } = if_stmt.test.as_compare_expr()?;
-
-    if **ops != [CmpOp::In] {
-        return None;
-    }
-
-    let [Expr::Name(right @ ast::ExprName { .. })] = &**comparators else {
+    let (left, CmpOp::In, Expr::Name(right)) = if_stmt.test.as_compare_expr()?.as_single()? else {
         return None;
     };
 
-    Some((left.as_ref(), right))
+    Some((left, right))
 }
 
 /// Match `if` body to be `name.remove(expr)`, returns a tuple of (`expr`, `name`) on success.
@@ -192,12 +188,12 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
-            args: Box::from([element.clone()]),
+            args: [element.clone()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // And finally, turn it into a statement.

@@ -178,7 +178,7 @@ class PurePath(PathLike[str]):
     if sys.version_info < (3, 15):
         if sys.version_info >= (3, 13):
             @deprecated(
-                "Deprecated since Python 3.13; will be removed in Python 3.15. "
+                "Deprecated since Python 3.13; removed in Python 3.15. "
                 "Use `os.path.isreserved()` to detect reserved paths on Windows."
             )
             def is_reserved(self) -> bool:

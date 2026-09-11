@@ -1,6 +1,6 @@
 use compact_str::ToCompactString;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, NodeIndex, PythonVersion};
+use ruff_python_ast::{self as ast, PythonVersion};
 use rustc_hash::FxHashSet;
 
 use ty_python_core::definition::Definition;
@@ -637,23 +637,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> DynamicEnumAnchor<'db> {
         match definition {
             Some(definition) => DynamicEnumAnchor::Definition { definition, spec },
-            None => {
-                let db = self.db();
-                let call_node_index = call_expr.node_index.load();
-                let scope = self.scope();
-                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-                let anchor_u32 = scope_anchor
-                    .as_u32()
-                    .expect("scope anchor should not be NodeIndex::NONE");
-                let call_u32 = call_node_index
-                    .as_u32()
-                    .expect("call node should not be NodeIndex::NONE");
-                DynamicEnumAnchor::ScopeOffset {
-                    scope,
-                    offset: call_u32 - anchor_u32,
-                    spec,
-                }
-            }
+            None => DynamicEnumAnchor::ScopeOffset {
+                scope: self.scope(),
+                offset: self.dynamic_class_scope_offset(call_expr),
+                spec,
+            },
         }
     }
 

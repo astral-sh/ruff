@@ -55,12 +55,12 @@ reveal_type(x4)  # revealed: Literal[MyEnum.A]
 reveal_type(promote(x4))  # revealed: list[MyEnum]
 
 x5 = 3.14
-reveal_type(x5)  # revealed: float
-reveal_type(promote(x5))  # revealed: list[int | float]
+reveal_type(x5)  # revealed: float*
+reveal_type(promote(x5))  # revealed: list[float]
 
 x6 = 3.14j
-reveal_type(x6)  # revealed: complex
-reveal_type(promote(x6))  # revealed: list[int | float | complex]
+reveal_type(x6)  # revealed: complex*
+reveal_type(promote(x6))  # revealed: list[complex]
 
 def _(source: Literal["foo", "bar"]):
     x7 = f"hello"
@@ -97,6 +97,22 @@ Covariant collection literals are not promoted:
 ```py
 reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[Literal[1, 2, 3]]
+```
+
+## Callable defaults are not promoted
+
+Promoting a callable as a collection element does not change its default values. This applies both
+to defaults on the source function and to values supplied by keyword to `functools.partial`.
+
+```py
+from functools import partial
+
+def f(x: int = 5, *, y: int) -> int:
+    return x + y
+
+bound = partial(f, y=7)
+reveal_type(bound)  # revealed: partial[(x: int = 5, *, y: int = 7) -> int]
+reveal_type([bound])  # revealed: list[partial[(x: int = 5, *, y: int = 7) -> int]]
 ```
 
 ## Unions of homogeneous, fixed-length tuples can be promoted to a single variadic tuple
@@ -296,7 +312,7 @@ We promote in non-covariant position in the return type of a generic function, o
 generic class:
 
 ```py
-from typing import Callable, Literal
+from typing import Callable, Literal, Any
 
 class Bivariant[T]:
     def __init__(self, value: T): ...
@@ -351,6 +367,61 @@ reveal_type(f11(1, 1))  # revealed: tuple[Invariant[Covariant[int] | None], Cova
 
 reveal_type(f12(1))  # revealed: ((int, /) -> bool) | None
 reveal_type(f13(1))  # revealed: ((bool, /) -> Invariant[int]) | None
+```
+
+This also works if the type variable is nested inside a union:
+
+```py
+def f14[T](x: T) -> Covariant[T | None]:
+    raise NotImplementedError
+
+def f15[T](x: T) -> Contravariant[T | None]:
+    raise NotImplementedError
+
+def f16[T](x: T) -> Invariant[T | None]:
+    raise NotImplementedError
+
+reveal_type(f14(1))  # revealed: Covariant[Literal[1] | None]
+reveal_type(f15(1))  # revealed: Contravariant[int | None]
+reveal_type(f16(1))  # revealed: Invariant[int | None]
+```
+
+And similarly if the type variable is nested in an intersection (note that negation flips variance):
+
+```py
+from ty_extensions import Intersection, Not
+
+def f17[T](x: T) -> Covariant[Intersection[Any, T]]:
+    raise NotImplementedError
+
+def f18[T](x: T) -> Covariant[Intersection[Any, Not[T]]]:
+    raise NotImplementedError
+
+def f19[T](x: T) -> Invariant[Intersection[Any, T]]:
+    raise NotImplementedError
+
+reveal_type(f17(1))  # revealed: Covariant[Any & Literal[1]]
+reveal_type(f18(1))  # revealed: Covariant[Any & ~int]
+reveal_type(f19(1))  # revealed: Invariant[Any & int]
+```
+
+We also promote a callable's return type, if the whole callable is in invariant position:
+
+```py
+def f20[T](x: T) -> Invariant[Callable[[], T]]:
+    raise NotImplementedError
+
+reveal_type(f20(1))  # revealed: Invariant[() -> int]
+```
+
+When the same nested type occurs in both covariant and contravariant positions, both occurrences
+contribute to promotion:
+
+```py
+def f21[T](x: T) -> tuple[Covariant[T | None], Contravariant[T | None]]:
+    raise NotImplementedError
+
+reveal_type(f21(1))  # revealed: tuple[Covariant[int | None], Contravariant[int | None]]
 ```
 
 ## Promotion is recursive
@@ -635,6 +706,21 @@ def i[T: Literal[1] | str](x: T) -> list[T]:
 
 reveal_type(i("a"))  # revealed: list[str]
 reveal_type(i(1))  # revealed: list[Literal[1]]
+```
+
+## Promotion respects inferred upper bounds
+
+Promotion must not select a solution that violates its inferred upper bound.
+
+```py
+from typing import Callable
+
+def f[T](value: T, upper: Callable[[T], None]) -> list[T]:
+    return [value]
+
+def _(upper: Callable[[int], None]):
+    # error: [invalid-argument-type]
+    reveal_type(f("x", upper))  # revealed: list[str | int]
 ```
 
 ## Literal annotations from declaration are respected

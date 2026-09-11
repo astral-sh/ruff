@@ -567,8 +567,8 @@ the subject after that pattern succeeds.
 
 Value patterns use `==`, and `as` binds the original subject rather than the value written in the
 pattern. Broad builtin types are treated as if they use builtin equality, so matching `1` narrows
-`x` to the integer and boolean literals that compare equal to it. After that pattern fails, matching
-`"foo"` narrows `x` to that string literal.
+`x` to that integer literal without adding the boolean literal that compares equal to it. After that
+pattern fails, matching `"foo"` narrows `x` to that string literal.
 
 ```py
 def _(target: int | str):
@@ -577,7 +577,7 @@ def _(target: int | str):
     match target:
         case 1 as x:
             y = 2
-            reveal_type(x)  # revealed: Literal[1, True]
+            reveal_type(x)  # revealed: Literal[1]
         case "foo" as x:
             y = 3
             reveal_type(x)  # revealed: Literal["foo"]

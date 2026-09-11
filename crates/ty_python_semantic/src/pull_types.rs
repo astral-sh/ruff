@@ -4,15 +4,16 @@
 //! (Mdtest uses the `pull_types` function via the `ty_test` crate.)
 
 use crate::{Db, HasType, SemanticModel};
-use ruff_db::{PythonFile, parsed::parsed_module};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{
     self as ast, visitor::source_order, visitor::source_order::SourceOrderVisitor,
 };
+use ty_python_core::ProgramFile;
 
-pub fn pull_types(db: &dyn Db, file: PythonFile<'_>) {
+pub fn pull_types(db: &dyn Db, file: ProgramFile<'_>) {
     let mut visitor = PullTypesVisitor::new(db, file);
 
-    let ast = parsed_module(db, file).load(db);
+    let ast = parsed_module(db, file.python_file(db)).load(db);
 
     visitor.visit_body(ast.suite());
 }
@@ -22,7 +23,7 @@ struct PullTypesVisitor<'db> {
 }
 
 impl<'db> PullTypesVisitor<'db> {
-    fn new(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
+    fn new(db: &'db dyn Db, file: ProgramFile<'db>) -> Self {
         Self {
             model: SemanticModel::new(db, file),
         }

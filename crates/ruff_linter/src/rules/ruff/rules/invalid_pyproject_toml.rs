@@ -6,6 +6,7 @@ use toml::de::DeTable;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::codes::Category;
 use crate::{FixAvailability, Violation, checkers::ast::LintContext};
 
 /// ## What it does
@@ -37,7 +38,7 @@ use crate::{FixAvailability, Violation, checkers::ast::LintContext};
 /// - [Specification of `[build-system]` in pyproject.toml](https://peps.python.org/pep-0518/)
 /// - [Draft but implemented license declaration extensions](https://peps.python.org/pep-0639)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Correctness)]
 pub(crate) struct InvalidPyprojectToml {
     pub message: String,
 }

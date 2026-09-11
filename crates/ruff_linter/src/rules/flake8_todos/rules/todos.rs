@@ -8,6 +8,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::directives::{TodoComment, TodoDirective, TodoDirectiveKind};
 use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 
@@ -31,7 +32,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 /// # TODO(ruff): this is now fixed!
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.269")]
+#[violation_metadata(stable_since = "v0.0.269", category = Category::Pedantic)]
 pub(crate) struct InvalidTodoTag {
     pub tag: String,
 }
@@ -62,7 +63,7 @@ impl Violation for InvalidTodoTag {
 /// # TODO(charlie): now an author is assigned
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.269")]
+#[violation_metadata(stable_since = "v0.0.269", category = Category::Pedantic)]
 pub(crate) struct MissingTodoAuthor;
 
 impl Violation for MissingTodoAuthor {
@@ -104,7 +105,7 @@ impl Violation for MissingTodoAuthor {
 /// # SIXCHR-003
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.269")]
+#[violation_metadata(stable_since = "v0.0.269", category = Category::Pedantic)]
 pub(crate) struct MissingTodoLink;
 
 impl Violation for MissingTodoLink {
@@ -134,7 +135,7 @@ impl Violation for MissingTodoLink {
 /// # TODO(charlie): colon fixed
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.269")]
+#[violation_metadata(stable_since = "v0.0.269", category = Category::Pedantic)]
 pub(crate) struct MissingTodoColon;
 
 impl Violation for MissingTodoColon {
@@ -162,7 +163,7 @@ impl Violation for MissingTodoColon {
 /// # TODO(charlie): fix some issue
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.269")]
+#[violation_metadata(stable_since = "v0.0.269", category = Category::Pedantic)]
 pub(crate) struct MissingTodoDescription;
 
 impl Violation for MissingTodoDescription {
@@ -190,7 +191,7 @@ impl Violation for MissingTodoDescription {
 /// # TODO(charlie): this is capitalized
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.269")]
+#[violation_metadata(stable_since = "v0.0.269", category = Category::Pedantic)]
 pub(crate) struct InvalidTodoCapitalization {
     tag: String,
 }
@@ -228,7 +229,7 @@ impl AlwaysFixableViolation for InvalidTodoCapitalization {
 /// # TODO(charlie): fix this
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.269")]
+#[violation_metadata(stable_since = "v0.0.269", category = Category::Pedantic)]
 pub(crate) struct MissingSpaceAfterTodoColon;
 
 impl Violation for MissingSpaceAfterTodoColon {

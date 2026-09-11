@@ -1,17 +1,17 @@
 use crate::goto::find_goto_target;
 use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
-use ruff_db::PythonFile;
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
+use ty_python_core::ProgramFile;
 use ty_python_semantic::SemanticModel;
 
 pub fn goto_type_definition(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
 
@@ -55,6 +55,31 @@ mod tests {
           |
         2 | class Test: ...
           |       ----
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_slot_descriptor() {
+        let test = cursor_test(
+            r#"
+            class Slotted:
+                __slots__ = ("value",)
+
+            descriptor = Slotted.va<CURSOR>lue
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:22
+           |
+        LL | descriptor = Slotted.value
+           |                      ^^^^^ Clicking here
+        info: Found 1 type definition
+          --> stdlib/types.pyi:LL:7
+           |
+        LL | class MemberDescriptorType:
+           |       --------------------
         ");
     }
 
@@ -2055,7 +2080,7 @@ def function():
             let Some(targets) = salsa::attach(&self.db, || {
                 goto_type_definition(
                     &self.db,
-                    self.python_file(self.cursor.file),
+                    self.program_file(self.cursor.file),
                     self.cursor.offset,
                 )
             }) else {

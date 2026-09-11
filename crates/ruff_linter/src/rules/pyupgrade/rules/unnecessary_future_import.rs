@@ -10,6 +10,7 @@ use ruff_python_semantic::{NameImport, Scope};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::{AlwaysFixableViolation, Applicability, Fix};
 
@@ -44,7 +45,7 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 /// ## References
 /// - [Python documentation: `__future__` — Future statement definitions](https://docs.python.org/3/library/__future__.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Complexity)]
 pub(crate) struct UnnecessaryFutureImport<'a> {
     pub names: &'a [&'a str],
 }

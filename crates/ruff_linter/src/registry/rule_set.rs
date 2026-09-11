@@ -298,8 +298,7 @@ impl Display for RuleSet {
         } else {
             writeln!(f, "[")?;
             for rule in self {
-                let code = rule.noqa_code();
-                writeln!(f, "\t{name} ({code}),", name = rule.name())?;
+                writeln!(f, "\t{},", rule.name_and_code())?;
             }
             write!(f, "]")?;
         }

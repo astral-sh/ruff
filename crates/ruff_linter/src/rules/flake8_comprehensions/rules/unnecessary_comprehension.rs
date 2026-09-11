@@ -4,6 +4,7 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Fix};
 
 use crate::rules::flake8_comprehensions::fixes;
@@ -59,7 +60,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// This rule's fix is always marked as unsafe because of the known problems described above and
 /// because comments may be dropped when rewriting the comprehension.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.73")]
+#[violation_metadata(stable_since = "v0.0.73", category = Category::Pedantic)]
 pub(crate) struct UnnecessaryComprehension {
     kind: ComprehensionKind,
 }

@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -41,7 +42,7 @@ use ruff_python_ast::PythonVersion;
 ///
 /// [bottom type]: https://en.wikipedia.org/wiki/Bottom_type
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.272")]
+#[violation_metadata(stable_since = "v0.0.272", category = Category::Style)]
 pub(crate) struct NoReturnArgumentAnnotationInStub {
     module: TypingModule,
 }

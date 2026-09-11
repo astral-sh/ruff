@@ -7,6 +7,11 @@ use crate::ast_node_ref::AstNodeRef;
 pub struct NodeKey(NodeIndex);
 
 impl NodeKey {
+    /// Returns the index of the AST node.
+    pub fn index(self) -> NodeIndex {
+        self.0
+    }
+
     pub fn from_node<N>(node: N) -> Self
     where
         N: HasNodeIndex,

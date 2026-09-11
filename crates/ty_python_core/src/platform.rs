@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 use ty_combine::Combine;
 
 /// The target platform to assume when resolving types.
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, ruff_macros::RustDoc),

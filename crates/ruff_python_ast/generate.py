@@ -2,6 +2,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = []
+#
+# [tool.uv]
+# exclude-newer = "P7D"
 # ///
 
 from __future__ import annotations
@@ -67,7 +70,7 @@ def rustfmt(code: str) -> str:
 
 def to_snake_case(node: str) -> str:
     """Converts CamelCase to snake_case"""
-    return re.sub("([A-Z])", r"_\1", node).lower().lstrip("_")
+    return re.sub(r"([A-Z])", r"_\1", node).lower().lstrip("_")
 
 
 def write_rustdoc(out: list[str], doc: str) -> None:
@@ -144,7 +147,9 @@ class Node:
     doc: str | None
     fields: list[Field] | None
     derives: list[str]
+    custom_debug: bool
     custom_source_order: bool
+    custom_range: bool
     source_order: list[str] | None
 
     def __init__(self, group: Group, node_name: str, node: dict[str, Any]) -> None:
@@ -155,7 +160,9 @@ class Node:
         fields = node.get("fields")
         if fields is not None:
             self.fields = [Field(f) for f in fields]
+        self.custom_debug = node.get("custom_debug", False)
         self.custom_source_order = node.get("custom_source_order", False)
+        self.custom_range = node.get("custom_range", False)
         self.derives = node.get("derives", [])
         self.doc = node.get("doc")
         self.source_order = node.get("source_order")
@@ -173,7 +180,6 @@ class Node:
                 if field.skip_source_order():
                     continue
                 if field.name == field_name:
-                    field = field
                     break
             fields.append(field)
         return fields
@@ -456,6 +462,8 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
         out.append("}")
 
     for node in ast.all_nodes:
+        if node.custom_range:
+            continue
         out.append(f"""
             impl ruff_text_size::Ranged for {node.ty} {{
                 fn range(&self) -> ruff_text_size::TextRange {{
@@ -1045,7 +1053,9 @@ def write_node(out: list[str], ast: Ast) -> None:
             if node.doc is not None:
                 write_rustdoc(out, node.doc)
             out.append(
-                "#[derive(Clone, Debug, PartialEq"
+                "#[derive(Clone"
+                + ("" if node.custom_debug else ", Debug")
+                + ", PartialEq"
                 + "".join(f", {derive}" for derive in node.derives)
                 + ")]"
             )
@@ -1053,7 +1063,8 @@ def write_node(out: list[str], ast: Ast) -> None:
             name = node.name
             out.append(f"pub struct {name} {{")
             out.append("pub node_index: crate::AtomicNodeIndex,")
-            out.append("pub range: ruff_text_size::TextRange,")
+            if not node.custom_range:
+                out.append("pub range: ruff_text_size::TextRange,")
             for field in node.fields:
                 field_str = f"pub {field.name}: "
                 ty = field.parsed_ty
@@ -1098,7 +1109,8 @@ def write_source_order(out: list[str], ast: Ast) -> None:
                     fields_list += f"{field.name}: _,\n"
                 else:
                     fields_list += f"{field.name},\n"
-            fields_list += "range: _,\n"
+            if not node.custom_range:
+                fields_list += "range: _,\n"
             fields_list += "node_index: _,\n"
 
             for field in node.fields_in_source_order():

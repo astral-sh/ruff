@@ -83,7 +83,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             deferred_state
         };
 
-        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, state);
+        let previous_deferred_state = self.replace_deferred_state(state);
         let previous_check_unbound_typevars = self
             .context
             .inference_flags
@@ -108,7 +108,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         fn infer_name_or_attribute<'db>(
             ty: Type<'db>,
             annotation: &ast::Expr,
-            builder: &TypeInferenceBuilder<'db, '_>,
+            builder: &mut TypeInferenceBuilder<'db, '_>,
             pep_613_policy: PEP613Policy,
         ) -> AnnotationExpressionInference<'db> {
             let special_case = match ty {

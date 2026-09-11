@@ -13,6 +13,7 @@ use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet};
 
 pub(crate) mod builder;
+mod generic_gradual_intersections;
 
 pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
 
@@ -504,6 +505,25 @@ pub(crate) enum KnownUnion {
 }
 
 impl KnownUnion {
+    /// Returns the class whose annotation denotes this numeric-tower union.
+    pub(crate) const fn annotation_class(self) -> KnownClass {
+        match self {
+            Self::Float => KnownClass::Float,
+            Self::Complex => KnownClass::Complex,
+        }
+    }
+
+    /// Returns whether this union contains exact instances of `class`.
+    pub(crate) const fn contains(self, class: KnownClass) -> bool {
+        match self {
+            Self::Float => matches!(class, KnownClass::Int | KnownClass::Float),
+            Self::Complex => matches!(
+                class,
+                KnownClass::Int | KnownClass::Float | KnownClass::Complex
+            ),
+        }
+    }
+
     pub(crate) fn to_type<'db>(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
             KnownUnion::Float => UnionType::from_two_elements(
@@ -880,7 +900,10 @@ impl<'db> IntersectionType<'db> {
 
         let non_union_elements = elements.clone().filter(|element| !element.is_union());
         let initial = Self::from_elements(db, env, non_union_elements);
-        let insert_candidate = |candidates: &mut Vec<Type<'db>>, new_ty: Type<'db>| -> Option<()> {
+        let insert_candidate = |candidates: &mut Vec<Type<'db>>,
+                                new_ty: Type<'db>,
+                                check_budget: bool|
+         -> Option<()> {
             if new_ty.is_never()
                 || candidates
                     .iter()
@@ -890,7 +913,7 @@ impl<'db> IntersectionType<'db> {
             }
 
             candidates.retain(|old| !old.is_redundant_with(db, env, new_ty));
-            if candidates.len() >= MAX_INTERSECTION_DNF_TERMS {
+            if check_budget && candidates.len() >= MAX_INTERSECTION_DNF_TERMS {
                 return None;
             }
             candidates.push(new_ty);
@@ -899,7 +922,7 @@ impl<'db> IntersectionType<'db> {
 
         let mut frontier = Vec::new();
         let mut next = Vec::new();
-        insert_candidate(&mut frontier, initial)?;
+        insert_candidate(&mut frontier, initial, true)?;
 
         for (idx, clause) in elements.filter_map(Type::as_union).enumerate() {
             // Don't check the budget for the first union clause. That ensures that we have a
@@ -907,13 +930,13 @@ impl<'db> IntersectionType<'db> {
             // result. For instance, this allows us to return the precise result for
             // `(A | B | C | D | E) & (A | B | F | G | H)` (in which each class is final), since
             // most of the pairs are disjoint.
-            let skip_budget_check = (idx == 0).then_some(());
+            let check_budget = idx > 0;
 
             next.clear();
             for candidate in &frontier {
                 for alternative in clause.elements(db) {
                     let refined = Self::from_two_elements(db, env, *candidate, *alternative);
-                    insert_candidate(&mut next, refined).or(skip_budget_check)?;
+                    insert_candidate(&mut next, refined, check_budget)?;
                 }
             }
 
@@ -1019,8 +1042,8 @@ impl<'db> IntersectionType<'db> {
         builder.build()
     }
 
-    /// Compute the `__class__` type when this intersection contains a positive class-backed
-    /// protocol constraint.
+    /// Compute the `__class__` type for class-backed protocols and `TypedDict` instances,
+    /// whose runtime classes differ from their internal meta-types.
     ///
     /// Negative instance constraints are not transferred: an object not satisfying `P` does not
     /// imply that other instances of its class cannot satisfy `P`.
@@ -1033,7 +1056,7 @@ impl<'db> IntersectionType<'db> {
             matches!(
                 positive,
                 Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_some()
-            )
+            ) || positive.is_typed_dict()
         }) {
             return None;
         }
@@ -1244,19 +1267,14 @@ fn expand_intersection_typevars_and_newtypes<'db>(
     let mut builder = IntersectionBuilder::new(db, env);
     for &element in positive {
         match element {
-            Type::TypeVar(tvar) => {
-                match tvar.typevar(db).bound_or_constraints(db, env) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        builder.add_positive_in_place(bound);
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        builder.add_positive_in_place(constraints.as_type(db, env));
-                    }
-                    // Type variables without bounds or constraints implicitly have `object`
-                    // as their upper bound, and adding `object` to an intersection is always a no-op
-                    None => {}
+            Type::TypeVar(tvar) => match tvar.require_bound_or_constraints(db, env) {
+                TypeVarBoundOrConstraints::UpperBound(bound) => {
+                    builder.add_positive_in_place(bound);
                 }
-            }
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                    builder.add_positive_in_place(constraints.as_type(db, env));
+                }
+            },
             Type::NewTypeInstance(newtype) => {
                 builder.add_positive_in_place(newtype.concrete_base_type(db));
             }

@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -28,7 +29,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.python.org/en/latest/guides/writing_stubs.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.253")]
+#[violation_metadata(stable_since = "v0.0.253", category = Category::Correctness)]
 pub(crate) struct NonEmptyStubBody;
 
 impl AlwaysFixableViolation for NonEmptyStubBody {

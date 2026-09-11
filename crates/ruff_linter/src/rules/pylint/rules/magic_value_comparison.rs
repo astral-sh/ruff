@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pylint::settings::ConstantType;
 
 /// ## What it does
@@ -50,7 +51,7 @@ use crate::rules::pylint::settings::ConstantType;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#constants
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.221")]
+#[violation_metadata(stable_since = "v0.0.221", category = Category::Pedantic)]
 pub(crate) struct MagicValueComparison {
     value: String,
 }
@@ -119,8 +120,8 @@ fn is_sys_version_comparand(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// PLR2004
-pub(crate) fn magic_value_comparison(checker: &Checker, left: &Expr, comparators: &[Expr]) {
-    for (left, right) in std::iter::once(left).chain(comparators).tuple_windows() {
+pub(crate) fn magic_value_comparison(checker: &Checker, operands: &[Expr]) {
+    for (left, right) in operands.iter().tuple_windows() {
         // If both of the comparators are literals, skip rule for the whole expression.
         // R0133: comparison-of-constants
         if as_literal(left).is_some() && as_literal(right).is_some() {
@@ -129,7 +130,7 @@ pub(crate) fn magic_value_comparison(checker: &Checker, left: &Expr, comparators
     }
 
     let mut previous = None;
-    let mut operands = std::iter::once(left).chain(comparators).peekable();
+    let mut operands = operands.iter().peekable();
     while let Some(comparison_expr) = operands.next() {
         if let Some(value) = as_literal(comparison_expr)
             && is_magic_value(value, &checker.settings().pylint.allow_magic_value_types)

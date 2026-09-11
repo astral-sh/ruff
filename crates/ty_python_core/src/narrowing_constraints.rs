@@ -41,6 +41,7 @@ use crate::ast_ids::ScopedUseId;
 use crate::predicate::ScopedPredicateId;
 use crate::rank::{RankBitBox, RankBitBoxVec};
 use crate::scope::FileScopeId;
+use crate::use_def::BindingsSnapshotId;
 
 /// The ID of a narrowing formula within one scope.
 ///
@@ -266,6 +267,29 @@ impl NarrowingConstraintsBuilder {
         }
     }
 
+    /// Adds a constraint that selects between two formulas based on `predicate`.
+    pub(crate) fn add_conditional(
+        &mut self,
+        predicate: ScopedPredicateId,
+        if_true: ScopedNarrowingConstraint,
+        if_false: ScopedNarrowingConstraint,
+    ) -> ScopedNarrowingConstraint {
+        let node = InteriorNode {
+            atom: predicate,
+            if_true,
+            if_uncertain: ALWAYS_FALSE,
+            if_false,
+        };
+        if let Some(cached) = self.interior_cache.get(&node) {
+            return *cached;
+        }
+        if self.interiors.len() >= MAX_INTERIOR_NODES {
+            return ALWAYS_TRUE;
+        }
+
+        self.add_interior(node)
+    }
+
     pub(crate) fn add_or_constraint(
         &mut self,
         a: ScopedNarrowingConstraint,
@@ -402,6 +426,7 @@ pub enum ConstraintKey {
     NarrowingConstraint(ScopedNarrowingConstraint),
     NestedScope(FileScopeId),
     UseId(ScopedUseId),
+    Snapshot(BindingsSnapshotId),
 }
 
 #[cfg(test)]

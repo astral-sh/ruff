@@ -30,9 +30,10 @@ exit_code: 0
       "since": "v0.0.18"
     }
   },
+  "category": "suspicious",
   "source_location": {
     "file": "<FILE>",
-    "line": 144
+    "line": 145
   }
 }
 ----- stderr -----

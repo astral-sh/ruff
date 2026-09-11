@@ -81,11 +81,19 @@ impl<'db> CallArgumentTypes<'db> {
     }
 
     /// Returns the type of this argument when inferred against the provided declared type.
+    ///
+    /// If the type was not inferred against the declared type directly, this method will fall back to
+    /// [`Self::get_default`].
+    pub(crate) fn try_get_for_declared_type(&self, tcx: Type<'db>) -> Option<Type<'db>> {
+        self.types.get(&tcx).copied().or_else(|| self.get_default())
+    }
+
+    /// Returns the type of this argument when inferred against the provided declared type.
+    ///
+    /// If the type was not inferred against the declared type directly, this method will fall back to
+    /// [`Self::get_default`], or to `Unknown` if no fallback type exists.
     pub(crate) fn get_for_declared_type(&self, tcx: Type<'db>) -> Type<'db> {
-        self.types
-            .get(&tcx)
-            .copied()
-            .or_else(|| self.get_default())
+        self.try_get_for_declared_type(tcx)
             .unwrap_or(Type::unknown())
     }
 
@@ -110,7 +118,7 @@ impl<'db> CallArgumentTypes<'db> {
 impl<'a, 'db> CallArguments<'a, 'db> {
     /// Create `CallArguments` from AST arguments. We will use the provided callback to obtain the
     /// type of each splatted argument, so that we can determine its length. All other arguments
-    /// will remain uninitialized as `Unknown`.
+    /// will remain uninitialized.
     pub(crate) fn from_arguments(
         arguments: &'a ast::Arguments,
         mut infer_argument_type: impl FnMut(&ast::ArgOrKeyword, &ast::Expr) -> Type<'db>,
@@ -459,85 +467,35 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             }
         }
 
-        struct DisplayCallArguments<'env, 'a, 'db> {
-            call_arguments: &'a CallArguments<'a, 'db>,
-            db: &'db dyn Db,
-            env: &'env ProgramEnvironment<'db>,
-        }
-
-        impl std::fmt::Display for DisplayCallArguments<'_, '_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("(")?;
-                for (index, (argument, types)) in self.call_arguments.iter().enumerate() {
-                    if index > 0 {
-                        write!(f, ", ")?;
+        std::fmt::from_fn(move |f| {
+            f.write_str("(")?;
+            for (index, (argument, types)) in self.iter().enumerate() {
+                if index > 0 {
+                    write!(f, ", ")?;
+                }
+                match argument {
+                    Argument::Synthetic => {
+                        write!(f, "self: {}", DisplayCallArgumentTypes { types, db, env })?;
                     }
-                    match argument {
-                        Argument::Synthetic => {
-                            write!(
-                                f,
-                                "self: {}",
-                                DisplayCallArgumentTypes {
-                                    types,
-                                    db: self.db,
-                                    env: self.env,
-                                }
-                            )?;
-                        }
-                        Argument::Positional => {
-                            write!(
-                                f,
-                                "{}",
-                                DisplayCallArgumentTypes {
-                                    types,
-                                    db: self.db,
-                                    env: self.env,
-                                }
-                            )?;
-                        }
-                        Argument::Variadic => {
-                            write!(
-                                f,
-                                "*{}",
-                                DisplayCallArgumentTypes {
-                                    types,
-                                    db: self.db,
-                                    env: self.env,
-                                }
-                            )?;
-                        }
-                        Argument::Keyword(name) => write!(
-                            f,
-                            "{}={}",
-                            name,
-                            DisplayCallArgumentTypes {
-                                types,
-                                db: self.db,
-                                env: self.env,
-                            }
-                        )?,
-                        Argument::Keywords => {
-                            write!(
-                                f,
-                                "**{}",
-                                DisplayCallArgumentTypes {
-                                    types,
-                                    db: self.db,
-                                    env: self.env,
-                                }
-                            )?;
-                        }
+                    Argument::Positional => {
+                        write!(f, "{}", DisplayCallArgumentTypes { types, db, env })?;
+                    }
+                    Argument::Variadic => {
+                        write!(f, "*{}", DisplayCallArgumentTypes { types, db, env })?;
+                    }
+                    Argument::Keyword(name) => write!(
+                        f,
+                        "{}={}",
+                        name,
+                        DisplayCallArgumentTypes { types, db, env }
+                    )?,
+                    Argument::Keywords => {
+                        write!(f, "**{}", DisplayCallArgumentTypes { types, db, env })?;
                     }
                 }
-                f.write_str(")")
             }
-        }
-
-        DisplayCallArguments {
-            call_arguments: self,
-            db,
-            env,
-        }
+            f.write_str(")")
+        })
     }
 }
 

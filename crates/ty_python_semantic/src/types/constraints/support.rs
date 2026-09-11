@@ -20,6 +20,7 @@ pub(super) struct SupportId;
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct Support {
     chunks: SmallVec<[usize; 2]>,
+    has_skipped_lazy_attributes: bool,
 }
 
 const CHUNK_SIZE: usize = usize::BITS as usize;
@@ -64,6 +65,21 @@ impl Support {
             })
         })
     }
+
+    /// Returns whether this support contains any type variables in common with `other`.
+    pub(super) fn overlaps_with(&self, other: &Self) -> bool {
+        std::iter::zip(&self.chunks, &other.chunks).any(|(lhs, rhs)| (*lhs & *rhs) != 0)
+    }
+
+    /// Records that lazy type attributes may contain additional type variables.
+    pub(super) fn mark_incomplete(&mut self) {
+        self.has_skipped_lazy_attributes = true;
+    }
+
+    /// Returns whether all type attributes were inspected while collecting this support.
+    pub(super) fn is_complete(&self) -> bool {
+        !self.has_skipped_lazy_attributes
+    }
 }
 
 impl BitOrAssign<&Self> for Support {
@@ -74,6 +90,7 @@ impl BitOrAssign<&Self> for Support {
         for (lhs, rhs) in std::iter::zip(&mut self.chunks, &rhs.chunks) {
             *lhs |= *rhs;
         }
+        self.has_skipped_lazy_attributes |= rhs.has_skipped_lazy_attributes;
     }
 }
 

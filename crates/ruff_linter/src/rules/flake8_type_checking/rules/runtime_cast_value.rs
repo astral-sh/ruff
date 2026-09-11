@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_type_checking::helpers::quote_type_expression;
 use crate::{AlwaysFixableViolation, Fix};
 
@@ -43,7 +44,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// This fix is safe as long as the type expression doesn't span multiple
 /// lines and includes comments on any of the lines apart from the last one.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Pedantic)]
 pub(crate) struct RuntimeCastValue;
 
 impl AlwaysFixableViolation for RuntimeCastValue {

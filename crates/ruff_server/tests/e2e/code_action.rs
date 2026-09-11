@@ -135,6 +135,7 @@ extend-select = ["F401"]
             "tags": []
           }
         ],
+        "isPreferred": true,
         "edit": {
           "changes": {
             "file://<temp_dir>/ruff.toml": [

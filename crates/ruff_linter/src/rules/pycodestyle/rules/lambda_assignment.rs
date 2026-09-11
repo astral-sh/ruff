@@ -10,6 +10,7 @@ use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -45,7 +46,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.28")]
+#[violation_metadata(stable_since = "v0.0.28", category = Category::Pedantic)]
 pub(crate) struct LambdaAssignment {
     name: String,
 }

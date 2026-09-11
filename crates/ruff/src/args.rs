@@ -45,7 +45,7 @@ pub struct GlobalConfigArgs {
     /// or a TOML `<KEY> = <VALUE>` pair
     /// (such as you might find in a `ruff.toml` configuration file)
     /// overriding a specific configuration option
-    /// (e.g., `--config "lint.line-length = 100"` or `--config "format.quote-style = 'single'"`).
+    /// (e.g., `--config "line-length = 100"` or `--config "format.quote-style = 'single'"`).
     /// Overrides of individual settings using this option always take precedence
     /// over all configuration files, including configuration files that were also
     /// specified using `--config`.
@@ -1015,7 +1015,7 @@ impl TypedValueParser for ConfigArgumentParser {
         let _guard = ValueSourceGuard::new(ValueSource::Cli, false);
 
         let config_parse_error = match toml::Table::from_str(value) {
-            Ok(table) => match table.try_into::<Options>() {
+            Ok(table) => match Options::from_toml_table(table) {
                 Ok(option) => {
                     if option.extend.is_none() {
                         return Ok(SingleConfigArgument::SettingsOverride(Arc::new(option)));

@@ -6,6 +6,7 @@ use ruff_python_stdlib::str;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
@@ -48,7 +49,7 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.77")]
+#[violation_metadata(stable_since = "v0.0.77", category = Category::Pedantic)]
 pub(crate) struct InvalidFunctionName {
     name: String,
 }

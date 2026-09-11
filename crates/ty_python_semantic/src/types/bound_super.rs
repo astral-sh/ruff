@@ -10,11 +10,13 @@ use crate::{
     place::{Place, PlaceAndQualifiers},
     types::{
         BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
-        IntersectionBuilder, KnownClass, MemberLookupPolicy, SpecialFormType, SubclassOfInner,
-        SubclassOfType, Type, TypeVarBoundOrConstraints, UnionBuilder,
+        IntersectionBuilder, KnownClass, MemberLookupErrorKind, MemberLookupPolicy,
+        MemberLookupResult, SpecialFormType, SubclassOfInner, SubclassOfType, Type,
+        TypeVarBoundOrConstraints, UnionBuilder,
         constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
+        member_lookup_result,
         relation::EquivalenceChecker,
         signatures::{Parameter, Parameters, Signature},
         typevar::{TypeVarConstraints, TypeVarInstance},
@@ -29,11 +31,15 @@ pub(crate) enum TypeVarOwnerContext<'db> {
 }
 
 impl<'db> TypeVarOwnerContext<'db> {
-    fn typevar(self, db: &'db dyn Db) -> TypeVarInstance<'db> {
+    fn bound_typevar(self) -> BoundTypeVarInstance<'db> {
         match self {
             TypeVarOwnerContext::Bare(bound_typevar)
-            | TypeVarOwnerContext::SubclassOf(bound_typevar) => bound_typevar.typevar(db),
+            | TypeVarOwnerContext::SubclassOf(bound_typevar) => bound_typevar,
         }
+    }
+
+    fn typevar(self, db: &'db dyn Db) -> TypeVarInstance<'db> {
+        self.bound_typevar().typevar(db)
     }
 
     fn has_implicit_upper_bound(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
@@ -50,14 +56,12 @@ impl<'db> TypeVarOwnerContext<'db> {
     ) -> Type<'db> {
         match self {
             TypeVarOwnerContext::Bare(typevar) => typevar
-                .typevar(db)
                 .require_bound_or_constraints(db, env)
                 .as_type(db, env),
             TypeVarOwnerContext::SubclassOf(typevar) => SubclassOfType::try_from_instance(
                 db,
                 env,
                 typevar
-                    .typevar(db)
                     .require_bound_or_constraints(db, env)
                     .as_type(db, env),
             )
@@ -108,8 +112,9 @@ impl<'db> BoundSuperError<'db> {
                     let env = context.program_environment();
                     if let Some(typevar_context) = typevar_context {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "`{owner}` is a type variable with an abstract/structural type as \
-                            its bounds or constraints, in `super({pivot_class}, {owner})` call",
+                            "`{owner}` is a type variable \
+                            with an abstract/structural type as its bounds or constraints, \
+                            in `super({pivot_class}, {owner})` call",
                             pivot_class = pivot_class.display(db, env),
                             owner = owner_type.display(db, env),
                         ));
@@ -165,9 +170,11 @@ impl<'db> BoundSuperError<'db> {
                     if let Some(typevar_context) = typevar_context {
                         Self::describe_typevar(db, env, &mut diagnostic, *typevar_context);
                         diagnostic.info(format_args!(
-                            "`{bounds_or_constraints}` is not an instance or subclass of `{pivot_class}`",
-                            bounds_or_constraints =
-                                typevar_context.bound_or_constraints_type(db, env).display(db, env),
+                            "`{bounds_or_constraints}` is not an instance or subclass of \
+                             `{pivot_class}`",
+                            bounds_or_constraints = typevar_context
+                                .bound_or_constraints_type(db, env)
+                                .display(db, env),
                             pivot_class = pivot_class.display(db, env),
                         ));
                         let typevar = typevar_context.typevar(context.db());
@@ -203,11 +210,13 @@ impl<'db> BoundSuperError<'db> {
         let type_var = type_var_context.typevar(db);
         match type_var_context.typevar(db).bound_or_constraints(db, env) {
             None => {
+                let top = type_var_context.bound_typevar().domain(db).top(db);
                 diagnostic.info(format_args!(
-                    "Type variable `{}` has `object` as its implicit upper bound",
+                    "Type variable `{}` has `{}` as its implicit upper bound",
                     type_var.name(db),
+                    top.display(db, env),
                 ));
-                Type::object()
+                top
             }
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 diagnostic.info(format_args!(
@@ -664,9 +673,8 @@ impl<'db> BoundSuperType<'db> {
                 SubclassOfInner::Protocol(_) => SuperOwnerKind::Dynamic(DynamicType::Unknown),
                 SubclassOfInner::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
                 SubclassOfInner::TypeVar(bound_typevar) => {
-                    let typevar = bound_typevar.typevar(db);
-                    match typevar.bound_or_constraints(db, env) {
-                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    match bound_typevar.require_bound_or_constraints(db, env) {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
                             let class = match bound {
                                 Type::NominalInstance(instance) => Some(instance.class(db, env)),
                                 Type::ProtocolInstance(protocol) => {
@@ -693,23 +701,11 @@ impl<'db> BoundSuperType<'db> {
                                 );
                             }
                         }
-                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
                             return build_constrained_union(
                                 constraints,
                                 TypeVarOwnerContext::SubclassOf(bound_typevar),
                             );
-                        }
-                        None => {
-                            // No bound means the implicit upper bound is `object`.
-                            SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
-                                db,
-                                pivot_class,
-                                pivot_class_type,
-                                owner_type,
-                                owner_type,
-                                ClassType::object(db, env),
-                                Some(TypeVarOwnerContext::SubclassOf(bound_typevar)),
-                            )?)
                         }
                     }
                 }
@@ -783,9 +779,8 @@ impl<'db> BoundSuperType<'db> {
                 return delegate_to(alias.value_type(db));
             }
             Type::TypeVar(bound_typevar) => {
-                let typevar = bound_typevar.typevar(db);
-                match typevar.bound_or_constraints(db, env) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                match bound_typevar.require_bound_or_constraints(db, env) {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
                         let class = match bound {
                             Type::NominalInstance(instance) => Some(instance.class(db, env)),
                             Type::ProtocolInstance(protocol) => {
@@ -809,22 +804,11 @@ impl<'db> BoundSuperType<'db> {
                             );
                         }
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
                         return build_constrained_union(
                             constraints,
                             TypeVarOwnerContext::Bare(bound_typevar),
                         );
-                    }
-                    None => {
-                        // No bound means the implicit upper bound is `object`.
-                        SuperOwnerKind::Resolved(Self::resolve_instance_super_owner(
-                            db,
-                            pivot_class,
-                            pivot_class_type,
-                            owner_type,
-                            ClassType::object(db, env),
-                            Some(TypeVarOwnerContext::Bare(bound_typevar)),
-                        )?)
                     }
                 }
             }
@@ -860,6 +844,9 @@ impl<'db> BoundSuperType<'db> {
             }
             Type::PropertyInstance(property) => {
                 return delegate_to(property.instance_fallback(db, env));
+            }
+            Type::SlotDescriptor(_) => {
+                return delegate_to(KnownClass::MemberDescriptorType.to_instance(db, env));
             }
             Type::BoundSuper(_) => {
                 return delegate_to(KnownClass::Super.to_instance(db, env));
@@ -940,9 +927,20 @@ impl<'db> BoundSuperType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         attribute: PlaceAndQualifiers<'db>,
-    ) -> Option<PlaceAndQualifiers<'db>> {
+    ) -> Option<MemberLookupResult<'db>> {
         let (instance, owner) = self.owner(db).descriptor_binding(db, env)?;
-        Some(Type::try_call_dunder_get_on_attribute(db, env, attribute, instance, owner).0)
+        let (member, _, descriptor_error) =
+            Type::try_call_dunder_get_on_attribute(db, env, attribute, instance, owner);
+        Some(member_lookup_result(
+            db,
+            member,
+            descriptor_error.map(MemberLookupErrorKind::DescriptorGet),
+            instance
+                .and_then(|_| attribute.place.ignore_possibly_undefined())
+                .and_then(|ty| ty.property_deprecations(db))
+                // `super` delegates reads to the owner's descriptors, but not writes or deletions.
+                .map(|properties| properties.getters_only(db)),
+        ))
     }
 
     /// Similar to `Type::find_name_in_mro_with_policy`, but performs lookup starting *after* the

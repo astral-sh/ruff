@@ -5,6 +5,7 @@ use ruff_python_ast::{Expr, StmtWith, WithItem};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_async::helpers::MethodName;
 
 /// ## What it does
@@ -45,7 +46,7 @@ use crate::rules::flake8_async::helpers::MethodName;
 /// - [`anyio` timeouts](https://anyio.readthedocs.io/en/stable/cancellation.html)
 /// - [`trio` timeouts](https://trio.readthedocs.io/en/stable/reference-core.html#cancellation-and-timeouts)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.269")]
+#[violation_metadata(stable_since = "v0.0.269", category = Category::Suspicious)]
 pub(crate) struct CancelScopeNoCheckpoint {
     method_name: MethodName,
 }

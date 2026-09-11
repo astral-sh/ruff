@@ -141,13 +141,13 @@ Module(
     },
 )
 ```
-## Errors
+## Semantic Syntax Errors
 
   |
 1 | foo(a=1, b=2, c=3, b=4, a=5)
-  |                    ^^^ Syntax Error: Duplicate keyword argument "b"
+  |                    ^^^ Syntax Error: Duplicate keyword argument `b`
 
 
   |
 1 | foo(a=1, b=2, c=3, b=4, a=5)
-  |                         ^^^ Syntax Error: Duplicate keyword argument "a"
+  |                         ^^^ Syntax Error: Duplicate keyword argument `a`

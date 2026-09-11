@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 
 /// ## What it does
@@ -41,7 +42,7 @@ use crate::docstrings::Docstring;
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
+#[violation_metadata(stable_since = "v0.0.70", category = Category::Pedantic)]
 pub(crate) struct SignatureInDocstring;
 
 impl Violation for SignatureInDocstring {

@@ -6,6 +6,7 @@ use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::comments::shebang::ShebangDirective;
 
 static UV_RUN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
@@ -51,7 +52,7 @@ static UV_RUN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.229")]
+#[violation_metadata(stable_since = "v0.0.229", category = Category::Pedantic)]
 pub(crate) struct ShebangMissingPython;
 
 impl Violation for ShebangMissingPython {

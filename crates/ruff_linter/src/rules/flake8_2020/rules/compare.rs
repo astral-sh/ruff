@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::registry::Rule;
 
 use crate::rules::flake8_2020::helpers::is_sys;
@@ -41,7 +42,7 @@ use crate::rules::flake8_2020::helpers::is_sys;
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.113")]
+#[violation_metadata(stable_since = "v0.0.113", category = Category::Suspicious)]
 pub(crate) struct SysVersionCmpStr3;
 
 impl Violation for SysVersionCmpStr3 {
@@ -92,7 +93,7 @@ impl Violation for SysVersionCmpStr3 {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.113")]
+#[violation_metadata(stable_since = "v0.0.113", category = Category::Suspicious)]
 pub(crate) struct SysVersionInfo0Eq3 {
     eq: bool,
 }
@@ -139,7 +140,7 @@ impl Violation for SysVersionInfo0Eq3 {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.113")]
+#[violation_metadata(stable_since = "v0.0.113", category = Category::Suspicious)]
 pub(crate) struct SysVersionInfo1CmpInt;
 
 impl Violation for SysVersionInfo1CmpInt {
@@ -182,7 +183,7 @@ impl Violation for SysVersionInfo1CmpInt {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.113")]
+#[violation_metadata(stable_since = "v0.0.113", category = Category::Suspicious)]
 pub(crate) struct SysVersionInfoMinorCmpInt;
 
 impl Violation for SysVersionInfoMinorCmpInt {
@@ -226,7 +227,7 @@ impl Violation for SysVersionInfoMinorCmpInt {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.113")]
+#[violation_metadata(stable_since = "v0.0.113", category = Category::Suspicious)]
 pub(crate) struct SysVersionCmpStr10;
 
 impl Violation for SysVersionCmpStr10 {
@@ -237,7 +238,11 @@ impl Violation for SysVersionCmpStr10 {
 }
 
 /// YTT103, YTT201, YTT203, YTT204, YTT302
-pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators: &[Expr]) {
+pub(crate) fn compare(checker: &Checker, compare: &ast::ExprCompare) {
+    let Some((left, op, right)) = compare.as_single() else {
+        return;
+    };
+
     match left {
         Expr::Subscript(ast::ExprSubscript { value, slice, .. })
             if is_sys(value, "version_info", checker.semantic()) =>
@@ -249,14 +254,12 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
             {
                 if *i == 0 {
                     if let (
-                        [operator @ (CmpOp::Eq | CmpOp::NotEq)],
-                        [
-                            Expr::NumberLiteral(ast::ExprNumberLiteral {
-                                value: ast::Number::Int(n),
-                                ..
-                            }),
-                        ],
-                    ) = (ops, comparators)
+                        operator @ (CmpOp::Eq | CmpOp::NotEq),
+                        Expr::NumberLiteral(ast::ExprNumberLiteral {
+                            value: ast::Number::Int(n),
+                            ..
+                        }),
+                    ) = (op, right)
                     {
                         if *n == 3 && checker.is_rule_enabled(Rule::SysVersionInfo0Eq3) {
                             checker.report_diagnostic(
@@ -269,14 +272,12 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                     }
                 } else if *i == 1 {
                     if let (
-                        [CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE],
-                        [
-                            Expr::NumberLiteral(ast::ExprNumberLiteral {
-                                value: ast::Number::Int(_),
-                                ..
-                            }),
-                        ],
-                    ) = (ops, comparators)
+                        CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
+                        Expr::NumberLiteral(ast::ExprNumberLiteral {
+                            value: ast::Number::Int(_),
+                            ..
+                        }),
+                    ) = (op, right)
                     {
                         checker.report_diagnostic_if_enabled(SysVersionInfo1CmpInt, left.range());
                     }
@@ -288,14 +289,12 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
             if is_sys(value, "version_info", checker.semantic()) && attr == "minor" =>
         {
             if let (
-                [CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE],
-                [
-                    Expr::NumberLiteral(ast::ExprNumberLiteral {
-                        value: ast::Number::Int(_),
-                        ..
-                    }),
-                ],
-            ) = (ops, comparators)
+                CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
+                Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(_),
+                    ..
+                }),
+            ) = (op, right)
             {
                 checker.report_diagnostic_if_enabled(SysVersionInfoMinorCmpInt, left.range());
             }
@@ -306,9 +305,9 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
 
     if is_sys(left, "version", checker.semantic()) {
         if let (
-            [CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE],
-            [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })],
-        ) = (ops, comparators)
+            CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }),
+        ) = (op, right)
         {
             if value.len() == 1 {
                 checker.report_diagnostic_if_enabled(SysVersionCmpStr10, left.range());

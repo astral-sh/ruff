@@ -1,18 +1,18 @@
 use crate::goto::find_goto_target;
 use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
-use ruff_db::PythonFile;
 use ruff_text_size::TextSize;
+use ty_python_core::ProgramFile;
 use ty_python_semantic::SemanticModel;
 
 /// Find all document highlights for a symbol at the given position.
 /// Document highlights are limited to the current file only.
 pub fn document_highlights(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Option<Vec<ReferenceTarget>> {
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = ruff_db::parsed::parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
     let model = SemanticModel::new(db, file);
 
@@ -36,7 +36,7 @@ mod tests {
         fn document_highlights(&self) -> String {
             let Some(highlight_results) = document_highlights(
                 &self.db,
-                self.python_file(self.cursor.file),
+                self.program_file(self.cursor.file),
                 self.cursor.offset,
             ) else {
                 return "No highlights found".to_string();

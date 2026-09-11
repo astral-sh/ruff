@@ -119,13 +119,10 @@ NPY201 [*] `np.chararray` will be removed in NumPy 2.0. Use `numpy.char.chararra
    |
 help: Replace with `numpy.char.chararray`
    |
-1  + from numpy.char import chararray
-2  | def func():
---------------------------------------------------------------------------------
-14 |
+13 |
    -     np.chararray
-15 +     chararray
-16 |
+14 +     np.char.chararray
+15 |
    |
 
 NPY201 [*] `np.format_parser` will be removed in NumPy 2.0. Use `numpy.rec.format_parser` instead.

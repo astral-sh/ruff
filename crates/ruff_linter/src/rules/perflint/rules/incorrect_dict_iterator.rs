@@ -6,6 +6,7 @@ use ruff_python_ast::{Arguments, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -44,7 +45,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// (e.g., if it is missing a `.keys()` or `.values()` method, or if those
 /// methods behave differently than they do on standard mapping types).
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.273")]
+#[violation_metadata(stable_since = "v0.0.273", category = Category::Complexity)]
 pub(crate) struct IncorrectDictIterator {
     subset: DictSubset,
 }

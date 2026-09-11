@@ -14,8 +14,8 @@ We test the whole matrix of possible boundness and declaredness states. The curr
 summarized in the following table, while the tests below demonstrate each case. Note that some of
 this behavior is questionable and might change in the future. See the TODOs in `symbol_by_id`
 (`types.rs`) and [this issue](https://github.com/astral-sh/ruff/issues/14297) for more information.
-In particular, we should raise errors in the "possibly-undeclared-and-unbound" as well as the
-"undeclared-and-possibly-unbound" cases (marked with a "?").
+In particular, we should raise an error in the "possibly-undeclared-and-unbound" case (marked with a
+"?").
 
 | **Public type**  | declared     | possibly-undeclared        | undeclared              |
 | ---------------- | ------------ | -------------------------- | ----------------------- |
@@ -23,11 +23,11 @@ In particular, we should raise errors in the "possibly-undeclared-and-unbound" a
 | possibly-unbound | `T_declared` | `T_declared \| T_inferred` | `Unknown \| T_inferred` |
 | unbound          | `T_declared` | `T_declared`               | `Unknown`               |
 
-| **Diagnostic**   | declared | possibly-undeclared       | undeclared          |
-| ---------------- | -------- | ------------------------- | ------------------- |
-| bound            |          |                           |                     |
-| possibly-unbound |          | `possibly-missing-import` | ?                   |
-| unbound          |          | ?                         | `unresolved-import` |
+| **Diagnostic**   | declared | possibly-undeclared          | undeclared                   |
+| ---------------- | -------- | ---------------------------- | ---------------------------- |
+| bound            |          |                              |                              |
+| possibly-unbound |          | `possibly-missing-attribute` | `possibly-missing-attribute` |
+| unbound          |          | ?                            | `unresolved-attribute`       |
 
 When the declared and inferred types are mutually assignable, we use `T_declared` directly instead
 of unioning it with `T_inferred`.
@@ -73,7 +73,7 @@ class Public:
     c: Any
     d: int
 
-    if flag:
+    if flag():
         a = 1
         b = 2  # error: [invalid-assignment]
         c = 3
@@ -211,25 +211,27 @@ Public.a = None
 
 ### Undeclared and possibly unbound
 
-If a symbol is undeclared and *possibly* unbound, we currently do not raise an error. This seems
-inconsistent when compared to the "possibly-undeclared-and-possibly-unbound" case.
+If a symbol is undeclared and *possibly* unbound, we raise a `possibly-missing-attribute` error
+because the attribute might not exist.
 
 ```py
 def flag() -> bool:
     return True
 
 class Public:
-    if flag:
+    if flag():
         a = 1
         b: SomeUnknownName = 1  # error: [unresolved-reference]
 
-# TODO: these should raise an error. Once we fix this, update the section description and the table
-# on top of this document.
+# error: [possibly-missing-attribute]
 reveal_type(Public.a)  # revealed: int
-reveal_type(Public.b)  # revealed: Unknown
+# error: [possibly-missing-attribute]
+reveal_type(Public.b)  # revealed: Literal[1] | Unknown
 
 # External modifications of `a` are checked against the inferred type:
+#
 # error: [invalid-assignment]
+# error: [possibly-missing-attribute]
 Public.a = None
 ```
 

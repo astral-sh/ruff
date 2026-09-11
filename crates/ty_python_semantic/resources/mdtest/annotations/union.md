@@ -83,3 +83,46 @@ X = int | str
 def f(y: X):
     reveal_type(y)  # revealed: int | str
 ```
+
+## Runtime class
+
+### Python 3.13 and earlier
+
+`typing.Union` is an instance of `typing._SpecialForm`, so it is not a class.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Union
+
+reveal_type(type(Union))  # revealed: <class '_SpecialForm'>
+
+def takes_type(cls: type) -> None: ...
+
+takes_type(Union)  # error: [invalid-argument-type]
+```
+
+### Python 3.14 and later
+
+`typing.Union` is a class, as is its re-export from `typing_extensions`.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Union
+from typing_extensions import Union as ExtensionsUnion
+
+reveal_type(type(Union))  # revealed: <class 'type'>
+reveal_type(type(ExtensionsUnion))  # revealed: <class 'type'>
+
+def takes_type(cls: type) -> None: ...
+
+takes_type(Union)
+takes_type(ExtensionsUnion)
+```

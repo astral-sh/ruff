@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::registry::Rule;
 
 /// ## What it does
@@ -46,7 +47,7 @@ use crate::registry::Rule;
 /// ## References
 /// - [Typing documentation: Version and Platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.246")]
+#[violation_metadata(stable_since = "v0.0.246", category = Category::Suspicious)]
 pub(crate) struct UnrecognizedPlatformCheck;
 
 impl Violation for UnrecognizedPlatformCheck {
@@ -85,7 +86,7 @@ impl Violation for UnrecognizedPlatformCheck {
 /// ## References
 /// - [Typing documentation: Version and Platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.246")]
+#[violation_metadata(stable_since = "v0.0.246", category = Category::Suspicious)]
 pub(crate) struct UnrecognizedPlatformName {
     platform: String,
 }
@@ -100,17 +101,11 @@ impl Violation for UnrecognizedPlatformName {
 
 /// PYI007, PYI008
 pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
-    let Expr::Compare(ast::ExprCompare {
-        left,
-        ops,
-        comparators,
-        ..
-    }) = test
-    else {
+    let Expr::Compare(compare) = test else {
         return;
     };
 
-    let ([op], [right]) = (&**ops, &**comparators) else {
+    let Some((left, op, right)) = compare.as_single() else {
         return;
     };
 

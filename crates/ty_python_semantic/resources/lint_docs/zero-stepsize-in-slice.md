@@ -8,9 +8,9 @@ Python's built-in sequence types raise a `ValueError` when sliced with a step si
 
 ## Known problems
 
-This check is not exhaustive. It reports zero-step slices for certain built-in sequence
-types where the operation is known to fail. A custom `__getitem__` implementation can
-accept or reject such a slice, so ty cannot detect every runtime failure.
+This check is not exhaustive. It reports zero-step slices for certain built-in sequence types where
+the operation is known to fail. A custom `__getitem__` implementation can accept or reject such a
+slice, so ty cannot detect every runtime failure.
 
 ## Examples
 

@@ -365,6 +365,22 @@ def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B]):
         reveal_type(x)  # revealed: tuple[Literal["a"], A]
 ```
 
+A tuple can have several literal tags. Matching a different tag rules out that tuple, while
+excluding only one of its possible tags leaves it in the union:
+
+```py
+def multiple_tags(x: tuple[Literal["a"], int] | tuple[Literal["b", "c"], str]):
+    if "a" == x[0]:
+        reveal_type(x)  # revealed: tuple[Literal["a"], int]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["b", "c"], str]
+
+    if x[0] != "b":
+        reveal_type(x)  # revealed: tuple[Literal["a"], int] | tuple[Literal["b", "c"], str]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["b", "c"], str]
+```
+
 Enum literals are supported as tuple tags, including `IntEnum` literals:
 
 ```py
@@ -403,6 +419,19 @@ def _(x: tuple[Literal["tag1"], A] | tuple[str, B]):
     else:
         # But we *can* narrow with inequality
         reveal_type(x)  # revealed: tuple[str, B]
+```
+
+This also applies when a tag is a union of literal and non-literal types. The non-literal
+alternative can compare equal to the tag being checked:
+
+```py
+class MatchesAnything:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def nonliteral_tag_union(x: tuple[Literal["a"], int] | tuple[Literal["b"] | MatchesAnything, str]):
+    if x[0] == "a":
+        reveal_type(x)  # revealed: tuple[Literal["a"], int] | tuple[Literal["b"] | MatchesAnything, str]
 ```
 
 If the index is out of bounds for any tuple in the union, we also skip narrowing (a diagnostic will

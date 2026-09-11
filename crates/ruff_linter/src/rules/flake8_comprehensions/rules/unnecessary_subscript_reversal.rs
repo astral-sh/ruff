@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for unnecessary subscript reversal of iterable.
@@ -27,7 +28,7 @@ use crate::checkers::ast::Checker;
 /// iterable
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.64")]
+#[violation_metadata(stable_since = "v0.0.64", category = Category::Complexity)]
 pub(crate) struct UnnecessarySubscriptReversal {
     func: String,
 }

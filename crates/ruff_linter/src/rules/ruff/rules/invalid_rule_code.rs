@@ -3,6 +3,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::fix::edits::delete_comment;
 use crate::noqa::{Code, Directive, FileNoqaDirectives};
 use crate::noqa::{Codes, NoqaDirectives};
@@ -61,7 +62,7 @@ impl InvalidRuleCodeKind {
 ///
 /// - `lint.external`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
 pub(crate) struct InvalidRuleCode {
     pub(crate) rule_code: String,
     pub(crate) kind: InvalidRuleCodeKind,

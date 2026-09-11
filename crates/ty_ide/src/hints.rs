@@ -1,4 +1,4 @@
-use ruff_db::PythonFile;
+use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use ty_python_semantic::types::ide_support::{
@@ -40,12 +40,12 @@ impl HintKind {
     }
 }
 
-pub fn hints(db: &dyn Db, file: PythonFile<'_>) -> Vec<Hint> {
-    let source_file = file.file(db);
-    if !db.should_check_file(source_file) {
+pub fn hints(db: &dyn Db, file: File) -> Vec<Hint> {
+    if !ty_project::should_check_semantics(db, file) {
         return Vec::new();
     }
 
+    let file = db.program_file(file);
     let unreachable = unreachable_ranges(db, file);
 
     let mut hints = unused_bindings(db, file)

@@ -13,6 +13,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::{
     is_b006_check_guaranteed_mutable_expr_enabled,
     is_b006_unsafe_fix_preserve_assignment_expr_enabled,
@@ -79,7 +80,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.92")]
+#[violation_metadata(stable_since = "v0.0.92", category = Category::Suspicious)]
 pub(crate) struct MutableArgumentDefault;
 
 impl Violation for MutableArgumentDefault {

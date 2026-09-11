@@ -74,7 +74,7 @@ hosting = ["simple", "github"]
 simple-download-url = "https://releases.astral.sh/github/ruff/releases/download/{tag}"
 
 [dist.github-custom-runners]
-global = "depot-ubuntu-latest-4"
+global = "depot-ubuntu-24.04-4"
 
 [dist.github-action-commits]
 "actions/checkout" = "de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2

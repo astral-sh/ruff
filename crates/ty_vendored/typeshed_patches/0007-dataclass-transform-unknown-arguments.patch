@@ -1,0 +1,22 @@
+--- a/stdlib/typing.pyi
++++ b/stdlib/typing.pyi
+@@ -2280,7 +2280,6 @@ if sys.version_info >= (3, 11):
+         order_default: bool = False,
+         kw_only_default: bool = False,
+         frozen_default: bool = False,  # on 3.11, runtime accepts it as part of kwargs
+         field_specifiers: tuple[type[Any] | Callable[..., Any], ...] = (),
+-        **kwargs: Any,
+     ) -> IdentityFunction:
+         """Decorator to mark an object as providing dataclass-like behavior.
+
+--- a/stdlib/typing_extensions.pyi
++++ b/stdlib/typing_extensions.pyi
+@@ -804,8 +804,7 @@ else:
+         order_default: bool = False,
+         kw_only_default: bool = False,
+         frozen_default: bool = False,
+         field_specifiers: tuple[type[Any] | Callable[..., Any], ...] = (),
+-        **kwargs: object,
+     ) -> IdentityFunction:
+         """Decorator that marks a function, class, or metaclass as providing
+         dataclass-like behavior.

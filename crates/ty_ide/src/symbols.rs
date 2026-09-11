@@ -8,15 +8,15 @@ use regex::Regex;
 
 use ruff_db::parsed::parsed_module;
 
-use ruff_db::PythonFile;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
-use ty_module_resolver::{ModuleName, resolve_module};
+use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 use ty_project::Db;
+use ty_python_core::ProgramFile;
 
 use crate::completion::CompletionKind;
 
@@ -392,8 +392,8 @@ impl SymbolKind {
 /// The flattened list includes parent/child information and can be
 /// converted into a hierarchical collection of symbols.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn symbols_for_file(db: &dyn Db, file: PythonFile<'_>) -> FlatSymbols {
-    let parsed = parsed_module(db, file);
+pub(crate) fn symbols_for_file(db: &dyn Db, file: ProgramFile<'_>) -> FlatSymbols {
+    let parsed = parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
 
     let mut visitor = SymbolVisitor::tree(db, file);
@@ -411,9 +411,9 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: PythonFile<'_>) -> FlatSymbols
     cycle_initial=|_, _, _| FlatSymbols::default(),
     heap_size=ruff_memory_usage::heap_size,
 )]
-pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: PythonFile<'_>) -> FlatSymbols {
+pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: ProgramFile<'_>) -> FlatSymbols {
     let source_file = file.file(db);
-    let parsed = parsed_module(db, file);
+    let parsed = parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
 
     let mut visitor = SymbolVisitor::globals(db, file);
@@ -455,7 +455,7 @@ impl ImportedFrom {
 
     fn import_from(
         db: &dyn Db,
-        importing_file: PythonFile<'_>,
+        importing_file: ImportingFile<'_>,
         ast: &ast::StmtImportFrom,
         kind: ImportKind,
     ) -> Option<ImportedFrom> {
@@ -596,16 +596,22 @@ impl<'db> Imports<'db> {
     fn get_module_symbols(
         &self,
         db: &'db dyn Db,
-        importing_file: PythonFile<'db>,
+        program_file: ProgramFile<'db>,
         name: &ModuleName,
     ) -> Option<&'db FlatSymbols> {
-        let module_name = match self.module_names.get(name.as_str())? {
+        let module_kind = self.module_names.get(name.as_str())?;
+        let importing_file =
+            ImportingFile::File(program_file.file(db), program_file.resolver_environment(db));
+        let module_name = match module_kind {
             ImportModuleKind::Definitive(name) | ImportModuleKind::Possible(name) => {
                 name.to_module_name(db, importing_file)?
             }
         };
         let module = resolve_module(db, importing_file, &module_name)?;
-        Some(symbols_for_file_global_only(db, module.python_file(db)?))
+        Some(symbols_for_file_global_only(
+            db,
+            ProgramFile::new(db, module.file(db)?, program_file.program(db)),
+        ))
     }
 }
 
@@ -657,7 +663,7 @@ impl<'db> ImportModuleName<'db> {
     fn to_module_name(
         self,
         db: &'db dyn Db,
-        importing_file: PythonFile<'db>,
+        importing_file: ImportingFile<'db>,
     ) -> Option<ModuleName> {
         match self {
             ImportModuleName::Import(name) => ModuleName::new(name),
@@ -694,7 +700,7 @@ impl Ranged for AstImport<'_> {
 #[expect(clippy::struct_excessive_bools)]
 struct SymbolVisitor<'db> {
     db: &'db dyn Db,
-    file: PythonFile<'db>,
+    file: ProgramFile<'db>,
     symbols: IndexVec<SymbolId, SymbolTree>,
     symbol_stack: Vec<SymbolId>,
     /// Track if we're currently inside a function at any point.
@@ -709,6 +715,8 @@ struct SymbolVisitor<'db> {
     in_class: bool,
     /// The statement whose expressions are currently being visited.
     current_stmt: Option<&'db ast::Stmt>,
+    /// The binding declared directly by the pattern currently being visited.
+    pattern_binding: Option<&'db ast::Identifier>,
     /// Whether store-context names should be excluded from the enclosing scope.
     suppress_store_symbols: bool,
     /// When enabled, the visitor should only try to extract
@@ -732,7 +740,7 @@ struct SymbolVisitor<'db> {
 }
 
 impl<'db> SymbolVisitor<'db> {
-    fn tree(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
+    fn tree(db: &'db dyn Db, file: ProgramFile<'db>) -> Self {
         Self {
             db,
             file,
@@ -741,6 +749,7 @@ impl<'db> SymbolVisitor<'db> {
             in_function: false,
             in_class: false,
             current_stmt: None,
+            pattern_binding: None,
             suppress_store_symbols: false,
             exports_only: false,
             all_origin: None,
@@ -750,7 +759,7 @@ impl<'db> SymbolVisitor<'db> {
         }
     }
 
-    fn globals(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
+    fn globals(db: &'db dyn Db, file: ProgramFile<'db>) -> Self {
         Self {
             exports_only: true,
             ..Self::tree(db, file)
@@ -859,27 +868,45 @@ impl<'db> SymbolVisitor<'db> {
     }
 
     /// Adds a symbol for a name definition.
-    fn add_name_symbol(&mut self, stmt: &ast::Stmt, name: &ast::ExprName, kind: SymbolKind) {
+    fn add_name_symbol(
+        &mut self,
+        stmt: &ast::Stmt,
+        name: &Name,
+        name_range: TextRange,
+        kind: SymbolKind,
+    ) {
         let symbol = SymbolTree {
             parent: None,
-            name: name.id.to_string(),
+            name: name.to_string(),
             kind,
             deprecated: false,
-            name_range: name.range(),
+            name_range,
             full_range: stmt.range(),
             imported_from: None,
         };
         self.add_symbol(symbol);
     }
 
+    fn add_pattern_binding(&mut self, stmt: &ast::Stmt, name: &ast::Identifier) {
+        if self.in_function || !name.is_valid() || name.id == "_" {
+            return;
+        }
+
+        self.add_assignment(stmt, &name.id, name.range());
+
+        if self.exports_only && self.all_origin.is_some() && name.id == "__all__" {
+            self.all_invalid = true;
+        }
+    }
+
     /// Adds a symbol introduced via an assignment.
-    fn add_assignment(&mut self, stmt: &ast::Stmt, name: &ast::ExprName) {
+    fn add_assignment(&mut self, stmt: &ast::Stmt, name: &Name, name_range: TextRange) {
         // Include assignments only when we're in global or class scope.
         if self.in_function {
             return;
         }
 
-        let kind = if Self::is_constant_name(name.id.as_str()) {
+        let kind = if Self::is_constant_name(name.as_str()) {
             SymbolKind::Constant
         } else if self
             .iter_symbol_stack()
@@ -889,7 +916,7 @@ impl<'db> SymbolVisitor<'db> {
         } else {
             SymbolKind::Variable
         };
-        self.add_name_symbol(stmt, name, kind);
+        self.add_name_symbol(stmt, name, name_range, kind);
     }
 
     /// Adds a symbol introduced via an import `stmt`.
@@ -906,9 +933,15 @@ impl<'db> SymbolVisitor<'db> {
         let full_range = import.range();
         let Some(imported_from) = (match import {
             AstImport::Import(_) => ImportedFrom::import(alias, import_kind),
-            AstImport::ImportFrom(ast) => {
-                ImportedFrom::import_from(self.db, self.file, ast, import_kind)
-            }
+            AstImport::ImportFrom(ast) => ImportedFrom::import_from(
+                self.db,
+                ImportingFile::File(
+                    self.file.file(self.db),
+                    self.file.resolver_environment(self.db),
+                ),
+                ast,
+                import_kind,
+            ),
         }) else {
             tracing::debug!(
                 "Dropping imported symbol {name} since its module name could not be discovered",
@@ -1073,6 +1106,10 @@ impl<'db> SymbolVisitor<'db> {
             .iter()
             .find(|alias| &alias.name == "*")
             .map(Ranged::range);
+        let importing_file = ImportingFile::File(
+            self.file.file(self.db),
+            self.file.resolver_environment(self.db),
+        );
         self.symbols
             .extend(symbols.symbols.iter().filter_map(|symbol| {
                 // If there's no `__all__`, then names with an underscore
@@ -1088,7 +1125,7 @@ impl<'db> SymbolVisitor<'db> {
                 }
                 let Some(imported_from) = ImportedFrom::import_from(
                     self.db,
-                    self.file,
+                    importing_file,
                     import_from,
                     ImportKind::Wildcard,
                 ) else {
@@ -1133,12 +1170,16 @@ impl<'db> SymbolVisitor<'db> {
         &self,
         import_from: &ast::StmtImportFrom,
     ) -> Option<&'db FlatSymbols> {
+        let importing_file = ImportingFile::File(
+            self.file.file(self.db),
+            self.file.resolver_environment(self.db),
+        );
         let module_name =
-            ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
-        let module = resolve_module(self.db, self.file, &module_name)?;
+            ModuleName::from_import_statement(self.db, importing_file, import_from).ok()?;
+        let module = resolve_module(self.db, importing_file, &module_name)?;
         Some(symbols_for_file_global_only(
             self.db,
-            module.python_file(self.db)?,
+            ProgramFile::new(self.db, module.file(self.db)?, self.file.program(self.db)),
         ))
     }
 
@@ -1362,7 +1403,7 @@ impl<'db> SymbolVisitor<'db> {
                 let ast::Expr::Name(name) = &*type_alias.name else {
                     return;
                 };
-                self.add_name_symbol(stmt, name, SymbolKind::Variable);
+                self.add_name_symbol(stmt, &name.id, name.range(), SymbolKind::Variable);
             }
             ast::Stmt::Assign(assign) => {
                 self.add_all_assignment(&assign.targets, Some(&assign.value));
@@ -1512,7 +1553,7 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     && !self.suppress_store_symbols
                     && let Some(stmt) = self.current_stmt =>
             {
-                self.add_assignment(stmt, name);
+                self.add_assignment(stmt, &name.id, name.range());
 
                 if name.id != "__all__" {
                     return;
@@ -1553,6 +1594,32 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
 
         for condition in &comprehension.ifs {
             self.visit_expr(condition);
+        }
+    }
+
+    fn visit_pattern(&mut self, pattern: &'db ast::Pattern) {
+        let binding = match pattern {
+            ast::Pattern::MatchStar(pattern) => pattern.name.as_ref(),
+            ast::Pattern::MatchAs(pattern) => pattern.name.as_ref(),
+            ast::Pattern::MatchMapping(pattern) => pattern.rest.as_ref(),
+            _ => None,
+        };
+
+        let previous_binding = self.pattern_binding;
+        self.pattern_binding = binding;
+        source_order::walk_pattern(self, pattern);
+        self.pattern_binding = previous_binding;
+    }
+
+    fn visit_identifier(&mut self, identifier: &'db ast::Identifier) {
+        source_order::walk_identifier(self, identifier);
+
+        if let Some(stmt) = self.current_stmt
+            && self
+                .pattern_binding
+                .is_some_and(|binding| std::ptr::eq(binding, identifier))
+        {
+            self.add_pattern_binding(stmt, identifier);
         }
     }
 }
@@ -1599,12 +1666,12 @@ mod tests {
     use insta::internals::SettingsBindDropGuard;
 
     use ruff_db::Db;
-    use ruff_db::PythonFile;
     use ruff_db::files::{FileRootKind, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use ty_project::{ProjectMetadata, TestDb};
+    use ty_python_core::ProgramFile;
 
     use super::symbols_for_file_global_only;
 
@@ -1716,6 +1783,85 @@ with_left :: Variable\n\
 with_rest :: Variable\n\
 captured :: Variable\n\
 walrus :: Variable"
+        );
+    }
+
+    #[test]
+    fn exports_match_pattern_bindings() {
+        let test = public_test(
+            "\
+match subject:
+    case [first, *middle, last] as sequence:
+        body_target = 1
+    case {\"key\": mapping_value, **remaining}:
+        fallback_target = 2
+    case Point(positional, named=keyword):
+        pass
+    case (0 as alternative) | (1 as alternative):
+        pass
+    case _:
+        wildcard_body = 3
+
+match other:
+    case CONSTANT_CAPTURE:
+        pass
+",
+        );
+
+        assert_eq!(
+            test.exports(),
+            "first :: Variable\n\
+middle :: Variable\n\
+last :: Variable\n\
+sequence :: Variable\n\
+body_target :: Variable\n\
+mapping_value :: Variable\n\
+remaining :: Variable\n\
+fallback_target :: Variable\n\
+positional :: Variable\n\
+keyword :: Variable\n\
+alternative :: Variable\n\
+wildcard_body :: Variable\n\
+CONSTANT_CAPTURE :: Constant"
+        );
+    }
+
+    #[test]
+    fn exports_reports_mapping_pattern_bindings_in_source_order() {
+        let test = public_test(
+            "\
+match subject:
+    case {\"a\": before, **between, \"b\": after}:
+        pass
+",
+        );
+
+        assert_eq!(
+            test.exports(),
+            "before :: Variable\n\
+between :: Variable\n\
+after :: Variable"
+        );
+    }
+
+    #[test]
+    fn exports_invalidate_all_rebound_by_match_pattern() {
+        let test = public_test(
+            "\
+hidden = 1
+visible = 2
+__all__ = ['visible']
+match subject:
+    case __all__:
+        pass
+",
+        );
+
+        assert_eq!(
+            test.exports(),
+            "hidden :: Variable\n\
+visible :: Variable\n\
+__all__ :: Variable"
         );
     }
 
@@ -3165,7 +3311,11 @@ class C: ...
             let file = system_path_to_file(&self.db, path.as_ref()).unwrap();
             symbols_for_file_global_only(
                 &self.db,
-                PythonFile::new(&self.db, file, self.db.python_version()),
+                ProgramFile::new(
+                    &self.db,
+                    file,
+                    self.db.program_environment().program(&self.db),
+                ),
             )
         }
 
@@ -3205,8 +3355,7 @@ class C: ...
             let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/"));
             let mut db = TestDb::new(metadata);
 
-            db.init_program_with_python_version(self.python_version.unwrap_or_default())
-                .unwrap();
+            db.set_python_version(self.python_version.unwrap_or_default());
 
             for Source { path, contents } in &self.sources {
                 db.write_file(path, contents)

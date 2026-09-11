@@ -4,6 +4,7 @@ use ruff_python_semantic::analyze::class::is_enumeration;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 
 /// ## What it does
@@ -45,7 +46,7 @@ use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 /// ## References
 /// - [Python documentation: Enum HOWTO &sect; Dataclass support](https://docs.python.org/3/howto/enum.html#dataclass-support)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Correctness)]
 pub(crate) struct DataclassEnum;
 
 impl Violation for DataclassEnum {

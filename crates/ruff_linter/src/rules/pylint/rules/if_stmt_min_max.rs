@@ -5,6 +5,7 @@ use ruff_python_ast::{self as ast, CmpOp, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
@@ -46,7 +47,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.6.0")]
+#[violation_metadata(stable_since = "0.6.0", category = Category::Complexity)]
 pub(crate) struct IfStmtMinMax {
     min_max: MinMax,
     replacement: SourceCodeSnippet,
@@ -109,21 +110,12 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
         return;
     };
 
-    let Some(ast::ExprCompare {
-        ops,
-        left,
-        comparators,
-        ..
-    }) = test.as_compare_expr()
-    else {
+    let Some(compare) = test.as_compare_expr() else {
         return;
     };
 
     // Ignore, e.g., `foo < bar < baz`.
-    let [op] = &**ops else {
-        return;
-    };
-    let [right] = &**comparators else {
+    let Some((left, op, right)) = compare.as_single() else {
         return;
     };
 
@@ -158,9 +150,9 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
     };
 
     let (arg1, arg2) = if flip_args {
-        (right, &**left)
+        (right, left)
     } else {
-        (&**left, right)
+        (left, right)
     };
 
     let replacement = format!(

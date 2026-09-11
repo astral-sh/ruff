@@ -329,13 +329,13 @@ reveal_type(1 >= 1.0)  # revealed: bool
 reveal_type(1 == 2j)  # revealed: bool
 reveal_type(1 != 2j)  # revealed: bool
 
-# error: [unsupported-operator] "Operator `<` is not supported between objects of type `Literal[1]` and `complex`"
+# error: [unsupported-operator] "Operator `<` is not supported between objects of type `Literal[1]` and `complex*`"
 reveal_type(1 < 2j)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `<=` is not supported between objects of type `Literal[1]` and `complex`"
+# error: [unsupported-operator] "Operator `<=` is not supported between objects of type `Literal[1]` and `complex*`"
 reveal_type(1 <= 2j)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>` is not supported between objects of type `Literal[1]` and `complex`"
+# error: [unsupported-operator] "Operator `>` is not supported between objects of type `Literal[1]` and `complex*`"
 reveal_type(1 > 2j)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>=` is not supported between objects of type `Literal[1]` and `complex`"
+# error: [unsupported-operator] "Operator `>=` is not supported between objects of type `Literal[1]` and `complex*`"
 reveal_type(1 >= 2j)  # revealed: Unknown
 
 def f(x: bool, y: int):

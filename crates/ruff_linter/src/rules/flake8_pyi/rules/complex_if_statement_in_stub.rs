@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `if` statements with complex conditionals in stubs.
@@ -32,7 +33,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Typing documentation: Version and platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.276")]
+#[violation_metadata(stable_since = "v0.0.276", category = Category::Suspicious)]
 pub(crate) struct ComplexIfStatementInStub;
 
 impl Violation for ComplexIfStatementInStub {
@@ -45,18 +46,15 @@ impl Violation for ComplexIfStatementInStub {
 
 /// PYI002
 pub(crate) fn complex_if_statement_in_stub(checker: &Checker, test: &Expr) {
-    let Expr::Compare(ast::ExprCompare {
-        left, comparators, ..
-    }) = test
-    else {
+    let Expr::Compare(ast::ExprCompare { operands, .. }) = test else {
         checker.report_diagnostic(ComplexIfStatementInStub, test.range());
         return;
     };
 
-    if comparators.len() != 1 {
+    let [left, _] = &**operands else {
         checker.report_diagnostic(ComplexIfStatementInStub, test.range());
         return;
-    }
+    };
 
     if left.is_subscript_expr() {
         return;

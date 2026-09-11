@@ -4,8 +4,8 @@ Checks for bool conversions where the object doesn't correctly implement `__bool
 
 ## Why is this bad?
 
-If an exception is raised when you attempt to evaluate the truthiness of an object,
-using the object in a boolean context will fail at runtime.
+If an exception is raised when you attempt to evaluate the truthiness of an object, using the object
+in a boolean context will fail at runtime.
 
 ## Examples
 

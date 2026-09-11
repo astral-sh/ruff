@@ -8,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::rules::blocking_open_call::is_open_call_from_pathlib;
+use crate::rules::flake8_use_pathlib::helpers::is_file_descriptor;
 use crate::{Applicability, Edit, Fix};
 
 /// Format a code snippet to call `name.method()`.
@@ -31,12 +32,12 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
-            args: Box::from([]),
+            args: [].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // And finally, turn it into a statement.
@@ -65,9 +66,8 @@ pub(super) fn replace_with_identity_check(
     };
 
     let new_expr = Expr::Compare(ast::ExprCompare {
-        left: left.clone().into(),
         ops: [op].into(),
-        comparators: [ast::ExprNoneLiteral::default().into()].into(),
+        operands: [left.clone(), ast::ExprNoneLiteral::default().into()].into(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
@@ -280,6 +280,12 @@ fn find_file_open<'a>(
 
     // Match positional arguments, get filename and mode.
     let (filename, pos_mode) = match_open_args(args)?;
+
+    // `open` accepts a file descriptor, but `Path` does not, so a `pathlib` replacement
+    // would fail at runtime. `PTH123` skips these for the same reason.
+    if is_file_descriptor(filename, semantic) {
+        return None;
+    }
 
     // Match keyword arguments, get keyword arguments to forward and possibly mode.
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;

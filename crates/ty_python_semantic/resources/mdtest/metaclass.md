@@ -628,8 +628,12 @@ The metaclass of a derived class must be a (non-strict) subclass of the metaclas
 bases. ("Strict subclass" is a synonym for "proper subclass"; a non-strict subclass can be a
 subclass or the class itself.)
 
+We report the conflict and retain the candidate from the first base for attribute lookup.
+
 ```py
-class M1(type): ...
+class M1(type):
+    value: int
+
 class M2(type): ...
 class A(metaclass=M1): ...
 class B(metaclass=M2): ...
@@ -637,7 +641,8 @@ class B(metaclass=M2): ...
 # error: [conflicting-metaclass] "The metaclass of a derived class (`C`) must be a subclass of the metaclasses of all its bases, but `M1` (metaclass of base class `A`) and `M2` (metaclass of base class `B`) have no subclass relationship"
 class C(A, B): ...
 
-reveal_type(C.__class__)  # revealed: type[Unknown]
+reveal_type(C.__class__)  # revealed: <class 'M1'>
+reveal_type(C.value)  # revealed: int
 ```
 
 ## Conflict (2)
@@ -646,15 +651,21 @@ The metaclass of a derived class must be a (non-strict) subclass of the metaclas
 bases. ("Strict subclass" is a synonym for "proper subclass"; a non-strict subclass can be a
 subclass or the class itself.)
 
+An explicit metaclass is retained for attribute lookup when it conflicts with a base's metaclass.
+
 ```py
 class M1(type): ...
-class M2(type): ...
+
+class M2(type):
+    value: str
+
 class A(metaclass=M1): ...
 
 # error: [conflicting-metaclass] "The metaclass of a derived class (`B`) must be a subclass of the metaclasses of all its bases, but `M2` (metaclass of `B`) and `M1` (metaclass of base class `A`) have no subclass relationship"
 class B(A, metaclass=M2): ...
 
-reveal_type(B.__class__)  # revealed: type[Unknown]
+reveal_type(B.__class__)  # revealed: <class 'M2'>
+reveal_type(B.value)  # revealed: str
 ```
 
 ## Common metaclass
@@ -668,6 +679,254 @@ class B(metaclass=M): ...
 class C(A, B): ...
 
 reveal_type(C.__class__)  # revealed: <class 'M'>
+```
+
+## Protocol metaclass inheritance
+
+A protocol declared in Python source uses `typing._ProtocolMeta`, which derives from `ABCMeta`.
+Explicitly specifying `ABCMeta` selects the more derived `_ProtocolMeta`. A compatible custom
+metaclass is preserved, including when its base is obtained by calling `type`.
+
+```py
+from abc import ABC, ABCMeta
+from typing import Protocol
+
+class P(Protocol): ...
+class Base(ABC): ...
+class Combined(Base, P): ...
+class ExplicitABC(Protocol, metaclass=ABCMeta): ...
+
+reveal_type(type(Combined))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(ExplicitABC))  # revealed: <class '_ProtocolMeta'>
+
+class Meta(type(Protocol)): ...
+class Derived(Base, P, metaclass=Meta): ...
+
+reveal_type(type(Derived))  # revealed: <class 'Meta'>
+```
+
+An unrelated metaclass conflicts with this constraint, both when declaring a protocol and when
+subclassing an existing one.
+
+```py
+class Unrelated(type): ...
+
+# error: [conflicting-metaclass] "`_ProtocolMeta` (metaclass of base class `typing.Protocol`)"
+class InvalidDirect(Protocol, metaclass=Unrelated): ...
+class InvalidSubclass(P, metaclass=Unrelated): ...  # error: [conflicting-metaclass]
+```
+
+Deriving an otherwise unrelated metaclass from `ABCMeta` does not make it compatible with
+`_ProtocolMeta`.
+
+```py
+class UnrelatedABC(ABCMeta): ...
+class InvalidABC(P, metaclass=UnrelatedABC): ...  # error: [conflicting-metaclass]
+```
+
+## Protocol metaclass fallback in typeshed
+
+Typeshed can list `Protocol` as a base even when the runtime class does not inherit from
+`typing.Protocol`. For example, `collections.abc.Iterable` is an ordinary abstract base class at
+runtime. Its typeshed definition therefore does not establish that the class has `_ProtocolMeta` as
+its metaclass.
+
+When no custom metaclass is selected, ty uses `ABCMeta` instead of `type` for class attribute
+lookup. This fallback makes ABC methods such as `register` available:
+
+```py
+from collections.abc import Iterable
+
+class Registered: ...
+
+reveal_type(type(Iterable))  # revealed: <class 'ABCMeta'>
+reveal_type(Iterable.register(Registered))  # revealed: type[Registered]
+```
+
+The inferred `ABCMeta` is not a claim about the exact runtime metaclass. It does not constrain
+subclasses, so a subclass can choose a metaclass unrelated to `ABCMeta` without a conflict.
+
+```py
+class Meta(type): ...
+class Direct(Iterable[object], metaclass=Meta): ...
+
+reveal_type(type(Direct))  # revealed: <class 'Meta'>
+```
+
+## Protocol metaclass fallback in a custom typeshed
+
+The same fallback applies to a configured typeshed. These minimal standard-library stubs provide the
+types used below.
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class object: ...
+class type: ...
+class tuple: ...
+```
+
+`/typeshed/stdlib/abc.pyi`:
+
+```pyi
+class ABCMeta(type): ...
+```
+
+`/typeshed/stdlib/typing.pyi`:
+
+```pyi
+from abc import ABCMeta
+
+class _SpecialForm: ...
+
+Protocol: _SpecialForm
+
+class _ProtocolMeta(ABCMeta): ...
+
+def reveal_type(obj, /): ...
+```
+
+`/typeshed/stdlib/interface.pyi`:
+
+```pyi
+from typing import Protocol
+
+class Interface(Protocol): ...
+```
+
+The typeshed protocol gets the lookup fallback, but an unrelated explicit metaclass wins.
+
+`main.py`:
+
+```py
+from interface import Interface
+from typing import reveal_type
+
+class Meta(type): ...
+class Derived(Interface, metaclass=Meta): ...
+
+reveal_type(Interface.__class__)  # revealed: <class 'ABCMeta'>
+reveal_type(Derived.__class__)  # revealed: <class 'Meta'>
+```
+
+## Inheritance of a typeshed protocol metaclass fallback
+
+A source-defined subclass inherits the same non-constraining fallback from a typeshed protocol. An
+indirect or dynamically created subclass can choose an unrelated metaclass. `Child` can also share a
+subclass with `Other`, despite `Other`'s final metaclass, and `type[Child]` is not a subtype of
+`ABCMeta`.
+
+```py
+from abc import ABCMeta
+from collections.abc import Iterable
+from typing import final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
+
+class Child(Iterable[object]): ...
+
+@final
+class Meta(type): ...
+
+class Other(metaclass=Meta): ...
+class Left(Child, Other): ...
+class Right(Other, Child): ...
+
+Dynamic = type("Dynamic", (Iterable,), {})
+Combined = type("Combined", (Child, Other), {})
+
+class ViaDynamic(Dynamic, metaclass=Meta): ...
+
+reveal_type(type(Child))  # revealed: <class 'ABCMeta'>
+reveal_type(type(Left))  # revealed: <class 'Meta'>
+reveal_type(type(Right))  # revealed: <class 'Meta'>
+reveal_type(type(Combined))  # revealed: <class 'Meta'>
+reveal_type(type(ViaDynamic))  # revealed: <class 'Meta'>
+static_assert(not is_disjoint_from(Child, Other))
+static_assert(not is_subtype_of(type[Child], ABCMeta))
+```
+
+Explicitly listing `Protocol` in source declares a new protocol with a `_ProtocolMeta` constraint,
+even when another base contributes only the typeshed fallback.
+
+```py
+from typing import Protocol
+
+class SourceProtocol(Iterable[object], Protocol): ...
+class Invalid(SourceProtocol, metaclass=Meta): ...  # error: [conflicting-metaclass]
+```
+
+## Explicit typeshed protocol metaclasses
+
+Explicitly choosing the inferred `ABCMeta` makes it a real constraint on later subclasses.
+
+```py
+from collections.abc import Iterable
+
+class Meta(type): ...
+class Pinned(Iterable[object], metaclass=type(Iterable)): ...
+class Invalid(Pinned, metaclass=Meta): ...  # error: [conflicting-metaclass]
+
+reveal_type(type(Pinned))  # revealed: <class 'ABCMeta'>
+```
+
+## Typeshed protocol metaclass attributes in the class namespace
+
+The `ABCMeta` fallback inferred from typeshed bases does not guarantee that the runtime metaclass
+creates attributes in the class namespace. It therefore does not make attributes such as
+`__abstractmethods__` available on instances.
+
+For example, typeshed declares `weakref.WeakSet` as a `MutableSet` subclass, but at runtime it
+inherits directly from `object` and has metaclass `type`.
+
+```py
+from weakref import WeakSet
+
+class Child(WeakSet[object]): ...
+
+reveal_type(type(Child))  # revealed: <class 'ABCMeta'>
+
+def f(child: Child):
+    child.__abstractmethods__  # error: [unresolved-attribute]
+```
+
+The fallback also does not constrain the types of attributes defined in the class namespace. For
+example, a `WeakSet` subclass can define its own `__abstractmethods__` without matching `ABCMeta`'s
+declaration.
+
+```py
+class OwnAttribute(WeakSet[object]):
+    __abstractmethods__ = 1
+```
+
+## Built-in collection metaclasses
+
+Typeshed includes collection ABCs in some built-in classes' bases to describe their interfaces.
+Those stub-only bases do not change the built-ins' runtime metaclasses or introduce conflicts when
+they are subclassed.
+
+```py
+from collections import deque
+from types import GeneratorType
+
+reveal_type(type(str))  # revealed: <class 'type'>
+reveal_type(type(tuple))  # revealed: <class 'type'>
+reveal_type(type(list))  # revealed: <class 'type'>
+reveal_type(type(dict))  # revealed: <class 'type'>
+reveal_type(type(deque))  # revealed: <class 'type'>
+reveal_type(type(GeneratorType))  # revealed: <class 'type'>
+
+class Meta(type): ...
+class CustomList(list[int], metaclass=Meta): ...
+class OrdinaryList(list[int]): ...
+
+reveal_type(type(CustomList))  # revealed: <class 'Meta'>
+reveal_type(type(OrdinaryList))  # revealed: <class 'type'>
 ```
 
 ## Metaclass metaclass
@@ -698,7 +957,7 @@ class C(metaclass=M12): ...
 # error: [conflicting-metaclass] "The metaclass of a derived class (`D`) must be a subclass of the metaclasses of all its bases, but `M1` (metaclass of base class `A`) and `M2` (metaclass of base class `B`) have no subclass relationship"
 class D(A, B, C): ...
 
-reveal_type(D.__class__)  # revealed: type[Unknown]
+reveal_type(D.__class__)  # revealed: <class 'M1'>
 ```
 
 ## Unknown
@@ -771,6 +1030,32 @@ reveal_type(D)  # revealed: <class 'D'>
 reveal_type(D.__class__)  # revealed: <class 'SignatureMismatch'>
 ```
 
+## Metaclass bounds
+
+With a metaclass annotated as `type[Meta]`, the resulting class and its subclasses are instances of
+`Meta`, and therefore of `type`. Matching a `type[C]` value against `type()` is exhaustive, but
+returning it as `int` is invalid.
+
+```py
+from typing_extensions import assert_never
+
+class Meta(type): ...
+
+def _(meta: type[Meta]):
+    class C(metaclass=meta): ...
+
+    def check(cls: type[C]) -> None:
+        reveal_type(cls.__class__)  # revealed: type[Meta]
+        match cls:
+            case type():
+                pass
+            case _:
+                assert_never(cls)
+
+    def as_int(cls: type[C]) -> int:
+        return cls  # error: [invalid-return-type]
+```
+
 ## Diagnostic range
 
 ```py
@@ -799,6 +1084,75 @@ class B(C): ...  # error: [cyclic-class-definition]
 class C(A): ...  # error: [cyclic-class-definition]
 
 reveal_type(A.__class__)  # revealed: type[Unknown]
+```
+
+## Metaclass conflicts during recursive attribute inference
+
+A stub can refer to an inherited type alias through a nested class with a custom metaclass. When an
+attribute named `type` also depends on that alias, inferring the metaclass's bases can depend on the
+metaclass being selected. Type checking completes even when temporary metaclass conflicts arise
+during this inference cycle.
+
+Regression test for [ty#4492](https://github.com/astral-sh/ty/issues/4492).
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from mod import Outer
+
+# TODO: This should be `int`.
+reveal_type(Outer.value)  # revealed: Unknown
+```
+
+`mod.pyi`:
+
+```pyi
+class Wrapper[T](type): ...
+
+class Outer:
+    class Aliases:
+        Value = int
+
+    class Meta(Wrapper[int], type): ...
+    class Inner(Aliases, metaclass=Meta): ...
+    value: Outer.Inner.Value
+    type: Outer.Inner.Value
+```
+
+## Persistent metaclass conflict during recursive attribute inference
+
+Recursive attribute inference does not suppress a conflict between unrelated metaclasses. We retain
+the explicit candidate for member lookup and report the conflict when checking the stub.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from mod import Outer
+
+reveal_type(Outer.value)  # revealed: Unknown
+reveal_type(Outer.Inner.__class__)  # revealed: <class 'Meta'>
+```
+
+`mod.pyi`:
+
+```pyi
+class Wrapper[T](type): ...
+class OtherMeta(type): ...
+
+class Outer:
+    class Aliases(metaclass=OtherMeta):
+        Value = int
+
+    class Meta(Wrapper[int], type): ...
+    class Inner(Aliases, metaclass=Meta): ...  # error: [conflicting-metaclass]
+    value: Outer.Inner.Value
+    type: Outer.Inner.Value
 ```
 
 ## PEP 695 generic

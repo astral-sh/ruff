@@ -18,6 +18,7 @@ mod goto_implementation;
 mod goto_type_definition;
 mod hints;
 mod hover;
+#[cfg(test)]
 mod importer;
 mod inlay_hints;
 mod markup;
@@ -403,22 +404,21 @@ mod tests {
     use insta::internals::SettingsBindDropGuard;
 
     use ruff_db::Db;
-    use ruff_db::PythonFile;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, UnifiedFile,
     };
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_db::source::{SourceText, source_text};
-    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
-    use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
     use ty_module_resolver::SearchPathSettings;
-    use ty_project::{Db as _, ProjectMetadata};
+    use ty_project::{Db as _, ProjectMetadata, SemanticDb as _};
+    use ty_python_core::ProgramFile;
     use ty_python_core::platform::PythonPlatform;
-    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+    use ty_python_core::program::{FallibleStrategy, ProgramSettings};
     use ty_python_semantic::PythonVersionWithSource;
 
     /// A way to create a simple single-file (named `main.py`) cursor test.
@@ -440,8 +440,8 @@ mod tests {
             CursorTestBuilder::default()
         }
 
-        pub(super) fn python_file(&self, file: File) -> PythonFile<'_> {
-            PythonFile::new(&self.db, file, self.db.python_version())
+        pub(super) fn program_file(&self, file: File) -> ProgramFile<'_> {
+            self.db.program_file(file)
         }
 
         pub(super) fn write_file(
@@ -507,7 +507,6 @@ mod tests {
         pub(super) offset: TextSize,
         pub(super) parsed: ParsedModuleRef,
         pub(super) source: SourceText,
-        pub(super) stylist: Stylist<'static>,
     }
 
     #[derive(Default)]
@@ -525,10 +524,9 @@ mod tests {
             let mut db =
                 ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
 
-            db.init_program_with_python_version(
-                self.python_version.unwrap_or_else(PythonVersion::latest_ty),
-            )
-            .unwrap();
+            if let Some(python_version) = self.python_version {
+                db.set_python_version(python_version);
+            }
 
             let mut cursor: Option<Cursor> = None;
             for &Source {
@@ -569,16 +567,12 @@ mod tests {
 
                     let source = source_text(&db, file);
                     let parsed =
-                        parsed_module(&db, PythonFile::new(&db, file, db.python_version()))
-                            .load(&db);
-                    let stylist =
-                        Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
+                        parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
                     cursor = Some(Cursor {
                         file,
                         offset,
                         parsed,
                         source,
-                        stylist,
                     });
                 }
             }
@@ -657,7 +651,7 @@ mod tests {
             let mut db =
                 ty_project::TestDb::new(ProjectMetadata::new("test", project_root.clone()));
 
-            // Write site-packages files first (before init)
+            // Write site-packages files first.
             for Source {
                 path,
                 contents,
@@ -669,11 +663,6 @@ mod tests {
                     .expect("write to memory file system to be successful");
             }
 
-            // Create /src directory for first-party code
-            db.memory_file_system()
-                .create_directory_all(&project_root)
-                .expect("create /src directory");
-
             // Configure search paths with site-packages
             let search_paths = SearchPathSettings {
                 src_roots: vec![project_root.clone()],
@@ -683,8 +672,8 @@ mod tests {
             .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
             .expect("valid search paths");
 
-            Program::from_settings(
-                &db,
+            db.project().update_program(
+                &mut db,
                 ProgramSettings {
                     python_version: PythonVersionWithSource::default(),
                     python_platform: PythonPlatform::default(),
@@ -723,16 +712,12 @@ mod tests {
 
                     let source = source_text(&db, file);
                     let parsed =
-                        parsed_module(&db, PythonFile::new(&db, file, db.python_version()))
-                            .load(&db);
-                    let stylist =
-                        Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
+                        parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
                     cursor = Some(Cursor {
                         file,
                         offset,
                         parsed,
                         source,
-                        stylist,
                     });
                 }
             }

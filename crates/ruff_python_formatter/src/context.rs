@@ -153,12 +153,14 @@ impl Debug for PyFormatContext<'_> {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) enum InterpolatedStringState {
-    /// The formatter is inside an f-string expression element i.e., between the
-    /// curly brace in `f"foo {x}"`.
+    /// The formatter is inside the elements of an f-string or t-string, including
+    /// literal text and interpolations. In `f"foo {x}"`, this state is active
+    /// while formatting both `foo ` and `{x}`.
     ///
-    /// The containing `FStringContext` is the surrounding f-string context.
+    /// The containing `InterpolatedStringContext` is the surrounding f-string context.
     InsideInterpolatedElement(InterpolatedStringContext),
-    /// The formatter is inside more than one nested f-string, such as in `nested` in:
+    /// The formatter is inside more than one nested interpolated string, such as
+    /// in `nested` in:
     ///
     /// ```py
     /// f"{f'''{'nested'} inner'''} outer"
@@ -170,6 +172,16 @@ pub(crate) enum InterpolatedStringState {
 }
 
 impl InterpolatedStringState {
+    /// Entering another interpolated string increases the nesting depth.
+    pub(crate) fn enter_string(self, context: InterpolatedStringContext) -> Self {
+        match self {
+            Self::Outside => Self::InsideInterpolatedElement(context),
+            Self::InsideInterpolatedElement(_) | Self::NestedInterpolatedElement(_) => {
+                Self::NestedInterpolatedElement(context)
+            }
+        }
+    }
+
     pub(crate) fn can_contain_line_breaks(self) -> Option<bool> {
         match self {
             InterpolatedStringState::InsideInterpolatedElement(context)

@@ -187,7 +187,7 @@ mod tests {
     #[test_case(Rule::UnusedAnnotation, Path::new("F842.py"))]
     #[test_case(Rule::RaiseNotImplemented, Path::new("F901.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
@@ -201,7 +201,7 @@ mod tests {
         rule_code: Rule,
         path: &Path,
     ) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings {
@@ -261,11 +261,7 @@ mod tests {
     #[test_case(Rule::UndefinedExport, Path::new("__init__.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_36.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings::for_rule(rule_code).with_preview_mode(),
@@ -327,11 +323,7 @@ mod tests {
     // Regression test for https://github.com/astral-sh/ruff/issues/12897
     #[test_case(Rule::UnusedImport, Path::new("F401_33/__init__.py"))]
     fn f401_preview_local_init_import(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let settings = LinterSettings {
             preview: PreviewMode::Enabled,
             isort: isort::settings::Settings {
@@ -360,11 +352,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
     fn f401_stable(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "{}_stable_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("{}_stable_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
@@ -383,7 +371,7 @@ mod tests {
     fn f401_deprecated_option(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "{}_deprecated_option_{}",
-            rule_code.noqa_code(),
+            rule_code.name(),
             path.to_string_lossy()
         );
         let diagnostics = test_path(

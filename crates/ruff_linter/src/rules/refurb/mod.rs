@@ -58,7 +58,7 @@ mod tests {
     #[test_case(Rule::SubclassBuiltin, Path::new("FURB189.py"))]
     #[test_case(Rule::FromisoformatReplaceZ, Path::new("FURB162.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("refurb").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),

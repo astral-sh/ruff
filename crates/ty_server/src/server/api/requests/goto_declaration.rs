@@ -1,10 +1,8 @@
 use std::borrow::Cow;
 
 use lsp_types::{DeclarationParams, DeclarationRequest, DeclarationResponse, Uri};
-use ruff_db::PythonFile;
 use ty_ide::goto_declaration;
-use ty_project::Db as _;
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{
@@ -50,9 +48,7 @@ impl BackgroundDocumentRequestHandler for GotoDeclarationRequestHandler {
             return Ok(None);
         };
 
-        let Some(ranged) =
-            goto_declaration(db, PythonFile::new(db, file, db.python_version()), offset)
-        else {
+        let Some(ranged) = goto_declaration(db, db.program_file(file), offset) else {
             return Ok(None);
         };
 

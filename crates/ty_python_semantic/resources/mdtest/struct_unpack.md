@@ -20,15 +20,15 @@ def _(buf: bytes):
     reveal_type(unpack("0c", buf))  # revealed: tuple[()]
     reveal_type(unpack("1s", buf))  # revealed: tuple[bytes]
     reveal_type(unpack("255s", buf))  # revealed: tuple[bytes]
-    reveal_type(unpack("e", buf))  # revealed: tuple[float]
-    reveal_type(unpack("2e", buf))  # revealed: tuple[float, float]
-    reveal_type(unpack("e4x", buf))  # revealed: tuple[float]
-    reveal_type(unpack("3eH", buf))  # revealed: tuple[float, float, float, int]
+    reveal_type(unpack("e", buf))  # revealed: tuple[float*]
+    reveal_type(unpack("2e", buf))  # revealed: tuple[float*, float*]
+    reveal_type(unpack("e4x", buf))  # revealed: tuple[float*]
+    reveal_type(unpack("3eH", buf))  # revealed: tuple[float*, float*, float*, int]
     reveal_type(unpack("?x?", buf))  # revealed: tuple[bool, bool]
     reveal_type(unpack("2?", buf))  # revealed: tuple[bool, bool]
     reveal_type(unpack("?2xI", buf))  # revealed: tuple[bool, int]
-    reveal_type(unpack("fd4x", buf))  # revealed: tuple[float, float]
-    reveal_type(unpack("d2xH", buf))  # revealed: tuple[float, int]
+    reveal_type(unpack("fd4x", buf))  # revealed: tuple[float*, float*]
+    reveal_type(unpack("d2xH", buf))  # revealed: tuple[float*, int]
     reveal_type(unpack("2i4x2h", buf))  # revealed: tuple[int, int, int, int]
     reveal_type(unpack("iP", buf))  # revealed: tuple[int, int]
     reveal_type(unpack("@n2xN", buf))  # revealed: tuple[int, int]
@@ -46,8 +46,8 @@ python-version = "3.14"
 from struct import *
 
 def _(buf: bytes):
-    reveal_type(unpack("2F", buf))  # revealed: tuple[complex, complex]
-    reveal_type(unpack("3D", buf))  # revealed: tuple[complex, complex, complex]
+    reveal_type(unpack("2F", buf))  # revealed: tuple[complex*, complex*]
+    reveal_type(unpack("3D", buf))  # revealed: tuple[complex*, complex*, complex*]
 ```
 
 ## Escape Large Repetition Counts

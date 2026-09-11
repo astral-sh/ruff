@@ -4,6 +4,7 @@ use ruff_python_semantic::SemanticModel;
 
 use crate::AlwaysFixableViolation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::refurb::helpers::replace_with_identity_check;
 
 /// ## What it does
@@ -32,7 +33,7 @@ use crate::rules::refurb::helpers::replace_with_identity_check;
 /// - [Python documentation: `type`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Complexity)]
 pub(crate) struct TypeNoneComparison {
     replacement: IdentityCheck,
 }
@@ -53,7 +54,7 @@ impl AlwaysFixableViolation for TypeNoneComparison {
 
 /// FURB169
 pub(crate) fn type_none_comparison(checker: &Checker, compare: &ast::ExprCompare) {
-    let ([op], [right]) = (&*compare.ops, &*compare.comparators) else {
+    let Some((left, op, right)) = compare.as_single() else {
         return;
     };
 
@@ -63,7 +64,7 @@ pub(crate) fn type_none_comparison(checker: &Checker, compare: &ast::ExprCompare
         _ => return,
     };
 
-    let Some(left_arg) = type_call_arg(&compare.left, checker.semantic()) else {
+    let Some(left_arg) = type_call_arg(left, checker.semantic()) else {
         return;
     };
     let Some(right_arg) = type_call_arg(right, checker.semantic()) else {

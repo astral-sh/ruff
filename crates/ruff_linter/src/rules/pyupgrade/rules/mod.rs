@@ -41,6 +41,7 @@ pub(crate) use use_pep604_isinstance::*;
 pub(crate) use useless_class_metaclass_type::*;
 pub(crate) use useless_metaclass_type::*;
 pub(crate) use useless_object_inheritance::*;
+pub(crate) use while_one::*;
 pub(crate) use yield_in_for_loop::*;
 
 mod convert_named_tuple_functional_to_class;
@@ -86,4 +87,5 @@ mod use_pep604_isinstance;
 mod useless_class_metaclass_type;
 mod useless_metaclass_type;
 mod useless_object_inheritance;
+mod while_one;
 mod yield_in_for_loop;

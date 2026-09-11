@@ -296,6 +296,44 @@ def f(val: str | bytes) -> None:
 reveal_type(accepts_callable(f))  # revealed: str | bytes
 ```
 
+## Rejected overloaded callbacks preserve valid specializations
+
+An overloaded callback may contain one alternative whose return type violates a type variable's
+upper bound or declared constraints. The valid alternative must determine the specialization
+regardless of the order in which the overloads appear.
+
+```py
+from typing import Callable, TypeVar, overload
+
+Bounded = TypeVar("Bounded", bound=int)
+Constrained = TypeVar("Constrained", int, bytes)
+
+@overload
+def invalid_first(value: str) -> str: ...
+@overload
+def invalid_first(value: int) -> int: ...
+def invalid_first(value: str | int) -> str | int:
+    return value
+
+@overload
+def invalid_last(value: int) -> int: ...
+@overload
+def invalid_last(value: str) -> str: ...
+def invalid_last(value: str | int) -> str | int:
+    return value
+
+def infer_bound(callback: Callable[..., Bounded]) -> Bounded:
+    raise NotImplementedError
+
+def infer_constrained(callback: Callable[..., Constrained]) -> Constrained:
+    raise NotImplementedError
+
+reveal_type(infer_bound(invalid_first))  # revealed: int
+reveal_type(infer_bound(invalid_last))  # revealed: int
+reveal_type(infer_constrained(invalid_first))  # revealed: int
+reveal_type(infer_constrained(invalid_last))  # revealed: int
+```
+
 ## Overloaded callable with a constrained type variable
 
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated
@@ -346,6 +384,91 @@ def singleton(flag: bool = False) -> Callable[[Callable[[int], S]], Callable[[in
         return func
 
     return wrapper
+```
+
+## Return type inference from partially annotated overloads
+
+The catch-all overload returns `object`, which is preserved when inferring a return type from the
+whole callback even though the literal-specific overloads have unannotated return types.
+
+```py
+from typing import Callable, Literal, TypeVar, overload
+from typing_extensions import assert_type
+
+R = TypeVar("R")
+T = TypeVar("T")
+
+def infer_return(callback: Callable[[T], R]) -> R:
+    raise NotImplementedError
+
+@overload
+def callback(value: Literal["a"]): ...
+@overload
+def callback(value: Literal["b"]): ...
+@overload
+def callback(value: Literal["c"]): ...
+@overload
+def callback(value: Literal["d", "e"]): ...
+@overload
+def callback(value: Literal["f", "g"]): ...
+@overload
+def callback(value: Literal["h", "i"]): ...
+@overload
+def callback(value: Literal["j", "k"]): ...
+@overload
+def callback(value: object) -> object: ...
+def callback(value):
+    raise NotImplementedError
+
+assert_type(infer_return(callback), object)
+```
+
+## Generic inference after projection budget exhaustion
+
+Each tuple element independently matches one of the callback's overloads. The combined alternative
+bindings exceed generic inference's projection limits. The precise type of `default=0` does not
+replace the missing callback evidence: we recover with `Unknown` in either argument order.
+
+```py
+from typing import Callable, Literal, TypeVar, overload
+from typing_extensions import assert_type
+from ty_extensions._internal import Unknown
+
+R = TypeVar("R")
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+def infer_return(callback: tuple[Callable[[T], R], Callable[[U], R], Callable[[V], R]], default: R) -> R:
+    raise NotImplementedError
+
+@overload
+def callback(value: Literal[0, 1]): ...
+@overload
+def callback(value: Literal[2, 3]): ...
+@overload
+def callback(value: Literal[4, 5]): ...
+@overload
+def callback(value: Literal[6, 7]): ...
+@overload
+def callback(value: Literal[8, 9]): ...
+@overload
+def callback(value: Literal[10, 11]): ...
+@overload
+def callback(value: Literal[12, 13]): ...
+@overload
+def callback(value: Literal[14, 15]): ...
+@overload
+def callback(value: Literal[16, 17]): ...
+@overload
+def callback(value: Literal[18, 19]): ...
+@overload
+def callback(value: object) -> object: ...
+def callback(value):
+    raise NotImplementedError
+
+assert_type(infer_return((callback, callback, callback), 0), Unknown)
+assert_type(infer_return(default=0, callback=(callback, callback, callback)), Unknown)
 ```
 
 ## Multiple occurrences of a higher-order generic callable

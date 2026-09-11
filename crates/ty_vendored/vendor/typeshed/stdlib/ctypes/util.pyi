@@ -8,6 +8,6 @@ if sys.platform == "win32":
 
 if sys.version_info >= (3, 14):
     def dllist() -> list[str]:
-        """Return a list of loaded shared libraries in the current process."""
+        """dllist() return a list of loaded shared libraries"""
 
 def test() -> None: ...

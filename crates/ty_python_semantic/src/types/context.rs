@@ -15,6 +15,7 @@ use salsa::plumbing::{AsId, FromId, Id};
 use super::{Type, TypeCheckDiagnostics, infer_definition_types};
 
 use crate::diagnostic::DiagnosticGuard;
+use crate::importer::Importer;
 use crate::lint::LintSource;
 use crate::reachability::is_range_reachable;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNBOUND_TYPE_VARIABLE};
@@ -25,9 +26,10 @@ use crate::{
     lint::{LintId, LintMetadata},
     suppression::suppressions,
 };
+use ty_module_resolver::ResolverEnvironment;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::semantic_index;
+use ty_python_core::{ProgramFile, semantic_index};
 
 /// The lazily resolved program used by a semantic operation.
 #[derive(Clone)]
@@ -37,8 +39,8 @@ pub struct ProgramEnvironment<'db> {
 }
 
 impl<'db> ProgramEnvironment<'db> {
-    /// Creates an environment that lazily obtains its Python version from `file`.
-    pub fn from_file(file: PythonFile<'db>) -> Self {
+    /// Creates an environment that lazily obtains its program from `file`.
+    pub fn from_file(file: ProgramFile<'db>) -> Self {
         Self {
             environment: Cell::new(ProgramSource::File(file.as_id())),
             lifetime: PhantomData,
@@ -46,7 +48,7 @@ impl<'db> ProgramEnvironment<'db> {
     }
 
     /// Creates an environment that lazily obtains its program from `definition`.
-    pub fn from_definition(definition: Definition<'db>) -> Self {
+    pub(crate) fn from_definition(definition: Definition<'db>) -> Self {
         Self {
             environment: Cell::new(ProgramSource::Definition(definition.as_id())),
             lifetime: PhantomData,
@@ -54,7 +56,7 @@ impl<'db> ProgramEnvironment<'db> {
     }
 
     /// Creates an environment that lazily obtains its program from `scope`.
-    pub fn from_scope(scope: ScopeId<'db>) -> Self {
+    pub(crate) fn from_scope(scope: ScopeId<'db>) -> Self {
         Self {
             environment: Cell::new(ProgramSource::Scope(scope.as_id())),
             lifetime: PhantomData,
@@ -62,22 +64,23 @@ impl<'db> ProgramEnvironment<'db> {
     }
 
     /// Creates an environment with an already-established program.
-    pub const fn from_program(program: Program) -> Self {
+    pub fn from_program(program: Program<'db>) -> Self {
         Self {
-            environment: Cell::new(ProgramSource::Program(program)),
+            environment: Cell::new(ProgramSource::Program(program.as_id())),
             lifetime: PhantomData,
         }
     }
 
     /// Returns the program used by this operation.
-    pub fn program(&self, db: &'db dyn Db) -> Program {
+    #[inline]
+    pub fn program(&self, db: &'db dyn Db) -> Program<'db> {
         let program = match self.environment.get() {
-            ProgramSource::Program(program) => return program,
+            ProgramSource::Program(id) => return Program::from_id(id),
             ProgramSource::File(file) => {
                 cold_path();
                 // The source handle and database share `'db`; re-wrapping the stored ingredient
                 // ID immediately before the read restores the original database lifetime.
-                PythonFile::from_id(file).python_version(db)
+                ProgramFile::from_id(file).program(db)
             }
             ProgramSource::Definition(definition) => {
                 cold_path();
@@ -93,23 +96,30 @@ impl<'db> ProgramEnvironment<'db> {
             }
         };
 
-        self.environment.set(ProgramSource::Program(program));
+        self.environment
+            .set(ProgramSource::Program(program.as_id()));
         program
     }
 
     /// Returns the Python version used by this operation.
     #[inline]
-    pub fn python_version(&self, db: &'db dyn Db) -> PythonVersion {
-        self.program(db)
+    pub(crate) fn python_version(&self, db: &'db dyn Db) -> PythonVersion {
+        self.program(db).python_version(db)
+    }
+
+    /// Returns the resolver environment used by this operation.
+    #[inline]
+    pub(crate) fn resolver_environment(&self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
+        self.program(db).resolver_environment(db)
     }
 }
 
 #[derive(Clone, Copy)]
 enum ProgramSource {
-    Program(Program),
-    // Salsa interned handles are thin `Id` wrappers, so converting between `PythonFile` and `Id`
+    Program(Id),
+    // Salsa interned handles are thin `Id` wrappers, so converting between `ProgramFile` and `Id`
     // is an inlined representation change with no database lookup. Keeping the lifetime-bearing
-    // `PythonFile` out of the `Cell` preserves covariance in `'db`; replacing this variant after
+    // `ProgramFile` out of the `Cell` preserves covariance in `'db`; replacing this variant after
     // the first read avoids repeated Salsa ingredient reads in hot, recursive type operations.
     File(Id),
     Definition(Id),
@@ -133,7 +143,7 @@ pub(crate) struct InferContext<'db, 'ast> {
     program_environment: &'ast ProgramEnvironment<'db>,
     scope: ScopeId<'db>,
     file: File,
-    python_file: PythonFile<'db>,
+    program_file: ProgramFile<'db>,
     module: &'ast ParsedModuleRef,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
     diagnostics_suppressed: bool,
@@ -148,11 +158,12 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         program_environment: &'ast ProgramEnvironment<'db>,
         scope: ScopeId<'db>,
         file: File,
-        python_file: PythonFile<'db>,
+        program_file: ProgramFile<'db>,
         module: &'ast ParsedModuleRef,
     ) -> Self {
-        debug_assert_eq!(scope.python_file(db), python_file);
-        debug_assert_eq!(python_file.file(db), file);
+        debug_assert_eq!(scope.program_file(db), program_file);
+        debug_assert_eq!(program_file.file(db), file);
+        debug_assert_eq!(program_environment.program(db), scope.program(db));
 
         Self {
             db,
@@ -160,7 +171,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             scope,
             module,
             file,
-            python_file,
+            program_file,
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
             diagnostics_suppressed: false,
             inference_flags: InferenceFlags::empty(),
@@ -175,8 +186,12 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.file
     }
 
-    pub(crate) fn python_file(&self) -> PythonFile<'db> {
-        self.python_file
+    fn python_file(&self) -> PythonFile<'db> {
+        self.program_file.python_file(self.db())
+    }
+
+    pub(crate) fn program_file(&self) -> ProgramFile<'db> {
+        self.program_file
     }
 
     #[inline]
@@ -187,6 +202,11 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// The module for which the types are inferred.
     pub(crate) fn module(&self) -> &'ast ParsedModuleRef {
         self.module
+    }
+
+    /// Constructs an importer using the file's cached imports and source style.
+    pub(crate) fn importer(&self) -> Importer<'_> {
+        Importer::new(self.db, self.program_file, self.module)
     }
 
     pub(crate) fn scope(&self) -> ScopeId<'db> {
@@ -302,7 +322,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
         // Accessing the semantic index here is fine because
         // the index belongs to the same file as for which we emit the diagnostic.
-        let index = semantic_index(self.db(), self.python_file);
+        let index = semantic_index(self.db(), self.program_file);
 
         let scope_id = self.scope.file_scope_id(self.db());
 
@@ -328,9 +348,9 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     ///
     /// This checks both whether the scope itself is reachable and whether the
     /// specific statement or expression containing this range is reachable.
-    fn is_range_reachable(&self, range: TextRange) -> bool {
+    pub(super) fn is_range_reachable(&self, range: TextRange) -> bool {
         let db = self.db;
-        let index = semantic_index(self.db(), self.python_file);
+        let index = semantic_index(self.db(), self.program_file);
         let scope_id = self.scope.file_scope_id(self.db());
         is_range_reachable(db, index, scope_id, range)
     }
@@ -366,7 +386,7 @@ impl fmt::Debug for InferContext<'_, '_> {
             .field("db", &"<dyn Db>")
             .field("scope", &self.scope)
             .field("file", &self.file)
-            .field("python_file", &self.python_file)
+            .field("program_file", &self.program_file)
             .field("diagnostics", &self.diagnostics)
             .field("diagnostics_suppressed", &self.diagnostics_suppressed)
             .field("inference_flags", &self.inference_flags)
@@ -513,11 +533,14 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
                 LintSource::File => {
                     format!("rule `{rule}` was selected in the configuration file")
                 }
+                LintSource::ScriptMetadata => {
+                    format!("rule `{rule}` was selected in script metadata")
+                }
                 LintSource::Editor => {
                     format!("rule `{rule}` was selected in the editor settings")
                 }
-                LintSource::UvWorkspace => {
-                    format!("rule `{rule}` was selected by uv workspace metadata")
+                LintSource::UvMetadata => {
+                    format!("rule `{rule}` was selected by uv metadata")
                 }
             });
         }

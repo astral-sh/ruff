@@ -851,10 +851,11 @@ def typeahead(fd: int, /) -> None:
     """
 
 def unctrl(ch: _ChType, /) -> bytes:
-    """Return a string which is a printable representation of the character ch.
+    """Return a bytes object which is a printable representation of ch.
 
-    Control characters are displayed as a caret followed by the character,
-    for example as ^C.  Printing characters are left as they are.
+    Control characters are displayed as a caret followed by the
+    character, for example as ^C.  Printing characters are left as they
+    are.  Any attributes and color pair are ignored.
     """
 
 def unget_wch(ch: int | str, /) -> None:
@@ -1166,17 +1167,24 @@ class window:  # undocumented
     @overload
     def getch(self) -> int:
         """getch([y, x])
-        Get a character code from terminal keyboard.
+        Read a key press and return it as an integer.
 
           y
             Y-coordinate.
           x
             X-coordinate.
 
-        The integer returned does not have to be in ASCII range: function
-        keys, keypad keys and so on return numbers higher than 256.  In
-        no-delay mode, -1 is returned if there is no input, else getch()
-        waits until a key is pressed.
+        Wait until a key is pressed, or return -1 if the read is
+        non-blocking or times out.
+
+        An ordinary key is returned as the code of a single byte of its
+        encoding in the current locale, so a character encoded with several
+        bytes takes several calls.  Use get_wch() to read it as a single
+        character.
+
+        In keypad mode function keys and other special keys are returned as
+        one of the KEY_* constants, which cannot be mistaken for an ordinary
+        key.  Otherwise their bytes are returned one at a time.
         """
     @overload
     def getch(self, y: int, x: int) -> int: ...
@@ -1184,15 +1192,19 @@ class window:  # undocumented
     @overload
     def get_wch(self) -> int | str:
         """get_wch([y, x])
-        Get a wide character from terminal keyboard.
+        Read a key press and return it as a one-character str.
 
           y
             Y-coordinate.
           x
             X-coordinate.
 
-        Return a character for most keys, or an integer for function keys,
-        keypad keys, and other special keys.
+        Wait until a key is pressed, or raise curses.error if the read is
+        non-blocking or times out.
+
+        In keypad mode function keys and other special keys are returned as
+        one of the KEY_* constants, an integer.  Otherwise their characters
+        are returned one at a time.
         """
     @overload
     def get_wch(self, y: int, x: int) -> int | str: ...
@@ -1200,17 +1212,17 @@ class window:  # undocumented
     @overload
     def getkey(self) -> str:
         """getkey([y, x])
-        Get a character (string) from terminal keyboard.
+        Read a key press and return it as a str.
 
           y
             Y-coordinate.
           x
             X-coordinate.
 
-        Returning a string instead of an integer, as getch() does.  Function
-        keys, keypad keys and other special keys return a multibyte string
-        containing the key name.  In no-delay mode, an exception is raised
-        if there is no input.
+        Read as getch() does, but return an ordinary key as a one-character
+        string, the byte decoded as Latin-1, and a special key as its name,
+        such as 'KEY_UP'.  Raise curses.error instead of returning -1 if
+        there is no input.
         """
     @overload
     def getkey(self, y: int, x: int) -> str: ...
@@ -1224,14 +1236,14 @@ class window:  # undocumented
     @overload
     def getstr(self) -> bytes:
         """getstr([[y, x,] n=2047])
-        Read a string from the user, with primitive line editing capacity.
+        Read a line of input and return it as a bytes object.
 
           y
             Y-coordinate.
           x
             X-coordinate.
           n
-            Maximal number of characters.
+            Maximal number of bytes.
         """
     @overload
     def getstr(self, n: int) -> bytes: ...
@@ -1365,21 +1377,19 @@ class window:  # undocumented
     @overload
     def instr(self, n: int = 2047) -> bytes:
         """instr([y, x,] n=2047)
-        Return a string of characters, extracted from the window.
+        Return the text of the window as a bytes object.
 
           y
             Y-coordinate.
           x
             X-coordinate.
           n
-            Maximal number of characters.
+            Maximal number of bytes.
 
-        Return a string of characters, extracted from the window starting
-        at the current cursor position, or at y, x if specified, and
-        stopping at the end of the line.  Attributes and color
-        information are stripped from the characters.  If n is specified,
-        instr() returns a string at most n characters long (exclusive of
-        the trailing NUL).
+        Read from the current cursor position, or from y, x if specified, to
+        the end of the line, and return the text in the encoding of the
+        current locale, with attributes and color pairs stripped.  At most n
+        bytes are read.
         """
     @overload
     def instr(self, y: int, x: int, n: int = 2047) -> bytes: ...

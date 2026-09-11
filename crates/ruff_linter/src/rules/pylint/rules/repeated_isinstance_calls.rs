@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::AlwaysFixableViolation;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## Removed
@@ -49,7 +50,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// [SIM101]: https://docs.astral.sh/ruff/rules/duplicate-isinstance-call/
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.5.0")]
+#[violation_metadata(removed_since = "0.5.0", category = Category::Complexity)]
 pub(crate) struct RepeatedIsinstanceCalls {
     expression: SourceCodeSnippet,
 }

@@ -9,6 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pyupgrade::fixes;
 use crate::rules::pyupgrade::rules::unnecessary_future_import::is_import_required_by_isort;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -64,7 +65,7 @@ enum Deprecation {
 /// from collections.abc import Sequence
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.239")]
+#[violation_metadata(stable_since = "v0.0.239", category = Category::Suspicious)]
 pub(crate) struct DeprecatedImport {
     deprecation: Deprecation,
 }
@@ -192,7 +193,6 @@ const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
     "ValuesView",
     "cast",
     "no_type_check",
-    "no_type_check_decorator",
     // Introduced in Python 3.5.2, but `typing_extensions` contains backported bugfixes and
     // optimizations,
     // "NewType",

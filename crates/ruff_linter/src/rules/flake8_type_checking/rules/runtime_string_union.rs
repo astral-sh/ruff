@@ -4,6 +4,7 @@ use ruff_python_ast::{Expr, Operator};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_type_checking::helpers::{quote_type_expression, quotes_are_unremovable};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -63,7 +64,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Correctness)]
 pub(crate) struct RuntimeStringUnion {
     strategy: Option<Strategy>,
 }

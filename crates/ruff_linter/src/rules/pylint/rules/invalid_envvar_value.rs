@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `os.getenv` calls with an invalid `key` argument.
@@ -30,7 +31,7 @@ use crate::checkers::ast::Checker;
 /// os.getenv("1")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.255")]
+#[violation_metadata(stable_since = "v0.0.255", category = Category::Correctness)]
 pub(crate) struct InvalidEnvvarValue;
 
 impl Violation for InvalidEnvvarValue {

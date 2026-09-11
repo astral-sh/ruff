@@ -1,6 +1,10 @@
 use crate::Db;
 use crate::{ProgramEnvironment, types::BoundTypeVarIdentity};
 
+mod equations;
+
+pub(super) use equations::{VarianceOrigin, VarianceTerm, infer_protocol_variance};
+
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub enum TypeVarVariance {
     Invariant,
@@ -126,27 +130,24 @@ impl std::iter::FromIterator<Self> for TypeVarVariance {
 }
 
 pub(crate) trait VarianceInferable<'db>: Sized {
-    /// The variance of `typevar` in `self`
+    /// Builds a variance expression without choosing how protocol declarations are evaluated.
     ///
-    /// Generally, one will implement this by traversing any types within `self`
-    /// in which `typevar` could occur, and calling `variance_of` recursively on
-    /// them.
-    ///
-    /// Sometimes the recursive calls will be in positions where you need to
-    /// specify a non-covariant polarity. See `with_polarity` for more details.
+    /// Recursive definitions contribute named variables instead of expanding their bodies.
+    /// Evaluation and dependency discovery operate on the resulting expression, so both use
+    /// the same member-selection and variance-composition rules.
     fn variance_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance;
+    ) -> VarianceTerm<'db>;
 
     /// Creates a `VarianceInferable` that applies `polarity` (see
     /// `TypeVarVariance::compose`) to the result of variance inference on the
     /// underlying value.
     ///
     /// In some cases, we need to apply a polarity to the recursive call.
-    /// You can do this with `ty.with_polarity(polarity).variance_of(typevar)`.
+    /// You can do this with `ty.with_polarity(polarity).variance_of(db, env, typevar)`.
     /// Generally, this will be whenever the type occurs in argument-position,
     /// in which case you will want `TypeVarVariance::Contravariant`, or
     /// `TypeVarVariance::Invariant` if the value(s) being annotated is known to
@@ -176,12 +177,13 @@ where
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         let WithPolarity {
             variance_inferable,
             polarity,
         } = self;
 
-        polarity.compose_thunk(|| variance_inferable.variance_of(db, env, typevar))
+        VarianceTerm::from(polarity)
+            .compose_thunk(db, || variance_inferable.variance_of(db, env, typevar))
     }
 }

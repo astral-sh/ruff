@@ -152,6 +152,7 @@ Scalar types follow the Python-input conversions in Pydantic's [conversion table
 import re
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from fractions import Fraction
 from ipaddress import (
     IPv4Address,
     IPv4Interface,
@@ -174,6 +175,7 @@ LaxBool(value=1.0)
 LaxBool(value=1)
 LaxBool(value=Decimal(1))
 LaxBool(value="true")
+LaxBool(value=b"true")
 LaxBool(value=[True])  # error: [invalid-argument-type]
 
 class LaxBytes(BaseModel):
@@ -217,6 +219,7 @@ LaxFloat(value=True)
 LaxFloat(value=b"1.0")
 LaxFloat(value="1.0")
 LaxFloat(value=Decimal("1.0"))
+LaxFloat(value=Fraction(1, 2))
 LaxFloat(value=(1, 0))  # error: [invalid-argument-type]
 
 class LaxInt(BaseModel):
@@ -228,6 +231,7 @@ LaxInt(value=b"1")
 LaxInt(value=1.0)
 LaxInt(value="1")
 LaxInt(value=Decimal(1))
+LaxInt(value=Fraction(2, 1))
 LaxInt(value=(1,))  # error: [invalid-argument-type]
 
 class LaxStr(BaseModel):
@@ -736,6 +740,101 @@ JsonValueModel(value=SomethingElse())  # error: [invalid-argument-type]
 
 # TODO: this should be an error once we support recursive types
 JsonValueModel(value={"outer": [1, {"inner": SomethingElse()}]})
+```
+
+### Enum values for string fields
+
+In lax mode, Pydantic converts enum members to strings regardless of the member's underlying value.
+
+```py
+from enum import Enum
+
+from pydantic import BaseModel, ConfigDict, Field
+
+class StringEnum(Enum):
+    VALUE = "value"
+
+class IntegerEnum(Enum):
+    VALUE = 1
+
+class LaxModel(BaseModel):
+    value: str
+
+LaxModel(value=StringEnum.VALUE)
+LaxModel(value=IntegerEnum.VALUE)
+```
+
+Strict models and fields reject ordinary enum members because they are not strings.
+
+```py
+class StrictModel(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    value: str
+
+class StrictFieldModel(BaseModel):
+    value: str = Field(strict=True)
+
+StrictModel(value=StringEnum.VALUE)  # error: [invalid-argument-type]
+StrictModel(value=IntegerEnum.VALUE)  # error: [invalid-argument-type]
+StrictFieldModel(value=StringEnum.VALUE)  # error: [invalid-argument-type]
+StrictFieldModel(value=IntegerEnum.VALUE)  # error: [invalid-argument-type]
+```
+
+A field that opts out of model-wide strict mode accepts enum members again.
+
+```py
+class LaxFieldModel(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    value: str = Field(strict=False)
+
+LaxFieldModel(value=StringEnum.VALUE)
+LaxFieldModel(value=IntegerEnum.VALUE)
+```
+
+### Enum values for integer fields
+
+In lax mode, Pydantic accepts enum members as integers by using their underlying values.
+
+```py
+from enum import Enum
+
+from pydantic import BaseModel, ConfigDict, Field
+
+class IntegerEnum(Enum):
+    VALUE = 1
+
+class LaxModel(BaseModel):
+    value: int
+
+LaxModel(value=IntegerEnum.VALUE)
+```
+
+Strict models and fields reject ordinary enum members because they are not integers.
+
+```py
+class StrictModel(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    value: int
+
+class StrictFieldModel(BaseModel):
+    value: int = Field(strict=True)
+
+StrictModel(value=IntegerEnum.VALUE)  # error: [invalid-argument-type]
+StrictFieldModel(value=IntegerEnum.VALUE)  # error: [invalid-argument-type]
+```
+
+A field that opts out of model-wide strict mode accepts enum members again.
+
+```py
+class LaxFieldModel(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    value: int = Field(strict=False)
+
+LaxFieldModel(value=IntegerEnum.VALUE)
 ```
 
 ### Changing a specific field
@@ -1341,6 +1440,39 @@ HasGenericRoot(root=GenericRoot("1"))
 
 # This would ideally be an error, but we currently do not attempt to detect this:
 HasGenericRoot(root=GenericRoot(None))
+```
+
+## Generic models
+
+Generic models inherit model configuration with both PEP 695 and legacy generic syntax. An explicit
+`Generic[T]` base does not override the inherited configuration.
+
+```py
+from typing import Generic, TypeVar
+
+from pydantic import BaseModel, ConfigDict
+
+class ForbidExtras(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+class Model[T](ForbidExtras):
+    value: T
+
+Model[int](value=1)
+Model[int](value=1, something_else=7)  # error: [unknown-argument]
+
+T = TypeVar("T")
+
+class LegacyModel(ForbidExtras, Generic[T]):
+    value: T
+
+LegacyModel[int](value=1)
+LegacyModel[int](value=1, something_else=7)  # error: [unknown-argument]
+
+class InheritsLegacyModel(LegacyModel[int]): ...
+
+InheritsLegacyModel(value=1)
+InheritsLegacyModel(value=1, something_else=7)  # error: [unknown-argument]
 ```
 
 ## Model configuration

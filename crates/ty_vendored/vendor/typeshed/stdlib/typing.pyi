@@ -1860,7 +1860,7 @@ class Mapping(Collection[_KT], Generic[_KT, _VT_co]):
     def get(self, key: object, /) -> _VT_co | None:
         """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
     @overload
-    def get(self, key: object, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    def get(self, key: object, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter  # pyrefly: ignore [invalid-variance]
     @overload
     def get(self, key: object, default: _T, /) -> _VT_co | _T: ...
 
@@ -2281,7 +2281,6 @@ if sys.version_info >= (3, 11):
         kw_only_default: bool = False,
         frozen_default: bool = False,  # on 3.11, runtime accepts it as part of kwargs
         field_specifiers: tuple[type[Any] | Callable[..., Any], ...] = (),
-        **kwargs: Any,
     ) -> IdentityFunction:
         """Decorator to mark an object as providing dataclass-like behavior.
 
@@ -2378,11 +2377,14 @@ class NamedTuple(tuple[Any, ...]):
     if sys.version_info >= (3, 12):
         __orig_bases__: ClassVar[tuple[Any, ...]]
 
-    @overload
-    def __init__(self, typename: str, fields: Iterable[tuple[str, Any]], /) -> None: ...
-    @overload
-    @deprecated("Creating a typing.NamedTuple using keyword arguments is deprecated and support will be removed in Python 3.15")
-    def __init__(self, typename: str, fields: None = None, /, **kwargs: Any) -> None: ...
+    if sys.version_info >= (3, 15):
+        def __init__(self, typename: str, fields: Iterable[tuple[str, Any]], /) -> None: ...
+    else:
+        @overload
+        def __init__(self, typename: str, fields: Iterable[tuple[str, Any]], /) -> None: ...
+        @overload
+        @deprecated("Creating a typing.NamedTuple using keyword arguments is deprecated; support removed in Python 3.15")
+        def __init__(self, typename: str, fields: None = None, /, **kwargs: Any) -> None: ...
 
     @final
     @classmethod

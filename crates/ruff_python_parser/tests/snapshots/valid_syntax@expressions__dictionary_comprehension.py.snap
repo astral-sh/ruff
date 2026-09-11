@@ -309,18 +309,18 @@ Module(
                                             ExprCompare {
                                                 node_index: NodeIndex(None),
                                                 range: 98..104,
-                                                left: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 98..99,
-                                                        id: Name("x"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
                                                 ops: [
                                                     In,
                                                 ],
-                                                comparators: [
+                                                operands: [
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 98..99,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
                                                     Name(
                                                         ExprName {
                                                             node_index: NodeIndex(None),
@@ -488,18 +488,18 @@ Module(
                                             ExprCompare {
                                                 node_index: NodeIndex(None),
                                                 range: 170..175,
-                                                left: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 170..171,
-                                                        id: Name("k"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
                                                 ops: [
                                                     Gt,
                                                 ],
-                                                comparators: [
+                                                operands: [
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 170..171,
+                                                            id: Name("k"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
                                                     Name(
                                                         ExprName {
                                                             node_index: NodeIndex(None),
@@ -618,18 +618,18 @@ Module(
                                             ExprCompare {
                                                 node_index: NodeIndex(None),
                                                 range: 225..230,
-                                                left: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 225..226,
-                                                        id: Name("k"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
                                                 ops: [
                                                     Gt,
                                                 ],
-                                                comparators: [
+                                                operands: [
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 225..226,
+                                                            id: Name("k"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
                                                     Name(
                                                         ExprName {
                                                             node_index: NodeIndex(None),

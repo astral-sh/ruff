@@ -11,6 +11,7 @@ use ruff_text_size::TextSize;
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 
 /// ## What it does
 /// Check for `type: ignore` annotations that suppress all type warnings, as
@@ -42,7 +43,7 @@ use crate::checkers::ast::LintContext;
 /// enable_error_code = ["ignore-without-code"]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.187")]
+#[violation_metadata(stable_since = "v0.0.187", category = Category::Restriction)]
 pub(crate) struct BlanketTypeIgnore;
 
 impl Violation for BlanketTypeIgnore {

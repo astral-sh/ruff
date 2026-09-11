@@ -70,7 +70,7 @@ use ty_python_core::expression::Expression;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
-use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, semantic_index};
+use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, semantic_index};
 
 mod builder;
 mod comparisons;
@@ -86,6 +86,9 @@ bitflags::bitflags! {
 
         /// The operand of an `Unpack[...]` expression is neither a tuple nor a `TypeVarTuple`.
         const INVALID_UNPACK = 1 << 1;
+
+        /// The expression refers to a `TypeVarTuple` without unpacking it.
+        const INVALID_BARE_TYPE_VAR_TUPLE = 1 << 2;
     }
 }
 
@@ -119,6 +122,28 @@ fn extend_collection_use_constraints<'db>(
     }
 }
 
+/// Normalizes recursive collection constraints so that each cycle iteration cannot add another
+/// layer of nesting. These constraints feed back into the collection's initializer, so they need
+/// the same normalization as expression and binding types before the next iteration uses them.
+fn normalize_collection_use_constraints<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    constraints: &mut CollectionUseConstraints<'db>,
+    cycle: &salsa::Cycle,
+) {
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "constraints for distinct collection definitions are normalized independently"
+    )]
+    for types in constraints.values_mut() {
+        *types = std::mem::take(types)
+            .into_iter()
+            .map(|ty| ty.recursive_type_normalized(db, env, cycle))
+            .collect();
+        types.shrink_to_fit();
+    }
+}
+
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a place use or public type of a place.
 #[salsa::tracked(
@@ -135,7 +160,8 @@ pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
-    let python_file = definition.python_file(db);
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
     let _span = tracing::trace_span!(
         "infer_definition_types",
@@ -144,16 +170,16 @@ pub(crate) fn infer_definition_types<'db>(
     )
     .entered();
 
-    let index = semantic_index(db, python_file);
+    let index = semantic_index(db, program_file);
 
-    let env = ProgramEnvironment::from_file(python_file);
+    let env = ProgramEnvironment::from_file(program_file);
 
     TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Definition(definition),
         python_file.file(db),
-        python_file,
+        program_file,
         index,
         &module,
     )
@@ -196,18 +222,19 @@ pub(crate) fn function_known_decorators<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> FunctionDecoratorInference<'db> {
-    let python_file = definition.python_file(db);
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
-    let index = semantic_index(db, python_file);
+    let index = semantic_index(db, program_file);
 
-    let env = ProgramEnvironment::from_file(python_file);
+    let env = ProgramEnvironment::from_file(program_file);
 
     TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::FunctionDecorators(definition),
         python_file.file(db),
-        python_file,
+        program_file,
         index,
         &module,
     )
@@ -270,6 +297,7 @@ impl<'db> FunctionDecoratorInference<'db> {
 ///
 /// Deferred expressions are type expressions (annotations, base classes, aliases...) in a stub
 /// file, or in a file with `from __future__ import annotations`, or stringified annotations.
+/// Function parameter defaults are inferred separately by [`infer_function_default_types`].
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
@@ -284,7 +312,8 @@ pub(crate) fn infer_deferred_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
-    let python_file = definition.python_file(db);
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
     let _span = tracing::trace_span!(
         "infer_deferred_types",
@@ -294,16 +323,53 @@ pub(crate) fn infer_deferred_types<'db>(
     )
     .entered();
 
-    let index = semantic_index(db, python_file);
+    let index = semantic_index(db, program_file);
 
-    let env = ProgramEnvironment::from_file(python_file);
+    let env = ProgramEnvironment::from_file(program_file);
 
     TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Deferred(definition),
         python_file.file(db),
-        python_file,
+        program_file,
+        index,
+        &module,
+    )
+    .finish_definition(definition)
+}
+
+/// Infer a function's parameter defaults without retaining its annotation types.
+///
+/// Callable signature checking only needs to know which parameters are optional. Inferring their
+/// default values while inferring annotations can re-enter the decorated function's own signature.
+/// Keeping the results separate also avoids caching annotation expressions twice.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|db, id, definition: Definition<'db>| {
+        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+    },
+    cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
+        inference.cycle_normalized(db, previous, cycle, definition)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(crate) fn infer_function_default_types<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> DefinitionInference<'db> {
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let index = semantic_index(db, program_file);
+    let env = ProgramEnvironment::from_file(program_file);
+
+    TypeInferenceBuilder::new(
+        db,
+        &env,
+        InferenceRegion::FunctionDefaults(definition),
+        python_file.file(db),
+        program_file,
         index,
         &module,
     )
@@ -323,13 +389,13 @@ pub(crate) fn infer_complete_scope_types<'db>(
     // Scopes that may require type context are inferred during the inference of
     // their outer scope.
     if scope.accepts_type_context(db) {
-        let python_file = scope.python_file(db);
-        let index = semantic_index(db, python_file);
+        let program_file = scope.program_file(db);
+        let index = semantic_index(db, program_file);
 
         if let Some(parent_scope) = index.parent_scope_id(scope.file_scope_id(db)) {
             // Note that nested lambdas or comprehensions may require recursing until we reach
             // an outer scope that is independent of any type context.
-            return infer_complete_scope_types(db, parent_scope.to_scope_id(db, python_file));
+            return infer_complete_scope_types(db, parent_scope.to_scope_id(db, program_file));
         }
     }
 
@@ -367,7 +433,8 @@ pub(crate) fn infer_scope_types_impl<'db>(
     input: InferScope<'db>,
 ) -> ScopeInference<'db> {
     let (scope, tcx) = input.into_inner(db);
-    let python_file = scope.python_file(db);
+    let program_file = scope.program_file(db);
+    let python_file = program_file.python_file(db);
     let _span =
         tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), ?python_file).entered();
 
@@ -375,16 +442,16 @@ pub(crate) fn infer_scope_types_impl<'db>(
 
     // Using the index here is fine because the code below depends on the AST anyway.
     // The isolation of the query is by the return inferred types.
-    let index = semantic_index(db, python_file);
+    let index = semantic_index(db, program_file);
 
-    let env = ProgramEnvironment::from_file(python_file);
+    let env = ProgramEnvironment::from_file(program_file);
 
     TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Scope(scope, tcx),
         python_file.file(db),
-        python_file,
+        program_file,
         index,
         &module,
     )
@@ -419,7 +486,8 @@ pub(super) fn infer_expression_types_impl<'db>(
 ) -> ExpressionInference<'db> {
     let (expression, tcx) = input.into_inner(db);
 
-    let python_file = expression.python_file(db);
+    let program_file = expression.program_file(db);
+    let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
     let _span = tracing::trace_span!(
         "infer_expression_types",
@@ -429,16 +497,16 @@ pub(super) fn infer_expression_types_impl<'db>(
     )
     .entered();
 
-    let index = semantic_index(db, python_file);
+    let index = semantic_index(db, program_file);
 
-    let env = ProgramEnvironment::from_file(python_file);
+    let env = ProgramEnvironment::from_file(program_file);
 
     TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Expression(expression, tcx),
         python_file.file(db),
-        python_file,
+        program_file,
         index,
         &module,
     )
@@ -530,7 +598,7 @@ pub(super) fn infer_statement_types<'db>(
         StatementInferenceInner::cycle_initial(statement.scope(db), Type::divergent(id))
     },
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, statement: StatementInner<'db>| {
-        let env = ProgramEnvironment::from_file(statement.python_file(db));
+        let env = ProgramEnvironment::from_file(statement.program_file(db));
         inference.cycle_normalized(db, &env, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
@@ -539,7 +607,8 @@ fn infer_statement_types_impl<'db>(
     db: &'db dyn Db,
     statement: StatementInner<'db>,
 ) -> StatementInferenceInner<'db> {
-    let python_file = statement.python_file(db);
+    let program_file = statement.program_file(db);
+    let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
     let _span = tracing::trace_span!(
         "infer_statement_types",
@@ -549,16 +618,16 @@ fn infer_statement_types_impl<'db>(
     )
     .entered();
 
-    let index = semantic_index(db, python_file);
+    let index = semantic_index(db, program_file);
 
-    let env = ProgramEnvironment::from_file(python_file);
+    let env = ProgramEnvironment::from_file(program_file);
 
     TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Statement(statement),
         python_file.file(db),
-        python_file,
+        program_file,
         index,
         &module,
     )
@@ -723,13 +792,14 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
     returns(ref),
     cycle_initial=|_, id, _| UnpackResult::cycle_initial(Type::divergent(id)),
     cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, unpack: Unpack<'db>| {
-        let env = ProgramEnvironment::from_file(unpack.python_file(db));
+        let env = ProgramEnvironment::from_file(unpack.program_file(db));
         result.cycle_normalized(db, &env, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
-    let python_file = unpack.python_file(db);
+    let program_file = unpack.program_file(db);
+    let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
     let _span = tracing::trace_span!(
         "infer_unpack_types",
@@ -738,8 +808,8 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     )
     .entered();
 
-    let env = ProgramEnvironment::from_file(python_file);
-    let mut unpacker = Unpacker::new(db, &env, unpack.target_scope(db), python_file, &module);
+    let env = ProgramEnvironment::from_file(program_file);
+    let mut unpacker = Unpacker::new(db, &env, unpack.target_scope(db), program_file, &module);
     unpacker.unpack(unpack.target(db, &module), unpack.value(db));
     unpacker.finish()
 }
@@ -825,6 +895,8 @@ pub(crate) enum InferenceRegion<'db> {
     Definition(Definition<'db>),
     /// infer types for the decorators on a function [`Definition`]
     FunctionDecorators(Definition<'db>),
+    /// Infer a function's parameter default values, but not its annotations.
+    FunctionDefaults(Definition<'db>),
     /// infer deferred types for a [`Definition`]
     Deferred(Definition<'db>),
     /// infer types for an entire [`ScopeId`]
@@ -838,6 +910,7 @@ impl<'db> InferenceRegion<'db> {
             InferenceRegion::Expression(expression, _) => expression.scope(db),
             InferenceRegion::Definition(definition)
             | InferenceRegion::FunctionDecorators(definition)
+            | InferenceRegion::FunctionDefaults(definition)
             | InferenceRegion::Deferred(definition) => definition.scope(db),
             InferenceRegion::Scope(scope, _) => scope,
         }
@@ -908,6 +981,15 @@ impl<'db> ScopeInference<'db> {
             extend_collection_use_constraints(
                 &mut extra.collection_use_constraints,
                 &previous_extra.collection_use_constraints,
+            );
+        }
+
+        if let Some(extra) = self.extra.as_deref_mut() {
+            normalize_collection_use_constraints(
+                db,
+                env,
+                &mut extra.collection_use_constraints,
+                cycle,
             );
         }
 
@@ -1263,6 +1345,10 @@ struct DeferredAndUndecorated<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct OtherDefinitionInferenceExtra<'db> {
+    /// Condition truthiness retained for checks of enclosing conditions containing walrus expressions.
+    /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.
+    comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
+
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -1289,6 +1375,9 @@ struct OtherDefinitionInferenceExtra<'db> {
 
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
+
+    /// Input types for failed decorator applications that are checked after inference.
+    deferred_decorator_calls: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// Whether synthesized dictionary-key assignments derived from the right-hand side should be
     /// discarded.
@@ -1355,6 +1444,13 @@ impl<'db> DefinitionInferenceExtra<'db> {
             _ => None,
         }
     }
+
+    fn comparison_truthiness(&self) -> Option<&FrozenMap<ExpressionNodeKey, Truthiness>> {
+        match self {
+            Self::Other(extra) => Some(&extra.comparison_truthiness),
+            _ => None,
+        }
+    }
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -1369,7 +1465,8 @@ impl<'db> DefinitionInference<'db> {
         // Eagerly store more precise types for collection literals to avoid an extra
         // cycle iteration, i.e., by inferring `list[Divergent]` instead of `Divergent`.
         if let DefinitionKind::Assignment(assignment) = definition.kind(db) {
-            let python_file = definition.python_file(db);
+            let program_file = definition.program_file(db);
+            let python_file = program_file.python_file(db);
             let module = parsed_module(db, python_file).load(db);
             let known_collection = match assignment.value(&module) {
                 ast::Expr::Set(_) => Some(KnownClass::Set),
@@ -1388,6 +1485,39 @@ impl<'db> DefinitionInference<'db> {
                     types =
                         DefinitionTypes::Binding(Type::instance(db, &env, divergent_collection));
                 }
+            }
+        } else if let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) {
+            let program_file = definition.program_file(db);
+            let python_file = program_file.python_file(db);
+            let module = parsed_module(db, python_file).load(db);
+            let index = semantic_index(db, program_file);
+
+            if assignment.value(&module).is_none()
+                && index
+                    .use_def_map(definition.file_scope(db))
+                    .bindings_at_definition(definition)
+                    .any(|binding| {
+                        binding
+                            .binding
+                            .is_defined_and(|binding| binding.kind(db).is_loop_header())
+                    })
+            {
+                // Loop-carried assignments need this annotation as context before validating
+                // the declaration can infer their binding types.
+                return TypeInferenceBuilder::new(
+                    db,
+                    &env,
+                    InferenceRegion::Definition(definition),
+                    python_file.file(db),
+                    program_file,
+                    index,
+                    &module,
+                )
+                .infer_annotated_assignment_cycle_initial(
+                    definition,
+                    assignment,
+                    cycle_recovery,
+                );
             }
         }
 
@@ -1413,6 +1543,10 @@ impl<'db> DefinitionInference<'db> {
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
         let env = ProgramEnvironment::from_definition(definition);
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            self.widen_comparison_truthiness(db, &env, previous_inference);
+        }
+
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, &env, previous_ty, cycle);
@@ -1424,6 +1558,18 @@ impl<'db> DefinitionInference<'db> {
             cycle,
             definition,
         );
+
+        if let Some(DefinitionInferenceExtra::Other(extra)) = self.extra.as_deref_mut() {
+            for (expression, ty) in &mut extra.deferred_decorator_calls {
+                *ty = if let Some(previous_ty) =
+                    previous_inference.deferred_decorator_input_type(*expression)
+                {
+                    ty.cycle_normalized(db, &env, previous_ty, cycle)
+                } else {
+                    ty.recursive_type_normalized(db, &env, cycle)
+                };
+            }
+        }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
             && let Some(previous_constraints) = previous_inference
@@ -1445,7 +1591,45 @@ impl<'db> DefinitionInference<'db> {
             self.extra = Some(Box::new(DefinitionInferenceExtra::Other(Box::new(extra))));
         }
 
+        if let Some(DefinitionInferenceExtra::Other(extra)) = self.extra.as_deref_mut() {
+            normalize_collection_use_constraints(
+                db,
+                &env,
+                &mut extra.collection_use_constraints,
+                cycle,
+            );
+        }
+
         self
+    }
+
+    fn widen_comparison_truthiness(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: &Self,
+    ) {
+        let comparison_truthiness = widen_comparison_truthiness(
+            self.extra
+                .as_deref()
+                .and_then(DefinitionInferenceExtra::comparison_truthiness),
+            previous
+                .extra
+                .as_deref()
+                .and_then(DefinitionInferenceExtra::comparison_truthiness),
+            |expression| self.expression_type(expression).bool(db, env),
+            |expression| previous.expression_type(expression).bool(db, env),
+        );
+        if comparison_truthiness.iter().next().is_some() {
+            let mut extra = self
+                .extra
+                .take()
+                .map_or_else(OtherDefinitionInferenceExtra::default, |extra| {
+                    extra.into_other()
+                });
+            extra.comparison_truthiness = comparison_truthiness;
+            self.extra = Some(Box::new(DefinitionInferenceExtra::Other(Box::new(extra))));
+        }
     }
 
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
@@ -1583,6 +1767,19 @@ impl<'db> DefinitionInference<'db> {
         }
     }
 
+    fn deferred_decorator_input_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::Other(extra)) => extra
+                .deferred_decorator_calls
+                .get(&expression.into())
+                .copied(),
+            Some(_) | None => None,
+        }
+    }
+
     pub(crate) fn function_type(&self, definition: Definition<'db>) -> Option<FunctionType<'db>> {
         let ty = if let Some(undecorated) = self.undecorated_type() {
             undecorated
@@ -1594,6 +1791,43 @@ impl<'db> DefinitionInference<'db> {
 
         ty.as_function_literal()
     }
+}
+
+/// Widen comparison truthiness for expression, statement, and definition regions using the same rules.
+///
+/// Sparse overrides can appear or disappear as operand types change. Compare the effective
+/// truthiness in both iterations, including previous-only overrides, so widening cannot make
+/// a condition alternate between definite outcomes. The fallbacks use each iteration's value
+/// types before those types are themselves widened.
+fn widen_comparison_truthiness(
+    current: Option<&FrozenMap<ExpressionNodeKey, Truthiness>>,
+    previous: Option<&FrozenMap<ExpressionNodeKey, Truthiness>>,
+    current_fallback: impl Fn(ExpressionNodeKey) -> Truthiness,
+    previous_fallback: impl Fn(ExpressionNodeKey) -> Truthiness,
+) -> FrozenMap<ExpressionNodeKey, Truthiness> {
+    current
+        .into_iter()
+        .chain(previous)
+        .flatten()
+        .map(|(expression, _)| {
+            let truthiness = current
+                .and_then(|overrides| overrides.get(expression))
+                .copied()
+                .unwrap_or_else(|| current_fallback(*expression));
+            let previous_truthiness = previous
+                .and_then(|overrides| overrides.get(expression))
+                .copied()
+                .unwrap_or_else(|| previous_fallback(*expression));
+            (
+                *expression,
+                if truthiness == previous_truthiness {
+                    truthiness
+                } else {
+                    Truthiness::Ambiguous
+                },
+            )
+        })
+        .collect()
 }
 
 /// The inferred types for an expression region.
@@ -1620,6 +1854,33 @@ struct ExpressionInferenceExtra<'db> {
 
     /// Metadata for type expressions in this region.
     type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
+
+    /// A comparison chain's truthiness when evaluated directly as a condition.
+    ///
+    /// Expression types describe the objects produced by evaluation, which is not always enough
+    /// to determine a condition's outcome. If `x < 1` returns an object with mutable truthiness,
+    /// `saved = x < 1 < 0` can store that object after it tests falsy; `if saved:` can then test it
+    /// again and get `True`. In contrast, `if x < 1 < 0:` cannot enter its body: either the first
+    /// comparison tests falsy or the final comparison `1 < 0` does. Its condition truthiness is
+    /// `AlwaysFalse`, but its value type must still include objects returned by the first comparison.
+    ///
+    /// The same distinction matters for `and`/`or`, but their operands have separate expression
+    /// nodes with inferred types. [`crate::reachability::analyze_condition_expression`] can
+    /// reconstruct their condition truthiness by recursively visiting those operands, without
+    /// relying on the compound expression's value type.
+    ///
+    /// A comparison chain instead has one `ExprCompare` node with the operands and operators.
+    /// In `x < 1 < 0`, neither `x < 1` nor `1 < 0` has its own expression node, so their result
+    /// types are not recorded in [`ExpressionInference::expressions`]. We retain their combined
+    /// condition truthiness here while those types are available during comparison inference.
+    /// A single comparison needs no override: there is no intermediate truthiness check.
+    ///
+    /// When an `and`/`or` condition has a comparison chain as an operand, the recursive condition
+    /// analysis uses this map for that operand.
+    ///
+    /// Inference normally stores only differences from the truthiness of the chain's value type.
+    /// Cycle recovery also retains earlier overrides to keep widening monotonic.
+    comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
 
     /// The constraints on any collection initializers that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
@@ -1675,6 +1936,10 @@ impl<'db> ExpressionInference<'db> {
             }
         }
 
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            self.widen_comparison_truthiness(db, env, previous);
+        }
+
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
@@ -1691,7 +1956,38 @@ impl<'db> ExpressionInference<'db> {
             );
         }
 
+        if let Some(extra) = self.extra.as_deref_mut() {
+            normalize_collection_use_constraints(
+                db,
+                env,
+                &mut extra.collection_use_constraints,
+                cycle,
+            );
+        }
+
         self
+    }
+
+    fn widen_comparison_truthiness(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: &Self,
+    ) {
+        let comparison_truthiness = widen_comparison_truthiness(
+            self.extra
+                .as_deref()
+                .map(|extra| &extra.comparison_truthiness),
+            previous
+                .extra
+                .as_deref()
+                .map(|extra| &extra.comparison_truthiness),
+            |expression| self.expression_type(expression).bool(db, env),
+            |expression| previous.expression_type(expression).bool(db, env),
+        );
+        if comparison_truthiness.iter().next().is_some() {
+            self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
+        }
     }
 
     fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
@@ -1704,6 +2000,17 @@ impl<'db> ExpressionInference<'db> {
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
+    }
+
+    pub(crate) fn comparison_truthiness(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Truthiness> {
+        self.extra
+            .as_deref()?
+            .comparison_truthiness
+            .get(&expression.into())
+            .copied()
     }
 
     fn collection_use_constraints(
@@ -1781,6 +2088,10 @@ pub(crate) struct StatementInferenceInner<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct StatementInferenceInnerExtra<'db> {
+    /// Condition truthiness retained for checks performed by the enclosing suite.
+    /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.
+    comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
+
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -1837,6 +2148,10 @@ impl<'db> StatementInferenceInner<'db> {
         previous_inference: &StatementInferenceInner<'db>,
         cycle: &salsa::Cycle,
     ) -> StatementInferenceInner<'db> {
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            self.widen_comparison_truthiness(db, env, previous_inference);
+        }
+
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
@@ -1878,7 +2193,38 @@ impl<'db> StatementInferenceInner<'db> {
             );
         }
 
+        if let Some(extra) = self.extra.as_deref_mut() {
+            normalize_collection_use_constraints(
+                db,
+                env,
+                &mut extra.collection_use_constraints,
+                cycle,
+            );
+        }
+
         self
+    }
+
+    fn widen_comparison_truthiness(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: &Self,
+    ) {
+        let comparison_truthiness = widen_comparison_truthiness(
+            self.extra
+                .as_deref()
+                .map(|extra| &extra.comparison_truthiness),
+            previous
+                .extra
+                .as_deref()
+                .map(|extra| &extra.comparison_truthiness),
+            |expression| self.expression_type(expression).bool(db, env),
+            |expression| previous.expression_type(expression).bool(db, env),
+        );
+        if comparison_truthiness.iter().next().is_some() {
+            self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
+        }
     }
 
     fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
@@ -1975,6 +2321,9 @@ bitflags::bitflags! {
 
         /// Whether the visitor is currently visiting the argument to `Unpack[...]` or `*`.
         const IN_UNPACK_TYPE_ARGUMENT = 1 << 14;
+
+        /// Whether the current method's explicit receiver annotation is incompatible with `Self`.
+        const HAS_INCOMPATIBLE_SELF_RECEIVER = 1 << 15;
     }
 }
 

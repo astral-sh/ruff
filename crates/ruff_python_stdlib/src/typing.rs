@@ -7,7 +7,7 @@ pub fn is_standard_library_generic(qualified_name: &[&str]) -> bool {
         qualified_name,
         [
             "" | "builtins",
-            "dict" | "frozenset" | "list" | "set" | "tuple" | "type"
+            "dict" | "frozendict" | "frozenset" | "list" | "set" | "slice" | "tuple" | "type"
         ] | [
             "collections" | "typing" | "typing_extensions",
             "ChainMap" | "Counter"
@@ -204,9 +204,11 @@ pub fn is_standard_library_generic_member(member: &str) -> bool {
             | "WeakValueDictionary"
             | "defaultdict"
             | "deque"
+            | "frozendict"
             | "frozenset"
             | "list"
             | "set"
+            | "slice"
             | "tuple"
             | "type"
     )

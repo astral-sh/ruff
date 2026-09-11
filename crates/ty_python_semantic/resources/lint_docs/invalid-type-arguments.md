@@ -4,10 +4,9 @@ Checks for invalid type arguments in explicit type specialization.
 
 ## Why is this bad?
 
-Providing the wrong number of type arguments or type arguments that don't
-satisfy the type variable's bounds or constraints will lead to incorrect
-type inference and may indicate a misunderstanding of the generic type's
-interface.
+Providing the wrong number of type arguments or type arguments that don't satisfy the type
+variable's bounds or constraints will lead to incorrect type inference and may indicate a
+misunderstanding of the generic type's interface.
 
 ## Examples
 

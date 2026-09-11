@@ -88,7 +88,7 @@ mod tests {
     #[test_case(Rule::DjangoRawSql, Path::new("S611.py"))]
     #[test_case(Rule::TarfileUnsafeMembers, Path::new("S202.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_bandit").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
@@ -106,11 +106,7 @@ mod tests {
     #[test_case(Rule::SuspiciousTelnetUsage, Path::new("S312.py"))]
     #[test_case(Rule::UnsafeYAMLLoad, Path::new("S506.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
 
         assert_diagnostics_diff!(
             snapshot,

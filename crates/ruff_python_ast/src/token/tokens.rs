@@ -347,10 +347,8 @@ impl From<&Tokens> for TriviaRanges {
 
 /// An iterator over the [`Token`]s with context.
 ///
-/// This struct is created by the [`iter_with_context`] method on [`Tokens`]. Refer to its
-/// documentation for more details.
-///
-/// [`iter_with_context`]: Tokens::iter_with_context
+/// Use [`Tokens::iter_with_context`] to iterate over all tokens, or [`Self::new`] to iterate over a
+/// token slice.
 #[derive(Debug, Clone)]
 pub struct TokenIterWithContext<'a> {
     inner: std::slice::Iter<'a, Token>,
@@ -358,7 +356,8 @@ pub struct TokenIterWithContext<'a> {
 }
 
 impl<'a> TokenIterWithContext<'a> {
-    fn new(tokens: &'a [Token]) -> TokenIterWithContext<'a> {
+    /// Creates an iterator with a nesting level of zero at the start of the token slice.
+    pub fn new(tokens: &'a [Token]) -> TokenIterWithContext<'a> {
         TokenIterWithContext {
             inner: tokens.iter(),
             nesting: 0,

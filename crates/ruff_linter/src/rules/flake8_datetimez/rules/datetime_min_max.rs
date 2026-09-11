@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of `datetime.datetime.min` and `datetime.datetime.max`.
@@ -42,7 +43,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Pedantic)]
 pub(crate) struct DatetimeMinMax {
     min_max: MinMax,
 }
@@ -98,7 +99,11 @@ fn usage_is_safe(semantic: &SemanticModel) -> bool {
 
     match (parent, grandparent) {
         (Expr::Attribute(ExprAttribute { attr, .. }), Expr::Call(ExprCall { arguments, .. })) => {
-            attr == "time" || (attr == "replace" && arguments.find_keyword("tzinfo").is_some())
+            attr == "time"
+                || (attr == "replace"
+                    && arguments
+                        .find_keyword("tzinfo")
+                        .is_some_and(|keyword| !keyword.value.is_none_literal_expr()))
         }
         _ => false,
     }

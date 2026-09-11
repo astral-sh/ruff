@@ -4,8 +4,8 @@ Detects invalid `TypedDict` field declarations.
 
 ## Why is this bad?
 
-`TypedDict` subclasses cannot redefine inherited fields incompatibly. Doing so breaks the
-subtype guarantees that `TypedDict` inheritance is meant to preserve.
+`TypedDict` subclasses cannot redefine inherited fields incompatibly. Doing so breaks the subtype
+guarantees that `TypedDict` inheritance is meant to preserve.
 
 ## Example
 

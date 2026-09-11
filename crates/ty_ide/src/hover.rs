@@ -1,25 +1,24 @@
 use crate::docstring::{Docstring, DocstringFragment};
 use crate::goto::{Definitions, GotoTarget, docstring_for_call_definition, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
-use ruff_db::PythonFile;
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
-use std::fmt;
-use std::fmt::Formatter;
+use std::fmt::{self, Display};
+use ty_python_core::ProgramFile;
 use ty_python_semantic::ProgramEnvironment;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeAliasType, TypeVarVariance};
 
-use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
+use ty_python_semantic::{SemanticModel, TypeQualifiers};
 
 pub fn hover<'db>(
     db: &'db dyn Db,
-    file: PythonFile<'db>,
+    file: ProgramFile<'db>,
     offset: TextSize,
 ) -> Option<RangedValue<Hover<'db>>> {
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &parsed, offset)?;
 
@@ -142,7 +141,7 @@ pub fn hover<'db>(
     Some(RangedValue {
         range: FileRange::new(file.file(db), goto_target.range()),
         value: Hover {
-            python_file: file,
+            program_file: file,
             contents,
         },
     })
@@ -224,18 +223,27 @@ fn documentation_for_parameter(docstring: &Docstring, name: &str) -> Option<Docs
 }
 
 pub struct Hover<'db> {
-    python_file: PythonFile<'db>,
+    program_file: ProgramFile<'db>,
     contents: Vec<HoverContent<'db>>,
 }
 
 impl<'db> Hover<'db> {
     /// Renders the hover to a string using the specified markup kind.
-    pub const fn display<'a>(&'a self, db: &'db dyn Db, kind: MarkupKind) -> DisplayHover<'db, 'a> {
-        DisplayHover {
-            db,
-            hover: self,
-            kind,
-        }
+    pub const fn display<'a>(&'a self, db: &'db dyn Db, kind: MarkupKind) -> impl Display {
+        std::fmt::from_fn(move |f| {
+            let mut first = true;
+            let env = ProgramEnvironment::from_file(self.program_file);
+            for content in &self.contents {
+                if !first {
+                    kind.horizontal_line().fmt(f)?;
+                }
+
+                content.display(db, &env, kind).fmt(f)?;
+                first = false;
+            }
+
+            Ok(())
+        })
     }
 
     fn iter(&self) -> std::slice::Iter<'_, HoverContent<'db>> {
@@ -258,30 +266,6 @@ impl<'a, 'db> IntoIterator for &'a Hover<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
-    }
-}
-
-pub struct DisplayHover<'db, 'a> {
-    db: &'db dyn Db,
-    hover: &'a Hover<'db>,
-    kind: MarkupKind,
-}
-
-impl fmt::Display for DisplayHover<'_, '_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let db = self.db;
-        let mut first = true;
-        let env = ProgramEnvironment::from_file(self.hover.python_file);
-        for content in &self.hover.contents {
-            if !first {
-                self.kind.horizontal_line().fmt(f)?;
-            }
-
-            content.display(db, &env, self.kind).fmt(f)?;
-            first = false;
-        }
-
-        Ok(())
     }
 }
 
@@ -340,9 +324,7 @@ impl<'db> DisplayHoverContent<'_, 'db> {
         let db = self.db;
         // Special types like `<special-form of whatever 'blahblah' with 'florps'>`
         // render poorly with python syntax-highlighting but well as xml
-        let ty_string = ty
-            .display_with(db, self.env, DisplaySettings::default().multiline())
-            .to_string();
+        let ty_string = ty.display(db, self.env).multiline().to_string();
         let syntax = if ty_string.starts_with('<') {
             "xml"
         } else {
@@ -6067,13 +6049,13 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        int | float
+        float
         ---------------------------------------------
         Convert a string or number to a floating-point number, if possible.
 
         ---------------------------------------------
         ```python
-        int | float
+        float
         ```
         ---
         Convert a string or number to a floating-point number, if possible.
@@ -6086,6 +6068,61 @@ def function():
           |    |
           |    source
         ");
+    }
+
+    #[test]
+    fn hover_shadowed_numeric_builtin() {
+        let test = hover_test(
+            r#"
+            import builtins
+
+            class float: ...
+
+            def f(x: builtins.float | float):
+                x<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.hover());
+    }
+
+    #[test]
+    fn hover_shadowed_numeric_builtin_in_selected_signature() {
+        let test = hover_test(
+            r#"
+            import builtins
+            from typing import overload
+
+            class float: ...
+
+            @overload
+            def choose(value: builtins.float | float) -> None: ...
+            @overload
+            def choose(value: str) -> None: ...
+            def choose(value: object) -> None: ...
+
+            choose<CURSOR>(1.0)
+            "#,
+        );
+
+        assert_snapshot!(test.hover());
+    }
+
+    #[test]
+    fn hover_shadowed_numeric_builtin_in_keyword_parameter() {
+        let test = hover_test(
+            r#"
+            import builtins
+
+            class float: ...
+
+            def choose(*, value: builtins.float | float) -> None: ...
+
+            choose(value<CURSOR>=1.0)
+            "#,
+        );
+
+        assert_snapshot!(test.hover());
     }
 
     #[test]
@@ -6900,7 +6937,7 @@ type U<CURSOR> = MyType
 
             let Some(hover) = hover(
                 &self.db,
-                self.python_file(self.cursor.file),
+                self.program_file(self.cursor.file),
                 self.cursor.offset,
             ) else {
                 return "Hover provided no content".to_string();
