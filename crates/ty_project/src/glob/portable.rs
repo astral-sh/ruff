@@ -169,10 +169,13 @@ impl<'a> PortableGlobPattern<'a> {
 
         let mut output = String::with_capacity(prefix.as_str().len() + rest.len());
 
+        // The directory is a literal path; only `rest` contains glob syntax.
         for component in prefix.components() {
             match component {
                 camino::Utf8Component::Prefix(utf8_prefix_component) => {
-                    output.push_str(&utf8_prefix_component.as_str().replace(MAIN_SEPARATOR, "/"));
+                    output.push_str(&escape_glob_path_component(
+                        &utf8_prefix_component.as_str().replace(MAIN_SEPARATOR, "/"),
+                    ));
                 }
 
                 camino::Utf8Component::RootDir => {
@@ -182,7 +185,7 @@ impl<'a> PortableGlobPattern<'a> {
                 camino::Utf8Component::CurDir => {}
                 camino::Utf8Component::ParentDir => output.push_str("../"),
                 camino::Utf8Component::Normal(component) => {
-                    output.push_str(component);
+                    output.push_str(&escape_glob_path_component(component));
                     output.push('/');
                 }
             }
@@ -202,6 +205,12 @@ impl<'a> PortableGlobPattern<'a> {
             }
         }
     }
+}
+
+fn escape_glob_path_component(component: &str) -> String {
+    // The matchers treat `\` as an escape. A literal `\` in the path therefore needs
+    // `\\` in the glob; `globset::escape` does not make that substitution.
+    globset::escape(&component.replace('\\', r"\\"))
 }
 
 impl Deref for PortableGlobPattern<'_> {
@@ -394,9 +403,29 @@ mod tests {
     }
 
     #[test]
+    fn absolute_pattern_escapes_cwd() {
+        assert_absolute_path(
+            "src/*.py",
+            "/root/dir[1]/package{v2}",
+            r"/root/dir[[]1[]]/package[{]v2[}]/src/*.py",
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn absolute_pattern_escapes_cwd_unix() {
+        assert_absolute_path(
+            "src/*.py",
+            r"/root/dir*?\name",
+            r"/root/dir[*][?]\\name/src/*.py",
+        );
+    }
+
+    #[test]
     #[cfg(windows)]
     fn absolute_pattern_windows() {
         assert_absolute_path("./src", r"C:\root", "C:/root/src");
         assert_absolute_path("./src", r"\\server\test", "//server/test/src");
+        assert_absolute_path("./src", r"C:\root\dir[1]", r"C:/root/dir[[]1[]]/src");
     }
 }

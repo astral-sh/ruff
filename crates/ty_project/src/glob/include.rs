@@ -237,7 +237,8 @@ impl IncludeFilterBuilder {
             // so that `match_file` returns true when matching against a file. However, we don't
             // need to do this if this is a pattern that should only match a directory (specifically, its contents).
             if !only_directory {
-                let is_literal_pattern = globset::escape(glob_pattern) == glob_pattern;
+                // The anchored glob may contain escaped characters from the directory.
+                let is_literal_pattern = globset::escape(input.relative()) == input.relative();
 
                 if is_literal_pattern {
                     self.literal_pattern_indices.resize(self.set_len, false);
@@ -422,6 +423,23 @@ mod tests {
 
         assert_eq!(filter.match_file("not_included"), MatchFile::No);
         assert_eq!(filter.match_file("files/a.pi"), MatchFile::No);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn match_file_with_metacharacters_in_cwd() {
+        let mut builder = IncludeFilterBuilder::new();
+        builder
+            .add(
+                &PortableGlobPattern::parse("file", PortableGlobKind::Include)
+                    .unwrap()
+                    .into_absolute("/root/dir[1]"),
+            )
+            .unwrap();
+        let filter = builder.build().unwrap();
+
+        assert_eq!(filter.match_file("/root/dir[1]/file"), MatchFile::Literal);
+        assert_eq!(filter.match_file("/root/dir1/file"), MatchFile::No);
     }
 
     /// Check that we skip directories that can never match.
