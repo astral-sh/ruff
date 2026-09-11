@@ -148,7 +148,9 @@ pub(crate) trait TypeVisitor<'db> {
     }
 
     fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-        if self.should_visit_lazy_type_attributes() {
+        // An inferred recursive type has no separate alias definition: its body
+        // is part of the type, including any still-free inference variables.
+        if self.should_visit_lazy_type_attributes() || recursive.alias(db).is_none() {
             self.visit_type(db, recursive.unfold(db, self.program_environment()));
         } else {
             self.notify_skipped_lazy_type_attributes();
@@ -839,7 +841,9 @@ where
             if self.mode.should_visit_alias_arguments() {
                 let arguments = match ty {
                     Type::TypeAlias(alias) => Some(alias.specialization(db)),
-                    Type::Recursive(recursive) => Some(recursive.arguments(db)),
+                    Type::Recursive(recursive) if recursive.alias(db).is_some() => {
+                        Some(recursive.arguments(db))
+                    }
                     _ => None,
                 };
                 if let Some(arguments) = arguments {

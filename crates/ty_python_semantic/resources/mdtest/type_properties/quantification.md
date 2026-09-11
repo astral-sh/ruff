@@ -44,10 +44,8 @@ def grounded[X, A]() -> None:
     body = ConstraintSet.equality(X, int) & ConstraintSet.upper_bound(A, Invariant[X])
     quantified = body.exists(tuple[X])
 
-    # TODO: revealed: tuple[Solution[X=int, A=list[int]]]
-    # revealed: tuple[Solution[X=int, A=Invariant[int] & Invariant[X@grounded]]]
+    # revealed: tuple[Solution[X=int, A=Invariant[int]]]
     reveal_type(body.solutions(inferable=tuple[X, A]))
-    # TODO: revealed: tuple[Solution[A=list[int]]]
     # revealed: tuple[Solution[A=Invariant[int]]]
     reveal_type(quantified.solutions(inferable=tuple[A]))
 
@@ -194,8 +192,7 @@ def correlated_outputs[X, Y, Z]() -> None:
     body = c1 & c2
     quantified = body.exists(tuple[X])
 
-    # TODO: revealed: tuple[Solution[X=int, Y=int, Z=Invariant[int]], Solution[X=str, Y=str, Z=Invariant[str]]]
-    # revealed: tuple[Solution[X=int | Y@correlated_outputs, Z=Invariant[X@correlated_outputs] | Invariant[int], Y=int], Solution[X=str | Y@correlated_outputs, Z=Invariant[X@correlated_outputs] | Invariant[str], Y=str]]
+    # revealed: tuple[Solution[X=int, Z=Invariant[int], Y=int], Solution[X=str, Z=Invariant[str], Y=str]]
     reveal_type(body.solutions(inferable=tuple[X, Y, Z]))
     # revealed: tuple[Solution[Y=int, Z=Invariant[int]], Solution[Y=str, Z=Invariant[str]]]
     reveal_type(quantified.solutions(inferable=tuple[Y, Z]))
@@ -236,7 +233,6 @@ def finite_domain[X: (int, str), Y, Z]() -> None:
     body = ConstraintSet.equality(Y, X) & ConstraintSet.equality(Z, Invariant[X])
     quantified = body.exists(tuple[X])
 
-    # TODO: revealed: tuple[Solution[X=int, Y=int, Z=Invariant[int]], Solution[X=str, Y=str, Z=Invariant[str]]]
     # revealed: tuple[Solution[X=Y@finite_domain, Y=X@finite_domain, Z=Invariant[X@finite_domain] | Invariant[Y@finite_domain]]]
     reveal_type(body.solutions(inferable=tuple[X, Y, Z]))
     # TODO: revealed: tuple[Solution[Y=int, Z=Invariant[int]], Solution[Y=str, Z=Invariant[str]]]
@@ -264,7 +260,7 @@ def finite_domain[X: (int, str), Y, Z]() -> None:
     invalid_domain = ConstraintSet.equality(Y, bytes) & ConstraintSet.equality(Z, Invariant[bytes])
     static_assert(not (quantified & invalid_domain))
     # TODO: revealed: None
-    # revealed: tuple[Solution[Z=Invariant[Y@finite_domain] | Invariant[bytes], Y=bytes]]
+    # revealed: tuple[Solution[Z=Invariant[bytes], Y=bytes]]
     reveal_type((quantified & invalid_domain).solutions(inferable=tuple[Y, Z]))
 ```
 

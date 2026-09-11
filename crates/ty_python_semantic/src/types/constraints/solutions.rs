@@ -6,6 +6,7 @@ use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBoundsBuilder, ConstraintId, ConstraintSetStorage, NodeId,
     PathBounds, SolutionLimits,
 };
+use crate::types::typevar::TypeVarSet;
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
@@ -94,6 +95,7 @@ impl<'db> SolutionWalker<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> PathBounds<'db> {
         if self.sorted_paths.is_empty() {
             return PathBounds::Unsatisfiable;
@@ -142,6 +144,6 @@ impl<'db> SolutionWalker<'db> {
             result.push(path_bounds);
         }
 
-        PathBounds::Constrained(result.into_boxed_slice())
+        PathBounds::Constrained(result.into_boxed_slice(), inferable)
     }
 }

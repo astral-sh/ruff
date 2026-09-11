@@ -2562,5 +2562,57 @@ def f(l: list[tuple[Any | str, Any | str]]) -> None:
     reveal_type(dict(l))
 ```
 
+## Inferring recursive callback solutions
+
+Passing the identity function relates the argument and return types of the callback. The inferred
+result is an integer or a tuple containing another such value. Subscribing the tuple recovers that
+same recursive type, and the result cannot be assigned to `str`.
+
+```py
+from typing import Callable, TypeVar
+
+def fixed[T](callback: Callable[[T], tuple[T] | int]) -> T:
+    raise NotImplementedError
+
+def identity[U](value: U) -> U:
+    return value
+
+root = fixed(identity)
+reveal_type(root)  # revealed: μ$0. tuple[$0] | int
+if isinstance(root, tuple):
+    reveal_type(root)  # revealed: tuple[μ$0. tuple[$0] | int]
+    reveal_type(root[0])  # revealed: μ$0. tuple[$0] | int
+wrong: str = root  # error: [invalid-assignment]
+```
+
+## Specializing inferred recursive values
+
+The inferred recursive attribute retains the class's type parameter. Access through a specialized
+instance substitutes that parameter throughout the recursive type, including after subscripting. The
+two specializations remain independent.
+
+```py
+from typing import Callable, cast
+
+def fixed[T, E](callback: Callable[[T], tuple[T, E] | E], leaf: E) -> T:
+    raise NotImplementedError
+
+def identity[U](value: U) -> U:
+    return value
+
+class Tree[E]:
+    node = fixed(identity, cast(E, None))
+    reveal_type(node)  # revealed: μ$0. tuple[$0, E@Tree] | E@Tree
+
+first = Tree[int]().node
+second = Tree[str]().node
+reveal_type(first)  # revealed: μ$0. tuple[$0, int] | int
+reveal_type(second)  # revealed: μ$0. tuple[$0, str] | str
+if isinstance(first, tuple):
+    reveal_type(first[0])  # revealed: μ$0. tuple[$0, int] | int
+    reveal_type(first[1])  # revealed: int
+wrong: str = first  # error: [invalid-assignment]
+```
+
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371

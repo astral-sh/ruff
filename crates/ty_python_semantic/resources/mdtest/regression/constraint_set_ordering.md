@@ -502,7 +502,7 @@ def high_fanout[
     # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
     # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
     # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 4, 5, 6, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
-    # revealed: tuple[Solution[P=L0@high_fanout | L1@high_fanout | Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
+    # revealed: tuple[Solution[P=Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]]]
     reveal_type(pivot)
 
     # TODO: sometimes: revealed tuple[Solution[R11=P@high_fanout]]
@@ -512,7 +512,7 @@ def high_fanout[
     # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
     # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 2, 3, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
     # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 2, 3, 4, 5, 6, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
-    # revealed: tuple[Solution[R11=L1@high_fanout | Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
+    # revealed: tuple[Solution[R11=Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0]]]
     reveal_type(result)
 
     impossible = constraints & ConstraintSet.upper_bound(R11, Literal[0])

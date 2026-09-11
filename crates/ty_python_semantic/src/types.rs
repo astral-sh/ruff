@@ -148,6 +148,7 @@ mod enums;
 mod equality;
 mod function;
 mod generics;
+mod graph;
 pub mod ide_support;
 mod infer;
 mod instance;
@@ -459,6 +460,12 @@ type MaterializationEquivalenceVisitor<'db> =
 pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
+    /// Number of nested recursive binders entered during a structural substitution.
+    /// Starts at 0 inside the target binder's body. References at this depth belong
+    /// to the target binder rather than a nested one.
+    recursive_depth: u32,
+    /// Closed backedges retained while transforming a simultaneous recursive binder.
+    recursive_roots: Vec<RecursiveType<'db>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -476,6 +483,8 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             env,
             recursion_context: None,
+            recursive_depth: 0,
+            recursive_roots: Vec::new(),
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
             top_materialization: OnceCell::default(),
@@ -486,6 +495,25 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             skip_promotion: OnceCell::default(),
             materialization_equivalence: OnceCell::default(),
         }
+    }
+
+    /// Start fresh transformation caches at the same recursive binder depth.
+    fn fresh(&self) -> Self {
+        Self {
+            recursion_context: self.recursion_context,
+            recursive_depth: self.recursive_depth,
+            recursive_roots: self.recursive_roots.clone(),
+            materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
+            ..Self::new(self.env)
+        }
+    }
+
+    /// Enter a nested recursive body. The changed depth can give the same type a
+    /// different substitution result, so transformation caches must also be fresh.
+    fn with_recursive_binder(&self) -> Self {
+        let mut nested = self.fresh();
+        nested.recursive_depth += 1;
+        nested
     }
 
     fn with_recursion_context(mut self, context: Option<&'env TypeRecursionContext<'db>>) -> Self {
@@ -8940,6 +8968,22 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        if let TypeMapping::Recursive(mapping) = type_mapping
+            && let Some(ty) = mapping.extract_type(db, self, visitor)
+        {
+            return ty;
+        }
+        self.apply_type_mapping_children(db, type_mapping, tcx, visitor)
+    }
+
+    /// Map a node's children after its structural mapper has handled the node itself.
+    fn apply_type_mapping_children<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
         // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
@@ -10689,7 +10733,7 @@ pub enum TypeMapping<'a, 'db> {
         materialization_kind: MaterializationKind,
     },
     /// A structural substitution constructed only by the recursive-type binder.
-    Recursive(RecursiveMapping<'db>),
+    Recursive(RecursiveMapping<'a, 'db>),
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode, PromotionKind),

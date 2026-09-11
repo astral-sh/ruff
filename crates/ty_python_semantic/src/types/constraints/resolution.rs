@@ -8,7 +8,9 @@ use super::TypeVarSolution;
 use crate::types::cyclic::CycleDetector;
 use crate::types::function::FunctionType;
 use crate::types::generics::{ApplySpecialization, GenericContext};
+use crate::types::graph::DependencyGraph;
 use crate::types::known_instance::walk_known_instance_type;
+use crate::types::recursive::RecursiveType;
 use crate::types::signatures::{Signature, walk_signature};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
 use crate::types::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
@@ -24,13 +26,13 @@ use crate::{Db, FxOrderMap, ProgramEnvironment};
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum SolutionType<'db> {
     Resolved(Type<'db>),
-    /// The original selected type, retained when dependencies are missing, cyclic, or cannot be
-    /// substituted through a type form that preserves captured references.
+    /// The original selected type, retained for missing dependencies, noncontractive cycles,
+    /// or type forms whose captured references cannot be substituted.
     Unresolved(Type<'db>),
 }
 
-/// Resolves only dependencies with selected, acyclic solutions. The result has the same order as
-/// `solution`; references outside `inferable` retain their original bound-variable identity.
+/// Resolves selected dependencies, closing contractive cycles as simultaneous recursive types.
+/// Results follow `solution` order; variables outside `inferable` retain their bound identity.
 pub(crate) fn resolve_solution<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -46,13 +48,13 @@ pub(crate) fn resolve_solution<'db>(
             .enumerate()
             .map(|(index, binding)| (binding.bound_typevar.identity(db), index))
             .collect(),
-        resolved: CycleDetector::new(None),
     };
+    let resolved = resolver.resolve(db);
     solution
         .iter()
         .enumerate()
         .map(|(index, binding)| {
-            resolver.resolve(db, index).map_or(
+            resolved[index].map_or(
                 SolutionType::Unresolved(binding.solution),
                 SolutionType::Resolved,
             )
@@ -60,66 +62,110 @@ pub(crate) fn resolve_solution<'db>(
         .collect()
 }
 
-struct ResolveBinding;
-
 struct Resolver<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
     inferable: TypeVarSet<'db>,
     solution: &'a [TypeVarSolution<'db>],
     indices: FxHashMap<BoundTypeVarIdentity<'db>, usize>,
-    resolved: CycleDetector<'db, ResolveBinding, Type<'db>, Option<Type<'db>>, 3>,
 }
 
 impl<'db> Resolver<'_, 'db> {
-    fn resolve(&self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
-        let binding = &self.solution[index];
-        self.resolved
-            .visit(db, Type::TypeVar(binding.bound_typevar), || {
-                let original = binding.solution;
-                let replacements = RefCell::new(FxOrderMap::default());
-                if !Dependencies::check(db, self.env, self.inferable, original, |dependency| {
-                    let Some(&index) = self.indices.get(&dependency.identity(db)) else {
-                        return false;
-                    };
-                    let Some(ty) = self.resolve(db, index) else {
-                        return false;
-                    };
-                    replacements.borrow_mut().insert(index, ty);
-                    true
-                }) {
-                    return None;
-                }
-                let replacements = replacements.into_inner();
-                if replacements.is_empty() {
-                    return Some(original);
-                }
+    fn resolve(&self, db: &'db dyn Db) -> Vec<Option<Type<'db>>> {
+        let graph = DependencyGraph::new(
+            self.solution
+                .iter()
+                .map(|binding| {
+                    let indices = RefCell::new(Vec::new());
+                    Dependencies::check(
+                        db,
+                        self.env,
+                        self.inferable,
+                        binding.solution,
+                        |dependency| {
+                            if let Some(index) = self.indices.get(&dependency.identity(db)) {
+                                indices.borrow_mut().push(*index);
+                            }
+                            true
+                        },
+                    );
+                    indices.into_inner()
+                })
+                .collect(),
+        );
+        let mut resolved = vec![None; self.solution.len()];
+        for component in graph.components(0..self.solution.len()) {
+            let Some(equations) = component
+                .iter()
+                .map(|index| {
+                    let binding = &self.solution[*index];
+                    let original = binding.solution;
+                    let replacements = RefCell::new(FxOrderMap::default());
+                    if !Dependencies::check(db, self.env, self.inferable, original, |dependency| {
+                        let Some(&index) = self.indices.get(&dependency.identity(db)) else {
+                            return false;
+                        };
+                        if component.contains(&index) {
+                            return true;
+                        }
+                        let Some(ty) = resolved[index] else {
+                            return false;
+                        };
+                        replacements.borrow_mut().insert(index, ty);
+                        true
+                    }) {
+                        return None;
+                    }
+                    let replacements = replacements.into_inner();
+                    if replacements.is_empty() {
+                        return Some((binding.bound_typevar, original));
+                    }
 
-                // Every replacement is already closed. One simultaneous substitution therefore
-                // suffices, and never substitutes a cycle with an arbitrary representative.
-                let context = GenericContext::from_typevar_instances(
-                    db,
-                    self.env,
-                    replacements
-                        .keys()
-                        .map(|index| self.solution[*index].bound_typevar),
-                );
-                let types: Vec<_> = replacements.values().copied().collect();
-                let mapped = original.apply_type_mapping(
-                    db,
-                    self.env,
-                    &TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
-                        generic_context: context,
-                        types: &types,
-                        skip: None,
-                    }),
-                    TypeContext::default(),
-                );
-                // Some type forms preserve captured variables when specialized. For example, an
-                // alias changes its explicit arguments but can retain a free variable in its body.
-                // Verify closure on the actual result without performing further substitutions.
-                Dependencies::check(db, self.env, self.inferable, mapped, |_| false)
-                    .then_some(mapped)
-            })
+                    // Dependencies outside this component are already closed. Internal references
+                    // remain in the equations until the whole component is bound together.
+                    let context = GenericContext::from_typevar_instances(
+                        db,
+                        self.env,
+                        replacements
+                            .keys()
+                            .map(|index| self.solution[*index].bound_typevar),
+                    );
+                    let types: Vec<_> = replacements.values().copied().collect();
+                    let mapped = original.apply_type_mapping(
+                        db,
+                        self.env,
+                        &TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
+                            generic_context: context,
+                            types: &types,
+                            skip: None,
+                        }),
+                        TypeContext::default(),
+                    );
+                    Some((binding.bound_typevar, mapped))
+                })
+                .collect::<Option<Vec<_>>>()
+            else {
+                continue;
+            };
+            let types = if graph.is_cyclic(&component) {
+                let Some(types) = RecursiveType::from_equations(db, self.env, &equations) else {
+                    continue;
+                };
+                types
+            } else {
+                equations.iter().map(|(_, ty)| *ty).collect()
+            };
+            // Specialization can preserve captured variables, including within alias bodies.
+            // Publish a component only when every resulting type is actually closed.
+            if types
+                .iter()
+                .all(|ty| Dependencies::check(db, self.env, self.inferable, *ty, |_| false))
+            {
+                for (index, ty) in component.into_iter().zip(types) {
+                    resolved[index] = Some(ty);
+                }
+            }
+        }
+        resolved
     }
 }
 
@@ -190,8 +236,8 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
                 self.satisfied.set((self.query)(typevar));
             }
         } else if let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) {
-            // Revisiting a recursive structural type adds no new dependencies. Binding cycles
-            // are handled separately by Resolver, where their fallback is unresolved.
+            // Revisiting a recursive structural type adds no new dependencies. Resolver handles
+            // cycles between bindings separately, retaining those it cannot close as unresolved.
             self.visited
                 .visit(db, ty, || walk_non_atomic_type(db, non_atomic, self));
         }
