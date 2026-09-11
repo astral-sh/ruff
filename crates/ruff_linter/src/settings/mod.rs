@@ -539,6 +539,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::InvalidAllFormat), // PLE0605
     RuleSelector::rule(Rule::PotentialIndexError), // PLE0643
     RuleSelector::rule(Rule::MisplacedBareRaise), // PLE0704
+    RuleSelector::rule(Rule::CallNonCallable), // PLE1102
     RuleSelector::rule(Rule::RepeatedKeywordArgument), // PLE1132
     RuleSelector::rule(Rule::AwaitOutsideAsync), // PLE1142
     RuleSelector::rule(Rule::LoggingTooManyArgs), // PLE1205
