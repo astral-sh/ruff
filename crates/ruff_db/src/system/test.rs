@@ -246,31 +246,30 @@ impl WritableSystem for TestSystem {
     }
 }
 
-/// Extension trait for databases that use a [`WritableSystem`].
+/// File-writing helpers for databases, intended for tests.
 ///
-/// Provides various helper function that ease testing.
+/// Writes return an error when the database's system does not support writing.
 pub trait DbWithWritableSystem: Db + Sized {
-    type System: WritableSystem;
-
-    fn writable_system(&self) -> &Self::System;
+    /// Returns the writable system, or an error if writing is unsupported.
+    fn writable_system(&self) -> Result<&dyn WritableSystem>;
 
     /// Writes the content of the given file and notifies the Db about the change.
     fn write_file(&mut self, path: impl AsRef<SystemPath>, content: impl AsRef<str>) -> Result<()> {
         let path = path.as_ref();
-        match self.writable_system().write_file(path, content.as_ref()) {
+        match self.writable_system()?.write_file(path, content.as_ref()) {
             Ok(()) => {
                 File::sync_path(self, path);
                 Ok(())
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 if let Some(parent) = path.parent() {
-                    self.writable_system().create_directory_all(parent)?;
+                    self.writable_system()?.create_directory_all(parent)?;
 
                     for ancestor in parent.ancestors() {
                         File::sync_path(self, ancestor);
                     }
 
-                    self.writable_system().write_file(path, content.as_ref())?;
+                    self.writable_system()?.write_file(path, content.as_ref())?;
                     File::sync_path(self, path);
 
                     Ok(())
@@ -351,10 +350,8 @@ impl<T> DbWithWritableSystem for T
 where
     T: DbWithTestSystem,
 {
-    type System = TestSystem;
-
-    fn writable_system(&self) -> &Self::System {
-        self.test_system()
+    fn writable_system(&self) -> Result<&dyn WritableSystem> {
+        Ok(self.test_system())
     }
 }
 
