@@ -732,11 +732,8 @@ fn apply_sync_result(
         // After a failed synchronization, recover the path from the new metadata because the
         // previous metadata was cleared along with its virtual-environment path.
         //
-        // FIXME: This is overbroad. A file watcher can tell us precisely what changed.
-        // Remove this fallback once the language server also watches script environments.
-        // Changes inside virtual environments should instead be watched and processed through `ProjectDatabase::apply_changes`.
-        // Using a file watcher also ensures that virtual environment changes in
-        // scripts without using uv are detected.
+        // Watcher events may arrive after diagnostics resume for this synchronization result,
+        // so refresh the environment directly even when a watch already covers it.
         Files::sync_all_recursive(db, [root]);
     }
 
