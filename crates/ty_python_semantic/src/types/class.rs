@@ -1545,9 +1545,8 @@ impl<'db> ClassType<'db> {
             let place_table = place_table(db, scope);
             let use_def_map = use_def_map(db, class_literal.body_scope(db));
 
-            // Treat abstract methods from superclasses as having been overridden
-            // if this class has a synthesized method by that name,
-            // or this class has a `ClassVar` declaration by that name
+            // Attribute declarations can describe overrides supplied dynamically, just as they
+            // do for attribute lookup. Synthesized methods also implement inherited abstract members.
             abstract_methods.retain(|name, _| {
                 if class_literal
                     .own_synthesized_member(db, env, None, None, name)
@@ -1558,10 +1557,9 @@ impl<'db> ClassType<'db> {
 
                 place_table.symbol_id(name).is_none_or(|symbol_id| {
                     let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
-                    !place_from_declarations(db, env, declarations)
-                        .ignore_conflicting_declarations()
-                        .qualifiers
-                        .contains(TypeQualifiers::CLASS_VAR)
+                    let declared = place_from_declarations(db, env, declarations)
+                        .ignore_conflicting_declarations();
+                    declared.is_undefined() || declared.is_init_var()
                 })
             });
 

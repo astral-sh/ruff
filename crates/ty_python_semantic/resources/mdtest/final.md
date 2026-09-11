@@ -1279,49 +1279,115 @@ class Child2(Base):
     f: int = 42  # OK: annotated assignment with value also overrides
 ```
 
-### Annotation doesn't override abstract method
+### Attribute declarations override abstract members
 
-A simple annotation like `method: int` shadows the name but doesn't actually implement the abstract
-method. Attempting to instantiate the class will still fail at runtime.
+An attribute declaration can describe an implementation supplied dynamically, for example by a
+metaclass. We trust these declarations to implement inherited abstract members, just as we trust
+them when looking up attributes.
 
 ```py
 from abc import ABC, abstractmethod
-from typing import final
+from typing import Callable, final
 
-class Base(ABC):
+class AbstractMethod(ABC):
     @abstractmethod
     def method(self) -> int: ...
 
 @final
-class Bad(Base):  # error: [abstract-method-in-final-class]
-    method: int
+class Concrete(AbstractMethod):
+    method: Callable[[], int]
+
+@final
+class Incompatible(AbstractMethod):
+    def method(self) -> str:  # error: [invalid-method-override]
+        return "incompatible"
 ```
 
-The same applies to abstract properties:
+An ordinary instance-attribute declaration also implements an abstract property:
 
 ```py
-from abc import ABC, abstractmethod
-from typing import final
-
-class Base(ABC):
+class AbstractProperty(ABC):
     @property
     @abstractmethod
     def f(self) -> int: ...
 
 @final
-class BadChild(Base):  # error: [abstract-method-in-final-class]
+class ConcreteChild(AbstractProperty):
     f: int
 ```
 
-But we make an exception here for `ClassVar` annotations: we assume in this case that the user will
-dynamically patch the attribute onto the class (e.g., using a metaclass):
+The declaration can accompany an explicit slot or use `ClassVar`:
 
 ```py
 from typing import ClassVar
 
 @final
-class GoodChild(Base):  # fine
+class SlottedChild(AbstractProperty):
+    __slots__ = ("f",)
+    f: int
+
+@final
+class ClassVarChild(AbstractProperty):
     f: ClassVar[int]
+```
+
+Initialization-only dataclass parameters do not declare attributes and cannot implement an abstract
+property:
+
+```py
+from dataclasses import InitVar, dataclass
+
+@final
+@dataclass
+class InitializationOnly(AbstractProperty):  # error: [abstract-method-in-final-class]
+    f: InitVar[int]
+```
+
+### Attribute declarations and abstract members in the MRO
+
+A declared override must precede the abstract member in the MRO:
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Abstract(ABC):
+    @property
+    @abstractmethod
+    def value(self) -> int: ...
+
+class Declared:
+    value: int
+
+@final
+class Concrete(Declared, Abstract): ...
+
+@final
+class StillAbstract(Abstract, Declared): ...  # error: [abstract-method-in-final-class]
+```
+
+An abstract override can make the member abstract again after a declared implementation:
+
+```py
+class Implemented(Abstract):
+    value: int
+
+class AbstractAgain(Implemented):
+    @property
+    @abstractmethod
+    def value(self) -> int: ...
+
+@final
+class FinalAbstract(AbstractAgain): ...  # error: [abstract-method-in-final-class]
+```
+
+An unreachable declaration does not implement an abstract member:
+
+```py
+@final
+class Unreachable(Abstract):  # error: [abstract-method-in-final-class]
+    if False:
+        value: int
 ```
 
 ### Abstract classmethod
