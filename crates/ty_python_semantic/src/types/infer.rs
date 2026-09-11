@@ -46,7 +46,6 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
@@ -57,6 +56,7 @@ pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
+use crate::types::recursive::InferenceQuery;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, RecursiveType, StaticClassLiteral, Type, TypeAndQualifiers,
@@ -550,7 +550,7 @@ pub(super) fn infer_expression_types_impl<'db>(
 
     let env = ProgramEnvironment::from_file(program_file);
 
-    TypeInferenceBuilder::new(
+    let mut inference = TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Expression(expression, tcx),
@@ -559,7 +559,9 @@ pub(super) fn infer_expression_types_impl<'db>(
         index,
         &module,
     )
-    .finish_expression()
+    .finish_expression();
+    inference.query = Some(input);
+    inference
 }
 
 fn expression_cycle_initial<'db>(
@@ -568,8 +570,18 @@ fn expression_cycle_initial<'db>(
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
     let (expression, _) = input.into_inner(db);
-    let cycle_recovery = Type::divergent(id);
-    ExpressionInference::cycle_initial(expression.scope(db), cycle_recovery)
+    let scope = expression.scope(db);
+    let program_file = scope.program_file(db);
+    let module = parsed_module(db, program_file.python_file(db)).load(db);
+    let mut inference = ExpressionInference::cycle_initial(scope, Type::divergent(id));
+    inference.query = Some(input);
+    inference.expressions = [(
+        expression.node_ref(db).node(&module).into(),
+        RecursiveType::initial_inference(db, &ProgramEnvironment::from_scope(scope), id),
+    )]
+    .into_iter()
+    .collect();
+    inference
 }
 
 /// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
@@ -583,7 +595,7 @@ pub(crate) fn infer_same_file_expression_type<'db>(
     tcx: TypeContext<'db>,
 ) -> Type<'db> {
     let inference = infer_expression_types(db, expression, tcx);
-    inference.expression_type(expression.node_ref(db))
+    inference.expression_type(db, expression.node_ref(db))
 }
 
 /// Infers the type of an expression where the expression might come from another file.
@@ -617,7 +629,7 @@ fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>)
     // It's okay to call the "same file" version here because we're inside a salsa query.
     let inference = infer_expression_types_impl(db, input);
 
-    inference.expression_type(expression.node_ref(db))
+    inference.expression_type(db, expression.node_ref(db))
 }
 
 /// Infer all types for a [`Statement`].
@@ -687,7 +699,7 @@ fn infer_statement_types_impl<'db>(
 ///
 /// This is a Salsa supertype used as the input to `infer_expression_types` to avoid
 /// interning an `ExpressionWithContext` unnecessarily when no type context is provided.
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::SalsaValue)]
 pub(super) enum InferExpression<'db> {
     Bare(Expression<'db>),
     WithContext(ExpressionWithContext<'db>),
@@ -700,6 +712,8 @@ pub(super) struct ExpressionWithContext<'db> {
     #[returns(copy)]
     tcx: TypeContext<'db>,
 }
+
+impl get_size2::GetSize for InferExpression<'_> {}
 
 impl<'db> InferExpression<'db> {
     fn new(
@@ -714,7 +728,7 @@ impl<'db> InferExpression<'db> {
         }
     }
 
-    fn into_inner(self, db: &'db dyn Db) -> (Expression<'db>, TypeContext<'db>) {
+    pub(super) fn into_inner(self, db: &'db dyn Db) -> (Expression<'db>, TypeContext<'db>) {
         match self {
             InferExpression::Bare(expression) => (expression, TypeContext::default()),
             InferExpression::WithContext(expression_with_context) => (
@@ -909,7 +923,7 @@ pub(crate) fn original_class_type<'db>(
     let inference = infer_definition_types(db, definition);
     inference
         .undecorated_type()
-        .unwrap_or_else(|| inference.binding_type(definition))
+        .unwrap_or_else(|| inference.binding_type(db, definition))
         .as_class_literal()
 }
 
@@ -1511,31 +1525,18 @@ impl<'db> DefinitionInference<'db> {
         let env = ProgramEnvironment::from_definition(definition);
         let mut types = DefinitionTypes::Empty;
 
-        // Eagerly store more precise types for collection literals to avoid an extra
-        // cycle iteration, i.e., by inferring `list[Divergent]` instead of `Divergent`.
-        if let DefinitionKind::Assignment(assignment) = definition.kind(db) {
-            let program_file = definition.program_file(db);
-            let python_file = program_file.python_file(db);
-            let module = parsed_module(db, python_file).load(db);
-            let known_collection = match assignment.value(&module) {
-                ast::Expr::Set(_) => Some(KnownClass::Set),
-                ast::Expr::List(_) => Some(KnownClass::List),
-                ast::Expr::Dict(_) => Some(KnownClass::Dict),
-                _ => None,
-            };
-
-            if let Some(known_collection) = known_collection {
-                if let Some(collection_class) = known_collection.try_to_class_literal(db, &env) {
-                    let divergent_collection = collection_class
-                        .apply_specialization(db, |generic_context| {
-                            generic_context.repeat_specialization(db, cycle_recovery)
-                        });
-
-                    types =
-                        DefinitionTypes::Binding(Type::instance(db, &env, divergent_collection));
-                }
-            }
-        } else if let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) {
+        if let Some(divergent) = cycle_recovery.as_divergent()
+            && matches!(
+                definition.kind(db),
+                DefinitionKind::Assignment(_)
+                    | DefinitionKind::LoopHeader(_)
+                    | DefinitionKind::NestedBindings(_)
+            )
+        {
+            types =
+                DefinitionTypes::Binding(RecursiveType::initial_inference(db, &env, divergent.id));
+        }
+        if let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) {
             let program_file = definition.program_file(db);
             let python_file = program_file.python_file(db);
             let module = parsed_module(db, python_file).load(db);
@@ -1738,7 +1739,12 @@ impl<'db> DefinitionInference<'db> {
     }
 
     #[track_caller]
-    pub(crate) fn binding_type(&self, definition: Definition<'db>) -> Type<'db> {
+    pub(crate) fn binding_type(&self, db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
+        InferenceQuery::Binding(definition).value(db, self.raw_binding_type(definition))
+    }
+
+    /// Read the stored equation body without introducing a reference to this result.
+    pub(super) fn raw_binding_type(&self, definition: Definition<'db>) -> Type<'db> {
         self.types
             .bindings(definition)
             .find_map(|(def, ty)| if def == definition { Some(ty) } else { None })
@@ -1751,9 +1757,15 @@ impl<'db> DefinitionInference<'db> {
 
     fn bindings(
         &self,
+        db: &'db dyn Db,
         owner: Definition<'db>,
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {
-        self.types.bindings(owner)
+        self.types.bindings(owner).map(move |(definition, ty)| {
+            (
+                definition,
+                InferenceQuery::Binding(definition).value(db, ty),
+            )
+        })
     }
 
     pub(crate) fn inferred_declaration(
@@ -1882,6 +1894,8 @@ fn widen_comparison_truthiness(
 /// The inferred types for an expression region.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ExpressionInference<'db> {
+    /// The owning query, when this region can define a recursive equation for its root expression.
+    query: Option<InferExpression<'db>>,
     /// The types of every expression in this region.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
@@ -1953,6 +1967,7 @@ impl<'db> ExpressionInference<'db> {
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {
+            query: None,
             extra: Some(Box::new(ExpressionInferenceExtra {
                 cycle_recovery: Some(cycle_recovery),
                 ..ExpressionInferenceExtra::default()
@@ -1990,7 +2005,7 @@ impl<'db> ExpressionInference<'db> {
         }
 
         for (expr, ty) in &mut self.expressions {
-            let previous_ty = previous.expression_type(*expr);
+            let previous_ty = previous.raw_expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
         }
 
@@ -2031,8 +2046,8 @@ impl<'db> ExpressionInference<'db> {
                 .extra
                 .as_deref()
                 .map(|extra| &extra.comparison_truthiness),
-            |expression| self.expression_type(expression).bool(db, env),
-            |expression| previous.expression_type(expression).bool(db, env),
+            |expression| self.raw_expression_type(expression).bool(db, env),
+            |expression| previous.raw_expression_type(expression).bool(db, env),
         );
         if comparison_truthiness.iter().next().is_some() {
             self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
@@ -2046,9 +2061,39 @@ impl<'db> ExpressionInference<'db> {
             .or_else(|| self.fallback_type())
     }
 
-    pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
+    pub(crate) fn expression_type(
+        &self,
+        db: &'db dyn Db,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Type<'db> {
+        let expression = expression.into();
+        let ty = self.raw_expression_type(expression);
+        match self.query {
+            Some(input)
+                if ExpressionNodeKey::from(input.into_inner(db).0.node_ref(db)) == expression =>
+            {
+                InferenceQuery::Expression(input).value(db, ty)
+            }
+            _ => ty,
+        }
+    }
+
+    /// Read the stored body for equation solving or query recovery.
+    pub(super) fn raw_expression_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Type<'db> {
         self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
+    }
+
+    fn expression_types(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = (ExpressionNodeKey, Type<'db>)> {
+        self.expressions
+            .iter()
+            .map(move |(expression, _)| (*expression, self.expression_type(db, *expression)))
     }
 
     pub(crate) fn comparison_truthiness(
@@ -2089,9 +2134,13 @@ pub(crate) enum StatementInference<'db> {
 }
 
 impl<'db> StatementInference<'db> {
-    fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
+    fn expression_type(
+        &self,
+        db: &'db dyn Db,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Type<'db> {
         match self {
-            StatementInference::Expression(inference) => inference.expression_type(expression),
+            StatementInference::Expression(inference) => inference.expression_type(db, expression),
             StatementInference::Definition(_, inference) => inference.expression_type(expression),
             StatementInference::Other(inference) => inference.expression_type(expression),
         }

@@ -74,7 +74,7 @@ impl<'db> ClassBase<'db> {
                 | DynamicType::UnknownGeneric(_)
                 | DynamicType::UnknownLambdaParameter
                 | DynamicType::InvalidConcatenateUnknown
-                | DynamicType::AmbiguousOverload,
+                | DynamicType::AmbiguousOverload(_),
             ) => "Unknown",
             ClassBase::Dynamic(DynamicType::UnspecializedTypeVar) => "UnspecializedTypeVar",
             ClassBase::Dynamic(DynamicType::Todo(_)) => "@Todo",

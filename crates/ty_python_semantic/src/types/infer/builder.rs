@@ -109,6 +109,7 @@ use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_po
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::narrow::pattern_success_types;
 use crate::types::newtype::NewType;
+use crate::types::recursive::TupleLengthAnalysis;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
 use crate::types::special_form::TypeQualifier;
@@ -595,7 +596,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.declarations.extend(inference.declarations(definition));
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
-            self.bindings.extend(inference.bindings(definition));
+            self.bindings
+                .extend(inference.bindings(self.db(), definition));
         }
 
         if let Some(extra) = &inference.extra {
@@ -731,7 +733,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Merges expression results without claiming bindings owned by their enclosing statement.
     fn extend_expression_without_bindings(&mut self, inference: &ExpressionInference<'db>) {
-        self.extend_expression_types(inference.expressions.iter().copied());
+        self.extend_expression_types(inference.expression_types(self.db()));
 
         if let Some(extra) = &inference.extra {
             self.comparison_truthiness
@@ -2969,7 +2971,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_target(target, value, &|builder, tcx| {
                     let inference = infer_expression_types(builder.db(), shared_value, tcx);
                     builder.extend_expression_without_bindings(inference);
-                    inference.expression_type(value.as_ref())
+                    inference.expression_type(builder.db(), value.as_ref())
                 });
             }
         }
@@ -3480,7 +3482,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.extend_expression_without_bindings(inference);
                         }
                     }
-                    inference.expression_type(value)
+                    inference.expression_type(self.db(), value)
                 } else if let ast::Expr::Call(call_expr) = value {
                     // If the RHS is not a standalone expression, this is a simple assignment
                     // (single target, no unpackings). That means it's a valid syntactic form
@@ -6515,7 +6517,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // the result from `types` directly because we might be in cycle recovery where
         // `types.cycle_fallback_type` is `Some(fallback_ty)`, which we can retrieve by
         // using `expression_type` on `types`:
-        types.expression_type(expression)
+        types.expression_type(self.db(), expression)
     }
 
     /// Infer the type of an expression.
@@ -6658,14 +6660,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.finish_expression_type(expression, ty, tcx)
     }
 
-    /// Apply context before recording an inferred expression type.
+    /// Apply context and normalization before recording an inferred expression type.
     fn finish_expression_type(
         &mut self,
         expression: &ast::Expr,
         ty: Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let ty = self.apply_type_context(expression, ty, tcx);
+        let ty = self
+            .apply_type_context(expression, ty, tcx)
+            .normalize_recursive(self.db(), self.program_environment());
         self.store_expression_type(expression, ty);
         ty
     }
@@ -7190,7 +7194,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             },
             &|builder, unpacked| builder.concat(db, env, unpacked),
         );
-        Type::tuple(TupleType::new(db, env, &spec))
+        TupleLengthAnalysis::normalize(db, env, self.scope(), tuple, spec, &|expression| {
+            self.expression_type(expression)
+        })
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList, tcx: TypeContext<'db>) -> Type<'db> {
@@ -7802,7 +7808,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let statement_use_types = infer_statement_types(self.db(), statement);
 
                 if let Some(divergent) = statement_use_types
-                    .expression_type(use_expression)
+                    .expression_type(db, use_expression)
+                    .resolve_type_alias(db)
                     .as_divergent()
                 {
                     // Infer `collection[Divergent]` for the initial cycle result.
@@ -8437,12 +8444,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut infer_iterable_type = || {
             let expression = self.index.expression(iterable);
             let result = infer_expression_types(self.db(), expression, TypeContext::default());
-            let iterable_type = result.expression_type(iterable);
+            let iterable_type = result.expression_type(self.db(), iterable);
             let element_type = if comprehension.is_async() {
                 None
             } else {
                 self.fixed_length_iterable_element_type(iterable, |expr| {
-                    result.expression_type(expr)
+                    result.expression_type(self.db(), expr)
                 })
             };
 
@@ -8501,7 +8508,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
             self.extend_definition(definition, result);
-            result.binding_type(definition)
+            result.binding_type(self.db(), definition)
         } else {
             // String annotations have no indexed definitions, and syntactically invalid targets
             // cannot define a name. Both sides still need inference to preserve their diagnostics.
@@ -12476,6 +12483,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
         });
 
         ExpressionInference {
+            query: None,
             expressions: FrozenMap::from(self.expressions),
             extra,
             #[cfg(debug_assertions)]

@@ -2,13 +2,49 @@ use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
 use crate::types::constraints::paths::PathAssignments;
+use crate::types::constraints::projection::ProjectionTypeBudget;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBoundsBuilder, ConstraintId, ConstraintSetStorage, NodeId,
-    PathBounds, SolutionLimits,
+    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBoundsBuilder, ConstraintId, ConstraintSetBuilder,
+    ConstraintSetStorage, NodeId, PathBound, PathBounds, ProjectionError, SolutionBudget,
+    SolutionLimits, Solutions, TypeVarSolution,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
+
+impl<'db> TypeVarSolution<'db> {
+    /// Solve one defining equation per variable using the shared path solver.
+    /// The equations already form one conjunction; discovering alternative constraint
+    /// paths would only derive redundant consequences before closing their cycles.
+    pub(in crate::types) fn solve_equations(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        equations: &[Self],
+    ) -> Result<Solutions<'db>, ProjectionError> {
+        let inferable =
+            TypeVarSet::from_typevars(db, equations.iter().map(|equation| equation.bound_typevar));
+        let bounds = PathBounds::Constrained(
+            Box::new([equations
+                .iter()
+                .map(|equation| PathBound::exact(equation.bound_typevar, equation.solution))
+                .collect()]),
+            inferable,
+        );
+        let builder = ConstraintSetBuilder::new();
+        let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
+        bounds.try_solve_with(
+            db,
+            env,
+            |_variance, bound| PathBounds::default_solve(db, env, &builder, bound),
+            |solution| {
+                for binding in solution {
+                    budget.charge_type(db, binding.solution)?;
+                }
+                Ok(())
+            },
+        )
+    }
+}
 
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,

@@ -4501,7 +4501,8 @@ class C:
 reveal_type(C().x)  # revealed: int
 ```
 
-If the only assignment to a name is cyclic, we infer `Divergent` for that attribute:
+If assignments only refer back to the same attribute, its type remains an unproductive recursive
+type:
 
 ```py
 class D:
@@ -4743,9 +4744,9 @@ class NestedLists2:
 reveal_type(NestedLists2().x)  # revealed: list[Divergent]
 ```
 
-During fixpoint iteration, overloads may fail to resolve correctly and be treated as `Unknown`. Even
-in this case, `Divergent` is propagated, guaranteeing the convergence of type inference. Here is the
-regression test for this scenario (<https://github.com/astral-sh/ty/issues/3614>):
+Overload resolution can lose precision during inference. We approximate the recursive list with
+`Divergent` when its inferred type does not settle. This reproduces
+<https://github.com/astral-sh/ty/issues/3614>:
 
 ```py
 from typing import Any
@@ -4908,12 +4909,10 @@ reveal_type(Answer.NO.value)  # revealed: Literal[0]
 reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Answer]
 ```
 
-## Divergent inferred implicit instance attribute types
+## Recursive inferred implicit instance attribute types
 
-If an implicit attribute is defined recursively and type inference diverges, the divergent part is
-filled in with the dynamic type `Divergent`. Types containing `Divergent` can be seen as "cheap"
-recursive types: they are not true recursive types based on recursive type theory, so no unfolding
-is performed when you use them.
+An attribute built from its own value has a recursive type. We currently approximate its recursive
+part with `Divergent`, so indexing into that part also produces `Divergent`.
 
 ```py
 class C:
@@ -4924,7 +4923,20 @@ reveal_type(C().x)  # revealed: tuple[Divergent, int]
 reveal_type(C().x[0])  # revealed: Divergent
 ```
 
-This also works if the tuple is not constructed directly:
+An initial value remains an alternative alongside the approximated tuple:
+
+```py
+class WithInitial:
+    def __init__(self):
+        self.value = 1
+
+    def update(self, other: "WithInitial"):
+        self.value = (other.value, "b")
+
+reveal_type(WithInitial().value)  # revealed: int | tuple[Divergent, str]
+```
+
+A helper function can also construct the recursive tuple:
 
 ```py
 from typing import TypeVar, Literal
@@ -4941,7 +4953,7 @@ class D:
 reveal_type(D().x)  # revealed: tuple[Divergent, Literal[1]]
 ```
 
-The tuple type may also expand exponentially "in breadth":
+Multiple elements can refer to the same recursive type:
 
 ```py
 def duplicate(x: T) -> tuple[T, T]:
@@ -4967,8 +4979,8 @@ class F:
 reveal_type(F().x)  # revealed: tuple[Divergent, ...]
 ```
 
-A homogeneous tuple of `Divergent` has gradual length, so it is assignable to a fixed-length tuple.
-This allows a recursively inferred instance attribute to retain an empty tuple as its class default:
+The `tuple()` call inspects its iterable argument during inference. This cycle still uses
+`Divergent`, whose gradual tuple length allows the empty tuple as a class default:
 
 ```py
 class G:

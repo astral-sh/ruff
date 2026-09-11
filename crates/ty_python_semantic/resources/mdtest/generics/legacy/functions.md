@@ -1834,7 +1834,7 @@ def identity(value: U) -> U:
 root = fixed(identity)
 reveal_type(root)  # revealed: μ$0. tuple[$0] | int
 if isinstance(root, tuple):
-    reveal_type(root)  # revealed: tuple[μ$0. tuple[$0] | int]
+    reveal_type(root)  # revealed: μ$0. tuple[$0 | int]
     reveal_type(root[0])  # revealed: μ$0. tuple[$0] | int
 wrong: str = root  # error: [invalid-assignment]
 ```

@@ -19,6 +19,11 @@ impl DependencyGraph {
         }
     }
 
+    /// Nodes that directly depend on `node`, in insertion order.
+    pub(super) fn dependents(&self, node: usize) -> &[usize] {
+        &self.dependents[node]
+    }
+
     /// Whether a nonempty component contains a cycle, including a self-reference.
     pub(super) fn is_cyclic(&self, component: &[usize]) -> bool {
         component.len() > 1 || self.dependencies[component[0]].contains(&component[0])

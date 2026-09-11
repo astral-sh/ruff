@@ -774,3 +774,17 @@ def f():
         # get this right, we have to detect that nested `global` writes are visible in this scope.
         reveal_type(x)  # revealed: Literal["g2"] | int
 ```
+
+## Recursive tuple construction
+
+Assignments in a nested function contribute to the recursive type of the enclosing binding.
+
+```py
+value = 0
+
+def update():
+    global value
+    value = (value,)
+
+reveal_type(value)  # revealed: (μ$0. tuple[$0 | Literal[0]]) | Literal[0]
+```

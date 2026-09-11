@@ -57,6 +57,7 @@ use crate::types::infer::original_class_type;
 use crate::types::known_instance::{
     FieldInstance, InternedConstraintSetSolution, MethodWrapper, MethodWrapperKind,
 };
+use crate::types::recursive::RecursiveInputs;
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication, PartialSignatureApplication,
@@ -4418,7 +4419,22 @@ impl<'db> CallableBinding<'db> {
 
         if !are_return_types_equivalent_for_all_matching_overloads {
             // Overload matching is ambiguous.
-            self.overload_call_result = Some(OverloadCallResult::Ambiguous);
+            self.overload_call_result =
+                Some(OverloadCallResult::Ambiguous(RecursiveInputs::unknown(
+                    db,
+                    RecursiveInputs::collect(
+                        db,
+                        env,
+                        [self.callable_type, self.signature_type]
+                            .into_iter()
+                            .chain(self.bound_type)
+                            .chain(
+                                arguments
+                                    .iter_types()
+                                    .flat_map(|types| types.iter().map(|(_, ty)| ty)),
+                            ),
+                    ),
+                )));
         }
         !are_return_types_equivalent_for_all_matching_overloads
     }
@@ -4537,7 +4553,7 @@ impl<'db> CallableBinding<'db> {
             OverloadCallResult::ArgumentTypeExpansion(expanded) => {
                 expanded.selected_overloads.contains(index)
             }
-            OverloadCallResult::Ambiguous => true,
+            OverloadCallResult::Ambiguous(_) => true,
             OverloadCallResult::ArgumentTypeExpansionLimitReached(_) => false,
         }))
     }
@@ -4620,7 +4636,7 @@ impl<'db> CallableBinding<'db> {
             return match overload_call_result {
                 OverloadCallResult::ArgumentTypeExpansion(expanded) => expanded.return_type,
                 OverloadCallResult::ArgumentTypeExpansionLimitReached(_) => Type::unknown(),
-                OverloadCallResult::Ambiguous => Type::Dynamic(DynamicType::AmbiguousOverload),
+                OverloadCallResult::Ambiguous(unknown) => *unknown,
             };
         }
         if let Some((_, first_overload)) = self.matching_overloads().next() {
@@ -4874,7 +4890,7 @@ enum OverloadCallResult<'db> {
     /// Argument expansion stopped at this argument's expansion limit.
     ArgumentTypeExpansionLimitReached(usize),
     /// Several overloads remain with non-equivalent return types.
-    Ambiguous,
+    Ambiguous(Type<'db>),
 }
 
 /// The combined return type and selected overloads from successful argument expansion.

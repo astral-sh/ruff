@@ -225,16 +225,15 @@ class StaticModuleRecord(TypedDict):
     value: int
 ```
 
-TODO: In class-body `while` loops, eager collection cycle recovery loses the declared `TypedDict`
-context.
+Class-body `while` loops also preserve the declared `TypedDict` context.
 
 ```py
 class Container:
     while bool(input()):
-        record: ClassRecord  # error: [invalid-declaration]
+        record: ClassRecord
         record = {"value": 1}
         inspect(record)
-        reveal_type(record)  # revealed: dict[str, int]
+        reveal_type(record)  # revealed: ClassRecord
 
 class ClassRecord(TypedDict):
     value: int

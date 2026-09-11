@@ -5,6 +5,11 @@
 //! closed unfolding, including during intermediate normalization steps.
 
 mod graph;
+mod inference;
+mod tuple_length;
+
+pub(super) use inference::{InferenceKey, InferenceQuery, RecursiveInputs};
+pub(super) use tuple_length::TupleLengthAnalysis;
 
 use std::cell::{Cell, RefCell};
 
@@ -19,8 +24,9 @@ use super::relation::{TypeRelation, TypeRelationChecker};
 use super::variance::{VarianceInferable, VarianceOrigin};
 use super::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, GenericContext,
-    MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, VarianceTerm,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, DivergentType,
+    GenericContext, MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping,
+    VarianceTerm, any_over_type,
 };
 use crate::{Db, FxIndexMap, FxOrderSet, Program, ProgramEnvironment};
 
@@ -72,6 +78,12 @@ impl<'db> RecursiveVar<'db> {
             .arguments(db)
             .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
         let target = match (self.target(db), substitution) {
+            (
+                RecursiveVarTarget::Graph { depth, .. },
+                RecursiveSubstitution::Approximate(divergent),
+            ) if depth == visitor.recursive_depth => {
+                return *divergent;
+            }
             (RecursiveVarTarget::Alias(cycle), RecursiveSubstitution::Unfold(recursive))
                 if Some(cycle) == substitution.alias_cycle(db) =>
             {
@@ -110,6 +122,8 @@ pub struct RecursiveMapping<'a, 'db>(RecursiveSubstitution<'a, 'db>);
 enum RecursiveSubstitution<'a, 'db> {
     Unfold(RecursiveType<'db>),
     Bind(RecursiveBinding<'db>),
+    Replace(&'a [(Type<'db>, Type<'db>)]),
+    Approximate(Type<'db>),
     Reindex(&'a [usize]),
     Rebuild(&'a [Type<'db>]),
     Extract(&'a RecursiveGraphBuilder<'db>),
@@ -126,7 +140,9 @@ impl RecursiveSubstitution<'_, '_> {
         };
         match recursive.origin(db) {
             RecursiveOrigin::Alias { cycle, .. } => Some(cycle),
-            RecursiveOrigin::ConstraintSolution(_) => None,
+            RecursiveOrigin::ConstraintSolution(_)
+            | RecursiveOrigin::Inference(_)
+            | RecursiveOrigin::InferenceCycle { .. } => None,
         }
     }
 }
@@ -162,21 +178,86 @@ impl<'db> RecursiveBinding<'db> {
 }
 
 impl<'db> RecursiveMapping<'_, 'db> {
-    /// Extract closed children as graph edges. Bodies of named aliases keep their
-    /// own binder; only the arguments outside that binder belong to this graph.
-    pub(super) fn extract_type(
+    /// Replace anonymous recursive backedges without requesting inference or discarding constructors.
+    pub(super) fn approximate_inference(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        divergent: Type<'db>,
+    ) -> Type<'db> {
+        ty.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::Recursive(Self(RecursiveSubstitution::Approximate(divergent))),
+            TypeContext::default(),
+        )
+    }
+
+    /// Merged Salsa cycles share one marker, including its materialized bounds.
+    /// Otherwise earlier heads can leave duplicate fallback types in the merged cycle.
+    pub(super) fn unify_cycle_heads(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        cycle: &salsa::Cycle,
+    ) -> Type<'db> {
+        let replacements: Vec<_> = cycle
+            .head_ids()
+            .filter(|id| *id != cycle.id())
+            .flat_map(|id| {
+                [
+                    None,
+                    Some(MaterializationKind::Top),
+                    Some(MaterializationKind::Bottom),
+                ]
+                .map(|materialization| {
+                    (
+                        Type::Divergent(DivergentType {
+                            materialization,
+                            ..DivergentType::new(id)
+                        }),
+                        Type::Divergent(DivergentType {
+                            materialization,
+                            ..DivergentType::new(cycle.id())
+                        }),
+                    )
+                })
+            })
+            .collect();
+        if replacements.is_empty() {
+            return ty;
+        }
+        ty.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Replace(
+                &replacements,
+            ))),
+            TypeContext::default(),
+        )
+    }
+
+    /// Substitute equation references or extract closed children as graph edges.
+    /// Replacements must contain no unbound `RecursiveVar`; alias bodies retain their own binder.
+    pub(super) fn map_type(
         self,
         db: &'db dyn Db,
         ty: Type<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Option<Type<'db>> {
-        let RecursiveSubstitution::Extract(builder) = self.0 else {
-            return None;
-        };
-        if visitor.recursive_depth != 0 || matches!(ty, Type::RecursiveVar(_)) {
-            return Some(ty);
+        match self.0 {
+            RecursiveSubstitution::Replace(replacements) => replacements
+                .iter()
+                .find_map(|(target, replacement)| (ty == *target).then_some(*replacement)),
+            RecursiveSubstitution::Extract(builder) => {
+                if visitor.recursive_depth != 0 || matches!(ty, Type::RecursiveVar(_)) {
+                    Some(ty)
+                } else {
+                    Some(builder.reference(db, ty))
+                }
+            }
+            _ => None,
         }
-        Some(builder.reference(db, ty))
     }
 }
 
@@ -190,6 +271,13 @@ pub enum RecursiveOrigin<'db> {
     },
     /// A closed solution of recursive type constraints, independent of any query cycle.
     ConstraintSolution(Program<'db>),
+    /// A closed reference to a query equation; its identity excludes provisional solutions.
+    Inference(InferenceKey<'db>),
+    /// A query's unresolved initial binder. It is replaced by a query reference at read boundaries.
+    InferenceCycle {
+        program: Program<'db>,
+        cycle: salsa::Id,
+    },
 }
 
 impl get_size2::GetSize for RecursiveOrigin<'_> {}
@@ -282,6 +370,61 @@ impl<'db> RecursiveType<'db> {
             arguments,
             None,
         )
+    }
+
+    /// Start value inference with a closed recursive variable. Ordinary `Divergent`
+    /// recovery remains separate from equations collected by constructor inference.
+    pub(super) fn initial_inference(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        cycle: salsa::Id,
+    ) -> Type<'db> {
+        Type::Recursive(Self::new_internal(
+            db,
+            RecursiveOrigin::InferenceCycle {
+                program: env.program(db),
+                cycle,
+            },
+            RecursiveGraph::new_internal(
+                db,
+                vec![Type::RecursiveVar(RecursiveVar::new_internal(
+                    db,
+                    RecursiveVarTarget::Graph { depth: 0, index: 0 },
+                    None,
+                ))]
+                .into_boxed_slice(),
+            ),
+            0,
+            None,
+            None,
+        ))
+    }
+
+    /// Construct a closed reference to the equation owned by an inference query.
+    fn inference(db: &'db dyn Db, key: InferenceKey<'db>) -> Self {
+        Self::new_internal(
+            db,
+            RecursiveOrigin::Inference(key),
+            RecursiveGraph::new_internal(
+                db,
+                vec![Type::RecursiveVar(RecursiveVar::new_internal(
+                    db,
+                    RecursiveVarTarget::Graph { depth: 0, index: 0 },
+                    None,
+                ))]
+                .into_boxed_slice(),
+            ),
+            0,
+            None,
+            None,
+        )
+    }
+
+    pub(super) fn inference_key(self, db: &'db dyn Db) -> Option<InferenceKey<'db>> {
+        match self.origin(db) {
+            RecursiveOrigin::Inference(key) => Some(key),
+            _ => None,
+        }
     }
 
     /// Close all equations together, preserving sharing between their solutions.
@@ -502,6 +645,10 @@ impl<'db> RecursiveType<'db> {
             RecursiveOrigin::ConstraintSolution(program) => {
                 ProgramEnvironment::from_program(program)
             }
+            RecursiveOrigin::Inference(key) => key.environment(db),
+            RecursiveOrigin::InferenceCycle { program, .. } => {
+                ProgramEnvironment::from_program(program)
+            }
         }
     }
 
@@ -509,6 +656,9 @@ impl<'db> RecursiveType<'db> {
     /// The traversal starts at depth 0 inside this binder; only nested recursive
     /// bodies increase the depth used to identify references to this binder.
     pub fn unfold(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        if let Some(key) = self.inference_key(db) {
+            return key.solution(db).unfolded;
+        }
         // A growing specialization cannot converge by repeating the same query key. Materialize
         // its closed unfolding directly, under the caller's recursion guard, instead.
         if self.materialization_kind(db).is_some() && !self.may_have_unbounded_specialization(db) {
@@ -550,6 +700,14 @@ impl<'db> RecursiveType<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         match mapping {
+            TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Approximate(_)))
+                if self.alias(db).is_none() =>
+            {
+                // The stored body starts at depth zero inside this closed binder.
+                let visitor = ApplyTypeMappingVisitor::new(visitor.env);
+                self.body(db)
+                    .apply_type_mapping_impl(db, mapping, tcx, &visitor)
+            }
             TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(binding)))
                 if let Some(cycle) = binding.matching_alias_cycle(db, self) =>
             {
@@ -588,6 +746,12 @@ impl<'db> RecursiveType<'db> {
                     arguments,
                     self.materialization_kind(db),
                 ))
+            }
+            // Until mappings can retain an equation's input, use the ordinary cycle
+            // approximation instead of repeatedly specializing provisional solutions.
+            _ if let Some(key) = self.inference_key(db) => key.fallback(),
+            _ if matches!(self.origin(db), RecursiveOrigin::InferenceCycle { .. }) => {
+                Type::Recursive(self)
             }
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::ApplySpecializationWithMaterialization { .. }
@@ -738,7 +902,11 @@ impl<'db> RecursiveType<'db> {
     ) -> Option<F> {
         let unfolded = self.unfold(db, env);
         if unfolded == Type::Recursive(self) {
-            None
+            if let RecursiveOrigin::InferenceCycle { cycle, .. } = self.origin(db) {
+                Some(operation(Type::divergent(cycle)))
+            } else {
+                None
+            }
         } else {
             Some(operation(unfolded))
         }
@@ -965,7 +1133,25 @@ impl<'db> TypeVisitor<'db> for RecursiveReferences<'_, 'db> {
     }
 }
 
-impl Type<'_> {
+impl<'db> Type<'db> {
+    /// Fold constructor prefixes onto existing anonymous recursive graph entries.
+    pub(super) fn normalize_recursive(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Self {
+        if !any_over_type(
+            db,
+            env,
+            self,
+            false,
+            |ty| matches!(ty, Type::Recursive(recursive) if recursive.alias(db).is_none()),
+        ) {
+            return self;
+        }
+        RecursiveGraphBuilder::normalize(db, env, self)
+    }
+
     /// Reject a bare recursive variable at a semantic-operation boundary.
     pub(super) const fn assert_not_recursive_var(self) {
         debug_assert!(
