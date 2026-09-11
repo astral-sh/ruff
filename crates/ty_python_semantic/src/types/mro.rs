@@ -475,17 +475,12 @@ impl<'db> Mro<'db> {
         //
         // This matches the `dynamic_fallback` approach used by `of_dynamic_class`.
         let fallback_mro = || {
-            let mut result = vec![self_base];
-            let mut seen = FxHashSet::default();
-            seen.insert(self_base);
-            for base in &resolved_bases {
-                for item in base.mro(db, env, None) {
-                    if seen.insert(item) {
-                        result.push(item);
-                    }
-                }
-            }
-            Self::from(result)
+            Self::fallback_from_bases(
+                db,
+                env,
+                ClassType::NonGeneric(dynamic_enum.into()),
+                resolved_bases.iter().copied(),
+            )
         };
 
         // Standard C3 linearization: build sequences from each base's MRO, plus the
@@ -511,29 +506,47 @@ impl<'db> Mro<'db> {
 
     /// Compute a fallback MRO for a dynamic class when `of_dynamic_class` fails.
     ///
-    /// Iterates over base MROs sequentially with deduplication.
+    /// Preserves known bases even when an invalid base must be replaced with `Unknown`.
     fn dynamic_fallback(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         dynamic: DynamicClassLiteral<'db>,
     ) -> Self {
-        let self_base = ClassBase::Class(ClassType::NonGeneric(dynamic.into()));
+        Self::fallback_from_bases(
+            db,
+            env,
+            ClassType::NonGeneric(dynamic.into()),
+            dynamic.explicit_bases(db).iter().map(|base_type| {
+                ClassBase::try_from_explicit_base(db, env, *base_type, None)
+                    .unwrap_or_else(ClassBase::unknown)
+            }),
+        )
+    }
+
+    /// Retain the first specialization of each class when C3 cannot determine a valid MRO.
+    ///
+    /// Visit the bases' MROs in order, but defer `object` until every other base has been added.
+    /// This preserves known members while keeping class identities unique and `object` last,
+    /// including when subclasses inherit this fallback MRO.
+    fn fallback_from_bases(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class: ClassType<'db>,
+        bases: impl IntoIterator<Item = ClassBase<'db>>,
+    ) -> Self {
+        let self_base = ClassBase::Class(class);
+        let object_base = ClassBase::object(db, env);
         let mut result = vec![self_base];
-        let mut seen = FxHashSet::default();
-        seen.insert(self_base);
-
-        for base_type in dynamic.explicit_bases(db) {
-            // Convert `Type` to `ClassBase`, falling back to `Unknown` if conversion fails.
-            let base = ClassBase::try_from_explicit_base(db, env, *base_type, None)
-                .unwrap_or_else(ClassBase::unknown);
-
+        let mut seen =
+            FxHashSet::from_iter([self_base.mro_identity(db), object_base.mro_identity(db)]);
+        for base in bases {
             for item in base.mro(db, env, None) {
-                if seen.insert(item) {
+                if seen.insert(item.mro_identity(db)) {
                     result.push(item);
                 }
             }
         }
-
+        result.push(object_base);
         Self::from(result)
     }
 }

@@ -276,6 +276,42 @@ class AA(Z): ...
 reveal_mro(AA)  # revealed: (<class 'AA'>, <class 'Z'>, Unknown, <class 'object'>)
 ```
 
+## Fallback MROs keep `object` last
+
+A class cannot inherit from `object` before another base. Its fallback MRO retains the known bases
+for member lookup, but defers `object` to the end. Subclasses also keep `object` last, whether they
+use single or multiple inheritance.
+
+```py
+from typing import Any
+from ty_extensions._internal import reveal_mro
+
+class A:
+    value: int
+
+class Other: ...
+
+# error: [inconsistent-mro]
+Broken = type("Broken", (object, A), {})
+
+class Child(Broken): ...
+class Multiple(Broken, Other): ...
+
+reveal_mro(Broken)  # revealed: (<class 'Broken'>, <class 'A'>, <class 'object'>)
+reveal_mro(Child)  # revealed: (<class 'Child'>, <class 'Broken'>, <class 'A'>, <class 'object'>)
+# revealed: (<class 'Multiple'>, <class 'Broken'>, <class 'A'>, <class 'Other'>, <class 'object'>)
+reveal_mro(Multiple)
+reveal_type(Multiple().value)  # revealed: int
+```
+
+The same fallback applies when a gradual base suppresses the MRO error.
+
+```py
+Gradual = type("Gradual", (object, A, Any), {})
+
+reveal_mro(Gradual)  # revealed: (<class 'Gradual'>, <class 'A'>, Any, <class 'object'>)
+```
+
 ## `__bases__` includes a `Union`
 
 <!-- snapshot-diagnostics -->

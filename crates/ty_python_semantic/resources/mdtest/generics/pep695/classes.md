@@ -843,6 +843,24 @@ reveal_type(PartiallyFixed.fixed)  # revealed: int
 reveal_type(PartiallyFixed.unresolved)  # revealed: Unknown
 ```
 
+## Fallback MROs preserve generic class identity
+
+Putting `Base` before its subclass makes the MRO inconsistent. During error recovery, the fallback
+MRO includes each class once, retaining its first specialization and placing `object` last.
+
+```py
+from ty_extensions._internal import reveal_mro
+
+class Base[T]: ...
+class IntBase(Base[int]): ...
+
+# error: [inconsistent-mro]
+Broken = type("Broken", (Base, IntBase), {})
+
+# revealed: (<class 'Broken'>, <class 'Base[Unknown]'>, typing.Generic, <class 'IntBase'>, <class 'object'>)
+reveal_mro(Broken)
+```
+
 ## Assignability through gradual and concrete inheritance paths
 
 A concrete inheritance path makes `Child` a subtype of `Base[int]` even when an earlier path

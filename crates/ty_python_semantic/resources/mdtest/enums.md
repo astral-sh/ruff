@@ -3283,6 +3283,21 @@ class StaticHttp(int, Enum):
 reveal_mro(StaticHttp)  # revealed: (<class 'StaticHttp'>, <class 'int'>, <class 'Enum'>, <class 'object'>)
 ```
 
+### Fallback MROs
+
+Putting `object` before `Enum` creates an inconsistent MRO. The fallback still includes `Enum` and
+places `object` last.
+
+```py
+from enum import Enum
+from ty_extensions._internal import reveal_mro
+
+# error: [inconsistent-mro]
+Broken = Enum("Broken", "MEMBER", type=object)
+
+reveal_mro(Broken)  # revealed: (<class 'Broken'>, <class 'Enum'>, <class 'object'>)
+```
+
 ### IntEnum function syntax
 
 ```py
