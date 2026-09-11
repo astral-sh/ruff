@@ -355,9 +355,7 @@ impl<'db> SubclassOfType<'db> {
                 .inferred_metaclass_with_fallback(db, fallback)
                 .for_inheritance(db, env)
                 .to_instance_approximation(db, env)
-                .map(|instance| {
-                    instance.to_meta_type_with_metaclass_fallback(db, env, context, fallback)
-                })
+                .map(|instance| instance.to_meta_type_with_recursion(db, env, context, fallback))
                 .unwrap_or(SubclassOfType::subclass_of_unknown()),
             // Structural implementations of a protocol can have arbitrary metaclasses. The only
             // guaranteed upper bound is therefore `type`, not the protocol origin's metaclass.
@@ -371,11 +369,11 @@ impl<'db> SubclassOfType<'db> {
                     // `with_transposed_type_var` always adds a bound for unbounded TypeVars
                     None => unreachable!(),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.to_meta_type_with_metaclass_fallback(db, env, context, fallback)
+                        bound.to_meta_type_with_recursion(db, env, context, fallback)
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
                         .as_type(db, env)
-                        .to_meta_type_with_metaclass_fallback(db, env, context, fallback),
+                        .to_meta_type_with_recursion(db, env, context, fallback),
                 }
             }
         }
@@ -636,12 +634,12 @@ impl<'db> SubclassOfInner<'db> {
                 ),
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     TypeVarBoundOrConstraints::UpperBound(
-                        bound.to_meta_type_with_metaclass_fallback(db, env, context, fallback),
+                        bound.to_meta_type_with_recursion(db, env, context, fallback),
                     )
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                     TypeVarBoundOrConstraints::Constraints(constraints.map(db, |constraint| {
-                        constraint.to_meta_type_with_metaclass_fallback(db, env, context, fallback)
+                        constraint.to_meta_type_with_recursion(db, env, context, fallback)
                     }))
                 }
             })

@@ -1680,8 +1680,8 @@ reveal_type(Combined.__class__)  # revealed: <class 'DerivedMeta'>
 
 ## Sibling metaclasses with an unknown ancestor
 
-Sibling metaclasses conflict even when their shared base has an unknown superclass. The missing
-ancestry cannot make either sibling inherit from the other without creating a cycle.
+An unknown ancestor cannot make sibling metaclasses inherit from each other without a cycle. TODO:
+Gradual assignability currently misses this conflict, so the metaclass remains unknown.
 
 ```py
 from typing import Any
@@ -1694,8 +1694,8 @@ class RightMeta(RootMeta): ...
 class Left(metaclass=LeftMeta): ...
 class Right(metaclass=RightMeta): ...
 
-Combined = type("Combined", (Left, Right), {})  # error: [conflicting-metaclass]
-Reversed = type("Reversed", (Right, Left), {})  # error: [conflicting-metaclass]
+Combined = type("Combined", (Left, Right), {})
+Reversed = type("Reversed", (Right, Left), {})
 
 reveal_type(Combined.__class__)  # revealed: type[Unknown]
 reveal_type(type(Reversed))  # revealed: type[Unknown]
@@ -1729,18 +1729,18 @@ reveal_type(Reverse.__class__)  # revealed: type[Unknown]
 reveal_type(Child.__class__)  # revealed: type[Unknown]
 ```
 
-A known subclass of both metaclasses resolves the ambiguity, including when it is inherited from a
-dynamic class.
+Once the metaclass is unknown, a later base does not resolve the ambiguity. The possible candidates
+are not retained, including when the unknown metaclass is inherited from a dynamic class.
 
 ```py
 class CommonMeta(Meta2, Meta1): ...
 class Common(metaclass=CommonMeta): ...
 
-Resolved = type("Resolved", (A, B, Common), {})
-ResolvedInherited = type("ResolvedInherited", (Forward, Common), {})
+WithCommonBase = type("WithCommonBase", (A, B, Common), {})
+InheritedWithCommonBase = type("InheritedWithCommonBase", (Forward, Common), {})
 
-reveal_type(Resolved.__class__)  # revealed: <class 'CommonMeta'>
-reveal_type(ResolvedInherited.__class__)  # revealed: <class 'CommonMeta'>
+reveal_type(WithCommonBase.__class__)  # revealed: type[Unknown]
+reveal_type(InheritedWithCommonBase.__class__)  # revealed: type[Unknown]
 ```
 
 ## Custom metaclass via bases

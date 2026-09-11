@@ -1063,8 +1063,9 @@ reveal_type(Reversed.__class__)  # revealed: <class 'Meta'>
 
 ## Sibling metaclasses with an unknown ancestor
 
-An unknown ancestor of a shared base cannot make its subclasses inherit from one another. Doing so
-would introduce an inheritance cycle, so these sibling metaclasses still conflict.
+An unknown ancestor of a shared base cannot make its subclasses inherit from one another without an
+inheritance cycle. TODO: We currently use gradual assignability here, which misses this conflict and
+leaves the metaclass unknown.
 
 ```py
 from typing import Any
@@ -1076,24 +1077,11 @@ class LeftMeta(RootMeta): ...
 class RightMeta(RootMeta): ...
 class Left(metaclass=LeftMeta): ...
 class Right(metaclass=RightMeta): ...
-class Combined(Left, Right): ...  # error: [conflicting-metaclass]
-class Reversed(Right, Left): ...  # error: [conflicting-metaclass]
+class Combined(Left, Right): ...
+class Reversed(Right, Left): ...
 
 reveal_type(Combined.__class__)  # revealed: type[Unknown]
 reveal_type(type(Reversed))  # revealed: type[Unknown]
-```
-
-A separate unknown base can supply the missing relationship. Here `FlexibleMeta` could inherit
-`RightMeta` through its own unknown base, without creating a cycle through `RootMeta`.
-
-```py
-from missing import IndependentBase  # error: [unresolved-import]
-
-class FlexibleMeta(IndependentBase, RootMeta): ...
-class Flexible(metaclass=FlexibleMeta): ...
-class Allowed(Flexible, Right): ...
-
-reveal_type(Allowed.__class__)  # revealed: <class 'FlexibleMeta'>
 ```
 
 ## Ambiguous metaclasses
@@ -1141,17 +1129,17 @@ class PossiblyInvalid(A, Other): ...
 reveal_type(PossiblyInvalid.__class__)  # revealed: type[Unknown]
 ```
 
-A later base with a metaclass that is a known subclass of both candidates resolves the ambiguity.
-This also works when the candidates come from an already ambiguous base class.
+Once the metaclass is unknown, we do not retain the possible candidates. A later base therefore does
+not resolve the ambiguity, even when its metaclass inherits from both original candidates.
 
 ```py
 class CommonMeta(Meta2, Meta1): ...
 class Common(metaclass=CommonMeta): ...
-class Resolved(A, B, Common): ...
-class ResolvedInherited(Forward, Common): ...
+class WithCommonBase(A, B, Common): ...
+class InheritedWithCommonBase(Forward, Common): ...
 
-reveal_type(Resolved.__class__)  # revealed: <class 'CommonMeta'>
-reveal_type(ResolvedInherited.__class__)  # revealed: <class 'CommonMeta'>
+reveal_type(WithCommonBase.__class__)  # revealed: type[Unknown]
+reveal_type(InheritedWithCommonBase.__class__)  # revealed: type[Unknown]
 ```
 
 ## Unknown
@@ -1384,6 +1372,22 @@ class Outer:
     class Meta(Wrapper[int], type): ...
     class Inner(Aliases, metaclass=Meta): ...
     type = Inner.Value.__class__
+```
+
+## Metaclass reflection in a metaclass base
+
+A stub's class attribute named `type` can depend on the same metaclass that uses it as a base.
+Inference converges and reports the resulting inheritance cycle.
+
+`mod.pyi`:
+
+```pyi
+class Outer:
+    class Meta(type): ...  # error: [cyclic-class-definition]
+    class Inner(object, metaclass=Meta): ...
+    type = Inner.__class__
+
+reveal_type(Outer.Inner.__class__)  # revealed: type[Unknown]
 ```
 
 ## PEP 695 generic

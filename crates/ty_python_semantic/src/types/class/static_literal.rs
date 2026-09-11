@@ -24,16 +24,17 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallArguments,
         CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
         DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
-        MaterializationKind, MemberLookupPolicy, MetaclassTransformInfo, Parameter, Parameters,
-        PropertyInstanceType, Signature, SpecialFormType, StaticMroError, SubclassOfType, Type,
-        TypeContext, TypeMapping, TypeVarVariance, TypingModule, UnionBuilder, UnionType,
+        MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
+        Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
+        SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance, TypingModule,
+        UnionBuilder, UnionType,
         bound_super::BoundSuperType,
         call::{CallError, CallErrorKind},
         callable::CallableTypeKind,
         class::{
             ClassInstanceFlags, ClassMemberResult, ClassMetaclass, CodeGeneratorKind, DisjointBase,
-            DynamicTypedDictLiteral, Field, FieldKind, InstanceMemberResult, MetaclassCandidates,
-            MetaclassError, MetaclassErrorKind, MethodDecorator, MroLookup, NamedTupleField,
+            DynamicTypedDictLiteral, Field, FieldKind, InstanceMemberResult, MetaclassError,
+            MetaclassErrorKind, MethodDecorator, MroLookup, NamedTupleField,
             synthesize_namedtuple_class_member,
             typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
@@ -1244,9 +1245,7 @@ impl<'db> StaticClassLiteral<'db> {
             let mut has_protocol_fallback = false;
             let mut base_metaclasses = base_classes.filter_map(|base| {
                 match base.inferred_metaclass(db, &env, ClassLiteral::Static(class)) {
-                    metaclass @ (ClassMetaclass::Selected(_) | ClassMetaclass::Ambiguous(_)) => {
-                        Some((base, metaclass))
-                    }
+                    ClassMetaclass::Selected(metaclass) => Some((base, metaclass)),
                     ClassMetaclass::ProtocolFallback => {
                         has_protocol_fallback = true;
                         None
@@ -1254,19 +1253,19 @@ impl<'db> StaticClassLiteral<'db> {
                 }
             });
             let (metaclass, base) = if let Some(metaclass) = explicit_metaclass {
-                (ClassMetaclass::Selected(metaclass), None)
+                (metaclass, None)
             } else if let Some((base_class, metaclass)) = base_metaclasses.next() {
                 (metaclass, Some(base_class))
             } else {
-                (
-                    ClassMetaclass::Selected(KnownClass::Type.to_class_literal(db, &env)),
-                    None,
-                )
+                (KnownClass::Type.to_class_literal(db, &env), None)
             };
 
-            let Some(mut candidates) = MetaclassCandidates::from_metaclass(db, metaclass, base)
-            else {
-                let metaclass = metaclass.to_type(db, &env);
+            let mut candidate = if let Some(metaclass_ty) = metaclass.to_class_type(db) {
+                MetaclassCandidate {
+                    metaclass: metaclass_ty,
+                    base,
+                }
+            } else {
                 let name = Type::string_literal(db, class.name(db));
                 let bases = Type::heterogeneous_tuple(db, &env, class.explicit_bases(db));
                 let namespace = KnownClass::Dict.to_specialized_instance(
@@ -1306,41 +1305,57 @@ impl<'db> StaticClassLiteral<'db> {
             // - https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass
             // - https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
             for (base_class, metaclass) in base_metaclasses {
-                let Some(other) =
-                    MetaclassCandidates::from_metaclass(db, metaclass, Some(base_class))
-                else {
+                if metaclass == SubclassOfType::subclass_of_unknown() {
+                    return Ok((ClassMetaclass::Selected(metaclass), None));
+                }
+                let Some(metaclass) = metaclass.to_class_type(db) else {
                     continue;
                 };
-                if candidates.reconcile(db, &env, &other) {
+                if let Some(selected) = candidate
+                    .metaclass
+                    .most_derived_metaclass(db, &env, metaclass)
+                {
+                    let Some(metaclass) = selected.to_class_type(db) else {
+                        return Ok((ClassMetaclass::Selected(selected), None));
+                    };
+                    if metaclass == candidate.metaclass {
+                        continue;
+                    }
+                    candidate = MetaclassCandidate {
+                        metaclass,
+                        base: Some(base_class),
+                    };
                     continue;
                 }
                 return Err(MetaclassError {
                     kind: MetaclassErrorKind::Conflict {
-                        candidate: candidates.first,
-                        base_metaclass: other.first.metaclass,
+                        candidate,
+                        base_metaclass: metaclass,
                         base: base_class,
                     },
                 });
             }
 
-            let transform_info = candidates.unique().and_then(|candidate| {
-                candidate
-                    .metaclass
-                    .static_class_literal(db)
-                    .and_then(|(metaclass_literal, specialization)| {
-                        metaclass_literal.inherited_dataclass_transformer_params(db, specialization)
-                    })
-                    .map(|params| MetaclassTransformInfo {
-                        params,
-                        from_explicit_metaclass: candidate.base.is_none(),
-                    })
-            });
+            let transform_info = candidate
+                .metaclass
+                .static_class_literal(db)
+                .and_then(|(metaclass_literal, specialization)| {
+                    metaclass_literal.inherited_dataclass_transformer_params(db, specialization)
+                })
+                .map(|params| MetaclassTransformInfo {
+                    params,
+                    from_explicit_metaclass: candidate.base.is_none(),
+                });
             let use_protocol_fallback = has_protocol_fallback
                 && !class
                     .known(db)
                     .is_some_and(|known| known.has_known_type_metaclass(env.python_version(db)));
             Ok((
-                candidates.into_metaclass(db, &env, use_protocol_fallback),
+                ClassMetaclass::with_protocol_fallback(
+                    db,
+                    candidate.metaclass.into(),
+                    use_protocol_fallback,
+                ),
                 transform_info,
             ))
         }

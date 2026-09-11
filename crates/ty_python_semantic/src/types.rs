@@ -492,7 +492,9 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
 
     fn project_meta_type(&self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self.recursion_context {
-            Some(context) => ty.to_meta_type_with_recursion(db, self.env, context),
+            Some(context) => {
+                ty.to_meta_type_with_recursion(db, self.env, context, MetaclassFallback::Allow)
+            }
             None => ty.to_meta_type(db, self.env),
         }
     }
@@ -8462,20 +8464,18 @@ impl<'db> Type<'db> {
     /// See `Self::dunder_class` for more details.
     #[must_use]
     fn to_meta_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        self.to_meta_type_with_recursion(db, env, &TypeRecursionContext::default())
+        self.to_meta_type_with_recursion(
+            db,
+            env,
+            &TypeRecursionContext::default(),
+            MetaclassFallback::Allow,
+        )
     }
 
+    /// Project to classes using the active recursion guards and requested metaclass fallback.
+    /// Recursive projections, including those triggered by alias specialization, must reuse
+    /// `context`; only entry points such as `to_meta_type` and `dunder_class` create a fresh one.
     fn to_meta_type_with_recursion(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        context: &TypeRecursionContext<'db>,
-    ) -> Type<'db> {
-        self.to_meta_type_with_metaclass_fallback(db, env, context, MetaclassFallback::Allow)
-    }
-
-    /// Project to classes while distinguishing lookup recovery from an observable metaclass.
-    fn to_meta_type_with_metaclass_fallback(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -8723,7 +8723,7 @@ impl<'db> Type<'db> {
                 .map(Type::from)
                 // Guard against user-customized typesheds with a broken `dict` class
                 .unwrap_or_else(Type::unknown),
-            _ => self.to_meta_type_with_metaclass_fallback(
+            _ => self.to_meta_type_with_recursion(
                 db,
                 env,
                 &TypeRecursionContext::default(),

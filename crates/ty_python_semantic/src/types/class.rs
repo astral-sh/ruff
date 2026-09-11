@@ -740,7 +740,11 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Infer the metaclass, optionally retaining a conflicting candidate for member lookup.
+    /// Infer a metaclass for member lookup or `__class__`/`type()` reflection.
+    ///
+    /// [`MetaclassFallback::Disallow`] exposes failed selection as `type[Unknown]`.
+    /// [`MetaclassFallback::Allow`] retains a conflicting candidate for member lookup so
+    /// recursive attribute inference can converge.
     pub(super) fn inferred_metaclass_with_fallback(
         self,
         db: &'db dyn Db,
@@ -1533,46 +1537,35 @@ impl<'db> ClassType<'db> {
             .is_always_satisfied(db, env)
     }
 
-    /// Whether an unknown base could supply an otherwise unproven subclass relationship.
+    /// Select the more derived metaclass, or return `None` for a conflict.
     ///
-    /// An unknown base of a shared ancestor cannot do so: if `Left(Root)` and `Right(Root)`
-    /// inherit an unknown base through `Root`, making that base inherit `Right` would create
-    /// an inheritance cycle. A separate unknown base of `Left` can still supply the relationship.
-    fn could_inherit_from(
+    /// Known subclass relationships take precedence over gradual assignability. If unknown
+    /// ancestry leaves both metaclasses as possible winners, retain only `type[Unknown]`; we do
+    /// not preserve constraints on the unknown bases for later metaclass selection.
+    fn most_derived_metaclass(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        target: Self,
-    ) -> bool {
-        if target.is_final(db)
-            || !self.iter_mro(db).any(|base| {
-                matches!(
-                    base,
-                    ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_)
-                )
-            })
-        {
-            return false;
+        other: Self,
+    ) -> Option<Type<'db>> {
+        if self.is_subclass_of(db, env, other) {
+            return Some(self.into());
+        }
+        if other.is_subclass_of(db, env, self) {
+            return Some(other.into());
         }
 
-        let target_ancestors: FxOrderSet<_> = target
-            .iter_mro(db)
-            .filter_map(ClassBase::into_class)
-            .map(|class| class.class_literal(db))
-            .collect();
-
-        self.iter_mro(db)
-            .filter_map(ClassBase::into_class)
-            .map(|class| class.class_literal(db))
-            .filter(|class| !target_ancestors.contains(class))
-            .any(|class| {
-                class.explicit_bases(db).iter().any(|base| {
-                    matches!(
-                        ClassBase::try_from_explicit_base(db, env, *base, Some(class)),
-                        Some(ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_))
-                    )
-                })
-            })
+        let self_instance = Type::instance(db, env, self);
+        let other_instance = Type::instance(db, env, other);
+        match (
+            !other.is_final(db) && self_instance.is_assignable_to(db, env, other_instance),
+            !self.is_final(db) && other_instance.is_assignable_to(db, env, self_instance),
+        ) {
+            (true, false) => Some(self.into()),
+            (false, true) => Some(other.into()),
+            (true, true) => Some(SubclassOfType::subclass_of_unknown()),
+            (false, false) => None,
+        }
     }
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
@@ -1595,9 +1588,6 @@ impl<'db> ClassType<'db> {
         match class.inferred_metaclass_with_fallback(db, fallback) {
             ClassMetaclass::Selected(metaclass) => ClassMetaclass::Selected(
                 metaclass.apply_optional_specialization(db, specialization),
-            ),
-            ClassMetaclass::Ambiguous(metaclasses) => ClassMetaclass::Ambiguous(
-                metaclasses.apply_optional_specialization(db, specialization),
             ),
             ClassMetaclass::ProtocolFallback => ClassMetaclass::ProtocolFallback,
         }
@@ -3435,7 +3425,7 @@ pub(super) enum DisjointBaseKind {
     DefinesSlots,
 }
 
-/// The selected or possible metaclasses, or the fallback from a typeshed stdlib protocol base.
+/// A selected metaclass, or the `ABCMeta` fallback inferred from a typeshed stdlib protocol base.
 ///
 /// Typeshed lists `Protocol` as a base for some classes, such as collection ABCs, that do not
 /// inherit from it at runtime. Inferring a metaclass constraint from those bases would therefore
@@ -3447,8 +3437,6 @@ pub(super) enum DisjointBaseKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum ClassMetaclass<'db> {
     Selected(Type<'db>),
-    /// A union of possible winners, retained for selection in subclasses.
-    Ambiguous(Type<'db>),
     /// A lookup-only fallback originating in typeshed. Inheritance preserves this provenance.
     ProtocolFallback,
 }
@@ -3473,7 +3461,6 @@ impl<'db> ClassMetaclass<'db> {
     pub(super) fn to_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
             Self::Selected(metaclass) => metaclass,
-            Self::Ambiguous(_) => SubclassOfType::subclass_of_unknown(),
             Self::ProtocolFallback => KnownClass::ABCMeta.to_class_literal(db, env),
         }
     }
@@ -3486,7 +3473,6 @@ impl<'db> ClassMetaclass<'db> {
     ) -> Type<'db> {
         match self {
             Self::Selected(metaclass) => metaclass,
-            Self::Ambiguous(_) => SubclassOfType::subclass_of_unknown(),
             Self::ProtocolFallback => KnownClass::Type.to_class_literal(db, env),
         }
     }
@@ -3499,139 +3485,6 @@ pub(super) enum MetaclassFallback {
     Allow,
     /// Expose `type[Unknown]` through `__class__` and `type()` when selection fails.
     Disallow,
-}
-
-/// Possible winners while reconciling an explicit metaclass and the base classes' metaclasses.
-///
-/// Unknown ancestry can leave either candidate as the more derived one. Retain both until all
-/// bases have been considered, since a later base can select a known subclass of both.
-struct MetaclassCandidates<'db> {
-    first: MetaclassCandidate<'db>,
-    alternatives: Vec<MetaclassCandidate<'db>>,
-}
-
-impl<'db> MetaclassCandidates<'db> {
-    /// Collect the concrete candidates from a selected metaclass or an inherited ambiguity.
-    fn from_metaclass(
-        db: &'db dyn Db,
-        metaclass: ClassMetaclass<'db>,
-        base: Option<ClassBase<'db>>,
-    ) -> Option<Self> {
-        let ty = match metaclass {
-            ClassMetaclass::Selected(ty) => {
-                return Some(Self {
-                    first: MetaclassCandidate {
-                        metaclass: ty.to_class_type(db)?,
-                        base,
-                    },
-                    alternatives: Vec::new(),
-                });
-            }
-            ClassMetaclass::Ambiguous(ty) => ty,
-            ClassMetaclass::ProtocolFallback => return None,
-        };
-        let types = match ty {
-            Type::Union(union) => union.elements(db),
-            _ => std::slice::from_ref(&ty),
-        };
-        let mut types = types.iter();
-        let first = MetaclassCandidate {
-            metaclass: types.next()?.to_class_type(db)?,
-            base,
-        };
-        let alternatives = types
-            .map(|ty| {
-                Some(MetaclassCandidate {
-                    metaclass: ty.to_class_type(db)?,
-                    base,
-                })
-            })
-            .collect::<Option<Vec<_>>>()?;
-        Some(Self {
-            first,
-            alternatives,
-        })
-    }
-
-    fn iter(&self) -> impl Iterator<Item = &MetaclassCandidate<'db>> {
-        std::iter::once(&self.first).chain(&self.alternatives)
-    }
-
-    /// Reconcile another base, leaving the existing candidates intact on a conflict.
-    fn reconcile(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, other: &Self) -> bool {
-        let mut first: Option<MetaclassCandidate<'db>> = None;
-        let mut alternatives: Vec<MetaclassCandidate<'db>> = Vec::new();
-        let mut add = |candidate: &MetaclassCandidate<'db>| match &first {
-            Some(first)
-                if candidate.metaclass != first.metaclass
-                    && !alternatives
-                        .iter()
-                        .any(|other| other.metaclass == candidate.metaclass) =>
-            {
-                alternatives.push(candidate.clone());
-            }
-            None => first = Some(candidate.clone()),
-            Some(_) => {}
-        };
-
-        for candidate in self.iter() {
-            for other in other.iter() {
-                if candidate.metaclass.is_subclass_of(db, env, other.metaclass) {
-                    add(candidate);
-                } else if other.metaclass.is_subclass_of(db, env, candidate.metaclass) {
-                    add(other);
-                } else {
-                    if candidate
-                        .metaclass
-                        .could_inherit_from(db, env, other.metaclass)
-                    {
-                        add(candidate);
-                    }
-                    if other
-                        .metaclass
-                        .could_inherit_from(db, env, candidate.metaclass)
-                    {
-                        add(other);
-                    }
-                }
-            }
-        }
-
-        let Some(first) = first else {
-            return false;
-        };
-        *self = Self {
-            first,
-            alternatives,
-        };
-        true
-    }
-
-    fn unique(&self) -> Option<&MetaclassCandidate<'db>> {
-        self.alternatives.is_empty().then_some(&self.first)
-    }
-
-    /// Expose a unique winner, preserving unresolved alternatives for inheritance.
-    fn into_metaclass(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        has_protocol_fallback: bool,
-    ) -> ClassMetaclass<'db> {
-        if self.alternatives.is_empty() {
-            ClassMetaclass::with_protocol_fallback(
-                db,
-                self.first.metaclass.into(),
-                has_protocol_fallback,
-            )
-        } else {
-            ClassMetaclass::Ambiguous(UnionType::from_elements(
-                db,
-                env,
-                self.iter().map(|candidate| Type::from(candidate.metaclass)),
-            ))
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
