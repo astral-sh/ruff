@@ -148,6 +148,61 @@ __lazy_modules__ = configured_modules()
 import json
 ```
 
+### Conditional declarations
+
+```toml
+target-version = "py315"
+
+[lint]
+preview = true
+select = ["TID254"]
+
+[lint.flake8-tidy-imports]
+require-lazy = ["pathlib", "math", "typing"]
+ban-lazy = ["json"]
+```
+
+#### Conditional assignment
+
+The declaration may not execute, so `json`'s laziness is unknown and no diagnostic is emitted.
+
+```py
+if condition:
+    __lazy_modules__ = ["json"]
+
+import json  # ok, may or may not be lazy depending on `condition`
+```
+
+#### Conditional reassignments
+
+Modules present in both declarations remain lazy, and modules absent from both remain eager. Added
+or removed modules have unknown laziness, so their import policies are not enforced.
+
+```py
+__lazy_modules__ = ["json", "pathlib"]
+if condition:
+    __lazy_modules__ = ["json", "math"]
+
+import json  # error: [lazy-import-mismatch]
+import pathlib
+import math
+import typing  # error: [lazy-import-mismatch]
+```
+
+#### Exhaustive branches
+
+Ruff does not prove that branches cover every path, so `json`'s laziness remains unknown even though
+both branches list it.
+
+```py
+if condition:
+    __lazy_modules__ = ["json"]
+else:
+    __lazy_modules__ = ["json"]
+
+import json  # ok, unknown laziness in our simplified model
+```
+
 ### Per-alias policies
 
 Each alias is checked independently. Here `json` must become eager and `pathlib` must become lazy.
