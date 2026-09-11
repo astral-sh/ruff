@@ -2064,8 +2064,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         match pattern {
             PatternPredicateKind::Value(value) => {
                 let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
-                self.evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, true)
-                    .map(NarrowingConstraint::intersection)
+                self.evaluate_expr_compare_op(
+                    subject_ty,
+                    value_ty,
+                    ast::CmpOp::Eq,
+                    true,
+                    self.comparison_soundness_policy(),
+                )
+                .map(NarrowingConstraint::intersection)
             }
             PatternPredicateKind::Singleton(singleton) => Some(NarrowingConstraint::intersection(
                 singleton_pattern_type(db, &self.env, *singleton),
@@ -3819,6 +3825,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         rhs_ty: Type<'db>,
         op: ast::CmpOp,
         is_positive: bool,
+        soundness_policy: ComparisonSoundnessPolicy,
     ) -> Option<Type<'db>> {
         let db = self.db;
         if op == ast::CmpOp::Eq {
@@ -3828,7 +3835,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 lhs_ty,
                 rhs_ty,
                 is_positive,
-                self.comparison_soundness_policy(),
+                soundness_policy,
             );
         }
         if op == ast::CmpOp::NotEq {
@@ -3838,7 +3845,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 lhs_ty,
                 rhs_ty,
                 is_positive,
-                self.comparison_soundness_policy(),
+                soundness_policy,
             );
         }
 
@@ -4403,8 +4410,13 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             // - `if x not in y`
             if narrowable_ast(left)
                 && let Some(narrowable) = PlaceExpr::try_from_expr(left)
-                && let Some(ty) =
-                    self.evaluate_expr_compare_op(lhs_ty, lhs_narrowing_rhs_ty, *op, is_positive)
+                && let Some(ty) = self.evaluate_expr_compare_op(
+                    lhs_ty,
+                    lhs_narrowing_rhs_ty,
+                    *op,
+                    is_positive,
+                    self.comparison_soundness_policy(),
+                )
             {
                 let place = self.expect_place(&narrowable);
                 let constraint = NarrowingConstraint::intersection(ty);
@@ -4426,7 +4438,13 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             if !matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn)
                 && narrowable_ast(right)
                 && let Some(narrowable) = PlaceExpr::try_from_expr(right)
-                && let Some(ty) = self.evaluate_expr_compare_op(rhs_ty, lhs_ty, *op, is_positive)
+                && let Some(ty) = self.evaluate_expr_compare_op(
+                    rhs_ty,
+                    lhs_ty,
+                    *op,
+                    is_positive,
+                    self.comparison_soundness_policy(),
+                )
             {
                 let place = self.expect_place(&narrowable);
                 let constraint = NarrowingConstraint::intersection(ty);
@@ -4845,7 +4863,13 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let value_ty = infer_same_file_expression_type(db, value, TypeContext::default());
 
         let mut constraints = self
-            .evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, is_positive)
+            .evaluate_expr_compare_op(
+                subject_ty,
+                value_ty,
+                ast::CmpOp::Eq,
+                is_positive,
+                self.comparison_soundness_policy(),
+            )
             .map(|ty| {
                 NarrowingConstraints::from_iter([(place, NarrowingConstraint::intersection(ty))])
             })
@@ -4972,39 +4996,42 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         is_positive: bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
         let db = self.db;
-        // Check preconditions: we need a TypedDict, a string key, and a supported tag literal.
+        // Check preconditions: we need a TypedDict and a string key.
         if !is_or_contains_typeddict(db, subscript_value_type) {
             return None;
         }
         let subscript_place_expr = PlaceExpr::try_from_expr(subscript_value_expr)?;
         let key_literal = subscript_key_type.as_string_literal()?;
-        if !is_supported_tag_literal(rhs_type) {
-            return None;
-        }
 
-        let (tag_types, all_literal) = matching_typeddict_field_types(
+        // Compare each field before combining tag types: `str | Literal["b"]` simplifies to
+        // `str`, but a field declared as `Literal["b"]` can still be ruled out by `== "a"`.
+        // Use conservative semantics when constraining the containing dictionary, since a broad
+        // tag can contain subclasses with arbitrary comparison methods.
+        let mut excluded_tags = UnionBuilder::new(db, &self.env);
+        visit_matching_typeddict_field_types(
             db,
-            &self.env,
             subscript_value_type,
             key_literal.value(db),
+            &mut |tag_type| {
+                if let Some(constraint) = self.evaluate_expr_compare_op(
+                    tag_type,
+                    rhs_type,
+                    operator,
+                    is_positive,
+                    ComparisonSoundnessPolicy::CONSERVATIVE,
+                ) {
+                    // A constraint can be relative to this field's type, so its complement need
+                    // not describe other possible tags. Exclude only values from this domain.
+                    excluded_tags.add_in_place(
+                        IntersectionBuilder::new(db, &self.env)
+                            .add_positive(tag_type)
+                            .add_negative(constraint)
+                            .build(),
+                    );
+                }
+            },
         );
-        // A true equality or false inequality does not constrain broad fields: their subclasses
-        // can have arbitrary comparison methods. Only narrow literal tags in these branches.
-        let is_equality = is_positive == (operator == ast::CmpOp::Eq);
-        if is_equality && !all_literal {
-            return None;
-        }
-
-        // An enum literal can compare equal to an integer or string with a disjoint type.
-        // Exclude only tag values that cannot satisfy the runtime comparison in this branch.
-        // Restrict the exclusion to the observed tag types: a comparison constraint can be
-        // relative to this domain, so its complement need not describe other possible tags.
-        let constraint =
-            self.evaluate_expr_compare_op(tag_types, rhs_type, operator, is_positive)?;
-        let excluded_tags = IntersectionBuilder::new(db, &self.env)
-            .add_positive(tag_types)
-            .add_negative(constraint)
-            .build();
+        let excluded_tags = excluded_tags.build();
         if excluded_tags.is_never() {
             return None;
         }
@@ -5088,7 +5115,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
     }
 
-    /// Narrow tagged unions of tuples with `Literal` elements.
+    /// Narrow unions of tuples by comparing an element's value.
     ///
     /// Given a subscript expression like `t[0]` where `t` is a union of tuple types, and a
     /// comparison value like `"foo"`, this method creates a constraint on `t` that narrows it
@@ -5121,24 +5148,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let index = subscript_index_type.as_int_literal()?;
         let index = i32::try_from(index).ok()?;
 
-        // The comparison value must be a supported literal type.
-        if !is_supported_tag_literal(rhs_type) {
-            return None;
-        }
-
         let subscript_place_expr = PlaceExpr::try_from_expr(subscript_value_expr)?;
         // Skip narrowing if any tuple in the union has an out-of-bounds index.
         // A diagnostic will be emitted elsewhere for the out-of-bounds access.
         if any_tuple_has_out_of_bounds_index(db, &self.env, union, index) {
-            return None;
-        }
-
-        // For equality constraints, all matching elements must have literal types to safely narrow.
-        // For inequality constraints, we can narrow even with non-literal element types.
-        let is_equality = is_positive == (operator == ast::CmpOp::Eq);
-        if is_equality
-            && !all_matching_tuple_elements_have_literal_types(db, &self.env, union, index)
-        {
             return None;
         }
 
@@ -5147,8 +5160,14 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             elem.tuple_instance_spec(db, &self.env)
                 .and_then(|spec| spec.py_index(db, &self.env, index).ok())
                 .is_none_or(|el_ty| {
-                    self.evaluate_expr_compare_op(el_ty, rhs_type, operator, is_positive)
-                        .is_none_or(|constraint| !el_ty.is_disjoint_from(db, &self.env, constraint))
+                    self.evaluate_expr_compare_op(
+                        el_ty,
+                        rhs_type,
+                        operator,
+                        is_positive,
+                        ComparisonSoundnessPolicy::CONSERVATIVE,
+                    )
+                    .is_none_or(|constraint| !el_ty.is_disjoint_from(db, &self.env, constraint))
                 })
         });
 
@@ -5175,12 +5194,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             return None;
         };
 
-        if matches!(operator, ast::CmpOp::Eq | ast::CmpOp::NotEq)
-            && !is_supported_tag_literal(rhs_type)
-        {
-            return None;
-        }
-
         let narrowed = union.filter(db, |element| {
             element
                 .resolve_type_alias(db)
@@ -5188,20 +5201,17 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 .place
                 .ignore_possibly_undefined()
                 .is_none_or(|attribute_type| match operator {
-                    ast::CmpOp::Eq | ast::CmpOp::NotEq => {
-                        let is_equality = is_positive == (operator == ast::CmpOp::Eq);
-                        (is_equality && !is_supported_tag_literal_or_union(db, attribute_type))
-                            || self
-                                .evaluate_expr_compare_op(
-                                    attribute_type,
-                                    rhs_type,
-                                    operator,
-                                    is_positive,
-                                )
-                                .is_none_or(|constraint| {
-                                    !attribute_type.is_disjoint_from(db, &self.env, constraint)
-                                })
-                    }
+                    ast::CmpOp::Eq | ast::CmpOp::NotEq => self
+                        .evaluate_expr_compare_op(
+                            attribute_type,
+                            rhs_type,
+                            operator,
+                            is_positive,
+                            ComparisonSoundnessPolicy::CONSERVATIVE,
+                        )
+                        .is_none_or(|constraint| {
+                            !attribute_type.is_disjoint_from(db, &self.env, constraint)
+                        }),
                     ast::CmpOp::Is | ast::CmpOp::IsNot => attribute_type
                         .identity_comparison_truthiness(db, &self.env, rhs_type)
                         .negate_if(is_positive != (operator == ast::CmpOp::Is))
@@ -5387,71 +5397,36 @@ fn key_membership_contains_protocol<'db>(
     )
 }
 
-fn is_supported_tag_literal(ty: Type) -> bool {
-    matches!(
-        ty.as_literal_value_kind(),
-        Some(
-            LiteralValueTypeKind::String(_)
-                | LiteralValueTypeKind::Bytes(_)
-                | LiteralValueTypeKind::Int(_)
-                | LiteralValueTypeKind::Enum(_)
-        )
-    )
-}
-
-/// Return true if the given type is a literal type with one or more supported literal values,
-/// e.g. `Literal[1, "A", "B"]`. These types are represented as `Type::Union(_)`.
-fn is_supported_tag_literal_or_union(db: &dyn Db, ty: Type) -> bool {
-    match ty {
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .copied()
-            .all(is_supported_tag_literal),
-        _ => is_supported_tag_literal(ty),
-    }
-}
-
-/// Collect matching `TypedDict` field types and whether every field has supported literal tags.
-/// Non-`TypedDict` alternatives and missing fields do not contribute any tag types.
-fn matching_typeddict_field_types<'db>(
+/// Visit matching `TypedDict` field types, ignoring other alternatives and missing fields.
+fn visit_matching_typeddict_field_types<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     field_name: &str,
-) -> (Type<'db>, bool) {
+    visit: &mut impl FnMut(Type<'db>),
+) {
     let elements = match ty {
         Type::TypedDict(td) => {
-            return td
-                .items(db)
-                .get(field_name)
-                .map_or((Type::Never, true), |field| {
-                    (
-                        field.declared_ty,
-                        is_supported_tag_literal_or_union(db, field.declared_ty),
-                    )
-                });
+            if let Some(field) = td.items(db).get(field_name) {
+                visit(field.declared_ty);
+            }
+            return;
         }
         Type::TypeAlias(alias) => {
-            return matching_typeddict_field_types(db, env, alias.value_type(db), field_name);
+            return visit_matching_typeddict_field_types(
+                db,
+                alias.value_type(db),
+                field_name,
+                visit,
+            );
         }
         Type::Union(union) => Either::Left(union.elements(db).iter()),
         Type::Intersection(intersection) => Either::Right(intersection.positive(db).iter()),
-        _ => return (Type::Never, true),
+        _ => return,
     };
 
-    let mut tag_types = UnionBuilder::new(db, env);
-    let mut all_literal = true;
     for element in elements {
-        if !is_or_contains_typeddict(db, *element) {
-            continue;
-        }
-        let (element_tags, element_is_literal) =
-            matching_typeddict_field_types(db, env, *element, field_name);
-        tag_types = tag_types.add(element_tags);
-        all_literal &= element_is_literal;
+        visit_matching_typeddict_field_types(db, *element, field_name, visit);
     }
-    (tag_types.build(), all_literal)
 }
 
 /// Check if any tuple in the union has an out-of-bounds index.
@@ -5467,24 +5442,6 @@ fn any_tuple_has_out_of_bounds_index<'db>(
     union.elements(db).iter().any(|elem| {
         elem.tuple_instance_spec(db, env)
             .is_some_and(|spec| spec.py_index(db, env, index).is_err())
-    })
-}
-
-/// Check that all tuple elements at the given index have literal types.
-///
-/// Non-literal types (like `str` or `int`) could have subclasses that compare equal
-/// to arbitrary values. We therefore restrict equality narrowing to tuples with
-/// literal tags; their comparison semantics are checked separately.
-fn all_matching_tuple_elements_have_literal_types<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    union: UnionType<'db>,
-    index: i32,
-) -> bool {
-    union.elements(db).iter().all(|elem| {
-        elem.tuple_instance_spec(db, env)
-            .and_then(|spec| spec.py_index(db, env, index).ok())
-            .is_none_or(|ty| is_supported_tag_literal_or_union(db, ty))
     })
 }
 

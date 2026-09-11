@@ -4318,20 +4318,20 @@ def enum_tag_equal_to_integer(
             reveal_type(x)  # revealed: tuple[Literal[2], bytes]
 ```
 
-Narrowing is restricted to `Literal` tag elements:
+A broad tag keeps its tuple possible in both branches, while other tuples can still be excluded
+based on their literal tags:
 
 ```py
-def _(x: tuple[Literal["tag1"], A] | tuple[str, B]):
+def _(x: tuple[Literal["tag1"], A] | tuple[str, B] | tuple[Literal["tag2"], C]):
     match x[0]:
         case "tag1":
-            # Can't narrow because second tuple has `str` (not literal) at index 0
             reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | tuple[str, B]
         case _:
-            # But we *can* narrow with inequality
-            reveal_type(x)  # revealed: tuple[str, B]
+            reveal_type(x)  # revealed: tuple[str, B] | tuple[Literal["tag2"], C]
 ```
 
-and it is also restricted to `match` patterns that solely consist of value patterns:
+A broad value pattern can match either tag, so another alternative in the same OR pattern does not
+rule out either tuple:
 
 ```py
 class Config:

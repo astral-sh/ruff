@@ -2784,7 +2784,8 @@ def _(x: A | B):
         reveal_type(x)  # revealed: B
 ```
 
-Non-literal tag arms are preserved during positive narrowing:
+A broad `str` tag can match the comparison value or a different string, so its containing object
+remains possible in both branches:
 
 ```py
 from typing import Literal
@@ -2828,6 +2829,84 @@ def _(x: A | B):
         reveal_type(x)  # revealed: A
     else:
         reveal_type(x)  # revealed: B
+```
+
+## Attribute tags with non-literal comparators
+
+A boolean comparison value can match a boolean tag, but cannot match either of these other tags:
+
+```py
+from typing import Literal
+
+class BooleanTag:
+    tag: bool
+
+class StringTag:
+    tag: Literal["text"]
+
+class NumberTag:
+    tag: Literal[2]
+
+def boolean_comparator(value: BooleanTag | StringTag | NumberTag, other: bool):
+    if value.tag == other:
+        reveal_type(value)  # revealed: BooleanTag
+    else:
+        reveal_type(value)  # revealed: BooleanTag | StringTag | NumberTag
+```
+
+A union comparison value can match tags of different types. Neither `True` nor `"text"` equals `2`,
+so `NumberTag` is excluded from the equality branch:
+
+```py
+def union_comparator(value: BooleanTag | StringTag | NumberTag, other: Literal[True, "text"]):
+    if value.tag == other:
+        reveal_type(value)  # revealed: BooleanTag | StringTag
+    else:
+        reveal_type(value)  # revealed: BooleanTag | StringTag | NumberTag
+```
+
+## Attribute tags with ambiguous comparisons
+
+An `int` tag can contain a subclass with custom equality. This remains true when the tag is a
+non-final subclass that inherits `int.__eq__`. Both tag types stay possible when compared with a
+string, while the unrelated literal tag is excluded:
+
+```py
+from typing import Literal
+
+class OpenInt(int): ...
+
+class IntegerTag:
+    tag: int
+
+class SubclassTag:
+    tag: OpenInt
+
+class A:
+    tag: Literal["a"]
+
+class B:
+    tag: Literal["b"]
+
+def integer_tags(value: IntegerTag | SubclassTag | A | B):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: IntegerTag | SubclassTag | A
+    else:
+        reveal_type(value)  # revealed: IntegerTag | SubclassTag | B
+```
+
+The comparison value can also have a subclass with custom equality. A `str` value might therefore
+match an integer tag, so neither containing object can be excluded:
+
+```py
+class One:
+    tag: Literal[1]
+
+def broad_comparator(value: A | One, other: str):
+    if value.tag == other:
+        reveal_type(value)  # revealed: A | One
+    else:
+        reveal_type(value)  # revealed: A | One
 ```
 
 ## Attribute tags with enum equality
