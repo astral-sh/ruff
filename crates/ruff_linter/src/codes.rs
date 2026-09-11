@@ -1031,6 +1031,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Pie, "807") => rules::flake8_pie::rules::ReimplementedContainerBuiltin,
         (Flake8Pie, "808") => rules::flake8_pie::rules::UnnecessaryRangeStart,
         (Flake8Pie, "810") => rules::flake8_pie::rules::MultipleStartsEndsWith,
+        (Flake8Pie, "811") => rules::ruff::rules::UnnecessaryLiteralUnpacking,
 
         // flake8-commas
         (Flake8Commas, "812") => rules::flake8_commas::rules::MissingTrailingComma,

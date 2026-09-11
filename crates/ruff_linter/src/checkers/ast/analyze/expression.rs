@@ -1404,6 +1404,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_bugbear::rules::duplicate_value(checker, set);
             }
         }
+        Expr::Starred(starred) => {
+            if checker.is_rule_enabled(Rule::UnnecessaryLiteralUnpacking) {
+                ruff::rules::unnecessary_literal_unpacking(checker, starred);
+            }
+        }
         Expr::Yield(_) => {
             if checker.is_rule_enabled(Rule::YieldInInit) {
                 pylint::rules::yield_in_init(checker, expr);
