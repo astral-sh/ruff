@@ -94,7 +94,7 @@ PositiveList = TypeAliasType(
 T = typing.TypeVar("T", default=Any)
 AnyList = TypeAliasType("AnyList", list[T], type_params=(T,))
 
-# unsafe fix if comments within the fix
+# Comments outside the alias value are removed by the fix.
 T = TypeVar("T")
 PositiveList = TypeAliasType(  # eaten comment
     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
