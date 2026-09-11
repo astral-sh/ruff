@@ -87,7 +87,7 @@ impl LspFileWatcher {
 
     /// Computes which paths need to be watched and returns an updated registration
     /// if there are any changes to the watched paths.
-    pub(super) fn reconcile<'db>(
+    fn reconcile<'db>(
         &mut self,
         projects: impl ExactSizeIterator<Item = &'db ProjectDatabase> + Clone,
     ) -> Option<FileWatcherUpdate> {
@@ -205,7 +205,7 @@ impl LspFileWatcher {
         })
     }
 
-    pub(super) fn complete_registration(
+    fn complete_registration(
         &mut self,
         response: &lsp_server::Response,
     ) -> Option<FileWatcherCompletion> {
@@ -294,13 +294,13 @@ impl FileWatcherUpdate {
     }
 }
 
-pub(super) struct FileWatcherCompletion {
+struct FileWatcherCompletion {
     old_id: Option<String>,
     newly_covered_paths: Vec<SystemPathBuf>,
 }
 
 impl FileWatcherCompletion {
-    pub(super) fn apply(self, session: &mut Session, client: &Client) {
+    fn apply(self, session: &mut Session, client: &Client) {
         // Existing paths were watched by the old registration throughout this
         // request. Refresh newly covered paths after the client's response so
         // edits missed before registration invalidate cached files, including `.pth` files.
