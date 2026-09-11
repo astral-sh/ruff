@@ -77,6 +77,16 @@ fn solution<'db>(solved_typevars: impl IntoIterator<Item = TypeVarSolution<'db>>
     }
 }
 
+fn invalid_solution<'db>(
+    solved_typevars: impl IntoIterator<Item = TypeVarSolution<'db>>,
+) -> Solution<'db> {
+    let solved_typevars = solved_typevars.into_iter().collect();
+    Solution {
+        solved_typevars,
+        validity: SolutionValidity::Invalid,
+    }
+}
+
 fn collect_paths<'db, 'c>(
     db: &'db TestDb,
     builder: &'c ConstraintSetBuilder<'db>,
@@ -452,7 +462,7 @@ fn valid_unsolved_path_is_not_unconstrained() {
         ),
         (
             PathBoundSolution::Unsatisfiable,
-            Solutions::Unsatisfiable(SolutionPaths::Complete(vec![])),
+            Solutions::Unsatisfiable(SolutionPaths::Complete(vec![invalid_solution([])])),
             Ok(SolutionProjection::Unsatisfiable),
         ),
     ] {

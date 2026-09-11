@@ -3647,35 +3647,32 @@ impl<'db> PathBounds<'db> {
             PathBounds::Constrained(paths) => paths,
         };
 
-        let mut solutions = Vec::with_capacity(paths.len());
-        let mut exceeded_budget = false;
+        let mut valid_solutions = Vec::with_capacity(paths.len());
+        let mut invalid_solutions = Vec::new();
+        let mut valid_exceeded_budget = false;
+        let mut invalid_exceeded_budget = false;
         for path in paths {
-            let Some((solution, path_exceeded_budget)) = Self::solve_path_with(path, &mut choose)
-            else {
-                continue;
-            };
-            check_solution(&solution)?;
-            exceeded_budget |= path_exceeded_budget;
-            solutions.push(solution);
+            let (solution, path_exceeded_budget) = Self::solve_path_with(path, &mut choose);
+            if solution.is_valid() {
+                check_solution(&solution)?;
+                valid_exceeded_budget |= path_exceeded_budget;
+                valid_solutions.push(solution);
+            } else {
+                invalid_exceeded_budget |= path_exceeded_budget;
+                invalid_solutions.push(solution);
+            }
         }
 
-        // If there are no solutions at all, the constraint set is unsatisfiable.
-        if solutions.is_empty() {
-            let solutions = SolutionPaths::Complete(Vec::default());
-            return Ok(Solutions::Unsatisfiable(solutions));
+        if !valid_solutions.is_empty() {
+            let solutions = SolutionPaths::new(valid_solutions, valid_exceeded_budget);
+            return Ok(Solutions::Constrained(solutions));
         }
 
-        // If the only solutions we found were invalid, the constraint set is unsatisfiable.
-        let all_solutions_invalid = solutions.iter().all(|solution| !solution.is_valid());
-        if all_solutions_invalid {
-            let solutions = SolutionPaths::new(solutions, exceeded_budget);
-            return Ok(Solutions::Unsatisfiable(solutions));
+        for solution in &invalid_solutions {
+            check_solution(solution)?;
         }
-
-        // If we found any valid solutions, we can throw away the invalid ones.
-        solutions.retain(Solution::is_valid);
-        let solutions = SolutionPaths::new(solutions, exceeded_budget);
-        Ok(Solutions::Constrained(solutions))
+        let solutions = SolutionPaths::new(invalid_solutions, invalid_exceeded_budget);
+        Ok(Solutions::Unsatisfiable(solutions))
     }
 
     /// Solves one complete path, retaining whether any of its bindings used a fallback.
@@ -3683,14 +3680,22 @@ impl<'db> PathBounds<'db> {
     fn solve_path_with(
         path: &[PathBound<'db>],
         choose: &mut impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
-    ) -> Option<(Solution<'db>, bool)> {
+    ) -> (Solution<'db>, bool) {
         let mut solved_typevars = Vec::with_capacity(path.len());
+        let mut validity = SolutionValidity::Valid;
         let mut exceeded_budget = false;
         for path_bound in path {
             let ty = match choose(path_bound.variance(), path_bound) {
                 PathBoundSolution::Solved(ty) => Some(ty),
                 PathBoundSolution::Unsolved => None,
-                PathBoundSolution::Unsatisfiable => return None,
+                PathBoundSolution::Unsatisfiable => {
+                    // This typevar causes the overall path to not be a valid solution. But we
+                    // still want to report it upwards. If there are any other paths that are
+                    // valid, this one will be discarded. If there are only invalid paths, we will
+                    // use them to construct a useful diagnostic.
+                    validity = SolutionValidity::Invalid;
+                    None
+                }
                 PathBoundSolution::BudgetExceeded { fallback } => {
                     exceeded_budget = true;
                     fallback
@@ -3705,9 +3710,9 @@ impl<'db> PathBounds<'db> {
         }
         let solution = Solution {
             solved_typevars,
-            validity: SolutionValidity::Valid,
+            validity,
         };
-        Some((solution, exceeded_budget))
+        (solution, exceeded_budget)
     }
 
     /// The default solution selection logic for a single typevar on a single BDD path.
@@ -4442,7 +4447,6 @@ pub(crate) enum SolutionValidity {
     /// The solution satisfies all evidence constraints, but doesn't satisfy the validity
     /// constraints. (This often means we've found something that _would_ be a solution, except
     /// that it violates the declared upper bound or constraints of one or more of the typevars.)
-    #[expect(dead_code)]
     Invalid,
 }
 
