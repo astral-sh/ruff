@@ -7765,6 +7765,163 @@ def _(flag: bool) -> None:
     reveal_type(infer_producer(cls))  # revealed: int | str
 ```
 
+## Default specialization of generic meta-protocol constructors
+
+Checking a bare generic class against `type[Protocol]` does not provide constructor arguments from
+which to infer a specialization. Its constructed instance therefore uses the class's default type
+arguments, or `Unknown` for parameters without defaults.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Protocol
+
+class HasValue[T](Protocol):
+    @property
+    def value(self) -> T: ...
+
+class Defaulted[T = int]:
+    value: T
+
+class NoDefault[T]:
+    value: T
+
+defaulted: type[HasValue[int]] = Defaulted
+wrong_default: type[HasValue[str]] = Defaulted  # error: [invalid-assignment]
+unspecified: type[HasValue[str]] = NoDefault
+```
+
+Generic inference exposes these type arguments: `int` for `Defaulted` and `Unknown` for `NoDefault`.
+Explicit class arguments take precedence over defaults.
+
+```py
+def infer[T](cls: type[HasValue[T]]) -> T:
+    return cls().value
+
+reveal_type(infer(Defaulted))  # revealed: int
+reveal_type(infer(NoDefault))  # revealed: Unknown
+reveal_type(infer(Defaulted[str]))  # revealed: str
+
+explicit: type[HasValue[str]] = Defaulted[str]
+wrong: type[HasValue[int]] = Defaulted[str]  # error: [invalid-assignment]
+```
+
+Inference from a union of bare classes combines their default arguments.
+
+```py
+class StringDefaulted[T = str]:
+    value: T
+
+def infer_union(flag: bool) -> None:
+    cls = Defaulted if flag else StringDefaulted
+    reveal_type(infer(cls))  # revealed: int | str
+```
+
+A parameter already annotated with a specialization retains that specialization, including type
+variables supplied by its caller.
+
+```py
+def preserve[T](cls: type[Defaulted[T]]) -> T:
+    reveal_type(infer(cls))  # revealed: T@preserve
+    return infer(cls)
+```
+
+An ordinary method is checked on both the constructed instance and the class object. Default
+specialization also preserves the method's unbound signature.
+
+```py
+class Getter[T](Protocol):
+    def get(self) -> T: ...
+
+class DefaultedGetter[T = int]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def infer_getter[T](cls: type[Getter[T]]) -> T:
+    return cls().get()
+
+reveal_type(infer_getter(DefaultedGetter))  # revealed: int
+reveal_type(infer_getter(DefaultedGetter[str]))  # revealed: str
+wrong_getter: type[Getter[str]] = DefaultedGetter  # error: [invalid-assignment]
+```
+
+`functools.partial` has special constructor handling. Its omitted type argument also becomes
+`Unknown`, while an explicit argument is preserved.
+
+```py
+from functools import partial
+from typing import Any
+
+class CallableInstance[T](Protocol):
+    def __call__(self, *args: Any, **kwargs: Any) -> T: ...
+
+def infer_return[T](cls: type[CallableInstance[T]]) -> T:
+    raise NotImplementedError
+
+reveal_type(infer_return(partial[str]))  # revealed: str
+reveal_type(infer_return(partial))  # revealed: Unknown
+
+bad_partial: type[CallableInstance[int]] = partial[str]  # error: [invalid-assignment]
+```
+
+## Generic meta-protocol constructors with a custom return type
+
+Default specialization still uses the effective constructor return. `Factory` does not have the
+required instance attribute itself, but its `__new__` returns a `Product` that does.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Protocol
+
+class HasValue[T](Protocol):
+    @property
+    def value(self) -> T: ...
+
+class Product[T]:
+    value: T
+
+class Factory[T = int]:
+    def __new__(cls) -> Product[T]:
+        raise NotImplementedError
+
+defaulted: type[HasValue[int]] = Factory
+explicit: type[HasValue[str]] = Factory[str]
+wrong: type[HasValue[str]] = Factory  # error: [invalid-assignment]
+```
+
+A constructor can return a type unrelated to its class's default arguments. Those arguments do not
+replace an explicitly declared return type.
+
+```py
+class StringFactory[T = int]:
+    def __new__(cls) -> Product[str]:
+        raise NotImplementedError
+
+strings: type[HasValue[str]] = StringFactory
+integers: type[HasValue[int]] = StringFactory  # error: [invalid-assignment]
+```
+
+A metaclass can override construction independently of the generic class's default arguments. Its
+`__call__` return still determines which instance protocol the class satisfies.
+
+```py
+class StringFactoryMeta(type):
+    def __call__(self) -> Product[str]:
+        raise NotImplementedError
+
+class MetaFactory[T = int](metaclass=StringFactoryMeta): ...
+
+meta_strings: type[HasValue[str]] = MetaFactory
+meta_integers: type[HasValue[int]] = MetaFactory  # error: [invalid-assignment]
+```
+
 ## Generic substitution of `type[Protocol]`
 
 Passing `type[P]` through a generic identity function preserves its structural meaning, including
