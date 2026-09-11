@@ -3073,7 +3073,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 && generic_context.variables_inner(db).keys().all(|identity| {
                     match (path_types.get(identity), types.get(identity)) {
                         (None, None) => true,
-                        (Some(SolutionType::Resolved(resolved)), Some(merged)) => {
+                        (Some(SolutionType::Resolved { ty: resolved, .. }), Some(merged)) => {
                             resolved == merged
                         }
                         _ => false,
@@ -4732,8 +4732,28 @@ mod tests {
             assert_eq!(
                 paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
                 FxHashSet::from_iter([
-                    [Some(Resolved(int)), Some(Resolved(str))].as_slice(),
-                    [Some(Resolved(str)), Some(Resolved(int))].as_slice(),
+                    [
+                        Some(Resolved {
+                            ty: int,
+                            selected: int
+                        }),
+                        Some(Resolved {
+                            ty: str,
+                            selected: str
+                        })
+                    ]
+                    .as_slice(),
+                    [
+                        Some(Resolved {
+                            ty: str,
+                            selected: str
+                        }),
+                        Some(Resolved {
+                            ty: int,
+                            selected: int
+                        })
+                    ]
+                    .as_slice(),
                 ])
             );
 
@@ -4783,8 +4803,25 @@ mod tests {
                 assert_eq!(
                     paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
                     FxHashSet::from_iter([
-                        [Some(Resolved(int)), Some(Resolved(str))].as_slice(),
-                        [fallback.map(Resolved), Some(Resolved(int))].as_slice(),
+                        [
+                            Some(Resolved {
+                                ty: int,
+                                selected: int
+                            }),
+                            Some(Resolved {
+                                ty: str,
+                                selected: str
+                            })
+                        ]
+                        .as_slice(),
+                        [
+                            fallback.map(|ty| Resolved { ty, selected: ty }),
+                            Some(Resolved {
+                                ty: int,
+                                selected: int
+                            })
+                        ]
+                        .as_slice(),
                     ])
                 );
 
@@ -5001,8 +5038,22 @@ mod tests {
                 assert_eq!(
                     paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
                     FxHashSet::from_iter([
-                        [None, Some(Resolved(int))].as_slice(),
-                        [None, Some(Resolved(str))].as_slice(),
+                        [
+                            None,
+                            Some(Resolved {
+                                ty: int,
+                                selected: int
+                            })
+                        ]
+                        .as_slice(),
+                        [
+                            None,
+                            Some(Resolved {
+                                ty: str,
+                                selected: str
+                            })
+                        ]
+                        .as_slice(),
                     ])
                 );
             }
@@ -5054,7 +5105,14 @@ mod tests {
             paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
             FxHashSet::from_iter([
                 [Some(Unresolved(Type::TypeVar(u))), None].as_slice(),
-                [Some(Resolved(int)), None].as_slice(),
+                [
+                    Some(Resolved {
+                        ty: int,
+                        selected: int
+                    }),
+                    None
+                ]
+                .as_slice(),
             ])
         );
         assert_eq!(inference.merged_types(db), [Some(int), None]);
@@ -5099,8 +5157,14 @@ mod tests {
         for path in paths {
             match &**path {
                 [
-                    Some(Resolved(Type::Recursive(t))),
-                    Some(Resolved(Type::Recursive(u))),
+                    Some(Resolved {
+                        ty: Type::Recursive(t),
+                        ..
+                    }),
+                    Some(Resolved {
+                        ty: Type::Recursive(u),
+                        ..
+                    }),
                 ] => {
                     assert_eq!(t, u);
                     assert_eq!(
@@ -5108,7 +5172,7 @@ mod tests {
                         KnownClass::List.to_specialized_instance(db, &env, &[Type::Recursive(*t)])
                     );
                 }
-                [Some(Resolved(t)), Some(Resolved(u))] => {
+                [Some(Resolved { ty: t, .. }), Some(Resolved { ty: u, .. })] => {
                     assert_eq!((*t, *u), (Type::object(), Type::object()));
                 }
                 _ => anyhow::bail!("expected closed alternatives"),
@@ -5318,8 +5382,28 @@ mod tests {
         assert_eq!(
             paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
             FxHashSet::from_iter([
-                [Some(Resolved(Type::TypeVar(outer))), Some(Resolved(int)),].as_slice(),
-                [Some(Resolved(Type::TypeVar(outer))), Some(Resolved(str)),].as_slice(),
+                [
+                    Some(Resolved {
+                        ty: Type::TypeVar(outer),
+                        selected: Type::TypeVar(outer)
+                    }),
+                    Some(Resolved {
+                        ty: int,
+                        selected: int
+                    }),
+                ]
+                .as_slice(),
+                [
+                    Some(Resolved {
+                        ty: Type::TypeVar(outer),
+                        selected: Type::TypeVar(outer)
+                    }),
+                    Some(Resolved {
+                        ty: str,
+                        selected: str
+                    }),
+                ]
+                .as_slice(),
             ])
         );
         Ok(())

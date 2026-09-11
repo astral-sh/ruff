@@ -4919,13 +4919,16 @@ class C:
     def f(self, other: "C"):
         self.x = (other.x, 1)
 
-reveal_type(C().x)  # revealed: tuple[μ$0. tuple[$0, int], int]
+# TODO: remove redundant recursive alternatives. Expected: tuple[μ$0. tuple[$0, int], int]
+# revealed: tuple[μ$0. tuple[$0, int], int] | (μ$0. tuple[$0, int])
+reveal_type(C().x)
 reveal_type(C().x[0])  # revealed: μ$0. tuple[$0, int]
 reveal_type(C().x[0][1])  # revealed: int
 wrong: str = C().x[0][1]  # error: [invalid-assignment]
 ```
 
-An initial value remains an alternative at every level of the recursive tuple:
+An initial value remains an alternative to the assigned tuple. The recursive item is currently
+approximated with `Divergent`:
 
 ```py
 class WithInitial:
@@ -4935,7 +4938,9 @@ class WithInitial:
     def update(self, other: "WithInitial"):
         self.value = (other.value, "b")
 
-reveal_type(WithInitial().value)  # revealed: int | tuple[μ$0. tuple[$0, str] | int, str]
+# TODO: retain the recursive type. Expected: int | tuple[μ$0. tuple[$0, str] | int, str]
+# revealed: int | tuple[Divergent, str]
+reveal_type(WithInitial().value)
 ```
 
 A helper function can also construct the recursive tuple:

@@ -62,7 +62,7 @@ pub(crate) struct ProjectionTypeBudget {
 }
 
 impl ProjectionTypeBudget {
-    pub(super) fn new(remaining: usize) -> Self {
+    fn new(remaining: usize) -> Self {
         Self { remaining }
     }
 

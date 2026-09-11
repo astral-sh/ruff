@@ -4,8 +4,7 @@ use std::cell::{Cell, RefCell};
 
 use rustc_hash::FxHashMap;
 
-use super::projection::ProjectionTypeBudget;
-use super::{ProjectionError, SolutionBudget, TypeVarSolution};
+use super::TypeVarSolution;
 use crate::types::cyclic::CycleDetector;
 use crate::types::function::FunctionType;
 use crate::types::generics::{ApplySpecialization, GenericContext};
@@ -26,7 +25,11 @@ use crate::{Db, FxOrderMap, ProgramEnvironment};
 /// This does not describe budget completeness or apply defaults to variables without evidence.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum SolutionType<'db> {
-    Resolved(Type<'db>),
+    Resolved {
+        ty: Type<'db>,
+        /// The selected expression before substituting dependencies and closing recursive binders.
+        selected: Type<'db>,
+    },
     /// The original selected type, retained for missing dependencies, noncontractive cycles,
     /// or type forms whose captured references cannot be substituted.
     Unresolved(Type<'db>),
@@ -37,27 +40,8 @@ impl<'db> SolutionType<'db> {
     /// Match the outcome instead when a consumer requires a closed solution.
     pub(crate) fn ty(self) -> Type<'db> {
         match self {
-            Self::Resolved(ty) | Self::Unresolved(ty) => ty,
+            Self::Resolved { ty, .. } | Self::Unresolved(ty) => ty,
         }
-    }
-}
-
-impl<'db> TypeVarSolution<'db> {
-    /// Resolve one defining equation per variable, bounding the size of the resulting types.
-    pub(in crate::types) fn solve_equations(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        equations: &[Self],
-    ) -> Result<Box<[SolutionType<'db>]>, ProjectionError> {
-        let inferable =
-            TypeVarSet::from_typevars(db, equations.iter().map(|equation| equation.bound_typevar));
-        let resolved = resolve_solution(db, env, inferable, equations);
-        let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
-        for ty in &resolved {
-            let (SolutionType::Resolved(ty) | SolutionType::Unresolved(ty)) = ty;
-            budget.charge_type(db, *ty)?;
-        }
-        Ok(resolved)
     }
 }
 
@@ -84,10 +68,12 @@ pub(crate) fn resolve_solution<'db>(
         .iter()
         .enumerate()
         .map(|(index, binding)| {
-            resolved[index].map_or(
-                SolutionType::Unresolved(binding.solution),
-                SolutionType::Resolved,
-            )
+            resolved[index].map_or(SolutionType::Unresolved(binding.solution), |ty| {
+                SolutionType::Resolved {
+                    ty,
+                    selected: binding.solution,
+                }
+            })
         })
         .collect()
 }
@@ -406,7 +392,13 @@ mod tests {
                 );
                 assert_eq!(
                     resolved.as_ref(),
-                    [SolutionType::Unresolved(alias), SolutionType::Resolved(int)],
+                    [
+                        SolutionType::Unresolved(alias),
+                        SolutionType::Resolved {
+                            ty: int,
+                            selected: int
+                        }
+                    ],
                     "{name}"
                 );
             }
@@ -441,7 +433,13 @@ mod tests {
                 TypeVarSet::from_typevars(db, [t]),
                 &[binding(t, tree)],
             );
-            assert_eq!(resolved.as_ref(), [SolutionType::Resolved(tree)]);
+            assert_eq!(
+                resolved.as_ref(),
+                [SolutionType::Resolved {
+                    ty: tree,
+                    selected: tree
+                }]
+            );
 
             // A closed recursive alias does not prevent resolving an independent tuple element.
             let pair = Type::tuple(TupleType::heterogeneous(db, &env, [tree, Type::TypeVar(u)]));
@@ -455,8 +453,14 @@ mod tests {
             assert_eq!(
                 resolved.as_ref(),
                 [
-                    SolutionType::Resolved(expected),
-                    SolutionType::Resolved(int)
+                    SolutionType::Resolved {
+                        ty: expected,
+                        selected: pair
+                    },
+                    SolutionType::Resolved {
+                        ty: int,
+                        selected: int
+                    }
                 ]
             );
         }
@@ -510,11 +514,15 @@ mod tests {
                 &[binding(t, Type::KnownInstance(partial)), binding(u, int)],
             );
             let [
-                SolutionType::Resolved(Type::KnownInstance(
-                    KnownInstanceType::FunctoolsPartial(mapped)
-                    | KnownInstanceType::FunctoolsPartialCall(mapped),
-                )),
-                SolutionType::Resolved(resolved_u),
+                SolutionType::Resolved {
+                    ty:
+                        Type::KnownInstance(
+                            KnownInstanceType::FunctoolsPartial(mapped)
+                            | KnownInstanceType::FunctoolsPartialCall(mapped),
+                        ),
+                    ..
+                },
+                SolutionType::Resolved { ty: resolved_u, .. },
             ] = resolved.as_ref()
             else {
                 anyhow::bail!("expected resolved partial and U");

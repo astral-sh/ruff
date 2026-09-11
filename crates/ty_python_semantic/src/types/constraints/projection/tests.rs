@@ -59,7 +59,10 @@ fn binding<'db>(
 ) -> TypeVarSolution<'db, SolutionType<'db>> {
     TypeVarSolution {
         bound_typevar,
-        solution: SolutionType::Resolved(solution),
+        solution: SolutionType::Resolved {
+            ty: solution,
+            selected: solution,
+        },
     }
 }
 

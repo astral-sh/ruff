@@ -30,8 +30,8 @@ use ty_python_core::definition::Definition;
 use super::operations::RecursiveOperations;
 use super::{RecursiveMapping, RecursiveOrigin, RecursiveSubstitution, RecursiveType};
 use crate::types::class::ImplicitAttributeName;
-use crate::types::constraints::TypeVarSolution;
 use crate::types::constraints::resolution::SolutionType;
+use crate::types::constraints::{SolutionPaths, Solutions, TypeVarSolution};
 use crate::types::generics::walk_specialization_types;
 use crate::types::infer::{InferExpression, infer_definition_types, infer_expression_types_impl};
 use crate::types::visitor::{TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type};
@@ -262,15 +262,40 @@ impl<'db> InferenceKey<'db> {
             });
         }
         let result = match &TypeVarSolution::solve_equations(db, &env, &symbolic) {
-            Ok(solution) if let Some(SolutionType::Resolved(ty)) = solution.first() => Some(*ty),
+            Ok(Solutions::Constrained(SolutionPaths::Complete(paths)))
+                if let [solution] = paths.as_slice() =>
+            {
+                solution.iter().find_map(|binding| {
+                    if binding.bound_typevar == variables[0]
+                        && let SolutionType::Resolved { ty, selected } = binding.solution
+                    {
+                        Some((ty, selected))
+                    } else {
+                        None
+                    }
+                })
+            }
             _ => None,
         };
-        let result = result.filter(|ty| !RecursiveInputs::contains(db, &env, [*ty]));
-        let Some(ty) = result else {
+        let result = result.filter(|(ty, _)| !RecursiveInputs::contains(db, &env, [*ty]));
+        let Some((ty, selected)) = result else {
             return self.approximate_equation(db, &equations);
         };
-        // Retain query-owned backedges instead of embedding the closed solution in its equation.
-        InferenceSolution { ty, unfolded: root }
+        // The solver can remove unguarded self-references. Expose its selected expression while
+        // retaining query-owned backedges instead of embedding a provisional closed solution.
+        let replacements: Vec<_> = replacements
+            .into_iter()
+            .map(|(key, variable)| (variable, key))
+            .collect();
+        let unfolded = selected.apply_type_mapping_impl(
+            db,
+            &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Replace(
+                &replacements,
+            ))),
+            TypeContext::default(),
+            &visitor,
+        );
+        InferenceSolution { ty, unfolded }
     }
 }
 

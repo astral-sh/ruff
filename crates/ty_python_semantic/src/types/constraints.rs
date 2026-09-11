@@ -6209,11 +6209,10 @@ mod tests {
             Ok(Solutions::Constrained(SolutionPaths::Complete(vec![vec![
                 TypeVarSolution {
                     bound_typevar: t,
-                    solution: SolutionType::Resolved(UnionType::from_elements(
-                        db,
-                        &env,
-                        [int, str]
-                    )),
+                    solution: SolutionType::Resolved {
+                        ty: UnionType::from_elements(db, &env, [int, str]),
+                        selected: UnionType::from_elements(db, &env, [int, str])
+                    },
                 }
             ]])))
         );
@@ -6254,11 +6253,17 @@ mod tests {
         assert_eq!(solutions[0].len(), 2);
         assert!(solutions[0].contains(&TypeVarSolution {
             bound_typevar: t,
-            solution: SolutionType::Resolved(int),
+            solution: SolutionType::Resolved {
+                ty: int,
+                selected: int
+            },
         }));
         assert!(solutions[0].contains(&TypeVarSolution {
             bound_typevar: u,
-            solution: SolutionType::Resolved(int),
+            solution: SolutionType::Resolved {
+                ty: int,
+                selected: int
+            },
         }));
 
         let storage = builder.storage.borrow();
@@ -6440,7 +6445,10 @@ class E: ...
         let str = known_instance(db, KnownClass::Str);
         let binding = |bound_typevar, solution| TypeVarSolution {
             bound_typevar,
-            solution: SolutionType::Resolved(solution),
+            solution: SolutionType::Resolved {
+                ty: solution,
+                selected: solution,
+            },
         };
 
         for lower in [None, Some(Type::any())] {
@@ -7786,11 +7794,17 @@ class E: ...
         let expected = Ok(Solutions::Constrained(SolutionPaths::Complete(vec![
             vec![TypeVarSolution {
                 bound_typevar: u,
-                solution: SolutionType::Resolved(known_instance(db, KnownClass::Int)),
+                solution: SolutionType::Resolved {
+                    ty: known_instance(db, KnownClass::Int),
+                    selected: known_instance(db, KnownClass::Int),
+                },
             }],
             vec![TypeVarSolution {
                 bound_typevar: u,
-                solution: SolutionType::Resolved(known_instance(db, KnownClass::Str)),
+                solution: SolutionType::Resolved {
+                    ty: known_instance(db, KnownClass::Str),
+                    selected: known_instance(db, KnownClass::Str),
+                },
             }],
         ])));
 

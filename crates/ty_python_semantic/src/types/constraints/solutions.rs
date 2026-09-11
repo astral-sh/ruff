@@ -3,12 +3,39 @@ use std::ops::ControlFlow;
 
 use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBoundsBuilder, ConstraintId, ConstraintSetStorage, NodeId,
-    PathBounds, SolutionLimits,
+    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBoundsBuilder, ConstraintId, ConstraintSet,
+    ConstraintSetBuilder, ConstraintSetStorage, IteratorConstraintsExtension, NodeId, PathBounds,
+    ProjectionError, SolutionLimits, Solutions, TypeVarSolution,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
+
+impl<'db> TypeVarSolution<'db> {
+    /// Solve defining equations as equality constraints, retaining per-binding resolution outcomes.
+    pub(in crate::types) fn solve_equations(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        equations: &[Self],
+    ) -> Result<Solutions<'db>, ProjectionError> {
+        let builder = ConstraintSetBuilder::new();
+        let inferable =
+            TypeVarSet::from_typevars(db, equations.iter().map(|equation| equation.bound_typevar));
+        equations
+            .iter()
+            .when_all(db, &builder, |equation| {
+                ConstraintSet::constrain_typevar(
+                    db,
+                    env,
+                    &builder,
+                    equation.bound_typevar,
+                    equation.solution,
+                    equation.solution,
+                )
+            })
+            .solutions(db, env, inferable)
+    }
+}
 
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,

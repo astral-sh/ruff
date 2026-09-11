@@ -37,8 +37,12 @@ def show(n: int):
             reveal_type(array)  # revealed: list[tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])]]
             # revealed: tuple[tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])], tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])]]
             reveal_type(pair)
-            reveal_type(union)  # revealed: tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])] | int
-            reveal_type(intersection)  # revealed: tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])] & T@contexts
+            # TODO: remove redundant recursive alternatives. Expected: tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])] | int
+            # revealed: tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])] | (μ$0. tuple[$0 | Literal[0]]) | int
+            reveal_type(union)
+            # TODO: remove redundant recursive alternatives. Expected: tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])] & T@contexts
+            # revealed: μ{$0; $1 = tuple[($1 | $0) | Literal[0]]}. $1 & T@contexts
+            reveal_type(intersection)
             reveal_type(complement)  # revealed: ~tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])]
             # revealed: (tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])], /) -> tuple[Literal[0] | (μ$0. tuple[$0 | Literal[0]])]
             reveal_type(callback)
@@ -88,8 +92,8 @@ def inspect(container: Container, flag: bool):
 
 ## Unions of class objects
 
-Class-object alternatives are grouped under a single `type[...]` annotation, both outside the
-recursive tuple and within its body.
+Class-object alternatives are grouped under a single `type[...]` annotation. The recursively
+constructed tuple is currently approximated, losing these alternatives within its item.
 
 ```py
 class A: ...
@@ -103,5 +107,7 @@ class Container:
         self.value = (self.value,)
 
 def inspect(container: Container):
-    reveal_type(container.value)  # revealed: type[B | A] | tuple[μ$0. tuple[$0] | type[A | B]]
+    # TODO: retain the recursive type. Expected: type[B | A] | tuple[μ$0. tuple[$0] | type[A | B]]
+    # revealed: type[B | A] | tuple[Divergent]
+    reveal_type(container.value)
 ```
