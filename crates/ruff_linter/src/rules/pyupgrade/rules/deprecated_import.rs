@@ -253,7 +253,6 @@ const TYPING_TO_COLLECTIONS_ABC_39: &[&str] = &[
     "AsyncIterable",
     "AsyncIterator",
     "Awaitable",
-    "ByteString",
     "Collection",
     "Container",
     "Coroutine",
