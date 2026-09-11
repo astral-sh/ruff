@@ -5214,7 +5214,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         }),
                     ast::CmpOp::Is | ast::CmpOp::IsNot => attribute_type
                         .identity_comparison_truthiness(db, &self.env, rhs_type)
-                        .negate_if(is_positive != (operator == ast::CmpOp::Is))
+                        .negate_if(is_positive != operator.is_is())
                         .may_be_true(),
                     _ => true,
                 })
