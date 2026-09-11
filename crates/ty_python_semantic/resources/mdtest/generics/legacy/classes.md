@@ -1251,6 +1251,57 @@ reveal_type(DescriptorChild.descriptor)  # revealed: Unknown
 reveal_type(DescriptorChild[int].descriptor)  # revealed: int
 ```
 
+## Assignability through gradual and concrete inheritance paths
+
+A concrete inheritance path makes `Child` a subtype of `Base[int]` even when an earlier path
+inherits `Base[Any]`. Assigning it to `Base[int]` is sound; assigning it to the invariant
+`Base[str]` is not.
+
+```toml
+[rules]
+unsound-assignment = "error"
+```
+
+```py
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    value: T
+
+class Gradual(Base[Any]): ...
+class Concrete(Base[int]): ...
+class Child(Gradual, Concrete): ...
+
+as_concrete: Concrete = Child()
+as_base: Base[int] = Child()
+incompatible: Base[str] = Child()  # error: [unsound-assignment]
+```
+
+The relationship is preserved when the bases are reversed, through another subclass, and for classes
+constructed with `type()`.
+
+```py
+class Reversed(Concrete, Gradual): ...
+class Grandchild(Child): ...
+
+as_reversed: Base[int] = Reversed()
+as_grandchild: Base[int] = Grandchild()
+
+Dynamic = type("Dynamic", (Gradual, Concrete), {})
+as_dynamic: Base[int] = Dynamic()
+```
+
+Specializing a generic subclass also specializes the concrete inheritance path.
+
+```py
+class GenericChild(Gradual, Base[list[T]]): ...
+
+as_specialized: Base[list[int]] = GenericChild[int]()
+incompatible_specialization: Base[list[str]] = GenericChild[int]()  # error: [unsound-assignment]
+```
+
 ## Generic methods
 
 Generic classes can contain methods that are themselves generic. The generic methods can refer to
