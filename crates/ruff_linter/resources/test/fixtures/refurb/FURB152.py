@@ -43,3 +43,13 @@ e = 2.71820001  # OK
 e = 2.718200000000001  # OK
 
 e = 2.7182000000000001  # FURB152
+
+# Each of these already denotes exactly the same float as the constant it matches,
+# so substituting the constant cannot change a result and the fix is safe. Every
+# shorter approximation above computes a different value once rewritten, so those
+# fixes are offered as unsafe.
+r = 3.141592653589793  # FURB152
+
+e = 2.718281828459045  # FURB152
+
+t = 6.283185307179586  # FURB152
