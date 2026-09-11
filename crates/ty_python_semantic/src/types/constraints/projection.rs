@@ -165,7 +165,7 @@ impl<'db> ConstraintSet<'db, '_> {
         let path_bounds = self.bounded_path_bounds(db, env, inferable, budget)?;
         let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
         path_bounds.try_solve_with(choose, |solution| {
-            for binding in solution {
+            for binding in &solution.solved_typevars {
                 type_budget.charge_type(db, binding.solution)?;
             }
             Ok(())
@@ -237,7 +237,7 @@ impl<'db> PathBounds<'db> {
             if incomplete {
                 return Err(ProjectionError::IncompleteSolution);
             }
-            accumulated = fold(accumulated, &solution, budget)?;
+            accumulated = fold(accumulated, &solution.solved_typevars, budget)?;
             retained = true;
         }
 

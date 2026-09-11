@@ -2888,7 +2888,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 Solutions::Constrained(solutions) => {
                     let mut merged_types = FxHashMap::default();
                     for solution in solutions.as_slice() {
-                        builder.merge_solution(&mut merged_types, solution);
+                        builder.merge_solution(&mut merged_types, &solution.solved_typevars);
                     }
 
                     // Solving charges only present bindings, but context-aligned alternatives
@@ -3053,7 +3053,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // alternatives: a bare `U` survives on one path, but is removed from a merged `U | int`.
         let mut paths = Vec::with_capacity(solutions.as_slice().len());
         for mut path in solutions.into_vec() {
-            path.retain_mut(|binding| {
+            path.solved_typevars.retain_mut(|binding| {
                 if !generic_context.contains(db, binding.bound_typevar.identity(db)) {
                     return false;
                 }
@@ -3063,8 +3063,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 );
                 true
             });
-            let resolved = resolve_solution(db, self.env, self.inferable, &path);
+            let resolved = resolve_solution(db, self.env, self.inferable, &path.solved_typevars);
             let path_types: FxHashMap<_, _> = path
+                .solved_typevars
                 .iter()
                 .zip(resolved)
                 .map(|(binding, ty)| (binding.bound_typevar.identity(db), ty))
@@ -3476,7 +3477,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         };
 
         for solution in solutions.as_slice() {
-            for binding in solution {
+            for binding in &solution.solved_typevars {
                 let solution = self.remove_inferable_typevar_artifacts_from_solution(
                     binding.bound_typevar,
                     binding.solution,

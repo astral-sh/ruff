@@ -3166,6 +3166,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 paths.into_vec().into_iter().map(|path| {
                                     let path: Box<[_]> = path
+                                        .solved_typevars
                                         .into_iter()
                                         .filter(|binding| binding.bound_typevar == typevar)
                                         .collect();
@@ -3206,7 +3207,7 @@ impl<'db> Bindings<'db> {
                                     Type::KnownInstance(KnownInstanceType::ConstraintSetSolution(
                                         InternedConstraintSetSolution::new(
                                             db,
-                                            path.into_boxed_slice(),
+                                            path.solved_typevars.into_boxed_slice(),
                                         ),
                                     ))
                                 }),
@@ -6098,7 +6099,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     FxHashMap::default();
 
                 for solution in solutions.as_slice() {
-                    for binding in solution {
+                    for binding in &solution.solved_typevars {
                         let identity = binding.bound_typevar.identity(db);
 
                         // Avoid unnecessarily widening the return type based on a covariant
@@ -6157,7 +6158,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 // Add preferred types to the builder so they serve as the base mapping
                 // when argument inference adds more types.
                 for solution in solutions.as_slice() {
-                    for binding in solution {
+                    for binding in &solution.solved_typevars {
                         let identity = binding.bound_typevar.identity(db);
                         // A `ParamSpec` keeps its first binding, so seeding it here would discard
                         // the inferred parameter list of the argument.
@@ -7946,7 +7947,7 @@ impl<'db> Binding<'db> {
             });
             if let Solutions::Constrained(solutions) = solutions {
                 for solution in solutions.into_vec() {
-                    for binding in solution {
+                    for binding in solution.solved_typevars {
                         let identity = binding.bound_typevar.identity(db);
                         return_type_solutions
                             .entry(identity)

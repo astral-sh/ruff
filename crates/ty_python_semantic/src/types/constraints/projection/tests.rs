@@ -68,6 +68,11 @@ fn binding<'db>(
     }
 }
 
+fn solution<'db>(solved_typevars: impl IntoIterator<Item = TypeVarSolution<'db>>) -> Solution<'db> {
+    let solved_typevars = solved_typevars.into_iter().collect();
+    Solution { solved_typevars }
+}
+
 fn collect_paths<'db, 'c>(
     db: &'db TestDb,
     builder: &'c ConstraintSetBuilder<'db>,
@@ -93,7 +98,7 @@ fn collect_paths<'db, 'c>(
                     .iter()
                     .position(|typevar| *typevar == binding.bound_typevar)
             });
-            paths.insert(path);
+            paths.insert(solution(path));
             Ok(paths)
         },
     )
@@ -189,8 +194,8 @@ fn source_and_interning_order_do_not_change_correlated_projection() {
     let atoms = [(t, int), (t, str), (u, bytes), (u, bool)];
     // These alternatives do not admit the crossed pairings of T and U.
     let expected = FxHashSet::from_iter([
-        vec![binding(t, int), binding(u, bytes)],
-        vec![binding(t, str), binding(u, bool)],
+        solution([binding(t, int), binding(u, bytes)]),
+        solution([binding(t, str), binding(u, bool)]),
     ]);
 
     for interning_order in (0..atoms.len()).permutations(atoms.len()) {
@@ -256,11 +261,12 @@ fn four_independent_binary_arguments_have_sixteen_solutions() {
         .into_iter()
         .multi_cartesian_product()
         .map(|choices| {
-            typevars
-                .into_iter()
-                .zip(choices)
-                .map(|(typevar, ty)| binding(typevar, ty))
-                .collect()
+            solution(
+                typevars
+                    .into_iter()
+                    .zip(choices)
+                    .map(|(typevar, ty)| binding(typevar, ty)),
+            )
         })
         .collect();
 
@@ -322,7 +328,7 @@ fn incomplete_solution_discards_the_projection() {
         assert_eq!(
             set.solutions_with(db, &env, inferable, budget, choose),
             Ok(Solutions::Constrained(SolutionPaths::BudgetExceeded(
-                alternatives.map(|ty| vec![binding(t, ty)]).into()
+                alternatives.map(|ty| solution([binding(t, ty)])).into()
             )))
         );
         assert_eq!(
@@ -386,9 +392,9 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                 };
                 assert_eq!(
                     set.solutions_with(db, &env, inferable, budget, choose),
-                    Ok(Solutions::Constrained(SolutionPaths::Complete(vec![vec![
-                        binding(t, int),
-                    ]])))
+                    Ok(Solutions::Constrained(SolutionPaths::Complete(vec![
+                        solution([binding(t, int),])
+                    ])))
                 );
                 assert_eq!(
                     set.try_fold_solutions(
@@ -402,11 +408,13 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                             for binding in path {
                                 budget.charge_type(db, binding.solution)?;
                             }
-                            paths.push(path.to_vec());
+                            paths.push(solution(path.iter().copied()));
                             Ok(paths)
                         },
                     ),
-                    Ok(SolutionProjection::Constrained(vec![vec![binding(t, int)]]))
+                    Ok(SolutionProjection::Constrained(vec![solution([binding(
+                        t, int
+                    )])]))
                 );
             }
         }
@@ -430,12 +438,12 @@ fn valid_unsolved_path_is_not_unconstrained() {
     for (selected, collected, projected) in [
         (
             PathBoundSolution::Unsolved,
-            Solutions::Constrained(SolutionPaths::Complete(vec![vec![]])),
+            Solutions::Constrained(SolutionPaths::Complete(vec![solution([])])),
             Ok(SolutionProjection::Constrained(1)),
         ),
         (
             PathBoundSolution::BudgetExceeded { fallback: None },
-            Solutions::Constrained(SolutionPaths::BudgetExceeded(vec![vec![]])),
+            Solutions::Constrained(SolutionPaths::BudgetExceeded(vec![solution([])])),
             Err(ProjectionError::IncompleteSolution),
         ),
         (
@@ -519,7 +527,9 @@ fn type_budget_is_charged_before_constructing_a_union() {
             assert_eq!(
                 collected,
                 Ok(Solutions::Constrained(SolutionPaths::Complete(
-                    [int, str, bytes].map(|ty| vec![binding(t, ty)]).into()
+                    [int, str, bytes]
+                        .map(|ty| solution([binding(t, ty)]))
+                        .into()
                 )))
             );
             assert_eq!(

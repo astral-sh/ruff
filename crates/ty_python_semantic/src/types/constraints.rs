@@ -3672,7 +3672,7 @@ impl<'db> PathBounds<'db> {
         path: &[PathBound<'db>],
         choose: &mut impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
     ) -> Option<(Solution<'db>, bool)> {
-        let mut solution = Vec::with_capacity(path.len());
+        let mut solved_typevars = Vec::with_capacity(path.len());
         let mut exceeded_budget = false;
         for path_bound in path {
             let ty = match choose(path_bound.variance(), path_bound) {
@@ -3685,12 +3685,13 @@ impl<'db> PathBounds<'db> {
                 }
             };
             if let Some(ty) = ty {
-                solution.push(TypeVarSolution {
+                solved_typevars.push(TypeVarSolution {
                     bound_typevar: path_bound.bound_typevar,
                     solution: ty,
                 });
             }
         }
+        let solution = Solution { solved_typevars };
         Some((solution, exceeded_budget))
     }
 
@@ -4411,9 +4412,12 @@ impl<'db> SolutionPaths<'db> {
     }
 }
 
-pub(crate) type Solution<'db> = Vec<TypeVarSolution<'db>>;
-
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct Solution<'db> {
+    pub(crate) solved_typevars: Vec<TypeVarSolution<'db>>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct TypeVarSolution<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
     pub(crate) solution: Type<'db>,
@@ -4926,6 +4930,13 @@ mod tests {
         )
     }
 
+    fn solution<'db>(
+        solved_typevars: impl IntoIterator<Item = TypeVarSolution<'db>>,
+    ) -> Solution<'db> {
+        let solved_typevars = solved_typevars.into_iter().collect();
+        Solution { solved_typevars }
+    }
+
     #[derive(Default)]
     struct CountSolutionLimits {
         visits: usize,
@@ -5405,7 +5416,7 @@ mod tests {
         assert_eq!(PathBoundSolution::Unsolved.as_type(), None);
         assert_eq!(
             PathBounds::Constrained(Box::new([Box::new([path_bound])])).solve(db, &env, &builder),
-            Solutions::Constrained(SolutionPaths::Complete(vec![vec![]]))
+            Solutions::Constrained(SolutionPaths::Complete(vec![solution([])]))
         );
     }
 
@@ -5554,7 +5565,7 @@ class E: ...
                     .into_iter()
                     .collect::<Vec<_>>();
                 recovered.push(binding(u, str));
-                let mut expected_paths = vec![recovered, vec![binding(t, int)]];
+                let mut expected_paths = vec![solution(recovered), solution([binding(t, int)])];
                 if reverse {
                     paths.reverse();
                     expected_paths.reverse();
@@ -5581,7 +5592,9 @@ class E: ...
                 ]));
                 assert_eq!(
                     paths.solve(db, &env, &builder),
-                    Solutions::Constrained(SolutionPaths::Complete(vec![vec![binding(t, int)]]))
+                    Solutions::Constrained(SolutionPaths::Complete(vec![solution([binding(
+                        t, int
+                    )])]))
                 );
             }
         }
@@ -5885,7 +5898,7 @@ class E: ...
             let mut merged = FxHashMap::default();
             if let Ok(Solutions::Constrained(paths)) = &solutions {
                 for path in paths.as_slice() {
-                    for binding in path {
+                    for binding in &path.solved_typevars {
                         merged
                             .entry(binding.bound_typevar)
                             .and_modify(|existing| {
@@ -5919,7 +5932,8 @@ class E: ...
                     .as_slice()
                     .iter()
                     .map(|path| {
-                        path.iter()
+                        path.solved_typevars
+                            .iter()
                             .map(|binding| {
                                 format!(
                                     "{}={}",
@@ -6730,14 +6744,14 @@ class E: ...
         let u = create_typevar(db, "U");
         let inferable = TypeVarSet::from_typevars(db, [u]);
         let expected = Ok(Solutions::Constrained(SolutionPaths::Complete(vec![
-            vec![TypeVarSolution {
+            solution([TypeVarSolution {
                 bound_typevar: u,
                 solution: known_instance(db, KnownClass::Int),
-            }],
-            vec![TypeVarSolution {
+            }]),
+            solution([TypeVarSolution {
                 bound_typevar: u,
                 solution: known_instance(db, KnownClass::Str),
-            }],
+            }]),
         ])));
 
         let owned = ConstraintSetBuilder::new().into_owned(|builder| {
