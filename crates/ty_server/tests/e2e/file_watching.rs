@@ -34,6 +34,7 @@ fn refreshes_script_dependency_after_rewatch() -> Result<()> {
         .with_file(script, &source)?
         .with_file(dependency, "value = 1")?
         .with_watched_file_support(true)
+        .enable_workspace_diagnostic_refresh(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -102,6 +103,7 @@ fn refreshes_script_dependency_after_rewatch() -> Result<()> {
     // Completing registration refreshes the known dependency and finds its missed edit.
     server.acknowledge_request(request_id);
     assert_eq!(server.acknowledge_unregistration()?, project_id);
+    server.await_diagnostic_refresh();
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(server.document_diagnostic_request(script, None)),
         @r#"6:14..6:19[ERROR]: Object of type `Literal["wrong"]` is not assignable to `int`"#

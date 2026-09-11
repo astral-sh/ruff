@@ -461,6 +461,9 @@ from attrs import define
             registration_id = next_id;
         }
 
+        // Restoring the environment rescans its previously unwatched dependencies.
+        server.await_diagnostic_refresh();
+
         installed_package_event(&mut server, &site_packages, "attrs")?;
 
         assert!(
@@ -542,6 +545,7 @@ from idna import encode
             server.acknowledge_request(request_id);
             if let Some(previous_id) = previous_id {
                 ensure!(server.acknowledge_unregistration()? == previous_id);
+                server.await_diagnostic_refresh();
             }
             if let Some(site_packages) = site_packages {
                 return Ok((id, site_packages));

@@ -16,7 +16,7 @@ use ty_project::ProjectDatabase;
 use ty_project::watch::watch_paths;
 
 use crate::capabilities::ResolvedClientCapabilities;
-use crate::server::SendRequest;
+use crate::server::{SendRequest, publish_all_document_diagnostics};
 
 use super::{
     Session,
@@ -309,6 +309,19 @@ impl FileWatcherCompletion {
         if !self.newly_covered_paths.is_empty() {
             for state in session.projects.values_mut() {
                 Files::sync_all_recursive(&mut state.db, &self.newly_covered_paths);
+            }
+
+            // A previous refresh may have run before these unwatched paths were scanned.
+            // Notify the client about files that changed while the watch was absent.
+            session.bump_revision();
+            session.resume_suspended_workspace_diagnostic_request(client);
+            if session
+                .client_capabilities()
+                .supports_workspace_diagnostic_refresh()
+            {
+                client.send_request::<lsp_types::DiagnosticRefreshRequest>(session, (), |_, ()| {});
+            } else {
+                publish_all_document_diagnostics(session, client);
             }
         }
 
