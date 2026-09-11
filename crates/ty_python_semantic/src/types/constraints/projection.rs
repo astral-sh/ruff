@@ -165,6 +165,11 @@ impl<'db> ConstraintSet<'db, '_> {
         let path_bounds = self.bounded_path_bounds(db, env, inferable, budget)?;
         let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
         path_bounds.try_solve_with(choose, |solution| {
+            for violation in solution.violations() {
+                if let Some(argument) = violation.argument {
+                    type_budget.charge_type(db, argument)?;
+                }
+            }
             for binding in &solution.solved_typevars {
                 type_budget.charge_type(db, binding.solution)?;
             }
@@ -231,7 +236,9 @@ impl<'db> PathBounds<'db> {
 
         let mut retained = false;
         for path in paths {
-            let (solution, incomplete) = Self::solve_path_with(path, &mut choose);
+            let Some((solution, incomplete)) = Self::solve_path_with(path, &mut choose) else {
+                continue;
+            };
             if !solution.is_valid() {
                 continue;
             }
