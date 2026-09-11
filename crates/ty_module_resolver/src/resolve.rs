@@ -1530,43 +1530,33 @@ impl<'db, 'name> NameResolver<'db, 'name> {
 
         let mut components = self.name.components().skip(1).peekable();
 
-        loop {
-            // Keep a partial stub package's namespace while resolving the next part of the module
-            // name. Once the complete name is resolved, a concrete package or module shadows that
-            // namespace.
-            let has_remaining_components = components.peek().is_some();
-            cur_candidates =
-                normalize_candidates(self.context.db, cur_candidates, has_remaining_components);
+        // Keep a partial stub package's namespace while resolving the next part of the module
+        // name. Once the complete name is resolved, a concrete package or module shadows that
+        // namespace.
+        cur_candidates =
+            normalize_candidates(self.context.db, cur_candidates, components.peek().is_some());
 
-            let Some(component) = components.next() else {
-                return Some(cur_candidates);
-            };
-            let file_filter = if components.peek().is_some() {
+        while let Some(component) = components.next() {
+            let has_remaining_components = components.peek().is_some();
+            let file_filter = if has_remaining_components {
                 ComponentFileFilter::ByMode
             } else {
                 final_filter
             };
 
-            let mut remaining_are_shadowed = false;
-            cur_candidates.retain_mut(|candidate| {
-                if remaining_are_shadowed {
-                    return false;
-                }
-
-                let resolved =
-                    resolve_component(&self.context, candidate, component, file_filter).is_ok();
-
-                // A terminal candidate shadows every lower-priority candidate, even if resolving
-                // this component fails. Higher-priority candidates remain in play.
-                remaining_are_shadowed = candidate.missing_submodule_is_terminal();
-
-                resolved
-            });
+            cur_candidates = self.advance_candidates(
+                cur_candidates,
+                component,
+                file_filter,
+                has_remaining_components,
+            );
 
             if cur_candidates.is_empty() {
                 return None;
             }
         }
+
+        Some(cur_candidates)
     }
 
     /// Finds candidates for a top-level name across the supplied search paths and stub packages.
@@ -1636,6 +1626,35 @@ impl<'db, 'name> NameResolver<'db, 'name> {
         }
 
         cur_candidates
+    }
+
+    /// Advances normalized prefix candidates, preserving terminal shadowing even on a failed probe.
+    ///
+    /// With `for_descendants`, retain partial stub-package namespaces for the next component.
+    /// At the final component, concrete packages and modules shadow those namespaces.
+    fn advance_candidates(
+        &self,
+        mut candidates: ResolvedNames<'db>,
+        component: &str,
+        filter: ComponentFileFilter,
+        for_descendants: bool,
+    ) -> ResolvedNames<'db> {
+        let context = &self.context;
+        let mut remaining_are_shadowed = false;
+        candidates.retain_mut(|candidate| {
+            if remaining_are_shadowed {
+                return false;
+            }
+
+            let resolved = resolve_component(context, candidate, component, filter).is_ok();
+
+            // A terminal candidate shadows every lower-priority candidate, even if resolving
+            // this component fails. Higher-priority candidates remain in play.
+            remaining_are_shadowed = candidate.missing_submodule_is_terminal();
+
+            resolved
+        });
+        normalize_candidates(context.db, candidates, for_descendants)
     }
 }
 
