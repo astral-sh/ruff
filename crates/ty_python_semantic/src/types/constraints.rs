@@ -3865,12 +3865,17 @@ impl<'db> CandidateSolutions<'db> {
                 }
 
                 if path_bound.has_upper_evidence() {
-                    return IntersectionType::bounded_from_elements(
-                        db,
-                        env,
-                        path_bound.upper.iter_clauses(),
-                    )
-                    .map_or(
+                    // Evidence determines whether to infer a solution, while validity restricts
+                    // which evidence-compatible solution is permitted. Top-materialize validity
+                    // bounds so that their gradual elements do not become part of the result.
+                    let upper_bounds = std::iter::chain(
+                        path_bound.upper.iter_evidence(),
+                        path_bound
+                            .upper
+                            .iter_validity()
+                            .map(|bound| bound.top_materialization(db, env)),
+                    );
+                    return IntersectionType::bounded_from_elements(db, env, upper_bounds).map_or(
                         PathBoundSolution::BudgetExceeded { fallback: None },
                         PathBoundSolution::Solved,
                     );
