@@ -94,9 +94,9 @@ note: This is an unsafe fix and may change runtime behavior
 ## Type parameter constraints are typing only
 
 ```py
-import io  # error: typing-only-standard-library-import
-from pandas import DataFrame  # error: typing-only-third-party-import
-from .anndata import AnnData  # error: typing-only-first-party-import
+import io  # error: [typing-only-standard-library-import]
+from pandas import DataFrame  # error: [typing-only-third-party-import]
+from .anndata import AnnData  # error: [typing-only-first-party-import]
 
 
 def f[T: (io.BytesIO, DataFrame, AnnData)](a: T) -> T: ...
@@ -105,9 +105,9 @@ def f[T: (io.BytesIO, DataFrame, AnnData)](a: T) -> T: ...
 ## Type parameter defaults are typing only
 
 ```py
-import io  # error: typing-only-standard-library-import
-from pandas import DataFrame  # error: typing-only-third-party-import
-from .anndata import AnnData  # error: typing-only-first-party-import
+import io  # error: [typing-only-standard-library-import]
+from pandas import DataFrame  # error: [typing-only-third-party-import]
+from .anndata import AnnData  # error: [typing-only-first-party-import]
 
 
 def foo[T: object = AnnData](a: T) -> T: ...
