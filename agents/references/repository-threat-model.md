@@ -36,13 +36,6 @@ themselves.
 
 ## Repository-specific additions
 
-The generic CI statement about untrusted code running with privileged permissions requires checking
-effective permissions in Ruff's pull request jobs. Benchmark jobs build or run contributed code
-while declaring `id-token: write` for CodSpeed. The pull request Docker build declares
-`packages: write`, but registry login and image push require a release plan. For these jobs, assess
-the effective token and OIDC authority for the event and whether untrusted output reaches a
-privileged publisher before identifying a boundary crossing.
-
 ## Severity calibration
 
 - **Critical:** With few prerequisites and safe defaults, a remote attacker or actor at a lower
