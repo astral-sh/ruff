@@ -1311,6 +1311,35 @@ frozen_again.value = 2  # error: [invalid-assignment]
 frozen_again.text = "after"  # error: [invalid-assignment]
 ```
 
+If there is a custom `__setattr__` method on a frozen model, we allow mutation, unless that
+`__setattr__` return `Never`:
+
+```py
+from typing_extensions import Never
+
+class FrozenWithCustomSetattr(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    value: int
+
+    def __setattr__(self, name, value):
+        object.__setattr__(self, name, value)
+
+frozen_custom = FrozenWithCustomSetattr(value=1)
+frozen_custom.value = 2
+
+class FrozenWithCustomSetattrNever(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    value: int
+
+    def __setattr__(self, name, value) -> Never:
+        raise AttributeError(name)
+
+frozen_custom_never = FrozenWithCustomSetattrNever(value=1)
+frozen_custom_never.value = 2  # error: [invalid-assignment]
+```
+
 Private attributes on models with `frozen=True` can be mutated:
 
 ```py
