@@ -10,7 +10,8 @@ use crate::db::tests::{TestDb, setup_db};
 use crate::place::global_symbol;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
-    PathBoundSolution, PathBounds, Solution, SolutionPaths, Solutions, TypeVarSolution,
+    PathBoundSolution, PathBounds, Solution, SolutionPaths, SolutionValidity, Solutions,
+    TypeVarSolution,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{
@@ -70,7 +71,10 @@ fn binding<'db>(
 
 fn solution<'db>(solved_typevars: impl IntoIterator<Item = TypeVarSolution<'db>>) -> Solution<'db> {
     let solved_typevars = solved_typevars.into_iter().collect();
-    Solution { solved_typevars }
+    Solution {
+        solved_typevars,
+        validity: SolutionValidity::Valid,
+    }
 }
 
 fn collect_paths<'db, 'c>(
@@ -448,7 +452,7 @@ fn valid_unsolved_path_is_not_unconstrained() {
         ),
         (
             PathBoundSolution::Unsatisfiable,
-            Solutions::Unsatisfiable,
+            Solutions::Unsatisfiable(SolutionPaths::Complete(vec![])),
             Ok(SolutionProjection::Unsatisfiable),
         ),
     ] {
