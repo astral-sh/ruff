@@ -77,7 +77,7 @@ impl<'db> ModelMetadata<'db> {
         validate_by_name.enabled_or(false)
     }
 
-    pub(in crate::types) fn is_frozen(self, db: &'db dyn Db) -> bool {
+    fn is_frozen(self, db: &'db dyn Db) -> bool {
         self.config(db).frozen.is_enabled()
     }
 }
