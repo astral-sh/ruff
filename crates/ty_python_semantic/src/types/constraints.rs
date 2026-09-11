@@ -3103,8 +3103,12 @@ pub(crate) enum PathBoundSolution<'db> {
     Solved(Type<'db>),
     /// The path provides no type to infer for this variable.
     Unsolved,
-    /// The bounds cannot be satisfied, so the entire path must be rejected.
+    /// The path's lower and upper bounds cannot be satisfied together
     Unsatisfiable,
+    /// The path does not satisfy the typevar's declared upper bound
+    ViolatesDeclaredUpperBound,
+    /// The path does not satisfy the typevar's declared constraints
+    ViolatesDeclaredConstraints,
     /// Computing the solution exceeded the type-construction budget. A previously known type
     /// can still be used as a conservative fallback, but is not a complete solution.
     BudgetExceeded {
@@ -3120,7 +3124,10 @@ impl<'db> PathBoundSolution<'db> {
             Self::BudgetExceeded { fallback } => Self::BudgetExceeded {
                 fallback: fallback.map(f),
             },
-            Self::Unsolved | Self::Unsatisfiable => self,
+            Self::Unsolved
+            | Self::Unsatisfiable
+            | Self::ViolatesDeclaredUpperBound
+            | Self::ViolatesDeclaredConstraints => self,
         }
     }
 
@@ -3129,7 +3136,10 @@ impl<'db> PathBoundSolution<'db> {
     pub(crate) fn as_type(self) -> Option<Type<'db>> {
         match self {
             Self::Solved(ty) => Some(ty),
-            Self::Unsolved | Self::Unsatisfiable => None,
+            Self::Unsolved
+            | Self::Unsatisfiable
+            | Self::ViolatesDeclaredUpperBound
+            | Self::ViolatesDeclaredConstraints => None,
             Self::BudgetExceeded { fallback } => fallback,
         }
     }
@@ -3652,7 +3662,10 @@ impl<'db> PathBounds<'db> {
         let mut valid_exceeded_budget = false;
         let mut invalid_exceeded_budget = false;
         for path in paths {
-            let (solution, path_exceeded_budget) = Self::solve_path_with(path, &mut choose);
+            let Some((solution, path_exceeded_budget)) = Self::solve_path_with(path, &mut choose)
+            else {
+                continue;
+            };
             if solution.is_valid() {
                 check_solution(&solution)?;
                 valid_exceeded_budget |= path_exceeded_budget;
@@ -3680,20 +3693,31 @@ impl<'db> PathBounds<'db> {
     fn solve_path_with(
         path: &[PathBound<'db>],
         choose: &mut impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
-    ) -> (Solution<'db>, bool) {
+    ) -> Option<(Solution<'db>, bool)> {
         let mut solved_typevars = Vec::with_capacity(path.len());
-        let mut validity = SolutionValidity::Valid;
+        let mut violations = Vec::new();
         let mut exceeded_budget = false;
         for path_bound in path {
             let ty = match choose(path_bound.variance(), path_bound) {
                 PathBoundSolution::Solved(ty) => Some(ty),
                 PathBoundSolution::Unsolved => None,
-                PathBoundSolution::Unsatisfiable => {
-                    // This typevar causes the overall path to not be a valid solution. But we
-                    // still want to report it upwards. If there are any other paths that are
-                    // valid, this one will be discarded. If there are only invalid paths, we will
-                    // use them to construct a useful diagnostic.
-                    validity = SolutionValidity::Invalid;
+                PathBoundSolution::Unsatisfiable => return None,
+                PathBoundSolution::ViolatesDeclaredUpperBound => {
+                    violations.push(SolutionViolation {
+                        bound_typevar: path_bound.bound_typevar,
+                        argument: path_bound.evidence_lower(),
+                        variance: path_bound.variance(),
+                        kind: SolutionViolationKind::UpperBound,
+                    });
+                    None
+                }
+                PathBoundSolution::ViolatesDeclaredConstraints => {
+                    violations.push(SolutionViolation {
+                        bound_typevar: path_bound.bound_typevar,
+                        argument: path_bound.evidence_lower(),
+                        variance: path_bound.variance(),
+                        kind: SolutionViolationKind::Constraints,
+                    });
                     None
                 }
                 PathBoundSolution::BudgetExceeded { fallback } => {
@@ -3708,11 +3732,16 @@ impl<'db> PathBounds<'db> {
                 });
             }
         }
+        let validity = if violations.is_empty() {
+            SolutionValidity::Valid
+        } else {
+            SolutionValidity::Invalid(violations.into_boxed_slice())
+        };
         let solution = Solution {
             solved_typevars,
             validity,
         };
-        (solution, exceeded_budget)
+        Some((solution, exceeded_budget))
     }
 
     /// The default solution selection logic for a single typevar on a single BDD path.
@@ -3771,6 +3800,15 @@ impl<'db> PathBounds<'db> {
                 // upper bound (which may include TypeVar bounds/constraints). The upper bound
                 // should only be used as a fallback when no concrete type was inferred.
                 if path_bound.evidence_lower.is_some() {
+                    if !is_possibly_constraint_set_assignable(
+                        db,
+                        TypePair::new(db, env.program(db), lower, declared_upper),
+                    ) {
+                        // Prefer a declared-bound violation when the inferred bounds are also
+                        // contradictory, so callers can report the more specific cause.
+                        return PathBoundSolution::ViolatesDeclaredUpperBound;
+                    }
+
                     if !path_bound.upper.is_satisfied_by(db, env, lower) {
                         let mut storage = builder.storage.borrow_mut();
                         let (when_upper, source_order) =
@@ -3782,15 +3820,6 @@ impl<'db> PathBounds<'db> {
                             // therefore not a valid specialization.
                             return PathBoundSolution::Unsatisfiable;
                         }
-                    }
-
-                    if !is_possibly_constraint_set_assignable(
-                        db,
-                        TypePair::new(db, env.program(db), lower, declared_upper),
-                    ) {
-                        // This path does not satisfy the typevar's declared upper bound, and is
-                        // therefore not a valid specialization.
-                        return PathBoundSolution::Unsatisfiable;
                     }
 
                     return PathBoundSolution::Solved(lower);
@@ -3906,7 +3935,7 @@ impl<'db> PathBounds<'db> {
                 let Some(compatible_constraint) = compatible_constraint else {
                     // This path does not satisfy any of the constraints, and is therefore not a
                     // valid specialization.
-                    return PathBoundSolution::Unsatisfiable;
+                    return PathBoundSolution::ViolatesDeclaredConstraints;
                 };
 
                 if let (ty @ Type::TypeVar(_), _) | (_, Some(ty @ Type::TypeVar(_))) = (
@@ -4440,25 +4469,46 @@ impl<'db> SolutionPaths<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub(crate) enum SolutionValidity {
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum SolutionViolationKind {
+    UpperBound,
+    Constraints,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct SolutionViolation<'db> {
+    pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
+    pub(crate) argument: Option<Type<'db>>,
+    pub(crate) variance: TypeVarVariance,
+    pub(crate) kind: SolutionViolationKind,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum SolutionValidity<'db> {
     /// The solution is valid
     Valid,
     /// The solution satisfies all evidence constraints, but doesn't satisfy the validity
-    /// constraints. (This often means we've found something that _would_ be a solution, except
-    /// that it violates the declared upper bound or constraints of one or more of the typevars.)
-    Invalid,
+    /// constraints. The violations indicate which declared upper bounds or constraints were not
+    /// satisfied.
+    Invalid(Box<[SolutionViolation<'db>]>),
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct Solution<'db> {
     pub(crate) solved_typevars: Vec<TypeVarSolution<'db>>,
-    pub(crate) validity: SolutionValidity,
+    pub(crate) validity: SolutionValidity<'db>,
 }
 
-impl Solution<'_> {
+impl<'db> Solution<'db> {
     pub(crate) fn is_valid(&self) -> bool {
-        self.validity == SolutionValidity::Valid
+        matches!(self.validity, SolutionValidity::Valid)
+    }
+
+    pub(crate) fn violations(&self) -> &[SolutionViolation<'db>] {
+        match &self.validity {
+            SolutionValidity::Valid => &[],
+            SolutionValidity::Invalid(violations) => violations,
+        }
     }
 }
 
