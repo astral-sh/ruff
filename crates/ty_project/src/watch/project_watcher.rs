@@ -21,9 +21,6 @@ pub struct ProjectWatcher {
     /// The paths currently watched, in registration order.
     watched_paths: Vec<SystemPathBuf>,
 
-    /// Paths that were unwatched and must be refreshed if they are watched again.
-    inactive_paths: FxHashSet<SystemPathBuf>,
-
     /// True if registering a watcher for any path failed.
     has_errored_paths: bool,
 
@@ -37,7 +34,6 @@ impl ProjectWatcher {
         let mut watcher = Self {
             watcher,
             watched_paths: Vec::new(),
-            inactive_paths: FxHashSet::default(),
             cache_key: None,
             has_errored_paths: false,
         };
@@ -48,15 +44,39 @@ impl ProjectWatcher {
     }
 
     pub fn update(&mut self, db: &mut ProjectDatabase) {
-        let watch_paths = watch_paths(db, db.project());
+        const MAX_RECONCILIATION_PASSES: usize = 10;
 
-        if self.cache_key == Some(watch_paths.cache_key) {
-            return;
+        for _ in 0..MAX_RECONCILIATION_PASSES {
+            if !self.update_once(db) {
+                return;
+            }
+
+            // `watch_paths` reads `.pth` files to find editable module search paths. If a
+            // script's `site-packages` was unwatched when a `.pth` file changed from `/old`
+            // to `/new`, this pass registered `/old` using stale contents. The refresh above
+            // updates the `.pth` file; recompute the plan and register `/new` before returning.
+            if self.cache_key == Some(watch_paths(db, db.project()).cache_key) {
+                return;
+            }
         }
 
-        let paths = &watch_paths.paths;
+        tracing::warn!(
+            "File watcher paths did not stabilize after {MAX_RECONCILIATION_PASSES} updates; changes outside the registered paths may be missed until the next update"
+        );
+    }
+
+    /// Returns whether newly covered paths were refreshed.
+    fn update_once(&mut self, db: &mut ProjectDatabase) -> bool {
+        let watch_plan = watch_paths(db, db.project());
+
+        if self.cache_key == Some(watch_plan.cache_key) {
+            return false;
+        }
+
+        let paths = &watch_plan.paths;
+        let previously_watched = self.watched_paths.clone();
         let mut watcher_paths = self.watcher.paths_mut();
-        let mut rewatched_paths = Vec::new();
+        let mut newly_covered_paths = Vec::new();
 
         // On Linux, overlapping watches through a symlink report events using the path of the
         // last registered watch. If `/project/bar` points to `/bar`, the module search path
@@ -66,11 +86,7 @@ impl ProjectWatcher {
         let first_new_path = if !self.has_errored_paths && paths.starts_with(&self.watched_paths) {
             self.watched_paths.len()
         } else {
-            let requested: FxHashSet<_> = paths.iter().collect();
             for path in self.watched_paths.drain(..) {
-                if !requested.contains(&path) {
-                    self.inactive_paths.insert(path.clone());
-                }
                 if let Err(error) = watcher_paths.remove(&path) {
                     info!("Failed to remove the file watcher for path `{path}`: {error}");
                 }
@@ -88,8 +104,15 @@ impl ProjectWatcher {
                 );
                 self.has_errored_paths = true;
             } else {
-                if self.inactive_paths.remove(path) {
-                    rewatched_paths.push(path.clone());
+                // A previous recursive watch already covered this path, even if it must be
+                // re-registered for precedence. Skip initial setup to avoid rescanning every
+                // project file immediately after discovery.
+                if self.cache_key.is_some()
+                    && !previously_watched
+                        .iter()
+                        .any(|watched| path.starts_with(watched))
+                {
+                    newly_covered_paths.push(path.clone());
                 }
                 self.watched_paths.push(path.clone());
             }
@@ -109,11 +132,17 @@ impl ProjectWatcher {
             }
         );
 
-        self.cache_key = Some(watch_paths.cache_key);
+        self.cache_key = Some(watch_plan.cache_key);
 
-        // Changes to an unwatched path may not have updated Files. Refresh after registering
-        // the watch so changes made during the refresh can still produce watcher events.
-        Files::sync_all_recursive(db, rewatched_paths);
+        if newly_covered_paths.is_empty() {
+            return false;
+        }
+
+        // A newly covered path may contain known files that changed while it was unwatched.
+        // Registering the watch does not update their cached contents, so refresh them here.
+        Files::sync_all_recursive(db, newly_covered_paths);
+
+        true
     }
 
     /// Returns `true` if setting up watching for any path failed.
