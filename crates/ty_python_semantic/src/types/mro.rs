@@ -1,10 +1,10 @@
 use crate::Db;
+use crate::FxIndexMap;
 use crate::ProgramEnvironment;
 use std::collections::VecDeque;
 use std::ops::Deref;
 
-use indexmap::IndexMap;
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use rustc_hash::FxHashSet;
 
 use crate::types::class::{DynamicClassLiteral, DynamicEnumLiteral};
 use crate::types::class_base::ClassBase;
@@ -258,11 +258,8 @@ impl<'db> Mro<'db> {
                 let mut duplicate_dynamic_bases = false;
 
                 let duplicate_bases: Vec<DuplicateBaseError<'db>> = {
-                    let mut base_to_indices = IndexMap::<
-                        Type<'db>,
-                        (ClassBase<'db>, Vec<usize>),
-                        FxBuildHasher,
-                    >::default();
+                    let mut base_to_indices =
+                        FxIndexMap::<Type<'db>, (ClassBase<'db>, Vec<usize>)>::default();
 
                     // We need to iterate over `original_bases` here rather than `resolved_bases`
                     // so that we get the correct index of the duplicate bases if there were any
