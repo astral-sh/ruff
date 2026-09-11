@@ -1030,6 +1030,25 @@ package = "invalid"
             diagnostics
         );
         assert!(server.collect_publish_diagnostic_notifications(1)[&event.uri].is_empty());
+
+        // uv can recreate the lockfile without changing the project configuration.
+        std::fs::remove_file(server.file_path("src/uv.lock"))?;
+        let output = Command::new("uv")
+            .env_clear()
+            .envs(uv_test_env_vars())
+            .current_dir(server.file_path("src"))
+            .args(["lock", "--offline"])
+            .output()?;
+        anyhow::ensure!(
+            output.status.success(),
+            "uv lock failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        server.did_change_watched_files(vec![lsp_types::FileEvent {
+            uri: server.file_uri("src/uv.lock"),
+            kind: lsp_types::FileChangeType::Created,
+        }]);
+        server.assert_work_done_progress("Refreshing example metadata")?;
         Ok(())
     }
 
