@@ -1,0 +1,44 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/del_debug_attribute_py313.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..60,
+        body: [
+            Delete(
+                StmtDelete {
+                    node_index: NodeIndex(None),
+                    range: 44..59,
+                    targets: [
+                        Attribute(
+                            ExprAttribute {
+                                node_index: NodeIndex(None),
+                                range: 48..59,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 48..49,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: Name("__debug__"),
+                                    range: 50..59,
+                                    node_index: NodeIndex(None),
+                                },
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
