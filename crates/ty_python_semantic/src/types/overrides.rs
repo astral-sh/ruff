@@ -87,6 +87,31 @@ pub(super) fn check_class<'db>(
     }
     let enum_info = enum_metadata(db, class.into());
 
+    let mut bases: Vec<_> = class_specialized.iter_mro(db).skip(1).collect();
+    if configuration.check_method_liskov_violations() {
+        let generic_bases: Vec<_> = bases
+            .iter()
+            .filter_map(|base| base.into_class()?.into_generic_alias())
+            .collect();
+        if !generic_bases.is_empty() {
+            // Overrides must respect every inherited specialization. Keep the MRO's bases first
+            // so the immediate parent used to suppress inherited violations is unchanged.
+            let env = &context.program_environment();
+            bases.extend(
+                class_specialized
+                    .iter_explicit_ancestors(db, env)
+                    .filter_map(ClassType::into_generic_alias)
+                    .filter(|ancestor| {
+                        !generic_bases.contains(ancestor)
+                            && generic_bases
+                                .iter()
+                                .any(|base| base.origin(db) == ancestor.origin(db))
+                    })
+                    .map(|ancestor| ClassBase::Class(ClassType::Generic(ancestor))),
+            );
+        }
+    }
+
     #[expect(
         clippy::iter_over_hash_type,
         reason = "each class member is checked independently"
@@ -98,6 +123,7 @@ pub(super) fn check_class<'db>(
             enum_info,
             class_specialized,
             scope,
+            &bases,
             &member,
         );
     }
@@ -438,6 +464,7 @@ fn check_class_declaration<'db>(
     enum_info: Option<&EnumMetadata<'db>>,
     class: ClassType<'db>,
     class_scope: ScopeId<'db>,
+    bases: &[ClassBase<'db>],
     member: &MemberWithDefinition<'db>,
 ) {
     let db = context.db();
@@ -630,7 +657,7 @@ fn check_class_declaration<'db>(
     let mut immediate_parent_variable_kind: Option<(ClassType<'db>, VariableKind)> = None;
 
     if !is_private_member {
-        for class_base in class.iter_mro(db).skip(1) {
+        for &class_base in bases {
             let superclass = match class_base {
                 ClassBase::Protocol | ClassBase::Generic => continue,
                 ClassBase::Any | ClassBase::Dynamic(_) => {

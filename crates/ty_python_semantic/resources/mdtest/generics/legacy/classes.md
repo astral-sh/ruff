@@ -1302,6 +1302,72 @@ as_specialized: Base[list[int]] = GenericChild[int]()
 incompatible_specialization: Base[list[str]] = GenericChild[int]()  # error: [unsound-assignment]
 ```
 
+## Method overrides through gradual and concrete inheritance paths
+
+An override must satisfy the concrete return type inherited through `Concrete`, even when the MRO
+retains `Base[Any]` from `Gradual`.
+
+```py
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    def method(self) -> T:
+        raise NotImplementedError
+
+class Gradual(Base[Any]): ...
+class Concrete(Base[int]): ...
+
+class Invalid(Gradual, Concrete):
+    # error: [invalid-method-override]
+    def method(self) -> str:
+        return ""
+
+class Valid(Gradual, Concrete):
+    def method(self) -> int:
+        return 0
+```
+
+The same contract applies when the bases are reversed or another subclass inherits the diamond. Each
+invalid override produces one diagnostic.
+
+```py
+class Reversed(Concrete, Gradual):
+    # error: [invalid-method-override]
+    def method(self) -> str:
+        return ""
+
+class Combined(Gradual, Concrete): ...
+
+reveal_type(Combined().method())  # revealed: Any
+
+class Indirect(Combined):
+    # error: [invalid-method-override]
+    def method(self) -> str:
+        return ""
+```
+
+An override that preserves its parent's signature does not repeat an existing violation in the
+parent's inheritance hierarchy.
+
+```py
+class PreservesInvalid(Invalid):
+    def method(self) -> str:
+        return ""
+```
+
+Specializing a generic intermediate class also specializes the inherited method's return type.
+
+```py
+class GenericDiamond(Gradual, Base[T]): ...
+
+class Specialized(GenericDiamond[int]):
+    # error: [invalid-method-override]
+    def method(self) -> str:
+        return ""
+```
+
 ## Generic methods
 
 Generic classes can contain methods that are themselves generic. The generic methods can refer to
