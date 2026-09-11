@@ -896,6 +896,134 @@ fn force_exclude_directory_exclusion() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Default exclusions do not apply to ancestors of the project root.
+#[test]
+fn force_exclude_project_under_excluded_directory() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "dist/project/src/main.py",
+        r#"
+        print(undefined_var)
+        "#,
+    )?;
+    let project_dir = case.root().join("dist/project");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)
+      |       ^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude").arg("src"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)
+      |       ^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude").arg("src/main.py"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)
+      |       ^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// Default exclusions do not apply to a sibling outside the project root.
+#[test]
+fn force_exclude_sibling_outside_project_root() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("dist/project/main.py", ""),
+        ("dist/sibling/main.py", "print(undefined_var)"),
+    ])?;
+    let project_dir = case.root().join("dist/project");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude").arg("../sibling"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> <temp_dir>/dist/sibling/main.py:1:7
+      |
+    1 | print(undefined_var)
+      |       ^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude").arg("../sibling/main.py"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> <temp_dir>/dist/sibling/main.py:1:7
+      |
+    1 | print(undefined_var)
+      |       ^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// A default exclusion does not apply to an explicit directory outside the project.
+#[test]
+fn force_exclude_directory_outside_project() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("project/main.py", ""),
+        ("sibling/dist/main.py", "print(undefined_var)"),
+    ])?;
+    let project_dir = case.root().join("project");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude").arg("../sibling/dist"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> <temp_dir>/sibling/dist/main.py:1:7
+      |
+    1 | print(undefined_var)
+      |       ^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 #[test]
 fn cli_and_configuration_exclude() -> anyhow::Result<()> {
     let case = CliTest::with_files([
