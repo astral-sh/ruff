@@ -15,7 +15,7 @@ class AbstractBase(abc.ABC):
 
 class StillAbstract(AbstractBase): ...
 
-# snapshot: call-non-callable
+# snapshot: instantiate-abstract-class
 StillAbstract()
 
 class AbstractBase2(abc.ABC):
@@ -24,12 +24,12 @@ class AbstractBase2(abc.ABC):
     @abc.abstractmethod
     def bar2(self): ...
 
-# snapshot: call-non-callable
+# snapshot: instantiate-abstract-class
 AbstractBase2()
 
 class StillAbstract2(AbstractBase2): ...
 
-# error: [call-non-callable]
+# error: [instantiate-abstract-class]
 StillAbstract2()
 
 class AbstractBase3(Protocol):
@@ -37,12 +37,12 @@ class AbstractBase3(Protocol):
 
 class StillAbstract3(AbstractBase3): ...
 
-# snapshot: call-non-callable
+# snapshot: instantiate-abstract-class
 StillAbstract3()
 ```
 
 ```snapshot
-error[call-non-callable]: Cannot instantiate abstract class `StillAbstract`
+error[instantiate-abstract-class]: Cannot instantiate abstract class `StillAbstract`
   --> src/mdtest_snippet.py:11:1
    |
 11 |   StillAbstract()
@@ -55,7 +55,7 @@ error[call-non-callable]: Cannot instantiate abstract class `StillAbstract`
    | |______________________- `bar` declared as abstract on superclass `AbstractBase`
 
 
-error[call-non-callable]: Cannot instantiate abstract class `AbstractBase2`
+error[instantiate-abstract-class]: Cannot instantiate abstract class `AbstractBase2`
   --> src/mdtest_snippet.py:20:1
    |
 20 |   AbstractBase2()
@@ -68,7 +68,7 @@ error[call-non-callable]: Cannot instantiate abstract class `AbstractBase2`
    | |______________________- `bar` declared as abstract
 
 
-error[call-non-callable]: Cannot instantiate abstract class `StillAbstract3`
+error[instantiate-abstract-class]: Cannot instantiate abstract class `StillAbstract3`
   --> src/mdtest_snippet.py:33:1
    |
 33 | StillAbstract3()
@@ -110,7 +110,7 @@ class AlsoConcreteOrdered(AbstractOrdered):
 # if it already exists in the MRO, even if the one that
 # exists in the MRO is abstract!
 #
-# error: [call-non-callable]
+# error: [instantiate-abstract-class]
 AlsoConcreteOrdered()
 ```
 
@@ -142,12 +142,12 @@ class StillAbstractDynamic(AbstractDynamic):
     f: int
     g: Callable[..., str]
 
-# snapshot: call-non-callable
+# snapshot: instantiate-abstract-class
 StillAbstractDynamic()
 ```
 
 ```snapshot
-error[call-non-callable]: Cannot instantiate abstract class `StillAbstractDynamic`
+error[instantiate-abstract-class]: Cannot instantiate abstract class `StillAbstractDynamic`
   --> src/mdtest_snippet.py:76:1
    |
 76 | StillAbstractDynamic()
@@ -179,7 +179,7 @@ class ConcreteMixin:
 class Sub1(AbstractMixin, ConcreteMixin): ...
 class Sub2(ConcreteMixin, AbstractMixin): ...
 
-Sub1()  # error: [call-non-callable]
+Sub1()  # error: [instantiate-abstract-class]
 Sub2()  # fine
 ```
 
@@ -203,12 +203,12 @@ class Abstract(Protocol):
 
 class StillSadlyAbstract(Abstract): ...
 
-# snapshot: call-non-callable
+# snapshot: instantiate-abstract-class
 StillSadlyAbstract()
 ```
 
 ```snapshot
-error[call-non-callable]: Cannot instantiate abstract class `StillSadlyAbstract`
+error[instantiate-abstract-class]: Cannot instantiate abstract class `StillSadlyAbstract`
    --> src/mdtest_snippet.py:106:1
     |
 106 | StillSadlyAbstract()
@@ -245,12 +245,12 @@ class Abstract(Protocol):
 
 class StillAbstract(Abstract): ...
 
-# snapshot: call-non-callable
+# snapshot: instantiate-abstract-class
 StillAbstract()
 ```
 
 ```snapshot
-error[call-non-callable]: Cannot instantiate abstract class `StillAbstract`
+error[instantiate-abstract-class]: Cannot instantiate abstract class `StillAbstract`
   --> src/mdtest_snippet.py:12:1
    |
 12 | StillAbstract()
@@ -265,7 +265,7 @@ info: `Abstract.first` is implicitly abstract because `Abstract` is a `Protocol`
   |
 3 | class Abstract(Protocol):
   |       ------------------ `Abstract` declared here
-info: rule `call-non-callable` is enabled by default
+info: rule `instantiate-abstract-class` is enabled by default
 ```
 
 ## Abstract methods without `ABCMeta`
@@ -282,7 +282,7 @@ class Abstract:
     def method(self) -> int:
         return 42
 
-# error: [call-non-callable]
+# error: [instantiate-abstract-class]
 reveal_type(Abstract())  # revealed: Abstract
 
 class Concrete(Abstract):
@@ -290,6 +290,65 @@ class Concrete(Abstract):
         return super().method()
 
 Concrete()
+```
+
+## Suppressing abstract instantiation
+
+An `instantiate-abstract-class` suppression applies to the annotated call. Other calls to the same
+abstract class still produce an error.
+
+```py
+from abc import ABC, abstractmethod
+
+class Abstract(ABC):
+    @abstractmethod
+    def method(self) -> int: ...
+
+Abstract()  # ty: ignore[instantiate-abstract-class]
+Abstract()  # error: [instantiate-abstract-class]
+```
+
+## Disabling abstract instantiation
+
+Disabling `instantiate-abstract-class` preserves constructor return types and errors for calls to
+non-callable objects.
+
+```toml
+[rules]
+instantiate-abstract-class = "ignore"
+```
+
+```py
+from abc import ABC, abstractmethod
+
+class Abstract(ABC):
+    @abstractmethod
+    def method(self) -> int: ...
+
+reveal_type(Abstract())  # revealed: Abstract
+value = 1
+value()  # error: [call-non-callable]
+```
+
+## Disabling calls to non-callable objects
+
+Disabling `call-non-callable` still reports attempts to instantiate abstract classes.
+
+```toml
+[rules]
+call-non-callable = "ignore"
+```
+
+```py
+from abc import ABC, abstractmethod
+
+class Abstract(ABC):
+    @abstractmethod
+    def method(self) -> int: ...
+
+Abstract()  # error: [instantiate-abstract-class]
+value = 1
+value()
 ```
 
 ## Generic abstract classes and aliases
@@ -309,9 +368,9 @@ class Abstract[T](ABC):
     @abstractmethod
     def method(self) -> T: ...
 
-Abstract[int]()  # error: [call-non-callable]
+Abstract[int]()  # error: [instantiate-abstract-class]
 Alias = Abstract[str]
-Alias()  # error: [call-non-callable]
+Alias()  # error: [instantiate-abstract-class]
 
 class Concrete[T](Abstract[T]):
     def method(self) -> T:
@@ -361,7 +420,7 @@ class AbstractSetter(ABC):
     @abstractmethod
     def value(self, value: int) -> None: ...
 
-AbstractSetter()  # error: [call-non-callable]
+AbstractSetter()  # error: [instantiate-abstract-class]
 
 class ConcreteSetter(AbstractSetter):
     @AbstractSetter.value.setter
@@ -378,7 +437,7 @@ class AbstractDeleter(ABC):
     @abstractmethod
     def value(self) -> None: ...
 
-AbstractDeleter()  # error: [call-non-callable]
+AbstractDeleter()  # error: [instantiate-abstract-class]
 
 class ConcreteDeleter(AbstractDeleter):
     @AbstractDeleter.value.deleter
@@ -411,7 +470,7 @@ from interface import Interface
 
 class StillAbstract(Interface): ...
 
-StillAbstract()  # error: [call-non-callable] "unimplemented abstract method `required`"
+StillAbstract()  # error: [instantiate-abstract-class] "unimplemented abstract method `required`"
 
 class Concrete(Interface):
     def required(self) -> int:

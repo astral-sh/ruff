@@ -67,13 +67,13 @@ use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
     DYNAMIC_FUNCTION_DECORATOR_RETURN, GeneratorMismatchKind, INEFFECTIVE_FINAL,
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_DECLARATION,
-    INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE,
-    INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
-    UNSOUND_YIELD, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, YieldKind,
+    INSTANTIATE_ABSTRACT_CLASS, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
+    INVALID_ATTRIBUTE_ACCESS, INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION,
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE,
+    INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    INVALID_TYPE_VARIABLE_DEFAULT, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
+    TypeCheckDiagnostics, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
+    UNSOUND_ASSIGNMENT, UNSOUND_YIELD, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, YieldKind,
     autofix_with_notimplementederror, hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
     report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
@@ -9419,7 +9419,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         call_expression,
                         protocol,
                     );
-                } else if self.context.is_lint_enabled(&CALL_NON_CALLABLE) {
+                } else if self.context.is_lint_enabled(&INSTANTIATE_ABSTRACT_CLASS) {
                     let abstract_methods = AbstractMethods::of_class(db, class);
                     if !abstract_methods.is_empty() {
                         report_attempted_instantiation_of_abstract_class(
