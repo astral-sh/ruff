@@ -1,10 +1,8 @@
-use anyhow::{Context, Result, ensure};
+use anyhow::Result;
 use insta::{assert_json_snapshot, assert_snapshot};
-use lsp_server::RequestId;
 use lsp_types::{
-    BaseUri, DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, GlobPattern,
-    RegistrationRequest, TextDocumentContentChangeEvent, TextDocumentContentChangeWholeDocument,
-    UnregistrationRequest,
+    BaseUri, FileSystemWatcher, GlobPattern, TextDocumentContentChangeEvent,
+    TextDocumentContentChangeWholeDocument,
 };
 use ruff_db::system::SystemPath;
 use ruff_python_trivia::textwrap::dedent;
@@ -74,7 +72,7 @@ fn refreshes_script_dependency_after_rewatch() -> Result<()> {
       "file://<temp_dir>/src :: **"
     ]
     "#);
-    assert_eq!(acknowledge_unregistration(&mut server)?, initial_id);
+    assert_eq!(server.acknowledge_unregistration()?, initial_id);
 
     // No file event reaches the server for this edit while the dependency is unwatched.
     server.write_file(dependency, "value = 'wrong'")?;
@@ -89,7 +87,7 @@ fn refreshes_script_dependency_after_rewatch() -> Result<()> {
         ],
         3,
     );
-    let (request_id, _, watches) = watcher_registration_request(&mut server)?;
+    let (request_id, _, watches) = server.watcher_registration_request()?;
     assert_json_snapshot!(watcher_snapshot(&watches), @r#"
     [
       "file://<temp_dir>/src :: **",
@@ -103,7 +101,7 @@ fn refreshes_script_dependency_after_rewatch() -> Result<()> {
 
     // Completing registration refreshes the known dependency and finds its missed edit.
     server.acknowledge_request(request_id);
-    assert_eq!(acknowledge_unregistration(&mut server)?, project_id);
+    assert_eq!(server.acknowledge_unregistration()?, project_id);
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(server.document_diagnostic_request(script, None)),
         @r#"6:14..6:19[ERROR]: Object of type `Literal["wrong"]` is not assignable to `int`"#
@@ -198,7 +196,7 @@ fn picks_up_edits_to_unwatched_pth_files() -> Result<()> {
       "file://<temp_dir>/src :: **"
     ]
     "#);
-    acknowledge_unregistration(&mut server)?;
+    server.acknowledge_unregistration()?;
 
     // The client doesn't report the `.pth` edit while site-packages is unwatched.
     let new = server.file_path("new");
@@ -210,7 +208,7 @@ fn picks_up_edits_to_unwatched_pth_files() -> Result<()> {
         uri: server.file_uri(config),
         kind: lsp_types::FileChangeType::Changed,
     }]);
-    let (request_id, stale_pth_id, watches) = watcher_registration_request(&mut server)?;
+    let (request_id, stale_pth_id, watches) = server.watcher_registration_request()?;
     assert_json_snapshot!(watcher_snapshot(&watches), @r#"
     [
       "file://<temp_dir>/src :: **",
@@ -219,7 +217,7 @@ fn picks_up_edits_to_unwatched_pth_files() -> Result<()> {
     ]
     "#);
     server.acknowledge_request(request_id);
-    assert_eq!(acknowledge_unregistration(&mut server)?, project_only_id);
+    assert_eq!(server.acknowledge_unregistration()?, project_only_id);
 
     // Completing registration refreshes `.pth` and registers its new search path.
     let (_, watches) = watcher_registrations(&mut server)?;
@@ -230,7 +228,7 @@ fn picks_up_edits_to_unwatched_pth_files() -> Result<()> {
       "file://<temp_dir>/venv/<site-packages> :: **"
     ]
     "#);
-    assert_eq!(acknowledge_unregistration(&mut server)?, stale_pth_id);
+    assert_eq!(server.acknowledge_unregistration()?, stale_pth_id);
 
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(server.document_diagnostic_request(main, None)),
@@ -299,7 +297,7 @@ fn nested_search_path_picks_up_missed_dependency_edit() -> Result<()> {
       "file://<temp_dir>/src :: **"
     ]
     "#);
-    acknowledge_unregistration(&mut server)?;
+    server.acknowledge_unregistration()?;
 
     // No file event reports the edit while the parent search path is unwatched.
     server.write_file(dependency, "value = 'wrong'")?;
@@ -325,7 +323,7 @@ fn nested_search_path_picks_up_missed_dependency_edit() -> Result<()> {
       "file://<temp_dir>/dependencies/pkg :: **"
     ]
     "#);
-    acknowledge_unregistration(&mut server)?;
+    server.acknowledge_unregistration()?;
 
     // The new search root exposes the same file as `dependency` instead of `pkg.dependency`.
     // Reimport it to check that the edit missed while it was unwatched has been refreshed.
@@ -400,40 +398,9 @@ fn watches_project_without_relative_patterns() -> Result<()> {
 }
 
 fn watcher_registrations(server: &mut TestServer) -> Result<(String, Vec<FileSystemWatcher>)> {
-    let (request_id, registration_id, watchers) = watcher_registration_request(server)?;
+    let (request_id, registration_id, watchers) = server.watcher_registration_request()?;
     server.acknowledge_request(request_id);
     Ok((registration_id, watchers))
-}
-
-pub(super) fn watcher_registration_request(
-    server: &mut TestServer,
-) -> Result<(RequestId, String, Vec<FileSystemWatcher>)> {
-    let (request_id, params) = server.await_request::<RegistrationRequest>();
-    let [registration] = params.registrations.as_slice() else {
-        anyhow::bail!("expected exactly one file watcher registration");
-    };
-    ensure!(
-        registration.method == "workspace/didChangeWatchedFiles",
-        "unexpected registration method: {}",
-        registration.method
-    );
-    let options: DidChangeWatchedFilesRegistrationOptions = serde_json::from_value(
-        registration
-            .register_options
-            .clone()
-            .context("expected file watcher options")?,
-    )?;
-    Ok((request_id, registration.id.clone(), options.watchers))
-}
-
-pub(super) fn acknowledge_unregistration(server: &mut TestServer) -> Result<String> {
-    let (request_id, params) = server.await_request::<UnregistrationRequest>();
-    let [unregistration] = params.unregisterations.as_slice() else {
-        anyhow::bail!("expected exactly one file watcher unregistration");
-    };
-    let registration_id = unregistration.id.clone();
-    server.acknowledge_request(request_id);
-    Ok(registration_id)
 }
 
 fn watcher_snapshot(watchers: &[FileSystemWatcher]) -> Vec<String> {
