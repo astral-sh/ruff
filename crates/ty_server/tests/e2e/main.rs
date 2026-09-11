@@ -196,7 +196,7 @@ pub(crate) struct TestServer {
     /// Valid responses contain exactly one response but may contain multiple responses
     /// when the server sends multiple responses for a single request.
     /// The responses are guaranteed to never be empty.
-    responses: FxHashMap<RequestId, Vec<Response>>,
+    responses: FxHashMap<RequestId, smallvec::SmallVec<[Response; 1]>>,
 
     /// An ordered queue of all the notifications received from the server
     notifications: VecDeque<lsp_server::Notification>,
