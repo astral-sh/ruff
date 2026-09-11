@@ -823,3 +823,100 @@ help: Add return type annotation: `NoReturn`
 327 |     raise ValueError
     |
 note: This is an unsafe fix and may change runtime behavior
+
+ANN201 [*] Missing return type annotation for public function `func`
+   --> auto_return_type.py:332:5
+    |
+330 | # Test cases for context managers that swallow exceptions: the function returns `None`, even
+331 | # though every statement in the `with` body raises
+332 | def func():
+    |     ^^^^
+333 |     import pytest
+    |
+help: Add return type annotation: `None`
+    |
+331 | # though every statement in the `with` body raises
+    - def func():
+332 + def func() -> None:
+333 |     import pytest
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+ANN201 [*] Missing return type annotation for public function `func`
+   --> auto_return_type.py:339:5
+    |
+339 | def func():
+    |     ^^^^
+340 |     import contextlib
+    |
+help: Add return type annotation: `None`
+    |
+338 |
+    - def func():
+339 + def func() -> None:
+340 |     import contextlib
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+ANN201 [*] Missing return type annotation for public function `method`
+   --> auto_return_type.py:347:9
+    |
+346 | class Class:
+347 |     def method(self):
+    |         ^^^^^^
+348 |         with self.assertRaises(ValueError):
+349 |             raise ValueError
+    |
+help: Add return type annotation: `None`
+    |
+346 | class Class:
+    -     def method(self):
+347 +     def method(self) -> None:
+348 |         with self.assertRaises(ValueError):
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+ANN201 [*] Missing return type annotation for public function `func`
+   --> auto_return_type.py:353:5
+    |
+352 | # The `return` is also conditional, since the exception can be swallowed before it runs
+353 | def func():
+    |     ^^^^
+354 |     import contextlib
+    |
+help: Add return type annotation: `Optional[int]`
+    |
+216 |
+    - from typing import overload
+217 + from typing import overload, Optional
+218 |
+--------------------------------------------------------------------------------
+352 | # The `return` is also conditional, since the exception can be swallowed before it runs
+    - def func():
+353 + def func() -> Optional[int]:
+354 |     import contextlib
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+ANN201 [*] Missing return type annotation for public function `func`
+   --> auto_return_type.py:361:5
+    |
+360 | # Test case: a context manager that isn't known to swallow exceptions still gets NoReturn
+361 | def func():
+    |     ^^^^
+362 |     with open("file") as f:
+363 |         raise ValueError(f)
+    |
+help: Add return type annotation: `NoReturn`
+    |
+216 |
+    - from typing import overload
+217 + from typing import overload, NoReturn
+218 |
+--------------------------------------------------------------------------------
+360 | # Test case: a context manager that isn't known to swallow exceptions still gets NoReturn
+    - def func():
+361 + def func() -> NoReturn:
+362 |     with open("file") as f:
+    |
+note: This is an unsafe fix and may change runtime behavior

@@ -257,5 +257,6 @@ help: Remove unnecessary assignment
 461 +     return (1
 462 |               )
     -     return x
+463 |
     |
 note: This is an unsafe fix and may change runtime behavior
