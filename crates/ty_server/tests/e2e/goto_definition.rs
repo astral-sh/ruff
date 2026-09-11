@@ -59,17 +59,18 @@ from dependency import script_only
 
 #[cfg(feature = "test-uv")]
 mod uv_metadata {
-    use anyhow::{Context, Result, anyhow};
+    use anyhow::{Context, Result, anyhow, ensure};
     use lsp_types::{
-        Code, Definition, DefinitionResponse, FileChangeType, FileEvent, Position,
-        TextDocumentContentChangeEvent, TextDocumentContentChangeWholeDocument,
+        BaseUri, Code, Definition, DefinitionResponse, FileChangeType, FileEvent, GlobPattern,
+        Position, TextDocumentContentChangeEvent, TextDocumentContentChangeWholeDocument, Uri,
         WorkspaceDocumentDiagnosticReport,
     };
     use ruff_db::system::{SystemPath, SystemPathBuf};
     use ty_project::UseUv;
     use ty_server::{ClientOptions, DiagnosticMode};
 
-    use crate::TestServerBuilder;
+    use crate::file_watching::{acknowledge_unregistration, watcher_registration_request};
+    use crate::{TestServer, TestServerBuilder};
 
     #[test]
     fn synchronization_reports_progress_before_resolving_dependency_definitions() -> Result<()> {
@@ -222,12 +223,14 @@ from idna import encode
             .with_workspace(workspace_root, None)?
             .with_file(script, initial)?
             .with_real_uv(UseUv::Scripts)?
+            .with_watched_file_support(true)
             .enable_workspace_diagnostic_refresh(true)
             .build()
             .wait_until_workspaces_are_initialized();
 
         server.open_text_document(script, initial, 1);
         server.await_diagnostic_refresh();
+        let (_, site_packages) = watched_site_packages(&mut server)?;
 
         server.change_text_document(
             script,
@@ -268,6 +271,7 @@ from idna import encode
         server.save_text_document(script);
 
         server.await_diagnostic_refresh();
+        installed_package_event(&mut server, &site_packages, "idna")?;
 
         assert!(
             server
@@ -298,6 +302,7 @@ from attrs import define
             .with_workspace(SystemPath::new("src"), None)?
             .with_file(script, initial)?
             .with_real_uv(UseUv::Scripts)?
+            .with_watched_file_support(true)
             .enable_workspace_diagnostic_refresh(true)
             .build()
             .wait_until_workspaces_are_initialized();
@@ -305,6 +310,7 @@ from attrs import define
         // Opening synchronizes the backing file, not the unsaved metadata.
         server.open_text_document(script, updated, 1);
         server.await_diagnostic_refresh();
+        let (_, site_packages) = watched_site_packages(&mut server)?;
         assert!(
             server
                 .goto_definition_request(script, Position::new(4, 18))
@@ -315,6 +321,7 @@ from attrs import define
         server.write_file(script, updated)?;
         server.save_text_document(script);
         server.await_diagnostic_refresh();
+        installed_package_event(&mut server, &site_packages, "attrs")?;
         assert!(
             server
                 .goto_definition_request(script, Position::new(4, 18))
@@ -395,12 +402,14 @@ from attrs import define
             .with_workspace(workspace_root, None)?
             .with_file(script, initial)?
             .with_real_uv(UseUv::Scripts)?
+            .with_watched_file_support(true)
             .enable_workspace_diagnostic_refresh(true)
             .build()
             .wait_until_workspaces_are_initialized();
 
         server.open_text_document(script, initial, 1);
         server.await_diagnostic_refresh();
+        let (mut registration_id, site_packages) = watched_site_packages(&mut server)?;
 
         assert!(
             server
@@ -445,7 +454,15 @@ from attrs import define
             server.write_file(script, updated)?;
             server.save_text_document(script);
             server.await_diagnostic_refresh();
+
+            // Invalid metadata removes the environment watch; correcting it restores the watch.
+            let (request_id, next_id, _) = watcher_registration_request(&mut server)?;
+            server.acknowledge_request(request_id);
+            ensure!(acknowledge_unregistration(&mut server)? == registration_id);
+            registration_id = next_id;
         }
+
+        installed_package_event(&mut server, &site_packages, "attrs")?;
 
         assert!(
             server
@@ -505,6 +522,54 @@ from idna import encode
             "watched changes must update environments even while scripts are closed"
         );
 
+        Ok(())
+    }
+
+    fn watched_site_packages(server: &mut TestServer) -> Result<(String, Uri)> {
+        let mut previous_id = None;
+        // uv may finish after the initial project-only watch was requested.
+        for _ in 0..2 {
+            let (request_id, id, watchers) = watcher_registration_request(server)?;
+            let site_packages = watchers.iter().find_map(|watcher| {
+                if let GlobPattern::RelativePattern(pattern) = &watcher.glob_pattern
+                    && let BaseUri::Uri(uri) = &pattern.base_uri
+                    && uri.to_string().ends_with("/site-packages")
+                {
+                    Some(uri.clone())
+                } else {
+                    None
+                }
+            });
+            server.acknowledge_request(request_id);
+            if let Some(previous_id) = previous_id {
+                ensure!(acknowledge_unregistration(server)? == previous_id);
+            }
+            if let Some(site_packages) = site_packages {
+                return Ok((id, site_packages));
+            }
+            previous_id = Some(id);
+        }
+        Err(anyhow!("expected a watcher for the script's site-packages"))
+    }
+
+    fn installed_package_event(
+        server: &mut TestServer,
+        site_packages: &Uri,
+        package: &str,
+    ) -> Result<()> {
+        let directory = Uri::parse(&format!("{site_packages}/{package}"))?;
+        let uri = Uri::parse(&format!("{site_packages}/{package}/__init__.py"))?;
+        server.did_change_watched_files(vec![
+            FileEvent {
+                uri: directory,
+                kind: FileChangeType::Created,
+            },
+            FileEvent {
+                uri,
+                kind: FileChangeType::Created,
+            },
+        ]);
+        server.await_diagnostic_refresh();
         Ok(())
     }
 }

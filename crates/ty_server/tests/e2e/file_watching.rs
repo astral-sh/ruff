@@ -405,7 +405,7 @@ fn watcher_registrations(server: &mut TestServer) -> Result<(String, Vec<FileSys
     Ok((registration_id, watchers))
 }
 
-fn watcher_registration_request(
+pub(super) fn watcher_registration_request(
     server: &mut TestServer,
 ) -> Result<(RequestId, String, Vec<FileSystemWatcher>)> {
     let (request_id, params) = server.await_request::<RegistrationRequest>();
@@ -426,7 +426,7 @@ fn watcher_registration_request(
     Ok((request_id, registration.id.clone(), options.watchers))
 }
 
-fn acknowledge_unregistration(server: &mut TestServer) -> Result<String> {
+pub(super) fn acknowledge_unregistration(server: &mut TestServer) -> Result<String> {
     let (request_id, params) = server.await_request::<UnregistrationRequest>();
     let [unregistration] = params.unregisterations.as_slice() else {
         anyhow::bail!("expected exactly one file watcher unregistration");
