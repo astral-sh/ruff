@@ -90,13 +90,129 @@ class _:
 a = A()
 # error: [unresolved-attribute]
 a.dynamically_added = 0
-# error: [unresolved-attribute]
 reveal_type(a.dynamically_added)  # revealed: Literal[0]
 
 # error: [unresolved-reference]
 does.nt.exist = 0
 # error: [unresolved-reference]
 reveal_type(does.nt.exist)  # revealed: Literal[0]
+```
+
+### Recovery after an undeclared attribute assignment
+
+Assigning an undeclared attribute reports an error. Simple reads following that assignment in the
+same straight-line block use its recovery type without repeating the missing-attribute error.
+
+```py
+class Item: ...
+
+def immediate_reads(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+    item.value
+    return item.value
+```
+
+The same recovery applies to module attributes, including a read used as a call argument. Arguments
+are evaluated before the call runs.
+
+```py
+import logging
+
+logging.TRACE = 9  # error: [unresolved-attribute]
+reveal_type(logging.TRACE)  # revealed: Literal[9]
+```
+
+### Permitted writes do not establish read recovery
+
+Recovery does not hide a missing read after a permitted write. A custom setter can accept an
+assignment without storing the attribute.
+
+```py
+class Sink:
+    def __setattr__(self, name: str, value: object) -> None:
+        pass
+
+sink = Sink()
+sink.value = 1
+sink.value  # error: [unresolved-attribute]
+```
+
+### Writes and calls end attribute-read recovery
+
+Deletion and receiver reassignment end recovery. A later plain attribute assignment starts it again.
+
+```py
+class Item: ...
+
+def deleted(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+    del item.value  # error: [unresolved-attribute]
+    item.value  # error: [unresolved-attribute]
+    item.value = 2  # error: [unresolved-attribute]
+    reveal_type(item.value)  # revealed: Literal[2]
+
+def replaced(item: Item, other: Item):
+    item.value = 1  # error: [unresolved-attribute]
+    item = other
+    item.value  # error: [unresolved-attribute]
+```
+
+Calls can mutate the receiver. A read after a call reports the missing attribute, including when the
+call appears in an earlier argument of the same expression.
+
+```py
+def consume(*args: object) -> None: ...
+def called(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+    consume(item.value)
+    item.value  # error: [unresolved-attribute]
+
+def called_in_argument(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+    consume(consume(), item.value)  # error: [unresolved-attribute]
+```
+
+### Attribute-read recovery stays within a block
+
+A branch or loop body can recover from its own assignments. That recovery does not extend past the
+block or establish presence on a later loop iteration.
+
+```py
+class Item: ...
+
+def conditional(item: Item, condition: bool):
+    if condition:
+        item.value = 1  # error: [unresolved-attribute]
+        item.value
+    item.value  # error: [unresolved-attribute]
+
+def loop(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+    for _ in range(2):
+        item.value  # error: [unresolved-attribute]
+        item.value = 2  # error: [unresolved-attribute]
+        item.value
+        del item.value  # error: [unresolved-attribute]
+```
+
+A class body ends recovery in its enclosing block. Reads in nested scopes also report their own
+missing-attribute errors.
+
+```py
+def eager_scope(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        del item.value  # error: [unresolved-attribute]
+
+    item.value  # error: [unresolved-attribute]
+
+def nested_scopes(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+    [item.value for _ in range(1)]  # error: [unresolved-attribute]
+
+    def inner():
+        return item.value  # error: [unresolved-attribute]
 ```
 
 ### Narrowing chain
