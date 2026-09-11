@@ -1184,6 +1184,23 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             })
     }
 
+    fn check_source_typevar_bounds(
+        &self,
+        db: &'db dyn Db,
+        bound_or_constraints: TypeVarBoundOrConstraints<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match bound_or_constraints {
+            TypeVarBoundOrConstraints::UpperBound(bound) => self.check_type_pair(db, bound, target),
+            TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                .elements(db)
+                .iter()
+                .when_all(db, self.constraints, |&constraint| {
+                    self.check_type_pair(db, constraint, target)
+                }),
+        }
+    }
+
     fn check_source_union(
         &self,
         db: &'db dyn Db,
@@ -1232,13 +1249,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.check_type_pair(db, alternatives, target);
         }
 
-        let is_new_type_of_union = || {
+        let check_expanded_source = || {
             // Normally non-unions cannot directly contain unions in our model due to the fact that
             // we enforce a DNF structure on our set-theoretic types. However, it *is* possible for
             // there to be a newtype of a union, for an intersection to contain a newtype of a
             // union, or for a non-inferable typevar (possibly inside an intersection) to widen to a
             // bound or set of constraints that exposes a union; this requires special handling.
             match source {
+                Type::TypeVar(typevar)
+                    if !typevar.is_inferable(db, self.inferable)
+                        && let Some(bound_or_constraints) =
+                            typevar.typevar(db).bound_or_constraints(db, self.env) =>
+                {
+                    self.check_source_typevar_bounds(db, bound_or_constraints, target)
+                }
                 Type::Intersection(intersection)
                     if self.should_expand_intersection(db, intersection) =>
                 {
@@ -1276,7 +1300,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 }
                 result
             })
-            .or(db, self.constraints, is_new_type_of_union);
+            .or(db, self.constraints, check_expanded_source);
 
         if context_tree.is_some()
             && !elements_context.is_empty()
@@ -1972,6 +1996,33 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 source_sentinel.is_same_sentinel(db, target_sentinel),
             ),
 
+            // A nominal descriptor annotation specifies the wrapped callable through `__func__`.
+            // Comparing that contract directly preserves overloads and avoids replacing the
+            // wrapped callable's parameter and return types with the default specialization.
+            (
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)),
+                Type::NominalInstance(target_instance),
+            ) if target_instance
+                .class(db, env)
+                .is_known(db, wrapper.class(db)) =>
+            {
+                self.with_recursion_guard(db, source, target, || {
+                    let Some(target_function) = target
+                        .member_lookup_with_policy(
+                            db,
+                            env,
+                            "__func__",
+                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        )
+                        .place
+                        .ignore_possibly_undefined()
+                    else {
+                        return self.never();
+                    };
+                    self.check_type_pair(db, wrapper.wrapped(db), target_function)
+                })
+            }
+
             // When checking `FunctoolsPartial <: functools.partial[T]`, we need to specialize
             // the nominal instance with the partial's return type so the check is precise.
             (
@@ -2141,28 +2192,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 ConstraintSet::from_bool(self.constraints, source.is_type_var() == other_is_top)
             }
 
-            // A fully static typevar is a subtype of its upper bound, and to something similar to
-            // the union of its constraints. An unbound, unconstrained, fully static typevar has an
-            // implicit upper bound of `object` (which is handled above).
-            (Type::TypeVar(bound_typevar), _)
-                if !bound_typevar.is_inferable(db, self.inferable)
-                    && let Some(bound_or_constraints) =
-                        bound_typevar.typevar(db).bound_or_constraints(db, env) =>
-            {
-                match bound_or_constraints {
-                    TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        self.check_type_pair(db, bound, target)
-                    }
-                    TypeVarBoundOrConstraints::Constraints(typevar_constraints) => {
-                        typevar_constraints.elements(db).iter().when_all(
-                            db,
-                            self.constraints,
-                            |constraint| self.check_type_pair(db, *constraint, target),
-                        )
-                    }
-                }
-            }
-
             // If the typevar is constrained, there must be multiple constraints, and the typevar
             // might be specialized to any one of them. However, the constraints do not have to be
             // disjoint, which means an lhs type might be a subtype of all of the constraints.
@@ -2229,6 +2258,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (Type::Intersection(intersection), _) => {
                 self.check_source_intersection(db, intersection, target)
+            }
+
+            // A fully static typevar is a subtype of its upper bound, and to something similar to
+            // the union of its constraints. An unbound, unconstrained, fully static typevar has an
+            // implicit upper bound of `object` (which is handled above).
+            (Type::TypeVar(bound_typevar), _)
+                if !bound_typevar.is_inferable(db, self.inferable)
+                    && let Some(bound_or_constraints) =
+                        bound_typevar.typevar(db).bound_or_constraints(db, env) =>
+            {
+                self.check_source_typevar_bounds(db, bound_or_constraints, target)
             }
 
             // `Never` is the bottom type, the empty set.
@@ -2671,6 +2711,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::Callable(callable), _) if callable.is_function_like(db) => {
                 self.check_type_pair(db, KnownClass::FunctionType.to_instance(db, env), target)
             }
+
+            // Method-wrapper callables are subtypes of `MethodWrapperType`.
+            (Type::Callable(callable), _) if callable.is_method_wrapper(db) => self
+                .check_type_pair(
+                    db,
+                    KnownClass::MethodWrapperType.to_instance(db, env),
+                    target,
+                ),
 
             (Type::Callable(_), _) => self.never(),
 

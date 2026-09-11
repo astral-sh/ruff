@@ -1,5 +1,58 @@
 # Changelog
 
+## 0.16.7
+
+Released on 2026-09-10.
+
+### Preview features
+
+- \[`ruff`\] Add rule for default values on method receivers (`RUF077`) ([#26700](https://github.com/astral-sh/ruff/pull/26700))
+- \[`ruff`\] Recognize `re.prefixmatch` (`RUF039`, `RUF055`) ([#28311](https://github.com/astral-sh/ruff/pull/28311))
+
+### Bug fixes
+
+- Alternate nested quotes inside format spec interpolations ([#28259](https://github.com/astral-sh/ruff/pull/28259))
+- \[`flake8-implicit-str-concat`\] Mark fix unsafe when it creates a docstring (`ISC003`) ([#27981](https://github.com/astral-sh/ruff/pull/27981))
+- \[`flake8-tidy-imports`\] Skip fixes for multi-member imports (`TID254`) ([#26584](https://github.com/astral-sh/ruff/pull/26584))
+- \[`pylint`\] Gate `ImportCycleError` on Python 3.15 (`PLW0133`) ([#28310](https://github.com/astral-sh/ruff/pull/28310))
+
+### Rule changes
+
+- Correct `D211` and `D203` rule conflict diagnostic ([#28444](https://github.com/astral-sh/ruff/pull/28444))
+- Recognize `slice` and `frozendict` generics ([#28477](https://github.com/astral-sh/ruff/pull/28477))
+- Stop defining `__cached__` for Python 3.15 ([#28476](https://github.com/astral-sh/ruff/pull/28476))
+- \[`pyupgrade`\] Stop recommending removed `typing.no_type_check_decorator` (`UP035`) ([#28475](https://github.com/astral-sh/ruff/pull/28475))
+
+### Performance
+
+- Reuse parser name lookups when interning ([#28399](https://github.com/astral-sh/ruff/pull/28399))
+- Speed up inherited configuration resolution ([#28299](https://github.com/astral-sh/ruff/pull/28299))
+
+### Documentation
+
+- Fix `line-length` path in `--config` example ([#28392](https://github.com/astral-sh/ruff/pull/28392))
+- Remove the "Who’s Using Ruff?" list ([#28455](https://github.com/astral-sh/ruff/pull/28455))
+
+### Other changes
+
+- Embed archive checksums in the shell installer ([#28281](https://github.com/astral-sh/ruff/pull/28281))
+
+### Contributors
+
+- [@The-Compiler](https://github.com/The-Compiler)
+- [@mdiniz97](https://github.com/mdiniz97)
+- [@zsol](https://github.com/zsol)
+- [@gorewilliams](https://github.com/gorewilliams)
+- [@RafaelJohn9](https://github.com/RafaelJohn9)
+- [@qatcod](https://github.com/qatcod)
+- [@zanieb](https://github.com/zanieb)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@ntBre](https://github.com/ntBre)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@nightt5879](https://github.com/nightt5879)
+- [@jonathandung](https://github.com/jonathandung)
+- [@jogo-openai](https://github.com/jogo-openai)
+
 ## 0.16.6
 
 Released on 2026-09-03.

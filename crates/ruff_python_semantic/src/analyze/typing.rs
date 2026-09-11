@@ -24,6 +24,7 @@ use crate::{Binding, BindingKind, Modules};
 pub enum Callable {
     Bool,
     Cast,
+    TypeForm,
     NewType,
     TypeVar,
     NamedTuple,

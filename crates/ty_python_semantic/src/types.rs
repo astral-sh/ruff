@@ -1231,10 +1231,11 @@ bitflags! {
         /// Do not call `__getattr__` during member lookup.
         const NO_GETATTR_LOOKUP = 1 << 4;
 
-        /// Ignore members that are only available through a dynamic type.
+        /// Ignore members that are only available through a dynamic type or a divergent marker.
         ///
         /// This is used when detecting descriptors. An `Any` or `Unknown` base can provide any
         /// member, but that does not mean that every subclass should be treated as a descriptor.
+        /// Likewise, a divergent marker from cyclic inference does not establish a concrete member.
         const REQUIRE_CONCRETE = 1 << 5;
     }
 }
@@ -2199,7 +2200,11 @@ impl<'db> Type<'db> {
     fn supports_self_binding(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         match self {
             Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => false,
-            Type::Callable(callable) if callable.is_function_like(db) => false,
+            Type::Callable(callable)
+                if callable.is_function_like(db) || callable.is_method_wrapper(db) =>
+            {
+                false
+            }
             _ => self.contains_self(db, env),
         }
     }
@@ -3769,7 +3774,9 @@ impl<'db> Type<'db> {
                 }))
             }
 
-            Type::Dynamic(_) if policy.require_concrete() => Some(Place::Undefined.into()),
+            Type::Dynamic(_) | Type::Divergent(_) if policy.require_concrete() => {
+                Some(Place::Undefined.into())
+            }
 
             Type::Recursive(recursive) => recursive.map_or_else(
                 db,
@@ -4063,8 +4070,28 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         key: MemberLookupKey<'db>,
+        receiver: Type<'db>,
     ) -> PlaceAndQualifiers<'db> {
         let ty = key.ty(db);
+
+        // `object.__dict__` is a typeshed approximation: a concrete slotted instance without
+        // dictionary storage does not inherit that attribute at runtime. Keep normal lookup for
+        // `Self` and other type variables because their subclasses can introduce a dictionary.
+        let key = if key.name(db) == "__dict__"
+            && let Type::NominalInstance(instance) = receiver
+            && let Some((class, _)) = instance.class(db, env).static_class_literal(db)
+            && class.lacks_instance_storage(db, "__dict__")
+        {
+            MemberLookupKey::new(
+                db,
+                key.program(db),
+                ty,
+                key.name(db).as_str(),
+                key.policy(db) | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+            )
+        } else {
+            key
+        };
 
         if let Type::TypeVar(_) = ty {
             if let Some(class) = ty.nominal_class(db, env) {
@@ -5154,7 +5181,8 @@ impl<'db> Type<'db> {
         fallback: MemberLookupResult<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
     ) -> MemberLookupResult<'db> {
-        let meta_attr_plain = Self::instance_lookup_class_member_with_policy(db, env, key);
+        let meta_attr_plain =
+            Self::instance_lookup_class_member_with_policy(db, env, key, receiver);
         let meta_attr_ty = meta_attr_plain.place.ignore_possibly_undefined();
         // Preserve the receiver's type variables and all its narrowed class constraints.
         let owner = receiver.to_meta_type(db, env);
@@ -5825,9 +5853,12 @@ impl<'db> Type<'db> {
                 }
                 Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => match name_str {
                     "__func__" | "__wrapped__" => Place::bound(wrapper.wrapped(db)).into(),
-                    "__call__" if let Some(callables) = wrapper.callables(db, env) => {
-                        Place::bound(callables.into_type(db, env)).into()
-                    }
+                    "__call__" if let Some(callables) = wrapper.callables(db, env) => Place::bound(
+                        callables
+                            .map(|callable| callable.into_method_wrapper(db))
+                            .into_type(db, env),
+                    )
+                    .into(),
                     _ => wrapper
                         .instance_fallback(db, env)
                         .member_lookup_with_policy_and_receiver(
@@ -5838,7 +5869,14 @@ impl<'db> Type<'db> {
                     "__self__" => Place::bound(bound_method.self_instance(db)).into(),
                     "__func__" => Place::bound(bound_method.func(db)).into(),
                     "__call__" if let Some(callables) = bound_method.callables(db, env) => {
-                        Place::bound(callables.into_type(db, env)).into()
+                        // The extracted method wrapper does not bind another receiver when
+                        // stored on a class, even if the underlying callable is function-like.
+                        Place::bound(
+                            callables
+                                .map(|callable| callable.into_method_wrapper(db))
+                                .into_type(db, env),
+                        )
+                        .into()
                     }
                     _ => {
                         let result = KnownClass::MethodType
@@ -5876,6 +5914,12 @@ impl<'db> Type<'db> {
 
                 Type::Callable(callable) if callable.is_function_like(db) => {
                     KnownClass::FunctionType
+                        .to_instance(db, env)
+                        .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver)
+                }
+
+                Type::Callable(callable) if callable.is_method_wrapper(db) => {
+                    KnownClass::MethodWrapperType
                         .to_instance(db, env)
                         .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver)
                 }
@@ -6267,6 +6311,11 @@ impl<'db> Type<'db> {
                 }),
                 _ => None,
             }
+        }
+
+        // Eagerly distribute over unions as a fast path to avoid building a large union of bound methods.
+        if let Type::Union(union) = self {
+            return union.try_map(db, env, |element| element.len(db, env));
         }
 
         if let Type::LiteralValue(literal) = self
@@ -8594,6 +8643,9 @@ impl<'db> Type<'db> {
                 Type::DataclassDecorator(_) => KnownClass::FunctionType.to_class_literal(db, env),
                 Type::Callable(callable) if callable.is_function_like(db) => {
                     KnownClass::FunctionType.to_class_literal(db, env)
+                }
+                Type::Callable(callable) if callable.is_method_wrapper(db) => {
+                    KnownClass::MethodWrapperType.to_class_literal(db, env)
                 }
                 Type::Callable(_) | Type::DataclassTransformer(_) => {
                     KnownClass::Type.to_instance(db, env)

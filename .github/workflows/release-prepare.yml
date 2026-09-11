@@ -1,0 +1,110 @@
+# Bump the Ruff version and create a pull request.
+name: "Prepare release"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The version to set (overrides detection)"
+        required: false
+        type: string
+
+permissions: {}
+
+env:
+  UV_LOCKED: 1
+
+jobs:
+  prepare-release:
+    if: github.repository == 'astral-sh/ruff' && github.ref == 'refs/heads/main'
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    environment: automations
+    permissions:
+      contents: read
+      id-token: write # for the credential broker
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.11"
+          enable-cache: true
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: false
+
+      - name: "Get Ruff token"
+        id: token
+        uses: open-security-tools/ost-simple-sts@9e012247e07c39080fb6a832dbfbcfeacebc19c4
+        with:
+          exchange-url: ${{ secrets.STS_API_URL }}/exchange
+          audience: ${{ secrets.STS_API_URL }}
+          repository: astral-sh/ruff
+          permissions: |
+            contents: write
+            pull_requests: write
+
+      - name: "Configure Git"
+        run: |
+          git config user.name "astral-automations-bot[bot]"
+          git config user.email "305554984+astral-automations-bot[bot]@users.noreply.github.com"
+
+      - name: "Bump version"
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            ./scripts/release.sh --version "$INPUT_VERSION"
+          else
+            ./scripts/release.sh
+          fi
+        env:
+          GITHUB_TOKEN: ${{ steps.token.outputs.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+
+      - name: "Install Rust toolchain"
+        run: rustup component add rustfmt
+
+      - name: "Format and check release changes"
+        shell: bash
+        run: |
+          mapfile -d '' files < <(git diff --name-only --diff-filter=ACMR -z HEAD)
+          if (( ${#files[@]} )); then
+            # Hooks can fix generated files and exit nonzero. Require a clean pass before committing.
+            uv run --only-dev --locked prek run --files "${files[@]}" ||
+              uv run --only-dev --locked prek run --files "${files[@]}"
+          fi
+
+      - name: "Create release branch"
+        run: |
+          version="$(uv version --short)"
+          git switch -c "release/$version"
+          git commit -am "Bump version to $version"
+
+      - name: "Create or update pull request"
+        run: |
+          branch="$(git branch --show-current)"
+          git push --force \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            HEAD:"$branch"
+
+          pull_request="$(
+            gh pr list \
+              --base main \
+              --head "$branch" \
+              --state open \
+              --json url \
+              --jq '.[0].url'
+          )"
+          if [ -n "$pull_request" ]; then
+            printf '%s\n' "$pull_request"
+          else
+            gh pr create \
+              --base main \
+              --head "$branch" \
+              --fill-first
+          fi
+        env:
+          GITHUB_TOKEN: ${{ steps.token.outputs.token }}

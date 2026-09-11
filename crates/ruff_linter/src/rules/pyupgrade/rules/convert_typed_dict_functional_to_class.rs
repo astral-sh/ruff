@@ -177,7 +177,7 @@ fn create_class_def_stmt(
     ast::StmtClassDef {
         name: Identifier::new(class_name.to_string(), TextRange::default()),
         arguments: Some(Box::new(Arguments {
-            args: Box::from([base_class.clone()]),
+            args: [base_class.clone()].into(),
             keywords: match total_keyword {
                 Some(keyword) => std::iter::once(keyword.clone()).collect(),
                 None => std::iter::empty().collect(),

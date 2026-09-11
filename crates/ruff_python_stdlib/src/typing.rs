@@ -7,7 +7,7 @@ pub fn is_standard_library_generic(qualified_name: &[&str]) -> bool {
         qualified_name,
         [
             "" | "builtins",
-            "dict" | "frozenset" | "list" | "set" | "tuple" | "type"
+            "dict" | "frozendict" | "frozenset" | "list" | "set" | "slice" | "tuple" | "type"
         ] | [
             "collections" | "typing" | "typing_extensions",
             "ChainMap" | "Counter"
@@ -85,7 +85,9 @@ pub fn is_standard_library_generic(qualified_name: &[&str]) -> bool {
                     | "TextIO"
                     | "Tuple"
                     | "Type"
+                    | "TypeForm"
                     | "TypeGuard"
+                    | "TypeIs"
                     | "Union"
                     | "Unpack"
                     | "ValuesView"
@@ -106,6 +108,9 @@ pub fn is_standard_library_generic(qualified_name: &[&str]) -> bool {
                     | "DefaultDict"
                     | "Deque"
                     | "Type"
+                    | "TypeForm"
+                    | "TypeGuard"
+                    | "TypeIs"
             ]
             | [
                 "weakref",
@@ -195,7 +200,9 @@ pub fn is_standard_library_generic_member(member: &str) -> bool {
             | "TextIO"
             | "Tuple"
             | "Type"
+            | "TypeForm"
             | "TypeGuard"
+            | "TypeIs"
             | "Union"
             | "Unpack"
             | "ValuesView"
@@ -204,9 +211,11 @@ pub fn is_standard_library_generic_member(member: &str) -> bool {
             | "WeakValueDictionary"
             | "defaultdict"
             | "deque"
+            | "frozendict"
             | "frozenset"
             | "list"
             | "set"
+            | "slice"
             | "tuple"
             | "type"
     )

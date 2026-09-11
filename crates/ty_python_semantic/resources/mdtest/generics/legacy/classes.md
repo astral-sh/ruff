@@ -1591,6 +1591,29 @@ Box.make.cache_clear()
 Box[int].make.cache_info()
 ```
 
+## Inferring a descriptor's wrapped signature
+
+A nominal `staticmethod` annotation can infer its parameter specification and return type from the
+precise callable retained by a method wrapper.
+
+```py
+from collections.abc import Callable
+from typing import ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def unwrap(method: staticmethod[P, R]) -> Callable[P, R]:
+    return method.__func__
+
+def stringify(value: int) -> str:
+    return str(value)
+
+function = unwrap(staticmethod(stringify))
+reveal_type(function(1))  # revealed: str
+function("wrong")  # error: [invalid-argument-type]
+```
+
 ## Metaclass descriptors shadow generic instance attributes
 
 A data descriptor on the metaclass governs class access even when instances have an attribute of the

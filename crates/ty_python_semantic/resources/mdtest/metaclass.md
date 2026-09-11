@@ -628,8 +628,12 @@ The metaclass of a derived class must be a (non-strict) subclass of the metaclas
 bases. ("Strict subclass" is a synonym for "proper subclass"; a non-strict subclass can be a
 subclass or the class itself.)
 
+We report the conflict and retain the candidate from the first base for attribute lookup.
+
 ```py
-class M1(type): ...
+class M1(type):
+    value: int
+
 class M2(type): ...
 class A(metaclass=M1): ...
 class B(metaclass=M2): ...
@@ -637,7 +641,8 @@ class B(metaclass=M2): ...
 # error: [conflicting-metaclass] "The metaclass of a derived class (`C`) must be a subclass of the metaclasses of all its bases, but `M1` (metaclass of base class `A`) and `M2` (metaclass of base class `B`) have no subclass relationship"
 class C(A, B): ...
 
-reveal_type(C.__class__)  # revealed: type[Unknown]
+reveal_type(C.__class__)  # revealed: <class 'M1'>
+reveal_type(C.value)  # revealed: int
 ```
 
 ## Conflict (2)
@@ -646,15 +651,21 @@ The metaclass of a derived class must be a (non-strict) subclass of the metaclas
 bases. ("Strict subclass" is a synonym for "proper subclass"; a non-strict subclass can be a
 subclass or the class itself.)
 
+An explicit metaclass is retained for attribute lookup when it conflicts with a base's metaclass.
+
 ```py
 class M1(type): ...
-class M2(type): ...
+
+class M2(type):
+    value: str
+
 class A(metaclass=M1): ...
 
 # error: [conflicting-metaclass] "The metaclass of a derived class (`B`) must be a subclass of the metaclasses of all its bases, but `M2` (metaclass of `B`) and `M1` (metaclass of base class `A`) have no subclass relationship"
 class B(A, metaclass=M2): ...
 
-reveal_type(B.__class__)  # revealed: type[Unknown]
+reveal_type(B.__class__)  # revealed: <class 'M2'>
+reveal_type(B.value)  # revealed: str
 ```
 
 ## Common metaclass
@@ -946,7 +957,7 @@ class C(metaclass=M12): ...
 # error: [conflicting-metaclass] "The metaclass of a derived class (`D`) must be a subclass of the metaclasses of all its bases, but `M1` (metaclass of base class `A`) and `M2` (metaclass of base class `B`) have no subclass relationship"
 class D(A, B, C): ...
 
-reveal_type(D.__class__)  # revealed: type[Unknown]
+reveal_type(D.__class__)  # revealed: <class 'M1'>
 ```
 
 ## Unknown
@@ -1073,6 +1084,75 @@ class B(C): ...  # error: [cyclic-class-definition]
 class C(A): ...  # error: [cyclic-class-definition]
 
 reveal_type(A.__class__)  # revealed: type[Unknown]
+```
+
+## Metaclass conflicts during recursive attribute inference
+
+A stub can refer to an inherited type alias through a nested class with a custom metaclass. When an
+attribute named `type` also depends on that alias, inferring the metaclass's bases can depend on the
+metaclass being selected. Type checking completes even when temporary metaclass conflicts arise
+during this inference cycle.
+
+Regression test for [ty#4492](https://github.com/astral-sh/ty/issues/4492).
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from mod import Outer
+
+# TODO: This should be `int`.
+reveal_type(Outer.value)  # revealed: Unknown
+```
+
+`mod.pyi`:
+
+```pyi
+class Wrapper[T](type): ...
+
+class Outer:
+    class Aliases:
+        Value = int
+
+    class Meta(Wrapper[int], type): ...
+    class Inner(Aliases, metaclass=Meta): ...
+    value: Outer.Inner.Value
+    type: Outer.Inner.Value
+```
+
+## Persistent metaclass conflict during recursive attribute inference
+
+Recursive attribute inference does not suppress a conflict between unrelated metaclasses. We retain
+the explicit candidate for member lookup and report the conflict when checking the stub.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from mod import Outer
+
+reveal_type(Outer.value)  # revealed: Unknown
+reveal_type(Outer.Inner.__class__)  # revealed: <class 'Meta'>
+```
+
+`mod.pyi`:
+
+```pyi
+class Wrapper[T](type): ...
+class OtherMeta(type): ...
+
+class Outer:
+    class Aliases(metaclass=OtherMeta):
+        Value = int
+
+    class Meta(Wrapper[int], type): ...
+    class Inner(Aliases, metaclass=Meta): ...  # error: [conflicting-metaclass]
+    value: Outer.Inner.Value
+    type: Outer.Inner.Value
 ```
 
 ## PEP 695 generic

@@ -1454,5 +1454,24 @@ reveal_type(C.identity(1))  # revealed: Unknown
 reveal_type(C[int].identity(1))  # revealed: int
 ```
 
+## Inferring a descriptor's wrapped signature
+
+A nominal `staticmethod` annotation can infer its parameter specification and return type from the
+precise callable retained by a method wrapper.
+
+```py
+from collections.abc import Callable
+
+def unwrap[**P, R](method: staticmethod[P, R]) -> Callable[P, R]:
+    return method.__func__
+
+def stringify(value: int) -> str:
+    return str(value)
+
+function = unwrap(staticmethod(stringify))
+reveal_type(function(1))  # revealed: str
+function("wrong")  # error: [invalid-argument-type]
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

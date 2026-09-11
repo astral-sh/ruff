@@ -246,7 +246,11 @@ impl<'db> Type<'db> {
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
-            Type::Callable(callable) if callable.is_function_like(db) => Truthiness::AlwaysTrue,
+            Type::Callable(callable)
+                if callable.is_function_like(db) || callable.is_method_wrapper(db) =>
+            {
+                Truthiness::AlwaysTrue
+            }
 
             Type::Dynamic(_)
             | Type::Divergent(_)

@@ -19,10 +19,12 @@ const MAGIC_GLOBALS: &[&str] = &[
     "WindowsError",
     "__annotations__",
     "__builtins__",
-    "__cached__",
     "__warningregistry__",
     "__file__",
 ];
+
+/// Magic globals that were removed in Python 3.15.
+const PRE_PY315_MAGIC_GLOBALS: &[&str] = &["__cached__"];
 
 /// Magic globals that are only available starting in specific Python versions.
 ///
@@ -242,8 +244,15 @@ pub fn python_magic_globals(minor_version: u8) -> impl Iterator<Item = &'static 
         None
     };
 
+    let pre_py315_magic_globals = if minor_version < 15 {
+        Some(PRE_PY315_MAGIC_GLOBALS)
+    } else {
+        None
+    };
+
     py314_magic_globals
         .into_iter()
+        .chain(pre_py315_magic_globals)
         .flatten()
         .chain(MAGIC_GLOBALS)
         .copied()
