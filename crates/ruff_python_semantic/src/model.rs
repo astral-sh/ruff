@@ -1,11 +1,12 @@
+use std::borrow::Cow;
 use std::path::Path;
 
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 
-use ruff_python_ast::helpers::{from_relative_import, map_subscript};
+use ruff_python_ast::helpers::{from_relative_import, map_subscript, resolve_imported_module_path};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, PythonVersion, Stmt};
+use ruff_python_ast::{self as ast, Alias, Expr, ExprContext, PySourceType, PythonVersion, Stmt};
 use ruff_python_stdlib::builtins::{is_python_builtin, python_builtins, python_magic_globals};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -154,6 +155,17 @@ pub struct SemanticModel<'a> {
     /// Modules that have been seen by the semantic model.
     pub seen: Modules,
 
+    /// The module names from the most recently visited module-level `__lazy_modules__` assignment.
+    ///
+    /// A declaration affects subsequent imports, without changing earlier imports:
+    ///
+    /// ```python
+    /// import json  # Eager.
+    /// __lazy_modules__ = ["json", "pathlib"]
+    /// import pathlib  # Lazy.
+    /// ```
+    pub lazy_modules: Option<LazyModules<'a>>,
+
     /// Exceptions that are handled by the current `try` block.
     ///
     /// For example, if we're visiting the `x = 1` assignment below,
@@ -208,6 +220,7 @@ impl<'a> SemanticModel<'a> {
             rebinding_scopes: FxHashMap::default(),
             flags: SemanticModelFlags::new(path),
             seen: Modules::empty(),
+            lazy_modules: None,
             handled_exceptions: Vec::default(),
             resolved_names: FxHashMap::default(),
         };
@@ -2395,6 +2408,122 @@ impl<'a> SemanticModel<'a> {
             }
             _ => false,
         })
+    }
+
+    /// Classify an import using its syntax and the current `__lazy_modules__` declaration.
+    /// The caller must check that the import occurs in a context where laziness is allowed.
+    pub fn import_laziness(&self, statement: &Stmt, alias: &Alias) -> ImportLaziness {
+        let explicit = match statement {
+            Stmt::Import(import) => import.is_lazy,
+            Stmt::ImportFrom(import) => import.is_lazy,
+            _ => return ImportLaziness::Unknown,
+        };
+        if explicit {
+            return ImportLaziness::Lazy;
+        }
+        if self.lazy_modules.is_none() {
+            return ImportLaziness::Eager;
+        }
+        let Some(module) = self.import_module_name(statement, alias) else {
+            return ImportLaziness::Unknown;
+        };
+        self.module_laziness(&module)
+    }
+
+    /// Test exact module membership in the current `__lazy_modules__` declaration.
+    /// Returns [`ImportLaziness::Unknown`] when the declaration is not a literal collection of strings.
+    pub fn module_laziness(&self, module: &str) -> ImportLaziness {
+        match &self.lazy_modules {
+            None => ImportLaziness::Eager,
+            Some(LazyModules::Unknown) => ImportLaziness::Unknown,
+            Some(LazyModules::Known(modules)) => {
+                if modules.contains(&module) {
+                    ImportLaziness::Lazy
+                } else {
+                    ImportLaziness::Eager
+                }
+            }
+        }
+    }
+
+    /// Extract literal module names when visiting a `__lazy_modules__` assignment.
+    pub fn set_lazy_modules(&mut self, value: &'a Expr) {
+        let names = match value {
+            Expr::List(ast::ExprList { elts, .. })
+            | Expr::Tuple(ast::ExprTuple { elts, .. })
+            | Expr::Set(ast::ExprSet { elts, .. }) => elts
+                .iter()
+                .map(|element| {
+                    element
+                        .as_string_literal_expr()
+                        .map(|literal| literal.value.to_str())
+                })
+                .collect::<Option<Vec<_>>>(),
+            _ => None,
+        };
+        self.lazy_modules = Some(names.map_or(LazyModules::Unknown, LazyModules::Known));
+    }
+
+    /// Return the module tested for membership in `__lazy_modules__`.
+    /// A `from package import member` statement tests `package`, not `package.member`.
+    fn import_module_name<'b>(
+        &self,
+        statement: &'b Stmt,
+        alias: &'b Alias,
+    ) -> Option<Cow<'b, str>> {
+        match statement {
+            Stmt::Import(_) => Some(Cow::Borrowed(alias.name.as_str())),
+            Stmt::ImportFrom(ast::StmtImportFrom { level, module, .. }) => {
+                resolve_imported_module_path(
+                    *level,
+                    module.as_deref(),
+                    self.module.qualified_name(),
+                )
+            }
+            _ => None,
+        }
+    }
+}
+
+/// Statically known module names in a `__lazy_modules__` declaration.
+#[derive(Debug)]
+pub enum LazyModules<'a> {
+    /// A literal list, set, or tuple that can be analyzed.
+    ///
+    /// For example:
+    ///
+    /// ```py
+    /// __lazy_modules__ = ["a", "list"]
+    /// ```
+    Known(Vec<&'a str>),
+
+    /// The declaration is present but not a literal collection that can be analyzed.
+    ///
+    /// For example:
+    ///
+    /// ```py
+    /// class LazyImporter:
+    ///     def __contains__(self, name): return True
+    ///
+    /// __lazy_modules__ = LazyImporter()
+    /// ```
+    Unknown,
+}
+
+/// Whether an import is lazy, as determined statically.
+///
+/// Dynamic assignments to `__lazy_modules__` are classified as unknown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportLaziness {
+    Lazy,
+    Eager,
+    Unknown,
+}
+
+impl ImportLaziness {
+    /// Returns `true` if the import laziness is [`Self::Lazy`].
+    pub fn is_lazy(&self) -> bool {
+        matches!(self, Self::Lazy)
     }
 }
 
