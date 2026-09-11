@@ -593,31 +593,36 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
         };
 
-        // Pydantic permits writes to private attributes even on frozen models.
-        let is_private_pydantic_attribute =
-            matches!(member, InstanceAttributeWriteMember::Explicit { .. })
-                && pydantic::is_private_attribute(self.attribute)
-                && pydantic::is_model_instance(db, env, object_ty);
+        let pydantic_setattr = pydantic::setattr_behavior(db, env, object_ty);
+        let assignment_blocked = match pydantic_setattr {
+            Some(pydantic::SetAttrBehavior::Frozen) => {
+                // Pydantic permits writes to private attributes even on frozen models.
+                !(matches!(member, InstanceAttributeWriteMember::Explicit { .. })
+                    && pydantic::is_private_attribute(self.attribute))
+            }
+            Some(pydantic::SetAttrBehavior::NonFrozen) => false,
+            Some(pydantic::SetAttrBehavior::CustomSetAttr) | None => setattr_returns_never,
+        };
 
-        let is_frozen_pydantic_model = pydantic::is_frozen_with_default_setattr(db, env, object_ty);
-        if (setattr_returns_never || is_frozen_pydantic_model) && !is_private_pydantic_attribute {
+        if assignment_blocked {
             if emit_diagnostics {
-                let is_read_only = is_frozen_pydantic_model
-                    || !matches!(
-                        frozen_dataclass_dispatch,
-                        Some(FrozenDataclassDispatch::Delegate(_))
-                    ) && match object_ty.class_member_with_policy(
-                        db,
-                        env,
-                        "__setattr__",
-                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                    ) {
-                        PlaceAndQualifiers {
-                            place: Place::Defined(DefinedPlace { ty, .. }),
-                            ..
-                        } => ty.is_callable_type(),
-                        _ => false,
-                    };
+                let is_read_only =
+                    matches!(pydantic_setattr, Some(pydantic::SetAttrBehavior::Frozen))
+                        || !matches!(
+                            frozen_dataclass_dispatch,
+                            Some(FrozenDataclassDispatch::Delegate(_))
+                        ) && match object_ty.class_member_with_policy(
+                            db,
+                            env,
+                            "__setattr__",
+                            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                        ) {
+                            PlaceAndQualifiers {
+                                place: Place::Defined(DefinedPlace { ty, .. }),
+                                ..
+                            } => ty.is_callable_type(),
+                            _ => false,
+                        };
                 let member_exists = !object_ty
                     .member(db, env, self.attribute)
                     .place

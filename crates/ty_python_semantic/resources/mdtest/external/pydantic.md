@@ -1277,11 +1277,12 @@ derived = Derived(value=1)
 derived.value = 2  # error: [invalid-assignment]
 ```
 
-Pydantic allows a frozen model to be subclassed and then made mutable again. This is generally unsound (a violation
-of the Liskov substitution principle), but we currently support it without emitting any errors:
+Pydantic allows a frozen model to be subclassed and then made mutable again. This is generally
+unsound (a violation of the Liskov substitution principle), but we currently support it without
+emitting any errors:
 
 ```py
-class MutableChildOfFrozenFrozenBase(Base):
+class MutableChildOfFrozenBase(Base):
     model_config = ConfigDict(frozen=False)
 
 mutable = MutableChildOfFrozenBase(value=1)
@@ -1302,7 +1303,7 @@ grandchild.text = "after"
 Freezing the model again makes both fields read-only:
 
 ```py
-class FrozenAgain(Child):
+class FrozenAgain(GrandChild):
     model_config = ConfigDict(frozen=True)
 
 frozen_again = FrozenAgain(value=1, text="before")
