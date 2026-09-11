@@ -231,9 +231,10 @@ impl<'db> PathBounds<'db> {
 
         let mut retained = false;
         for path in paths {
-            let Some((solution, incomplete)) = Self::solve_path_with(path, &mut choose) else {
+            let (solution, incomplete) = Self::solve_path_with(path, &mut choose);
+            if !solution.is_valid() {
                 continue;
-            };
+            }
             if incomplete {
                 return Err(ProjectionError::IncompleteSolution);
             }
