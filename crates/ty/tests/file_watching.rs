@@ -3040,6 +3040,14 @@ mod uv_metadata {
         )?;
         assert!(synchronized);
 
+        // Apply the package creation reported by the watcher after uv finishes writing it.
+        let changes = case.stop_watch(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Created { path, .. }
+                if path.file_name() == Some("attrs")
+                    && path.parent().is_some_and(|parent| parent.file_name() == Some("site-packages")))
+        });
+        case.apply_changes(&changes);
+
         assert!(case.db().check().is_empty());
 
         Ok(())
