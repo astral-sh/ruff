@@ -979,7 +979,7 @@ class ReturnsInt:
 class Compatible(SatisfiesBoth, ReturnsStr, ReturnsInt): ...
 ```
 
-### A compatible subclass override satisfies both contracts
+### Subclass overrides must satisfy both contracts
 
 A subclass can provide an implementation that satisfies otherwise-incompatible base definitions.
 
@@ -1003,6 +1003,17 @@ class AcceptsInt:
 
 class CompatibleParameter(AcceptsStr, AcceptsInt):
     def accepts(self, value: str | int) -> None: ...
+```
+
+Matching the first base's signature does not satisfy an incompatible contract from an unrelated
+base. The conflict is introduced by the subclass, so it is reported on the override.
+
+```pyi
+class IncompatibleReturn(ReturnsStr, ReturnsInt):
+    def method(self) -> str: ...  # error: [invalid-method-override]
+
+class IncompatibleParameter(AcceptsStr, AcceptsInt):
+    def accepts(self, value: str) -> None: ...  # error: [invalid-method-override]
 ```
 
 ### An intermediate `Any` does not hide a conflict
@@ -1538,6 +1549,19 @@ Unannotated overrides of overloaded dunder methods should remain accepted.
 ```pyi
 class C(list[int]):
     def __getitem__(self, key): ...
+```
+
+An invalid override of a method inherited implicitly from `object` is also reported only on the
+parent. Preserving that signature does not produce another diagnostic on the child.
+
+`object.pyi`:
+
+```pyi
+class InvalidStr:
+    def __str__(self) -> int: ...  # error: [invalid-method-override]
+
+class PreservesInvalidStr(InvalidStr):
+    def __str__(self) -> int: ...
 ```
 
 ## Non-generic methods on generic classes work as expected

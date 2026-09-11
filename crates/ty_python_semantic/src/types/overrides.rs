@@ -896,27 +896,39 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            // If this superclass is not the immediate parent for this method,
-            // check if the immediate parent itself already has an LSP violation with this ancestor.
-            // If so, don't report the same violation for the child class -- it would be a false positive
-            // since the child cannot fix the violation without contradicting its immediate parent's contract.
+            // Do not repeat a violation that already exists in the immediate parent's hierarchy.
+            // Check the parent's own ancestor specializations: a valid override of `Base[Any]`
+            // can become invalid when the child also inherits `Base[int]` through another base.
+            // Include the MRO for implicit ancestors such as `object`, and explicit inheritance
+            // paths for specializations omitted from the MRO.
             // See: https://github.com/astral-sh/ty/issues/2000
-            if let Some((immediate_parent, immediate_parent_type)) = immediate_parent_method {
-                if immediate_parent != superclass {
-                    // The immediate parent already defines this method and is different from the
-                    // current ancestor we're checking. Check if the immediate parent's method
-                    // is also incompatible with this ancestor.
-                    if !is_assignable_method_override(
-                        db,
-                        env,
-                        immediate_parent_type,
-                        superclass_type,
-                    ) {
-                        // The immediate parent already has an LSP violation with this ancestor.
-                        // Don't report the same violation for the child.
-                        continue;
-                    }
-                }
+            if let Some((immediate_parent, immediate_parent_type)) = immediate_parent_method
+                && immediate_parent != superclass
+                && !is_assignable_method_override(db, env, immediate_parent_type, superclass_type)
+                && immediate_parent
+                    .iter_mro(db)
+                    .skip(1)
+                    .filter_map(ClassBase::into_class)
+                    .chain(immediate_parent.iter_explicit_ancestors(db, env).skip(1))
+                    .filter(|ancestor| ancestor.class_literal(db) == superclass.class_literal(db))
+                    .any(|ancestor| {
+                        let Place::Defined(DefinedPlace {
+                            ty: ancestor_type, ..
+                        }) = Type::instance(db, env, ancestor)
+                            .member(db, env, &member.name)
+                            .place
+                        else {
+                            return false;
+                        };
+                        !is_assignable_method_override(
+                            db,
+                            env,
+                            immediate_parent_type,
+                            ancestor_type,
+                        )
+                    })
+            {
+                continue;
             }
 
             report_invalid_method_override(
