@@ -1230,13 +1230,30 @@ fn desperately_resolve_name<'db>(
     let importing_file = ResolverFile::new(db, importing_file, resolver_environment);
     let search_paths = absolute_desperate_search_paths(db, importing_file).unwrap_or_default();
     let resolver = NameResolver::new(db, resolver_environment, name, mode);
+    let stub_packages = mode
+        .is_typing()
+        .then(|| StubPackageIndex::from_search_paths(db, search_paths.iter()));
+    let mut candidates = resolver.discover_roots(
+        name.first_component(),
+        resolver.is_non_shadowable,
+        search_paths.iter(),
+        stub_packages
+            .as_ref()
+            .map_or_else(StubPackagePaths::default, StubPackageIndex::all),
+    );
+    let mut components = name.components().skip(1).peekable();
 
-    match mode {
-        ModuleResolveMode::Typing => resolver.resolve_desperate_typing(search_paths),
-        ModuleResolveMode::Runtime | ModuleResolveMode::RuntimeSomeShadowingAllowed => {
-            resolver.resolve_runtime(search_paths.iter())
-        }
+    candidates = normalize_candidates(db, candidates, components.peek().is_some());
+    while let Some(component) = components.next() {
+        candidates = resolver.advance_candidates(
+            candidates,
+            component,
+            ComponentFileFilter::ByMode,
+            components.peek().is_some(),
+        );
     }
+
+    (!candidates.is_empty()).then_some(candidates)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1482,23 +1499,6 @@ impl<'db, 'name> NameResolver<'db, 'name> {
         );
         candidates.extend(remaining_candidates);
 
-        self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
-    }
-
-    /// Resolves the name for type checking against desperate ancestor search paths.
-    ///
-    /// These paths can contain PEP 561 stub packages, but never user-provided extra paths, so this
-    /// indexes them for stub packages without performing a separate stub-overlay pass. Runtime
-    /// resolution instead ignores stub packages and `.pyi` files entirely.
-    fn resolve_desperate_typing(&self, search_paths: &[SearchPath]) -> Option<ResolvedNames<'db>> {
-        let stub_packages =
-            StubPackageIndex::from_search_paths(self.context.db, search_paths.iter());
-        let candidates = self.discover_roots(
-            self.name.first_component(),
-            self.is_non_shadowable,
-            search_paths.iter(),
-            stub_packages.all(),
-        );
         self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
     }
 
