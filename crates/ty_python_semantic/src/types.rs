@@ -8465,9 +8465,6 @@ impl<'db> Type<'db> {
         self.to_meta_type_with_recursion(db, env, &TypeRecursionContext::default())
     }
 
-    /// Project to classes using the active recursion guards. Recursive projections, including
-    /// those triggered by alias specialization, must reuse `context`; only entry points such as
-    /// `to_meta_type` create a fresh one.
     fn to_meta_type_with_recursion(
         self,
         db: &'db dyn Db,
