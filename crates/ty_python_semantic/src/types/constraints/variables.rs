@@ -36,14 +36,10 @@ pub(crate) enum ConstraintProvenance {
 
 impl ConstraintProvenance {
     /// Returns the provenance of a constraint derived from two existing constraints.
-    ///
-    /// Derived constraints must retain any call-site evidence that contributed to them. Otherwise,
-    /// a derivation could downgrade evidence to a background validity restriction, causing the
-    /// solver to ignore a specialization justified by the call site.
     pub(super) const fn derived(left: Self, right: Self) -> Self {
         match (left, right) {
-            (Self::Validity, Self::Validity) => Self::Validity,
-            _ => Self::Evidence,
+            (Self::Evidence, Self::Evidence) => Self::Evidence,
+            _ => Self::Validity,
         }
     }
 
@@ -365,6 +361,17 @@ impl<'db> Constraint<'db> {
             }
             _ => bound,
         }
+    }
+
+    pub(super) fn with_provenance(mut self, provenance: ConstraintProvenance) -> Self {
+        match &mut self {
+            Constraint::ConcreteLower(this) => this.provenance = provenance,
+            Constraint::ConcreteUpper(this) => this.provenance = provenance,
+            Constraint::ConcreteEquivalence(this) => this.provenance = provenance,
+            Constraint::TypeVarRange(this) => this.provenance = provenance,
+            Constraint::TypeVarEquivalence(this) => this.provenance = provenance,
+        }
+        self
     }
 
     pub(super) fn is_reflexive_typevar_relation(self, db: &'db dyn Db) -> bool {
