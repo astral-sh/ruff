@@ -27,6 +27,7 @@ pub(crate) fn bindings(checker: &Checker) {
         Rule::PrivateTypeParameter,
         Rule::UnnecessaryAssign,
         Rule::UnnecessaryAssignBeforeYield,
+        Rule::UnnecessaryRegularExpressionCompile,
     ]) {
         return;
     }
@@ -47,6 +48,9 @@ pub(crate) fn bindings(checker: &Checker) {
                     binding.statement(checker.semantic()).unwrap(),
                 );
             }
+        }
+        if checker.is_rule_enabled(Rule::UnnecessaryRegularExpressionCompile) {
+            ruff::rules::unnecessary_regular_expression_compile_binding(checker, binding);
         }
         if checker.is_rule_enabled(Rule::UnusedVariable) {
             if binding.kind.is_bound_exception()
