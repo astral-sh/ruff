@@ -32,6 +32,7 @@ mod code_actions;
 mod commands;
 mod completions;
 mod configuration;
+mod file_watching;
 mod folding_range;
 mod goto_definition;
 mod hover;
@@ -195,7 +196,7 @@ pub(crate) struct TestServer {
     /// Valid responses contain exactly one response but may contain multiple responses
     /// when the server sends multiple responses for a single request.
     /// The responses are guaranteed to never be empty.
-    responses: FxHashMap<RequestId, smallvec::SmallVec<[Response; 1]>>,
+    responses: FxHashMap<RequestId, Vec<Response>>,
 
     /// An ordered queue of all the notifications received from the server
     notifications: VecDeque<lsp_server::Notification>,
@@ -604,6 +605,11 @@ impl TestServer {
     /// Wait for and acknowledge a server-requested diagnostic refresh.
     pub(crate) fn await_diagnostic_refresh(&mut self) {
         let (id, ()) = self.await_request::<lsp_types::DiagnosticRefreshRequest>();
+        self.send(Message::Response(Response::new_ok(id, ())));
+    }
+
+    /// Acknowledge a successful server-to-client request.
+    pub(crate) fn acknowledge_request(&mut self, id: RequestId) {
         self.send(Message::Response(Response::new_ok(id, ())));
     }
 
@@ -1434,17 +1440,15 @@ impl TestServerBuilder {
         self
     }
 
-    /// Enable or disable file watching capability
-    #[expect(dead_code)]
-    pub(crate) fn enable_did_change_watched_files(mut self, enabled: bool) -> Self {
+    /// Enable dynamic file watching, optionally with relative patterns.
+    pub(crate) fn with_watched_file_support(mut self, relative_pattern_support: bool) -> Self {
         self.client_capabilities
             .workspace
             .get_or_insert_default()
-            .did_change_watched_files = if enabled {
-            Some(DidChangeWatchedFilesClientCapabilities::default())
-        } else {
-            None
-        };
+            .did_change_watched_files = Some(DidChangeWatchedFilesClientCapabilities {
+            dynamic_registration: Some(true),
+            relative_pattern_support: Some(relative_pattern_support),
+        });
         self
     }
 
