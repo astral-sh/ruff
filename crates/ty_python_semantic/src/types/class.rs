@@ -853,12 +853,7 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        self.metaclass(db)
-            .to_instance_approximation(db, env)
-            .expect(
-                "`Type::to_instance()` should always return `Some()` \
-                when called on the type of a metaclass",
-            )
+        metaclass_instance_type(db, env, self.metaclass(db))
     }
 
     /// Returns whether this class is type-check only.
@@ -1869,12 +1864,7 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        self.metaclass(db)
-            .to_instance_approximation(db, env)
-            .expect(
-                "`Type::to_instance()` should always return `Some()` \
-                when called on the type of a metaclass",
-            )
+        metaclass_instance_type(db, env, self.metaclass(db))
     }
 
     /// Returns the class member of this class named `name`.
@@ -3448,6 +3438,25 @@ pub(super) enum DisjointBaseKind {
     DisjointBaseDecorator,
     /// We know the class is a disjoint base because it has a non-empty `__slots__` definition.
     DefinesSlots,
+}
+
+/// Return the instance type of a metaclass, preserving that its instances are class objects.
+///
+/// If the metaclass is `type[Unknown]`, ordinary instance projection would produce `Unknown`
+/// and make a class object assignable to `None`. Use `type[Unknown]` for its instances instead:
+/// their metaclass is unknown, but they are still class objects.
+pub(super) fn metaclass_instance_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    metaclass: Type<'db>,
+) -> Type<'db> {
+    let instance = metaclass
+        .to_instance_approximation(db, env)
+        .expect("the type of a metaclass should always be instantiable");
+    match instance {
+        Type::Dynamic(dynamic) => SubclassOfType::from(db, env, dynamic),
+        _ => instance,
+    }
 }
 
 /// A selected metaclass, or the `ABCMeta` fallback inferred from a typeshed stdlib protocol base.

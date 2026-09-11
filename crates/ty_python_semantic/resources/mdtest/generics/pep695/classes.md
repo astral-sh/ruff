@@ -1271,6 +1271,13 @@ reveal_type(type(Invalid[int]))  # revealed: type[Unknown]
 reveal_type(Invalid[int].value)  # revealed: Unknown
 ```
 
+The specialized class remains a class object, so it cannot be assigned to `None`:
+
+```py
+meta: OtherMeta = Invalid[int]
+none: None = Invalid[int]  # error: [invalid-assignment]
+```
+
 The metaclass also remains unknown when the invalid class is reached through type-variable bounds or
 constraints:
 
@@ -1278,10 +1285,12 @@ constraints:
 def bounded[T: Invalid[int]](cls: type[T]):
     reveal_type(cls.__class__)  # revealed: type[Unknown]
     reveal_type(type(cls))  # revealed: type[Unknown]
+    none: None = cls  # error: [invalid-assignment]
 
 def constrained[T: (Invalid[int], Invalid[str])](cls: type[T]):
     reveal_type(cls.__class__)  # revealed: type[Unknown]
     reveal_type(type(cls))  # revealed: type[Unknown]
+    none: None = cls  # error: [invalid-assignment]
 ```
 
 ## Specializations propagate

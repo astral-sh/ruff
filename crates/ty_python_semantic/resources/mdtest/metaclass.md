@@ -660,6 +660,35 @@ def check_subclass(cls: type[C]):
     reveal_type(cls.value)  # revealed: Unknown
 ```
 
+Even with an unknown metaclass, `C` is a class object. It can be assigned to a metaclass instance
+type, but not to `None`. Overload resolution preserves this distinction:
+
+```py
+from typing import overload
+
+@overload
+def select(cls: None) -> None: ...
+@overload
+def select(cls: type) -> int: ...
+def select(cls: type | None) -> int | None: ...
+
+meta: M1 = C
+none: None = C  # error: [invalid-assignment]
+reveal_type(select(C))  # revealed: int
+
+def check_assignability(cls: type[C]):
+    meta: M1 = cls
+    none: None = cls  # error: [invalid-assignment]
+    reveal_type(select(cls))  # revealed: int
+```
+
+The same applies to classes created with `type()`:
+
+```py
+Dynamic = type("Dynamic", (A, B), {})  # error: [conflicting-metaclass]
+reveal_type(select(Dynamic))  # revealed: int
+```
+
 ## Conflict (2)
 
 The metaclass of a derived class must be a (non-strict) subclass of the metaclasses of all its
