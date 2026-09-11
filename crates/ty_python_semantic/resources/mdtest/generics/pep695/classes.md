@@ -151,6 +151,33 @@ reveal_mro(Baz)
 reveal_mro(Baz[int])
 ```
 
+## Inconsistent type arguments through partially gradual ancestors
+
+With three direct bases, the diagnostic identifies `First` and the third base as the sources of
+conflicting arguments. `Second` leaves the first type argument unconstrained.
+
+```py
+from typing import Any
+
+class Base[T, U]: ...
+class First(Base[int, Any]): ...
+class Second(Base[Any, str]): ...
+
+# snapshot: invalid-generic-class
+class Mixed(First, Second, Base[bytes, str]): ...
+```
+
+```snapshot
+error[invalid-generic-class]: Inconsistent type arguments for `Base` among class bases
+ --> src/mdtest_snippet.py:8:7
+  |
+8 | class Mixed(First, Second, Base[bytes, str]): ...
+  |       ^^^^^^-----^^^^^^^^^^----------------^
+  |             |              |
+  |             |              Later class base is `Base[bytes, str]`
+  |             Earlier class base inherits from `Base[int, Any]`
+```
+
 ## Class keyword arguments
 
 Class keyword arguments are evaluated inside the type-parameter scope, so they must be resolved
@@ -814,6 +841,155 @@ reveal_type(DefaultChild[str].x)  # revealed: str
 reveal_type(PartiallyFixed.fixed)  # revealed: int
 # error: [invalid-attribute-access]
 reveal_type(PartiallyFixed.unresolved)  # revealed: Unknown
+```
+
+## Fallback MROs preserve generic class identity
+
+Putting `Base` before its subclass makes the MRO inconsistent. During error recovery, the fallback
+MRO includes each class once, retaining its first specialization and placing `object` last.
+
+```py
+from ty_extensions._internal import reveal_mro
+
+class Base[T]: ...
+class IntBase(Base[int]): ...
+
+# error: [inconsistent-mro]
+Broken = type("Broken", (Base, IntBase), {})
+
+# revealed: (<class 'Broken'>, <class 'Base[Unknown]'>, typing.Generic, <class 'IntBase'>, <class 'object'>)
+reveal_mro(Broken)
+```
+
+## Assignability through gradual and concrete inheritance paths
+
+A concrete inheritance path makes `Child` a subtype of `Base[int]` even when an earlier path
+inherits `Base[Any]`. Assigning it to `Base[int]` is sound; assigning it to the invariant
+`Base[str]` is not.
+
+```toml
+[environment]
+python-version = "3.13"
+
+[rules]
+unsound-assignment = "error"
+```
+
+```py
+from typing import Any
+
+class Base[T]:
+    value: T
+
+class Gradual(Base[Any]): ...
+class Concrete(Base[int]): ...
+class Child(Gradual, Concrete): ...
+
+as_concrete: Concrete = Child()
+as_base: Base[int] = Child()
+incompatible: Base[str] = Child()  # error: [unsound-assignment]
+```
+
+The relationship is preserved when the bases are reversed, through another subclass, and for classes
+constructed with `type()`.
+
+```py
+class Reversed(Concrete, Gradual): ...
+class Grandchild(Child): ...
+
+as_reversed: Base[int] = Reversed()
+as_grandchild: Base[int] = Grandchild()
+
+Dynamic = type("Dynamic", (Gradual, Concrete), {})
+as_dynamic: Base[int] = Dynamic()
+```
+
+Specializing a generic subclass also specializes the concrete inheritance path.
+
+```py
+class GenericChild[T](Gradual, Base[list[T]]): ...
+
+as_specialized: Base[list[int]] = GenericChild[int]()
+incompatible_specialization: Base[list[str]] = GenericChild[int]()  # error: [unsound-assignment]
+```
+
+## Method overrides through gradual and concrete inheritance paths
+
+An override must satisfy the concrete return type inherited through `Concrete`, even when the MRO
+retains `Base[Any]` from `Gradual`.
+
+```py
+from typing import Any
+
+class Base[T]:
+    def method(self) -> T:
+        raise NotImplementedError
+
+class Gradual(Base[Any]): ...
+class Concrete(Base[int]): ...
+
+class Invalid(Gradual, Concrete):
+    # snapshot: invalid-method-override
+    def method(self) -> str:
+        return ""
+
+class Valid(Gradual, Concrete):
+    def method(self) -> int:
+        return 0
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.py:12:9
+   |
+12 |     def method(self) -> str:
+   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Base.method`
+   |
+  ::: src/mdtest_snippet.py:4:9
+   |
+ 4 |     def method(self) -> T:
+   |         ----------------- `Base.method` defined here
+info: incompatible return types: `str` is not assignable to `int`
+info: This violates the Liskov Substitution Principle
+```
+
+The same contract applies when the bases are reversed or another subclass inherits the diamond. Each
+invalid override produces one diagnostic.
+
+```py
+class Reversed(Concrete, Gradual):
+    # error: [invalid-method-override]
+    def method(self) -> str:
+        return ""
+
+class Combined(Gradual, Concrete): ...
+
+reveal_type(Combined().method())  # revealed: Any
+
+class Indirect(Combined):
+    # error: [invalid-method-override]
+    def method(self) -> str:
+        return ""
+```
+
+An override that preserves its parent's signature does not repeat an existing violation in the
+parent's inheritance hierarchy.
+
+```py
+class PreservesInvalid(Invalid):
+    def method(self) -> str:
+        return ""
+```
+
+Specializing a generic intermediate class also specializes the inherited method's return type.
+
+```py
+class GenericDiamond[T](Gradual, Base[T]): ...
+
+class Specialized(GenericDiamond[int]):
+    # error: [invalid-method-override]
+    def method(self) -> str:
+        return ""
 ```
 
 ## Unbound inherited methods
