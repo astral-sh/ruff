@@ -11,7 +11,7 @@ use ty_python_core::place::PlaceExpr;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::semantic_index;
 
-use super::{InferenceKey, InferenceQuery};
+use super::{InferenceQuery, InferenceSource};
 use crate::place::Place;
 use crate::place::loop_header_reachability;
 use crate::place_load::{
@@ -32,7 +32,7 @@ use crate::{Db, FxIndexMap, ProgramEnvironment};
 #[derive(Default)]
 pub(in crate::types) struct TupleLengthAnalysis<'db> {
     nodes: Vec<LengthNode>,
-    inputs: FxIndexMap<InferenceKey<'db>, usize>,
+    inputs: FxIndexMap<InferenceSource<'db>, usize>,
 }
 
 #[derive(Debug)]
@@ -200,8 +200,9 @@ impl<'db> TupleLengthAnalysis<'db> {
                                 MethodDecorator::None,
                             );
                             if !key.bindings(db).is_empty() {
-                                children
-                                    .push(self.input(InferenceKey(InferenceQuery::Attribute(key))));
+                                children.push(
+                                    self.input(InferenceSource(InferenceQuery::Attribute(key))),
+                                );
                             }
                         }
                     }
@@ -257,7 +258,7 @@ impl<'db> TupleLengthAnalysis<'db> {
                     for binding in bindings {
                         if let DefinitionState::Defined(definition) = binding.binding {
                             children.push(
-                                self.input(InferenceKey(InferenceQuery::Binding(definition))),
+                                self.input(InferenceSource(InferenceQuery::Binding(definition))),
                             );
                         } else {
                             definitely_bound = false;
@@ -279,7 +280,7 @@ impl<'db> TupleLengthAnalysis<'db> {
         }
     }
 
-    fn input(&mut self, key: InferenceKey<'db>) -> usize {
+    fn input(&mut self, key: InferenceSource<'db>) -> usize {
         if let Some(node) = self.inputs.get(&key) {
             return *node;
         }
@@ -292,7 +293,8 @@ impl<'db> TupleLengthAnalysis<'db> {
         match ty {
             Type::Recursive(recursive) => {
                 if let Some(key) = recursive.inference_key(db) {
-                    self.input(key)
+                    // Promotion preserves the outer tuple length.
+                    self.input(key.source)
                 } else {
                     // Reading stored syntax does not solve the recursive type. Its
                     // nested elements are irrelevant to the length of the outer tuple.
@@ -317,8 +319,12 @@ impl<'db> TupleLengthAnalysis<'db> {
         }
     }
 
-    fn equation(&mut self, db: &'db dyn Db, key: InferenceKey<'db>) -> usize {
+    fn equation(&mut self, db: &'db dyn Db, key: InferenceSource<'db>) -> usize {
         match key.0 {
+            InferenceQuery::Member(member) => {
+                let ty = member.equation(db);
+                self.type_length(db, ty)
+            }
             InferenceQuery::Expression(input) => {
                 let expression = input.into_inner(db).0;
                 let module = parsed_module(db, expression.python_file(db)).load(db);
@@ -370,7 +376,7 @@ impl<'db> TupleLengthAnalysis<'db> {
                         .reachable_bindings
                         .iter()
                         .map(|binding| {
-                            self.input(InferenceKey(InferenceQuery::Binding(binding.definition)))
+                            self.input(InferenceSource(InferenceQuery::Binding(binding.definition)))
                         })
                         .collect();
                     return self.push(LengthNode::Maximum(children));
@@ -395,7 +401,7 @@ impl<'db> TupleLengthAnalysis<'db> {
                             let DefinitionState::Defined(definition) = binding.binding else {
                                 return None;
                             };
-                            Some(self.input(InferenceKey(InferenceQuery::Binding(definition))))
+                            Some(self.input(InferenceSource(InferenceQuery::Binding(definition))))
                         })
                         .collect();
                     return self.push(LengthNode::Maximum(children));
@@ -406,7 +412,9 @@ impl<'db> TupleLengthAnalysis<'db> {
                 let children = attribute
                     .bindings(db)
                     .into_iter()
-                    .map(|definition| self.input(InferenceKey(InferenceQuery::Binding(definition))))
+                    .map(|definition| {
+                        self.input(InferenceSource(InferenceQuery::Binding(definition)))
+                    })
                     .collect();
                 self.push(LengthNode::Maximum(children))
             }

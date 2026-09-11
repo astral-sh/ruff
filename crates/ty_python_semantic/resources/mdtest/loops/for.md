@@ -2041,7 +2041,7 @@ def build(n: int):
         previous = left
         left = (right, 1)
         right = (previous, "end")
-    # revealed: (μ$0. tuple[tuple[$0 | Literal[1], Literal["end"]] | Literal["start"], Literal[1]]) | Literal[1]
+    # revealed: tuple[(μ$0. tuple[tuple[$0 | Literal["start"], Literal[1]] | Literal[1], Literal["end"]]) | Literal["start"], Literal[1]] | Literal[1]
     reveal_type(left)
     # revealed: (μ$0. tuple[tuple[$0 | Literal["start"], Literal[1]] | Literal[1], Literal["end"]]) | Literal["start"]
     reveal_type(right)

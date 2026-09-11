@@ -214,6 +214,7 @@ impl<'db> RecursiveGraphBuilder<'db> {
                         entries[local],
                         None,
                         None,
+                        None,
                     ));
                 }
             } else {
