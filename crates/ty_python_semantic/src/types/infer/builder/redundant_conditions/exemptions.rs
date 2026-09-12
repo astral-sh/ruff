@@ -28,7 +28,6 @@ use crate::{
             ImportAliasResolution, ResolvedDefinition, definitions_for_attribute,
             definitions_for_name,
         },
-        diagnostic::REDUNDANT_CONDITION_STRICT,
         infer::{
             TypeInferenceBuilder,
             builder::redundant_conditions::{SuiteExitKind, suite_ends_with_exit},
@@ -65,7 +64,8 @@ pub(super) enum RedundantConditionContext {
 
     /// A test within an assertion, including the complete assertion and tests in call arguments.
     ///
-    /// Tests classified as [`ConditionKind::Boolean`] or [`ConditionKind::ShortCircuit`] are exempt.
+    /// Tests classified as [`ConditionKind::Boolean`] and tests whose truthiness is fixed only by
+    /// short-circuit evaluation are exempt.
     /// Other always-truthy or always-falsy values remain eligible for `redundant-condition`, or
     /// `redundant-condition-strict` if classified as [`ConditionKind::ContainsWalrus`].
     ///
@@ -86,8 +86,9 @@ pub(super) enum RedundantConditionContext {
     /// We call that rejection a "defensive exit". For example, a function might raise `TypeError`
     /// if its argument has the wrong type. Type annotations do not enforce this at runtime, so
     /// the check can still be useful when the function is called from untyped code. We therefore
-    /// exempt conditions in [`ConditionKind::Boolean`] and [`ConditionKind::ShortCircuit`] when
-    /// their fixed truthiness rules out taking a defensive branch.
+    /// exempt conditions in [`ConditionKind::Boolean`] and conditions whose truthiness is fixed
+    /// only by short-circuit evaluation when their fixed truthiness rules out taking a defensive
+    /// branch.
     ///
     /// ```python
     /// def check(value: int):
@@ -124,9 +125,9 @@ pub(super) enum RedundantConditionContext {
     /// [`suite_ends_with_exit`] describes the forms of rejection we recognize
     /// with [`SuiteExitKind::Defensive`].
     ///
-    /// Boolean operands inherit these exemptions even when the complete condition has unknown
-    /// truthiness. Negation reverses which branch their truthiness selects. Independent tests in
-    /// call arguments do not inherit the exemptions, and mistakes such as testing an uncalled
+    /// Boolean and short-circuit operands inherit these exemptions even when the complete condition
+    /// has unknown truthiness. Negation reverses which branch their truthiness selects. Independent
+    /// tests in call arguments do not inherit the exemptions, and mistakes such as testing an uncalled
     /// function can still be reported. Each field records whether that branch ends in a defensive exit.
     DefensiveExit {
         truthy_branch: bool,
@@ -145,10 +146,6 @@ impl RedundantConditionContext {
         following_clauses: &[ast::ElifElseClause],
         following_statements: &[ast::Stmt],
     ) -> Self {
-        if !builder.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT) {
-            return Self::Standalone;
-        }
-
         let falsy_suite = match following_clauses {
             [else_clause] if else_clause.test.is_none() => Some(else_clause.body.as_slice()),
             [] if suite_ends_with_exit(builder, body, SuiteExitKind::Any) => {
@@ -176,30 +173,27 @@ impl RedundantConditionContext {
         condition: &RedundantCondition<'_, '_>,
     ) -> bool {
         let defensive = match self {
-            Self::Assertion => matches!(
-                &condition.kind,
-                ConditionKind::Boolean | ConditionKind::ShortCircuit
-            ),
+            Self::Assertion => true,
             Self::DefensiveExit {
                 truthy_branch,
                 falsy_branch,
             } => {
-                let is_boolean_or_short_circuit = matches!(
-                    &condition.kind,
-                    ConditionKind::Boolean | ConditionKind::ShortCircuit
-                );
-
-                is_boolean_or_short_circuit
-                    && if condition.is_truthy {
-                        falsy_branch
-                    } else {
-                        truthy_branch
-                    }
+                if condition.is_truthy {
+                    falsy_branch
+                } else {
+                    truthy_branch
+                }
             }
             Self::Standalone => false,
         };
 
-        if defensive {
+        if defensive
+            && (condition.kind == ConditionKind::Boolean
+                || condition
+                    .value_type
+                    .bool(builder.db(), builder.program_environment())
+                    .is_ambiguous())
+        {
             return true;
         }
 

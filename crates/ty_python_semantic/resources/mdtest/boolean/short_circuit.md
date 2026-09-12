@@ -252,12 +252,15 @@ operations.
 
 ```py
 def nested_operands(value: object):
+    # error: [redundant-condition]
     if (value and False) and reveal_type(value):  # revealed: Never
         pass
 
+    # error: [redundant-condition]
     if (value or True) or reveal_type(value):  # revealed: Never
         pass
 
+    # error: [redundant-condition]
     if not (value or True) and reveal_type(value):  # revealed: Never
         pass
 ```
@@ -267,16 +270,20 @@ comprehension filters, and match guards.
 
 ```py
 def other_conditions(value: object):
+    # error: [redundant-condition]
     while value and False:
         reveal_type(value)  # revealed: Never
 
     assert value or True, reveal_type(value)  # revealed: Never
 
+    # error: [redundant-condition]
     reveal_type(value) if value and False else None  # revealed: Never
 
+    # error: [redundant-condition]
     [reveal_type(item) for item in range(1) if value and False]  # revealed: Never
 
     match value:
+        # error: [redundant-condition]
         case _ if value and False:
             reveal_type(value)  # revealed: Never
 
@@ -377,6 +384,7 @@ def conditional_expressions(value: object, flag: bool):
     else:
         reveal_type(value)  # revealed: Never
 
+    # error: [redundant-condition]
     if True if value and False else False:
         reveal_type(value)  # revealed: Never
 ```
@@ -412,6 +420,7 @@ def comparisons(value: Comparable):
     if value < 1 < 0 < 1:
         reveal_type(value)  # revealed: Never
 
+    # error: [redundant-condition]
     if (value < 1 < 0) and reveal_type(value):  # revealed: Never
         pass
 
@@ -506,6 +515,7 @@ def comprehension_element(value: MutableTruthiness, marker: int):
     if [
         (value and False) and reveal_type(marker)  # revealed: int
         for _ in range(1)
+        # error: [redundant-condition]
         if value or True
     ]:
         pass

@@ -88,18 +88,7 @@ enum ConditionKind {
     /// ```
     Boolean,
 
-    /// A condition whose outcome is fixed by short-circuit evaluation, despite the fact that its
-    /// inferred value type does not have fixed truthiness. These conditions are only flagged by
-    /// the opt-in `redundant-condition-strict` rule.
-    ///
-    /// ```python
-    /// def check(value: object):
-    ///     if value and False:  # Always false; strict rule.
-    ///         print("unreachable")
-    /// ```
-    ShortCircuit,
-
-    /// An always-truthy or always-falsy value test containing a walrus expression.
+    /// An always-truthy or always-falsy condition containing a walrus expression.
     ///
     /// In general, it is hard to know for sure whether an expression could have a side effect.
     /// Walrus expressions are an exception to this, however: they *always* have a side effect,
@@ -114,10 +103,10 @@ enum ConditionKind {
     /// ```
     ContainsWalrus,
 
-    /// A value with fixed truthiness that does not require the strict rule.
+    /// A condition with fixed truthiness that does not require the strict rule.
     ///
-    /// Unlike the other three categories, these tests are reported by the enabled-by-default
-    /// `redundant-condition` rule.
+    /// These tests are reported by the enabled-by-default `redundant-condition` rule. Their
+    /// truthiness can be fixed by their value type or by short-circuit evaluation.
     ///
     /// ```python
     /// def ready() -> bool:
@@ -134,9 +123,7 @@ impl ConditionKind {
     const fn rule(self) -> &'static LintMetadata {
         match self {
             Self::Value => &REDUNDANT_CONDITION,
-            Self::Boolean | Self::ShortCircuit | Self::ContainsWalrus => {
-                &REDUNDANT_CONDITION_STRICT
-            }
+            Self::Boolean | Self::ContainsWalrus => &REDUNDANT_CONDITION_STRICT,
         }
     }
 }
@@ -385,9 +372,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Sweep over an entire suite of statements to examine if any direct `if`-statement conditions,
     /// `elif`-statement conditions or `assert`-statement conditionsin that suite are redundant.
     ///
-    /// We suppress conditions in [`ConditionKind::Boolean`] and [`ConditionKind::ShortCircuit`] when
-    /// the code they make unreachable is a "defensive exit". See the doc-comment for
-    /// [`RedundantConditionContext::DefensiveExit`] for more details.
+    /// We suppress conditions in [`ConditionKind::Boolean`] and conditions whose truthiness is fixed
+    /// only by short-circuit evaluation when the code they make unreachable is a "defensive exit".
+    /// See the doc-comment for [`RedundantConditionContext::DefensiveExit`] for more details.
     ///
     /// All types in the suite must already be inferred before this method is called. This is so we
     /// can recognize terminal statements from their types, including calls returning `Never` and
@@ -395,8 +382,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// ## Assertions
     ///
-    /// Assertions commonly check runtime invariants, so tests classified as
-    /// [`ConditionKind::Boolean`] or [`ConditionKind::ShortCircuit`] are exempt. This applies to
+    /// Assertions commonly check runtime invariants, so tests classified as [`ConditionKind::Boolean`]
+    /// and tests whose truthiness is fixed only by short-circuit evaluation are exempt. This applies to
     /// both complete assertion tests and their subexpressions:
     ///
     /// ```python
@@ -558,8 +545,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let kind = if value_type.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
             ConditionKind::Boolean
-        } else if value_type.bool(db, env).is_ambiguous() {
-            ConditionKind::ShortCircuit
         } else if any_over_expr(expression, ast::Expr::is_named_expr) {
             // Include deferred bodies: a surrounding call may execute a lambda or generator.
             ConditionKind::ContainsWalrus
@@ -642,7 +627,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// Diagnostic selection follows two rules:
     ///
-    /// - Within a condition with fixed truthiness, boolean and short-circuit operands are not
+    /// - Within a condition with fixed truthiness, boolean and integer operands are not
     ///   reported. The enclosing condition represents their redundancy, even if its diagnostic
     ///   is exempt or ignored.
     /// - Other operands, such as uncalled functions, take precedence over their enclosing
@@ -757,10 +742,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         if preference == BooleanDiagnosticPreference::EnclosingCondition
-            && matches!(
-                &condition.kind,
-                ConditionKind::Boolean | ConditionKind::ShortCircuit
-            )
+            && condition.kind == ConditionKind::Boolean
         {
             return ConditionCheckResult::CheckEnclosingCondition;
         }
