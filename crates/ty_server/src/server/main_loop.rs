@@ -85,14 +85,13 @@ impl Server {
                                 .outgoing_mut()
                                 .complete(&response.id)
                             {
-                                handler.handle_response(&client, response);
+                                handler.handle_response(&client, &mut self.session, response);
                             } else {
                                 tracing::error!(
                                     "Received a response with ID {}, which was not expected",
                                     response.id
                                 );
                             }
-
                             continue;
                         }
                     };
