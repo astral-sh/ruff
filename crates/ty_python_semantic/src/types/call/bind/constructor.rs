@@ -9,8 +9,8 @@ use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::Parameter;
 use crate::types::typevar::TypeVarNonceGenerator;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext,
-    TypeMapping,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType, Type,
+    TypeContext, TypeMapping,
 };
 
 /// Bindings for a constructor call.
@@ -514,8 +514,10 @@ impl<'db> ConstructorBinding<'db> {
     {
         // If we see both instance and non-instance returns, we return Unknown.
         // If we see multiple different non-instance returns, we also return Unknown.
-        // If we see multiple instance returns, we return `None` (we know we are constructing an
-        // instance of the constructed class, but we don't have more precise information.)
+        // If we see multiple instance returns that agree, we return that shared return type, the
+        // same as if it were the sole instance return; if they disagree, we return `None` (we
+        // know we are constructing an instance of the constructed class, but we don't have more
+        // precise information.)
         // Otherwise, we return the single non-instance return if present, or the single
         // instance return we saw (this is different from simply returning `None` since it
         // could be a specific subclass of the constructed class.)
@@ -525,12 +527,12 @@ impl<'db> ConstructorBinding<'db> {
         for overload in overloads {
             let (return_ty, is_instance_return) = self.single_overload_return(db, env, overload);
             if is_instance_return {
-                if saw_instance_return {
-                    sole_instance_return = None;
-                } else {
-                    sole_instance_return = Some(return_ty);
-                    saw_instance_return = true;
-                }
+                sole_instance_return = match sole_instance_return {
+                    None if !saw_instance_return => Some(return_ty),
+                    Some(previous) if previous == return_ty => Some(previous),
+                    _ => None,
+                };
+                saw_instance_return = true;
             } else {
                 non_instance_return = Some(match non_instance_return {
                     None => return_ty,
@@ -570,9 +572,9 @@ impl<'db> ConstructorBinding<'db> {
                 }),
             );
         if self
-            .constructed_class_literal(db, env)
-            .is_some_and(|class_literal| {
-                constructor_returns_instance(db, env, class_literal, return_ty)
+            .constructed_class_type(db, env)
+            .is_some_and(|constructed_class| {
+                constructor_returns_related_instance(db, env, constructed_class, return_ty)
             })
         {
             return (
@@ -645,6 +647,18 @@ impl<'db> ConstructorBinding<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<ClassLiteral<'db>> {
+        self.constructed_class_type(db, env)
+            .map(|class| class.class_literal(db))
+    }
+
+    /// Like [`Self::constructed_class_literal`], but keeps the class's specialization instead of
+    /// discarding it. Needed wherever a caller has to check the constructed class's ancestry, not
+    /// just its identity.
+    fn constructed_class_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<ClassType<'db>> {
         let instance_type = self.constructed_instance_type();
         let lookup_instance = match instance_type {
             Type::Intersection(_) => instance_type.flatten_typevars(db, env),
@@ -653,7 +667,7 @@ impl<'db> ConstructorBinding<'db> {
         lookup_instance
             .as_nominal_instance()
             // TODO may need to handle `Type::KnownInstance` here as well?
-            .map(|instance| instance.class(db, env).class_literal(db))
+            .map(|instance| instance.class(db, env))
     }
 
     fn constructor_kind(&self) -> ConstructorCallableKind {
@@ -704,6 +718,68 @@ pub(crate) enum ConstructorCallableKind {
 impl ConstructorCallableKind {
     fn is_init(self) -> bool {
         matches!(self, ConstructorCallableKind::Init)
+    }
+}
+
+/// Whether `return_ty` describes an instance of `constructed_class`, or of an ancestor class that
+/// `constructed_class` inherits this constructor overload from.
+///
+/// This is deliberately broader than [`constructor_returns_instance`], which only recognizes
+/// `return_ty` as an instance return when its class is `constructed_class` itself (or a further
+/// subclass). That narrower check is exactly right when a single overload matched the call: its
+/// return annotation describes what *that* call produces. But when overload resolution instead
+/// falls back to considering every overload together -- because none of them matched, or several
+/// matched ambiguously -- an overload declared on an ancestor class, with a concrete (non-`Self`)
+/// return annotation naming that ancestor, still describes what the *inherited* constructor
+/// produces when called through a subclass. Recognizing this lets that fallback construct a plain
+/// instance of the receiver, the same way it already does when the receiver is the class that
+/// declares the overloads, instead of degrading to `Unknown`:
+///
+/// ```python
+/// from typing import overload
+///
+/// class Box[T]:
+///     @overload
+///     def __new__(cls, code: int) -> "Box[int]": ...
+///     @overload
+///     def __new__(cls, code: str) -> "Box[str]": ...
+///     def __new__(cls, code): ...
+///
+/// class Sub(Box): ...
+///
+/// Sub(None)  # no overload matches; `Sub` is still recognized as the resulting instance
+/// ```
+fn constructor_returns_related_instance<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    constructed_class: ClassType<'db>,
+    return_ty: Type<'db>,
+) -> bool {
+    constructor_returns_instance(db, env, constructed_class.class_literal(db), return_ty)
+        || returns_instance_of_ancestor(db, env, constructed_class, return_ty)
+}
+
+/// Whether `return_ty` describes an instance of some ancestor of `constructed_class`.
+///
+/// Mirrors the union/intersection recursion in [`constructor_returns_instance`], so a return type
+/// combining several ancestor classes is recognized the same way a single one would be.
+fn returns_instance_of_ancestor<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    constructed_class: ClassType<'db>,
+    return_ty: Type<'db>,
+) -> bool {
+    match return_ty.resolve_type_alias(db) {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| returns_instance_of_ancestor(db, env, constructed_class, *element)),
+        Type::Intersection(intersection) => intersection
+            .iter_positive(db)
+            .any(|element| returns_instance_of_ancestor(db, env, constructed_class, element)),
+        Type::NominalInstance(instance) => constructed_class
+            .is_subtype_of_class_literal(db, instance.class(db, env).class_literal(db)),
+        _ => false,
     }
 }
 
