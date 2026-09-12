@@ -813,12 +813,43 @@ type GrowingAlias[T] = T | list[Co[GrowingAlias[list[T]]] & Child[object]]
 class GrowingRecord[T](TypedDict):
     child: Co[GrowingRecord[list[T]]] & Child[object]
 
+class GrowingProtocol[T](Protocol):
+    child: GrowingProtocol[list[T]]
+
 def _(
     alias: Co[GrowingAlias[int]] & Child[object],
     record: Co[GrowingRecord[int]] & Child[object],
+    protocol: Co[GrowingProtocol[int]] & Child[object],
 ):
     reveal_type(alias)  # revealed: Co[GrowingAlias[int]] & Child[object]
     reveal_type(record)  # revealed: Co[GrowingRecord[int]] & Child[object]
+    reveal_type(protocol)  # revealed: Co[GrowingProtocol[int]] & Child[object]
+```
+
+Growing specializations in a non-generic protocol's members or a type variable's bound also prevent
+simplification:
+
+```pyi
+class Wrapper(Protocol):
+    value: GrowingAlias[int]
+
+def _[T: GrowingAlias[int]](
+    protocol: Co[Wrapper] & Child[object],
+    bound: Co[T] & Child[object],
+):
+    reveal_type(protocol)  # revealed: Co[Wrapper] & Child[object]
+    reveal_type(bound)  # revealed: Co[T@_] & Child[object]
+```
+
+We also leave the intersection unsimplified when a protocol argument contains a growing
+specialization, even if the protocol's members do not use that argument:
+
+```pyi
+class Unused[T](Protocol):
+    value: int
+
+def _(value: Co[Unused[GrowingAlias[int]]] & Child[object]):
+    reveal_type(value)  # revealed: Co[Unused[GrowingAlias[int]]] & Child[object]
 ```
 
 ### Inherited properties with recursive protocol bounds

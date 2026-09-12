@@ -281,6 +281,19 @@ reveal_type(generic_context(outside_callable(1)))
 outside_callable(1)("string")
 ```
 
+A recursively specialized parameter alias also keeps `T` in the function's generic context, rather
+than the returned `Callable`'s:
+
+```py
+type Recursive[T] = list[Recursive[list[T]]]
+
+def f[T](value: Recursive[T]) -> Callable[[], T]:
+    raise NotImplementedError
+
+# revealed: ty_extensions._internal.GenericContext[T@f]
+reveal_type(generic_context(f))
+```
+
 ## Naming a generic `Callable` with paramspecs: function return values
 
 The same pattern holds if the callable involves a paramspec.

@@ -1,13 +1,104 @@
 use crate::Db;
 use crate::ProgramEnvironment;
 use rustc_hash::FxHashSet;
+use std::cell::Cell;
 
 use ruff_python_ast::{self as ast};
 
+use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
+use crate::types::newtype::{NewType, walk_newtype_base};
 use crate::types::tuple::TupleSpec;
-use crate::types::typevar::BoundTypeVarIdentity;
-use crate::types::visitor::any_over_type;
-use crate::types::{Type, UnionBuilder};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, walk_type_var_bounds};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::{IntersectionType, KnownInstanceType, Type, TypeAliasType, UnionBuilder};
+
+/// Return whether the outer type may be a tuple, without searching nested arguments or members.
+/// A recursion cutoff conservatively counts as a possible tuple.
+fn may_be_tuple<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> bool {
+    struct TupleShapeVisitor<'a, 'db> {
+        env: &'a ProgramEnvironment<'db>,
+        recursion_guard: TypeCollector<'db>,
+        active_types: ActiveRecursionDetector<TypeIdentity<'db>>,
+        may_be_tuple: Cell<bool>,
+    }
+
+    impl<'db> TupleShapeVisitor<'_, 'db> {
+        fn visit_guarded(&self, db: &'db dyn Db, ty: Type<'db>, visit: impl FnOnce()) {
+            self.active_types.visit(
+                &ty.to_type_identity(db),
+                || self.may_be_tuple.set(true),
+                visit,
+            );
+        }
+    }
+
+    impl<'db> TypeVisitor<'db> for TupleShapeVisitor<'_, 'db> {
+        fn program_environment(&self) -> &ProgramEnvironment<'db> {
+            self.env
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            if self.may_be_tuple.get() {
+                return;
+            }
+
+            if ty.tuple_instance_spec(db, self.env).is_some() {
+                self.may_be_tuple.set(true);
+                return;
+            }
+
+            if matches!(
+                ty,
+                Type::Union(_)
+                    | Type::Intersection(_)
+                    | Type::TypeAlias(_)
+                    | Type::NewTypeInstance(_)
+                    | Type::TypeVar(_)
+            ) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        fn visit_intersection_type(&self, db: &'db dyn Db, intersection: IntersectionType<'db>) {
+            for element in intersection.iter_positive(db) {
+                self.visit_type(db, element);
+            }
+        }
+
+        fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+            self.visit_guarded(db, Type::TypeAlias(alias), || {
+                self.visit_type(db, alias.value_type(db));
+            });
+        }
+
+        fn visit_newtype_instance_type(&self, db: &'db dyn Db, newtype: NewType<'db>) {
+            self.visit_guarded(db, Type::NewTypeInstance(newtype), || {
+                walk_newtype_base(db, newtype, self);
+            });
+        }
+
+        fn visit_type_var_type(&self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) {
+            self.visit_guarded(
+                db,
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)),
+                || {
+                    if let Some(bounds) = typevar.bound_or_constraints(db, self.env) {
+                        walk_type_var_bounds(db, bounds, self);
+                    }
+                },
+            );
+        }
+    }
+
+    let visitor = TupleShapeVisitor {
+        env,
+        recursion_guard: TypeCollector::default(),
+        active_types: ActiveRecursionDetector::default(),
+        may_be_tuple: Cell::new(false),
+    };
+    visitor.visit_type(db, ty);
+    visitor.may_be_tuple.get()
+}
 
 /// Tracks the typevars of a collection to which tuple size promotion should **not** apply.
 #[derive(Default)]
@@ -35,8 +126,7 @@ impl<'db> TupleSizePromotionConstraints<'db> {
         }
     }
 
-    /// Records that a typevar is ineligible for tuple size promotion if the given type contains
-    /// a tuple type.
+    /// Block tuple size promotion if this type variable is assigned a possible tuple type.
     pub(crate) fn record_unpromotable_type(
         &mut self,
         db: &'db dyn Db,
@@ -73,9 +163,7 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     ) -> bool {
         expression
             .is_some_and(|expression| Self::is_promotable_tuple_literal(db, env, expression, ty))
-            || !any_over_type(db, env, ty, true, |ty| {
-                ty.tuple_instance_spec(db, env).is_some()
-            })
+            || !may_be_tuple(db, env, ty)
     }
 
     /// Returns true if the given expression is either a non-starred homogeneous tuple literal or the

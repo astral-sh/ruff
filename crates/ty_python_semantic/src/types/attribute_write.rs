@@ -13,6 +13,7 @@ use ty_python_core::use_def_map;
 
 use super::call::CallArguments;
 use super::callable::CallableTypeKind;
+use super::visitor::any_over_typevar_including_lazy_attributes;
 use super::{
     IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Signature,
     Type, TypeQualifiers, TypeVarBoundOrConstraints, UnionType,
@@ -1054,7 +1055,7 @@ fn contains_signature_typevar<'db>(
     ty: Type<'db>,
 ) -> bool {
     signature.generic_context.is_some_and(|generic_context| {
-        super::visitor::any_over_type(db, env, ty, true, |ty| {
+        any_over_typevar_including_lazy_attributes(db, env, ty, |ty| {
             matches!(ty, Type::TypeVar(typevar) if generic_context.contains(db, typevar.identity(db)))
         })
     })

@@ -4370,6 +4370,49 @@ class AliasBox[T](TypedDict):
 reveal_type(AliasBox(value=[1]))  # revealed: AliasBox[int]
 ```
 
+### Constructor inference ignores unused alias arguments
+
+The `fixed` field has type `int`; `Inner[T]` appears only in an unused alias argument. The
+constructor can still infer `T` from `value`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+type Ignored[T] = int
+
+class Inner[T](TypedDict):
+    value: T
+
+class Outer[T](TypedDict):
+    fixed: Ignored[Inner[T]]
+    value: T
+
+reveal_type(Outer(fixed=1, value=1))  # revealed: Outer[int]
+```
+
+Wrapping the alias in a tuple does not introduce a dependency on `T`:
+
+```py
+class Nested[T](TypedDict):
+    fixed: tuple[Ignored[Inner[T]]]
+    value: T
+
+reveal_type(Nested(fixed=(1,), value=1))  # revealed: Nested[int]
+```
+
+An unused alias argument in the expected type also does not prevent constructor inference:
+
+```py
+def _[T]() -> None:
+    # revealed: Outer[int]
+    x: Outer[int] | tuple[Ignored[Outer[T]]] = reveal_type(Outer(fixed=1, value=1))
+```
+
 ### Constructor inference with upper bounds
 
 A literal upper bound preserves its literal, while an ordinary `int` upper bound permits the usual

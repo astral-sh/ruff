@@ -1059,15 +1059,11 @@ fn non_recursive_protocol_interface<'db>(
             self.env
         }
 
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            false
-        }
-
-        fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
+        fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
             self.active_aliases.visit(
-                &Type::TypeAlias(type_alias).to_type_identity(db),
+                &Type::TypeAlias(alias).to_type_identity(db),
                 || self.found.set(true),
-                || self.visit_type(db, type_alias.value_type(db)),
+                || self.visit_type(db, alias.value_type(db)),
             );
         }
 
@@ -1079,9 +1075,7 @@ fn non_recursive_protocol_interface<'db>(
             if ty
                 .as_protocol_instance()
                 .and_then(|protocol| protocol.nominal_origin_instance(db))
-                .is_some_and(|instance| {
-                    instance.class_literal(db, self.program_environment()) == self.origin
-                })
+                .is_some_and(|instance| instance.class_literal(db, self.env) == self.origin)
             {
                 self.found.set(true);
                 return;
@@ -1316,26 +1310,22 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
     protocol: ProtocolInstanceType<'db>,
     visitor: &V,
 ) {
-    if visitor.should_visit_lazy_type_attributes() {
-        walk_protocol_interface(db, protocol.interface(db), visitor);
-    } else {
-        match protocol.inner {
-            Protocol::FromClass(_) | Protocol::Materialized(_) => {
-                visitor.notify_skipped_lazy_type_attributes();
-                if let Some((_, Some(specialization))) = protocol
-                    .class_origin(db)
-                    .and_then(|class| class.static_class_literal(db))
-                {
-                    walk_specialization(db, specialization, visitor);
-                }
+    match protocol.inner {
+        Protocol::FromClass(_) | Protocol::Materialized(_) => {
+            visitor.notify_skipped_lazy_type_attributes();
+            if let Some((_, Some(specialization))) = protocol
+                .class_origin(db)
+                .and_then(|class| class.static_class_literal(db))
+            {
+                walk_specialization(db, specialization, visitor);
             }
-            Protocol::Synthesized(synthesized) => {
-                walk_protocol_interface(
-                    db,
-                    ProtocolInterfaceView::new(synthesized.interface(), None),
-                    visitor,
-                );
-            }
+        }
+        Protocol::Synthesized(synthesized) => {
+            walk_protocol_interface(
+                db,
+                ProtocolInterfaceView::new(synthesized.interface(), None),
+                visitor,
+            );
         }
     }
 }
