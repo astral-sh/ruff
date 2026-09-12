@@ -961,6 +961,17 @@ impl<'db> CallableTypes<'db> {
         CallableTypes(callables)
     }
 
+    pub(crate) fn try_from_elements(
+        callables: impl IntoIterator<Item = Option<CallableType<'db>>>,
+    ) -> Option<Self> {
+        let callables = callables.into_iter().collect::<Option<SmallVec<_>>>()?;
+        if callables.is_empty() {
+            None
+        } else {
+            Some(CallableTypes(callables))
+        }
+    }
+
     pub(crate) fn exactly_one(self) -> Option<CallableType<'db>> {
         match self.0.as_slice() {
             [single] => Some(*single),
