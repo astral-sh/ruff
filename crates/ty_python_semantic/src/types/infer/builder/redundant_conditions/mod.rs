@@ -2,7 +2,8 @@
 //! These may be reported under either `redundant-condition` or `redundant-condition-strict`.
 //!
 //! This module classifies tests and selects which expressions to report. [`exemptions`] handles
-//! assertions, defensive branches, and environment checks; [`diagnostic`] builds messages and fixes.
+//! assertions, defensive branches, calls returning `None`, and environment checks;
+//! [`diagnostic`] builds messages and fixes.
 //!
 //! ## How we check compound conditions
 //!
@@ -67,7 +68,169 @@ use crate::{
     },
 };
 
-use self::exemptions::RedundantConditionContext;
+/// The context in which a boolean test occurs.
+///
+/// This is used to help determine whether a test should be exempt from one or both
+/// redundant-condition rules. For example, the same always-true comparison can be reported in
+/// an `if` condition but exempt in an assertion.
+///
+/// [`ConditionKind`] determines the rule that will be applied if the condition is not exempted.
+/// This context determines whether the test serves a purpose that makes reporting it undesirable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum RedundantConditionContext {
+    /// A boolean test checked without the additional exemptions represented by the other variants.
+    ///
+    /// This includes ordinary `if` conditions. For example:
+    ///
+    /// ```python
+    /// def check(value: str):
+    ///     if isinstance(value, str):  # Always true; flagged by `redundant-condition-strict`.
+    ///         print(value)
+    /// ```
+    ///
+    /// The special cases for assertions and checks that reject unexpected input are described
+    /// by [`Self::Assertion`] and [`Self::DefensiveExit`].
+    Standalone,
+
+    /// A ternary `<EXPR1> if <COND> else <EXPR2>` expression, a comprehension filter, or a
+    /// standalone `not` expression.
+    ///
+    /// Calls returning `None` can be used for their side effects in `and`/`or` operands within
+    /// ternary tests and comprehension filters, or as the operand of a standalone `not`. For example,
+    /// the following is a common pattern found in the ecosystem that is used to deduplicate items
+    /// in a concise way:
+    ///
+    /// ```py
+    /// def find_duplicate_coordinates(coordinates: list[tuple[int, int]]):
+    ///     seen: set[tuple[int, int]] = set()
+    ///     # No diagnostic here, even though `seen.add(coord)` returns `None`, which is always falsy
+    ///     duplicates = {coord for coord in coordinates if coord in seen or seen.add(coord)}
+    ///     print(f"Duplicates are {duplicates}")
+    /// ```
+    ///
+    /// We exempt such calls from both rules, including calls with walrus arguments that would
+    /// otherwise be classified as [`ConditionKind::ContainsWalrus`].
+    ///
+    /// Operands of `and`, `or`, and `not` within these tests inherit the exemption. Above,
+    /// `seen.add(coord)` is exempt even though it is an operand of `or`. The following filter
+    /// instead keeps the first occurrence of each item: `not seen.add(item)` records a new item
+    /// and returns `True`, allowing that item through. The call is exempt despite the surrounding
+    /// `and` and `not`:
+    ///
+    /// ```python
+    /// def deduplicate(items: list[str]) -> list[str]:
+    ///     seen: set[str] = set()
+    ///     return [item for item in items if item not in seen and not seen.add(item)]  # no diagnostic
+    /// ```
+    ///
+    /// An awaited call is also exempt when awaiting it produces `None`. This callback queues a
+    /// job and returns `True` to indicate acceptance:
+    ///
+    /// ```python
+    /// from asyncio import Queue
+    ///
+    /// async def accept_job(job: str, queue: Queue[str]) -> bool:
+    ///     return not await queue.put(job)  # no diagnostic
+    /// ```
+    ///
+    /// The exemption does not apply when the expression is itself nested in another boolean test.
+    /// Here, the ternary selects which readiness flag to check, and the enclosing `if` tests that
+    /// flag. The `print` call logs the choice of the backup. Although it is an `or` operand, it is
+    /// also part of the enclosing `if` condition, so we report its always-falsy return value.
+    ///
+    /// ```python
+    /// def report_readiness(prefer_primary: bool, primary_ready: bool, backup_ready: bool) -> None:
+    ///     if primary_ready if prefer_primary or print("Using backup") else backup_ready:  # error: [redundant-condition]
+    ///         print("Ready")
+    /// ```
+    ///
+    /// A comprehension filter is inferred in a separate scope, but that does not make it
+    /// independent of an enclosing boolean test. Here, `if` tests whether the set of duplicates
+    /// is nonempty. The entire comprehension, including its filter, is nested in that `if`
+    /// condition, so `seen.add(coord)` is reported even though the same filter is exempt above:
+    ///
+    /// ```python
+    /// def report_duplicates(coordinates: list[tuple[int, int]]) -> None:
+    ///     seen: set[tuple[int, int]] = set()
+    ///     if {coord for coord in coordinates if coord in seen or seen.add(coord)}:  # error: [redundant-condition]
+    ///         print("Duplicate coordinates found")
+    /// ```
+    Expression {
+        /// Set for standalone `not` operands and when entering an `and`/`or` expression.
+        /// Negation preserves this exemption; independent nested tests do not inherit it.
+        allow_none_returning_calls: bool,
+    },
+
+    /// A test within an assertion, including the complete assertion and tests in call arguments.
+    ///
+    /// Tests classified as [`ConditionKind::Boolean`] or [`ConditionKind::ShortCircuit`] are exempt.
+    /// Other always-truthy or always-falsy values remain eligible for `redundant-condition`, or
+    /// `redundant-condition-strict` if classified as [`ConditionKind::ContainsWalrus`].
+    ///
+    /// ```python
+    /// def check(value: int, other: object, flag: bool):
+    ///     assert isinstance(value, int)  # Defensive runtime check; exempt.
+    ///     assert flag and (other or True)  # No diagnostic on `other or True`.
+    ///     assert other or True  # Short-circuit assertion; exempt.
+    /// ```
+    ///
+    /// An uncalled function in `assert not ready` is still reported: the function itself is an
+    /// always-truthy value even though the complete assertion always fails.
+    Assertion,
+
+    /// Whether the branches of an `if` or `elif` test reject unexpected input or an
+    /// unsupported operation.
+    ///
+    /// We call that rejection a "defensive exit". For example, a function might raise `TypeError`
+    /// if its argument has the wrong type. Type annotations do not enforce this at runtime, so
+    /// the check can still be useful when the function is called from untyped code. We therefore
+    /// exempt conditions in [`ConditionKind::Boolean`] and [`ConditionKind::ShortCircuit`] when
+    /// their fixed truthiness rules out taking a defensive branch.
+    ///
+    /// ```python
+    /// def check(value: int):
+    ///     # Always false according to the annotation,
+    ///     # but exempted from diagnostics due to the defensive exit in the branch body:
+    ///     if not isinstance(value, int):  
+    ///         raise TypeError("expected an integer")
+    /// ```
+    ///
+    /// The code that rejects the input can also be in an `else` branch:
+    ///
+    /// ```python
+    /// def check(value: int):
+    ///     # Always true according to the annotation,
+    ///     # but exempted from diagnostics due to the defensive exit in the `else`-branch body:
+    ///     if isinstance(value, int):  
+    ///         ...
+    ///     else:
+    ///         raise TypeError("expected an integer")
+    /// ```
+    ///
+    /// Or after an always-true final `if` or `elif` whose body ends in a recognized exit:
+    ///
+    /// ```python
+    /// def check(value: int):
+    ///     # Always true according to the annotation,
+    ///     # but exempted from diagnostics due to the defensive exit in the body
+    ///     # of the "implicit `else`" after the final `if`:
+    ///     if isinstance(value, int):  # Always true according to the annotation; exempt.
+    ///         return value
+    ///     raise TypeError("expected an integer")
+    /// ```
+    ///
+    /// [`suite_ends_with_exit`] describes the forms of rejection we recognize
+    /// with [`SuiteExitKind::Defensive`].
+    ///
+    /// Boolean operands inherit these exemptions even when the complete condition has unknown
+    /// truthiness. Negation reverses which branch their truthiness selects. Independent tests in
+    /// call arguments do not inherit the exemptions, and mistakes such as testing an uncalled
+    /// function can still be reported. Each field records whether that branch ends in a defensive exit.
+    DefensiveExit {
+        truthy_branch: bool,
+        falsy_branch: bool,
+    },
+}
 
 /// Classification of a redundant condition.
 ///
@@ -298,7 +461,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// always false.
     ///
     /// Tests in a different scope, such as a lambda body, are checked when that scope is inferred.
-    pub(super) fn check_condition_redundancy(&self, test: &ast::Expr, test_type: Type<'db>) {
+    pub(super) fn check_condition_redundancy(
+        &self,
+        test: &ast::Expr,
+        test_type: Type<'db>,
+        context: RedundantConditionContext,
+    ) {
         if !self.should_check_redundant_conditions() {
             return;
         }
@@ -316,7 +484,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 truthiness,
                 evaluation: ExpressionContext::Condition,
             },
-            RedundantConditionContext::Standalone,
+            context,
         ) {
             self.report_redundant_condition(&condition);
         }
@@ -376,7 +544,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 truthiness: operand_truthiness,
                 evaluation: ExpressionContext::Value,
             },
-            RedundantConditionContext::Standalone,
+            RedundantConditionContext::Expression {
+                allow_none_returning_calls: true,
+            },
         ) {
             self.report_redundant_condition(&condition);
         }
@@ -700,9 +870,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         match test.expression {
             ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
+                let context = match condition_context {
+                    RedundantConditionContext::Expression { .. } => {
+                        RedundantConditionContext::Expression {
+                            allow_none_returning_calls: true,
+                        }
+                    }
+                    context => context,
+                };
                 // Include the final operand: `if flag and func` tests `func` when `flag` is true.
                 for value in values {
-                    check_operand(value, condition_context, conditions);
+                    check_operand(value, context, conditions);
                 }
             }
 

@@ -3998,6 +3998,313 @@ unreachable region, so we special-case a literal `None` too:
 assert None  # no diagnostic
 ```
 
+## Calls returning `None` in expression tests
+
+Calls returning `None` are often used for their side effects in conditional expressions,
+comprehension filters, and standalone `not` expressions. In conditional tests and comprehension
+filters, we exempt these calls from both rules when they contribute to an `and` or `or` expression,
+including through `not`. Standalone `not` expressions also receive the exemption.
+
+### Deduplicating items
+
+To keep the first occurrence of each item, a comprehension can check a `seen` set and add each new
+item to it. `seen.add(item)` returns `None`, so `not seen.add(item)` lets the new item through after
+recording it. Removing that call would let duplicates through as well.
+
+```py
+items = ["red", "blue", "red", "green", "blue"]
+seen: set[str] = set()
+
+unique = [item for item in items if item not in seen and not seen.add(item)]  # no diagnostic
+assert unique == ["red", "blue", "green"]
+```
+
+The same filter can deduplicate items lazily in a generator expression:
+
+```py
+seen.clear()
+unique_iter = (item for item in items if item not in seen and not seen.add(item))  # no diagnostic
+assert list(unique_iter) == ["red", "blue", "green"]
+```
+
+To collect only duplicates, the filter instead accepts items already in `seen`. For a new item,
+`seen.add(item)` records it while its falsy return value excludes it from the result:
+
+```py
+seen.clear()
+duplicates = {item for item in items if item in seen or seen.add(item)}  # no diagnostic
+assert duplicates == {"red", "blue"}
+```
+
+A dictionary comprehension can use the first-occurrence filter to record each item's earliest
+position. Without the filter, later occurrences would overwrite those positions.
+
+```py
+seen.clear()
+first_positions = {
+    item: position
+    for position, item in enumerate(items)
+    if item not in seen and not seen.add(item)  # no diagnostic
+}
+assert first_positions == {"red": 0, "blue": 1, "green": 3}
+```
+
+To label every occurrence as new or repeated, a conditional expression can perform the same check
+and update:
+
+```py
+seen.clear()
+labels = [
+    "repeat" if item in seen or seen.add(item) else "new"  # no diagnostic
+    for item in items
+]
+assert labels == ["new", "new", "repeat", "new", "repeat"]
+```
+
+A predicate passed to `filter` can also keep first occurrences. Here, `not` returns `False` for an
+item already in `seen` and `True` for a new item, after `seen.add(item)` records it:
+
+```py
+seen.clear()
+unique = list(filter(lambda item: not (item in seen or seen.add(item)), items))  # no diagnostic
+assert unique == ["red", "blue", "green"]
+```
+
+### Calls used as entire tests
+
+Without `and` or `or`, calls returning `None` are still reported in conditional tests and
+comprehension filters. `set.add` does not indicate whether an item was already present, so this
+attempt to label first occurrences always selects `"repeat"`:
+
+```py
+items = ["red", "blue", "red"]
+seen: set[str] = set()
+
+labels = ["new" if seen.add(item) else "repeat" for item in items]  # error: [redundant-condition]
+assert labels == ["repeat", "repeat", "repeat"]
+```
+
+Using the call as the entire comprehension filter rejects every item:
+
+```py
+seen.clear()
+duplicates = [item for item in items if seen.add(item)]  # error: [redundant-condition]
+assert duplicates == []
+```
+
+Negating the call admits every item, including duplicates. The filter still has no effect on which
+items are included, so this call is also reported:
+
+```py
+seen.clear()
+unique = [item for item in items if not seen.add(item)]  # error: [redundant-condition]
+assert unique == items
+```
+
+### Mock callbacks
+
+A mock callback can answer one prompt directly and record the normalized forms of other prompts
+before looking up their responses. Here, the call is an `or` operand, so it is exempt despite its
+walrus argument:
+
+```py
+from unittest.mock import patch
+
+prompts: list[str] = []
+responses = {"Continue?": "yes"}
+with patch(
+    "builtins.input",
+    side_effect=lambda prompt: (
+        "no" if prompt == "Cancel?" or prompts.append(key := prompt.strip()) else responses[key]  # no diagnostic
+    ),
+):
+    assert input("Cancel?") == "no"
+    assert input("Continue? ") == "yes"
+
+assert prompts == ["Continue?"]
+```
+
+### Logging filters
+
+A logging filter must return a truthy value for a message to reach the logger's handlers. This
+filter collects messages for inspection and returns `True` by negating the `None` returned by
+`append`, so it does not suppress the messages it records.
+
+```py
+from logging import Logger, NullHandler
+
+messages: list[str] = []
+logger = Logger("capture")
+logger.addHandler(NullHandler())
+logger.addFilter(lambda record: not messages.append(record.getMessage()))  # no diagnostic
+
+logger.warning("Saved report")
+assert messages == ["Saved report"]
+```
+
+### Awaited calls
+
+The same exemption applies to awaited calls that produce `None`. Here, `Queue.put` queues a message
+for each unfinished job. Negating its awaited result keeps the queued message in the returned list.
+The walrus argument records the message so the comprehension can return exactly what it queued.
+
+```py
+from asyncio import Queue
+
+async def enqueue_pending(jobs: list[str], completed: set[str], queue: Queue[str]) -> list[str]:
+    return [
+        message
+        for job in jobs
+        if job not in completed and not await queue.put(message := f"Process {job}")  # no diagnostic
+    ]
+```
+
+A conditional expression can report whether a job was skipped or queued. The completed-job check
+selects `"skipped"`; otherwise, the awaited call queues the job and its `None` result selects
+`"queued"`:
+
+```py
+async def enqueue_status(job: str, completed: set[str], queue: Queue[str]) -> str:
+    return "skipped" if job in completed or await queue.put(job) else "queued"  # no diagnostic
+```
+
+An asynchronous callback can also queue a job and return `True` to indicate acceptance:
+
+```py
+async def accept_job(job: str, queue: Queue[str]) -> bool:
+    return not await queue.put(job)  # no diagnostic
+```
+
+Awaiting the call does not relax the restrictions on where the exemption applies. A bare conditional
+test is reported, as are `or` operands in statement conditions and comprehension filters nested in
+an outer boolean test:
+
+```py
+async def nonexempt_contexts(job: str, completed: set[str], queue: Queue[str]):
+    status = "skipped" if await queue.put(job) else "queued"  # error: [redundant-condition]
+
+    if job in completed or await queue.put(job):  # error: [redundant-condition]
+        pass
+
+    if [item for item in [job] if item not in completed and not await queue.put(item)]:  # error: [redundant-condition]
+        pass
+```
+
+## Calls returning `None` in statement conditions
+
+The `and`/`or` exemption does not apply to statement conditions. These calls are still reported even
+though they are operands of `or`:
+
+```py
+def foo(value: object = None) -> None:
+    pass
+
+def if_tests(flag: bool, other_flag: bool):
+    if flag or foo():  # error: [redundant-condition]
+        pass
+    elif other_flag or foo(value := 1):  # error: [redundant-condition-strict]
+        pass
+
+def while_test(flag: bool):
+    while flag or foo():  # error: [redundant-condition]
+        pass
+
+def match_test(flag: bool):
+    match flag:
+        case _ if flag or foo():  # error: [redundant-condition]
+            pass
+
+def assertion_test(flag: bool):
+    assert flag or foo()  # error: [redundant-condition]
+```
+
+Conditional and `not` expressions nested in an outer boolean test do not receive the exemption. This
+includes tests inside call arguments, even though they do not directly determine the enclosing
+call's truthiness.
+
+```py
+def accepts(value: object) -> bool:
+    return bool(value)
+
+def nested_tests(flag: bool, other_flag: bool, condition: bool):
+    if not foo():  # error: [redundant-condition]
+        pass
+
+    if flag if condition or foo() else other_flag:  # error: [redundant-condition]
+        pass
+
+    if accepts(not foo()):  # error: [redundant-condition]
+        pass
+
+    if accepts(1 if condition or foo(value := 1) else 2):  # error: [redundant-condition-strict]
+        pass
+
+    selected = 1 if flag and accepts(not foo()) else 2  # error: [redundant-condition]
+```
+
+Comprehensions, generators, and lambdas have their own scopes, but tests within them can still be
+nested in an outer boolean condition. These tests are also reported. The final comprehension and
+predicate deduplicate items outside those conditions, so the exemption applies again.
+
+```py
+def nested_scopes(items: list[int]):
+    if [item for item in items if item > 0 and not foo(item)]:  # error: [redundant-condition]
+        pass
+
+    if any(item for item in items if item > 0 and not foo(item)):  # error: [redundant-condition]
+        pass
+
+    if accepts(lambda: not foo()):  # error: [redundant-condition]
+        pass
+
+    if accepts(lambda: 1 if items or foo() else 2):  # error: [redundant-condition]
+        pass
+
+    seen: set[int] = set()
+    unique = [item for item in items if item not in seen and not seen.add(item)]  # no diagnostic
+    is_new = lambda item: not (item in seen or seen.add(item))  # no diagnostic
+```
+
+## Other always-falsy expression tests
+
+The exemption requires a call whose inferred return type is `None`. We still report other
+always-falsy return types, saved `None` values, and calls wrapped in a walrus expression, even in
+`and`/`or` operands or standalone `not` expressions.
+
+```py
+from typing import Literal
+
+def empty() -> Literal[""]:
+    return ""
+
+def false() -> Literal[False]:
+    return False
+
+def record() -> None: ...
+def other_tests(value: None, flag: bool):
+    selected = 1 if flag or empty() else 2  # error: [redundant-condition]
+    negated = not false()  # error: [redundant-condition-strict]
+
+    filtered = [item for item in range(3) if item > 0 and value]  # error: [redundant-condition]
+
+    selected = 1 if flag or (saved := record()) else 2  # error: [redundant-condition-strict]
+    negated = not (saved := record())  # error: [redundant-condition-strict]
+```
+
+An awaited call must produce `None` to qualify. The operand of `await` must also be a call: awaiting
+a saved awaitable does not receive the exemption, even if its result is `None`.
+
+```py
+from collections.abc import Awaitable
+
+async def async_false() -> Literal[False]:
+    return False
+
+async def awaited_tests(saved: Awaitable[None]):
+    negated = not await async_false()  # error: [redundant-condition-strict]
+    negated = not await saved  # error: [redundant-condition]
+```
+
 ## Defensive assertions
 
 Assertion tests and their subexpressions are exempt from both rules when their inferred value type
