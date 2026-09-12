@@ -2154,6 +2154,115 @@ class DataSub(DataSuper):
         super().__post_init__(x)
 ```
 
+## `@override` on `__init__` or `__new__`
+
+An explicit `@override` on `__init__` or `__new__` asserts that the override is compatible with the
+overridden method, so the exclusion above does not apply to those two methods. This matches
+[the typing spec](https://typing.python.org/en/latest/spec/class-compat.html#override), which does
+not exempt constructors from the assignability check that `@override` otherwise requires:
+
+```pyi
+from typing_extensions import Self, override
+
+class Base:
+    def __init__(self, x: int) -> None: ...
+    def __new__(cls, x: int) -> Self: ...
+
+class IncompatibleInit(Base):
+    @override
+    def __init__(self, x: str) -> None: ...  # error: [invalid-method-override]
+
+class IncompatibleNew(Base):
+    @override
+    def __new__(cls, x: str) -> Self: ...  # error: [invalid-method-override]
+
+class CompatibleOverride(Base):
+    @override
+    def __init__(self, x: int, y: int = 0) -> None: ...
+    @override
+    def __new__(cls, x: int, y: int = 0) -> Self: ...
+```
+
+Without `@override`, `__init__` and `__new__` keep the exclusion from above, since it is normal for
+a subclass to take different constructor arguments than its parent:
+
+```pyi
+class Unmarked(Base):
+    def __init__(self, x: str) -> None: ...
+    def __new__(cls, x: str) -> Self: ...
+```
+
+`__new__`'s implicit `cls` parameter is not part of its override contract: it always takes the type
+it is actually called on, so an `@override`d `__new__` with a covariant, concrete return type is
+accepted even though `cls` is declared as `type[NewBase]` on the base method and `type[NewChild]` on
+the override:
+
+```pyi
+from typing_extensions import override
+
+class NewBase:
+    def __new__(cls, x: int) -> NewBase: ...
+
+class NewChild(NewBase):
+    @override
+    def __new__(cls, x: int) -> NewChild: ...
+```
+
+`__post_init__` and `__init_subclass__` are not covered by the typing spec's constructor exception
+for `@override`; they keep the exclusion even when explicitly marked:
+
+```pyi
+from typing_extensions import override
+
+class HooksBase:
+    def __post_init__(self) -> None: ...
+    def __init_subclass__(cls, **kwargs: object) -> None: ...
+
+class HooksSub(HooksBase):
+    @override
+    def __post_init__(self, extra: int) -> None: ...
+    @override
+    def __init_subclass__(cls, extra: int, **kwargs: object) -> None: ...
+```
+
+## An `@override`d constructor is checked against every ancestor
+
+An `@override`d constructor is checked against the whole class hierarchy, the same as any other
+overridden method: only one diagnostic is reported, against the closest ancestor that defines the
+method, even when a more distant ancestor also defines an incompatible `__init__`. Here,
+`Parent.__init__` accepts anything, so `Child.__init__` is compatible with it; the diagnostic
+instead names `Grandparent`, which `Child.__init__` is not compatible with:
+
+```pyi
+from typing import Any
+from typing_extensions import override
+
+class Grandparent:
+    def __init__(self, x: int) -> None: ...
+
+class Parent(Grandparent):
+    def __init__(self, *args: Any, **kwargs: Any) -> None: ...
+
+class Child(Parent):
+    @override
+    def __init__(self, x: str) -> None: ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `__init__`
+  --> src/mdtest_snippet.pyi:12:9
+   |
+12 |     def __init__(self, x: str) -> None: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Grandparent.__init__`
+   |
+  ::: src/mdtest_snippet.pyi:5:9
+   |
+ 5 |     def __init__(self, x: int) -> None: ...
+   |         ------------------------------ `Grandparent.__init__` defined here
+info: parameter `x` has an incompatible type: `int` is not assignable to `str`
+info: This violates the Liskov Substitution Principle
+```
+
 ## Functions assigned in a class body
 
 A function assigned in a class body is bound as a method. It can conflict with a method definition

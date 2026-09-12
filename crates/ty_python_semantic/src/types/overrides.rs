@@ -254,7 +254,7 @@ fn check_inherited_method_conflicts<'db>(
                     continue;
                 };
                 let Some((selected_ty, contract_ty)) =
-                    method_override_types(db, env, selected_ty, contract_ty)
+                    method_override_types(db, env, selected_ty, contract_ty, receiver)
                 else {
                     continue;
                 };
@@ -312,7 +312,13 @@ fn check_inherited_method_conflicts<'db>(
                         continue;
                     };
                     if parent_decorator != ancestor_decorator
-                        || !is_assignable_method_override(db, env, parent_ty, ancestor_ty)
+                        || !is_assignable_method_override(
+                            db,
+                            env,
+                            parent_ty,
+                            ancestor_ty,
+                            parent_receiver,
+                        )
                     {
                         continue;
                     }
@@ -649,6 +655,10 @@ fn check_class_declaration<'db>(
     let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
     let is_private_member = is_mangled_private(member.name.as_str());
     let mut subclass_variable_kind: Option<Option<VariableKind>> = None;
+    // Whether this member is `__init__` or `__new__` decorated with `@override`. This is
+    // memoized like `subclass_variable_kind` above: it depends only on `member`, which is fixed
+    // for the whole call, so it would otherwise be recomputed on every MRO ancestor below.
+    let mut overridden_constructor_asserts_compatibility: Option<bool> = None;
 
     // Track the first superclass that defines this method so we can distinguish inherited
     // conflicts from violations introduced by the child.
@@ -870,8 +880,24 @@ fn check_class_declaration<'db>(
                 continue;
             };
 
-            // Constructor methods are not checked for Liskov compliance
-            if is_constructor_like_method(&member.name) {
+            // Constructor methods are not checked for Liskov compliance, since `__init__` and
+            // `__new__` routinely take different parameters in each subclass on purpose. An
+            // explicit `@override` on one of them is an exception: it asserts that the override
+            // is signature-compatible with the overridden method, so the typing spec requires the
+            // same assignability check as for any other overridden method.
+            // https://typing.python.org/en/latest/spec/class-compat.html#override
+            let overridden_constructor_asserts_compatibility =
+                *overridden_constructor_asserts_compatibility.get_or_insert_with(|| {
+                    matches!(member.name.as_str(), "__init__" | "__new__")
+                        && matches!(
+                            member.ty,
+                            Type::FunctionLiteral(function)
+                                if function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
+                        )
+                });
+            if is_constructor_like_method(&member.name)
+                && !overridden_constructor_asserts_compatibility
+            {
                 continue;
             }
 
@@ -882,9 +908,13 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let Some((subclass_override_type, superclass_override_type)) =
-                method_override_types(db, env, type_on_subclass_instance, superclass_type)
-            else {
+            let Some((subclass_override_type, superclass_override_type)) = method_override_types(
+                db,
+                env,
+                type_on_subclass_instance,
+                superclass_type,
+                instance_of_class,
+            ) else {
                 continue;
             };
 
@@ -901,9 +931,9 @@ fn check_class_declaration<'db>(
                     env,
                     bases,
                     method_owner,
-                    superclass,
-                    superclass_type,
+                    (superclass, superclass_type),
                     &member.name,
+                    instance_of_class,
                 )
             {
                 continue;
@@ -1003,9 +1033,11 @@ fn is_inherited_method_violation<'db>(
     env: &ProgramEnvironment<'db>,
     bases: &[ClassBase<'db>],
     method_owner: ClassType<'db>,
-    superclass: ClassType<'db>,
-    superclass_type: Type<'db>,
+    // The ancestor whose contract for this method was just found incompatible, together with the
+    // type of that contract. Bundled into a pair to keep this function's argument count in check.
+    (superclass, superclass_type): (ClassType<'db>, Type<'db>),
     name: &Name,
+    subclass_receiver: Type<'db>,
 ) -> bool {
     // An earlier MRO entry can select a different method in its own hierarchy. Check each
     // ancestor that inherits the method actually selected by the child's MRO.
@@ -1024,7 +1056,13 @@ fn is_inherited_method_violation<'db>(
             else {
                 return false;
             };
-            if is_assignable_method_override(db, env, parent_type, superclass_type) {
+            if is_assignable_method_override(
+                db,
+                env,
+                parent_type,
+                superclass_type,
+                subclass_receiver,
+            ) {
                 return false;
             }
 
@@ -1046,7 +1084,13 @@ fn is_inherited_method_violation<'db>(
                     else {
                         return false;
                     };
-                    !is_assignable_method_override(db, env, parent_type, ancestor_type)
+                    !is_assignable_method_override(
+                        db,
+                        env,
+                        parent_type,
+                        ancestor_type,
+                        subclass_receiver,
+                    )
                 })
         })
 }
@@ -1073,17 +1117,25 @@ fn is_assignable_method_override<'db>(
     env: &ProgramEnvironment<'db>,
     subclass_type: Type<'db>,
     superclass_type: Type<'db>,
+    subclass_receiver: Type<'db>,
 ) -> bool {
-    method_override_types(db, env, subclass_type, superclass_type).is_some_and(
+    method_override_types(db, env, subclass_type, superclass_type, subclass_receiver).is_some_and(
         |(subclass_type, superclass_type)| subclass_type.is_assignable_to(db, env, superclass_type),
     )
 }
 
+/// Returns the callable types to compare for a method override, or `None` if `superclass_type`
+/// cannot be compared as a callable.
+///
+/// `subclass_receiver` is an instance of the subclass whose declaration is being checked. It is
+/// used to normalize the implicit receiver of an `@override`d `__new__`, the same way the
+/// `BoundMethod` case below normalizes the receiver of an ordinary overridden method.
 fn method_override_types<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     subclass_type: Type<'db>,
     superclass_type: Type<'db>,
+    subclass_receiver: Type<'db>,
 ) -> Option<(Type<'db>, Type<'db>)> {
     let (subclass_type, superclass_type) = match (subclass_type, superclass_type) {
         (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method))
@@ -1128,6 +1180,32 @@ fn method_override_types<'db>(
                     env,
                     receiver,
                     typing_self_type,
+                )),
+            )
+        }
+        // `__new__` is implicitly static, so member lookup never binds it into a `BoundMethod`
+        // the way it does for the ordinary instance methods handled above: its instance member
+        // type stays a bare `FunctionLiteral`, implicit `cls` parameter and all. Bind both
+        // signatures to the subclass receiver here too, so that implicit `cls` parameter is
+        // dropped from the comparison instead of being compared between two unrelated classes.
+        // Without this, an `@override`d `__new__` with a covariant, concrete return type is
+        // rejected: `cls: type[Child]` is not assignable to `cls: type[Base]`, even though the
+        // parameter is never meant to vary independently of the receiver it is called on.
+        (Type::FunctionLiteral(subclass_function), Type::FunctionLiteral(superclass_function))
+            if subclass_function.name(db) == "__new__" =>
+        {
+            (
+                Type::Callable(subclass_function.into_bound_callable_with_receiver(
+                    db,
+                    env,
+                    subclass_receiver,
+                    subclass_receiver,
+                )),
+                Type::Callable(superclass_function.into_bound_callable_with_receiver(
+                    db,
+                    env,
+                    subclass_receiver,
+                    subclass_receiver,
                 )),
             )
         }
