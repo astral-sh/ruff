@@ -1167,7 +1167,7 @@ An intersection of `int` and `Any` likewise retains only the compatible `int` co
 variances.
 
 ```py
-type GradualInt = Intersection[int, Any]
+type GradualInt = int & Any
 
 static_assert(is_subtype_of(ConstrainedCovariant[int], Top[ConstrainedCovariant[GradualInt]]))
 static_assert(not is_subtype_of(ConstrainedCovariant[str], Top[ConstrainedCovariant[GradualInt]]))
@@ -1255,10 +1255,10 @@ python-version = "3.12"
 
 ```py
 from typing import Any
-from ty_extensions import Bottom, Intersection, Top, static_assert
+from ty_extensions import Bottom, Top, static_assert
 from ty_extensions._internal import is_assignable_to, is_subtype_of
 
-type GradualInt = Intersection[int, Any]
+type GradualInt = int & Any
 
 class MixedConstrained[T: (int, str), U]:
     value: T
