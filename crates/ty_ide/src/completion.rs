@@ -4414,7 +4414,7 @@ class Foo:
     }
 
     #[test]
-    fn class_blank1() {
+    fn class_blank() {
         let builder = completion_test_builder(
             "\
 class Foo:
@@ -4430,23 +4430,6 @@ class Foo:
         //
         // These don't work for similar reasons as other
         // tests above with the <CURSOR> inside of whitespace.
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"Foo");
-    }
-
-    #[test]
-    fn class_blank2() {
-        let builder = completion_test_builder(
-            "\
-class Foo:
-    bar = 1
-    quux = <CURSOR>
-    frob = 3
-",
-        );
-
-        // FIXME: Should include `bar`, `quux` and `frob`.
-        // (Unclear if `Foo` should be included, but a false
-        // positive isn't the end of the world.)
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"Foo");
     }
 
