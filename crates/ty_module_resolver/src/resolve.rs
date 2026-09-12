@@ -59,7 +59,7 @@ use crate::strategy::MisconfigurationStrategy;
 use crate::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::{ResolverEnvironment, ResolverFile, SearchPathSettings, SearchPathSettingsError};
 
-use self::search::ModuleSearch;
+use self::search::{ModuleEnumeration, ModuleSearch};
 
 /// Resolves a module name to a module.
 pub fn resolve_module<'db>(
@@ -1433,6 +1433,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
 /// Resolves module names using an environment and file-selection precedence.
 struct NameResolver<'db> {
     context: ResolverContext<'db>,
+    known_package: Option<Module<'db>>,
 }
 
 impl<'db> NameResolver<'db> {
@@ -1444,7 +1445,63 @@ impl<'db> NameResolver<'db> {
     ) -> Self {
         Self {
             context: ResolverContext::new(db, resolver_environment, mode),
+            known_package: None,
         }
+    }
+
+    /// Enumerates immediate child modules of a complete prefix, or top-level modules for `None`.
+    ///
+    /// Directory entries supply possible names; resolution selects each name before module enumeration
+    /// applies its eligibility rules. Unresolved overlay prefixes are returned separately so
+    /// recursive enumeration can visit them without offering them as importable modules.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "Module enumeration is consumed by the next change's cached listings"
+        )
+    )]
+    fn enumerate_modules(&self, prefix: Option<&ModuleName>) -> ModuleEnumeration<'db> {
+        if let Some(module) = self.known_package
+            && prefix == Some(module.name(self.context.db))
+            && module.kind(self.context.db) == ModuleKind::Module
+            && !ModuleSearch::may_have_children(&self.context, module.name(self.context.db))
+        {
+            return ModuleEnumeration::default();
+        }
+        ModuleSearch::for_prefix(self, prefix)
+            .map(|search| search.enumerate_modules())
+            .unwrap_or_default()
+    }
+
+    /// Allows module enumeration below an explicitly resolved package, even through symlinked ancestry.
+    /// Other namespace portions and overlays retain their normal eligibility checks.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "Module enumeration is consumed by the next change's cached listings"
+        )
+    )]
+    fn with_known_package(mut self, module: Module<'db>) -> Self {
+        self.known_package = Some(module);
+        self
+    }
+
+    /// Enumerates modules within one importing-file fallback path instead of configured roots.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "Module enumeration is consumed by the next change's cached listings"
+        )
+    )]
+    fn enumerate_modules_in_search_path(
+        &self,
+        prefix: &ModuleName,
+        path: &SearchPath,
+    ) -> ModuleEnumeration<'db> {
+        ModuleSearch::in_search_path(self, prefix, path).enumerate_modules()
     }
 
     /// Finds candidates for a top-level name across the supplied search paths and stub packages.

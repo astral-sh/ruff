@@ -102,6 +102,11 @@ impl ModuleName {
             .expect("at least one module component")
     }
 
+    /// Returns the first component as a module name, such as `acme` for `acme.tools`.
+    pub(crate) fn top_level(&self) -> Self {
+        Self(self.first_component().to_compact_string())
+    }
+
     /// Returns the last component in this module name.
     ///
     /// # Examples
