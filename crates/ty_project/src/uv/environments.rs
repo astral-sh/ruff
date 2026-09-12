@@ -733,6 +733,7 @@ fn apply_sync_result(
         // previous metadata was cleared along with its virtual-environment path.
         //
         // FIXME: This is overbroad. A file watcher can tell us precisely what changed.
+        // Remove this fallback once the language server also watches script environments.
         // Changes inside virtual environments should instead be watched and processed through `ProjectDatabase::apply_changes`.
         // Using a file watcher also ensures that virtual environment changes in
         // scripts without using uv are detected.
