@@ -10774,7 +10774,7 @@ impl std::fmt::Display for DynamicType<'_> {
 }
 
 bitflags! {
-    /// Type qualifiers that appear in an annotation expression.
+    /// Type qualifiers from annotations or synthesized member metadata.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, Hash)]
     pub struct TypeQualifiers: u8 {
         /// `typing.ClassVar`
@@ -10787,7 +10787,7 @@ bitflags! {
         const REQUIRED = 1 << 3;
         /// `typing_extensions.NotRequired`
         const NOT_REQUIRED = 1 << 4;
-        /// `typing_extensions.ReadOnly`
+        /// `typing_extensions.ReadOnly`, or a synthesized read-only class attribute.
         const READ_ONLY = 1 << 5;
         /// A non-standard type qualifier that marks implicit instance attributes, i.e.
         /// instance attributes that are only implicitly defined via `self.x = …` in

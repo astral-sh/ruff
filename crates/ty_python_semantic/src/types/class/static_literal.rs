@@ -1637,6 +1637,15 @@ impl<'db> StaticClassLiteral<'db> {
             return Member::unbound();
         }
 
+        // Enum members are read-only on the class, but instances can shadow them.
+        if enum_metadata(db, ClassLiteral::Static(self))
+            .is_some_and(|metadata| metadata.contains_member(name))
+        {
+            let mut member = member;
+            member.inner.qualifiers.insert(TypeQualifiers::READ_ONLY);
+            return member;
+        }
+
         // For enum classes, `nonmember(value)` creates a non-member attribute.
         // At runtime, the enum metaclass unwraps the value, so accessing the attribute
         // returns the inner value, not the `nonmember` wrapper.

@@ -41,7 +41,7 @@ pub(super) enum AttributeWriteRequirement<'db> {
     },
     /// A value may be assigned without an attribute-specific constraint.
     Unconstrained,
-    /// The object type does not permit writes at all.
+    /// The attribute cannot be assigned.
     CannotAssign,
     /// A module symbol, with its declared type when the symbol is known.
     ///
@@ -433,6 +433,12 @@ fn class_attribute_write_requirement<'db>(
     object_ty: Type<'db>,
     attribute: &str,
 ) -> AttributeWriteRequirement<'db> {
+    if object_ty
+        .find_name_in_mro(db, env, attribute)
+        .is_some_and(|member| member.is_read_only())
+    {
+        return AttributeWriteRequirement::CannotAssign;
+    }
     let Some(members) = assignment_attribute_members(db, env, object_ty, attribute) else {
         return AttributeWriteRequirement::Unconstrained;
     };
