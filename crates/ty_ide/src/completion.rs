@@ -4414,7 +4414,7 @@ class Foo:
     }
 
     #[test]
-    fn class_blank1() {
+    fn class_blank() {
         let builder = completion_test_builder(
             "\
 class Foo:
