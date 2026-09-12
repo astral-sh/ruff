@@ -403,6 +403,29 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db, env)
     }
 
+    /// Whether an attribute accepts every value of `value_ty` through ordinary assignment.
+    pub(super) fn is_attribute_writable_with(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        value_ty: Type<'db>,
+    ) -> bool {
+        let constraints = ConstraintSetBuilder::new();
+        TypeRelationChecker::new(
+            env,
+            TypeRelation::Assignability,
+            &constraints,
+            TypeVarSet::None,
+            &HasRelationToVisitor::default(&constraints),
+            &IsDisjointVisitor::default(&constraints),
+            &SignatureRelationVisitor::default(),
+            &ApplyTypeMappingVisitor::new(env),
+        )
+        .check_attribute_write(db, self, name, value_ty)
+        .is_always_satisfied(db, env)
+    }
+
     /// Re-run the assignability check with error context collection enabled.
     ///
     /// This should normally be called when `is_assignable_to` has returned `false` and we
