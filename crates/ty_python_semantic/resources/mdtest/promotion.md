@@ -306,6 +306,183 @@ segments: Mapping[str, Any] = {"start": (1, 2), "end": (3, 4, 5)}
 reveal_type(segments)  # revealed: dict[str, tuple[int, ...]]
 ```
 
+## Empty tuple class attributes
+
+An empty tuple assigned to an attribute often serves as an initial value that a subclass overrides
+or another method replaces with a nonempty tuple. A public type of `tuple[()]` would imply that the
+attribute can only ever be empty, which is rarely useful in these cases.
+
+When an unannotated class attribute's end-of-scope inferred type is `tuple[()]`, we give its public
+type an unknown element type and an arbitrary length. This also applies when the value comes from
+another name. Nonempty tuples and explicit annotations retain their fixed length.
+
+```py
+from typing import Final
+
+empty = ()
+
+class Values:
+    items = ()
+    from_name = empty
+    pair = (1, 2)
+    declared: tuple[()] = ()
+    final: Final = ()
+
+reveal_type(empty)  # revealed: tuple[()]
+reveal_type(Values.items)  # revealed: tuple[Unknown, ...]
+reveal_type(Values.from_name)  # revealed: tuple[Unknown, ...]
+reveal_type(Values.pair)  # revealed: tuple[int, int]
+reveal_type(Values.declared)  # revealed: tuple[()]
+reveal_type(Values.final)  # revealed: tuple[()]
+```
+
+Within the class body, a bare name still refers to the exact empty tuple. Accessing the attribute
+through an instance or the class uses its promoted public type, including from a method on the
+class.
+
+```py
+class LocalAndPublic:
+    items = ()
+    reveal_type(items)  # revealed: tuple[()]
+    if items:  # error: [redundant-condition] "Object of type `tuple[()]` is always falsy"
+        pass
+
+    def __init__(self):
+        reveal_type(self.items)  # revealed: tuple[Unknown, ...]
+        # No `redundant-condition` diagnostic: the public type may be nonempty.
+        if self.items:
+            pass
+
+reveal_type(LocalAndPublic.items)  # revealed: tuple[Unknown, ...]
+reveal_type(LocalAndPublic().items)  # revealed: tuple[Unknown, ...]
+```
+
+When separate branches assign an empty and a nonempty tuple, the end-of-scope type is a union. Both
+the local and public types retain the fixed-length alternatives.
+
+```py
+def coinflip() -> bool:
+    return True
+
+class Branches:
+    if coinflip():
+        items = ()
+    else:
+        items = (1,)
+    reveal_type(items)  # revealed: tuple[()] | tuple[Literal[1]]
+
+reveal_type(Branches.items)  # revealed: tuple[()] | tuple[int]
+```
+
+A single assignment with an inferred union likewise keeps both tuple shapes.
+
+```py
+class OneAssignment:
+    items = () if coinflip() else (1,)
+
+reveal_type(OneAssignment.items)  # revealed: tuple[()] | tuple[int]
+```
+
+The empty tuple has a special meaning for `__slots__` and `__match_args__`, and an enum's tuple
+payload provides arguments for the member constructor. Those tuples keep their exact shape.
+
+```py
+from enum import Enum
+
+class SpecialNames:
+    __slots__ = ()
+    __match_args__ = ()
+
+class Member(Enum):
+    EMPTY = ()
+
+reveal_type(SpecialNames.__slots__)  # revealed: tuple[()]
+reveal_type(SpecialNames.__match_args__)  # revealed: tuple[()]
+reveal_type(Member.EMPTY.value)  # revealed: tuple[()]
+```
+
+## Empty tuple class attributes in stubs
+
+Stub files describe the public interface directly, so an empty tuple assigned in a stub keeps its
+exact type when accessed through either the class or an instance.
+
+`values.pyi`:
+
+```pyi
+class Stubbed:
+    empty = ()
+```
+
+```py
+from typing import assert_type
+from values import Stubbed
+
+reveal_type(Stubbed.empty)  # revealed: tuple[()]
+reveal_type(Stubbed().empty)  # revealed: tuple[()]
+assert_type(Stubbed.empty, tuple[()])
+```
+
+## Empty tuple implicit attributes
+
+The same heuristic applies to an attribute inferred only from an empty tuple assigned in an instance
+method or classmethod: its type has an unknown element type and an arbitrary length. An explicit
+annotation or a nonempty tuple retains its existing type.
+
+```py
+empty = ()
+
+class Attributes:
+    def __init__(self) -> None:
+        self.items = ()
+        self.from_name = empty
+        self.pair = (1, 2)
+        self.declared: tuple[()] = ()
+
+    @classmethod
+    def configure(cls) -> None:
+        cls.class_items = ()
+        cls.class_pair = (1, 2)
+        cls.class_declared: tuple[()] = ()
+
+reveal_type(Attributes().items)  # revealed: tuple[Unknown, ...]
+reveal_type(Attributes().from_name)  # revealed: tuple[Unknown, ...]
+reveal_type(Attributes().pair)  # revealed: tuple[int, int]
+reveal_type(Attributes().declared)  # revealed: tuple[()]
+reveal_type(Attributes.class_items)  # revealed: tuple[Unknown, ...]
+reveal_type(Attributes().class_items)  # revealed: tuple[Unknown, ...]
+reveal_type(Attributes.class_pair)  # revealed: tuple[int, int]
+reveal_type(Attributes.class_declared)  # revealed: tuple[()]
+```
+
+When different assignments infer both an empty and a nonempty tuple for an instance attribute, the
+result keeps both shapes.
+
+```py
+class Alternating:
+    def __init__(self, coinflip: bool) -> None:
+        if coinflip:
+            self.value = ()
+        else:
+            self.value = (1,)
+
+reveal_type(Alternating(True).value)  # revealed: tuple[()] | tuple[int]
+```
+
+Implicit class attributes keep fixed-length alternatives when different assignments infer both an
+empty and a nonempty tuple, just like implicit instance attributes.
+
+```py
+class AlternatingClass:
+    @classmethod
+    def configure(cls, coinflip: bool) -> None:
+        if coinflip:
+            cls.value = ()
+        else:
+            cls.value = (1,)
+
+reveal_type(AlternatingClass.value)  # revealed: tuple[()] | tuple[int]
+```
+
 ## Invariant and contravariant return types are promoted
 
 We promote in non-covariant position in the return type of a generic function, or constructor of a
