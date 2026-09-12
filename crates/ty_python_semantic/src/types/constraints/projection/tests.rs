@@ -38,7 +38,13 @@ fn exact<'db, 'c>(
     typevar: BoundTypeVarInstance<'db>,
     ty: Type<'db>,
 ) -> ConstraintSet<'db, 'c> {
-    ConstraintSet::constrain_typevar(db, &db.program_environment(), builder, typevar, ty, ty)
+    ConstraintSet::constrain_typevar_equivalence_bound(
+        db,
+        &db.program_environment(),
+        builder,
+        typevar,
+        ty,
+    )
 }
 
 fn binary_choice<'db, 'c>(

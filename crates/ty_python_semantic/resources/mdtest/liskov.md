@@ -106,6 +106,28 @@ class DataArrayCoordinates[T_DataArray: DataArray](Coordinates):
     def __getitem__(self, key: object) -> T_DataArray: ...
 ```
 
+## Specialized receiver types
+
+An overriding method must accept every receiver accepted by the inherited method. A method that is
+only available on one specialization of the subclass is incompatible with an inherited method that
+is available on every specialization.
+
+```pyi
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Element(Generic[T]): ...
+
+class Base(Generic[T]):
+    def method(self) -> "Derived[Any]": ...
+
+class Derived(Base[T], Generic[T]):
+    # error: [invalid-method-override]
+    def method(self: "Derived[Element[S]]") -> "Derived[S]": ...
+```
+
 ## Method parameters
 
 A subclass method may provide a different parameter list to the superclass method, but all
