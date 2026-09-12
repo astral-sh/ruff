@@ -190,7 +190,7 @@ impl RedundantConditionContext {
                 );
 
                 is_boolean_or_short_circuit
-                    && if condition.is_truthy {
+                    && if condition.truthiness.is_always_true() {
                         falsy_branch
                     } else {
                         truthy_branch

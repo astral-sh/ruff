@@ -18,7 +18,6 @@ use ruff_source_file::{LineRanges, UniversalNewlineIterator, find_newline};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::{SearchPath, file_to_module};
 use ty_python_core::{
-    Truthiness,
     ast_ids::HasScopedUseId,
     definition::DefinitionKind,
     place::PlaceExpr,
@@ -90,7 +89,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let RedundantCondition {
             expression: test,
             value_type: test_type,
-            is_truthy,
+            truthiness,
             kind,
         } = condition;
 
@@ -113,6 +112,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let describe_condition = |diagnostic: &mut LintDiagnosticGuard| {
             let source = source_text(db, self.file());
+            let is_truthy = if truthiness.is_always_true() {
+                "true"
+            } else {
+                "false"
+            };
             if source.contains_line_break(test.range()) {
                 diagnostic.set_concise_message(format_args!("Condition is always {is_truthy}"));
             } else {
@@ -172,12 +176,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Short-circuit evaluation can determine a condition's truthiness even when its
         // value type does not. In that case, describe the condition rather than the type.
-        let describe_as_condition =
-            test_type.is_subtype_of(db, env, KnownClass::Bool.to_instance(db, env))
-                || test_type.bool(db, env) != Truthiness::from(*is_truthy);
+        let describe_as_condition = !truthiness.is_ambiguous()
+            && (test_type.is_subtype_of(db, env, KnownClass::Bool.to_instance(db, env))
+                || test_type.bool(db, env) != *truthiness);
 
         let builder = self.context.report_lint(rule, test)?;
-        let diagnostic = if *is_truthy {
+        let diagnostic = if truthiness.is_always_true() {
             let add_always_truthy_concise_message = |diagnostic: &mut LintDiagnosticGuard| {
                 if should_quote_test_expression()
                     && let source = source_text(db, self.file())
@@ -530,7 +534,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 diagnostic
             }
-        } else {
+        } else if truthiness.is_always_false() {
             let add_always_falsy_concise_message = |diagnostic: &mut LintDiagnosticGuard| {
                 if should_quote_test_expression()
                     && let source = source_text(db, self.file())
@@ -601,6 +605,92 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 diagnostic
             }
+        } else {
+            let mut diagnostic = builder.into_diagnostic("Suspicious boolean condition");
+            let source = source_text(db, self.file());
+
+            if let Some(callables) = test_type.try_upcast_to_callable(db, env) {
+                if source.contains_line_break(test.range()) {
+                    diagnostic.set_concise_message(format_args!(
+                        "Object of type `{}` might always be truthy (did you mean to call it?)",
+                        test_type.display(db, env)
+                    ));
+                } else if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+                    diagnostic.set_concise_message(format_args!(
+                        "Callable `{}` might always be truthy \
+                        (has type `{}` -- did you mean to call it?)",
+                        &source[test.range()],
+                        test_type.display(db, env)
+                    ));
+                } else {
+                    diagnostic.set_concise_message(format_args!(
+                        "Expression `{}` of type `{}` might always be truthy \
+                        (did you mean to call it?)",
+                        &source[test.range()],
+                        test_type.display(db, env)
+                    ));
+                }
+                diagnostic.set_primary_annotation_message(format_args!(
+                    "Has type `{}`",
+                    test_type.display(db, env)
+                ));
+                diagnostic.info(
+                    "Callable objects are usually functions, and functions are always truthy",
+                );
+                diagnostic.help("Did you mean to call this callable?");
+                if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+                    let (call, applicability) = if callables
+                        .iter()
+                        .all(|callable| callable.signatures(db).has_parameters())
+                    {
+                        ("(...)", Applicability::DisplayOnly)
+                    } else {
+                        ("()", Applicability::Unsafe)
+                    };
+                    diagnostic.help(format_args!(
+                        "Replace with `{}{call}`",
+                        &source[test.range()]
+                    ));
+                    let call_edit = Edit::insertion(call.to_string(), test.end());
+                    diagnostic.set_fix(Fix::applicable_edit(call_edit, applicability));
+                }
+            } else {
+                if source.contains_line_break(test.range()) {
+                    diagnostic.set_concise_message(format_args!(
+                        "Object might be truthy even if its length is 0 (has type `{}`)",
+                        test_type.display(db, env)
+                    ));
+                } else {
+                    let kind = if test.is_name_expr() {
+                        "Variable"
+                    } else {
+                        "Expression"
+                    };
+                    diagnostic.set_concise_message(format_args!(
+                        "{kind} `{}` might be truthy even if its length is 0 (has type `{}`)",
+                        &source[test.range()],
+                        test_type.display(db, env)
+                    ));
+                }
+                diagnostic.set_primary_annotation_message(format_args!(
+                    "Has type `{}`",
+                    test_type.display(db, env)
+                ));
+                diagnostic.info(
+                    "Iterable objects can be generators, \
+                    and generators are truthy even when empty",
+                );
+                diagnostic.help("Test the length of the iterable instead of its truthiness");
+                if SemanticModel::new(db, self.program_file())
+                    .definitely_has_builtin_binding("len", ast::AnyNodeRef::from(*test))
+                {
+                    diagnostic.set_fix(Fix::display_only_edits(
+                        Edit::insertion("len(".to_string(), test.start()),
+                        [Edit::insertion(")".to_string(), test.end())],
+                    ));
+                }
+            }
+            diagnostic
         };
 
         Some(diagnostic)
@@ -869,11 +959,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let RedundantCondition {
             expression: test,
             value_type: _,
-            is_truthy,
+            truthiness,
             kind,
         } = condition;
 
-        if *is_truthy
+        if truthiness.is_always_true()
             && *kind == ConditionKind::Boolean
             && let Some(clause) = if_stmt.elif_else_clauses.last()
             && clause.test.as_ref() == Some(test)

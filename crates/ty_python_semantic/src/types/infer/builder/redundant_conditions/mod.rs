@@ -62,8 +62,12 @@ use crate::{
     reachability::{analyze_condition_expression, is_non_terminal_call},
     types::{
         KnownClass, KnownInstanceType, Type,
-        diagnostic::{REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT},
+        constraints::ConstraintSetBuilder,
+        diagnostic::{
+            POSSIBLY_REDUNDANT_CONDITION, REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT,
+        },
         infer::TypeInferenceBuilder,
+        typevar::TypeVarSet,
     },
 };
 
@@ -127,6 +131,11 @@ enum ConditionKind {
     ///     print("ready")
     /// ```
     Value,
+
+    /// A value that does not have a known truthiness,
+    /// but is nonetheless suspicious in a boolean context because it is a subtype
+    /// of either `Iterable[object]` or `Top[Callable[..., object]]`.
+    IterableOrCallable,
 }
 
 impl ConditionKind {
@@ -134,6 +143,7 @@ impl ConditionKind {
     const fn rule(self) -> &'static LintMetadata {
         match self {
             Self::Value => &REDUNDANT_CONDITION,
+            Self::IterableOrCallable => &POSSIBLY_REDUNDANT_CONDITION,
             Self::Boolean | Self::ShortCircuit | Self::ContainsWalrus => {
                 &REDUNDANT_CONDITION_STRICT
             }
@@ -197,7 +207,7 @@ struct BooleanTest<'ast, 'db> {
 struct RedundantCondition<'ast, 'db> {
     expression: &'ast ast::Expr,
     value_type: Type<'db>,
-    is_truthy: bool,
+    truthiness: Truthiness,
     kind: ConditionKind,
 }
 
@@ -268,7 +278,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && self.db().should_check_file(self.file())
             && !self.file().is_stub(self.db())
             && (self.context.is_lint_enabled(&REDUNDANT_CONDITION)
-                || self.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT))
+                || self.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT)
+                || self.context.is_lint_enabled(&POSSIBLY_REDUNDANT_CONDITION))
     }
 
     /// Check a condition, for which types have already been inferred, to see if it is redundant.
@@ -535,9 +546,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             truthiness,
             ..
         } = test;
-        if truthiness.is_ambiguous() {
-            return None;
-        }
 
         if matches!(
             expression,
@@ -555,8 +563,51 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let db = self.db();
         let env = self.program_environment();
+        let mut is_iterable_or_callable = false;
 
-        let kind = if value_type.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
+        if truthiness.is_ambiguous() {
+            if value_type.is_equivalent_to(db, env, Type::Never) {
+                return None;
+            }
+
+            if value_type.is_callable_type()
+                || value_type
+                    .as_union()
+                    .is_some_and(|union| union.elements(db).iter().all(Type::is_callable_type))
+            {
+                is_iterable_or_callable = true;
+            } else {
+                let builder = ConstraintSetBuilder::new();
+
+                let check = |source: Type<'db>, target: Type<'db>| {
+                    source.when_subtype_of(db, env, target, &builder, TypeVarSet::None)
+                };
+
+                let generator = KnownClass::Generator
+                    .to_instance(db, env)
+                    .bottom_materialization(db, env);
+
+                if check(generator, value_type)
+                    .and(db, &builder, || {
+                        let iterable = KnownClass::Iterable.to_specialized_instance(
+                            db,
+                            env,
+                            &[Type::object()],
+                        );
+                        check(value_type, iterable)
+                    })
+                    .is_always_satisfied(db, env)
+                {
+                    is_iterable_or_callable = true;
+                } else {
+                    return None;
+                }
+            }
+        }
+
+        let kind = if is_iterable_or_callable {
+            ConditionKind::IterableOrCallable
+        } else if value_type.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
             ConditionKind::Boolean
         } else if value_type.bool(db, env).is_ambiguous() {
             ConditionKind::ShortCircuit
@@ -570,7 +621,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         Some(RedundantCondition {
             expression,
             value_type,
-            is_truthy: truthiness.is_always_true(),
+            truthiness,
             kind,
         })
     }
