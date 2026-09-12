@@ -10,6 +10,10 @@ request already addresses the issue, do not submit a competing one without maint
 
 ## Code Review Rules
 
+For security reviews of Ruff and ty runtime changes, use the
+[threat models](agents/references/threat-models.md) to assess trust boundaries and
+calibrate severity.
+
 When reviewing a branch or pull request, be deliberately nitpicky. Report not
 only bugs and regressions, but also architectural and maintenance risks, weak
 test coverage, unclear code, unnecessary complexity, and meaningful style or
