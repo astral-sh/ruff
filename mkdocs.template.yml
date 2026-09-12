@@ -84,6 +84,7 @@ plugins:
           - tutorial.md
         Configuration:
           - configuration.md
+          - migrating-to-categories.md
         Linter:
           - linter.md
         Formatter:

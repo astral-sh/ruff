@@ -207,6 +207,8 @@ default. For certain projects, you may want to enable either `security` or `form
 categories, but `pedantic` and `restriction` contain a wider variety of opinionated lints, and you
 will typically only want to select individual rules from these categories directly.
 
+See [Migrating to Categories](migrating-to-categories.md) for a migration guide.
+
 ### Interaction with other selectors
 
 Categories can be freely mixed with linter groups, linter prefixes, rule codes, and rule names. In
