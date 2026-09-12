@@ -654,15 +654,14 @@ info: This violates the Liskov Substitution Principle
 
 ## `ClassVar` and instance variables
 
-A pure class variable cannot override an inherited instance variable, and an instance variable
-cannot override an inherited pure class variable.
+A pure class variable cannot replace an attribute that permits writes through instances. A regular
+attribute supports both class and instance access, so it can override a pure class variable.
 
 ### Direct overrides
 
-An annotation without `ClassVar` declares an instance variable, even if the declaration also has a
-class-level default value. An explicit `ClassVar` declaration is a pure class variable. Overriding
-one with the other changes the places where the attribute is valid, so it violates Liskov
-substitution:
+A class-body annotation without `ClassVar` declares a regular attribute. An explicit `ClassVar`
+declaration restricts writes to the class object. Replacing a regular attribute with a `ClassVar`
+therefore removes an operation available on the base class:
 
 ```py
 from typing import ClassVar
@@ -679,7 +678,6 @@ class Subclass(Base):
     # error: [invalid-attribute-override] "class variable cannot override instance variable `Base.instance_attr_with_default`"
     instance_attr_with_default: ClassVar[int] = 1
 
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `Base.class_attr`"
     class_attr: int
 
 class ValidSubclass(Base):
@@ -690,9 +688,9 @@ class ValidSubclass(Base):
 
 ### Regular class-body assignments
 
-An unannotated class-body assignment is an instance variable with a class-level default. This means
-it can replace another inherited instance-variable default. If it overrides an inherited `ClassVar`,
-it inherits that declaration and remains a class variable. However, an explicit `ClassVar` cannot
+An unannotated class-body assignment provides a regular attribute with a class-level default. It can
+replace another inherited instance-variable default. If it overrides an inherited `ClassVar`, it
+inherits that declaration and remains a class variable. However, an explicit `ClassVar` cannot
 override an inherited unannotated class-body assignment, because code using the base class can still
 write that attribute through an instance:
 
@@ -775,9 +773,8 @@ class PropertySubclass(PropertyBase):
 
 ### Repeated inherited conflicts
 
-If a parent class already made an invalid change from class variable to instance variable, a child
-that keeps the parent's kind should not receive a duplicate diagnostic. The same applies in the
-other direction:
+A regular attribute can replace a class variable. If a parent makes the opposite, invalid change, a
+child that keeps the parent's kind does not receive a duplicate diagnostic:
 
 ```py
 from typing import ClassVar
@@ -786,7 +783,6 @@ class GrandparentClassVar:
     attr: ClassVar[int]
 
 class ParentInstance(GrandparentClassVar):
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `GrandparentClassVar.attr`"
     attr: int
 
 class ChildInstance(ParentInstance):
@@ -832,9 +828,8 @@ class DescriptorAnnotationOverride(DescriptorAnnotationBase):
 
 ### Multiple inheritance
 
-The subclass must satisfy every base class. It is not enough for the first base in the MRO to agree
-with the subclass: an unrelated base that declares the same member as a pure class variable still
-makes an instance-variable override invalid.
+A regular attribute can satisfy both a class-variable contract and an instance-variable contract
+inherited through different bases.
 
 ```py
 from typing import ClassVar
@@ -846,7 +841,6 @@ class InstanceBase:
     attr: int
 
 class MultipleInheritanceSubclass(InstanceBase, ClassVarBase):
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `ClassVarBase.attr`"
     attr: int
 ```
 
@@ -3133,4 +3127,137 @@ class String:
     value: str
 
 class Conflict(String, Gradual): ...  # error: [invalid-attribute-override]
+```
+
+## Receiver declarations cannot replace class variables
+
+Receiver declarations describe instance storage. They cannot replace an inherited attribute that
+supports writes on the class object itself.
+
+```py
+from typing import ClassVar
+
+class Base:
+    value: ClassVar[int]
+
+class Child(Base):
+    def __init__(self) -> None:
+        self.value: int = 1  # error: [invalid-attribute-override]
+```
+
+## Regular attributes overriding class variables
+
+Adding instance writes is compatible with a class variable, provided that the inherited type is
+preserved. Narrowing an explicit annotation still requires the mutable-override rule.
+
+```py
+from typing import ClassVar
+
+class Base:
+    value: ClassVar[int]
+
+class Regular(Base):
+    value: int
+
+class Default(Base):
+    value: int = 1
+
+class Incompatible(Base):
+    value: str  # error: [invalid-attribute-override]
+
+class Narrow(Base):
+    value: bool  # error: [invalid-mutable-override]
+```
+
+## Inherited storage conflicts
+
+A class variable selected by the MRO cannot satisfy a base contract that permits instance writes.
+The reverse order preserves both operations.
+
+```py
+from typing import ClassVar
+
+class ClassOnly:
+    value: ClassVar[int]
+
+class Regular:
+    value: int
+
+class Invalid(ClassOnly, Regular): ...  # error: [invalid-attribute-override]
+class Valid(Regular, ClassOnly): ...
+```
+
+## Initialized declarations preserve their annotated types
+
+An explicit annotation on a class-level default declares the same interface as an annotation without
+a default.
+
+```py
+class Base:
+    value: int = 0
+
+class Incompatible(Base):
+    value: str = ""  # error: [invalid-attribute-override]
+
+class Narrow(Base):
+    value: bool = True  # error: [invalid-mutable-override]
+
+class Same(Base):
+    value: int = 1
+```
+
+## Unannotated initializers
+
+TODO: Ordinary unannotated class-body assignments are not checked for attribute type overrides. They
+keep their ordinary inferred types; an inherited annotation does not supply initializer context or
+preserve a wider write type. Attribute assignments and protocol checks still use the inferred types.
+
+```py
+from typing import Protocol
+
+class Base:
+    value: int | str
+
+class Child(Base):
+    value = ""
+
+class Grandchild(Child):
+    value = 1
+
+class HasValue(Protocol):
+    value: int | str
+
+def check(child: Child) -> None:
+    child.value = 1  # error: [invalid-assignment]
+    value: HasValue = child  # error: [invalid-assignment]
+```
+
+An explicit annotation supplies initializer context and preserves the declared type for subsequent
+writes and protocol matching.
+
+```py
+class Annotated(Base):
+    value: int | str = ""
+
+def check_annotated(obj: Annotated) -> None:
+    obj.value = 1
+    value: HasValue = obj
+```
+
+## Dataclass attributes outside generated fields
+
+An unannotated class-body assignment in a dataclass can initialize an inherited class variable. It
+does not create a field in the generated initializer.
+
+```py
+from dataclasses import dataclass
+from typing import ClassVar
+
+@dataclass
+class Base:
+    value: ClassVar[int]
+
+@dataclass
+class Child(Base):
+    value = 1
 ```

@@ -18,6 +18,7 @@ use crate::{
         diagnostic::{
             INVALID_ATTRIBUTE_OVERRIDE, INVALID_MUTABLE_OVERRIDE, INVALID_PROPERTY_TYPE_OVERRIDE,
         },
+        enums::is_enum_class_by_inheritance,
         list_members::{MemberWithDefinition, all_end_of_scope_members},
     },
 };
@@ -31,6 +32,7 @@ struct AttributeContract<'db> {
     write: Option<Type<'db>>,
     is_property: bool,
     qualifiers: TypeQualifiers,
+    kind: super::VariableKind,
 }
 
 /// Resolve an owner's declaration as seen through the receiver being checked.
@@ -56,12 +58,17 @@ fn attribute_contract<'db>(
     receiver: Type<'db>,
     name: &str,
 ) -> Option<AttributeContract<'db>> {
-    // `object.__class__` is specialized by member lookup, including for protocols
-    // that describe exact runtime classes. Its synthetic `Self` is not an override contract.
-    if owner.is_object(db) && name == "__class__" {
+    // Intrinsic object metadata depends on the receiver's class and instance layout.
+    // In particular, slotted classes do not promise object dictionary or weakref storage.
+    if owner.is_object(db) && matches!(name, "__class__" | "__dict__" | "__weakref__" | "__doc__") {
         return None;
     }
     let (literal, _) = owner.static_class_literal(db)?;
+    // Slots describe this class's contribution to instance layout. Enum value annotations
+    // describe member construction, which has its own validation.
+    if name == "__slots__" || name == "_value_" && is_enum_class_by_inheritance(db, env, literal) {
+        return None;
+    }
     // NamedTuple fields have a dedicated override rule, including synthesized properties.
     if CodeGeneratorKind::NamedTuple.matches(db, literal.into())
         && literal
@@ -116,7 +123,9 @@ fn attribute_contract<'db>(
         let write = descriptor_write_domain(db, env, own_place.ty, receiver, read);
         (read, write)
     } else {
-        let place = if (is_class_var || is_final) && !class_member.place.is_undefined() {
+        let place = if (is_class_var || is_final || instance_member.place.is_undefined())
+            && !class_member.place.is_undefined()
+        {
             class_member.place
         } else {
             instance_member.place
@@ -142,6 +151,8 @@ fn attribute_contract<'db>(
         },
         is_property,
         qualifiers,
+        kind: super::variable_kind(db, env, owner, name, class_member, instance_member)
+            .unwrap_or(super::VariableKind::Instance),
     })
 }
 
@@ -191,6 +202,10 @@ enum AttributeViolation<'db> {
         target: Type<'db>,
     },
     ReadOnly,
+    Storage {
+        source: super::VariableKind,
+        target: super::VariableKind,
+    },
 }
 
 /// Find the first read or write that the overriding contract fails to preserve.
@@ -208,11 +223,28 @@ fn attribute_violation<'db>(
     source: &AttributeContract<'db>,
     target: &AttributeContract<'db>,
 ) -> Option<AttributeViolation<'db>> {
-    if target.qualifiers.contains(TypeQualifiers::FINAL)
-        || source.qualifiers.contains(TypeQualifiers::CLASS_VAR)
-            != target.qualifiers.contains(TypeQualifiers::CLASS_VAR)
-    {
+    if target.qualifiers.contains(TypeQualifiers::FINAL) {
         return None;
+    }
+    // Protocol implementations must preserve explicit ClassVar declarations, just as
+    // structural protocol checks require. Use the same classification so an unannotated
+    // initializer can still inherit its ClassVar qualifier.
+    let incompatible_protocol_class_var = target_receiver.is_protocol_instance()
+        && target.kind == super::VariableKind::Class
+        && receiver.nominal_class(db, env).is_some_and(|class| {
+            matches!(
+                super::effective_superclass_variable_kind(db, class, Name::new(name)),
+                Some(super::VariableKind::Instance | super::VariableKind::Regular)
+            )
+        });
+    if incompatible_protocol_class_var
+        || !source.kind.can_override(target.kind)
+            && (target.kind == super::VariableKind::Class || target.write.is_some())
+    {
+        return Some(AttributeViolation::Storage {
+            source: source.kind,
+            target: target.kind,
+        });
     }
     if !source.read.is_assignable_to(db, env, target.read) {
         return Some(AttributeViolation::Read {
@@ -231,23 +263,20 @@ fn attribute_violation<'db>(
     } else {
         target_receiver
     };
-    if !source
+    let accepts_write = source
         .write
         .is_some_and(|source_write| write.is_assignable_to(db, env, source_write))
-        || !receiver.is_attribute_writable_with(db, env, name, write)
-    {
-        // Do not require a write that the superclass itself cannot perform, for example
-        // when a descriptor or custom `__setattr__` rejects the declared value type.
-        if !target_receiver.is_attribute_writable_with(db, env, name, write) {
-            return None;
-        }
-        return Some(if source.write.is_none() {
-            AttributeViolation::ReadOnly
-        } else {
-            AttributeViolation::Write { target: write }
-        });
+        && receiver.is_attribute_writable_with(db, env, name, write);
+    // Do not require a write that the superclass itself cannot perform, for example
+    // when a descriptor or custom `__setattr__` rejects the declared value type.
+    if accepts_write || !target_receiver.is_attribute_writable_with(db, env, name, write) {
+        return None;
     }
-    None
+    Some(if source.write.is_none() {
+        AttributeViolation::ReadOnly
+    } else {
+        AttributeViolation::Write { target: write }
+    })
 }
 
 /// Report an incompatible explicit override, if its diagnostic rule is enabled.
@@ -287,7 +316,9 @@ pub(super) fn check_override<'db>(
         return false;
     }
 
-    let rule = if source.is_property || target.is_property {
+    let rule = if matches!(violation, AttributeViolation::Storage { .. }) {
+        &INVALID_ATTRIBUTE_OVERRIDE
+    } else if source.is_property || target.is_property {
         &INVALID_PROPERTY_TYPE_OVERRIDE
     } else if matches!(violation, AttributeViolation::Write { .. }) {
         &INVALID_MUTABLE_OVERRIDE
@@ -316,6 +347,13 @@ pub(super) fn check_override<'db>(
         }
         AttributeViolation::ReadOnly => diagnostic
             .set_primary_annotation_message("Read-only attribute overrides a writable attribute"),
+        AttributeViolation::Storage { source, target } => diagnostic
+            .set_primary_annotation_message(format_args!(
+                "{} cannot override {} `{}.{name}`",
+                source.description(),
+                target.description(),
+                superclass.name(db),
+            )),
     }
     if let Some(base_definition) = superclass_definition
         && base_definition.file(db) == context.file()
@@ -540,7 +578,9 @@ pub(super) fn check_inherited_conflicts<'db>(
                 if already_inherited(db, env, class_type, target_owner, &name, &source) {
                     continue;
                 }
-                let rule = if source.is_property || target.is_property {
+                let rule = if matches!(violation, AttributeViolation::Storage { .. }) {
+                    &INVALID_ATTRIBUTE_OVERRIDE
+                } else if source.is_property || target.is_property {
                     &INVALID_PROPERTY_TYPE_OVERRIDE
                 } else if matches!(violation, AttributeViolation::Write { .. }) {
                     &INVALID_MUTABLE_OVERRIDE
@@ -569,6 +609,13 @@ pub(super) fn check_inherited_conflicts<'db>(
                     )),
                     AttributeViolation::ReadOnly => diagnostic
                         .info("Inherited read-only attribute replaces a writable attribute"),
+                    AttributeViolation::Storage { source, target } => {
+                        diagnostic.info(format_args!(
+                            "{} cannot replace {}",
+                            source.description(),
+                            target.description(),
+                        ));
+                    }
                 }
                 for owner in [owner, target_owner] {
                     let Some((literal, _)) = owner.static_class_literal(db) else {

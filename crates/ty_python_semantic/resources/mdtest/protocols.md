@@ -2248,6 +2248,44 @@ as something that must be supported by type checkers:
 > To distinguish between protocol class variables and protocol instance variables, the special
 > `ClassVar` annotation should be used.
 
+## Explicit `ClassVar` protocol implementations
+
+A protocol's `ClassVar` requirement applies to explicit subclasses as well as structural
+implementations. A regular attribute can override a class variable in a nominal base, but it does
+not satisfy the protocol's qualifier requirement. An unannotated initializer inherits the qualifier.
+
+```py
+from typing import ClassVar, Protocol
+
+class HasValue(Protocol):
+    value: ClassVar[int]
+
+class NominalBase:
+    value: ClassVar[int]
+
+class ImplicitRegular(NominalBase):
+    value: int = 1
+
+class ExplicitRegular(HasValue):
+    value: int = 1  # error: [invalid-attribute-override]
+
+class ExplicitClassVar(HasValue):
+    value: ClassVar[int] = 1
+
+class Initialized(HasValue):
+    value = 1
+
+class Descendant(ExplicitClassVar):
+    value: int = 1  # error: [invalid-attribute-override]
+
+class Combined(ImplicitRegular, HasValue): ...  # error: [invalid-attribute-override]
+
+def check(regular: ImplicitRegular, declared: ExplicitClassVar, initialized: Initialized) -> None:
+    value: HasValue = regular  # error: [invalid-assignment]
+    value = declared
+    value = initialized
+```
+
 ## Declared instance attribute members
 
 Declared protocol instance attributes should be available both on protocol-typed values and through
@@ -6124,11 +6162,11 @@ class X(Protocol):
     x: int
 
 class YProto(X, Protocol):
-    x: None = None  # TODO: we should emit an error here due to the Liskov violation
+    x: None = None  # error: [invalid-attribute-override]
 
 @final
 class YNominal(X):
-    x: None = None  # TODO: we should emit an error here due to the Liskov violation
+    x: None = None  # error: [invalid-attribute-override]
 
 static_assert(is_subtype_of(YProto, X))
 static_assert(is_subtype_of(YNominal, X))

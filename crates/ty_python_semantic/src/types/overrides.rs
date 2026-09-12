@@ -850,34 +850,21 @@ fn check_class_declaration<'db>(
                         variable_kind(
                             db,
                             env,
+                            class,
+                            &member.name,
                             class.own_class_member(db, env, None, &member.name).inner,
                             subclass_instance_member,
                         )
                     });
 
                     if let Some(subclass_kind) = subclass_kind
-                        && subclass_kind != superclass_variable_kind
+                        && !subclass_kind.can_override(superclass_variable_kind)
                     {
-                        // An unannotated class-body assignment can inherit an overridden `ClassVar`
-                        // declaration instead of introducing a conflicting instance variable. This
-                        // also applies to augmented assignments after the initial class-body
-                        // assignment, e.g. `epilog = "..."; epilog += "..."`.
-                        if subclass_kind == VariableKind::Instance
-                            && superclass_variable_kind == VariableKind::Class
-                            && matches!(
-                                first_reachable_definition.kind(db),
-                                DefinitionKind::Assignment(_)
-                                    | DefinitionKind::AugmentedAssignment(_)
-                            )
-                        {
-                            continue;
-                        }
-
                         if let Some((immediate_parent, immediate_parent_kind)) =
                             immediate_parent_variable_kind
                             && immediate_parent != superclass
                             && immediate_parent.is_subclass_of(db, env, superclass)
-                            && immediate_parent_kind != superclass_variable_kind
+                            && !immediate_parent_kind.can_override(superclass_variable_kind)
                         {
                             continue;
                         }
@@ -1194,16 +1181,30 @@ fn method_override_types<'db>(
 pub(super) enum VariableKind {
     /// A variable annotated with `ClassVar`.
     Class,
-    /// An instance variable, including an unannotated class-body assignment.
+    /// A regular attribute available through both classes and instances.
+    Regular,
+    /// An attribute declared only on instances, including dataclass fields.
     Instance,
 }
 
 impl VariableKind {
+    /// Whether replacing `base` preserves its class and instance storage operations.
+    ///
+    /// Regular attributes can replace either kind. Instance-only attributes can also
+    /// replace regular attributes; nominal overrides deliberately permit that loss of
+    /// class access, including when an attribute is replaced by a descriptor.
+    const fn can_override(self, base: Self) -> bool {
+        !matches!(
+            (self, base),
+            (Self::Class, Self::Instance | Self::Regular) | (Self::Instance, Self::Class)
+        )
+    }
+
     /// Returns the wording used for this variable kind in diagnostics.
     const fn description(self) -> &'static str {
         match self {
             VariableKind::Class => "class variable",
-            VariableKind::Instance => "instance variable",
+            VariableKind::Instance | VariableKind::Regular => "instance variable",
         }
     }
 }
@@ -1211,6 +1212,8 @@ impl VariableKind {
 /// Returns the variable kind for a superclass member.
 fn superclass_variable_kind<'db>(
     db: &'db dyn Db,
+    superclass: ClassType<'db>,
+    name: &str,
     superclass_scope: ScopeId<'db>,
     superclass_symbol_id: Option<ScopedSymbolId>,
     class_member: PlaceAndQualifiers<'db>,
@@ -1233,7 +1236,7 @@ fn superclass_variable_kind<'db>(
     }
 
     let env = ProgramEnvironment::from_scope(superclass_scope);
-    variable_kind(db, &env, class_member, instance_member)
+    variable_kind(db, &env, superclass, name, class_member, instance_member)
 }
 
 /// Returns the variable kind for a superclass member, preserving inherited `ClassVar` declarations
@@ -1284,16 +1287,22 @@ pub(super) fn effective_superclass_variable_kind<'db>(
             .is_some()
     };
 
-    if has_own_member {
+    if has_own_member
+        || !superclass
+            .own_instance_member(db, env, &name)
+            .is_undefined()
+    {
         let superclass_variable_kind = superclass_variable_kind(
             db,
+            superclass,
+            &name,
             superclass_scope,
             superclass_symbol_id,
             superclass.own_class_member(db, env, None, &name).inner,
             superclass.own_instance_member(db, env, &name).inner,
         );
 
-        if superclass_variable_kind == Some(VariableKind::Instance)
+        if superclass_variable_kind == Some(VariableKind::Regular)
             && superclass_symbol_id.is_some_and(|id| {
                 symbol_definition(db, superclass_scope, id).is_some_and(|definition| {
                     matches!(
@@ -1354,6 +1363,8 @@ fn is_function_definition<'db>(
 fn variable_kind<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
+    owner: ClassType<'db>,
+    name: &str,
     class_member: PlaceAndQualifiers<'db>,
     instance_member: PlaceAndQualifiers<'db>,
 ) -> Option<VariableKind> {
@@ -1409,7 +1420,25 @@ fn variable_kind<'db>(
         return None;
     }
 
-    Some(VariableKind::Instance)
+    Some(
+        if class_member.place.is_undefined()
+            || matches!(
+                class_member.place.ignore_possibly_undefined(),
+                Some(Type::SlotDescriptor(_))
+            )
+            || owner
+                .static_class_literal(db)
+                .is_some_and(|(literal, _)| literal.is_own_dataclass_instance_field(db, name))
+            || class_member
+                .place
+                .ignore_possibly_undefined()
+                .is_some_and(|ty| ty.as_property_instance().is_some())
+        {
+            VariableKind::Instance
+        } else {
+            VariableKind::Regular
+        },
+    )
 }
 
 /// Returns the definition to use as the secondary annotation for an overridden symbol.
