@@ -40,12 +40,6 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// Additionally, the fix is marked as unsafe if the expression contains comments,
 /// as the replacement may remove comments attached to the original `setattr` call.
 ///
-/// The fix does not account for static type-checker constraints. A type checker
-/// may reject the resulting assignment when the target is typed as a method or
-/// otherwise does not allow assignment, even if it accepts the original
-/// `setattr` call. Review this fix against the type-checking configuration used
-/// by the project.
-///
 /// For example, the long s character `"ſ"` normalizes to `"s"` under NFKC, so:
 /// ```python
 /// # This creates an attribute with the exact name "ſ"
@@ -55,6 +49,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// # But this would normalize to "s" and set a different attribute
 /// obj.ſ = 1  # This is interpreted as obj.s = 1, not obj.ſ = 1
 /// ```
+///
+/// ## Known issues
+/// In some cases, a type checker may be able to analyze an assignment more
+/// thoroughly than a `setattr` call. Applying the fix in such cases may result
+/// in new type checking diagnostics, even if the runtime behavior of the code
+/// is unchanged.
 ///
 /// ## References
 /// - [Python documentation: `setattr`](https://docs.python.org/3/library/functions.html#setattr)
