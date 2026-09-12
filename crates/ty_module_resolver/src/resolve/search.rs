@@ -4,13 +4,14 @@ use std::cell::OnceCell;
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
+use camino::{Utf8Path, Utf8PathBuf};
 use ruff_db::files::{directory_listing, system_path_to_directory};
 use ruff_db::system::{FileType, SystemPath};
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
-use crate::path::SearchPath;
+use crate::path::{ModuleDirectory, SearchPath};
 
 use super::{
     ComponentFileFilter, ModuleNameIngredient, ModuleResolutionCandidate, NameResolver,
@@ -230,7 +231,7 @@ impl<'resolver, 'db> ModuleSearch<'resolver, 'db> {
                 context.db.unwind_if_revision_cancelled();
                 add_child_name(names, name, file_type, location);
             }
-        } else if let Some(path) = candidate.directory.path().to_vendored_path() {
+        } else if let Some(path) = candidate.directory.to_vendored_path() {
             for entry in context.db.vendored().read_directory(&path) {
                 let Some(name) = entry.path().file_name() else {
                     continue;
@@ -250,14 +251,14 @@ impl<'resolver, 'db> ModuleSearch<'resolver, 'db> {
     /// can shadow other locations.
     fn candidate_is_eligible(&self, candidate: &ModuleResolutionCandidate) -> bool {
         let db = self.resolver.context.db;
-        let Some(root) = candidate.directory.path().search_path().as_system_path() else {
+        let Some(root) = candidate.directory.search_path().as_system_path() else {
             return true;
         };
         let path = match candidate.module {
             ResolvedModule::Module(file) => {
                 file.path(db).as_system_path().map(SystemPath::to_path_buf)
             }
-            _ => candidate.directory.path().to_system_path(),
+            _ => candidate.directory.to_system_path(),
         };
         let Some(path) = path else { return false };
         // Exempt the known package's ancestry only for locations beneath its directory.
@@ -385,16 +386,13 @@ impl<'resolver, 'db> ModuleSearch<'resolver, 'db> {
             context.mode,
             context.resolver_environment,
         );
+        let relative_path: Utf8PathBuf = name.components().collect();
         roots_containing_top_level_directory(context.db, top_level)
             .iter()
             .any(|root| {
-                let mut path = root.to_module_path();
-                for component in name.components() {
-                    path.push(component);
-                }
                 // Reuse the containing directory's listing instead of creating an input
                 // and probing a missing path for every leaf. Overlays may supply this directory.
-                path.is_directory(context)
+                ModuleDirectory::exists_at(context, root, &relative_path)
             })
     }
 }
@@ -465,14 +463,12 @@ fn root_contains_top_level_directory(
     root: &SearchPath,
     component: &str,
 ) -> bool {
-    let mut path = root.to_module_path();
-    path.push(component);
     // Track the directory's status, not its containing root's listing: unrelated root
     // entries must not invalidate this result. Vendored paths retain Python-version checks.
-    if let Some(path) = path.to_system_path() {
-        system_path_to_directory(context.db, path).is_ok()
+    if let Some(path) = root.as_system_path() {
+        system_path_to_directory(context.db, path.join(component)).is_ok()
     } else {
-        path.is_directory(context)
+        ModuleDirectory::exists_at(context, root, Utf8Path::new(component))
     }
 }
 
