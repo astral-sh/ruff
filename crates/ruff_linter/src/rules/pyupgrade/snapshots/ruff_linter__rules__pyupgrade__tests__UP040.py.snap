@@ -245,6 +245,7 @@ help: Use the `type` keyword
 67 + type PositiveList[T] = list[Annotated[T, Gt(0)]]
 68 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
   --> UP040.py:73:1
@@ -267,6 +268,7 @@ help: Use the `type` keyword
 73 + type PositiveList[T: SupportGt] = list[Annotated[T, Gt(0)]]
 74 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `Tuple3` uses `TypeAliasType` assignment instead of the `type` keyword
   --> UP040.py:81:1
@@ -285,6 +287,7 @@ help: Use the `type` keyword
 81 + type Tuple3[T1: SupportGt, T2, T3] = tuple[T1, T2, T3]
 82 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `PositiveInt` uses `TypeAliasType` assignment instead of the `type` keyword
   --> UP040.py:84:1
@@ -301,6 +304,7 @@ help: Use the `type` keyword
 84 + type PositiveInt = Annotated[int, Gt(0)]
 85 | PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)], type_params=())
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `PositiveInt` uses `TypeAliasType` assignment instead of the `type` keyword
   --> UP040.py:85:1
@@ -319,11 +323,12 @@ help: Use the `type` keyword
 85 + type PositiveInt = Annotated[int, Gt(0)]
 86 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
    --> UP040.py:99:1
     |
- 97 |   # unsafe fix if comments within the fix
+ 97 |   # Comments outside the alias value are removed by the fix.
  98 |   T = TypeVar("T")
  99 | / PositiveList = TypeAliasType(  # eaten comment
 100 | |     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
@@ -360,6 +365,7 @@ help: Use the `type` keyword
 104 + type PositiveList[T] = list[Annotated[T, Gt(0)]] # this comment should be okay
 105 |
     |
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
    --> UP040.py:111:1
@@ -387,6 +393,7 @@ help: Use the `type` keyword
 113 +     ]
 114 |
     |
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keyword
    --> UP040.py:117:1
