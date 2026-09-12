@@ -1174,13 +1174,10 @@ impl<'db> StaticClassLiteral<'db> {
         self.try_metaclass(db)
             .map(|(metaclass, _)| metaclass)
             .unwrap_or_else(|error| match error.kind {
-                MetaclassErrorKind::Conflict { candidate, .. } => {
-                    // Keep the candidate for member lookup; `try_metaclass` still reports the
-                    // conflict during class validation. Falling back to `Unknown` here can change
-                    // attribute inference and make the conflict disappear on the next cycle
-                    // iteration, causing metaclass inference to oscillate.
-                    ClassMetaclass::Selected(candidate.metaclass.into())
-                }
+                MetaclassErrorKind::Conflict {
+                    explicit_metaclass: Some(metaclass),
+                    ..
+                } => ClassMetaclass::Selected(metaclass.into()),
                 _ => ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()),
             })
     }
@@ -1305,13 +1302,22 @@ impl<'db> StaticClassLiteral<'db> {
             // - https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass
             // - https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
             for (base_class, metaclass) in base_metaclasses {
+                if metaclass == SubclassOfType::subclass_of_unknown() {
+                    return Ok((ClassMetaclass::Selected(metaclass), None));
+                }
                 let Some(metaclass) = metaclass.to_class_type(db) else {
                     continue;
                 };
-                if candidate.metaclass.is_subclass_of(db, &env, metaclass) {
-                    continue;
-                }
-                if metaclass.is_subclass_of(db, &env, candidate.metaclass) {
+                if let Some(selected) = candidate
+                    .metaclass
+                    .most_derived_metaclass(db, &env, metaclass)
+                {
+                    let Some(metaclass) = selected.to_class_type(db) else {
+                        return Ok((ClassMetaclass::Selected(selected), None));
+                    };
+                    if metaclass == candidate.metaclass {
+                        continue;
+                    }
                     candidate = MetaclassCandidate {
                         metaclass,
                         base: Some(base_class),
@@ -1323,6 +1329,8 @@ impl<'db> StaticClassLiteral<'db> {
                         candidate,
                         base_metaclass: metaclass,
                         base: base_class,
+                        explicit_metaclass: explicit_metaclass
+                            .and_then(|metaclass| metaclass.to_class_type(db)),
                     },
                 });
             }

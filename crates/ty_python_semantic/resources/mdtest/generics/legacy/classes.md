@@ -1944,6 +1944,67 @@ Box.value = 2
 reveal_type(Box[str]().value)  # revealed: str
 ```
 
+## Metaclasses of specialized classes
+
+Specializing a class preserves its valid metaclass. Without an explicit metaclass, conflicting
+inherited metaclasses leave the metaclass and its attributes unknown after specialization.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Meta(type, Generic[T]):
+    value: T
+
+class OtherMeta(type): ...
+class Base(metaclass=OtherMeta): ...
+class MetaBase(metaclass=Meta[str]): ...
+class Valid(Generic[T], metaclass=Meta[str]): ...
+class Invalid(Base, MetaBase, Generic[T]): ...  # error: [conflicting-metaclass]
+
+reveal_type(Valid[int].__class__)  # revealed: <class 'Meta[str]'>
+reveal_type(type(Valid[int]))  # revealed: <class 'Meta[str]'>
+reveal_type(Invalid[int].__class__)  # revealed: type[Unknown]
+reveal_type(type(Invalid[int]))  # revealed: type[Unknown]
+reveal_type(Invalid[int].value)  # revealed: Unknown
+```
+
+The specialized class remains a class object, so it cannot be assigned to `None`:
+
+```py
+meta: OtherMeta = Invalid[int]
+none: None = Invalid[int]  # error: [invalid-assignment]
+```
+
+The metaclass also remains unknown when the invalid class is reached through type-variable bounds or
+constraints:
+
+```py
+Bounded = TypeVar("Bounded", bound=Invalid[int])
+Constrained = TypeVar("Constrained", Invalid[int], Invalid[str])
+
+def bounded(cls: type[Bounded]):
+    reveal_type(cls.__class__)  # revealed: type[Unknown]
+    reveal_type(type(cls))  # revealed: type[Unknown]
+    none: None = cls  # error: [invalid-assignment]
+
+def constrained(cls: type[Constrained]):
+    reveal_type(cls.__class__)  # revealed: type[Unknown]
+    reveal_type(type(cls))  # revealed: type[Unknown]
+    none: None = cls  # error: [invalid-assignment]
+```
+
+An explicit metaclass is retained after a conflict, including its specialization:
+
+```py
+class Explicit(Generic[T], Base, metaclass=Meta[str]): ...  # error: [conflicting-metaclass]
+
+reveal_type(Explicit[int].__class__)  # revealed: <class 'Meta[str]'>
+reveal_type(type(Explicit[int]))  # revealed: <class 'Meta[str]'>
+reveal_type(Explicit[int].value)  # revealed: str
+```
+
 ## Specializations propagate
 
 In a specialized generic alias, the specialization is applied to the attributes and methods of the

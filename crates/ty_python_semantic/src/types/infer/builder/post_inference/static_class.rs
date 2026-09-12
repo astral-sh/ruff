@@ -698,6 +698,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                     },
                 base_metaclass: metaclass2,
                 base: base2,
+                ..
             } => {
                 if let Some(base1) = base1 {
                     report_conflicting_metaclass_from_bases(

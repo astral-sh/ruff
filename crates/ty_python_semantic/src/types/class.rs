@@ -52,7 +52,7 @@ use crate::types::{
     TypingModule, UnionBuilder, VarianceInferable, VarianceTerm,
 };
 use crate::{
-    Db, FxIndexMap, FxOrderSet,
+    Db, FxIndexMap, FxIndexSet, FxOrderSet,
     place::{Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, PublicTypePolicy},
     types::{MetaclassCandidate, TypeDefinition, UnionType},
 };
@@ -853,12 +853,7 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        self.metaclass(db)
-            .to_instance_approximation(db, env)
-            .expect(
-                "`Type::to_instance()` should always return `Some()` \
-                when called on the type of a metaclass",
-            )
+        metaclass_instance_type(db, env, self.metaclass(db))
     }
 
     /// Returns whether this class is type-check only.
@@ -1497,13 +1492,28 @@ impl<'db> ClassType<'db> {
         env: &ProgramEnvironment<'db>,
         target: ClassType<'db>,
     ) -> bool {
+        self.has_relation_to(db, env, target, TypeRelation::Subtyping)
+    }
+
+    /// Check a nominal type relation directly between classes, including their specializations.
+    ///
+    /// Assignability allows unknown bases to supply a subclass relationship that subtyping
+    /// cannot establish.
+    fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Self,
+        relation: TypeRelation,
+    ) -> bool {
         let constraints = ConstraintSetBuilder::new();
         let relation_visitor = HasRelationToVisitor::default(&constraints);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::new(env);
-        let checker = TypeRelationChecker::subtyping(
+        let checker = TypeRelationChecker::new(
             env,
+            relation,
             &constraints,
             TypeVarSet::None,
             &relation_visitor,
@@ -1514,6 +1524,91 @@ impl<'db> ClassType<'db> {
         checker
             .check_class_pair(db, self, target)
             .is_always_satisfied(db, env)
+    }
+
+    /// Select the more derived metaclass, or return `None` for a conflict.
+    ///
+    /// One metaclass must derive from the other. Unlike [`Self::could_coexist_in_mro_with`],
+    /// the possibility of a common subclass is not sufficient.
+    ///
+    /// Known subclass relationships take precedence over gradual assignability. If unknown
+    /// ancestry leaves both metaclasses as possible winners, retain only `type[Unknown]`; we do
+    /// not preserve constraints on the unknown bases for later metaclass selection.
+    fn most_derived_metaclass(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Self,
+    ) -> Option<Type<'db>> {
+        if self.is_subclass_of(db, env, other) {
+            return Some(self.into());
+        }
+        if other.is_subclass_of(db, env, self) {
+            return Some(other.into());
+        }
+
+        match (
+            self.could_inherit_from(db, env, other),
+            other.could_inherit_from(db, env, self),
+        ) {
+            (true, false) => Some(self.into()),
+            (false, true) => Some(other.into()),
+            (true, true) => Some(SubclassOfType::subclass_of_unknown()),
+            (false, false) => None,
+        }
+    }
+
+    /// Whether an unknown base could supply an otherwise unproven subclass relationship.
+    ///
+    /// Call this after ruling out known subclass relationships in both directions. An unknown
+    /// base inherited through a shared ancestor cannot establish the missing relationship:
+    ///
+    /// ```python
+    /// from typing import Any
+    /// base: Any = type
+    /// class Root(base): ...
+    /// class Left(Root): ...
+    /// class Right(Root): ...
+    /// ```
+    ///
+    /// Making `Root` inherit `Right` would create a cycle. An unknown base introduced outside
+    /// their shared ancestry can still make `Left` inherit `Right`.
+    fn could_inherit_from(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Self,
+    ) -> bool {
+        if target.is_final(db)
+            || !self.has_relation_to(db, env, target, TypeRelation::Assignability)
+        {
+            return false;
+        }
+
+        // A cyclic MRO uses an unknown base for recovery. It need not correspond to an
+        // explicit unknown base, and rejecting it here can make recursive inference oscillate.
+        if ClassBase::Class(self).has_cyclic_mro(db) {
+            return true;
+        }
+
+        let target_ancestors: FxIndexSet<_> = target
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .map(|class| class.class_literal(db))
+            .collect();
+
+        self.iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .map(|class| class.class_literal(db))
+            .filter(|class| !target_ancestors.contains(class))
+            .any(|class| {
+                class.explicit_bases(db).iter().any(|base| {
+                    matches!(
+                        ClassBase::try_from_explicit_base(db, env, *base, Some(class)),
+                        Some(ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_))
+                    )
+                })
+            })
     }
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
@@ -1783,12 +1878,7 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        self.metaclass(db)
-            .to_instance_approximation(db, env)
-            .expect(
-                "`Type::to_instance()` should always return `Some()` \
-                when called on the type of a metaclass",
-            )
+        metaclass_instance_type(db, env, self.metaclass(db))
     }
 
     /// Returns the class member of this class named `name`.
@@ -3364,6 +3454,27 @@ pub(super) enum DisjointBaseKind {
     DefinesSlots,
 }
 
+/// Return the instance type of a metaclass, preserving that its instances are class objects.
+///
+/// If the metaclass is `type[Unknown]`, ordinary instance projection would produce `Unknown`
+/// and make a class object assignable to `None`. Use `type[Unknown]` for its instances instead:
+/// their metaclass is unknown, but they are still class objects.
+pub(super) fn metaclass_instance_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    metaclass: Type<'db>,
+) -> Type<'db> {
+    let instance = metaclass
+        .to_instance_approximation(db, env)
+        .expect("the type of a metaclass should always be instantiable");
+    // TODO: Intersect `instance` with `type` once equivalent representations are unified:
+    // https://github.com/astral-sh/ty/issues/222
+    match instance {
+        Type::Dynamic(dynamic) => SubclassOfType::from(db, env, dynamic),
+        _ => instance,
+    }
+}
+
 /// A selected metaclass, or the `ABCMeta` fallback inferred from a typeshed stdlib protocol base.
 ///
 /// Typeshed lists `Protocol` as a base for some classes, such as collection ABCs, that do not
@@ -3441,6 +3552,9 @@ pub(super) enum MetaclassErrorKind<'db> {
         /// The incompatible metaclass of `base`.
         base_metaclass: ClassType<'db>,
         base: ClassBase<'db>,
+        /// The original `metaclass=` value, retained for error recovery even if a base
+        /// supplied a more derived candidate before the conflict was found.
+        explicit_metaclass: Option<ClassType<'db>>,
     },
     /// The metaclass is a parameterized generic class, which is not supported.
     GenericMetaclass,
