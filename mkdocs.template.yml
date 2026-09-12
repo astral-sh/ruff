@@ -87,6 +87,10 @@ plugins:
           - migrating-to-categories.md
         Linter:
           - linter.md
+        Rules:
+          - rules.md
+          - rules-by-category.md
+          - default-rules.md
         Formatter:
           - formatter.md
           - formatter/black.md

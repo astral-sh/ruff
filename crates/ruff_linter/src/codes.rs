@@ -171,7 +171,7 @@ pub enum Category {
 impl Category {
     /// Return the description of the category, derived from its documentation.
     #[cfg(any(feature = "clap", test))]
-    pub(crate) fn description(self) -> &'static str {
+    pub fn description(self) -> &'static str {
         let Some(docs) =
             strum::EnumMessage::get_documentation(&self).and_then(|docs| docs.lines().next())
         else {
