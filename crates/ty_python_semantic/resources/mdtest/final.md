@@ -1282,7 +1282,8 @@ class Child2(Base):
 ### Annotation doesn't override abstract method
 
 A simple annotation like `method: int` shadows the name but doesn't actually implement the abstract
-method. Attempting to instantiate the class will still fail at runtime.
+method. Attempting to instantiate the class will still fail at runtime. The diagnostic identifies
+the abstract declaration and explains why the attribute annotation does not implement it.
 
 ```py
 from abc import ABC, abstractmethod
@@ -1293,8 +1294,30 @@ class Base(ABC):
     def method(self) -> int: ...
 
 @final
-class Bad(Base):  # error: [abstract-method-in-final-class]
+# snapshot: abstract-method-in-final-class
+class Bad(Base):
     method: int
+```
+
+```snapshot
+error[abstract-method-in-final-class]: Final class `Bad` has unimplemented abstract methods
+  --> src/mdtest_snippet.py:10:7
+   |
+ 5 | /     @abstractmethod
+ 6 | |     def method(self) -> int: ...
+   | |________________________________- `method` declared as abstract on superclass `Base`
+ 7 |
+ 8 |   @final
+   |   ------
+ 9 |   # snapshot: abstract-method-in-final-class
+10 |   class Bad(Base):
+   |         ^^^ `method` is unimplemented
+info: The instance-attribute annotation for `method` does not override the abstract method
+help: Either assign a value or add `ClassVar` to this declaration
+  --> src/mdtest_snippet.py:11:5
+   |
+11 |     method: int
+   |     ------ Instance-attribute declaration
 ```
 
 The same applies to abstract properties:
@@ -1309,8 +1332,29 @@ class Base(ABC):
     def f(self) -> int: ...
 
 @final
-class BadChild(Base):  # error: [abstract-method-in-final-class]
+# snapshot: abstract-method-in-final-class
+class BadChild(Base):
     f: int
+```
+
+```snapshot
+error[abstract-method-in-final-class]: Final class `BadChild` has unimplemented abstract methods
+  --> src/mdtest_snippet.py:22:7
+   |
+18 |     def f(self) -> int: ...
+   |         - `f` declared as abstract on superclass `Base`
+19 |
+20 | @final
+   | ------
+21 | # snapshot: abstract-method-in-final-class
+22 | class BadChild(Base):
+   |       ^^^^^^^^ `f` is unimplemented
+info: The instance-attribute annotation for `f` does not override the abstract method
+help: Either assign a value or add `ClassVar` to this declaration
+  --> src/mdtest_snippet.py:23:5
+   |
+23 |     f: int
+   |     - Instance-attribute declaration
 ```
 
 But we make an exception here for `ClassVar` annotations: we assume in this case that the user will
