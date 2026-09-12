@@ -112,6 +112,31 @@ class ScopeChain:
         self.depth: Final = 1 if parent is None else parent.depth + 1
 ```
 
+### Recursive bare `Final` class attributes
+
+A class defined in a loop can compute final attributes from the previous class. The number of
+iterations is unknown, so these growing values have types `int`, `str`, and `bytes`.
+
+```py
+from typing import Final
+
+def build_classes(n: int):
+    class C:
+        count: Final = 0
+        label: Final = ""
+        data: Final = b""
+
+    for _ in range(n):
+        class C:
+            count: Final = C.count + 1
+            label: Final = C.label + "a"
+            data: Final = C.data + b"a"
+
+    reveal_type(C.count)  # revealed: int
+    reveal_type(C.label)  # revealed: str
+    reveal_type(C.data)  # revealed: bytes
+```
+
 ## Not modifiable
 
 ### Names

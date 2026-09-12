@@ -1994,8 +1994,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             Type::Union(union) => {
                 let db = self.db();
-                let mut union_builder =
-                    UnionBuilder::new(db, env).recursively_defined(union.recursively_defined(db));
+                let mut union_builder = UnionBuilder::new(db, env)
+                    .or_recursively_defined(union.recursively_defined(db));
 
                 for (index, element) in union.elements(db).iter().enumerate() {
                     let mut speculative_builder = self.speculate();

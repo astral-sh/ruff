@@ -8940,7 +8940,7 @@ impl<'db> Type<'db> {
 
                     if union.recursively_defined(db).is_yes() {
                         expanded_callables =
-                            expanded_callables.recursively_defined(RecursivelyDefined::Yes);
+                            expanded_callables.or_recursively_defined(RecursivelyDefined::Yes);
                     }
                 }
 
