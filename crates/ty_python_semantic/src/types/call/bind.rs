@@ -3154,6 +3154,12 @@ impl<'db> Bindings<'db> {
                         else {
                             continue;
                         };
+                        if inferable
+                            .tuple_spec(db, env)
+                            .is_none_or(|tuple| tuple.is_variadic())
+                        {
+                            continue;
+                        }
                         let Some(inferable) = inferable_typevars_from_tuple(db, env, &inferable)
                         else {
                             continue;
@@ -3177,7 +3183,7 @@ impl<'db> Bindings<'db> {
                             ),
                             Ok(Solutions::Unsatisfiable) => Type::none(db, env),
                             Ok(Solutions::Unconstrained) => Type::empty_tuple(db, env),
-                            Err(_) => Type::unknown(),
+                            Ok(Solutions::Unsupported) | Err(_) => Type::unknown(),
                         };
                         overload.set_return_type(result);
                     }
@@ -3192,6 +3198,12 @@ impl<'db> Bindings<'db> {
                         else {
                             continue;
                         };
+                        if inferable
+                            .tuple_spec(db, env)
+                            .is_none_or(|tuple| tuple.is_variadic())
+                        {
+                            continue;
+                        }
                         let Some(inferable) = inferable_typevars_from_tuple(db, env, &inferable)
                         else {
                             continue;
@@ -3214,7 +3226,7 @@ impl<'db> Bindings<'db> {
                             ),
                             Ok(Solutions::Unsatisfiable) => Type::none(db, env),
                             Ok(Solutions::Unconstrained) => Type::empty_tuple(db, env),
-                            Err(_) => Type::unknown(),
+                            Ok(Solutions::Unsupported) | Err(_) => Type::unknown(),
                         };
                         overload.set_return_type(result);
                     }

@@ -1741,3 +1741,493 @@ def missing_bounds[**P]() -> None:
     # revealed: ConstraintSet[((...) ≤ P@missing_bounds ≤ (int, /))]
     reveal_type(ConstraintSet.range(Callable[..., None], P, Callable[[int], None]).with_detailed_display())
 ```
+
+## ParamSpec solutions
+
+Each path has its own solution. A bare ParamSpec binding describes parameters, not return types.
+
+### Exact solutions
+
+Both query methods return exact parameters and ignore returns, including for legacy ParamSpecs.
+
+```py
+from typing import Callable, ParamSpec
+from ty_extensions._internal import ConstraintSet
+
+P = ParamSpec("P")
+
+def exact(callback: Callable[P, None]) -> None:
+    constraints = ConstraintSet.range(Callable[[int, str], int], P, Callable[[int, str], str])
+    # revealed: ConstraintSet[bool]
+    reveal_type(constraints)
+    # revealed: tuple[Solution[P=(int, str, /)]]
+    reveal_type(constraints.solutions_for(P, inferable=tuple[P]))
+    # revealed: tuple[Solution[P=(int, str, /)]]
+    reveal_type(constraints.solutions(inferable=tuple[P]))
+```
+
+An empty parameter list is a solution, not missing evidence.
+
+```py
+def empty[**P]() -> None:
+    constraints = ConstraintSet.equality(P, Callable[[], None])
+    # revealed: tuple[Solution[P=()]]
+    reveal_type(constraints.solutions_for(P, inferable=tuple[P]))
+```
+
+### One-sided solutions
+
+One-sided constraints select the supplied list; the missing bound provides no evidence.
+
+```py
+from typing import Callable
+from ty_extensions._internal import ConstraintSet
+
+def one_sided[**P]() -> None:
+    lower = ConstraintSet.lower_bound(Callable[[int], None], P)
+    # revealed: tuple[Solution[P=(int, /)]]
+    reveal_type(lower.solutions_for(P, inferable=tuple[P]))
+
+    upper = ConstraintSet.upper_bound(P, Callable[[str], None])
+    # revealed: tuple[Solution[P=(str, /)]]
+    reveal_type(upper.solutions_for(P, inferable=tuple[P]))
+```
+
+### Two-sided solutions
+
+The solution uses the lower list of a compatible interval. Contravariance makes its reverse invalid.
+
+```py
+from typing import Callable
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def interval[**P]() -> None:
+    constraints = ConstraintSet.range(Callable[[object], int], P, Callable[[int], str])
+    # revealed: ConstraintSet[bool]
+    reveal_type(constraints)
+    # revealed: tuple[Solution[P=(object, /)]]
+    reveal_type(constraints.solutions_for(P, inferable=tuple[P]))
+
+    incompatible = ConstraintSet.range(Callable[[int], None], P, Callable[[object], None])
+    static_assert(incompatible == ConstraintSet.never())
+    # revealed: None
+    reveal_type(incompatible.solutions_for(P, inferable=tuple[P]))
+```
+
+### Missing evidence
+
+A constrained path can omit P while retaining T; an unconstrained query has no explicit solutions.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def absent[**P, T]() -> None:
+    # revealed: tuple[()]
+    reveal_type(ConstraintSet.always().solutions(inferable=tuple[P]))
+    constraints = ConstraintSet.equality(T, bytes)
+    # revealed: tuple[Solution[T=bytes]]
+    reveal_type(constraints.solutions(inferable=tuple[P, T]))
+    # revealed: tuple[Solution[]]
+    reveal_type(constraints.solutions_for(P, inferable=tuple[P, T]))
+    # revealed: tuple[()]
+    reveal_type(constraints.solutions_for(P, inferable=tuple[()]))
+```
+
+An unconstrained query does not apply a ParamSpec default.
+
+```py
+def defaulted[**P = [str]]() -> None:
+    # revealed: tuple[()]
+    reveal_type(ConstraintSet.always().solutions_for(P, inferable=tuple[P]))
+```
+
+### Explicit extremal bounds
+
+The solution retains an explicit bottom list, but uses the upper list when lower evidence is absent.
+
+```py
+from typing import Callable, Never
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import ConstraintSet
+
+def lower_evidence[**P]() -> None:
+    constraints = ConstraintSet.upper_bound(P, Callable[[int], None])
+    # revealed: tuple[Solution[P=(int, /)]]
+    reveal_type(constraints.solutions_for(P, inferable=tuple[P]))
+
+    constraints = ConstraintSet.range(Bottom[Callable[..., Never]], P, Callable[[int], None])
+    # revealed: tuple[Solution[P=(*args: object, **kwargs: object)]]
+    reveal_type(constraints.solutions_for(P, inferable=tuple[P]))
+```
+
+An explicit top parameter list also remains evidence rather than an absent bound.
+
+```py
+def upper_evidence[**P]() -> None:
+    constraints = ConstraintSet.upper_bound(P, Top[Callable[..., object]])
+    # revealed: tuple[Solution[P=Top[(...)]]]
+    reveal_type(constraints.solutions_for(P, inferable=tuple[P]))
+```
+
+### Gradual solutions
+
+Ellipsis and gradual annotations remain explicit parameter lists, distinct from absent evidence.
+
+```py
+from typing import Any, Callable
+from ty_extensions._internal import ConstraintSet, Unknown
+
+def gradual[**P]() -> None:
+    ellipsis = ConstraintSet.range(Callable[..., int], P, Callable[..., str])
+    # revealed: tuple[Solution[P=(...)]]
+    reveal_type(ellipsis.solutions_for(P, inferable=tuple[P]))
+    any_parameter = ConstraintSet.range(Callable[[Any], None], P, Callable[[int], None])
+    # revealed: tuple[Solution[P=(Any, /)]]
+    reveal_type(any_parameter.solutions_for(P, inferable=tuple[P]))
+    unknown_parameter = ConstraintSet.range(P, P, Callable[[Unknown], None])
+    # revealed: tuple[Solution[P=(Unknown, /)]]
+    reveal_type(unknown_parameter.solutions_for(P, inferable=tuple[P]))
+```
+
+### Complete signatures
+
+Extraction preserves names, parameter kinds, defaults, and annotations for both variadic parameters.
+
+```py
+from ty_extensions._internal import ConstraintSet, RegularCallableTypeOf
+
+def complete(value: int, /, text: str = "", *args: bytes, enabled: bool = False, **kwargs: object) -> int:
+    return 0
+
+def signature[**P]() -> None:
+    constraints = ConstraintSet.range(RegularCallableTypeOf[complete], P, RegularCallableTypeOf[complete])
+    # revealed: tuple[Solution[P=(value: int, /, text: str = "", *args: bytes, enabled: bool = False, **kwargs: object)]]
+    reveal_type(constraints.solutions_for(P, inferable=tuple[P]))
+```
+
+### Overloaded solutions
+
+Extraction preserves every overload in one parameter-list value, with each return erased.
+
+```pyi
+from typing import overload
+from ty_extensions._internal import ConstraintSet, RegularCallableTypeOf
+
+@overload
+def callback(value: int, /) -> int: ...
+@overload
+def callback(*, text: str) -> str: ...
+def overloaded[**P]() -> None:
+    constraints = ConstraintSet.range(RegularCallableTypeOf[callback], P, RegularCallableTypeOf[callback])
+    # revealed: tuple[Solution[P=Overload[(value: int, /) -> Unknown, (*, text: str) -> Unknown]]]
+    reveal_type(constraints.solutions_for(P, inferable=tuple[P]))
+```
+
+### Generic callable solutions
+
+A callable's own ParamSpec stays bound by that callable; extraction does not free Q.
+
+```py
+from ty_extensions._internal import ConstraintSet, RegularCallableTypeOf
+
+def callback[**Q](*args: Q.args, **kwargs: Q.kwargs) -> None: ...
+def generic[**P]() -> None:
+    constraints = ConstraintSet.range(RegularCallableTypeOf[callback], P, RegularCallableTypeOf[callback])
+    # revealed: tuple[Solution[P=(**Q@callback)]]
+    reveal_type(constraints.solutions_for(P, inferable=tuple[P]))
+```
+
+### Symbolic solutions
+
+A noninferable Q can be P's symbolic solution without acquiring concrete parameters.
+
+```py
+from typing import Callable, Concatenate
+from ty_extensions._internal import ConstraintSet
+
+def symbolic[**P, **Q]() -> None:
+    exact = ConstraintSet.range(Q, P, Q)
+    lower = ConstraintSet.range(Q, P, P)
+    upper = ConstraintSet.range(P, P, Q)
+    # revealed: tuple[Solution[P=Q@symbolic]]
+    reveal_type(exact.solutions_for(P, inferable=tuple[P]))
+    # revealed: tuple[Solution[P=Q@symbolic]]
+    reveal_type(lower.solutions_for(P, inferable=tuple[P]))
+    # revealed: tuple[Solution[P=Q@symbolic]]
+    reveal_type(upper.solutions_for(P, inferable=tuple[P]))
+```
+
+A prefixed symbolic solution retains the prefix and the same noninferable tail.
+
+```py
+def prefixed[**P, **Q]() -> None:
+    constraints = ConstraintSet.range(Callable[Concatenate[int, Q], int], P, Callable[Concatenate[int, Q], str])
+    # revealed: tuple[Solution[P=(int, /, *args: Q@prefixed.args, **kwargs: Q@prefixed.kwargs)]]
+    reveal_type(constraints.solutions_for(P, inferable=tuple[P]))
+```
+
+### Separate solution paths
+
+Disjunction returns separate parameter-list solutions, without unioning or choosing between them.
+
+```py
+from typing import Callable
+from ty_extensions._internal import ConstraintSet
+
+def alternatives[**P]() -> None:
+    integers = ConstraintSet.range(Callable[[int], None], P, Callable[[int], None])
+    strings = ConstraintSet.range(Callable[[str], None], P, Callable[[str], None])
+    # revealed: tuple[Solution[P=(int, /)], Solution[P=(str, /)]]
+    reveal_type((integers | strings).solutions(inferable=tuple[P]))
+```
+
+### Accumulated upper bounds
+
+The solution uses an upper clause that satisfies all others, regardless of conjunction order.
+
+```py
+from typing import Callable
+from ty_extensions._internal import ConstraintSet
+
+def upper_clauses[**P]() -> None:
+    integers = ConstraintSet.range(P, P, Callable[[int], None])
+    objects = ConstraintSet.range(P, P, Callable[[object], None])
+    # revealed: tuple[Solution[P=(object, /)]]
+    reveal_type((integers & objects).solutions_for(P, inferable=tuple[P]))
+    # revealed: tuple[Solution[P=(object, /)]]
+    reveal_type((objects & integers).solutions_for(P, inferable=tuple[P]))
+```
+
+### Incompatible accumulated bounds
+
+Valid one-sided bounds can conflict. An incompatible interval rejects the whole path, including T.
+
+```py
+from typing import Callable
+from ty_extensions._internal import ConstraintSet
+
+def incompatible[**P, T]() -> None:
+    lower = ConstraintSet.lower_bound(Callable[[int], None], P)
+    upper = ConstraintSet.upper_bound(P, Callable[[object], None])
+    # revealed: ConstraintSet[bool]
+    reveal_type(lower)
+    # revealed: ConstraintSet[bool]
+    reveal_type(upper)
+    constraints = lower & upper
+    # revealed: None
+    reveal_type(constraints.solutions_for(P, inferable=tuple[P]))
+    with_typevar = constraints & ConstraintSet.equality(T, bytes)
+    # revealed: None
+    reveal_type(with_typevar.solutions(inferable=tuple[P, T]))
+```
+
+### Compatible accumulated bounds
+
+The supplied witnesses prove compatibility, but extraction cannot synthesize a parameter list.
+
+```py
+from typing import Callable, Never
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def lower_clauses[**P, T]() -> None:
+    constraints = ConstraintSet.range(Callable[[int], None], P, P) & ConstraintSet.range(Callable[[str], None], P, P)
+    witness = ConstraintSet.range(Callable[[Never], None], P, Callable[[Never], None])
+    static_assert((constraints & witness) == witness)
+    with_typevar = constraints & ConstraintSet.equality(T, bytes)
+    # revealed: Unknown
+    reveal_type(with_typevar.solutions_for(T, inferable=tuple[P, T]))
+    # revealed: Unknown
+    reveal_type(with_typevar.solutions_for(P, inferable=tuple[P, T]))
+    # revealed: Unknown
+    reveal_type(with_typevar.solutions(inferable=tuple[P, T]))
+```
+
+An existing upper bound can supply a canonical solution for the same lower bounds.
+
+```py
+    upper = ConstraintSet.upper_bound(P, Callable[[Never], None])
+    # revealed: tuple[Solution[P=(Never, /)]]
+    reveal_type((constraints & upper).solutions_for(P, inferable=tuple[P]))
+```
+
+A callback accepting objects satisfies both upper bounds, but neither upper list is a solution.
+
+```py
+def upper_clauses[**P, T]() -> None:
+    constraints = ConstraintSet.range(P, P, Callable[[int], None]) & ConstraintSet.range(P, P, Callable[[str], None])
+    witness = ConstraintSet.range(Callable[[object], None], P, Callable[[object], None])
+    static_assert((constraints & witness) == witness)
+    with_typevar = constraints & ConstraintSet.equality(T, bytes)
+    # revealed: Unknown
+    reveal_type(with_typevar.solutions_for(T, inferable=tuple[P, T]))
+    # revealed: Unknown
+    reveal_type(with_typevar.solutions(inferable=tuple[P, T]))
+```
+
+### Ordinary TypeVar solutions
+
+Ordinary TypeVar solutions retain callable returns.
+
+```py
+from typing import Callable
+from ty_extensions._internal import ConstraintSet
+
+def ordinary[T]() -> None:
+    constraints = ConstraintSet.equality(T, Callable[[int], str])
+    # revealed: tuple[Solution[T=(int, /) -> str]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
+```
+
+### Qualified solution queries
+
+Method and type identities control the exception, including aliases and qualified names.
+
+`params.py`:
+
+```py
+from typing import ParamSpec
+
+args = ParamSpec("args")
+```
+
+`main.py`:
+
+```py
+from builtins import tuple as Typevars
+from typing import Callable
+from ty_extensions._internal import ConstraintSet
+import params
+
+def qualified(callback: Callable[params.args, None]) -> None:
+    constraints = ConstraintSet.range(Callable[[int], None], params.args, Callable[[int], None])
+    solutions = constraints.solutions
+    # revealed: tuple[Solution[args=(int, /)]]
+    reveal_type(solutions(inferable=Typevars[params.args]))
+    # revealed: tuple[Solution[args=(int, /)]]
+    reveal_type(constraints.solutions_for(params.args, inferable=Typevars[params.args]))
+    # An empty positional unpacking does not change the inferable argument.
+    # revealed: tuple[Solution[args=(int, /)]]
+    reveal_type(solutions(*(), inferable=Typevars[params.args]))
+```
+
+### ParamSpec component identities
+
+Component identities stay separate from bare P, despite sharing its name in solution displays.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def components[**P, T]() -> None:
+    args = ConstraintSet.range(tuple[int], P.args, tuple[object, ...])
+    kwargs = ConstraintSet.range(dict[str, object], P.kwargs, dict[str, object])
+    # revealed: tuple[Solution[P=tuple[int]]]
+    reveal_type(args.solutions_for(P.args, inferable=tuple[P.args]))
+    # revealed: tuple[Solution[P=dict[str, object]]]
+    reveal_type(kwargs.solutions_for(P.kwargs, inferable=tuple[P.kwargs]))
+    # revealed: tuple[()]
+    reveal_type(args.solutions_for(P, inferable=tuple[P]))
+    # revealed: tuple[()]
+    reveal_type(kwargs.solutions_for(P, inferable=tuple[P]))
+    with_typevar = args & kwargs & ConstraintSet.equality(T, bytes)
+    # revealed: tuple[Solution[]]
+    reveal_type(with_typevar.solutions_for(P, inferable=tuple[P, T]))
+```
+
+### Inferable tuple validation
+
+Malformed inferable tuples keep the broad return type, as do tuples containing a non-TypeVar.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def tuple_shapes[T, U]() -> None:
+    constraints = ConstraintSet.equality(T, int) & ConstraintSet.equality(U, str)
+    # revealed: tuple[()]
+    reveal_type(constraints.solutions(inferable=tuple[()]))
+    # revealed: tuple[ConstraintSetSolution, ...] | None
+    reveal_type(constraints.solutions(inferable=tuple[T, int]))
+    # revealed: tuple[ConstraintSetSolution, ...] | None
+    reveal_type(constraints.solutions(inferable=tuple[T, ...]))
+    # revealed: tuple[ConstraintSetSolution, ...] | None
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T, *tuple[U, ...]]))
+```
+
+### Invalid solution query forms
+
+Only fixed tuples of bare type variables admit ParamSpecs.
+
+```py
+from typing_extensions import TypeForm
+from ty_extensions._internal import ConstraintSet
+
+def malformed[**P, T, *Ts]() -> None:
+    constraints = ConstraintSet.equality(T, int)
+    constraints.solutions(inferable=tuple[P, int])  # error: [invalid-type-form]
+    constraints.solutions(inferable=tuple[P, P.args])  # error: [invalid-type-form]
+    constraints.solutions(inferable=tuple[P, P.kwargs])  # error: [invalid-type-form]
+    constraints.solutions(inferable=tuple[P, ...])  # error: [invalid-type-form]
+    constraints.solutions(inferable=tuple[P, *tuple[T, ...]])  # error: [invalid-type-form]
+    constraints.solutions(inferable=tuple[P, *Ts])  # error: [invalid-type-form]
+    constraints.solutions(inferable=tuple[list[P]])  # error: [invalid-type-arguments]
+    constraints.solutions_for(tuple[P], inferable=tuple[T])  # error: [invalid-type-form]
+```
+
+Neither duplicate argument qualifies for the ParamSpec exception.
+
+```py
+    # error: [invalid-type-form]
+    # error: [invalid-type-form]
+    # error: [invalid-syntax] "Duplicate keyword argument `inferable`"
+    constraints.solutions(inferable=tuple[P], inferable=tuple[P])
+```
+
+The exception excludes ordinary type forms, unrelated methods, and arguments inside receivers.
+
+```py
+class Other:
+    def solutions(self, *, inferable: TypeForm[tuple[object, ...]]) -> None: ...
+
+def receiver(form: TypeForm[object]) -> ConstraintSet:
+    return ConstraintSet.always()
+
+def identity(form: TypeForm[object]) -> TypeForm[object]:
+    return form
+
+def unrelated[**P]() -> None:
+    value: tuple[P]  # error: [invalid-type-form]
+    Other().solutions(inferable=tuple[P])  # error: [invalid-type-form]
+    receiver(P).solutions(inferable=tuple[()])  # error: [invalid-type-form]
+```
+
+The exception does not affect later type forms or unrelated calls inside query arguments.
+
+```py
+def argument_scope[**P]() -> None:
+    constraints = ConstraintSet.always()
+    constraints.solutions(inferable=tuple[P])
+    identity(P)  # error: [invalid-type-form]
+    constraints.solutions_for(identity(P), inferable=tuple[P])  # error: [invalid-type-form]
+```
+
+Unresolved names retain diagnostics when a query is inferred inside a generic call.
+
+```py
+def preserve[T](value: T) -> T:
+    return value
+
+def unresolved[**P]() -> None:
+    # error: [invalid-type-form]
+    # error: [unresolved-reference]
+    preserve(ConstraintSet.always().solutions(inferable=tuple[P, Missing]))
+```
+
+Inferable type variables must still be passed by keyword.
+
+```py
+def positional_inferable[T]() -> None:
+    # error: [missing-argument]
+    # error: [too-many-positional-arguments]
+    ConstraintSet.always().solutions_for(T, tuple[T])
+```
