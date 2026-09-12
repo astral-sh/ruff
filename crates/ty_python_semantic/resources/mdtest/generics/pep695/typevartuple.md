@@ -1240,19 +1240,22 @@ def positional_variadic(x: int, *args: str) -> tuple[int, *tuple[str, ...]]:
     raise NotImplementedError
 
 reveal_type(invoke(positional_only, 1, "a"))  # revealed: tuple[int, str]
-# TODO: Validate arguments matched to the variadic parameter against the `TypeVarTuple` inferred
-# from the callback.
+# error: [missing-argument]
 reveal_type(invoke(positional_only))  # revealed: tuple[int, str]
+# error: [missing-argument]
 reveal_type(invoke(positional_only, 1))  # revealed: tuple[int, str]
+# error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `str`, found `Literal[2]`"
 reveal_type(invoke(positional_only, 1, 2))  # revealed: tuple[int, str]
 
 reveal_type(invoke(standard, 1, "a"))  # revealed: tuple[int, str]
+# error: [missing-argument]
 # error: [unknown-argument] "Argument `x` does not match any known parameter of function `invoke`"
 # error: [unknown-argument] "Argument `y` does not match any known parameter of function `invoke`"
 reveal_type(invoke(standard, x=1, y="a"))  # revealed: tuple[int, str]
 
 reveal_type(invoke(positional_variadic, 1, "a", "b"))  # revealed: tuple[int, *tuple[str, ...]]
 reveal_type(invoke(positional_variadic, 1))  # revealed: tuple[int, *tuple[str, ...]]
+# error: [missing-argument]
 reveal_type(invoke(positional_variadic))  # revealed: tuple[int, *tuple[str, ...]]
 
 def accept_forwarded[*Ts](callback: Callable[[*Ts], object], args: tuple[*Ts]) -> None: ...
@@ -1268,6 +1271,86 @@ def forward_mixed[*Ts](
     *args: *tuple[int, *Ts, str],
 ) -> None:
     accept_mixed_forwarded(callback, args)
+```
+
+### Forwarded arguments use callback parameters
+
+A forwarding call validates each supplied positional argument against the callback parameter that
+consumes it. Missing arguments are diagnosed even when the forwarded pack is empty.
+
+```py
+from typing import Callable
+
+def forward[*Ts, R](callback: Callable[[*Ts], R], *args: *Ts) -> R:
+    raise NotImplementedError
+
+def receive(value: int, /) -> str:
+    return str(value)
+
+# error: [invalid-argument-type] "Expected `int`"
+forward(receive, 1.0)
+
+# error: [missing-argument]
+forward(receive)
+```
+
+### Callable forwarding through a sub-call
+
+Forwarded arguments are checked against the callback's actual overloads. A splat that also fills an
+earlier wrapper parameter forwards only its remaining tuple elements, and empty splats forward no
+arguments.
+
+```py
+from typing import Callable, overload
+
+def invoke[*Ts, R](callback: Callable[[*Ts], R], *args: *Ts) -> R:
+    raise NotImplementedError
+
+def invoke_after_header[*Ts](callback: Callable[[*Ts], str], header: int, *args: *Ts) -> str:
+    raise NotImplementedError
+
+@overload
+def correlated(left: str, right: str) -> str: ...
+@overload
+def correlated(left: bytes, right: bytes) -> bytes: ...
+def correlated(left: str | bytes, right: str | bytes) -> str | bytes:
+    return left
+
+# TODO: Should reveal the selected overload return type.
+reveal_type(invoke(correlated, "left", "right"))  # revealed: str | bytes
+# TODO: Should reveal the selected overload return type.
+reveal_type(invoke(correlated, b"left", b"right"))  # revealed: str | bytes
+# error: [invalid-argument-type]
+invoke(correlated, "left", b"right")
+
+@overload
+def accepts_string_or_bytes(value: str) -> str: ...
+@overload
+def accepts_string_or_bytes(value: bytes) -> str: ...
+def accepts_string_or_bytes(value: str | bytes) -> str:
+    return str(value)
+
+def split_splat(values: tuple[int, str], invalid: tuple[int, int]) -> None:
+    reveal_type(invoke_after_header(accepts_string_or_bytes, *values))  # revealed: str
+    invoke_after_header(
+        accepts_string_or_bytes,
+        *invalid,  # error: [invalid-argument-type]
+    )
+
+@overload
+def optional_arity() -> str: ...
+@overload
+def optional_arity(value: str) -> str: ...
+def optional_arity(value: str | None = None) -> str:
+    return "empty" if value is None else value
+
+reveal_type(invoke(optional_arity))  # revealed: str
+reveal_type(invoke(optional_arity, "value"))  # revealed: str
+
+def check_empty_splats(empty: tuple[()]) -> None:
+    reveal_type(invoke(optional_arity, *empty))  # revealed: str
+    # error: [missing-argument]
+    invoke(accepts_string_or_bytes, *empty)
 ```
 
 ### Callable inference through nested callable parameters
