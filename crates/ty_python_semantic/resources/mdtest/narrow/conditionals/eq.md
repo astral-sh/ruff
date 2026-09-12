@@ -2784,7 +2784,8 @@ def _(x: A | B):
         reveal_type(x)  # revealed: B
 ```
 
-Non-literal tag arms are preserved during positive narrowing:
+A broad `str` tag can match the comparison value or a different string, so its containing object
+remains possible in both branches:
 
 ```py
 from typing import Literal
@@ -2828,6 +2829,199 @@ def _(x: A | B):
         reveal_type(x)  # revealed: A
     else:
         reveal_type(x)  # revealed: B
+```
+
+## Attribute tags with non-literal comparators
+
+A boolean comparison value can match a boolean tag, but cannot match either of these other tags:
+
+```py
+from typing import Literal
+
+class BooleanTag:
+    tag: bool
+
+class StringTag:
+    tag: Literal["text"]
+
+class NumberTag:
+    tag: Literal[2]
+
+def boolean_comparator(value: BooleanTag | StringTag | NumberTag, other: bool):
+    if value.tag == other:
+        reveal_type(value)  # revealed: BooleanTag
+    else:
+        reveal_type(value)  # revealed: BooleanTag | StringTag | NumberTag
+```
+
+A union comparison value can match tags of different types. Neither `True` nor `"text"` equals `2`,
+so `NumberTag` is excluded from the equality branch:
+
+```py
+def union_comparator(value: BooleanTag | StringTag | NumberTag, other: Literal[True, "text"]):
+    if value.tag == other:
+        reveal_type(value)  # revealed: BooleanTag | StringTag
+    else:
+        reveal_type(value)  # revealed: BooleanTag | StringTag | NumberTag
+```
+
+## Attribute tags with ambiguous comparisons
+
+An `int` tag can contain a subclass with custom equality. This remains true when the tag is a
+non-final subclass that inherits `int.__eq__`. Both tag types stay possible when compared with a
+string, while the unrelated literal tag is excluded:
+
+```py
+from typing import Literal
+
+class OpenInt(int): ...
+
+class IntegerTag:
+    tag: int
+
+class SubclassTag:
+    tag: OpenInt
+
+class A:
+    tag: Literal["a"]
+
+class B:
+    tag: Literal["b"]
+
+def integer_tags(value: IntegerTag | SubclassTag | A | B):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: IntegerTag | SubclassTag | A
+    else:
+        reveal_type(value)  # revealed: IntegerTag | SubclassTag | B
+```
+
+The comparison value can also have a subclass with custom equality. A `str` value might therefore
+match an integer tag, so neither containing object can be excluded:
+
+```py
+class One:
+    tag: Literal[1]
+
+def broad_comparator(value: A | One, other: str):
+    if value.tag == other:
+        reveal_type(value)  # revealed: A | One
+    else:
+        reveal_type(value)  # revealed: A | One
+```
+
+## Attribute tags with enum equality
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+An `IntEnum` member compares equal to its integer value, so both `EnumTag` and `IntegerTag` match
+`1`. `EnumTag` also permits a different tag, leaving it possible in both branches:
+
+```py
+from enum import Enum, IntEnum, StrEnum
+from typing import Literal
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+class EnumTag:
+    tag: Literal[Number.ONE, "other"]
+
+class IntegerTag:
+    tag: Literal[1]
+
+class OtherTag:
+    tag: Literal[2]
+
+def equal_integer_tags(value: EnumTag | IntegerTag | OtherTag):
+    if value.tag == 1:
+        reveal_type(value)  # revealed: EnumTag | IntegerTag
+    else:
+        reveal_type(value)  # revealed: EnumTag | OtherTag
+
+    if value.tag != 1:
+        reveal_type(value)  # revealed: EnumTag | OtherTag
+    else:
+        reveal_type(value)  # revealed: EnumTag | IntegerTag
+```
+
+The enum can also be the comparison value. An integer literal can match the enum member without
+having the same literal type:
+
+```py
+def enum_comparator(value: EnumTag | IntegerTag | OtherTag):
+    if Number.ONE == value.tag:
+        reveal_type(value)  # revealed: EnumTag | IntegerTag
+    else:
+        reveal_type(value)  # revealed: EnumTag | OtherTag
+```
+
+`StrEnum` members likewise compare equal to strings with the same value:
+
+```py
+class Word(StrEnum):
+    A = "a"
+    B = "b"
+
+class EnumStringTag:
+    tag: Literal[Word.A]
+
+class StringTag:
+    tag: Literal["a"]
+
+class OtherStringTag:
+    tag: Literal["b"]
+
+def equal_string_tags(value: EnumStringTag | StringTag | OtherStringTag):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: EnumStringTag | StringTag
+    else:
+        reveal_type(value)  # revealed: OtherStringTag
+```
+
+Custom equality methods can make an enum member compare equal to unrelated values. An ambiguous
+comparison keeps the alternative containing that member in both branches:
+
+```py
+class Custom(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class CustomTag:
+    tag: Literal[Custom.A]
+
+def custom_equality(value: CustomTag | StringTag):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: CustomTag | StringTag
+    else:
+        reveal_type(value)  # revealed: CustomTag
+```
+
+An enum can customize `__ne__` independently of `__eq__`. An ambiguous inequality keeps the
+alternative with that enum tag in both branches, including the branch where the inequality is false:
+
+```py
+class NeverUnequal(Enum):
+    A = 1
+    B = 2
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+class UnequalTag:
+    tag: Literal[NeverUnequal.A]
+
+def custom_inequality(value: UnequalTag | StringTag | OtherStringTag):
+    if value.tag != "a":
+        reveal_type(value)  # revealed: UnequalTag | OtherStringTag
+    else:
+        reveal_type(value)  # revealed: UnequalTag | StringTag
 ```
 
 ## Enabling strict equality narrowing
