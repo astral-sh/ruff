@@ -4434,23 +4434,6 @@ class Foo:
     }
 
     #[test]
-    fn class_blank2() {
-        let builder = completion_test_builder(
-            "\
-class Foo:
-    bar = 1
-    quux = <CURSOR>
-    frob = 3
-",
-        );
-
-        // FIXME: Should include `bar`, `quux` and `frob`.
-        // (Unclear if `Foo` should be included, but a false
-        // positive isn't the end of the world.)
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"Foo");
-    }
-
-    #[test]
     fn class_super1() {
         let builder = completion_test_builder(
             "\

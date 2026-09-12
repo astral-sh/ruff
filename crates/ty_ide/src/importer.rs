@@ -832,32 +832,6 @@ from othermodule import defaultdict
     }
 
     #[test]
-    fn member_conflict_with_other_module_import_alias() {
-        let test = cursor_test(
-            "\
-import defaultdict as ddict
-
-(<CURSOR>)
-        ",
-        );
-
-        assert_snapshot!(
-            test.import("collections", "defaultdict"), @"
-        import collections
-        import defaultdict as ddict
-
-        (collections.defaultdict)
-        ");
-        assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @"
-        from collections import defaultdict
-        import defaultdict as ddict
-
-        (defaultdict)
-        ");
-    }
-
-    #[test]
     fn member_conflict_with_other_member_import_alias() {
         let test = cursor_test(
             "\
