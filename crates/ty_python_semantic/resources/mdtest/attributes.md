@@ -2009,6 +2009,7 @@ class InitializesShadowedGenerated:
     def __init__(self) -> None:
         self.generated: bytes = b"instance"
 
+# error: [invalid-property-type-override]
 class ShadowsInheritedGeneratedProperty(
     InitializesShadowedGenerated, InheritedGeneratedProperty, metaclass=StringStoringMeta
 ): ...
