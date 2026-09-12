@@ -39,7 +39,7 @@ pub(crate) struct ComplexIfStatementInStub;
 impl Violation for ComplexIfStatementInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`if` test must be a simple comparison against `sys.platform` or `sys.version_info`"
+        "`if` test in a stub file must be a simple comparison against `sys.platform` or `sys.version_info`"
             .to_string()
     }
 }
