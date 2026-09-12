@@ -96,6 +96,19 @@ fn bounded_intersection_preserves_late_union_elements() {
             Some(expected)
         );
     }
+
+    // A narrowing factor applies before union distribution even when it appears last.
+    let literal = Type::int_literal(5);
+    for elements in [
+        [wide, narrow, literal],
+        [narrow, wide, literal],
+        [literal, wide, narrow],
+    ] {
+        assert_eq!(
+            IntersectionType::bounded_from_elements(db, &env, elements),
+            Some(literal)
+        );
+    }
 }
 
 #[test]
@@ -115,6 +128,60 @@ fn bounded_intersection_returns_none_when_budget_exhausted() {
         IntersectionType::bounded_from_elements(db, &env, [wide, wide]),
         None
     );
+}
+
+#[test]
+fn bounded_intersection_limits_negated_alias_expansion() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/aliases.py",
+        r#"
+        from ty_extensions import Intersection, Not
+
+        class A: ...
+        class B: ...
+        class C: ...
+        class D: ...
+        class E: ...
+        class F: ...
+
+        type First = Intersection[A, B]
+        type Second = Intersection[C, D]
+        type Third = Intersection[E, F]
+        type Excluded = Not[int]
+        "#,
+    )?;
+    let db = &db;
+    let env = db.program_environment();
+    let file = system_path_to_file(db, "/src/aliases.py")?;
+    let file = ProgramFile::new(db, file, env.program(db));
+    let mut exclusions = Vec::new();
+    for name in ["First", "Second", "Third"] {
+        let ty = global_symbol(db, file, name).place.expect_type();
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) = ty else {
+            anyhow::bail!("expected `{name}` to be a type alias");
+        };
+        exclusions.push(Type::TypeAlias(alias).negate(db, &env));
+    }
+
+    // De Morgan's law expands these negated intersections into a product of unions.
+    assert!(IntersectionType::bounded_from_elements(db, &env, &exclusions[..2]).is_some());
+    assert!(IntersectionType::bounded_from_elements(db, &env, exclusions).is_none());
+
+    // A double negation introduces no alternatives and must not consume the first-union exemption.
+    let excluded = global_symbol(db, file, "Excluded").place.expect_type();
+    let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) = excluded else {
+        anyhow::bail!("expected `Excluded` to be a type alias");
+    };
+    let integer = Type::TypeAlias(alias).negate(db, &env);
+    let wide = UnionType::from_elements(db, &env, (1..=6).map(Type::int_literal));
+    for elements in [[integer, wide], [wide, integer]] {
+        assert_eq!(
+            IntersectionType::bounded_from_elements(db, &env, elements),
+            Some(wide)
+        );
+    }
+    Ok(())
 }
 
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
