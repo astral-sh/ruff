@@ -1,11 +1,5 @@
-# Build and publish a Docker image.
-#
-# Assumed to run as a subworkflow of .github/workflows/release.yml; specifically, as a local
-# artifacts job within `cargo-dist`.
-#
-# TODO(charlie): Ideally, the publish step would happen as a publish job within `cargo-dist`, but
-# sharing the built image as an artifact between jobs is challenging.
-name: "[ruff] Build Docker image"
+# Build Docker release candidates in Depot, then publish the saved indexes.
+name: "[ruff] Build Docker images"
 
 on:
   workflow_call:
@@ -16,350 +10,183 @@ on:
   pull_request:
     paths:
       - .github/workflows/build-docker.yml
+      - .github/workflows/publish-docker-image.yml
+      - Dockerfile
 
 env:
   UV_LOCKED: 1
   ACTIONS_CACHE_MODE: none
-  RUFF_BASE_IMG: ghcr.io/${{ github.repository_owner }}/ruff
+  IMAGE: ghcr.io/${{ github.repository_owner }}/ruff
 
 permissions:
   contents: read
-  # TODO(zanieb): Ideally, this would be `read` on dry-run but that will require
-  # significant changes to the workflow.
-  packages: write # zizmor: ignore[excessive-permissions]
 
 jobs:
-  docker-build:
-    name: Build Docker image (ghcr.io/astral-sh/ruff) for ${{ matrix.platform }}
+  plan:
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    environment:
-      name: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit && 'release' || '' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/arm64
+    timeout-minutes: 2
+    outputs:
+      project: ${{ steps.plan.outputs.project }}
+      save: ${{ inputs.plan != '' }}
+      push: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
+      tag: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit && fromJson(inputs.plan).announcement_tag || 'dry-run' }}
+      extra-images: ${{ steps.plan.outputs.extra-images }}
+    steps:
+      - name: Plan images
+        id: plan
+        env:
+          RELEASE_BUILD: ${{ inputs.plan != '' }}
+          PROD_PROJECT: ${{ vars.DEPOT_PROJECT_PROD }}
+          DEV_PROJECT: ${{ vars.DEPOT_PROJECT_DEV }}
+        run: |
+          if [ "$RELEASE_BUILD" == "true" ]; then
+            project="$PROD_PROJECT"
+          else
+            project="$DEV_PROJECT"
+          fi
+          if [ -z "$project" ]; then
+            echo "Configure DEPOT_PROJECT_PROD and DEPOT_PROJECT_DEV for ruff" >&2
+            exit 1
+          fi
+          echo "project=$project" >> "$GITHUB_OUTPUT"
+          echo 'extra-images={"image-mapping":["alpine:3.23,alpine3.23,alpine","debian:trixie-slim,trixie-slim,debian-slim","buildpack-deps:trixie,trixie,debian"]}' >> "$GITHUB_OUTPUT"
+
+  build-base:
+    name: build ruff
+    needs: plan
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      build-id: ${{ steps.build.outputs.build-id }}
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           persist-credentials: false
 
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Check tag consistency
-        if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
+        if: needs.plan.outputs.push == 'true'
         env:
-          TAG: ${{ inputs.plan != '' && fromJson(inputs.plan).announcement_tag || 'dry-run' }}
+          TAG: ${{ needs.plan.outputs.tag }}
         run: |
           version=$(grep -m 1 "^version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
-          if [ "${TAG}" != "${version}" ]; then
+          if [ "$TAG" != "$version" ]; then
             echo "The input tag does not match the version from pyproject.toml:" >&2
-            echo "${TAG}" >&2
-            echo "${version}" >&2
+            echo "$TAG" >&2
+            echo "$version" >&2
             exit 1
-          else
-            echo "Releasing ${version}"
           fi
+          echo "Releasing $version"
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          images: ${{ env.RUFF_BASE_IMG }}
-          # Defining this makes sure the org.opencontainers.image.version OCI label becomes the actual release version and not the branch name
-          tags: |
-            type=raw,value=dry-run,enable=${{ inputs.plan == '' || fromJson(inputs.plan).announcement_tag_is_implicit }}
-            type=pep440,pattern={{ version }},value=${{ inputs.plan != '' && fromJson(inputs.plan).announcement_tag || 'dry-run' }},enable=${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
-
-      - name: Normalize Platform Pair (replace / with -)
-        run: |
-          platform=${{ matrix.platform }}
-          echo "PLATFORM_TUPLE=${platform//\//-}" >> "$GITHUB_ENV"
-
-      # Adapted from https://docs.docker.com/build/ci/github-actions/multi-platform/
-      - name: Build and push by digest
+      - name: Build and save image
         id: build
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: astral-sh/github-actions/docker-build@29736b0ef051c49097a9b4adca75e0f3e0c973dd
         with:
-          context: .
-          platforms: ${{ matrix.platform }}
-          labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ env.RUFF_BASE_IMG }},push-by-digest=true,name-canonical=true,push=${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
-
-      - name: Export digests
-        env:
-          digest: ${{ steps.build.outputs.digest }}
-        run: |
-          mkdir -p /tmp/digests
-          touch "/tmp/digests/${digest#sha256:}"
-
-      - name: Upload digests
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: digests-${{ env.PLATFORM_TUPLE }}
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 1
-
-  docker-publish:
-    name: Publish Docker image (ghcr.io/astral-sh/ruff)
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    environment:
-      name: release
-    needs:
-      - docker-build
-    if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
-    permissions:
-      attestations: write
-      id-token: write
-      packages: write
-    steps:
-      - name: Download digests
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          path: /tmp/digests
-          pattern: digests-*
-          merge-multiple: true
-
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          images: ${{ env.RUFF_BASE_IMG }}
-          # Order is on purpose such that the label org.opencontainers.image.version has the first pattern with the full version
+          name: ruff
+          project: ${{ needs.plan.outputs.project }}
+          images: ${{ env.IMAGE }}
+          save: ${{ needs.plan.outputs.save }}
           tags: |
-            type=pep440,pattern={{ version }},value=${{ fromJson(inputs.plan).announcement_tag }}
-            type=pep440,pattern={{ major }}.{{ minor }},value=${{ fromJson(inputs.plan).announcement_tag }}
+            type=raw,value=dry-run,enable=${{ needs.plan.outputs.push == 'false' }}
+            type=pep440,pattern={{ version }},value=${{ needs.plan.outputs.tag }},enable=${{ needs.plan.outputs.push == 'true' }}
+            type=pep440,pattern={{ major }}.{{ minor }},value=${{ needs.plan.outputs.tag }},enable=${{ needs.plan.outputs.push == 'true' }}
 
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Adapted from https://docs.docker.com/build/ci/github-actions/multi-platform/
-      - name: Create manifest list and push
-        working-directory: /tmp/digests
-        # The jq command expands the docker/metadata json "tags" array entry to `-t tag1 -t tag2 ...` for each tag in the array
-        # The printf will expand the base image with the `<RUFF_BASE_IMG>@sha256:<sha256> ...` for each sha256 in the directory
-        # The final command becomes `docker buildx imagetools create -t tag1 -t tag2 ... <RUFF_BASE_IMG>@sha256:<sha256_1> <RUFF_BASE_IMG>@sha256:<sha256_2> ...`
-        run: |
-          # shellcheck disable=SC2046
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf "${RUFF_BASE_IMG}@sha256:%s " *)
-
-      - name: Export manifest digest
-        id: manifest-digest
-        env:
-          IMAGE: ${{ env.RUFF_BASE_IMG }}
-          VERSION: ${{ steps.meta.outputs.version }}
-        run: |
-          digest="$(
-            docker buildx imagetools inspect \
-              "${IMAGE}:${VERSION}" \
-              --format '{{json .Manifest}}' \
-            | jq -r '.digest'
-          )"
-          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
-
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-name: ${{ env.RUFF_BASE_IMG }}
-          subject-digest: ${{ steps.manifest-digest.outputs.digest }}
-
-  docker-publish-extra:
-    name: Publish additional Docker image based on ${{ matrix.image-mapping }}
+  build-extra:
+    name: build ${{ matrix.image-mapping }}
+    needs: [plan, build-base]
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    environment:
-      name: release
-    needs:
-      - docker-publish
-    if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
+    timeout-minutes: 5
     permissions:
-      attestations: write
+      contents: read
       id-token: write
-      packages: write
     strategy:
       fail-fast: false
-      matrix:
-        # Mapping of base image followed by a comma followed by one or more base tags (comma separated)
-        # Note, org.opencontainers.image.version label will use the first base tag (use the most specific tag first)
-        image-mapping:
-          - alpine:3.23,alpine3.23,alpine
-          - debian:trixie-slim,trixie-slim,debian-slim
-          - buildpack-deps:trixie,trixie,debian
+      matrix: ${{ fromJson(needs.plan.outputs.extra-images) }}
     steps:
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      - name: Generate Dockerfile and tags
+        id: variant
+        uses: astral-sh/github-actions/docker-variant@29736b0ef051c49097a9b4adca75e0f3e0c973dd
         with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          image-mapping: ${{ matrix.image-mapping }}
+          source-image: ${{ needs.plan.outputs.save == 'true' && format('registry.depot.dev/{0}@{1}', needs.plan.outputs.project, needs.build-base.outputs.digest) || format('{0}:latest', env.IMAGE) }}
+          binaries: ruff
+          command: ruff
+          version: ${{ needs.plan.outputs.tag }}
 
-      - name: Generate Dynamic Dockerfile Tags
-        shell: bash
-        env:
-          TAG_VALUE: ${{ fromJson(inputs.plan).announcement_tag }}
-        run: |
-          set -euo pipefail
-
-          # Extract the image and tags from the matrix variable
-          IFS=',' read -r BASE_IMAGE BASE_TAGS <<< "${{ matrix.image-mapping }}"
-
-          # Generate Dockerfile content
-          cat <<EOF > Dockerfile
-          FROM ${BASE_IMAGE}
-          COPY --from=${RUFF_BASE_IMG}:latest /ruff /usr/local/bin/ruff
-          ENTRYPOINT []
-          CMD ["/usr/local/bin/ruff"]
-          EOF
-
-          # Initialize a variable to store all tag docker metadata patterns
-          TAG_PATTERNS=""
-
-          # Loop through all base tags and append its docker metadata pattern to the list
-          # Order is on purpose such that the label org.opencontainers.image.version has the first pattern with the full version
-          IFS=','; for TAG in ${BASE_TAGS}; do
-            TAG_PATTERNS="${TAG_PATTERNS}type=pep440,pattern={{ version }},suffix=-${TAG},value=${TAG_VALUE}\n"
-            TAG_PATTERNS="${TAG_PATTERNS}type=pep440,pattern={{ major }}.{{ minor }},suffix=-${TAG},value=${TAG_VALUE}\n"
-            TAG_PATTERNS="${TAG_PATTERNS}type=raw,value=${TAG}\n"
-          done
-
-          # Remove the trailing newline from the pattern list
-          TAG_PATTERNS="${TAG_PATTERNS%\\n}"
-
-          # Export image cache name
-          echo "IMAGE_REF=${BASE_IMAGE//:/-}" >> "$GITHUB_ENV"
-
-          # Export tag patterns using the multiline env var syntax
-          {
-            echo "TAG_PATTERNS<<EOF"
-            echo -e "${TAG_PATTERNS}"
-            echo EOF
-          } >> "$GITHUB_ENV"
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        # ghcr.io prefers index level annotations
-        env:
-          DOCKER_METADATA_ANNOTATIONS_LEVELS: index
+      - name: Build and save image
+        uses: astral-sh/github-actions/docker-build@29736b0ef051c49097a9b4adca75e0f3e0c973dd
         with:
-          images: ${{ env.RUFF_BASE_IMG }}
-          flavor: |
-            latest=false
-          tags: |
-            ${{ env.TAG_PATTERNS }}
+          name: ${{ steps.variant.outputs.name }}
+          project: ${{ needs.plan.outputs.project }}
+          pull-build-id: ${{ needs.plan.outputs.save == 'true' && needs.build-base.outputs.build-id || '' }}
+          file: ${{ steps.variant.outputs.file }}
+          images: ${{ env.IMAGE }}
+          tags: ${{ steps.variant.outputs.tags }}
+          flavor: latest=false
+          save: ${{ needs.plan.outputs.save }}
 
-      - name: Build and push
-        id: build-and-push
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          # We do not really need to cache here as the Dockerfile is tiny
-          #cache-from: type=gha,scope=ruff-${{ env.IMAGE_REF }}
-          #cache-to: type=gha,mode=min,scope=ruff-${{ env.IMAGE_REF }}
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          annotations: ${{ steps.meta.outputs.annotations }}
-
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-name: ${{ env.RUFF_BASE_IMG }}
-          subject-digest: ${{ steps.build-and-push.outputs.digest }}
-
-  # This is effectively a duplicate of `docker-publish` to make https://github.com/astral-sh/ruff/pkgs/container/ruff
-  # show the ruff base image first since GitHub always shows the last updated image digests
-  # This works by annotating the original digests (previously non-annotated) which triggers an update to ghcr.io
-  docker-republish:
-    name: Annotate Docker image (ghcr.io/astral-sh/ruff)
+  manifest:
+    name: collect image manifest
+    needs: [plan, build-base, build-extra]
+    if: needs.plan.outputs.save == 'true'
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    environment:
-      name: release
-    needs:
-      - docker-publish-extra
-    if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
+    timeout-minutes: 2
+    outputs:
+      artifact-id: ${{ steps.manifest.outputs.artifact-id }}
+    steps:
+      - uses: astral-sh/github-actions/docker-manifest@29736b0ef051c49097a9b4adca75e0f3e0c973dd
+        id: manifest
+        with:
+          base-name: ruff
+          image-mappings: ${{ toJson(fromJson(needs.plan.outputs.extra-images).image-mapping) }}
+
+  publish-plan:
+    needs: [plan, manifest]
+    if: needs.plan.outputs.push == 'true'
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    timeout-minutes: 2
+    outputs:
+      base-image: ${{ steps.plan.outputs.base-image }}
+      extra-images: ${{ steps.plan.outputs.extra-images }}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.manifest.outputs.artifact-id }}
+          merge-multiple: true
+      - name: Read image manifest
+        id: plan
+        run: |
+          echo "base-image=$(jq -ce '.base' docker-manifest.json)" >> "$GITHUB_OUTPUT"
+          echo "extra-images=$(jq -ce '{include: .extra}' docker-manifest.json)" >> "$GITHUB_OUTPUT"
+
+  publish-extra:
+    name: publish ${{ matrix.name }}
+    needs: publish-plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.publish-plan.outputs.extra-images) }}
+    uses: ./.github/workflows/publish-docker-image.yml
+    with:
+      image: ${{ toJson(matrix) }}
     permissions:
-      attestations: write
+      contents: read
       id-token: write
       packages: write
-    steps:
-      - name: Download digests
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          path: /tmp/digests
-          pattern: digests-*
-          merge-multiple: true
+      attestations: write
 
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        env:
-          DOCKER_METADATA_ANNOTATIONS_LEVELS: index
-        with:
-          images: ${{ env.RUFF_BASE_IMG }}
-          # Order is on purpose such that the label org.opencontainers.image.version has the first pattern with the full version
-          tags: |
-            type=pep440,pattern={{ version }},value=${{ fromJson(inputs.plan).announcement_tag }}
-            type=pep440,pattern={{ major }}.{{ minor }},value=${{ fromJson(inputs.plan).announcement_tag }}
-
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Adapted from https://docs.docker.com/build/ci/github-actions/multi-platform/
-      - name: Create manifest list and push
-        working-directory: /tmp/digests
-        # The readarray part is used to make sure the quoting and special characters are preserved on expansion (e.g. spaces)
-        # The jq command expands the docker/metadata json "tags" array entry to `-t tag1 -t tag2 ...` for each tag in the array
-        # The printf will expand the base image with the `<RUFF_BASE_IMG>@sha256:<sha256> ...` for each sha256 in the directory
-        # The final command becomes `docker buildx imagetools create -t tag1 -t tag2 ... <RUFF_BASE_IMG>@sha256:<sha256_1> <RUFF_BASE_IMG>@sha256:<sha256_2> ...`
-        run: |
-          readarray -t lines <<< "$DOCKER_METADATA_OUTPUT_ANNOTATIONS"; annotations=(); for line in "${lines[@]}"; do annotations+=(--annotation "$line"); done
-
-          # shellcheck disable=SC2046
-          docker buildx imagetools create \
-            "${annotations[@]}" \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf "${RUFF_BASE_IMG}@sha256:%s " *)
-
-      - name: Export manifest digest
-        id: manifest-digest
-        env:
-          IMAGE: ${{ env.RUFF_BASE_IMG }}
-          VERSION: ${{ steps.meta.outputs.version }}
-        run: |
-          digest="$(
-            docker buildx imagetools inspect \
-              "${IMAGE}:${VERSION}" \
-              --format '{{json .Manifest}}' \
-            | jq -r '.digest'
-          )"
-          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
-
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-name: ${{ env.RUFF_BASE_IMG }}
-          subject-digest: ${{ steps.manifest-digest.outputs.digest }}
+  # Publish the annotated base index last so GHCR lists it before its variants.
+  publish-base:
+    name: publish ruff
+    needs: [publish-plan, publish-extra]
+    uses: ./.github/workflows/publish-docker-image.yml
+    with:
+      image: ${{ needs.publish-plan.outputs.base-image }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+      attestations: write
