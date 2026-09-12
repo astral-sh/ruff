@@ -77,7 +77,8 @@ enum ConditionKind {
     /// A condition whose value type is assignable to `int`, including `bool`.
     ///
     /// These tests commonly enforce runtime invariants, so they are only flagged by the
-    /// opt-in `redundant-condition-strict` rule and are exempted entirely in `assert` tests.
+    /// opt-in `redundant-condition-strict` rule. In `assert` tests, they are exempt unless an
+    /// always-falsy test makes a following nontrivial statement in the same suite unreachable.
     ///
     /// ```python
     /// def check(value: str):
@@ -396,8 +397,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// ## Assertions
     ///
     /// Assertions commonly check runtime invariants, so tests classified as
-    /// [`ConditionKind::Boolean`] or [`ConditionKind::ShortCircuit`] are exempt. This applies to
-    /// both complete assertion tests and their subexpressions:
+    /// [`ConditionKind::Boolean`] or [`ConditionKind::ShortCircuit`] are generally exempt,
+    /// including subexpressions. A complete assertion test with an always-falsy type is reported
+    /// when nontrivial code follows it in the same suite without a defensive exit. Always-truthy
+    /// tests remain exempt:
     ///
     /// ```python
     /// from typing import Literal
@@ -472,6 +475,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ast::Stmt::Assert(assert_statement) => {
                     let test_type = self.expression_type(&assert_statement.test);
                     let truthiness = self.condition_truthiness(&assert_statement.test);
+                    let following_statements = &suite[i + 1..];
+                    let report_failing_boolean_test = test_type
+                        .bool(self.db(), self.program_environment())
+                        .is_always_false()
+                        && following_statements
+                            .iter()
+                            .any(|stmt| !is_trivial_statement(stmt))
+                        && !suite_ends_with_exit(
+                            self,
+                            following_statements,
+                            SuiteExitKind::Defensive,
+                        );
                     for condition in self.redundant_conditions(
                         BooleanTest {
                             expression: &assert_statement.test,
@@ -479,7 +494,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             truthiness,
                             evaluation: ExpressionContext::Condition,
                         },
-                        RedundantConditionContext::Assertion,
+                        RedundantConditionContext::Assertion {
+                            report_failing_boolean_test,
+                        },
                     ) {
                         self.report_redundant_condition(&condition);
                     }
@@ -628,6 +645,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         test: BooleanTest<'ast, 'db>,
         condition_context: RedundantConditionContext,
     ) -> Vec<RedundantCondition<'ast, 'db>> {
+        // Operator annotations commonly omit `NotImplemented` even when it can be returned.
+        // Exempt the complete test before selecting operands, so a sentinel check also protects
+        // other boolean tests within the same condition.
+        if any_over_expr(test.expression, |expression| {
+            self.expression_type(expression)
+                .is_notimplemented(self.db())
+        }) {
+            return Vec::new();
+        }
+
         let mut conditions = Vec::new();
         self.check_boolean_test(
             test,
