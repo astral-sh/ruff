@@ -211,7 +211,7 @@ static TANJUN: Benchmark = Benchmark::new(
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    124,
+    125,
 );
 
 static STATIC_FRAME: Benchmark = Benchmark::new(

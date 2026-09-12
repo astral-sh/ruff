@@ -1387,18 +1387,15 @@ class Intermediate(Base):
     # Mypy does not report an error here, but pyright does: "… overrides symbol
     # of same name in class "Base". Variable is mutable so its type is invariant"
     #
-    # We should introduce a diagnostic for this. Whether or not that should be
-    # enabled by default can still be discussed.
+    # The opt-in mutable-override rule rejects this narrowing.
     #
-    # TODO: This should be an error
-    redeclared_with_narrower_type: str
+    redeclared_with_narrower_type: str  # error: [invalid-mutable-override]
 
     # Redeclaring attributes with a *wider type* directly violates LSP.
     #
     # In this case, both mypy and pyright report an error.
     #
-    # TODO: This should be an error
-    redeclared_with_wider_type: str | int | None
+    redeclared_with_wider_type: str | int | None  # error: [invalid-attribute-override]
 
     # TODO: This should be an `invalid-assignment` error
     overwritten_in_subclass_body = 1

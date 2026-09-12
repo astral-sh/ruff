@@ -183,6 +183,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPED_DICT_FIELD);
     registry.register_lint(&INVALID_TYPED_DICT_HEADER);
     registry.register_lint(&INVALID_ATTRIBUTE_OVERRIDE);
+    registry.register_lint(&INVALID_PROPERTY_TYPE_OVERRIDE);
+    registry.register_lint(&INVALID_MUTABLE_OVERRIDE);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&MISSING_OVERRIDE_DECORATOR);
@@ -1334,9 +1336,27 @@ declare_lint! {
 declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-attribute-override.md")]
     pub(crate) static INVALID_ATTRIBUTE_OVERRIDE = {
-        summary: "detects attribute overrides that change class-variable or instance-variable behavior",
+        summary: "detects attribute overrides that violate inherited type or access requirements",
         status: LintStatus::stable("0.0.33"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/invalid-property-type-override.md")]
+    pub(crate) static INVALID_PROPERTY_TYPE_OVERRIDE = {
+        summary: "detects incompatible overrides involving properties",
+        status: LintStatus::stable("0.0.81"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/invalid-mutable-override.md")]
+    pub(crate) static INVALID_MUTABLE_OVERRIDE = {
+        summary: "detects overrides that narrow writable attribute types",
+        status: LintStatus::stable("0.0.81"),
+        default_level: Level::Ignore,
     }
 }
 
