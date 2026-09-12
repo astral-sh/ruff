@@ -89,7 +89,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
  74 |     # error: [invalid-method-override]
  75 |     def foo(): ...
  76 |     @property
- 77 |     # TODO: we should emit a Liskov violation here too
+ 77 |     # error: [invalid-property-type-override]
  78 |     # error: [override-of-final-method]
  79 |     def my_property1(self) -> str: ...
  80 |     # TODO: we should emit a Liskov violation here too
@@ -348,6 +348,20 @@ help: Remove the override of `foo`
 73 |     @property
    |
 note: This is an unsafe fix and may change runtime behavior
+
+```
+
+```
+error[invalid-property-type-override]: Invalid override of attribute `my_property1`
+  --> src/mdtest_snippet.pyi:79:9
+   |
+79 |     def my_property1(self) -> str: ...
+   |         ^^^^^^^^^^^^ Type `str` is not assignable to inherited type `int`
+   |
+  ::: src/mdtest_snippet.pyi:11:9
+   |
+11 |     def my_property1(self) -> int: ...
+   |         ------------ `Parent.my_property1` declared here
 
 ```
 

@@ -1830,7 +1830,7 @@ class GenericOverlapB(Generic[OverlapT]):
     member: OverlapT
 
 class GenericOverlapC(GenericOverlapB[str], GenericOverlapA):
-    member: str
+    member: str  # error: [invalid-attribute-override]
 
 class GenericListOverlapA: ...
 

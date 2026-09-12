@@ -3,6 +3,8 @@
 //!
 //! [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
+mod attributes;
+
 use bitflags::bitflags;
 use ruff_db::{
     diagnostic::{Annotation, Span},
@@ -26,11 +28,11 @@ use crate::{
         context::InferContext,
         diagnostic::{
             INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_OVERRIDE, INVALID_DATACLASS,
-            INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE,
-            INVALID_NAMED_TUPLE_OVERRIDE, MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD,
-            OVERRIDE_OF_FINAL_VARIABLE, report_incompatible_base_method,
-            report_invalid_method_override, report_overridden_final_method,
-            report_overridden_final_variable,
+            INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_MUTABLE_OVERRIDE,
+            INVALID_NAMED_TUPLE, INVALID_NAMED_TUPLE_OVERRIDE, INVALID_PROPERTY_TYPE_OVERRIDE,
+            MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
+            report_incompatible_base_method, report_invalid_method_override,
+            report_overridden_final_method, report_overridden_final_variable,
         },
         enums::{EnumMetadata, enum_metadata, is_enum_class_by_inheritance},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
@@ -88,7 +90,7 @@ pub(super) fn check_class<'db>(
     let enum_info = enum_metadata(db, class.into());
 
     let mut bases: Vec<_> = class_specialized.iter_mro(db).skip(1).collect();
-    if configuration.check_method_liskov_violations() {
+    if configuration.check_liskov_violations() {
         let generic_bases: FxHashMap<_, _> = bases
             .iter()
             .filter_map(|base| base.into_class()?.into_generic_alias())
@@ -862,6 +864,20 @@ fn check_class_declaration<'db>(
                 }
             }
 
+            if configuration.check_attribute_type_violations()
+                && attributes::check_override(
+                    context,
+                    class,
+                    superclass,
+                    &member.name,
+                    *first_reachable_definition,
+                    superclass_symbol_id.and_then(|id| symbol_definition(db, superclass_scope, id)),
+                )
+            {
+                liskov_diagnostic_emitted = true;
+                continue;
+            }
+
             if !configuration.check_method_liskov_violations() {
                 continue;
             }
@@ -1451,6 +1467,8 @@ bitflags! {
         const FINAL_VARIABLE_OVERRIDDEN = 1 << 7;
         const INVALID_ENUM_VALUE = 1 << 8;
         const MISSING_OVERRIDE_DECORATOR = 1 << 9;
+        const LISKOV_PROPERTIES = 1 << 10;
+        const LISKOV_MUTABLE = 1 << 11;
     }
 }
 
@@ -1466,6 +1484,12 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_ATTRIBUTE_OVERRIDE)) {
             config |= OverrideRulesConfig::LISKOV_ATTRIBUTES;
+        }
+        if rule_selection.is_enabled(LintId::of(&INVALID_PROPERTY_TYPE_OVERRIDE)) {
+            config |= OverrideRulesConfig::LISKOV_PROPERTIES;
+        }
+        if rule_selection.is_enabled(LintId::of(&INVALID_MUTABLE_OVERRIDE)) {
+            config |= OverrideRulesConfig::LISKOV_MUTABLE;
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_EXPLICIT_OVERRIDE)) {
             config |= OverrideRulesConfig::EXPLICIT_OVERRIDE;
@@ -1509,9 +1533,16 @@ impl OverrideRulesConfig {
         self.contains(OverrideRulesConfig::LISKOV_ATTRIBUTES)
     }
 
+    const fn check_attribute_type_violations(self) -> bool {
+        self.intersects(
+            Self::LISKOV_ATTRIBUTES
+                .union(Self::LISKOV_PROPERTIES)
+                .union(Self::LISKOV_MUTABLE),
+        )
+    }
+
     const fn check_liskov_violations(self) -> bool {
-        self.contains(OverrideRulesConfig::LISKOV_METHODS)
-            || self.contains(OverrideRulesConfig::LISKOV_ATTRIBUTES)
+        self.check_method_liskov_violations() || self.check_attribute_type_violations()
     }
 
     const fn check_final_method_overridden(self) -> bool {
