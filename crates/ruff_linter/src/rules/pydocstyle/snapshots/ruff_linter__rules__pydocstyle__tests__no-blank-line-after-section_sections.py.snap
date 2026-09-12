@@ -34,3 +34,54 @@ help: Add blank line after "Returns"
 227 +
 228 |     Raises:
     |
+
+D410 [*] Missing blank line after section ("Keyword Args")
+   --> sections.py:647:5
+    |
+645 |     """Recognize Returns after a Google argument-section alias.
+646 |
+647 |     Keyword Args:
+    |     ^^^^^^^^^^^^
+648 |         option: some argument
+649 |     Returns:
+    |
+help: Add blank line after "Keyword Args"
+    |
+648 |         option: some argument
+649 +
+650 |     Returns:
+    |
+
+D410 [*] Missing blank line after section ("Args")
+   --> sections.py:658:5
+    |
+656 |     """Recognize supported singular section aliases.
+657 |
+658 |     Args:
+    |     ^^^^
+659 |         value: some argument.
+660 |     Return:
+    |
+help: Add blank line after "Args"
+    |
+659 |         value: some argument.
+660 +
+661 |     Return:
+    |
+
+D410 [*] Missing blank line after section ("Return")
+   --> sections.py:660:5
+    |
+658 |     Args:
+659 |         value: some argument.
+660 |     Return:
+    |     ^^^^^^
+661 |         bool: some return value
+662 |     Raises:
+    |
+help: Add blank line after "Return"
+    |
+661 |         bool: some return value
+662 +
+663 |     Raises:
+    |
