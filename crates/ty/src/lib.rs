@@ -161,7 +161,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     project_metadata.apply_configuration_files(&system)?;
 
-    project_metadata.apply_override_options(args.into_options());
+    project_metadata.set_override_options(args.into_options());
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;
     let project = db.project();

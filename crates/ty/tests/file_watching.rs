@@ -474,11 +474,11 @@ where
         ProjectMetadata::discover(&project_path, &system)?
     };
     if let Some(fallback_options) = fallback_options {
-        project.apply_fallback_options(fallback_options);
+        project.set_fallback_options(fallback_options);
     }
     project.apply_configuration_files(&system)?;
     if let Some(override_options) = override_options {
-        project.apply_override_options(override_options);
+        project.set_override_options(override_options);
     }
 
     // We need a chance to create the directories here.
