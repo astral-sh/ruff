@@ -1511,8 +1511,9 @@ impl<'db> ClassType<'db> {
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::new(env);
-        let mut checker = TypeRelationChecker::subtyping(
+        let checker = TypeRelationChecker::new(
             env,
+            relation,
             &constraints,
             TypeVarSet::None,
             &relation_visitor,
@@ -1520,7 +1521,6 @@ impl<'db> ClassType<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.relation = relation;
         checker
             .check_class_pair(db, self, target)
             .is_always_satisfied(db, env)
