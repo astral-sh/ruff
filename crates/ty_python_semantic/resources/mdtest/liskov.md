@@ -1101,7 +1101,7 @@ class IndirectConflict(Intermediate, ReturnsInt): ...  # error: [invalid-method-
 
 ### Properties
 
-Incompatible properties inherited from different bases are not yet checked.
+Incompatible properties inherited from different bases are rejected at the class that joins them.
 
 ```pyi
 class ReturnsStr:
@@ -1112,8 +1112,7 @@ class ReturnsInt:
     @property
     def value(self) -> int: ...
 
-# TODO: Incompatible inherited properties should be reported here.
-class PropertyConflict(ReturnsStr, ReturnsInt): ...
+class PropertyConflict(ReturnsStr, ReturnsInt): ...  # error: [invalid-property-type-override]
 ```
 
 ### Synthesized members
@@ -3052,4 +3051,86 @@ class Base:
 class Child(Base):
     def __init__(self) -> None:
         self.value: bool = True  # error: [invalid-mutable-override]
+```
+
+## Inherited attribute conflicts
+
+A class must preserve every base's attribute contract, even when it does not redeclare the
+attribute. The first definition in the MRO supplies the effective attribute.
+
+```py
+class Integer:
+    value: int
+
+class String:
+    value: str
+
+class Conflict(Integer, String): ...  # snapshot: invalid-attribute-override
+class Reversed(String, Integer): ...  # error: [invalid-attribute-override]
+class Descendant(Conflict): ...
+class Independent: ...
+class JoinedAgain(Independent, Conflict): ...
+class ReversedAgain(Conflict, Independent): ...
+```
+
+```snapshot
+error[invalid-attribute-override]: Incompatible inherited attribute `value`
+ --> src/mdtest_snippet.py:7:7
+  |
+2 |     value: int
+  |     ----- `Integer.value` declared here
+3 |
+4 | class String:
+5 |     value: str
+  |     ----- `String.value` declared here
+6 |
+7 | class Conflict(Integer, String): ...  # snapshot: invalid-attribute-override
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^ `Integer.value` is incompatible with `String.value`
+info: Type `int` is not assignable to inherited type `str`
+```
+
+## Explicit overrides preserve new base contracts
+
+Matching an existing parent declaration does not hide a conflict introduced by a second base. An
+override that repeats an existing parent violation does not report it again.
+
+```py
+class Integer:
+    value: int
+
+class String:
+    value: str
+
+class Conflict(String, Integer):
+    value: str  # error: [invalid-attribute-override]
+
+class Descendant(Conflict):
+    value: str
+
+class Independent: ...
+
+class JoinedAgain(Independent, Conflict):
+    value: str
+
+class ReversedAgain(Conflict, Independent):
+    value: str
+```
+
+## Gradual intermediate attribute contracts
+
+An intermediate `Any` annotation does not erase a concrete ancestor's requirements.
+
+```py
+from typing import Any
+
+class Integer:
+    value: int
+
+class Gradual(Integer):
+    value: Any
+
+class String:
+    value: str
+
+class Conflict(String, Gradual): ...  # error: [invalid-attribute-override]
 ```
