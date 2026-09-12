@@ -82,7 +82,17 @@ impl<'db> ConstructorBinding<'db> {
             return;
         };
         let generic_context = specialization.generic_context(db);
-        if generic_context_has_paramspec(db, generic_context)
+        // A constructor can use a class specialization reached through a fixed TypeVar's domain
+        // without owning that class's type variables. Only a context inherited by the constructor
+        // signature is eligible for freshening.
+        let owns_generic_context = self.entry.overloads.iter().any(|overload| {
+            overload
+                .signature
+                .generic_context
+                .is_some_and(|owned| generic_context.is_subset_of(db, owned))
+        });
+        if !owns_generic_context
+            || generic_context_has_paramspec(db, generic_context)
             || !nonce_generator.should_freshen(db, generic_context)
         {
             return;
@@ -95,10 +105,6 @@ impl<'db> ConstructorBinding<'db> {
         };
         let fresh_instance_type =
             instance_type.apply_type_mapping(db, env, &type_mapping, TypeContext::default());
-        // Only freshen a generic context that belongs to the constructed instance itself.
-        // `class_specialization` can also find a context through a class-object type variable's
-        // bound, but freshening that context would detach the constructor parameters from the
-        // receiver.
         if fresh_instance_type == instance_type {
             return;
         }
