@@ -3009,3 +3009,47 @@ class Child(Base):
     @property
     def value(self) -> str: ...  # error: [invalid-property-type-override]
 ```
+
+## Attributes declared in methods
+
+An annotation on a method receiver declares an attribute contract just like a class-body annotation.
+Plain initialization does not redeclare the inherited type.
+
+```py
+class Base:
+    def __init__(self) -> None:
+        self.value: int = 0
+
+class Same(Base):
+    def __init__(self) -> None:
+        self.value: int = 1
+
+class Incompatible(Base):
+    def __init__(self) -> None:
+        self.value: str = ""  # error: [invalid-attribute-override]
+
+class Narrow(Base):
+    def __init__(self) -> None:
+        self.value: bool = True  # error: [invalid-mutable-override]
+
+class Initialized(Base):
+    def __init__(self) -> None:
+        self.value = True
+
+class ClassBodyOverride(Base):
+    value: str  # error: [invalid-attribute-override]
+```
+
+## Method annotations overriding class-body declarations
+
+A subclass receiver annotation is checked against the base declaration even when ordinary member
+lookup still prefers the inherited class-body annotation.
+
+```py
+class Base:
+    value: int
+
+class Child(Base):
+    def __init__(self) -> None:
+        self.value: bool = True  # error: [invalid-mutable-override]
+```

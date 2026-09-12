@@ -2313,5 +2313,31 @@ class Incompatible(Base[int]):
         return ""
 ```
 
+## Specialized receiver attribute overrides
+
+Receiver declarations retain the specialization of their defining class when checking a subclass
+annotation.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    def __init__(self, value: T) -> None:
+        self.value: T = value
+
+class Same(Base[int]):
+    def __init__(self) -> None:
+        self.value: int = 0
+
+class Narrow(Base[int]):
+    def __init__(self) -> None:
+        self.value: bool = True  # error: [invalid-mutable-override]
+
+class Incompatible(Base[int]):
+    value: str  # error: [invalid-attribute-override]
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
