@@ -488,7 +488,7 @@ class Second(Base):
     value: int | None
 
 class Child(First, Second):
-    value: int = 1
+    value: int = 1  # error: [invalid-mutable-override]
 
     def update(self) -> None:
         self.value |= 2
