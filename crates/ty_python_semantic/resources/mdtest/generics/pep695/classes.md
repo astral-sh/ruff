@@ -1813,5 +1813,32 @@ class Incompatible(Base[int]):
     value: str  # error: [invalid-attribute-override]
 ```
 
+## Attribute conflicts introduced by another specialization
+
+A parent that satisfies `Base[Any]` can conflict with `Base[int]` inherited through another parent.
+The concrete contract remains relevant even if the lookup MRO selects the gradual one.
+
+```py
+from typing import Any
+
+class Base[T]:
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+class String(Base[Any]):
+    @property
+    def value(self) -> str:
+        return ""
+
+class Integer(Base[int]): ...
+class Conflict(String, Integer): ...  # error: [invalid-property-type-override]
+
+class Explicit(String, Integer):
+    @property
+    def value(self) -> str:  # error: [invalid-property-type-override]
+        return ""
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

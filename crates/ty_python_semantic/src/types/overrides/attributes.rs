@@ -3,19 +3,22 @@
 use ruff_db::diagnostic::Annotation;
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
-use ty_python_core::definition::Definition;
+use rustc_hash::FxHashSet;
+use ty_python_core::{definition::Definition, place_table};
 
 use crate::{
     Db, ProgramEnvironment,
     place::{Place, TypeOrigin},
     types::{
-        ClassBase, ClassType, IntersectionType, MemberLookupPolicy, Type, TypeQualifiers,
+        ClassBase, ClassType, IntersectionType, MemberLookupPolicy, StaticClassLiteral, Type,
+        TypeQualifiers,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         class::CodeGeneratorKind,
         context::InferContext,
         diagnostic::{
             INVALID_ATTRIBUTE_OVERRIDE, INVALID_MUTABLE_OVERRIDE, INVALID_PROPERTY_TYPE_OVERRIDE,
         },
+        list_members::{MemberWithDefinition, all_end_of_scope_members},
     },
 };
 
@@ -280,6 +283,10 @@ pub(super) fn check_override<'db>(
     ) else {
         return false;
     };
+    if already_inherited(db, env, class, superclass, name, &source) {
+        return false;
+    }
+
     let rule = if source.is_property || target.is_property {
         &INVALID_PROPERTY_TYPE_OVERRIDE
     } else if matches!(violation, AttributeViolation::Write { .. }) {
@@ -377,6 +384,216 @@ pub(super) fn check_instance_overrides<'db>(
                 Place::Undefined => None,
             };
             if check_override(context, class, base, name, definition, base_definition) {
+                break;
+            }
+        }
+    }
+}
+
+/// Whether a parent already contains the same incompatible attribute contract.
+///
+/// Inspect every parent hierarchy, since the conflicting parent need not be first in
+/// the child's MRO. Match the selected read/write contract in the child's context, then
+/// recheck the conflict with the parent's own specializations. A parent that satisfies
+/// `Base[Any]` cannot suppress a conflict with a newly inherited `Base[int]`.
+fn already_inherited<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassType<'db>,
+    target_owner: ClassType<'db>,
+    name: &str,
+    source: &AttributeContract<'db>,
+) -> bool {
+    let child_receiver = Type::instance(db, env, class);
+    class
+        .iter_mro(db)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .any(|parent| {
+            let Some(owner) = parent
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .find(|owner| {
+                    !owner.own_class_member(db, env, None, name).is_undefined()
+                        || !owner.own_instance_member(db, env, name).is_undefined()
+                })
+            else {
+                return false;
+            };
+            let Some(inherited) = attribute_contract(db, env, owner, child_receiver, name) else {
+                return false;
+            };
+            if inherited.read != source.read
+                || inherited.write != source.write
+                || inherited.qualifiers != source.qualifiers
+            {
+                return false;
+            }
+            let receiver = Type::instance(db, env, parent);
+            let Some(inherited) = attribute_contract(db, env, owner, receiver, name) else {
+                return false;
+            };
+            parent
+                .iter_mro(db)
+                .skip(1)
+                .filter_map(ClassBase::into_class)
+                .chain(parent.iter_explicit_ancestors(db, env).skip(1))
+                .filter(|ancestor| ancestor.class_literal(db) == target_owner.class_literal(db))
+                .any(|ancestor| {
+                    let Some(target) = attribute_contract(db, env, ancestor, receiver, name) else {
+                        return false;
+                    };
+                    attribute_violation(
+                        db,
+                        env,
+                        receiver,
+                        Type::instance(db, env, ancestor),
+                        name,
+                        &inherited,
+                        &target,
+                    )
+                    .is_some()
+                })
+        })
+}
+
+/// Check the attribute selected by an MRO against every inherited declaration of that name.
+///
+/// Explicit overrides are checked separately. Lookup selects only one source before the
+/// first dynamic base, but all inherited generic specializations remain target contracts.
+/// Conflicts already present in a parent hierarchy are suppressed.
+///
+/// ```python
+/// class Integer:
+///     value: int
+///
+/// class String:
+///     value: str
+///
+/// class Combined(Integer, String): ...  # Integer.value cannot satisfy String.value.
+/// ```
+pub(super) fn check_inherited_conflicts<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    class_type: ClassType<'db>,
+    own_members: &FxHashSet<MemberWithDefinition<'db>>,
+) {
+    let Some((mro, first_dynamic_base)) = super::inherited_conflict_mro(context, class, class_type)
+    else {
+        return;
+    };
+    let db = context.db();
+    let env = &context.program_environment();
+    let receiver = Type::instance(db, env, class_type);
+    let mut seen: FxHashSet<Name> = own_members
+        .iter()
+        .map(|member| member.member.name.clone())
+        .collect();
+    seen.extend(
+        class_type
+            .own_instance_attribute_names(db)
+            .iter()
+            .filter(|name| {
+                matches!(class_type.own_instance_member(db, env, name).inner.place,
+            Place::Defined(place) if place.origin == TypeOrigin::Declared)
+            })
+            .cloned(),
+    );
+    let contracts: Vec<_> = mro
+        .iter()
+        .copied()
+        .chain(class_type.iter_explicit_ancestors(db, env).skip(1))
+        .collect();
+    for (index, owner) in mro.iter().copied().enumerate() {
+        if first_dynamic_base.is_some_and(|position| index >= position) {
+            break;
+        }
+        let Some((literal, _)) = owner.static_class_literal(db) else {
+            continue;
+        };
+        let names = all_end_of_scope_members(db, literal.body_scope(db))
+            .map(|member| member.member.name)
+            .chain(owner.own_instance_attribute_names(db).iter().cloned());
+        for name in names {
+            if is_mangled_private(&name) || !seen.insert(name.clone()) {
+                continue;
+            }
+            let Some(source) = attribute_contract(db, env, owner, receiver, &name) else {
+                continue;
+            };
+            for target_owner in contracts.iter().copied().filter(|target| *target != owner) {
+                let Some(target) = attribute_contract(db, env, target_owner, receiver, &name)
+                else {
+                    continue;
+                };
+                let Some(violation) = attribute_violation(
+                    db,
+                    env,
+                    receiver,
+                    Type::instance(db, env, target_owner),
+                    &name,
+                    &source,
+                    &target,
+                ) else {
+                    continue;
+                };
+                if already_inherited(db, env, class_type, target_owner, &name, &source) {
+                    continue;
+                }
+                let rule = if source.is_property || target.is_property {
+                    &INVALID_PROPERTY_TYPE_OVERRIDE
+                } else if matches!(violation, AttributeViolation::Write { .. }) {
+                    &INVALID_MUTABLE_OVERRIDE
+                } else {
+                    &INVALID_ATTRIBUTE_OVERRIDE
+                };
+                let Some(builder) = context.report_lint(rule, class.header_range(db)) else {
+                    continue;
+                };
+                let mut diagnostic = builder
+                    .into_diagnostic(format_args!("Incompatible inherited attribute `{name}`"));
+                diagnostic.set_primary_annotation_message(format_args!(
+                    "`{}.{name}` is incompatible with `{}.{name}`",
+                    owner.name(db),
+                    target_owner.name(db),
+                ));
+                match violation {
+                    AttributeViolation::Read { source, target } => diagnostic.info(format_args!(
+                        "Type `{}` is not assignable to inherited type `{}`",
+                        source.display(db, env),
+                        target.display(db, env),
+                    )),
+                    AttributeViolation::Write { target } => diagnostic.info(format_args!(
+                        "Inherited attribute does not accept writes of type `{}`",
+                        target.display(db, env),
+                    )),
+                    AttributeViolation::ReadOnly => diagnostic
+                        .info("Inherited read-only attribute replaces a writable attribute"),
+                }
+                for owner in [owner, target_owner] {
+                    let Some((literal, _)) = owner.static_class_literal(db) else {
+                        continue;
+                    };
+                    let definition = place_table(db, literal.body_scope(db))
+                        .symbol_id(&name)
+                        .and_then(|id| super::symbol_definition(db, literal.body_scope(db), id))
+                        .or_else(
+                            || match owner.own_instance_member(db, env, &name).inner.place {
+                                Place::Defined(place) => place.provenance.definition(),
+                                Place::Undefined => None,
+                            },
+                        );
+                    if let Some(definition) = definition
+                        && definition.file(db) == context.file()
+                    {
+                        diagnostic.annotate(
+                            Annotation::secondary(
+                                context.span(definition.focus_range(db, context.module())),
+                            )
+                            .message(format_args!("`{}.{name}` declared here", owner.name(db))),
+                        );
+                    }
+                }
                 break;
             }
         }

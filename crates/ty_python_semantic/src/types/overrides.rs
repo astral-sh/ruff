@@ -87,6 +87,14 @@ pub(super) fn check_class<'db>(
     if configuration.check_method_liskov_violations() && !inconsistent_generic_bases {
         check_inherited_method_conflicts(context, class, class_specialized, &own_class_members);
     }
+    if configuration.check_attribute_type_violations() && !inconsistent_generic_bases {
+        attributes::check_inherited_conflicts(
+            context,
+            class,
+            class_specialized,
+            &own_class_members,
+        );
+    }
     let enum_info = enum_metadata(db, class.into());
 
     let mut bases: Vec<_> = class_specialized.iter_mro(db).skip(1).collect();
@@ -162,48 +170,10 @@ fn check_inherited_method_conflicts<'db>(
     let db = context.db();
     let env = &context.program_environment();
 
-    let mut direct_bases = Vec::new();
-    for base in class.explicit_bases(db) {
-        match ClassBase::try_from_explicit_base(db, env, *base, Some(class.into())) {
-            Some(ClassBase::Class(base)) if base.static_class_literal(db).is_some() => {
-                direct_bases.push(base);
-            }
-            Some(
-                ClassBase::Generic
-                | ClassBase::Protocol
-                | ClassBase::Any
-                | ClassBase::Dynamic(_)
-                | ClassBase::Divergent(_),
-            ) => {}
-            _ => return,
-        }
-    }
-    if direct_bases.len() < 2 || class.try_mro(db, None).is_err() {
+    let Some((mro, first_dynamic_base)) = inherited_conflict_mro(context, class, class_specialized)
+    else {
         return;
-    }
-
-    let constraints = ConstraintSetBuilder::new();
-    if direct_bases.iter().enumerate().any(|(index, left)| {
-        direct_bases[index + 1..]
-            .iter()
-            .any(|right| !left.could_coexist_in_mro_with(db, env, *right, &constraints))
-    }) {
-        return;
-    }
-
-    let mut mro = Vec::new();
-    let mut first_dynamic_base = None;
-    for base in class_specialized.iter_mro(db).skip(1) {
-        match base {
-            ClassBase::Class(base) if base.is_object(db) => break,
-            ClassBase::Class(base) if base.static_class_literal(db).is_some() => mro.push(base),
-            ClassBase::Protocol | ClassBase::Generic => {}
-            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
-                first_dynamic_base.get_or_insert(mro.len());
-            }
-            ClassBase::TypedDict(_) | ClassBase::Class(_) => return,
-        }
-    }
+    };
     let receiver = Type::instance(db, env, class_specialized);
     let mut seen_names: FxHashSet<_> = own_class_members
         .iter()
@@ -348,6 +318,64 @@ fn check_inherited_method_conflicts<'db>(
             }
         }
     }
+}
+
+/// Resolve the static MRO entries for a supported multiple-inheritance join.
+///
+/// Return `None` for fewer than two known direct bases, invalid or incompatible bases,
+/// or unsupported MRO entries. The returned list excludes the class itself and `object`.
+/// The optional index identifies where the first dynamic base interrupts known lookup:
+/// entries at and beyond it still constrain overrides, but cannot supply the selected member.
+fn inherited_conflict_mro<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    class_specialized: ClassType<'db>,
+) -> Option<(Vec<ClassType<'db>>, Option<usize>)> {
+    let db = context.db();
+    let env = &context.program_environment();
+    let mut direct_bases = Vec::new();
+    for base in class.explicit_bases(db) {
+        match ClassBase::try_from_explicit_base(db, env, *base, Some(class.into())) {
+            Some(ClassBase::Class(base)) if base.static_class_literal(db).is_some() => {
+                direct_bases.push(base);
+            }
+            Some(
+                ClassBase::Generic
+                | ClassBase::Protocol
+                | ClassBase::Any
+                | ClassBase::Dynamic(_)
+                | ClassBase::Divergent(_),
+            ) => {}
+            _ => return None,
+        }
+    }
+    if direct_bases.len() < 2 || class.try_mro(db, None).is_err() {
+        return None;
+    }
+
+    let constraints = ConstraintSetBuilder::new();
+    if direct_bases.iter().enumerate().any(|(index, left)| {
+        direct_bases[index + 1..]
+            .iter()
+            .any(|right| !left.could_coexist_in_mro_with(db, env, *right, &constraints))
+    }) {
+        return None;
+    }
+
+    let mut mro = Vec::new();
+    let mut first_dynamic_base = None;
+    for base in class_specialized.iter_mro(db).skip(1) {
+        match base {
+            ClassBase::Class(base) if base.is_object(db) => break,
+            ClassBase::Class(base) if base.static_class_literal(db).is_some() => mro.push(base),
+            ClassBase::Protocol | ClassBase::Generic => {}
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                first_dynamic_base.get_or_insert(mro.len());
+            }
+            ClassBase::TypedDict(_) | ClassBase::Class(_) => return None,
+        }
+    }
+    Some((mro, first_dynamic_base))
 }
 
 /// Returns a source-defined method bound to the class whose MRO is being checked.

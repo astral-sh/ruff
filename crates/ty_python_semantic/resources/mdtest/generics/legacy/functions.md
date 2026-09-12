@@ -950,6 +950,7 @@ single type for `T` in `extract_t`, because `P` and `Q` are invariant. However, 
 both types in a call to `extract_both`:
 
 ```py
+# error: [invalid-attribute-override]
 class PandQ(P[int], Q[str]):
     pass
 
