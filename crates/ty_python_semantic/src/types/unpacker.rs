@@ -945,7 +945,7 @@ pub(super) fn literal_source_expressions(
     )
 }
 
-pub(super) fn unpack_literal_values<'ast>(
+fn unpack_literal_values<'ast>(
     targets: &[ast::Expr],
     value: &'ast ast::Expr,
 ) -> Option<Tuple<Option<&'ast ast::Expr>, Vec<Option<&'ast ast::Expr>>>> {
