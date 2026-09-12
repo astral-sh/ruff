@@ -109,19 +109,18 @@ out = (obj[0] := obj).attr
 ## Multiple starred assignment targets
 
 Even when a recovered assignment has more than one starred target, unpacking records types for its
-bindings without panicking.
+bindings without panicking. The second starred target currently receives the last element's type;
+TODO: recover it as a list instead.
 
 ```py
 first, *left, *right = [1, 2, 3]  # error: [invalid-syntax] "Two starred expressions in assignment"
 reveal_type(first)  # revealed: Literal[1]
 reveal_type(left)  # revealed: list[int]
-# TODO: recovering to a `list` type of some kind would probably be better?
 reveal_type(right)  # revealed: Literal[3]
 
 first, *left, *right = (1, 2, 3)  # error: [invalid-syntax] "Two starred expressions in assignment"
 reveal_type(first)  # revealed: Literal[1]
 reveal_type(left)  # revealed: list[int]
-# TODO: recovering to a `list` type of some kind would probably be better?
 reveal_type(right)  # revealed: Literal[3]
 ```
 
@@ -134,7 +133,6 @@ first, *left, *right = (1, 2, 3)  # error: [invalid-syntax] "Two starred express
 
 reveal_type(first)  # revealed: Literal[1]
 reveal_type(left)  # revealed: list[int]
-# TODO: recovering to a `list` type of some kind would probably be better?
 reveal_type(right)  # revealed: Literal[3]
 ```
 
@@ -148,7 +146,6 @@ items, (*left, *right) = ([1], (2, 3, 4))
 
 reveal_type(items)  # revealed: list[object]
 reveal_type(left)  # revealed: list[int]
-# TODO: recovering to a `list` type of some kind would probably be better?
 reveal_type(right)  # revealed: Literal[4]
 
 # error: [invalid-syntax] "Two starred expressions in assignment"
@@ -156,7 +153,6 @@ reveal_type(right)  # revealed: Literal[4]
 
 reveal_type(items)  # revealed: list[object]
 reveal_type(left)  # revealed: list[int]
-# TODO: recovering to a `list` type of some kind would probably be better?
 reveal_type(right)  # revealed: Literal[4]
 ```
 

@@ -463,15 +463,25 @@ info: Item declaration
   |     ---------- Item declared here
 ```
 
-If a starred expression on the right prevents contextual inference, the assignment still reports the
-incompatible dictionary. Locating the inner literal for a diagnostic does not by itself establish
-that the literal was checked against the annotation.
+Expanding a literal tuple retains the correspondence between each source expression and its target.
+The declaration therefore supplies context to the dictionary inside the expanded tuple.
 
 ```py
-# error: [invalid-assignment]
+# error: [invalid-argument-type]
 payload, other = ({"value": "wrong"}, *(0,))
 reveal_type(payload)  # revealed: Payload
 reveal_type(other)  # revealed: Literal[0]
+```
+
+Expanding an existing iterable does not change the destination of a preceding fixed expression. The
+dictionary still receives `payload`'s context, even though the iterable's elements have no
+individual source expressions.
+
+```py
+def assign_from_iterable(tail: tuple[int]):
+    payload: Payload
+    # error: [invalid-argument-type]
+    payload, other = ({"value": "wrong"}, *tail)
 ```
 
 Unpacking a dictionary itself assigns its keys to the targets. The dictionary is not a `TypedDict`
@@ -484,9 +494,9 @@ payload, other = {"value": 1, "other": 2}
 
 ```snapshot
 error[invalid-assignment]: Object of type `str` is not assignable to `Payload`
-  --> src/mdtest_snippet.py:15:18
+  --> src/mdtest_snippet.py:19:18
    |
-15 | payload, other = {"value": 1, "other": 2}
+19 | payload, other = {"value": 1, "other": 2}
    | -------          ^^^^^^^^^^^^^^^^^^^^^^^^ Incompatible value of type `str`
    | |
    | Assigned to this variable
@@ -515,12 +525,11 @@ def assign_container(container: Container):
     (container["payload"],), other = (({"value": "wrong"},), 0)
 ```
 
-An inner dictionary that did not receive context still needs the assignment diagnostic, even when
-its position can be recovered from the source syntax.
+An expanded literal likewise receives a `TypedDict` key's context and reports its invalid field.
 
 ```py
-def assign_without_context(container: Container):
-    # error: [invalid-assignment]
+def assign_literal_expansion(container: Container):
+    # error: [invalid-argument-type]
     container["payload"], other = ({"value": "wrong"}, *(0,))
 ```
 

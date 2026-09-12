@@ -196,6 +196,53 @@ error[invalid-assignment]: Object of type `Literal[b"three"]` is not assignable 
   |     Declared type `int | str`
 ```
 
+## Conflicting declarations on unpacked targets
+
+An unpacked name can have different declarations on separate branches. The assignment reports one
+conflicting-declarations diagnostic for that target, as well as an invalid assignment if the value
+is incompatible with both types.
+
+```py
+def assign(flag: bool) -> None:
+    if flag:
+        x: int
+    else:
+        x: str
+
+    # error: [conflicting-declarations]
+    # error: [invalid-assignment]
+    x, other = (b"three", 0)
+```
+
+A starred target with conflicting element types likewise reports the conflict only once.
+
+```py
+def capture(flag: bool) -> None:
+    if flag:
+        rest: list[int]
+    else:
+        rest: list[str]
+
+    # error: [conflicting-declarations]
+    (*rest,) = (1,)
+```
+
+## Implicit class and function bindings through unpacking
+
+A class or function supplies an implicit type for its name.
+
+```py
+class Item: ...
+
+def operation() -> None: ...
+
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `<class 'Item'>` (declared type of variable `Item`)"
+Item, other = (1, 0)
+
+# error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to `def operation() -> None` (declared type of variable `operation`)"
+operation, other = (2, 0)
+```
+
 ## Equivalent declarations
 
 When distinct branches declare the same type, neither annotation is the unique source of the

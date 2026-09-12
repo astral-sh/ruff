@@ -529,7 +529,7 @@ first, *unconstrained = [0, *[(1,), (2, 3)]]
 reveal_type(first)  # revealed: Literal[0]
 reveal_type(unconstrained)  # revealed: list[tuple[int, ...]]
 
-accepted: list[tuple[int, ...]] = unconstrained
+accepted: list[tuple[int, ...]] = unconstrained  # no diagnostic
 ```
 
 A tuple from a variable retains its annotated shape and prevents tuple-size promotion for the
@@ -642,6 +642,26 @@ first, *rest, last = [*[1]]
 reveal_type(first)  # revealed: Unknown
 reveal_type(rest)  # revealed: list[Unknown]
 reveal_type(last)  # revealed: Unknown
+```
+
+The matched expression inside an expansion receives the declaration of its target, just as an
+expression written directly in the outer tuple does.
+
+```py
+def contextual_expansion() -> None:
+    first: list[object]
+    first, other = (*[[1]], 0)  # no diagnostic
+    reveal_type(first)  # revealed: list[object]
+    reveal_type(other)  # revealed: Literal[0]
+```
+
+This also applies when the expanded expression is nested in more than one literal.
+
+```py
+def nested_contextual_expansion() -> None:
+    first: list[object]
+    first, other = (*[*[[1]]], 0)  # no diagnostic
+    reveal_type(first)  # revealed: list[object]
 ```
 
 A dictionary literal with a single key supplies one element.
@@ -1667,11 +1687,11 @@ string is assigned separately and does not contribute to the list's element type
 from typing import Literal
 
 x: list[Literal[1, 2, 3]]
-*x, y = (1, 2, 3, "foo")
+*x, y = (1, 2, 3, "foo")  # no diagnostic
 reveal_type(x)  # revealed: list[Literal[1, 2, 3]]
 reveal_type(y)  # revealed: Literal["foo"]
 
-*x, y = [1, 2, 3, "foo"]
+*x, y = [1, 2, 3, "foo"]  # no diagnostic
 reveal_type(x)  # revealed: list[Literal[1, 2, 3]]
 reveal_type(y)  # revealed: Literal["foo"]
 ```
@@ -1700,16 +1720,16 @@ from typing import Literal
 
 numbers: list[object]
 literal: list[Literal[1]]
-numbers, literal = ([1], [1])
+numbers, literal = ([1], [1])  # no diagnostic
 reveal_type(numbers)  # revealed: list[object]
 reveal_type(literal)  # revealed: list[Literal[1]]
 
-[numbers, (literal,)] = [[1], ([1],)]
+[numbers, (literal,)] = [[1], ([1],)]  # no diagnostic
 reveal_type(numbers)  # revealed: list[object]
 reveal_type(literal)  # revealed: list[Literal[1]]
 
 rest: list[list[object]]
-(first, *rest), (literal,) = ((0, [1], [2]), [[1]])
+(first, *rest), (literal,) = ((0, [1], [2]), [[1]])  # no diagnostic
 reveal_type(rest)  # revealed: list[list[object]]
 reveal_type(literal)  # revealed: list[Literal[1]]
 ```
@@ -1718,7 +1738,7 @@ An unannotated outer capture does not discard context for a nested annotated cap
 capture widens its integer element to `int`.
 
 ```py
-(first, *rest), *outer = ((0, [1], [2]), 3)
+(first, *rest), *outer = ((0, [1], [2]), 3)  # no diagnostic
 reveal_type(first)  # revealed: Literal[0]
 reveal_type(rest)  # revealed: list[list[object]]
 reveal_type(outer)  # revealed: list[int]
@@ -1745,7 +1765,7 @@ def empty[T]() -> list[T]:
 
 items: list[int]
 record: Record
-items, record = (empty(), {"value": 1})
+items, record = (empty(), {"value": 1})  # no diagnostic
 reveal_type(items)  # revealed: list[int]
 reveal_type(record)  # revealed: Record
 ```
@@ -1759,9 +1779,9 @@ class Holder:
     values: list[object]
 
 def assign(holder: Holder, rows: list[list[object]]):
-    holder.values, rows[0] = ([1], [2])
-    first, *holder.values = (0, 1, 2)
-    first, *rows[0] = [0, 1, 2]
+    holder.values, rows[0] = ([1], [2])  # no diagnostic
+    first, *holder.values = (0, 1, 2)  # no diagnostic
+    first, *rows[0] = [0, 1, 2]  # no diagnostic
 ```
 
 Slots are descriptors, but their declared types describe both reads and writes. Their annotations
@@ -1774,8 +1794,8 @@ class SlottedHolder:
     values: list[object]
 
 def assign_slot(holder: SlottedHolder):
-    holder.values, other = ([1], 0)
-    first, *holder.values = (0, 1, 2)
+    holder.values, other = ([1], 0)  # no diagnostic
+    first, *holder.values = (0, 1, 2)  # no diagnostic
 ```
 
 Reading a property can return a different type from the one its setter accepts. The getter's return
@@ -1793,9 +1813,81 @@ class Property:
         pass
 
 def assign_property(holder: Property):
-    holder.value, other = ([1], 0)
+    holder.value, other = ([1], 0)  # no diagnostic
     # error: [invalid-assignment]
     holder.value, other = (["foo"], 0)
+```
+
+The setter's declared value type also supplies context when it is wider than the list literal's
+element type. Reading the property has a different type, so the getter cannot supply that context.
+
+```py
+class ObjectProperty:
+    @property
+    def value(self) -> list[str]:
+        return []
+
+    @value.setter
+    def value(self, value: list[object]) -> None:
+        pass
+
+def assign_object_property(holder: ObjectProperty):
+    holder.value, other = ([1], 0)  # no diagnostic
+```
+
+An unwritable attribute still allows the source expressions to be inferred. Rejecting the write does
+not change the type assigned to a separate target in the same unpacking.
+
+```py
+class ReadOnly:
+    @property
+    def value(self) -> list[int]:
+        return []
+
+def assign_read_only(holder: ReadOnly):
+    # error: [invalid-assignment]
+    holder.value, other = ([1], 0)
+    reveal_type(other)  # revealed: Literal[0]
+
+    # error: [invalid-assignment]
+    first, *holder.value = (0, 1, 2)
+    reveal_type(first)  # revealed: Literal[0]
+```
+
+A custom `__setitem__` supplies the same value context for an unpacked assignment as for an ordinary
+assignment. It also supplies context for a fresh list collected by a starred target.
+
+```py
+class Container:
+    def __setitem__(self, key: int, value: list[object]) -> None:
+        pass
+
+def assign_container(container: Container):
+    container[0] = [1]  # no diagnostic
+    container[0], other = ([1], 0)  # no diagnostic
+    first, *container[0] = (0, 1, 2)  # no diagnostic
+
+def assign_container_source(container: Container, source: tuple[int, int]):
+    first, *container[0] = source  # no diagnostic
+```
+
+When `__setitem__` is overloaded, the key selects the value context just as it does in an ordinary
+assignment.
+
+```py
+from typing import Literal, overload
+
+class OverloadedContainer:
+    @overload
+    def __setitem__(self, key: Literal[0], value: list[object]) -> None: ...
+    @overload
+    def __setitem__(self, key: Literal[1], value: list[str]) -> None: ...
+    def __setitem__(self, key: int, value: list[object] | list[str]) -> None:
+        pass
+
+def assign_overloaded_container(container: OverloadedContainer):
+    container[0], other = ([1], 0)  # no diagnostic
+    container[1], other = (["one"], 0)  # no diagnostic
 ```
 
 ### Nonliteral sources
@@ -1815,7 +1907,7 @@ reveal_type(rest)  # revealed: list[int]
 
 def copy_values(source: list[int]):
     objects: list[object]
-    (*objects,) = source
+    (*objects,) = source  # no diagnostic
     reveal_type(objects)  # revealed: list[object]
     reveal_type(source)  # revealed: list[int]
 ```
@@ -1838,19 +1930,65 @@ list or tuple does not include the surrounding fixed values in that capture.
 ```py
 def expanded(strings: list[str]):
     rest: list[str]
-    first, *rest, last = [0, *strings, 1]
+    first, *rest, last = [0, *strings, 1]  # no diagnostic
     reveal_type(first)  # revealed: Literal[0]
     reveal_type(rest)  # revealed: list[str]
     reveal_type(last)  # revealed: Literal[1]
 
-    first, *rest = (0, *strings)
+    first, *rest = (0, *strings)  # no diagnostic
     reveal_type(first)  # revealed: Literal[0]
     reveal_type(rest)  # revealed: list[str]
 
-    (first, *rest), last = [[0, *strings], 1]
+    (first, *rest), last = [[0, *strings], 1]  # no diagnostic
     reveal_type(first)  # revealed: Literal[0]
     reveal_type(rest)  # revealed: list[str]
     reveal_type(last)  # revealed: Literal[1]
+```
+
+A literal on the captured side of an expansion can still receive the capture's element context. The
+elements taken from the existing iterable keep their original types.
+
+```py
+def captured_literal_after_expansion(source: list[list[object]]) -> None:
+    rest: list[list[object]]
+    first, *rest = (0, *source, [1])  # no diagnostic
+    reveal_type(rest)  # revealed: list[list[object]]
+    reveal_type(source)  # revealed: list[list[object]]
+
+def captured_literal_before_expansion(source: list[list[object]]) -> None:
+    rest: list[list[object]]
+    *rest, last = ([1], *source, 0)  # no diagnostic
+    reveal_type(rest)  # revealed: list[list[object]]
+```
+
+A fixed target after an expansion also receives context when its corresponding literal cannot shift
+into the capture.
+
+```py
+def fixed_suffix_after_expansion(source: list[int]) -> None:
+    last: list[object]
+    first, *middle, last = (0, *source, [1])  # no diagnostic
+    reveal_type(last)  # revealed: list[object]
+```
+
+If the expansion is empty, a trailing literal can instead go to the fixed target. It cannot use the
+capture's context because it is not certain to be captured.
+
+```py
+def uncertain_capture(source: list[list[object]]) -> None:
+    rest: list[list[object]]
+    # error: [invalid-assignment]
+    first, *rest = (*source, [1])
+```
+
+The context applies to a newly written literal, but cannot widen a mutable list that came from the
+existing iterable.
+
+```py
+def existing_mutable_element(source: list[list[int]]) -> None:
+    rest: list[list[object]]
+    # error: [invalid-assignment]
+    first, *rest = (0, *source, [1])
 ```
 
 Literal expansions retain their individual element types, even when the enclosing list's type has
@@ -1860,7 +1998,7 @@ widened them.
 from typing import Literal
 
 rest: list[Literal["x"]]
-first, *rest = [0, *["x"]]
+first, *rest = [0, *["x"]]  # no diagnostic
 reveal_type(first)  # revealed: Literal[0]
 reveal_type(rest)  # revealed: list[Literal["x"]]
 ```
@@ -1910,7 +2048,7 @@ types.
 ```py
 def alternatives(source: tuple[int] | tuple[str]):
     rest: list[int] | list[str]
-    (*rest,) = source
+    (*rest,) = source  # no diagnostic
     reveal_type(rest)  # revealed: list[int] | list[str]
 ```
 
@@ -1939,7 +2077,7 @@ Fixed targets are matched within each alternative before the remaining elements 
 ```py
 def fixed_prefix(source: tuple[int, int] | tuple[str, str, str]):
     rest: list[int] | list[str]
-    first, *rest = source
+    first, *rest = source  # no diagnostic
     reveal_type(first)  # revealed: int | str
     reveal_type(rest)  # revealed: list[int] | list[str]
 ```
@@ -1949,7 +2087,7 @@ A conditional expression also supplies mutually exclusive source alternatives.
 ```py
 def conditional(flag: bool):
     rest: list[int] | list[str]
-    (*rest,) = (1,) if flag else ("one",)
+    (*rest,) = (1,) if flag else ("one",)  # no diagnostic
     reveal_type(rest)  # revealed: list[int] | list[str]
 ```
 
@@ -1960,7 +2098,7 @@ class Holder:
     values: list[int] | list[str]
 
 def attribute(holder: Holder, source: tuple[int] | tuple[str]):
-    (*holder.values,) = source
+    (*holder.values,) = source  # no diagnostic
     reveal_type(holder.values)  # revealed: list[int] | list[str]
 ```
 
@@ -1980,44 +2118,55 @@ contributes no elements to `rest`, so its strings do not affect the list's eleme
 ```py
 def capture(source: tuple[int, int, int] | tuple[str, str]):
     rest: list[int]
-    first, *rest, last = source
+    first, *rest, last = source  # no diagnostic
     reveal_type(first)  # revealed: int | str
     reveal_type(rest)  # revealed: list[int]
     reveal_type(last)  # revealed: int | str
 ```
 
-If a tuple alternative is too short, the assignment reports a length error and infers the capture
-without context. The valid alternative contributes `list[int]`, which is incompatible with
-`list[object]`.
+If a tuple alternative is too short, the assignment reports a length error. The valid alternative
+can still use the captured list's annotation, so the malformed alternative does not cause another
+assignment error.
 
 ```py
 def invalid_length(source: tuple[int, int, int] | tuple[int]):
     rest: list[object]
     # error: [invalid-assignment] "Not enough values to unpack: Expected at least 2"
-    # error: [invalid-assignment] "Object of type `list[int] | list[Unknown]` is not assignable to `list[object]`"
     first, *rest, last = source
     reveal_type(first)  # revealed: int | Unknown
     reveal_type(rest)  # revealed: list[object]
     reveal_type(last)  # revealed: int | Unknown
 ```
 
-A non-iterable alternative also prevents contextual inference of the capture.
+If only a fixed target is annotated, the unannotated capture retains its ordinary recovery type for
+the too-short alternative.
+
+```py
+def unannotated_capture(source: tuple[int, int, int] | tuple[int]):
+    first: int
+    # error: [invalid-assignment] "Not enough values to unpack: Expected at least 2"
+    first, *rest, last = source
+    reveal_type(rest)  # revealed: list[int] | list[Unknown]
+```
+
+A non-iterable alternative reports an iteration error while the other alternative still supplies
+context for the captured list.
 
 ```py
 def non_iterable(source: tuple[int, int, int] | int):
     rest: list[object]
     # error: [not-iterable] "Object of type `int` is not iterable"
-    # error: [invalid-assignment] "Object of type `list[int] | list[Unknown]` is not assignable to `list[object]`"
     first, *rest, last = source
     reveal_type(first)  # revealed: int | Unknown
     reveal_type(rest)  # revealed: list[object]
     reveal_type(last)  # revealed: int | Unknown
 ```
 
-### Context for a generic source
+### Whole-value generic sources
 
-The combined annotations provide tuple context for a generic call that produces the entire unpacked
-value.
+A generic call produces the entire source value without separate expressions for each target. The
+targets' expected types also guide this call: the declaration of `items` specializes its returned
+list element type.
 
 ```toml
 [environment]
@@ -2029,9 +2178,201 @@ def pair[T]() -> tuple[list[T], int]:
     return [], 0
 
 items: list[int]
-items, last = pair()
+items, last = pair()  # no diagnostic
 reveal_type(items)  # revealed: list[int]
 reveal_type(last)  # revealed: int
+```
+
+An annotation on the last target can also specialize the whole call, including values assigned to
+earlier targets.
+
+```py
+def two_lists[T]() -> tuple[list[T], list[T]]:
+    raise NotImplementedError
+
+right_list: list[int]
+left_list, right_list = two_lists()  # no diagnostic
+reveal_type(left_list)  # revealed: list[int]
+reveal_type(right_list)  # revealed: list[int]
+```
+
+An element of a literal expansion can be a generic call. Its matched target still specializes the
+call before the enclosing sequences are inferred.
+
+```py
+def make_list[T]() -> list[T]:
+    return []
+
+items: list[int]
+items, last = (*[make_list()], 0)  # no diagnostic
+reveal_type(items)  # revealed: list[int]
+```
+
+The same applies to a subscript target. Its `__setitem__` method selects the context for the
+returned list, and that context also specializes the generic element returned alongside it.
+
+```py
+class Container:
+    def __setitem__(self, key: int, value: list[object]) -> None:
+        pass
+
+def paired[T]() -> tuple[list[T], T]:
+    raise NotImplementedError
+
+def assign_container(container: Container):
+    container[0], element = paired()  # no diagnostic
+    reveal_type(element)  # revealed: object
+```
+
+A property's setter also supplies the call's context. Its getter returns a different type, which
+does not describe the value accepted by the assignment.
+
+```py
+class PropertyTarget:
+    @property
+    def value(self) -> list[str]:
+        return []
+
+    @value.setter
+    def value(self, assigned: list[object]) -> None:
+        pass
+
+def assign_property_source(holder: PropertyTarget):
+    holder.value, element = paired()  # no diagnostic
+    reveal_type(element)  # revealed: object
+```
+
+An attribute accepted through `__setattr__` uses that method's value type as context, even though
+the attribute has no declaration of its own.
+
+```py
+class DynamicHolder:
+    def __setattr__(self, name: str, value: list[object]) -> None:
+        pass
+
+def assign_dynamic_source(holder: DynamicHolder):
+    holder.values, element = paired()  # no diagnostic
+    reveal_type(element)  # revealed: object
+```
+
+If a property has no setter, trying to find context must not hide the eventual write error.
+
+```py
+class ReadOnlyProperty:
+    @property
+    def value(self) -> list[str]:
+        return []
+
+def assign_read_only_source(holder: ReadOnlyProperty):
+    # error: [invalid-assignment]
+    holder.value, element = paired()
+    reveal_type(element)  # revealed: Unknown
+```
+
+An overloaded setter selects its write signature using the key before the call is inferred.
+
+```py
+from typing import Literal, overload
+
+class OverloadedContainer:
+    @overload
+    def __setitem__(self, key: Literal[0], value: list[object]) -> None: ...
+    @overload
+    def __setitem__(self, key: Literal[1], value: list[str]) -> None: ...
+    def __setitem__(self, key: int, value: list[object] | list[str]) -> None:
+        pass
+
+def assign_overloaded_container(container: OverloadedContainer):
+    container[0], element = paired()  # no diagnostic
+    reveal_type(element)  # revealed: object
+```
+
+When overload selection depends on the value being assigned, another target's declaration can
+specialize the source and change which setter overload accepts its value. The declaration still
+provides context for the generic call.
+
+```py
+class ValueOverloadedContainer:
+    @overload
+    def __setitem__(self, key: int, value: list[str]) -> None: ...
+    @overload
+    def __setitem__(self, key: int, value: list[int]) -> None: ...
+    def __setitem__(self, key: int, value: list[str] | list[int]) -> None:
+        pass
+
+def matching_lists[T]() -> tuple[list[T], list[T]]:
+    raise NotImplementedError
+
+def assign_value_overload(container: ValueOverloadedContainer):
+    values: list[int]
+    values, container[0] = matching_lists()  # no diagnostic
+    reveal_type(values)  # revealed: list[int]
+```
+
+Targets are assigned from left to right. A later subscript can use the value of an earlier target to
+select its setter, whose expected value type then specializes the generic call.
+
+```py
+class KeyDependentContainer:
+    @overload
+    def __setitem__(self, key: Literal[1], value: list[int]) -> None: ...
+    @overload
+    def __setitem__(self, key: Literal[2], value: list[str]) -> None: ...
+    def __setitem__(self, key: int, value: list[int] | list[str]) -> None:
+        pass
+
+def keyed_values[T]() -> tuple[Literal[1], list[T], T]:
+    raise NotImplementedError
+
+def assign_key_dependent(container: KeyDependentContainer):
+    key, container[key], element = keyed_values()  # no diagnostic
+    reveal_type(key)  # revealed: Literal[1]
+    reveal_type(element)  # revealed: int
+```
+
+A nested unpacking target likewise supplies context to a call that returns the whole nested tuple.
+
+```py
+def nested[T]() -> tuple[tuple[list[T], int], int]:
+    raise NotImplementedError
+
+def assign_nested():
+    values: list[int]
+    (values, first), second = nested()  # no diagnostic
+    reveal_type(values)  # revealed: list[int]
+    reveal_type(first)  # revealed: int
+    reveal_type(second)  # revealed: int
+```
+
+A union annotation on a starred target can select a compatible element type for the generic call.
+Here inference chooses integers from the first suitable alternative.
+
+```py
+def repeated[T]() -> tuple[T, T]:
+    raise NotImplementedError
+
+def assign_alternative_capture():
+    rest: list[int] | list[str]
+    (*rest,) = repeated()  # no diagnostic
+    reveal_type(rest)  # revealed: list[int]
+```
+
+When the receiver can be either of two containers, a context accepted by only one setter cannot
+guide the source for both. The source remains unspecialized; choosing either setter's context would
+make the assignment invalid for the other.
+
+```py
+class IntContainer:
+    def __setitem__(self, key: int, value: list[int]) -> None:
+        pass
+
+class StrContainer:
+    def __setitem__(self, key: int, value: list[str]) -> None:
+        pass
+
+def assign_union_container(container: IntContainer | StrContainer):
+    container[0], element = paired()  # no diagnostic
+    reveal_type(element)  # revealed: Unknown
 ```
 
 ### Non-iterable annotations on starred targets
@@ -2083,6 +2424,18 @@ numbers: list[int]
 numbers, other = (["wrong"], 0)
 reveal_type(numbers)  # revealed: list[int]
 reveal_type(other)  # revealed: Literal[0]
+```
+
+### Source errors without type context
+
+An error in an unannotated source is reported once, even though each target becomes a separate
+binding. Both targets still receive types from the source.
+
+```py
+# error: [unresolved-reference] "Name `missing` used when not defined"
+first, second = (missing, 1)
+reveal_type(first)  # revealed: Unknown
+reveal_type(second)  # revealed: Literal[1]
 ```
 
 ## Empty

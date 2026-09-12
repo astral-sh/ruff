@@ -48,7 +48,7 @@ use itertools::Either;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
 use std::borrow::Cow;
@@ -788,6 +788,16 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
 /// involved in an unpacking operation. It returns a result-like object that can be used to get the
 /// type of the variables involved in this unpacking along with any violations that are detected
 /// during this unpacking.
+///
+/// An assignment can have several definitions but only one source expression:
+///
+/// ```python
+/// first, second = (1, 2)
+/// ```
+///
+/// Each definition and the enclosing statement need the same matched target types. This query
+/// owns source inference, matching, and target writes together so none of those callers has to
+/// infer or validate an unpacked target separately.
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, unpack: Unpack<'db>| UnpackResult::cycle_initial(unpack.value(db).expression().scope(db), Type::divergent(id)),
@@ -810,8 +820,10 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
 
     let env = ProgramEnvironment::from_file(program_file);
     let value = unpack.value(db);
-    if matches!(value.kind(), UnpackKind::Assign)
-        && let Some(inference) = TypeInferenceBuilder::new(
+    if matches!(value.kind(), UnpackKind::Assign) {
+        // Assignment inference belongs in the same query as matching its targets:
+        // the target reached by each source expression selects its write context.
+        return TypeInferenceBuilder::new(
             db,
             &env,
             InferenceRegion::Expression(value.expression(), TypeContext::default()),
@@ -820,21 +832,13 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
             semantic_index(db, program_file),
             &module,
         )
-        .finish_unpack(unpack)
-    {
-        return inference;
+        .finish_unpack(unpack);
     }
-    let mut unpacker = Unpacker::new(
-        db,
-        &env,
-        unpack.target_scope(db),
-        program_file,
-        &module,
-        None,
-    );
+    let mut unpacker = Unpacker::new(db, &env, unpack.target_scope(db), program_file, &module);
     let value_inference = infer_expression_types(db, value.expression(), TypeContext::default());
-    unpacker.unpack(unpack.target(db, &module), value, value_inference);
-    unpacker.finish(None, FxHashSet::default())
+    let mut inference = value_inference;
+    unpacker.unpack(unpack.target(db, &module), value, &mut inference);
+    unpacker.finish()
 }
 
 /// Returns the type of the nearest enclosing class for the given scope.

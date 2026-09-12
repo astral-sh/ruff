@@ -395,15 +395,15 @@ from typing import Any
 def returns_any() -> Any:
     return "not an integer"
 
-middle: list[int] = [returns_any()]
+middle: list[int] = [returns_any()]  # no diagnostic
 reveal_type(middle)  # revealed: list[int]
 
-first, *middle, last = (0, returns_any(), 1)
+first, *middle, last = (0, returns_any(), 1)  # no diagnostic
 reveal_type(first)  # revealed: Literal[0]
 reveal_type(middle)  # revealed: list[int]
 reveal_type(last)  # revealed: Literal[1]
 
-first, *middle, last = [0, returns_any(), 1]
+first, *middle, last = [0, returns_any(), 1]  # no diagnostic
 reveal_type(first)  # revealed: Literal[0]
 reveal_type(middle)  # revealed: list[int]
 reveal_type(last)  # revealed: Literal[1]
@@ -433,10 +433,10 @@ from typing import Any
 def returns_any() -> Any:
     return "not an integer"
 
-middle: list[int] = [1, returns_any(), 2]
+middle: list[int] = [1, returns_any(), 2]  # no diagnostic
 reveal_type(middle)  # revealed: list[int]
 
-first, *middle, last = (0, 1, returns_any(), 2, 3)
+first, *middle, last = (0, 1, returns_any(), 2, 3)  # no diagnostic
 reveal_type(first)  # revealed: Literal[0]
 reveal_type(middle)  # revealed: list[int]
 reveal_type(last)  # revealed: Literal[3]

@@ -21,7 +21,7 @@ use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, ExpandedClassBaseEntry, MethodDecorator,
 };
 use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
-use crate::types::infer::{UnsupportedComparisonError, infer_unpack_types};
+use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
 use crate::types::protocol_class::ProtocolMember;
 use crate::types::special_form::TypeQualifier;
@@ -61,7 +61,7 @@ use ty_module_resolver::{
 };
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_core::place::{PlaceTable, ScopedPlaceId};
-use ty_python_core::{ProgramFile, global_scope, place_table, use_def_map};
+use ty_python_core::{ExpressionNodeKey, ProgramFile, global_scope, place_table, use_def_map};
 
 const RUNTIME_CHECKABLE_DOCS_URL: &str =
     "https://docs.python.org/3/library/typing.html#typing.runtime_checkable";
@@ -1824,6 +1824,20 @@ enum AssignmentDiagnosticKind {
     Unsound,
 }
 
+/// Keep inferred source elements available when an unpacked binding is rejected.
+///
+/// ```python
+/// rest: list[int]
+/// first, *rest = (0, "wrong")
+/// ```
+///
+/// The diagnostic needs the type of `"wrong"` to explain the incompatible capture. At this
+/// point the unpacking result is still being built, so it cannot be queried again.
+pub(super) struct MatchedAssignmentSource<'a, 'db> {
+    pub contextual_expressions: &'a FxHashSet<ExpressionNodeKey>,
+    pub expression_type: &'a dyn Fn(&ast::Expr) -> Type<'db>,
+}
+
 /// Return the expression assigned by an ordinary or named assignment.
 fn assignment_value_node<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
@@ -1873,21 +1887,31 @@ fn assignment_value_node<'db, 'ast>(
     }
 }
 
+/// Return the source expressions collected by a starred assignment target.
+fn collected_assignment_values<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    definition_kind: &DefinitionKind<'db>,
+) -> Option<Vec<&'ast ast::Expr>> {
+    let DefinitionKind::Assignment(assignment) = definition_kind else {
+        return None;
+    };
+    let unpack = assignment.unpack()?;
+    let module = context.module();
+    starred_assignment_values(
+        unpack.target(context.db(), module),
+        assignment.value(module),
+        assignment.target(module),
+    )
+}
+
 /// Return the range of an assignment's value or the values collected by a starred target.
 fn assignment_diagnostic_range(
     context: &InferContext,
     target_node: AnyNodeRef,
     value_node: Option<&ast::Expr>,
-    definition_kind: &DefinitionKind,
+    collected: Option<&[&ast::Expr]>,
 ) -> TextRange {
-    let module = context.module();
-    if let DefinitionKind::Assignment(assignment) = definition_kind
-        && let Some(unpack) = assignment.unpack()
-        && let Some(collected) = starred_assignment_values(
-            unpack.target(context.db(), module),
-            assignment.value(module),
-            assignment.target(module),
-        )
+    if let Some(collected) = collected
         && let (Some(first), Some(last)) = (collected.first(), collected.last())
     {
         return first.range().cover(last.range());
@@ -1934,23 +1958,15 @@ fn assignment_display_settings<'db>(
 
 fn starred_assignment_element<'db>(
     context: &InferContext<'db, '_>,
-    definition_kind: &DefinitionKind<'db>,
+    collected: Option<&[&ast::Expr]>,
     target_type: Type<'db>,
     value_type: Type<'db>,
     diagnostic_kind: AssignmentDiagnosticKind,
+    matched_source: Option<&MatchedAssignmentSource<'_, 'db>>,
 ) -> Option<StarredAssignmentElement<'db>> {
-    let DefinitionKind::Assignment(assignment) = definition_kind else {
-        return None;
-    };
-    let unpack = assignment.unpack()?;
     let db = context.db();
     let env = context.program_environment();
-    let module = context.module();
-    let collected = starred_assignment_values(
-        unpack.target(db, module),
-        assignment.value(module),
-        assignment.target(module),
-    )?;
+    let collected = collected?;
     if collected.is_empty() {
         return None;
     }
@@ -1960,16 +1976,13 @@ fn starred_assignment_element<'db>(
         .homogeneous_element_type(db, env);
     let actual_type = match diagnostic_kind {
         AssignmentDiagnosticKind::Invalid => {
-            // The collected list's element type can include both contextual types and
-            // promotion. Describe the captured source values using their own inferred types.
-            let inference =
-                infer_unpack_types(db, unpack).value_inference(db, unpack.value(db).expression());
+            let source = matched_source?;
             UnionType::from_elements_leave_aliases(
                 db,
                 env,
                 collected
                     .iter()
-                    .map(|value| inference.expression_type(*value)),
+                    .map(|value| (source.expression_type)(value)),
             )
         }
         AssignmentDiagnosticKind::Unsound => value_type
@@ -2046,17 +2059,19 @@ pub(super) fn report_invalid_assignment<'db>(
     target_node: AnyNodeRef,
     definition: Definition<'db>,
     declaration: Option<Definition<'db>>,
-    target_ty: Type,
+    target_ty: Type<'db>,
     value_ty: Type<'db>,
+    matched_source: Option<&MatchedAssignmentSource<'_, 'db>>,
 ) {
     let db = context.db();
     let definition_kind = definition.kind(context.db());
     let value_node = assignment_value_node(context, definition_kind);
     let contextual_value_node = match definition_kind {
-        DefinitionKind::Assignment(assignment) if let Some(unpack) = assignment.unpack() => {
-            value_node
-                .filter(|value| infer_unpack_types(db, unpack).has_contextual_expression(value))
-        }
+        DefinitionKind::Assignment(assignment) if assignment.unpack().is_some() => value_node
+            .filter(|value| {
+                matched_source
+                    .is_some_and(|source| source.contextual_expressions.contains(&(*value).into()))
+            }),
         _ => definition_kind.value(context.module()).or(value_node),
     };
 
@@ -2072,18 +2087,20 @@ pub(super) fn report_invalid_assignment<'db>(
     }
 
     let env = &context.program_environment();
+    let collected = collected_assignment_values(context, definition_kind);
     let invalid_element = starred_assignment_element(
         context,
-        definition_kind,
+        collected.as_deref(),
         target_ty,
         value_ty,
         AssignmentDiagnosticKind::Invalid,
+        matched_source,
     );
     let settings =
         assignment_display_settings(context, target_ty, value_ty, invalid_element.as_ref());
 
     let diagnostic_range =
-        assignment_diagnostic_range(context, target_node, value_node, definition_kind);
+        assignment_diagnostic_range(context, target_node, value_node, collected.as_deref());
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         diagnostic_range,
@@ -2207,15 +2224,17 @@ pub(super) fn report_unsound_assignment<'db>(
             (target_node, assignment_value_node(context, definition_kind))
         };
 
+    let collected = collected_assignment_values(context, definition_kind);
     let unsound_element = starred_assignment_element(
         context,
-        definition_kind,
+        collected.as_deref(),
         target_ty,
         value_ty,
         AssignmentDiagnosticKind::Unsound,
+        None,
     );
     let diagnostic_range =
-        assignment_diagnostic_range(context, target_node, value_node, definition_kind);
+        assignment_diagnostic_range(context, target_node, value_node, collected.as_deref());
 
     let Some(builder) = context.report_lint(&UNSOUND_ASSIGNMENT, diagnostic_range) else {
         return;
