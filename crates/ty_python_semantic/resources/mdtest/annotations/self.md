@@ -661,6 +661,40 @@ def _(s: Sub):
     reveal_type(s.maker())  # revealed: Sub
 ```
 
+## Passing `self` as a callable
+
+Passing `self` to a generic function infers parameter and return types from the class's `__call__`
+method. This also works in nested calls:
+
+```py
+from typing import Callable
+
+def apply[T](callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+class Printer:
+    def __call__(self, value: int) -> str:
+        return str(value)
+
+    def format(self, values: list[int]) -> str:
+        reveal_type(apply(self))  # revealed: str
+        return ", ".join(map(self, values))
+```
+
+If `__call__` returns `Self`, the inferred return type remains `Self`, not the containing class:
+
+```py
+from typing import Self
+
+class Clone:
+    def __call__(self, value: int) -> Self:
+        return self
+
+    def clone(self) -> Self:
+        reveal_type(apply(self))  # revealed: Self@clone
+        return apply(self)
+```
+
 ## Generic Classes
 
 ```py
