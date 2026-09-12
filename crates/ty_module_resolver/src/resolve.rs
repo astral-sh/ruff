@@ -59,7 +59,8 @@ use crate::strategy::MisconfigurationStrategy;
 use crate::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::{ResolverEnvironment, ResolverFile, SearchPathSettings, SearchPathSettingsError};
 
-use self::search::{ModuleEnumeration, ModuleSearch};
+pub(crate) use self::search::ModuleEnumeration;
+use self::search::ModuleSearch;
 
 /// Resolves a module name to a module.
 pub fn resolve_module<'db>(
@@ -227,7 +228,7 @@ impl ModuleResolveMode {
     /// places due to being unable to resolve builtin symbols. This is similar
     /// behaviour to other type checkers such as mypy:
     /// <https://github.com/python/mypy/blob/3807423e9d98e678bf16b13ec8b4f909fe181908/mypy/build.py#L104-L117>
-    pub(super) fn is_non_shadowable(self, minor_version: u8, module_name: &str) -> bool {
+    fn is_non_shadowable(self, minor_version: u8, module_name: &str) -> bool {
         // Builtin modules are never shadowable, no matter what.
         if ruff_python_stdlib::sys::is_builtin_module(minor_version, module_name) {
             return true;
@@ -1134,8 +1135,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
             // (Most importantly, don't register a root for editable installations from the project
             // directory as that would change the durability of files within those folders).
             // Not having an exact file root for editable installs just means that
-            // some queries (like `list_modules_in`) will run slightly more frequently
-            // than they would otherwise.
+            // some queries will run slightly more frequently than they would otherwise.
             if files.root(db, path).is_none() {
                 files.try_add_root(db, path, FileRootKind::SearchPath);
             }
@@ -1191,7 +1191,7 @@ impl FusedIterator for SearchPathIterator<'_> {}
 ///
 /// This is needed because Salsa requires that all query arguments are salsa ingredients.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-struct ModuleNameIngredient<'db> {
+pub(crate) struct ModuleNameIngredient<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,
     #[returns(copy)]
@@ -1431,14 +1431,14 @@ impl<'db> ModuleResolutionCandidate<'db> {
 }
 
 /// Resolves module names using an environment and file-selection precedence.
-struct NameResolver<'db> {
+pub(crate) struct NameResolver<'db> {
     context: ResolverContext<'db>,
     known_package: Option<Module<'db>>,
 }
 
 impl<'db> NameResolver<'db> {
     /// Uses the environment and the requested file-selection precedence.
-    fn new(
+    pub(crate) fn new(
         db: &'db dyn Db,
         resolver_environment: ResolverEnvironment<'db>,
         mode: ModuleResolveMode,
@@ -1454,14 +1454,7 @@ impl<'db> NameResolver<'db> {
     /// Directory entries supply possible names; resolution selects each name before module enumeration
     /// applies its eligibility rules. Unresolved overlay prefixes are returned separately so
     /// recursive enumeration can visit them without offering them as importable modules.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "Module enumeration is consumed by the next change's cached listings"
-        )
-    )]
-    fn enumerate_modules(&self, prefix: Option<&ModuleName>) -> ModuleEnumeration<'db> {
+    pub(crate) fn enumerate_modules(&self, prefix: Option<&ModuleName>) -> ModuleEnumeration<'db> {
         if let Some(module) = self.known_package
             && prefix == Some(module.name(self.context.db))
             && module.kind(self.context.db) == ModuleKind::Module
@@ -1476,27 +1469,13 @@ impl<'db> NameResolver<'db> {
 
     /// Allows module enumeration below an explicitly resolved package, even through symlinked ancestry.
     /// Other namespace portions and overlays retain their normal eligibility checks.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "Module enumeration is consumed by the next change's cached listings"
-        )
-    )]
-    fn with_known_package(mut self, module: Module<'db>) -> Self {
+    pub(crate) fn with_known_package(mut self, module: Module<'db>) -> Self {
         self.known_package = Some(module);
         self
     }
 
     /// Enumerates modules within one importing-file fallback path instead of configured roots.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "Module enumeration is consumed by the next change's cached listings"
-        )
-    )]
-    fn enumerate_modules_in_search_path(
+    pub(crate) fn enumerate_modules_in_search_path(
         &self,
         prefix: &ModuleName,
         path: &SearchPath,
@@ -1725,12 +1704,12 @@ fn resolve_component<'db>(
     } else {
         // Last resort, check if a folder with the given name exists. If so,
         // then this is a namespace package. We need to skip this check for
-        // typeshed because the `resolve_file_module` can also return `None` if the
+        // typeshed because `resolve_file_module_with_filter` can also return `None` if the
         // `__init__.py` exists but isn't available for the current Python version.
         // Let's assume that the `xml` module is only available on Python 3.11+ and
         // we're resolving for Python 3.10:
         //
-        // * `resolve_file_module("xml/__init__.pyi")` returns `None` even though
+        // * Looking up `xml/__init__.pyi` returns `None` even though
         //   the file exists but the module isn't available for the current Python
         //   version.
         // * The check here would now return `true` because the `xml` directory
@@ -1763,25 +1742,6 @@ fn resolve_component<'db>(
 }
 
 type ResolvedNames<'db> = Vec<ModuleResolutionCandidate<'db>>;
-
-/// If `module` exists on disk with an extension permitted by the resolver's mode, return its
-/// [`File`].
-///
-/// Typing resolution prefers `.pyi` over `.py`; runtime resolution only considers `.py`.
-pub(super) fn resolve_file_module(
-    module: &ModulePath,
-    resolver_state: &ResolverContext,
-) -> Option<File> {
-    let mut parent = module.clone();
-    parent.pop();
-
-    resolve_file_module_with_filter(
-        &ModuleDirectory::new(resolver_state, parent),
-        resolver_state,
-        module.file_stem()?,
-        ComponentFileFilter::ByMode,
-    )
-}
 
 fn resolve_file_module_with_filter(
     directory: &ModuleDirectory,
