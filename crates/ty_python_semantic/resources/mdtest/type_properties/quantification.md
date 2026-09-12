@@ -233,7 +233,7 @@ def finite_domain[X: (int, str), Y, Z]() -> None:
     body = ConstraintSet.equality(Y, X) & ConstraintSet.equality(Z, Invariant[X])
     quantified = body.exists(tuple[X])
 
-    # revealed: tuple[Solution[X=Y@finite_domain, Y=X@finite_domain, Z=Invariant[X@finite_domain] | Invariant[Y@finite_domain]]]
+    # revealed: tuple[Solution[X=Y@finite_domain, Y=X@finite_domain, Z=Invariant[Y@finite_domain]]]
     reveal_type(body.solutions(inferable=tuple[X, Y, Z]))
     # TODO: revealed: tuple[Solution[Y=int, Z=Invariant[int]], Solution[Y=str, Z=Invariant[str]]]
     # revealed: tuple[Solution[Z=Invariant[Y@finite_domain]]]

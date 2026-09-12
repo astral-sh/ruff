@@ -1063,6 +1063,51 @@ def f[S, T, U]():
     ...
 ```
 
+## Dependent solutions fixed by equal bounds
+
+If `X` equals `Y` and `Y` equals `int`, both variables have the solution `int`. Writing the
+equalities in the opposite order gives the same types.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def equality[X, Y]():
+    same = ConstraintSet.equality(X, Y)
+    fixed = ConstraintSet.equality(Y, int)
+    reveal_type((same & fixed).solutions_for(X, inferable=tuple[X, Y]))  # revealed: tuple[Solution[X=int]]
+    reveal_type((same & fixed).solutions_for(Y, inferable=tuple[X, Y]))  # revealed: tuple[Solution[Y=int]]
+    reveal_type((fixed & same).solutions_for(X, inferable=tuple[X, Y]))  # revealed: tuple[Solution[X=int]]
+    reveal_type((fixed & same).solutions_for(Y, inferable=tuple[X, Y]))  # revealed: tuple[Solution[Y=int]]
+```
+
+Equalities with a shared tuple type also resolve once the tuple's element type is known.
+
+```py
+def shared[X, Y, Z]():
+    constraints = ConstraintSet.equality(X, tuple[Z]) & ConstraintSet.equality(Y, tuple[Z]) & ConstraintSet.equality(Z, int)
+    # revealed: tuple[Solution[X=tuple[int], Y=tuple[int], Z=int]]
+    reveal_type(constraints.solutions(inferable=tuple[X, Y, Z]))
+```
+
+## Static and gradual upper bounds
+
+An `int` lower bound and an `int` upper bound fix the result to `int`, even when another variable
+also supplies a lower bound. A gradual upper bound instead describes a range of types; it must not
+replace the concrete `int | str` evidence with a type that permits omitting `int`.
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+from ty_extensions._internal import ConstraintSet
+
+def bounds[T, U]():
+    fixed = ConstraintSet.range(int | U, T, int)
+    reveal_type(fixed.solutions(inferable=tuple[T, U]))  # revealed: tuple[Solution[T=int, U=int]]
+
+    gradual = ConstraintSet.range(int | str, T, Intersection[int, Any] | str)
+    reveal_type(gradual.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=int | str]]
+```
+
 ## Recursive solutions
 
 ### Direct and mutual recursion
@@ -1111,6 +1156,59 @@ def with_free_parameter[T, E]():
     constraints = ConstraintSet.equality(T, int | tuple[T, E])
     # revealed: tuple[Solution[T=μ$0. tuple[$0, E@with_free_parameter] | int]]
     reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+### Equal recursive definitions
+
+Giving two variables the same recursive definition resolves both to tuples whose first element has
+the same recursive structure.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def equal[X, Y]():
+    constraints = ConstraintSet.equality(X, tuple[Y, int]) & ConstraintSet.equality(Y, tuple[Y, int])
+    # revealed: tuple[Solution[X=tuple[μ$0. tuple[$0, int], int], Y=μ$0. tuple[$0, int]]]
+    reveal_type(constraints.solutions(inferable=tuple[X, Y]))
+```
+
+The common definition can refer to another variable that is a union. Here `X` and `Y` both contain
+either an integer or another tuple with the same structure.
+
+```py
+def shared_union[X, Y, Z]():
+    x = ConstraintSet.equality(X, tuple[Z])
+    y = ConstraintSet.equality(Y, tuple[Z])
+    z = ConstraintSet.equality(Z, int | Y)
+    # revealed: tuple[Solution[X=tuple[μ$0. tuple[$0] | int], Y=μ$0. tuple[$0 | int], Z=μ$0. tuple[$0] | int]]
+    reveal_type((x & y & z).solutions(inferable=tuple[X, Y, Z]))
+    # revealed: tuple[Solution[X=tuple[μ$0. tuple[$0] | int]]]
+    reveal_type((z & y & x).solutions_for(X, inferable=tuple[X, Y, Z]))
+```
+
+### Equivalent recursive definitions through aliases
+
+A type alias and its expansion can give the same definition to two variables. Both solutions retain
+that recursive structure.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Box[T] = tuple[T, int]
+
+def mixed[X, Y]():
+    constraints = ConstraintSet.equality(X, Box[Y]) & ConstraintSet.equality(Y, tuple[Y, int])
+    # revealed: tuple[Solution[X=Box[μ$0. tuple[$0, int]], Y=μ$0. tuple[$0, int]]]
+    reveal_type(constraints.solutions(inferable=tuple[X, Y]))
+```
+
+The alias may also contain an intermediate variable that refers back to the resulting tuple.
+
+```py
+def shared[X, Y, Z]():
+    constraints = ConstraintSet.equality(X, Box[Z]) & ConstraintSet.equality(Y, Box[Z]) & ConstraintSet.equality(Z, int | Y)
+    # revealed: tuple[Solution[X=Box[μ$0. Box[$0] | int], Y=Box[μ$0. Box[$0] | int], Z=μ$0. Box[$0] | int]]
+    reveal_type(constraints.solutions(inferable=tuple[X, Y, Z]))
 ```
 
 ### Sharing between recursive components
@@ -1399,7 +1497,7 @@ def captured_self[T, U]():
 def captured_dependency[T, U, V]():
     Local: TypeAlias = tuple[U, "Local"]
     constraints = ConstraintSet.equality(T, Local) & ConstraintSet.equality(U, int) & ConstraintSet.equality(V, list[T])
-    # revealed: tuple[Solution[V=list[T@captured_dependency] | list[Local]]]
+    # revealed: tuple[Solution[V=list[Local]]]
     reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))
 ```
 

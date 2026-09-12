@@ -1301,8 +1301,7 @@ class Tree:
 
 def inspect(tree: Tree):
     def bounds(top: Top[TypeOf[tree.value]], bottom: Bottom[TypeOf[tree.value]]):
-        # TODO: retain the nested tuple in the top materialization. Expected: tuple[tuple[Divergent, int], int]
-        # revealed: tuple[Divergent, int]
+        # revealed: tuple[tuple[Divergent, int], int]
         reveal_type(top)
         reveal_type(bottom)  # revealed: tuple[tuple[Divergent, int], int]
         reveal_type(top[1])  # revealed: int
