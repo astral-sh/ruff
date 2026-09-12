@@ -114,6 +114,10 @@ pub(super) fn check_class<'db>(
         }
     }
 
+    if configuration.check_attribute_type_violations() {
+        attributes::check_instance_overrides(context, class_specialized, &bases);
+    }
+
     #[expect(
         clippy::iter_over_hash_type,
         reason = "each class member is checked independently"
@@ -697,6 +701,9 @@ fn check_class_declaration<'db>(
                 if superclass_literal
                     .own_synthesized_member(db, env, superclass_specialization, None, &member.name)
                     .is_none()
+                    && superclass
+                        .own_instance_member(db, env, &member.name)
+                        .is_undefined()
                 {
                     continue;
                 }

@@ -2,13 +2,14 @@
 
 use ruff_db::diagnostic::Annotation;
 use ruff_python_ast::name::Name;
+use ruff_python_stdlib::identifiers::is_mangled_private;
 use ty_python_core::definition::Definition;
 
 use crate::{
     Db, ProgramEnvironment,
     place::{Place, TypeOrigin},
     types::{
-        ClassType, IntersectionType, MemberLookupPolicy, Type, TypeQualifiers,
+        ClassBase, ClassType, IntersectionType, MemberLookupPolicy, Type, TypeQualifiers,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         class::CodeGeneratorKind,
         context::InferContext,
@@ -68,8 +69,9 @@ fn attribute_contract<'db>(
     }
     let class_member = owner.own_class_member(db, env, None, name).inner;
     let instance_member = owner.own_instance_member(db, env, name).inner;
-    let Place::Defined(class_place) = class_member.place else {
-        return None;
+    let own_place = match (class_member.place, instance_member.place) {
+        (Place::Defined(place), _) | (_, Place::Defined(place)) => place,
+        (Place::Undefined, Place::Undefined) => return None,
     };
     // Method contracts have their own override checks, including conditional definitions.
     // A descriptor decorator, however, can turn a function into an attribute.
@@ -77,7 +79,7 @@ fn attribute_contract<'db>(
         matches!(ty, Type::FunctionLiteral(_))
             || matches!(ty, Type::Callable(callable) if callable.is_method_like(db))
     };
-    if match class_place.ty {
+    if match own_place.ty {
         Type::Union(union) => union.elements(db).iter().copied().all(is_method),
         ty => is_method(ty) || matches!(ty, Type::TypeAlias(_)),
     } {
@@ -86,9 +88,11 @@ fn attribute_contract<'db>(
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
     let is_final = qualifiers.contains(TypeQualifiers::FINAL);
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
-    let is_property = class_place.ty.as_property_instance().is_some();
+    let is_property = own_place.ty.as_property_instance().is_some();
     let is_descriptor = !is_class_var
-        && class_place
+        && !matches!(own_place.ty, Type::SlotDescriptor(_))
+        && !class_member.place.is_undefined()
+        && own_place
             .ty
             .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
             .place
@@ -97,19 +101,19 @@ fn attribute_contract<'db>(
     // TODO: Check ordinary unannotated initializers once inherited type context is
     // available in ordinary inference. Raw binding types can retain literals that
     // attribute access widens; they do not define an independent write contract.
-    if class_place.origin == TypeOrigin::Inferred && !is_descriptor {
+    if own_place.origin == TypeOrigin::Inferred && !is_descriptor {
         return None;
     }
     let (read, write) = if is_descriptor {
-        let read = class_place
+        let read = own_place
             .ty
             .try_call_dunder_get(db, env, Some(receiver), receiver.to_meta_type(db, env))
             .ok()??
             .return_type;
-        let write = descriptor_write_domain(db, env, class_place.ty, receiver, read);
+        let write = descriptor_write_domain(db, env, own_place.ty, receiver, read);
         (read, write)
     } else {
-        let place = if is_class_var || is_final {
+        let place = if (is_class_var || is_final) && !class_member.place.is_undefined() {
             class_member.place
         } else {
             instance_member.place
@@ -224,7 +228,11 @@ fn attribute_violation<'db>(
     } else {
         target_receiver
     };
-    if source.write.is_none() || !receiver.is_attribute_writable_with(db, env, name, write) {
+    if !source
+        .write
+        .is_some_and(|source_write| write.is_assignable_to(db, env, source_write))
+        || !receiver.is_attribute_writable_with(db, env, name, write)
+    {
         // Do not require a write that the superclass itself cannot perform, for example
         // when a descriptor or custom `__setattr__` rejects the declared value type.
         if !target_receiver.is_attribute_writable_with(db, env, name, write) {
@@ -314,4 +322,63 @@ pub(super) fn check_override<'db>(
         );
     }
     true
+}
+
+/// Check receiver annotations that introduce declarations outside the class body.
+///
+/// Only explicit receiver annotations introduce a new contract; ordinary assignments
+/// use the inherited one. Check base names before inferring the receiver declarations
+/// to avoid evaluating unrelated method bodies. Names also declared in the class body
+/// are handled by `check_override` through the class-member pass.
+///
+/// ```python
+/// class Base:
+///     value: int
+///
+/// class Child(Base):
+///     def __init__(self) -> None:
+///         self.value: str = ""  # Declares an incompatible override of Base.value.
+/// ```
+pub(super) fn check_instance_overrides<'db>(
+    context: &InferContext<'db, '_>,
+    class: ClassType<'db>,
+    bases: &[ClassBase<'db>],
+) {
+    let db = context.db();
+    let env = &context.program_environment();
+    for name in class.own_instance_attribute_names(db) {
+        if is_mangled_private(name) || !class.own_class_member(db, env, None, name).is_undefined() {
+            continue;
+        }
+        // Avoid inferring method bodies for names that do not override anything.
+        if !bases
+            .iter()
+            .filter_map(|base| base.into_class())
+            .any(|base| {
+                !base.own_instance_member(db, env, name).is_undefined()
+                    || !base.own_class_member(db, env, None, name).is_undefined()
+            })
+        {
+            continue;
+        }
+        let Place::Defined(place) = class.own_instance_member(db, env, name).inner.place else {
+            continue;
+        };
+        if place.origin != TypeOrigin::Declared {
+            continue;
+        }
+        let Some(definition) = place.provenance.definition() else {
+            continue;
+        };
+        for base in bases.iter().filter_map(|base| base.into_class()) {
+            let base_member = base.own_instance_member(db, env, name).inner;
+            let base_definition = match base_member.place {
+                Place::Defined(place) => place.provenance.definition(),
+                Place::Undefined => None,
+            };
+            if check_override(context, class, base, name, definition, base_definition) {
+                break;
+            }
+        }
+    }
 }

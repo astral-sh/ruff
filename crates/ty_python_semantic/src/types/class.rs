@@ -2301,6 +2301,13 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Names assigned through a method receiver in this class, excluding inherited names.
+    pub(super) fn own_instance_attribute_names(self, db: &'db dyn Db) -> &'db [Name] {
+        self.static_class_literal(db).map_or(&[], |(literal, _)| {
+            implicit_attributes::implicit_attribute_names(db, literal.body_scope(db))
+        })
+    }
+
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     pub(super) fn own_instance_member(
