@@ -1587,6 +1587,19 @@ class ChangesSignature(Parent):
     def method(self, right): ...
 ```
 
+A base that inherits the selected method without the conflicting contract does not make the conflict
+new. The conflict remains reported only on `Parent`, regardless of the child's base order.
+
+```pyi
+class Independent(Left): ...
+
+class IndependentFirst(Independent, Parent):
+    def method(self, left): ...
+
+class ParentFirst(Parent, Independent):
+    def method(self, left): ...
+```
+
 The existing conflict does not hide an incompatible contract introduced by another base of the
 child.
 

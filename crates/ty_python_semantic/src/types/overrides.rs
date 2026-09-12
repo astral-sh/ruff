@@ -1007,46 +1007,47 @@ fn is_inherited_method_violation<'db>(
     superclass_type: Type<'db>,
     name: &Name,
 ) -> bool {
-    // An earlier MRO entry can select a different method in its own hierarchy. Find the closest
+    // An earlier MRO entry can select a different method in its own hierarchy. Check each
     // ancestor that inherits the method actually selected by the child's MRO.
-    let parent = bases
+    bases
         .iter()
         .filter_map(|base| base.into_class())
-        .find(|parent| {
+        .filter(|parent| {
             parent
                 .iter_mro(db)
                 .any(|base| base == ClassBase::Class(method_owner))
         })
-        .unwrap_or(method_owner);
-    let Place::Defined(DefinedPlace {
-        ty: parent_type, ..
-    }) = Type::instance(db, env, parent).member(db, env, name).place
-    else {
-        return false;
-    };
-    if is_assignable_method_override(db, env, parent_type, superclass_type) {
-        return false;
-    }
-
-    // Check the parent's own specializations: a valid override of `Base[Any]` can become invalid
-    // when the child also inherits `Base[int]`. Include implicit ancestors such as `object` and
-    // explicit inheritance paths for specializations omitted from the MRO.
-    parent
-        .iter_mro(db)
-        .skip(1)
-        .filter_map(ClassBase::into_class)
-        .chain(parent.iter_explicit_ancestors(db, env).skip(1))
-        .filter(|ancestor| ancestor.class_literal(db) == superclass.class_literal(db))
-        .any(|ancestor| {
+        .any(|parent| {
             let Place::Defined(DefinedPlace {
-                ty: ancestor_type, ..
-            }) = Type::instance(db, env, ancestor)
-                .member(db, env, name)
-                .place
+                ty: parent_type, ..
+            }) = Type::instance(db, env, parent).member(db, env, name).place
             else {
                 return false;
             };
-            !is_assignable_method_override(db, env, parent_type, ancestor_type)
+            if is_assignable_method_override(db, env, parent_type, superclass_type) {
+                return false;
+            }
+
+            // Check the parent's own specializations: a valid override of `Base[Any]` can become
+            // invalid when the child also inherits `Base[int]`. Include implicit ancestors such
+            // as `object` and explicit inheritance paths for specializations omitted from the MRO.
+            parent
+                .iter_mro(db)
+                .skip(1)
+                .filter_map(ClassBase::into_class)
+                .chain(parent.iter_explicit_ancestors(db, env).skip(1))
+                .filter(|ancestor| ancestor.class_literal(db) == superclass.class_literal(db))
+                .any(|ancestor| {
+                    let Place::Defined(DefinedPlace {
+                        ty: ancestor_type, ..
+                    }) = Type::instance(db, env, ancestor)
+                        .member(db, env, name)
+                        .place
+                    else {
+                        return false;
+                    };
+                    !is_assignable_method_override(db, env, parent_type, ancestor_type)
+                })
         })
 }
 
