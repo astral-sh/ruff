@@ -1417,7 +1417,7 @@ fn check_final_class_abstract_methods<'db>(
     let abstract_methods = AbstractMethods::of_class(db, class_type);
 
     // If there are no abstract methods, we're done.
-    let Some(first_method_name) = abstract_methods.first_name() else {
+    let Some(first_method_name) = abstract_methods.first_name(db) else {
         return;
     };
 
@@ -1450,7 +1450,7 @@ fn check_final_class_abstract_methods<'db>(
     }
 
     abstract_methods.annotate_diagnostic(db, env, &mut diagnostic);
-    let num_abstract_methods = abstract_methods.len();
+    let num_abstract_methods = abstract_methods.len(db);
     if num_abstract_methods == 1 {
         diagnostic.set_concise_message(format_args!(
             "Final class `{class_name}` has unimplemented abstract method `{first_method_name}`",

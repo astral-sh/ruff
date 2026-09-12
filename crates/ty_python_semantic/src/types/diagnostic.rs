@@ -15,6 +15,7 @@ use crate::importer::{ImportAction, ImportRequest, MembersInScope};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, imported_symbol, place_from_bindings};
 use crate::suppression::FileSuppressionId;
+use crate::types::abstract_methods::AbstractMethods;
 use crate::types::call::bind::CallableDescription;
 use crate::types::call::{Bindings, CallDiagnosticOverride, CallError};
 use crate::types::class::{
@@ -155,6 +156,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ABSTRACT_AND_FINAL_METHOD);
     registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
     registry.register_lint(&CALL_ABSTRACT_METHOD);
+    registry.register_lint(&INSTANTIATE_ABSTRACT_CLASS);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&ASSERT_TYPE_UNSPELLABLE_SUBTYPE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
@@ -1049,6 +1051,15 @@ declare_lint! {
     pub(crate) static CALL_ABSTRACT_METHOD = {
         summary: "detects calls to abstract methods with trivial bodies on class objects",
         status: LintStatus::stable("0.0.16"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/instantiate-abstract-class.md")]
+    pub(crate) static INSTANTIATE_ABSTRACT_CLASS = {
+        summary: "detects attempts to instantiate classes with unimplemented abstract methods",
+        status: LintStatus::stable("0.0.81"),
         default_level: Level::Error,
     }
 }
@@ -3883,6 +3894,47 @@ pub(crate) fn report_call_to_abstract_method(
     diag.annotate(
         Annotation::secondary(span).message(format_args!("Method `{name}` defined here")),
     );
+}
+
+pub(crate) fn report_attempted_instantiation_of_abstract_class<'db>(
+    context: &InferContext<'db, '_>,
+    call: &ast::ExprCall,
+    class: ClassType<'db>,
+    abstract_methods: &AbstractMethods<'db>,
+) {
+    let db = context.db();
+    let Some(first_name) = abstract_methods.first_name(db) else {
+        return;
+    };
+    let Some(builder) = context.report_lint(&INSTANTIATE_ABSTRACT_CLASS, call) else {
+        return;
+    };
+    let class_name = class.name(db);
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Cannot instantiate abstract class `{class_name}`"
+    ));
+    let env = &ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
+    abstract_methods.annotate_diagnostic(db, env, &mut diagnostic);
+
+    let num_abstract_methods = abstract_methods.len(db);
+    if num_abstract_methods == 1 {
+        diagnostic.set_concise_message(format_args!(
+            "Cannot instantiate `{class_name}` with unimplemented abstract method `{first_name}`",
+        ));
+    } else {
+        let formatted_methods = abstract_methods.formatted_names(db);
+        if formatted_methods.truncation_occurred {
+            diagnostic.set_concise_message(format_args!(
+                "Cannot instantiate `{class_name}` with {num_abstract_methods} unimplemented \
+                    abstract methods, including {formatted_methods}",
+            ));
+        } else {
+            diagnostic.set_concise_message(format_args!(
+                "Cannot instantiate `{class_name}` with unimplemented \
+                    abstract methods {formatted_methods}",
+            ));
+        }
+    }
 }
 
 pub(super) fn abstract_method_span<'db>(

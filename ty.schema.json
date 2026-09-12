@@ -644,6 +644,16 @@
             }
           ]
         },
+        "instantiate-abstract-class": {
+          "title": "detects attempts to instantiate classes with unimplemented abstract methods",
+          "description": "## What it does\n\nChecks for attempts to instantiate classes with unimplemented abstract methods, whether those\nmethods are explicitly decorated with `abstractmethod` or implicitly abstract protocol members.\n\n## Why is this bad?\n\nAbstract methods describe behavior that a subclass must implement before it can be instantiated.\nClasses using `ABCMeta` enforce this at runtime; the type checker also enforces it for classes\nwithout `ABCMeta`.\n\n## Example\n\n```python\nfrom abc import ABC, abstractmethod\n\n\nclass Abstract(ABC):\n    @abstractmethod\n    def method(self) -> int: ...\n\n\n# `method` has not been implemented.\nAbstract()  # error\n\n\nclass Concrete(Abstract):\n    def method(self) -> int:\n        return 42\n\n\nConcrete()  # OK\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-argument-type": {
           "title": "detects call arguments whose type is not assignable to the corresponding typed parameter",
           "description": "## What it does\n\nDetects call arguments whose type is not assignable to the corresponding typed parameter.\n\n## Why is this bad?\n\nPassing an argument of a type the function (or callable object) does not accept violates the\nexpectations of the function author and may cause unexpected runtime errors within the body of the\nfunction.\n\n## Examples\n\n```python\ndef func(x: int): ...\n\n\nfunc(\"foo\")  # error: [invalid-argument-type]\n```",
