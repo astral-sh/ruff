@@ -193,6 +193,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER);
     registry.register_lint(&REDUNDANT_CONDITION);
     registry.register_lint(&REDUNDANT_CONDITION_STRICT);
+    registry.register_lint(&POSSIBLY_REDUNDANT_CONDITION);
 
     // String annotations
     registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
@@ -1391,6 +1392,15 @@ declare_lint! {
         summary: "detects conditions that are always truthy or always falsey (strict)",
         status: LintStatus::stable("0.0.79"),
         default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/possibly-redundant-condition.md")]
+    pub(crate) static POSSIBLY_REDUNDANT_CONDITION = {
+        summary: "detects conditions that might be always truthy",
+        status: LintStatus::stable("0.0.81"),
+        default_level: Level::Warn,
     }
 }
 
