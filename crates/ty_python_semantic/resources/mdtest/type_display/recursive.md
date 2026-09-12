@@ -111,3 +111,26 @@ def inspect(container: Container):
     # revealed: type[B | A] | tuple[Divergent]
     reveal_type(container.value)
 ```
+
+## Self-references in inferred unions
+
+`TypeOf[x]` refers to the inferred type of `x`, both directly and within a tuple. The smallest
+solution contains integers and arbitrarily nested one-element tuples containing integers. The direct
+self-reference adds no other values. Indexing a tuple preserves this recursive type, so its element
+cannot be assigned to `str`.
+
+```py
+from typing import cast
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+x = cast("int | TypeOf[x] | tuple[TypeOf[x]]", 0)
+reveal_type(x)  # revealed: μ$0. tuple[$0] | int
+
+type Tree = int | tuple[Tree]
+static_assert(is_equivalent_to(TypeOf[x], Tree))
+
+if isinstance(x, tuple):
+    reveal_type(x[0])  # revealed: μ$0. tuple[$0] | int
+    wrong: str = x[0]  # error: [invalid-assignment]
+```
