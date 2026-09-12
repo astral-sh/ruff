@@ -3951,29 +3951,6 @@ impl<'db> PathBound<'db> {
         UnionType::from_elements(db, env, [evidence_lower, self.validity_lower])
     }
 
-    /// A static bound present on both sides fixes the type, even when propagation has added
-    /// other lower bounds. Keep its definition instead of those redundant dependencies.
-    fn pinned_lower(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        let lower = self.effective_lower(db, env);
-        let Type::Union(_) = lower else {
-            return lower;
-        };
-        if !lower.is_fully_static(db, env) {
-            return lower;
-        }
-        self.upper
-            .iter_clauses()
-            .map(ConstraintBound::ty)
-            .find(|upper| {
-                // Choosing equality references independently could replace both defining
-                // expressions with a bare cycle, losing the bounds that fix their value.
-                upper.is_fully_static(db, env)
-                    && upper.resolve_type_alias(db).as_typevar().is_none()
-                    && upper.is_subtype_of(db, env, lower)
-            })
-            .unwrap_or(lower)
-    }
-
     fn variance(&self) -> TypeVarVariance {
         match (self.evidence_lower.is_some(), self.has_upper_evidence()) {
             (false, true) => TypeVarVariance::Covariant,
@@ -4536,7 +4513,7 @@ impl<'db> PathBounds<'db> {
                         return PathBoundSolution::Unsatisfiable;
                     }
 
-                    return PathBoundSolution::Solved(path_bound.pinned_lower(db, env));
+                    return PathBoundSolution::Solved(lower);
                 }
 
                 if path_bound.has_upper_evidence() {

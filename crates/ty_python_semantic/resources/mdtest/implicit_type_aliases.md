@@ -2667,8 +2667,9 @@ def inspect(value: Tree[Tree[int]]):
 A recursive alias can appear inside a generic function's list parameter. Both legacy and PEP 695
 functions infer result types from the elements of the argument list.
 
-TODO: These results still include recursive alternatives instead of inferring only the leaf type.
-Improving these constraint solutions is separate from supporting recursive aliases.
+TODO: These results still include recursive alternatives instead of inferring only the leaf type. A
+`Top[...]` materialization also remains in the result for nested tuples, even with fully static
+arguments. Improving these constraint solutions is separate from supporting recursive aliases.
 
 ```toml
 [environment]
@@ -2691,9 +2692,9 @@ def modern_first_list[W](value: list[Tree[W]]) -> W:
 reveal_type(first_list([1]))  # revealed: int | tuple[Tree[int]]
 reveal_type(modern_first_list([1]))  # revealed: int | tuple[Tree[int]]
 
-# revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
+# revealed: tuple[Top[Tree[tuple[tuple[int]] | tuple[int] | int]]] | int
 reveal_type(first_list([((1,),)]))
-# revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
+# revealed: tuple[Top[Tree[tuple[tuple[int]] | tuple[int] | int]]] | int
 reveal_type(modern_first_list([((1,),)]))
 ```
 

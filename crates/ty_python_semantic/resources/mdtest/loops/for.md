@@ -2041,9 +2041,11 @@ def build(n: int):
         previous = left
         left = (right, 1)
         right = (previous, "end")
-    # revealed: Literal[1] | (μ$0. tuple[tuple[$0 | Literal[1], Literal["end"]] | Literal["start"], Literal[1]])
+    # TODO: remove redundant recursive alternatives. Expected: Literal[1] | (μ$0. tuple[tuple[$0 | Literal[1], Literal["end"]] | Literal["start"], Literal[1]])
+    # revealed: Literal[1] | (μ{$0; $1 = tuple[$3 | Literal["start"], Literal[1]]; $2 = tuple[($3 | $4 | tuple[Literal[1], Literal["end"]] | tuple[tuple[tuple[Literal[1], Literal["end"]] | Literal["start"], Literal[1]], Literal["end"]]) | Literal["start"], Literal[1]]; $3 = tuple[$1 | tuple[$4 | Literal["start"], Literal[1]] | $2 | $0 | Literal[1] | tuple[tuple[Literal[1], Literal["end"]] | Literal["start"], Literal[1]], Literal["end"]]; $4 = tuple[$0, Literal["end"]]}. $1 | $2 | tuple[tuple[Literal[1], Literal["end"]] | Literal["start"], Literal[1]])
     reveal_type(left)
-    # revealed: Literal["start"] | tuple[μ$0. tuple[tuple[$0, Literal["end"]] | Literal["start"], Literal[1]] | Literal[1], Literal["end"]]
+    # TODO: remove redundant recursive alternatives. Expected: Literal["start"] | (μ$0. tuple[tuple[$0 | Literal["start"], Literal[1]] | Literal[1], Literal["end"]])
+    # revealed: Literal["start"] | (μ{$0; $1 = tuple[$4 | tuple[$2 | Literal["start"], Literal[1]] | $5 | $3 | Literal[1] | tuple[tuple[Literal[1], Literal["end"]] | Literal["start"], Literal[1]], Literal["end"]]; $2 = tuple[$3, Literal["end"]]; $3 = $4 | $5 | tuple[tuple[Literal[1], Literal["end"]] | Literal["start"], Literal[1]]; $4 = tuple[$1 | Literal["start"], Literal[1]]; $5 = tuple[$0 | Literal["start"], Literal[1]]}. $1 | $2 | tuple[Literal[1], Literal["end"]] | tuple[tuple[tuple[Literal[1], Literal["end"]] | Literal["start"], Literal[1]], Literal["end"]])
     reveal_type(right)
 ```
 

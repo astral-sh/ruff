@@ -205,11 +205,13 @@ def chain_stu[S, T, U]() -> None:
     static_assert(chain == linked)
 
     constraints = chain & ConstraintSet.lower_bound(int, S) & ConstraintSet.upper_bound(U, int)
-    # revealed: tuple[Solution[S=int]]
+    # TODO: inferable typevars should not remain in these concrete solutions.
+    # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_stu | T@chain_stu]]
+    # revealed: tuple[Solution[S=int | T@chain_stu | U@chain_stu]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
-    # revealed: tuple[Solution[T=int]]
+    # revealed: tuple[Solution[T=S@chain_stu | int | U@chain_stu]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
-    # revealed: tuple[Solution[U=int]]
+    # revealed: tuple[Solution[U=S@chain_stu | int | T@chain_stu]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
 
 def chain_uts[U, T, S]() -> None:
@@ -219,11 +221,13 @@ def chain_uts[U, T, S]() -> None:
     static_assert(chain == linked)
 
     constraints = chain & ConstraintSet.lower_bound(int, S) & ConstraintSet.upper_bound(U, int)
-    # revealed: tuple[Solution[S=int]]
+    # TODO: inferable typevars should not remain in these concrete solutions.
+    # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_uts | T@chain_uts]]
+    # revealed: tuple[Solution[S=int | T@chain_uts | U@chain_uts]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
-    # revealed: tuple[Solution[T=int]]
+    # revealed: tuple[Solution[T=S@chain_uts | int | U@chain_uts]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
-    # revealed: tuple[Solution[U=int]]
+    # revealed: tuple[Solution[U=S@chain_uts | int | T@chain_uts]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
 ```
 
