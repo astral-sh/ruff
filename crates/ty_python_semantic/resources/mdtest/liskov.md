@@ -2192,6 +2192,22 @@ class Unmarked(Base):
     def __new__(cls, x: str) -> Self: ...
 ```
 
+`__new__`'s implicit `cls` parameter is not part of its override contract: it always takes the type
+it is actually called on, so an `@override`d `__new__` with a covariant, concrete return type is
+accepted even though `cls` is declared as `type[NewBase]` on the base method and `type[NewChild]` on
+the override:
+
+```pyi
+from typing_extensions import override
+
+class NewBase:
+    def __new__(cls, x: int) -> NewBase: ...
+
+class NewChild(NewBase):
+    @override
+    def __new__(cls, x: int) -> NewChild: ...
+```
+
 `__post_init__` and `__init_subclass__` are not covered by the typing spec's constructor exception
 for `@override`; they keep the exclusion even when explicitly marked:
 
@@ -2213,20 +2229,38 @@ class HooksSub(HooksBase):
 
 An `@override`d constructor is checked against the whole class hierarchy, the same as any other
 overridden method: only one diagnostic is reported, against the closest ancestor that defines the
-method, even when a more distant ancestor also defines an incompatible `__init__`:
+method, even when a more distant ancestor also defines an incompatible `__init__`. Here,
+`Parent.__init__` accepts anything, so `Child.__init__` is compatible with it; the diagnostic
+instead names `Grandparent`, which `Child.__init__` is not compatible with:
 
 ```pyi
+from typing import Any
 from typing_extensions import override
 
 class Grandparent:
     def __init__(self, x: int) -> None: ...
 
 class Parent(Grandparent):
-    def __init__(self, x: int) -> None: ...
+    def __init__(self, *args: Any, **kwargs: Any) -> None: ...
 
 class Child(Parent):
     @override
-    def __init__(self, x: str) -> None: ...  # error: [invalid-method-override]
+    def __init__(self, x: str) -> None: ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `__init__`
+  --> src/mdtest_snippet.pyi:12:9
+   |
+12 |     def __init__(self, x: str) -> None: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Grandparent.__init__`
+   |
+  ::: src/mdtest_snippet.pyi:5:9
+   |
+ 5 |     def __init__(self, x: int) -> None: ...
+   |         ------------------------------ `Grandparent.__init__` defined here
+info: parameter `x` has an incompatible type: `int` is not assignable to `str`
+info: This violates the Liskov Substitution Principle
 ```
 
 ## Functions assigned in a class body
