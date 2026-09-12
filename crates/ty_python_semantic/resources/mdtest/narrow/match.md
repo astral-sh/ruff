@@ -2198,7 +2198,7 @@ class InstanceGetImpl:
 
 class InstanceGetMapping(Mapping[str, int]):
     def __init__(self) -> None:
-        self.get: InstanceGet = InstanceGetImpl()
+        self.get: InstanceGet = InstanceGetImpl()  # error: [invalid-attribute-override]
 
     def __getitem__(self, key: str) -> int:
         return 1

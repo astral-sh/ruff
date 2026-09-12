@@ -5270,7 +5270,7 @@ class NObject:
 
 class NStaticMethodShadowed(NStaticMethodGood):
     def __init__(self) -> None:
-        self.x: int = 1
+        self.x: int = 1  # error: [invalid-attribute-override]
 
 class PFactory(Protocol):
     @classmethod
