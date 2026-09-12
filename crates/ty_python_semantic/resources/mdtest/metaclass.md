@@ -791,6 +791,7 @@ Narrowing the invalid class to an intersection does not make its metaclass known
 ```py
 def check_intersection(other: Any):
     if Invalid is other:
+        reveal_type(Invalid)  # revealed: <class 'Invalid'> & Any
         reveal_type(Invalid.__class__)  # revealed: type[Unknown]
         reveal_type(type(Invalid))  # revealed: type[Unknown]
         reveal_type(Invalid.value)  # revealed: Unknown
@@ -1426,9 +1427,9 @@ class Outer:
 
 ## Metaclass reflection during recursive attribute inference
 
-The name `type` can refer to a metaclass obtained through an inherited alias's `__class__`
-attribute. Resolving this attribute depends on the metaclass whose bases use `type`; inference still
-converges.
+This stress test checks that cyclic attribute inference converges. Inferring `Outer.type` requires
+resolving `Inner.Value.__class__`, while inferring `Inner`'s metaclass uses `Outer.type` as a base.
+Both `__class__` and `type()` resolve to `Meta`.
 
 ```toml
 [environment]
@@ -1458,8 +1459,9 @@ class Outer:
 
 ## Metaclass reflection in a metaclass base
 
-A stub's class attribute named `type` can depend on the same metaclass that uses it as a base.
-Inference converges and reports the resulting inheritance cycle.
+This stress test creates an inheritance cycle through metaclass reflection. In the stub, `Meta`
+inherits from `Outer.type`, which refers back to `Meta` through `Inner.__class__`. Inference
+terminates and reports the cycle.
 
 `mod.pyi`:
 

@@ -52,7 +52,7 @@ use crate::types::{
     TypingModule, UnionBuilder, VarianceInferable, VarianceTerm,
 };
 use crate::{
-    Db, FxIndexMap, FxOrderSet,
+    Db, FxIndexMap, FxIndexSet, FxOrderSet,
     place::{Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, PublicTypePolicy},
     types::{MetaclassCandidate, TypeDefinition, UnionType},
 };
@@ -1492,12 +1492,26 @@ impl<'db> ClassType<'db> {
         env: &ProgramEnvironment<'db>,
         target: ClassType<'db>,
     ) -> bool {
+        self.has_relation_to(db, env, target, TypeRelation::Subtyping)
+    }
+
+    /// Check a nominal type relation directly between classes, including their specializations.
+    ///
+    /// Assignability allows unknown bases to supply a subclass relationship that subtyping
+    /// cannot establish.
+    fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Self,
+        relation: TypeRelation,
+    ) -> bool {
         let constraints = ConstraintSetBuilder::new();
         let relation_visitor = HasRelationToVisitor::default(&constraints);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::new(env);
-        let checker = TypeRelationChecker::subtyping(
+        let mut checker = TypeRelationChecker::subtyping(
             env,
             &constraints,
             TypeVarSet::None,
@@ -1506,12 +1520,16 @@ impl<'db> ClassType<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
+        checker.relation = relation;
         checker
             .check_class_pair(db, self, target)
             .is_always_satisfied(db, env)
     }
 
     /// Select the more derived metaclass, or return `None` for a conflict.
+    ///
+    /// One metaclass must derive from the other. Unlike [`Self::could_coexist_in_mro_with`],
+    /// the possibility of a common subclass is not sufficient.
     ///
     /// Known subclass relationships take precedence over gradual assignability. If unknown
     /// ancestry leaves both metaclasses as possible winners, retain only `type[Unknown]`; we do
@@ -1562,11 +1580,7 @@ impl<'db> ClassType<'db> {
         target: Self,
     ) -> bool {
         if target.is_final(db)
-            || !Type::instance(db, env, self).is_assignable_to(
-                db,
-                env,
-                Type::instance(db, env, target),
-            )
+            || !self.has_relation_to(db, env, target, TypeRelation::Assignability)
         {
             return false;
         }
@@ -1577,7 +1591,7 @@ impl<'db> ClassType<'db> {
             return true;
         }
 
-        let target_ancestors: FxOrderSet<_> = target
+        let target_ancestors: FxIndexSet<_> = target
             .iter_mro(db)
             .filter_map(ClassBase::into_class)
             .map(|class| class.class_literal(db))
@@ -3453,6 +3467,8 @@ pub(super) fn metaclass_instance_type<'db>(
     let instance = metaclass
         .to_instance_approximation(db, env)
         .expect("the type of a metaclass should always be instantiable");
+    // TODO: Intersect `instance` with `type` once equivalent representations are unified:
+    // https://github.com/astral-sh/ty/issues/222
     match instance {
         Type::Dynamic(dynamic) => SubclassOfType::from(db, env, dynamic),
         _ => instance,
