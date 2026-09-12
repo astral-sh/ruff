@@ -517,12 +517,11 @@ for specialization inference.
 ```py
 type MaybeList[T] = list[T] | T
 
-def test[X: int](items: list[X]) -> list[X]:
-    # The annotation MaybeList[str | int] expands to `list[str | int] | str | int`.
-    # Bidirectional inference should infer list[str | int] from the list() call.
+def _[X: int](items: list[X]) -> list[X]:
+    # `MaybeList[str | int]` expands to `list[str | int] | str | int`. The `list` alternative
+    # supplies the type context for the call.
     a: MaybeList[str | int] = list(items)
-    # The revealed type is list[str | int] because that's what list() returns.
-    reveal_type(a)  # revealed: list[str | int]
+    reveal_type(a)  # revealed: list[int | str]
     return items
 ```
 

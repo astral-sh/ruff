@@ -1080,6 +1080,103 @@ def f[T]():
     static_assert(c1 == c2)
 ```
 
+### Implication with gradual bounds
+
+A constraint implies another when every specialization allowed by the first also satisfies the
+second. Gradual assignability of their bounds is not sufficient: `T <= Any` allows more types than
+`T <= str`, even though `Any` is assignable to `str`. The same distinction applies to lower bounds.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+def _[T]():
+    upper_any = is_constraint_set_assignable_to(T, Any)
+    upper_str = ConstraintSet.upper_bound(T, str)
+    static_assert(upper_str.satisfies(upper_any))
+    static_assert(not upper_any.satisfies(upper_str))
+
+    lower_any = is_constraint_set_assignable_to(Any, T)
+    lower_str = ConstraintSet.lower_bound(str, T)
+    static_assert(lower_str.satisfies(lower_any))
+    static_assert(not lower_any.satisfies(lower_str))
+
+    static_assert(upper_any != upper_str)
+    static_assert(lower_any != lower_str)
+```
+
+Bounds containing gradual types follow the same rule. Fully static bounds retain ordinary subtype
+relationships in each direction.
+
+```py
+class Base: ...
+class Sub(Base): ...
+
+def _[T]():
+    upper_any = is_constraint_set_assignable_to(T, tuple[Any])
+    upper_str = ConstraintSet.upper_bound(T, tuple[str])
+    static_assert(upper_str.satisfies(upper_any))
+    static_assert(not upper_any.satisfies(upper_str))
+
+    lower_any = is_constraint_set_assignable_to(tuple[Any], T)
+    lower_str = ConstraintSet.lower_bound(tuple[str], T)
+    static_assert(lower_str.satisfies(lower_any))
+    static_assert(not lower_any.satisfies(lower_str))
+
+def _[T]():
+    upper_base = ConstraintSet.upper_bound(T, Base)
+    upper_sub = ConstraintSet.upper_bound(T, Sub)
+    static_assert(upper_sub.satisfies(upper_base))
+    static_assert(not upper_base.satisfies(upper_sub))
+
+    lower_base = ConstraintSet.lower_bound(Base, T)
+    lower_sub = ConstraintSet.lower_bound(Sub, T)
+    static_assert(lower_base.satisfies(lower_sub))
+    static_assert(not lower_sub.satisfies(lower_base))
+```
+
+Gradual types in contravariant positions also describe a range of possible bounds. An `Any`
+parameter does not imply a particular parameter type.
+
+```py
+from collections.abc import Callable
+
+def _[T]():
+    upper_any = is_constraint_set_assignable_to(T, Callable[[Any], int])
+    upper_str = ConstraintSet.upper_bound(T, Callable[[str], int])
+    static_assert(upper_str.satisfies(upper_any))
+    static_assert(not upper_any.satisfies(upper_str))
+
+    lower_any = is_constraint_set_assignable_to(Callable[[Any], int], T)
+    lower_str = ConstraintSet.lower_bound(Callable[[str], int], T)
+    static_assert(lower_str.satisfies(lower_any))
+    static_assert(not lower_any.satisfies(lower_str))
+```
+
+Distinct type variables remain independent, even when they share the same gradual bound. Comparing
+constraints cannot choose specializations for those variables to make an implication hold.
+
+```py
+def _[T, U: tuple[Any], V: tuple[Any]]():
+    upper_u = ConstraintSet.upper_bound(T, U)
+    upper_v = ConstraintSet.upper_bound(T, V)
+    static_assert(not upper_u.satisfies(upper_v))
+    static_assert(not upper_v.satisfies(upper_u))
+```
+
+A gradual alternative must not acquire incompatible bounds from other alternatives. This union
+permits `Any`, `object`, and `str`; the first alternative does not imply both `T = object` and
+`T <= str`.
+
+```py
+def _[T]():
+    gradual = is_constraint_set_assignable_to(Any, T) & is_constraint_set_assignable_to(T, Any)
+    constraints = gradual | ConstraintSet.equality(T, object) | ConstraintSet.upper_bound(T, str)
+    static_assert(constraints != ConstraintSet.never())
+    static_assert(constraints.solutions_for(T, inferable=tuple[T]) is not None)
+```
+
 ### Constraints on the same typevar
 
 Any particular specialization maps each typevar to one type. That means it's not useful to constrain

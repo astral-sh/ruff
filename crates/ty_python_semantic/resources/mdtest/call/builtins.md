@@ -416,9 +416,9 @@ def _(xs: Unknown):
     # TODO: should be `map[str]`
     reveal_type(map("{}".format, xs))  # revealed: map[object]
 
-    # TODO: should not emit an error and should reveal `str`
-    # error: [no-matching-overload]
-    reveal_type("".join(map("{}".format, xs)))  # revealed: Unknown
+    # TODO: The gradual iterable permits the context to select the `LiteralString` overload.
+    # This should reveal `str`.
+    reveal_type("".join(map("{}".format, xs)))  # revealed: LiteralString
 ```
 
 ## Mapping methods accept arbitrary object types

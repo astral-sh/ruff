@@ -1330,4 +1330,86 @@ class D[T = T]:
 reveal_type(D().x)  # revealed: Unknown
 ```
 
+A return context can override a standalone default. Without context, this call uses the `int`
+default; a `list[Any]` annotation supplies `Any` instead.
+
+```py
+from typing import Any
+
+def f[T = int]() -> list[T]:
+    raise NotImplementedError
+
+reveal_type(f())  # revealed: list[int]
+result: list[Any] = reveal_type(f())  # revealed: list[Any]
+reveal_type(result)  # revealed: list[Any]
+```
+
+### Defaults depending on inferred type variables
+
+Defaults that depend on argument inference are preserved when the return context supplies a wider
+static type. This also applies when the dependency goes through another type variable's default.
+
+```py
+def f[T, U = T, V = U](value: T) -> tuple[T, U, V]:
+    raise NotImplementedError
+
+reveal_type(f(1))  # revealed: tuple[Literal[1], Literal[1], Literal[1]]
+x1: tuple[int, object, object] = f(1)
+reveal_type(x1)  # revealed: tuple[Literal[1], Literal[1], Literal[1]]
+```
+
+A gradual context takes precedence over a mutually assignable type obtained from a dependent
+default:
+
+```py
+from typing import Any
+
+def same[T, U = T](value: T) -> tuple[T, U]:
+    raise NotImplementedError
+
+def _(value: int):
+    result: tuple[int, Any] = reveal_type(same(value))  # revealed: tuple[int, Any]
+```
+
+An incompatible return context overrides these defaults:
+
+```py
+x2: tuple[int, str, bytes] = f(1)
+reveal_type(x2)  # revealed: tuple[Literal[1], str, bytes]
+```
+
+The defaults can contain the inferred type inside a generic type, rather than referencing it
+directly:
+
+```py
+def g[T, U = tuple[T], V = tuple[U]](value: T) -> tuple[T, U, V]:
+    raise NotImplementedError
+
+x3: tuple[int, object, object] = g(1)
+reveal_type(x3)  # revealed: tuple[Literal[1], tuple[Literal[1]], tuple[tuple[Literal[1]]]]
+```
+
+An alias preserves the same dependency on the inferred type:
+
+```py
+type Wrap[T] = tuple[T]
+
+def h[T, U = Wrap[T]](value: T) -> tuple[T, U]:
+    raise NotImplementedError
+
+x4: tuple[int, object] = h(1)
+reveal_type(x4[1][0])  # revealed: Literal[1]
+```
+
+If the type variable referenced by the default has no inferred type, the return context supplies the
+candidate instead:
+
+```py
+def make[T, U = T]() -> tuple[T, U]:
+    raise NotImplementedError
+
+x5: tuple[object, int] = make()
+reveal_type(x5)  # revealed: tuple[object, int]
+```
+
 [pep 695]: https://peps.python.org/pep-0695/

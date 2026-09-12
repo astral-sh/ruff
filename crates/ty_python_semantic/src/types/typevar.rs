@@ -1341,6 +1341,14 @@ impl<'db> BoundTypeVarInstance<'db> {
                 mapped_specialization_type(specialization)
                     .unwrap_or_else(|| possibly_apply_to_self(specialization))
             }
+            TypeMapping::ApplySpecializationForTypeContext {
+                specialization,
+                promotion_mode,
+            } => mapped_specialization_type(specialization)
+                .map(|mapped| {
+                    mapped.promote_generic_class_context(db, visitor.env, *promotion_mode)
+                })
+                .unwrap_or_else(|| possibly_apply_to_self(specialization)),
             TypeMapping::ApplySpecializationWithMaterialization {
                 specialization,
                 materialization_kind,
