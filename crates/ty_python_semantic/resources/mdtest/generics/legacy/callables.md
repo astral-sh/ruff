@@ -269,6 +269,167 @@ reveal_type(generic_context(outside_callable(int_identity)))
 outside_callable(int_identity)("string")
 ```
 
+## Union without intersection does not consider budget
+
+A single union upper bound remains precise even when it has more alternatives than the solution
+budget. Nested `TypeAliasType` aliases preserve the same result.
+
+```py
+from typing import Callable, TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+
+def infer_from_consumer(consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume(value: A | B | C | D | E) -> None: ...
+
+reveal_type(infer_from_consumer(consume))  # revealed: A | B | C | D | E
+```
+
+The aliases retain nested union members until inference expands them:
+
+```py
+FirstTwo = TypeAliasType("FirstTwo", A | B)
+NextTwo = TypeAliasType("NextTwo", C | D)
+Options = TypeAliasType("Options", FirstTwo | NextTwo | E)
+
+def consume_alias(value: Options) -> None: ...
+
+reveal_type(infer_from_consumer(consume_alias))  # revealed: A | B | C | D | E
+```
+
+## Overlapping inferred union upper bounds with few surviving alternatives
+
+The individual union upper bounds can exceed the solution budget when only a few alternatives
+survive their intersection. Disjoint alternatives do not count toward the budget.
+
+```py
+from typing import Callable, TypeVar, final
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+
+def infer_from_consumers(left: Callable[[T], None], right: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+@final
+class E: ...
+
+@final
+class F: ...
+
+@final
+class G: ...
+
+@final
+class H: ...
+
+def consume_left(value: A | B | C | D | E) -> None: ...
+def consume_right(value: A | B | F | G | H) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: A | B
+```
+
+Aliases for these unions also preserve the precise intersection in either argument order:
+
+```py
+Left = TypeAliasType("Left", A | B | C | D | E)
+Right = TypeAliasType("Right", A | B | F | G | H)
+
+def consume_left_alias(value: Left) -> None: ...
+def consume_right_alias(value: Right) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left_alias, consume_right_alias))  # revealed: A | B
+reveal_type(infer_from_consumers(consume_right_alias, consume_left_alias))  # revealed: A | B
+```
+
+## Intersecting aliased upper bounds exceeding the solution budget
+
+Each consumer constrains `T` to a different union. The classes can share subclasses, so their
+intersection has eight distinct alternatives. Type aliases do not exempt this expansion from the
+solution budget: inference falls back to `Unknown` instead of constructing the entire intersection.
+
+```py
+from typing import Callable, TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+
+First = TypeAliasType("First", A | B)
+Second = TypeAliasType("Second", C | D)
+Third = TypeAliasType("Third", E | F)
+
+def infer_from_consumers(
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+    third: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+def consume_first(value: First) -> None: ...
+def consume_second(value: Second) -> None: ...
+def consume_third(value: Third) -> None: ...
+
+reveal_type(infer_from_consumers(consume_first, consume_second, consume_third))  # revealed: Unknown
+```
+
+The same budget applies when an explicit union is intersected with aliased unions:
+
+```py
+def consume_explicit(value: E | F) -> None: ...
+
+reveal_type(infer_from_consumers(consume_first, consume_second, consume_explicit))  # revealed: Unknown
+```
+
+## Intersecting recursive inferred union upper bounds
+
+A recursive alias can contribute an upper bound without expanding its nested occurrences. Here, only
+`int` satisfies both consumers, regardless of their order.
+
+```py
+from typing import Callable, TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+Recursive = TypeAliasType("Recursive", "int | list[Recursive]")
+
+def infer_from_consumers(left: Callable[[T], None], right: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume_recursive(value: Recursive) -> None: ...
+def consume_int_or_str(value: int | str) -> None: ...
+
+reveal_type(infer_from_consumers(consume_recursive, consume_int_or_str))  # revealed: int
+reveal_type(infer_from_consumers(consume_int_or_str, consume_recursive))  # revealed: int
+```
+
 ## Overloaded callable as generic `Callable` argument
 
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set
