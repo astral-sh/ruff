@@ -3536,6 +3536,9 @@ pub(super) enum MetaclassErrorKind<'db> {
         /// The incompatible metaclass of `base`.
         base_metaclass: ClassType<'db>,
         base: ClassBase<'db>,
+        /// The original `metaclass=` value, retained for error recovery even if a base
+        /// supplied a more derived candidate before the conflict was found.
+        explicit_metaclass: Option<ClassType<'db>>,
     },
     /// The metaclass is a parameterized generic class, which is not supported.
     GenericMetaclass,

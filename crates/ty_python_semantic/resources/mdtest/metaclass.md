@@ -695,8 +695,8 @@ The metaclass of a derived class must be a (non-strict) subclass of the metaclas
 bases. ("Strict subclass" is a synonym for "proper subclass"; a non-strict subclass can be a
 subclass or the class itself.)
 
-An explicit metaclass that conflicts with a base's metaclass also leaves the metaclass and its
-attributes unknown.
+An explicit metaclass that conflicts with a base's metaclass is retained for error recovery. This
+preserves the types of attributes declared on the class and its explicit metaclass.
 
 ```py
 class M1(type): ...
@@ -707,11 +707,45 @@ class M2(type):
 class A(metaclass=M1): ...
 
 # error: [conflicting-metaclass] "The metaclass of a derived class (`B`) must be a subclass of the metaclasses of all its bases, but `M2` (metaclass of `B`) and `M1` (metaclass of base class `A`) have no subclass relationship"
-class B(A, metaclass=M2): ...
+class B(A, metaclass=M2):
+    declared: int
 
-reveal_type(B.__class__)  # revealed: type[Unknown]
-reveal_type(type(B))  # revealed: type[Unknown]
-reveal_type(B.value)  # revealed: Unknown
+reveal_type(B.__class__)  # revealed: <class 'M2'>
+reveal_type(type(B))  # revealed: <class 'M2'>
+reveal_type(B.value)  # revealed: str
+reveal_type(B.declared)  # revealed: int
+```
+
+Descendants also inherit the recovered metaclass:
+
+```py
+class Child(B): ...
+
+reveal_type(Child.__class__)  # revealed: <class 'M2'>
+
+def check_subclass(cls: type[B]):
+    reveal_type(cls.__class__)  # revealed: type[M2]
+    reveal_type(type(cls))  # revealed: type[M2]
+    reveal_type(cls.value)  # revealed: str
+    reveal_type(cls.declared)  # revealed: int
+```
+
+## Explicit metaclass recovery after selecting a more derived candidate
+
+A base can supply a more derived metaclass before another base introduces a conflict. Error recovery
+still uses the original explicit metaclass, regardless of the order of the bases.
+
+```py
+class Meta(type): ...
+class DerivedMeta(Meta): ...
+class OtherMeta(type): ...
+class Derived(metaclass=DerivedMeta): ...
+class Other(metaclass=OtherMeta): ...
+class Forward(Derived, Other, metaclass=Meta): ...  # error: [conflicting-metaclass]
+class Reverse(Other, Derived, metaclass=Meta): ...  # error: [conflicting-metaclass]
+
+reveal_type(Forward.__class__)  # revealed: <class 'Meta'>
+reveal_type(Reverse.__class__)  # revealed: <class 'Meta'>
 ```
 
 ## Common metaclass
@@ -740,8 +774,9 @@ class Meta(type):
 
 class OtherMeta(type): ...
 class Valid(metaclass=Meta): ...
+class Base(metaclass=Meta): ...
 class Other(metaclass=OtherMeta): ...
-class Invalid(Other, metaclass=Meta): ...  # error: [conflicting-metaclass]
+class Invalid(Other, Base): ...  # error: [conflicting-metaclass]
 
 Classes: TypeAlias = type[Invalid] | type[Valid]
 
@@ -1354,8 +1389,8 @@ class Outer:
 ## Persistent metaclass conflict during recursive attribute inference
 
 Recursive attribute inference does not suppress a provable metaclass conflict. `OtherMeta` is final,
-so an unknown base inferred for `Meta` cannot make it a subclass of `OtherMeta`. We infer an unknown
-metaclass and still report the conflict when checking the stub.
+so an unknown base inferred for `Meta` cannot make it a subclass of `OtherMeta`. We retain the
+explicit metaclass and still report the conflict when checking the stub.
 
 ```toml
 [environment]
@@ -1366,7 +1401,7 @@ python-version = "3.12"
 from mod import Outer
 
 reveal_type(Outer.value)  # revealed: Unknown
-reveal_type(Outer.Inner.__class__)  # revealed: type[Unknown]
+reveal_type(Outer.Inner.__class__)  # revealed: <class 'Meta'>
 ```
 
 `mod.pyi`:

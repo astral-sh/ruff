@@ -1252,8 +1252,8 @@ Aliased[int].constant = 1
 
 ## Metaclasses of specialized classes
 
-Specializing a class preserves its valid metaclass. A conflicting metaclass and its attributes
-remain unknown after specialization.
+Specializing a class preserves its valid metaclass. Without an explicit metaclass, conflicting
+inherited metaclasses leave the metaclass and its attributes unknown after specialization.
 
 ```py
 class Meta[T](type):
@@ -1261,8 +1261,9 @@ class Meta[T](type):
 
 class OtherMeta(type): ...
 class Base(metaclass=OtherMeta): ...
+class MetaBase(metaclass=Meta[str]): ...
 class Valid[T](metaclass=Meta[str]): ...
-class Invalid[T](Base, metaclass=Meta[str]): ...  # error: [conflicting-metaclass]
+class Invalid[T](Base, MetaBase): ...  # error: [conflicting-metaclass]
 
 reveal_type(Valid[int].__class__)  # revealed: <class 'Meta[str]'>
 reveal_type(type(Valid[int]))  # revealed: <class 'Meta[str]'>
@@ -1291,6 +1292,16 @@ def constrained[T: (Invalid[int], Invalid[str])](cls: type[T]):
     reveal_type(cls.__class__)  # revealed: type[Unknown]
     reveal_type(type(cls))  # revealed: type[Unknown]
     none: None = cls  # error: [invalid-assignment]
+```
+
+An explicit metaclass is retained after a conflict, including its specialization:
+
+```py
+class Explicit[T](Base, metaclass=Meta[str]): ...  # error: [conflicting-metaclass]
+
+reveal_type(Explicit[int].__class__)  # revealed: <class 'Meta[str]'>
+reveal_type(type(Explicit[int]))  # revealed: <class 'Meta[str]'>
+reveal_type(Explicit[int].value)  # revealed: str
 ```
 
 ## Specializations propagate

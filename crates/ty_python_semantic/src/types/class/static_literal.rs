@@ -1173,7 +1173,13 @@ impl<'db> StaticClassLiteral<'db> {
     pub(in crate::types) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
         self.try_metaclass(db)
             .map(|(metaclass, _)| metaclass)
-            .unwrap_or_else(|_| ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()))
+            .unwrap_or_else(|error| match error.kind {
+                MetaclassErrorKind::Conflict {
+                    explicit_metaclass: Some(metaclass),
+                    ..
+                } => ClassMetaclass::Selected(metaclass.into()),
+                _ => ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()),
+            })
     }
 
     /// Return the selected metaclass or protocol fallback, or an error if it cannot be inferred.
@@ -1323,6 +1329,8 @@ impl<'db> StaticClassLiteral<'db> {
                         candidate,
                         base_metaclass: metaclass,
                         base: base_class,
+                        explicit_metaclass: explicit_metaclass
+                            .and_then(|metaclass| metaclass.to_class_type(db)),
                     },
                 });
             }
