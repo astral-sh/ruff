@@ -985,6 +985,7 @@ mod tests {
         	fast-api-redundant-response-model (FAST001),
         	fast-api-non-annotated-dependency (FAST002),
         	fast-api-unused-path-parameter (FAST003),
+        	cancellation-exception-without-reraise (ASYNC103),
         	blocking-http-call-httpx-in-async-function (ASYNC212),
         	blocking-path-method-in-async-function (ASYNC240),
         	blocking-input-in-async-function (ASYNC250),
