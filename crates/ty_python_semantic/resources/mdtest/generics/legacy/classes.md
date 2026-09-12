@@ -365,6 +365,112 @@ class BadChild8(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
 class BadChild9(Parent[T1, T2], Parent3[T2, T1], Parent4[Any, Any]): ...
 ```
 
+## Inconsistent type arguments through an unspecified ancestor
+
+A class can inherit the same generic ancestor through unspecified and specialized paths. The
+specialized path still constrains its subclasses, even when the MRO retains the unspecified path's
+type arguments.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]): ...
+class Unspecified(Base): ...  # error: [missing-type-argument]
+class IntBase(Base[int]): ...
+class Combined(Unspecified, IntBase): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[str]` and `Base[int]`"
+class Conflicting(Combined, Base[str]): ...
+class Compatible(Combined, Base[int]): ...
+class Inherited(Conflicting): ...
+```
+
+Classes constructed with `type()` also account for every inherited specialization.
+
+```py
+class StrBase(Base[str]): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[str]` and `Base[int]`"
+Dynamic = type("Dynamic", (Combined, StrBase), {})
+```
+
+## Inconsistent type arguments through partially gradual ancestors
+
+Each non-dynamic type argument constrains later inheritance paths independently. An `Any` in one
+position does not hide a conflict between concrete arguments contributed by other paths.
+
+```py
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Base(Generic[T, U]): ...
+class First(Base[int, Any]): ...
+class Second(Base[Any, str]): ...
+class Combined(First, Second): ...
+class Compatible(Combined, Base[int, str]): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[int, bytes]` and `Base[Any, str]`"
+class Conflicting(Combined, Base[int, bytes]): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[bytes, str]` and `Base[int, Any]`"
+class OtherConflict(Combined, Base[bytes, str]): ...
+class Inherited(Conflicting): ...
+```
+
+With three direct bases, the diagnostic identifies `First` and the third base as the sources of
+conflicting arguments. `Second` leaves the first type argument unconstrained.
+
+```py
+# snapshot: invalid-generic-class
+class Mixed(First, Second, Base[bytes, str]): ...
+```
+
+```snapshot
+error[invalid-generic-class]: Inconsistent type arguments for `Base` among class bases
+  --> src/mdtest_snippet.py:19:7
+   |
+19 | class Mixed(First, Second, Base[bytes, str]): ...
+   |       ^^^^^^-----^^^^^^^^^^----------------^
+   |             |              |
+   |             |              Later class base is `Base[bytes, str]`
+   |             Earlier class base inherits from `Base[int, Any]`
+```
+
+Reversing the paths preserves both constraints. Each diagnostic identifies the base that supplied
+the conflicting argument.
+
+```py
+class Reversed(Second, First): ...
+class ReversedCompatible(Reversed, Base[int, str]): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[bytes, str]` and `Base[int, Any]`"
+class ReversedConflict(Reversed, Base[bytes, str]): ...
+```
+
+The same constraints apply when another path contributes a more specialized version of an ancestor.
+
+```py
+class Specific(Base[int, str]): ...
+class Right(Specific, Base[int, Any]): ...
+class Diamond(First, Right): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[int, bytes]` and `Base[int, str]`"
+class DiamondConflict(Diamond, Base[int, bytes]): ...
+```
+
+Classes constructed with `type()` also preserve constraints from partially gradual ancestors.
+
+```py
+class BytesBase(Base[int, bytes]): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[int, bytes]` and `Base[Any, str]`"
+Dynamic = type("Dynamic", (Combined, BytesBase), {})
+```
+
 ## Specializing generic classes explicitly
 
 <!-- snapshot-diagnostics -->
@@ -1145,6 +1251,203 @@ reveal_type(DescriptorChild.descriptor)  # revealed: Unknown
 reveal_type(DescriptorChild[int].descriptor)  # revealed: int
 ```
 
+## Fallback MROs preserve generic class identity
+
+Putting `Base` before its subclass makes the MRO inconsistent. During error recovery, the fallback
+MRO includes each class once, retaining its first specialization and placing `object` last.
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions._internal import reveal_mro
+
+T = TypeVar("T")
+
+class Base(Generic[T]): ...
+class IntBase(Base[int]): ...
+
+# error: [inconsistent-mro]
+Broken = type("Broken", (Base, IntBase), {})
+
+# revealed: (<class 'Broken'>, <class 'Base[Unknown]'>, typing.Generic, <class 'IntBase'>, <class 'object'>)
+reveal_mro(Broken)
+```
+
+## Assignability through gradual and concrete inheritance paths
+
+A concrete inheritance path makes `Child` a subtype of `Base[int]` even when an earlier path
+inherits `Base[Any]`. Assigning it to `Base[int]` is sound; assigning it to the invariant
+`Base[str]` is not.
+
+```toml
+[rules]
+unsound-assignment = "error"
+```
+
+```py
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    value: T
+
+class Gradual(Base[Any]): ...
+class Concrete(Base[int]): ...
+class Child(Gradual, Concrete): ...
+
+as_concrete: Concrete = Child()
+as_base: Base[int] = Child()
+incompatible: Base[str] = Child()  # error: [unsound-assignment]
+```
+
+The relationship is preserved when the bases are reversed, through another subclass, and for classes
+constructed with `type()`.
+
+```py
+class Reversed(Concrete, Gradual): ...
+class Grandchild(Child): ...
+
+as_reversed: Base[int] = Reversed()
+as_grandchild: Base[int] = Grandchild()
+
+Dynamic = type("Dynamic", (Gradual, Concrete), {})
+as_dynamic: Base[int] = Dynamic()
+```
+
+Specializing a generic subclass also specializes the concrete inheritance path.
+
+```py
+class GenericChild(Gradual, Base[list[T]]): ...
+
+as_specialized: Base[list[int]] = GenericChild[int]()
+incompatible_specialization: Base[list[str]] = GenericChild[int]()  # error: [unsound-assignment]
+```
+
+## Method overrides through gradual and concrete inheritance paths
+
+An override must satisfy the concrete return type inherited through `Concrete`, even when the MRO
+retains `Base[Any]` from `Gradual`.
+
+```py
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    def method(self) -> T:
+        raise NotImplementedError
+
+class Gradual(Base[Any]): ...
+class Concrete(Base[int]): ...
+
+class Invalid(Gradual, Concrete):
+    # error: [invalid-method-override]
+    def method(self) -> str:
+        return ""
+
+class Valid(Gradual, Concrete):
+    def method(self) -> int:
+        return 0
+```
+
+The same contract applies when the bases are reversed or another subclass inherits the diamond. Each
+invalid override produces one diagnostic.
+
+```py
+class Reversed(Concrete, Gradual):
+    # error: [invalid-method-override]
+    def method(self) -> str:
+        return ""
+
+class Combined(Gradual, Concrete): ...
+
+reveal_type(Combined().method())  # revealed: Any
+
+class Indirect(Combined):
+    # error: [invalid-method-override]
+    def method(self) -> str:
+        return ""
+```
+
+An override that preserves its parent's signature does not repeat an existing violation in the
+parent's inheritance hierarchy.
+
+```py
+class PreservesInvalid(Invalid):
+    def method(self) -> str:
+        return ""
+```
+
+A parent that inherits only `Base[Any]` can validly return `str`. Adding `Concrete` introduces a new
+`int` return contract, so preserving that parent's signature is an invalid override. Further
+descendants do not repeat the violation.
+
+```py
+class Strings(Gradual):
+    def method(self) -> str:
+        return ""
+
+class Child(Strings, Concrete):
+    # error: [invalid-method-override]
+    def method(self) -> str:
+        return ""
+
+class Grandchild(Child):
+    def method(self) -> str:
+        return ""
+```
+
+The same new conflict is reported when the first base inherits the selected method from an
+intermediate class.
+
+```py
+class Intermediate(Strings): ...
+
+class IndirectChild(Intermediate, Concrete):
+    # error: [invalid-method-override]
+    def method(self) -> str:
+        return ""
+```
+
+Specializing a generic intermediate class also specializes the inherited method's return type.
+
+```py
+class GenericDiamond(Gradual, Base[T]): ...
+
+class Specialized(GenericDiamond[int]):
+    # error: [invalid-method-override]
+    def method(self) -> str:
+        return ""
+```
+
+## Existing method violations through gradual generic bases
+
+A parent can already have an invalid override of `Base[Any]` because its parameter is too narrow.
+Adding a `Base[int]` inheritance path does not repeat that violation on an override with the same
+signature. The parent's original `Base[Any]` specialization determines whether the violation already
+exists.
+
+```py
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    def method(self, value: object) -> T:
+        raise NotImplementedError
+
+class Invalid(Base[Any]):
+    # error: [invalid-method-override]
+    def method(self, value: str) -> Any:
+        return value
+
+class Concrete(Base[int]): ...
+
+class Child(Invalid, Concrete):
+    def method(self, value: str) -> Any:
+        return value
+```
+
 ## Generic methods
 
 Generic classes can contain methods that are themselves generic. The generic methods can refer to
@@ -1591,6 +1894,29 @@ Box.make.cache_clear()
 Box[int].make.cache_info()
 ```
 
+## Inferring a descriptor's wrapped signature
+
+A nominal `staticmethod` annotation can infer its parameter specification and return type from the
+precise callable retained by a method wrapper.
+
+```py
+from collections.abc import Callable
+from typing import ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def unwrap(method: staticmethod[P, R]) -> Callable[P, R]:
+    return method.__func__
+
+def stringify(value: int) -> str:
+    return str(value)
+
+function = unwrap(staticmethod(stringify))
+reveal_type(function(1))  # revealed: str
+function("wrong")  # error: [invalid-argument-type]
+```
+
 ## Metaclass descriptors shadow generic instance attributes
 
 A data descriptor on the metaclass governs class access even when instances have an attribute of the
@@ -1616,6 +1942,67 @@ reveal_type(Box.value)  # revealed: int
 reveal_type(Box[str].value)  # revealed: int
 Box.value = 2
 reveal_type(Box[str]().value)  # revealed: str
+```
+
+## Metaclasses of specialized classes
+
+Specializing a class preserves its valid metaclass. Without an explicit metaclass, conflicting
+inherited metaclasses leave the metaclass and its attributes unknown after specialization.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Meta(type, Generic[T]):
+    value: T
+
+class OtherMeta(type): ...
+class Base(metaclass=OtherMeta): ...
+class MetaBase(metaclass=Meta[str]): ...
+class Valid(Generic[T], metaclass=Meta[str]): ...
+class Invalid(Base, MetaBase, Generic[T]): ...  # error: [conflicting-metaclass]
+
+reveal_type(Valid[int].__class__)  # revealed: <class 'Meta[str]'>
+reveal_type(type(Valid[int]))  # revealed: <class 'Meta[str]'>
+reveal_type(Invalid[int].__class__)  # revealed: type[Unknown]
+reveal_type(type(Invalid[int]))  # revealed: type[Unknown]
+reveal_type(Invalid[int].value)  # revealed: Unknown
+```
+
+The specialized class remains a class object, so it cannot be assigned to `None`:
+
+```py
+meta: OtherMeta = Invalid[int]
+none: None = Invalid[int]  # error: [invalid-assignment]
+```
+
+The metaclass also remains unknown when the invalid class is reached through type-variable bounds or
+constraints:
+
+```py
+Bounded = TypeVar("Bounded", bound=Invalid[int])
+Constrained = TypeVar("Constrained", Invalid[int], Invalid[str])
+
+def bounded(cls: type[Bounded]):
+    reveal_type(cls.__class__)  # revealed: type[Unknown]
+    reveal_type(type(cls))  # revealed: type[Unknown]
+    none: None = cls  # error: [invalid-assignment]
+
+def constrained(cls: type[Constrained]):
+    reveal_type(cls.__class__)  # revealed: type[Unknown]
+    reveal_type(type(cls))  # revealed: type[Unknown]
+    none: None = cls  # error: [invalid-assignment]
+```
+
+An explicit metaclass is retained after a conflict, including its specialization:
+
+```py
+class Explicit(Generic[T], Base, metaclass=Meta[str]): ...  # error: [conflicting-metaclass]
+
+reveal_type(Explicit[int].__class__)  # revealed: <class 'Meta[str]'>
+reveal_type(type(Explicit[int]))  # revealed: <class 'Meta[str]'>
+reveal_type(Explicit[int].value)  # revealed: str
 ```
 
 ## Specializations propagate

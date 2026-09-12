@@ -1177,6 +1177,62 @@ def constrained[T: (int, str)](x: T):
     reveal_type(type(x))  # revealed: type[T@constrained]
 ```
 
+## Enum members on generic class objects
+
+An enum member cannot be reassigned through a generic class receiver. The restriction applies to
+every constraint or alternative in an upper bound. Non-member attributes remain writable.
+
+```py
+from enum import Enum
+from typing import Any, Protocol
+
+class A(Enum):
+    X = 0
+    label: str
+
+class B(Enum):
+    X = 0
+    label: str
+
+class Writable(Protocol):
+    X: Any
+```
+
+For a constrained type variable, the assignment must be valid for every constraint. These class
+objects also cannot satisfy a protocol that requires a writable enum member:
+
+```py
+def constrained[T: (A, B)](cls: type[T]):
+    cls.X = 0  # error: [invalid-assignment]
+    writable: Writable = cls  # error: [invalid-assignment]
+    cls.label = "label"
+```
+
+The same applies to a union bound, including one defined through a type alias:
+
+```py
+type Both = A | B
+
+def union_bound[T: Both](cls: type[T]):
+    cls.X = 0  # error: [invalid-assignment]
+    writable: Writable = cls  # error: [invalid-assignment]
+    cls.label = "label"
+```
+
+One enum alternative is enough to reject the write, even if another class allows assignment to the
+attribute:
+
+```py
+class Plain:
+    X: int = 0
+
+def mixed_constraints[T: (Plain, A)](cls: type[T]):
+    cls.X = 0  # error: [invalid-assignment]
+
+def mixed_bound[T: A | Plain](cls: type[T]):
+    cls.X = 0  # error: [invalid-assignment]
+```
+
 ## Cycles
 
 ### Bounds and constraints

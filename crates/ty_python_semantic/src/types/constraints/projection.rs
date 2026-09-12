@@ -15,6 +15,7 @@ pub(crate) struct SolutionBudget {
     /// Interior and terminal visits, shared by preprocessing and path collection.
     pub(crate) visits: usize,
     /// Set-theoretic terms contributed to the result, including terms exposed by aliases.
+    /// Also bounds storage when retaining alternatives.
     pub(crate) type_terms: usize,
 }
 

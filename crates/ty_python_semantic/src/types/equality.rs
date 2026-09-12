@@ -232,6 +232,13 @@ fn evaluate_type_comparison<'db>(
             .is_some_and(|narrowed| {
                 equality_truthiness(db, env, narrowed, *constraint, soundness_policy)
                     == Truthiness::AlwaysTrue
+                    // Equal values need not have the same type: `False == 0` does not make
+                    // `Literal[False]` a valid specialization of a `Literal[0]` constraint.
+                    && IntersectionBuilder::new(db, env)
+                        .add_positive(left)
+                        .add_positive(narrowed)
+                        .build()
+                        .is_subtype_of(db, env, *constraint)
             })
         })
     {
@@ -394,7 +401,7 @@ pub(crate) struct ComparisonSoundnessPolicy {
 }
 
 impl ComparisonSoundnessPolicy {
-    const CONSERVATIVE: Self = Self {
+    pub(super) const CONSERVATIVE: Self = Self {
         allow_unsafe_equality: false,
     };
 

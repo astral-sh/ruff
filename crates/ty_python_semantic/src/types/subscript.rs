@@ -418,7 +418,7 @@ fn map_subscript_alternatives<'db>(
     }
 
     if let Type::Union(union) = full_object_ty {
-        builder = builder.recursively_defined(union.recursively_defined(db));
+        builder = builder.or_recursively_defined(union.recursively_defined(db));
     }
     if errors.is_empty() {
         Ok(if preserves_typevar {

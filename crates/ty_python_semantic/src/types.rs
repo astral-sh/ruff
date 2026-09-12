@@ -30,8 +30,8 @@ pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
 use self::cyclic::{ActiveRecursionDetector, HasIdentity, TypeIdentity};
 pub use self::dedicated::pytest::{
-    FixtureBinding, FixtureExposure, FixtureNameSource, fixture_bindings_for_parameter,
-    fixture_exposures_for_definition, pytest_global_plugin_files,
+    FixtureBinding, FixtureExposure, FixtureNameSource, PytestTest, fixture_bindings_for_parameter,
+    fixture_exposures_for_definition, pytest_global_plugin_files, pytest_tests_in_file,
 };
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
@@ -129,6 +129,7 @@ use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{ProgramFile, Truthiness, place_table, semantic_index, use_def_map};
 
+mod abstract_methods;
 mod attribute_write;
 mod bool;
 mod bound_super;
@@ -2188,7 +2189,11 @@ impl<'db> Type<'db> {
     fn supports_self_binding(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         match self {
             Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => false,
-            Type::Callable(callable) if callable.is_function_like(db) => false,
+            Type::Callable(callable)
+                if callable.is_function_like(db) || callable.is_method_wrapper(db) =>
+            {
+                false
+            }
             _ => self.contains_self(db, env),
         }
     }
@@ -3993,8 +3998,28 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         key: MemberLookupKey<'db>,
+        receiver: Type<'db>,
     ) -> PlaceAndQualifiers<'db> {
         let ty = key.ty(db);
+
+        // `object.__dict__` is a typeshed approximation: a concrete slotted instance without
+        // dictionary storage does not inherit that attribute at runtime. Keep normal lookup for
+        // `Self` and other type variables because their subclasses can introduce a dictionary.
+        let key = if key.name(db) == "__dict__"
+            && let Type::NominalInstance(instance) = receiver
+            && let Some((class, _)) = instance.class(db, env).static_class_literal(db)
+            && class.lacks_instance_storage(db, "__dict__")
+        {
+            MemberLookupKey::new(
+                db,
+                key.program(db),
+                ty,
+                key.name(db).as_str(),
+                key.policy(db) | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+            )
+        } else {
+            key
+        };
 
         if let Type::TypeVar(_) = ty {
             if let Some(class) = ty.nominal_class(db, env) {
@@ -5074,7 +5099,8 @@ impl<'db> Type<'db> {
         fallback: MemberLookupResult<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
     ) -> MemberLookupResult<'db> {
-        let meta_attr_plain = Self::instance_lookup_class_member_with_policy(db, env, key);
+        let meta_attr_plain =
+            Self::instance_lookup_class_member_with_policy(db, env, key, receiver);
         let meta_attr_ty = meta_attr_plain.place.ignore_possibly_undefined();
         // Preserve the receiver's type variables and all its narrowed class constraints.
         let owner = receiver.to_meta_type(db, env);
@@ -5732,9 +5758,12 @@ impl<'db> Type<'db> {
                 }
                 Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => match name_str {
                     "__func__" | "__wrapped__" => Place::bound(wrapper.wrapped(db)).into(),
-                    "__call__" if let Some(callables) = wrapper.callables(db, env) => {
-                        Place::bound(callables.into_type(db, env)).into()
-                    }
+                    "__call__" if let Some(callables) = wrapper.callables(db, env) => Place::bound(
+                        callables
+                            .map(|callable| callable.into_method_wrapper(db))
+                            .into_type(db, env),
+                    )
+                    .into(),
                     _ => wrapper
                         .instance_fallback(db, env)
                         .member_lookup_with_policy_and_receiver(
@@ -5745,7 +5774,14 @@ impl<'db> Type<'db> {
                     "__self__" => Place::bound(bound_method.self_instance(db)).into(),
                     "__func__" => Place::bound(bound_method.func(db)).into(),
                     "__call__" if let Some(callables) = bound_method.callables(db, env) => {
-                        Place::bound(callables.into_type(db, env)).into()
+                        // The extracted method wrapper does not bind another receiver when
+                        // stored on a class, even if the underlying callable is function-like.
+                        Place::bound(
+                            callables
+                                .map(|callable| callable.into_method_wrapper(db))
+                                .into_type(db, env),
+                        )
+                        .into()
                     }
                     _ => {
                         let result = KnownClass::MethodType
@@ -5783,6 +5819,12 @@ impl<'db> Type<'db> {
 
                 Type::Callable(callable) if callable.is_function_like(db) => {
                     KnownClass::FunctionType
+                        .to_instance(db, env)
+                        .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver)
+                }
+
+                Type::Callable(callable) if callable.is_method_wrapper(db) => {
+                    KnownClass::MethodWrapperType
                         .to_instance(db, env)
                         .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver)
                 }
@@ -8473,6 +8515,9 @@ impl<'db> Type<'db> {
                 Type::Callable(callable) if callable.is_function_like(db) => {
                     KnownClass::FunctionType.to_class_literal(db, env)
                 }
+                Type::Callable(callable) if callable.is_method_wrapper(db) => {
+                    KnownClass::MethodWrapperType.to_class_literal(db, env)
+                }
                 Type::Callable(_) | Type::DataclassTransformer(_) => {
                     KnownClass::Type.to_instance(db, env)
                 }
@@ -8895,7 +8940,7 @@ impl<'db> Type<'db> {
 
                     if union.recursively_defined(db).is_yes() {
                         expanded_callables =
-                            expanded_callables.recursively_defined(RecursivelyDefined::Yes);
+                            expanded_callables.or_recursively_defined(RecursivelyDefined::Yes);
                     }
                 }
 
@@ -10730,7 +10775,7 @@ impl std::fmt::Display for DynamicType<'_> {
 }
 
 bitflags! {
-    /// Type qualifiers that appear in an annotation expression.
+    /// Type qualifiers from annotations or synthesized member metadata.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, Hash)]
     pub struct TypeQualifiers: u8 {
         /// `typing.ClassVar`
@@ -10743,7 +10788,7 @@ bitflags! {
         const REQUIRED = 1 << 3;
         /// `typing_extensions.NotRequired`
         const NOT_REQUIRED = 1 << 4;
-        /// `typing_extensions.ReadOnly`
+        /// `typing_extensions.ReadOnly`, or a synthesized read-only class attribute.
         const READ_ONLY = 1 << 5;
         /// A non-standard type qualifier that marks implicit instance attributes, i.e.
         /// instance attributes that are only implicitly defined via `self.x = …` in

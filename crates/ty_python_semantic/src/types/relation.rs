@@ -1037,8 +1037,11 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
 }
 
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
-    pub(super) fn subtyping(
+    /// Create a relation checker that eagerly evaluates type variables.
+    #[expect(clippy::too_many_arguments)]
+    pub(super) fn new(
         env: &'a ProgramEnvironment<'db>,
+        relation: TypeRelation,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
@@ -1050,7 +1053,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             env,
             constraints,
             inferable,
-            relation: TypeRelation::Subtyping,
+            relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
@@ -1062,6 +1065,27 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
+    pub(super) fn subtyping(
+        env: &'a ProgramEnvironment<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: TypeVarSet<'db>,
+        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'a, 'db>,
+    ) -> Self {
+        Self::new(
+            env,
+            TypeRelation::Subtyping,
+            constraints,
+            inferable,
+            relation_visitor,
+            disjointness_visitor,
+            signature_relation_visitor,
+            materialization_visitor,
+        )
+    }
+
     pub(super) fn constraint_set_assignability(
         env: &'a ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
@@ -1071,18 +1095,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         materialization_visitor: &'a ApplyTypeMappingVisitor<'a, 'db>,
     ) -> Self {
         Self {
-            env,
-            constraints,
-            inferable: TypeVarSet::None,
-            relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
-            context_tree: None,
-            given: ConstraintSet::from_bool(constraints, false),
-            perform_expensive_checks: true,
-            relation_visitor,
-            disjointness_visitor,
-            signature_relation_visitor,
-            materialization_visitor,
+            ..Self::new(
+                env,
+                TypeRelation::Assignability,
+                constraints,
+                TypeVarSet::None,
+                relation_visitor,
+                disjointness_visitor,
+                signature_relation_visitor,
+                materialization_visitor,
+            )
         }
     }
 
@@ -1948,6 +1971,33 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 source_sentinel.is_same_sentinel(db, target_sentinel),
             ),
 
+            // A nominal descriptor annotation specifies the wrapped callable through `__func__`.
+            // Comparing that contract directly preserves overloads and avoids replacing the
+            // wrapped callable's parameter and return types with the default specialization.
+            (
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)),
+                Type::NominalInstance(target_instance),
+            ) if target_instance
+                .class(db, env)
+                .is_known(db, wrapper.class(db)) =>
+            {
+                self.with_recursion_guard(db, source, target, || {
+                    let Some(target_function) = target
+                        .member_lookup_with_policy(
+                            db,
+                            env,
+                            "__func__",
+                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        )
+                        .place
+                        .ignore_possibly_undefined()
+                    else {
+                        return self.never();
+                    };
+                    self.check_type_pair(db, wrapper.wrapped(db), target_function)
+                })
+            }
+
             // When checking `FunctoolsPartial <: functools.partial[T]`, we need to specialize
             // the nominal instance with the partial's return type so the check is precise.
             (
@@ -2636,6 +2686,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::Callable(callable), _) if callable.is_function_like(db) => {
                 self.check_type_pair(db, KnownClass::FunctionType.to_instance(db, env), target)
             }
+
+            // Method-wrapper callables are subtypes of `MethodWrapperType`.
+            (Type::Callable(callable), _) if callable.is_method_wrapper(db) => self
+                .check_type_pair(
+                    db,
+                    KnownClass::MethodWrapperType.to_instance(db, env),
+                    target,
+                ),
 
             (Type::Callable(_), _) => self.never(),
 

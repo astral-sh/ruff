@@ -189,6 +189,20 @@ impl<'db> Type<'db> {
             SynthesizedProtocolType::new(ProtocolInterface::with_methods(db, env, methods)),
         ))
     }
+
+    /// Return the constructed type used in meta-protocol matching and inference.
+    ///
+    /// There are no constructor arguments here from which to infer the class's type arguments.
+    /// Use its defaults, as ordinary class-member lookup does, so that class-scoped typevars
+    /// do not escape through the constructor return type into protocol inference.
+    pub(super) fn instance_type_for_meta_protocol(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Self {
+        let constructor_ty = self.to_class_type(db).map_or(self, Type::from);
+        constructor_ty.bindings(db, env).return_type(db, env)
+    }
 }
 
 /// A type representing the set of runtime objects which are instances of a certain nominal class.
@@ -988,7 +1002,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_)
         );
 
-        let constructed_ty = meta_ty.bindings(db, env).return_type(db, env);
+        let constructed_ty = meta_ty.instance_type_for_meta_protocol(db, env);
         self.check_type_pair(db, constructed_ty, Type::ProtocolInstance(protocol))
             .and(db, self.constraints, || {
                 self.check_meta_protocol_members(db, constructed_ty, meta_ty, protocol)
@@ -1515,10 +1529,12 @@ impl<'db> ProtocolInstanceType<'db> {
         ) -> bool {
             let interface = protocol.interface(db);
 
-            // Hashability is not preserved by inheritance: subclasses can replace
-            // `object.__hash__` with `None`. A protocol that explicitly requires `__hash__`
-            // therefore does not describe every object, despite `object` defining that method.
-            if interface.includes_member(db, "__hash__") {
+            // Neither hashability nor instance-dictionary storage is guaranteed for every object.
+            // Subclasses can replace `object.__hash__` with `None`, while slotted instances can
+            // omit the `__dict__` that typeshed broadly declares on `object`.
+            if interface.includes_member(db, "__hash__")
+                || interface.includes_member(db, "__dict__")
+            {
                 return false;
             }
 

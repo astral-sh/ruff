@@ -602,8 +602,9 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
-    pub(crate) fn recursively_defined(mut self, val: RecursivelyDefined) -> Self {
-        self.recursively_defined = val;
+    /// Preserve recursion from both the source union and any transformed elements already added.
+    pub(crate) fn or_recursively_defined(mut self, val: RecursivelyDefined) -> Self {
+        self.recursively_defined = self.recursively_defined.or(val);
         self
     }
 
@@ -1178,7 +1179,7 @@ impl<'db> UnionBuilder<'db> {
             let builder = UnionBuilder::new(db, &self.env)
                 .unpack_aliases(unpack_aliases)
                 .cycle_recovery(cycle_recovery)
-                .recursively_defined(recursively_defined);
+                .or_recursively_defined(recursively_defined);
             return types
                 .into_iter()
                 .fold(builder, UnionBuilder::add)
@@ -2194,7 +2195,7 @@ mod tests {
         let union = (0..=literal_limit).map(Type::int_literal).fold(
             UnionBuilder::new(db, &env)
                 .cycle_recovery(true)
-                .recursively_defined(RecursivelyDefined::Yes),
+                .or_recursively_defined(RecursivelyDefined::Yes),
             UnionBuilder::add,
         );
 
