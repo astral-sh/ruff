@@ -3140,7 +3140,11 @@ impl<'db> StaticClassLiteral<'db> {
     /// should be treated as defining an instance attribute: dataclass fields are
     /// implicitly assigned in `__init__`, so they behave as instance attributes
     /// even though no explicit binding exists in the class body.
-    fn is_own_dataclass_instance_field(self, db: &'db dyn Db, name: &str) -> bool {
+    pub(in crate::types) fn is_own_dataclass_instance_field(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> bool {
         let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self) else {
             return false;
         };
