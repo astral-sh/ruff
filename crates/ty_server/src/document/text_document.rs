@@ -5,7 +5,7 @@ use lsp_types::{
 use ruff_source_file::LineIndex;
 
 use crate::PositionEncoding;
-use crate::document::range::lsp_range_to_text_range;
+use crate::document::range::{PositionError, lsp_range_to_text_range};
 use crate::system::AnySystemPath;
 
 pub(crate) type DocumentVersion = i32;
@@ -95,7 +95,7 @@ impl TextDocument {
         changes: Vec<lsp_types::TextDocumentContentChangeEvent>,
         new_version: DocumentVersion,
         encoding: PositionEncoding,
-    ) {
+    ) -> Result<(), PositionError> {
         if let [
             lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
                 TextDocumentContentChangeWholeDocument { text },
@@ -107,7 +107,7 @@ impl TextDocument {
                 contents.clone_from(text);
                 *version = new_version;
             });
-            return;
+            return Ok(());
         }
 
         let mut new_contents = self.contents().to_string();
@@ -119,7 +119,7 @@ impl TextDocument {
                     TextDocumentContentChangePartial { range, text, .. },
                 ) => {
                     let range =
-                        lsp_range_to_text_range(range, &new_contents, &active_index, encoding);
+                        lsp_range_to_text_range(range, &new_contents, &active_index, encoding)?;
 
                     new_contents
                         .replace_range(usize::from(range.start())..usize::from(range.end()), &text);
@@ -138,6 +138,8 @@ impl TextDocument {
             *contents = new_contents;
             *version = new_version;
         });
+
+        Ok(())
     }
 
     pub(crate) fn update_version(&mut self, new_version: DocumentVersion) {
@@ -183,33 +185,35 @@ def interface():
         );
 
         // Add an `s`, remove it again (back to the original code), and then re-add the `s`
-        document.apply_changes(
-            vec![
-                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
-                    TextDocumentContentChangePartial {
-                        range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 7)),
-                        text: "s".to_string(),
-                        ..Default::default()
-                    },
-                ),
-                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
-                    TextDocumentContentChangePartial {
-                        range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 8)),
-                        text: String::new(),
-                        ..Default::default()
-                    },
-                ),
-                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
-                    TextDocumentContentChangePartial {
-                        range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 7)),
-                        text: "s".to_string(),
-                        ..Default::default()
-                    },
-                ),
-            ],
-            1,
-            PositionEncoding::UTF16,
-        );
+        document
+            .apply_changes(
+                vec![
+                    TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                        TextDocumentContentChangePartial {
+                            range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 7)),
+                            text: "s".to_string(),
+                            ..Default::default()
+                        },
+                    ),
+                    TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                        TextDocumentContentChangePartial {
+                            range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 8)),
+                            text: String::new(),
+                            ..Default::default()
+                        },
+                    ),
+                    TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                        TextDocumentContentChangePartial {
+                            range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 7)),
+                            text: "s".to_string(),
+                            ..Default::default()
+                        },
+                    ),
+                ],
+                1,
+                PositionEncoding::UTF16,
+            )
+            .unwrap();
 
         assert_eq!(
             &document.contents,
@@ -225,5 +229,123 @@ def interface():
     pass
 "#
         );
+    }
+
+    #[test]
+    fn rejects_reversed_changes() {
+        let mut document = TextDocument::new(
+            Uri::parse("file:///test").unwrap(),
+            "abc".to_string(),
+            1,
+            LanguageKind::Python,
+        );
+
+        let result = document.apply_changes(
+            vec![
+                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                    TextDocumentContentChangePartial {
+                        range: lsp_types::Range::new(Position::new(0, 2), Position::new(0, 1)),
+                        text: String::new(),
+                        ..Default::default()
+                    },
+                ),
+            ],
+            2,
+            PositionEncoding::UTF16,
+        );
+
+        assert!(result.is_err());
+        assert_eq!(document.contents(), "abc");
+        assert_eq!(document.version(), 1);
+    }
+
+    #[test]
+    fn rejects_utf8_changes_inside_characters() {
+        let mut document = TextDocument::new(
+            Uri::parse("file:///test").unwrap(),
+            "é".to_string(),
+            1,
+            LanguageKind::Python,
+        );
+
+        let result = document.apply_changes(
+            vec![
+                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                    TextDocumentContentChangePartial {
+                        range: lsp_types::Range::new(Position::new(0, 1), Position::new(0, 1)),
+                        text: "x".to_string(),
+                        ..Default::default()
+                    },
+                ),
+            ],
+            2,
+            PositionEncoding::UTF8,
+        );
+
+        assert!(result.is_err());
+        assert_eq!(document.contents(), "é");
+        assert_eq!(document.version(), 1);
+    }
+
+    #[test]
+    fn rejects_invalid_changes_without_committing_preceding_changes() {
+        let mut document = TextDocument::new(
+            Uri::parse("file:///test").unwrap(),
+            "é".to_string(),
+            1,
+            LanguageKind::Python,
+        );
+
+        let result = document.apply_changes(
+            vec![
+                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                    TextDocumentContentChangePartial {
+                        range: lsp_types::Range::new(Position::new(0, 0), Position::new(0, 0)),
+                        text: "x".to_string(),
+                        ..Default::default()
+                    },
+                ),
+                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                    TextDocumentContentChangePartial {
+                        range: lsp_types::Range::new(Position::new(0, 2), Position::new(0, 2)),
+                        text: "y".to_string(),
+                        ..Default::default()
+                    },
+                ),
+            ],
+            2,
+            PositionEncoding::UTF8,
+        );
+
+        assert!(result.is_err());
+        assert_eq!(document.contents(), "é");
+        assert_eq!(document.version(), 1);
+    }
+
+    #[test]
+    fn rejects_out_of_bounds_offset_on_bare_cr_line() {
+        let mut document = TextDocument::new(
+            Uri::parse("file:///test").unwrap(),
+            "a\rb".to_string(),
+            1,
+            LanguageKind::Python,
+        );
+
+        let result = document.apply_changes(
+            vec![
+                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                    TextDocumentContentChangePartial {
+                        range: lsp_types::Range::new(Position::new(0, 1), Position::new(0, 1)),
+                        text: "X".to_string(),
+                        ..Default::default()
+                    },
+                ),
+            ],
+            2,
+            PositionEncoding::UTF8,
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(document.contents(), "aX\rb");
     }
 }

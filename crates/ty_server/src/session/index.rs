@@ -156,7 +156,7 @@ impl Index {
                     updated_cell.changes,
                     updated_cell.document.version,
                     encoding,
-                );
+                )?;
             }
         }
 

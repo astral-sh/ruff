@@ -2067,7 +2067,7 @@ impl DocumentHandle {
             if content_changes.is_empty() {
                 document.update_version(new_version);
             } else {
-                document.apply_changes(content_changes, new_version, position_encoding);
+                document.apply_changes(content_changes, new_version, position_encoding)?;
             }
 
             self.set_version(document.version());
