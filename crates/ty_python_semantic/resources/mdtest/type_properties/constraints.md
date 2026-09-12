@@ -1063,6 +1063,53 @@ def f[S, T, U]():
     ...
 ```
 
+## Equivalent variables share a solution
+
+Equality can determine several variables from one known type without introducing recursion.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def equal[X, Y]():
+    constraints = ConstraintSet.equality(X, Y) & ConstraintSet.equality(Y, int)
+    reveal_type(constraints.solutions(inferable=tuple[X, Y]))  # revealed: tuple[Solution[Y=int, X=int]]
+```
+
+A cycle of subtype relations also makes the variables equal. Fixing one variable determines all
+three variables.
+
+```py
+def transitive[X, Y, Z]():
+    constraints = (
+        ConstraintSet.equality(X, int | str)
+        & ConstraintSet.upper_bound(X, Y)
+        & ConstraintSet.upper_bound(Y, Z)
+        & ConstraintSet.upper_bound(Z, X)
+    )
+    # revealed: tuple[Solution[X=int | str, Y=int | str, Z=int | str]]
+    reveal_type(constraints.solutions(inferable=tuple[X, Y, Z]))
+```
+
+## Equivalent bounds in a gradual solution
+
+When `A` is `int`, the two tuple lower bounds describe the same type. After combining them, the
+`Any` part of the solution is still restricted by the upper bound `tuple[int | str]`.
+
+```py
+from typing import Any
+from ty_extensions._internal import ConstraintSet
+
+def gradual[A, X]():
+    constraints = (
+        ConstraintSet.equality(A, int)
+        & ConstraintSet.lower_bound(tuple[int], X)
+        & ConstraintSet.lower_bound(tuple[A], X)
+        & ConstraintSet.range(Any, X, tuple[int | str])
+    )
+    # revealed: tuple[Solution[A=int, X=tuple[int] | (tuple[int | str] & Any)]]
+    reveal_type(constraints.solutions(inferable=tuple[A, X]))
+```
+
 ## Recursive solutions
 
 ### Direct and mutual recursion
@@ -1127,6 +1174,20 @@ def components[A, B, C]():
     )
     # revealed: tuple[Solution[A=μ{$0; $1 = tuple[$1, $2, $2]; $2 = list[$2]}. tuple[$0, $1, $1]]]
     reveal_type(constraints.solutions_for(A, inferable=tuple[A, B, C]))
+```
+
+### Equal recursive definitions
+
+Two variables with the same defining expression have the same recursive solution. Their equality
+does not add another layer of recursion to the tuple structure.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def same_definition[X, Y, Z]():
+    constraints = ConstraintSet.equality(X, tuple[Z]) & ConstraintSet.equality(Y, tuple[Z]) & ConstraintSet.equality(Z, int | Y)
+    # revealed: tuple[Solution[X=μ$0. tuple[$0 | int], Y=tuple[μ$0. tuple[$0] | int], Z=μ$0. tuple[$0] | int]]
+    reveal_type(constraints.solutions(inferable=tuple[X, Y, Z]))
 ```
 
 ### Recursive alias arguments
@@ -1399,7 +1460,7 @@ def captured_self[T, U]():
 def captured_dependency[T, U, V]():
     Local: TypeAlias = tuple[U, "Local"]
     constraints = ConstraintSet.equality(T, Local) & ConstraintSet.equality(U, int) & ConstraintSet.equality(V, list[T])
-    # revealed: tuple[Solution[V=list[T@captured_dependency] | list[Local]]]
+    # revealed: tuple[Solution[V=list[T@captured_dependency]]]
     reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))
 ```
 

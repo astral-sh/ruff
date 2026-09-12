@@ -49,8 +49,7 @@ class Tree:
         reveal_type(value)
         self.value = value
 
-# TODO: remove redundant recursive alternatives. Expected: int | (μ$0. tuple[$0 | int, int])
-# revealed: int | (μ$0. tuple[$0 | int, int]) | tuple[int | (μ$0. tuple[$0 | int, int]), int]
+# revealed: int | (μ$0. tuple[$0 | int, int])
 reveal_type(Tree(1).value)
 
 def inspect(tree: Tree):
@@ -76,8 +75,7 @@ class Classes:
             value = (value, Token)
         self.value = value
 
-# TODO: remove redundant recursive alternatives. Expected: type[Token] | (μ$0. tuple[$0 | type[Token], type[Token]])
-# revealed: type[Token] | (μ$0. tuple[$0 | type[Token], type[Token]]) | tuple[type[Token] | (μ$0. tuple[$0 | type[Token], type[Token]]), type[Token]]
+# revealed: type[Token] | (μ$0. tuple[$0 | type[Token], type[Token]])
 reveal_type(Classes(1).value)
 ```
 
@@ -93,16 +91,14 @@ class Nested:
     def update(self, other: "Nested"):
         self.value = (other.value, Token, 1)
 
-# TODO: remove redundant recursive alternatives. Expected: tuple[μ$0. tuple[$0, type[Token], int], type[Token], int]
-# revealed: tuple[μ$0. tuple[$0, type[Token], int], type[Token], int] | (μ$0. tuple[$0, type[Token], int])
+# revealed: tuple[μ$0. tuple[$0, type[Token], int], type[Token], int]
 reveal_type(Nested().value)
 reveal_type(Nested().value[0][1])  # revealed: type[Token]
 reveal_type(Nested().value[0][2])  # revealed: int
 
 class Child(Nested): ...
 
-# TODO: remove redundant recursive alternatives. Expected: tuple[μ$0. tuple[$0, type[Token], int], type[Token], int]
-# revealed: tuple[μ$0. tuple[$0, type[Token], int], type[Token], int] | (μ$0. tuple[$0, type[Token], int])
+# revealed: tuple[μ$0. tuple[$0, type[Token], int], type[Token], int]
 reveal_type(Child().value)
 ```
 
@@ -119,8 +115,7 @@ class Nested:
     def update(cls):
         cls.value = (cls.value, Token, 1)
 
-# TODO: remove redundant recursive alternatives. Expected: tuple[μ$0. tuple[$0, type[Token], int], <class 'Token'>, int]
-# revealed: μ{$0; $1 = $0 | tuple[$1, type[Token], int]}. tuple[$1, <class 'Token'>, int]
+# revealed: tuple[μ$0. tuple[$0, type[Token], int], <class 'Token'>, int]
 reveal_type(Nested.value)
 reveal_type(Nested.value[0][1])  # revealed: type[Token]
 reveal_type(Nested.value[0][2])  # revealed: int
@@ -284,11 +279,9 @@ class Same:
         self.left = (other.right,)
         self.right = (other.left,)
 
-# TODO: remove redundant recursive alternatives. Expected: int | tuple[μ$0. tuple[$0] | int]
-# revealed: int | tuple[μ{$0; $1 = tuple[$6]; $2 = tuple[$7]; $3 = tuple[tuple[$2] | $8 | $5 | $6 | $7 | tuple[tuple[int]] | int]; $4 = $1 | $2 | $3 | tuple[tuple[tuple[int]]] | tuple[int]; $5 = tuple[$4]; $6 = tuple[$0]; $7 = $8 | $5 | $6 | tuple[tuple[tuple[tuple[int]]]] | tuple[tuple[int]]; $8 = tuple[$3]}. tuple[$5] | $1 | $2 | $3 | $4 | tuple[tuple[tuple[int]]] | tuple[int] | int]
+# revealed: int | tuple[μ$0. tuple[$0] | int]
 reveal_type(Same().left)
-# TODO: remove redundant recursive alternatives. Expected: int | tuple[μ$0. tuple[$0] | int]
-# revealed: int | tuple[μ{$0; $1 = tuple[$6]; $2 = tuple[$7]; $3 = tuple[tuple[$2] | $8 | $5 | $6 | $7 | tuple[tuple[int]] | int]; $4 = $1 | $2 | $3 | tuple[tuple[tuple[int]]] | tuple[int]; $5 = tuple[$4]; $6 = tuple[$0]; $7 = $8 | $5 | $6 | tuple[tuple[tuple[tuple[int]]]] | tuple[tuple[int]]; $8 = tuple[$3]}. tuple[$5] | $1 | $2 | $3 | $4 | tuple[tuple[tuple[int]]] | tuple[int] | int]
+# revealed: int | tuple[μ$0. tuple[$0] | int]
 reveal_type(Same().right)
 ```
 
@@ -314,11 +307,9 @@ class Branches:
         self.a = (other.a, other.b)
         self.b = (other.a,)
 
-# TODO: remove redundant recursive alternatives. Expected: int | tuple[μ$0. tuple[$0, tuple[$0] | str] | int, μ{$0; $1 = tuple[$1, $0] | int}. tuple[$1] | str]
-# revealed: int | tuple[μ{$0; $1 = tuple[$0, $7]; $2 = tuple[$0, $8]; $3 = tuple[$0, $9]; $4 = tuple[$0, str]; $5 = $1 | $2 | $3 | $4 | tuple[int, $8] | tuple[int, $9] | tuple[int, tuple[int]] | tuple[int, str]; $6 = tuple[$5]; $7 = tuple[$0]; $8 = tuple[tuple[$5, $9]] | $10 | tuple[tuple[$5, str]] | $11 | $6 | $7 | tuple[int]; $9 = tuple[$2] | $10 | $11 | $6 | $7 | $8 | tuple[int] | str; $10 = tuple[$3]; $11 = tuple[$4]}. tuple[$0, $6] | $1 | $2 | $3 | $4 | $5 | int, μ{$0; $1 = tuple[$7]; $2 = tuple[$8]; $3 = tuple[$9]; $4 = tuple[$10]; $5 = tuple[tuple[$9, $0]] | $1 | tuple[tuple[$9, str]] | $2 | $3 | $4 | tuple[int]; $6 = tuple[$10, $5]; $7 = tuple[$10, $0]; $8 = tuple[$10, str]; $9 = $11 | $6 | $7 | $8 | tuple[int, $5] | tuple[int, $0] | tuple[int, tuple[int]] | tuple[int, str]; $10 = tuple[$10, $3] | $11 | $6 | $7 | $8 | $9 | int; $11 = tuple[$10, $4]}. tuple[$6] | $1 | $2 | $3 | $4 | $5 | tuple[int] | str]
+# revealed: int | tuple[μ$0. tuple[$0, tuple[$0] | str] | int, μ{$0; $1 = tuple[$1, $0] | int}. tuple[$1] | str]
 reveal_type(Branches().a)
-# TODO: remove redundant recursive alternatives. Expected: str | tuple[μ$0. tuple[$0, tuple[$0] | str] | int]
-# revealed: str | tuple[μ{$0; $1 = tuple[$0, $7]; $2 = tuple[$0, $8]; $3 = tuple[$0, $9]; $4 = tuple[$0, str]; $5 = $1 | $2 | $3 | $4 | tuple[int, $8] | tuple[int, $9] | tuple[int, tuple[int]] | tuple[int, str]; $6 = tuple[$5]; $7 = tuple[$0]; $8 = tuple[tuple[$5, $9]] | $10 | tuple[tuple[$5, str]] | $11 | $6 | $7 | tuple[tuple[int, str]] | tuple[int]; $9 = tuple[$2] | $10 | $11 | $6 | $7 | $8 | tuple[int] | str; $10 = tuple[$3]; $11 = tuple[$4]}. tuple[$0, $6] | $1 | $2 | $3 | $4 | $5 | int]
+# revealed: str | tuple[μ$0. tuple[$0, tuple[$0] | str] | int]
 reveal_type(Branches().b)
 
 type A = int | tuple[A, B]

@@ -2692,9 +2692,9 @@ def modern_first_list[W](value: list[Tree[W]]) -> W:
 reveal_type(first_list([1]))  # revealed: int | tuple[Tree[int]]
 reveal_type(modern_first_list([1]))  # revealed: int | tuple[Tree[int]]
 
-# revealed: tuple[Top[Tree[tuple[tuple[int]] | tuple[int] | int]]] | int
+# revealed: int | tuple[Top[Tree[tuple[tuple[int]] | tuple[int] | int]]]
 reveal_type(first_list([((1,),)]))
-# revealed: tuple[Top[Tree[tuple[tuple[int]] | tuple[int] | int]]] | int
+# revealed: int | tuple[Top[Tree[tuple[tuple[int]] | tuple[int] | int]]]
 reveal_type(modern_first_list([((1,),)]))
 ```
 

@@ -105,6 +105,7 @@ use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
+use crate::types::constraints::relations::PathRelations;
 use crate::types::constraints::resolution::SolutionType;
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, TypeVarSet};
@@ -115,10 +116,11 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Parameters, Type, TypeContext,
     TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
-use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
+use crate::{Db, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
 pub(crate) mod paths;
 pub(crate) mod projection;
+pub(super) mod relations;
 pub(crate) mod resolution;
 mod sequents;
 mod solutions;
@@ -3859,6 +3861,7 @@ impl<'db> ConstraintBoundsBuilder<'db> {
         upper.shrink_to_fit();
         PathBound {
             bound_typevar,
+            candidate_lower: None,
             evidence_lower,
             validity_lower,
             upper,
@@ -3909,6 +3912,9 @@ impl<'db> PathBoundSolution<'db> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct PathBound<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
+    /// A lower candidate with redundant relations between equivalent types removed.
+    /// The original bounds remain available for validation and diagnostic recovery.
+    candidate_lower: Option<Type<'db>>,
     evidence_lower: Option<Type<'db>>,
     validity_lower: Type<'db>,
     upper: UpperBound<'db>,
@@ -3920,6 +3926,7 @@ impl<'db> PathBound<'db> {
     pub(crate) fn exact(bound_typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) -> Self {
         Self {
             bound_typevar,
+            candidate_lower: None,
             evidence_lower: Some(ty),
             validity_lower: Type::Never,
             upper: UpperBound::from_clause(ty),
@@ -3973,7 +3980,10 @@ impl<'db> PathBound<'db> {
         solution: Type<'db>,
     ) -> Option<Type<'db>> {
         if self.evidence_lower.is_none()
-            || self.effective_lower(db, env) != solution
+            || self
+                .candidate_lower
+                .unwrap_or_else(|| self.effective_lower(db, env))
+                != solution
             || !self.has_upper_evidence()
             || solution.bottom_materialization(db, env) == solution.top_materialization(db, env)
         {
@@ -4312,23 +4322,16 @@ impl<'db> PathBounds<'db> {
             }
         }
 
-        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
-            FxIndexMap::default();
         constraints.sort_by_key(|(_, source_order)| *source_order);
-        for (constraint, _) in constraints {
-            let bounds = mappings.entry(constraint.typevar()).or_default();
-            if let Some(lower) = constraint.stored_lower_bound() {
-                bounds.add_lower(db, env, lower);
-            }
-            if let Some(upper) = constraint.stored_upper_bound() {
-                bounds.add_upper(db, env, upper);
-            }
-        }
-
-        let path = mappings
-            .drain(..)
-            .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
+        let constraints: Vec<_> = constraints
+            .into_iter()
+            .map(|(constraint, _)| constraint)
             .collect();
+        let path = PathRelations::new(db, env, &constraints, inferable).collect_bounds(
+            db,
+            env,
+            &constraints,
+        );
         ControlFlow::Continue(Some(PathBounds::Constrained(Box::new([path]), inferable)))
     }
 
@@ -4513,7 +4516,7 @@ impl<'db> PathBounds<'db> {
                         return PathBoundSolution::Unsatisfiable;
                     }
 
-                    return PathBoundSolution::Solved(lower);
+                    return PathBoundSolution::Solved(path_bound.candidate_lower.unwrap_or(lower));
                 }
 
                 if path_bound.has_upper_evidence() {
@@ -4632,10 +4635,9 @@ impl<'db> PathBounds<'db> {
                     return PathBoundSolution::Unsatisfiable;
                 };
 
-                if let (ty @ Type::TypeVar(_), _) | (_, Some(ty @ Type::TypeVar(_))) = (
-                    path_bound.effective_lower(db, env),
-                    path_bound.as_single_upper_bound(db, env),
-                ) {
+                if let (ty @ Type::TypeVar(_), _) | (_, Some(ty @ Type::TypeVar(_))) =
+                    (lower, path_bound.as_single_upper_bound(db, env))
+                {
                     // This path relates two TypeVars, such as passing `S` to a parameter typed as
                     // `T: (int, str)`. The compatibility check above has verified that at least
                     // one of `T`'s declared constraints can satisfy the path, but choosing a
@@ -4654,7 +4656,7 @@ impl<'db> PathBounds<'db> {
                 // constraint. (Checking `int` against `T: (int, int | str)` selects `T = int`.)
                 if multiple_compatible_constraints && path_bound.has_only_gradual_evidence {
                     if path_bound.evidence_lower.is_some() {
-                        PathBoundSolution::Solved(path_bound.effective_lower(db, env))
+                        PathBoundSolution::Solved(lower)
                     } else if path_bound.has_upper_evidence() {
                         IntersectionType::bounded_from_elements(
                             db,
@@ -6313,6 +6315,7 @@ mod tests {
         let builder = ConstraintSetBuilder::new();
         let path_bound = PathBound {
             bound_typevar: t,
+            candidate_lower: None,
             evidence_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::unconstrained(),

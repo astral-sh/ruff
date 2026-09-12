@@ -398,13 +398,10 @@ def partial_mutually_recursive_alias(x: RecursivePartialA) -> bool:  # error: [i
         return True
 ```
 
-## Generic builtins should not overfit upper-bound-only callback constraints
+## Generic builtins with unknown iterable elements
 
-These examples are minimized from ecosystem regressions seen while preserving explicit `Never` and
-`object` bounds through the constraint solver. The current solver picks callback parameter upper
-bounds as concrete solutions when the iterable argument is otherwise unknown. That overfits the
-result to `Sized` or `object`; ideally the element type would remain `Unknown`, while the callable
-return type would still be used where possible.
+An unknown iterable does not determine its element type. A callback can still determine the mapped
+return type, allowing a string result to be passed to `join`.
 
 ```py
 from ty_extensions._internal import Unknown
@@ -413,12 +410,9 @@ def _(xs: Unknown):
     # TODO: should be `list[Unknown]`
     reveal_type(sorted(xs, key=len))  # revealed: list[Sized]
 
-    # TODO: should be `map[str]`
-    reveal_type(map("{}".format, xs))  # revealed: map[object]
+    reveal_type(map("{}".format, xs))  # revealed: map[str]
 
-    # TODO: should not emit an error and should reveal `str`
-    # error: [no-matching-overload]
-    reveal_type("".join(map("{}".format, xs)))  # revealed: Unknown
+    reveal_type("".join(map("{}".format, xs)))  # revealed: str
 ```
 
 ## Mapping methods accept arbitrary object types

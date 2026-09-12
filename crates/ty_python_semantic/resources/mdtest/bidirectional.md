@@ -2431,8 +2431,10 @@ def _(dynamic: Any):
 
 ## Lambda parameter cycles
 
-The return context can determine the types of mutually dependent identity callbacks. Unresolved
-parameter types do not contribute `Unknown` to the inferred return type:
+The return context can determine the types of mutually dependent identity callbacks.
+
+TODO: A provisional lambda parameter still contributes `Unknown` to the return type after the
+callback type variables are resolved.
 
 ```toml
 [environment]
@@ -2449,7 +2451,7 @@ def f[T, U, V](extract: Callable[[U], V], store: Callable[[V], U], key: Callable
     raise NotImplementedError
 
 def _[T](key: Callable[[T], str]) -> list[T]:
-    return f(key=key, extract=lambda x: x, store=lambda x: x)
+    return f(key=key, extract=lambda x: x, store=lambda x: x)  # error: [unsound-return-statement]
 ```
 
 Gradual types from arguments still propagate through an identity lambda:

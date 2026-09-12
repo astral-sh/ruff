@@ -2,14 +2,14 @@ use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
 use crate::types::constraints::paths::PathAssignments;
+use crate::types::constraints::relations::PathRelations;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBoundsBuilder, ConstraintId, ConstraintSet,
-    ConstraintSetBuilder, ConstraintSetStorage, IteratorConstraintsExtension, NodeId, PathBounds,
-    ProjectionError, SolutionLimits, Solutions, TypeVarSolution,
+    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintId, ConstraintSet, ConstraintSetBuilder,
+    ConstraintSetStorage, IteratorConstraintsExtension, NodeId, PathBounds, ProjectionError,
+    SolutionLimits, Solutions, TypeVarSolution,
 };
 use crate::types::typevar::TypeVarSet;
-use crate::types::{BoundTypeVarInstance, Type};
-use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
+use crate::{Db, FxIndexSet, ProgramEnvironment};
 
 impl<'db> TypeVarSolution<'db> {
     /// Solve defining equations as equality constraints, retaining per-binding resolution outcomes.
@@ -135,39 +135,16 @@ impl<'db> SolutionWalker<'db> {
         });
 
         let mut result = Vec::with_capacity(self.sorted_paths.len());
-        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
-            FxIndexMap::default();
-
         for path in self.sorted_paths {
-            mappings.clear();
-            for (constraint, _) in path {
-                let constraint = storage.constraint_data(constraint);
-                let typevar = constraint.typevar;
-                if let Some(lower) = constraint.stored_lower_bound() {
-                    let bounds = mappings.entry(typevar).or_default();
-                    bounds.add_lower(db, env, lower);
-
-                    if let Type::TypeVar(lower_bound_typevar) = lower.ty() {
-                        let bounds = mappings.entry(lower_bound_typevar).or_default();
-                        bounds.add_upper(db, env, lower.with_type(Type::TypeVar(typevar)));
-                    }
-                }
-
-                if let Some(upper) = constraint.stored_upper_bound() {
-                    let bounds = mappings.entry(typevar).or_default();
-                    bounds.add_upper(db, env, upper);
-
-                    if let Type::TypeVar(upper_bound_typevar) = upper.ty() {
-                        let bounds = mappings.entry(upper_bound_typevar).or_default();
-                        bounds.add_lower(db, env, upper.with_type(Type::TypeVar(typevar)));
-                    }
-                }
-            }
-
-            let path_bounds = mappings
-                .drain(..)
-                .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
+            let constraints: Vec<_> = path
+                .into_iter()
+                .map(|(constraint, _)| storage.constraint_data(constraint))
                 .collect();
+            let path_bounds = PathRelations::new(db, env, &constraints, inferable).collect_bounds(
+                db,
+                env,
+                &constraints,
+            );
             result.push(path_bounds);
         }
 

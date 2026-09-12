@@ -1471,8 +1471,7 @@ class Tree[T]:
         self.value = value
 
 def inspect(tree: Tree[int]):
-    # TODO: remove redundant recursive alternatives. Expected: int | tuple[int | Divergent, int]
-    # revealed: int | tuple[int | Divergent, int] | tuple[int | tuple[int | Divergent, int], int]
+    # revealed: int | tuple[int | Divergent, int]
     reveal_type(tree.value)
     if isinstance(tree.value, tuple):
         reveal_type(tree.value[1])  # revealed: int
