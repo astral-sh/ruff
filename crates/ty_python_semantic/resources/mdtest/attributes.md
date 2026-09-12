@@ -1408,11 +1408,9 @@ class Intermediate(Base):
     def set_attributes(self) -> None:
         self.redeclared_in_method_with_same_type: str | None = None
 
-        # TODO: This should be an error (violates Liskov)
-        self.redeclared_in_method_with_narrower_type: str = "foo"
+        self.redeclared_in_method_with_narrower_type: str = "foo"  # error: [invalid-mutable-override]
 
-        # TODO: This should be an error (violates Liskov)
-        self.redeclared_in_method_with_wider_type: object = object()
+        self.redeclared_in_method_with_wider_type: object = object()  # error: [invalid-attribute-override]
 
         self.overwritten_in_subclass_method = None  # error: [invalid-assignment]
 
