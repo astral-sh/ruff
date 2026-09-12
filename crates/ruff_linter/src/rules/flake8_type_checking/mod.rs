@@ -276,6 +276,10 @@ mod tests {
         Path::new("runtime_evaluated_base_classes_4.py")
     )]
     #[test_case(
+        Rule::RuntimeImportInTypeCheckingBlock,
+        Path::new("runtime_evaluated_base_classes_4.py")
+    )]
+    #[test_case(
         Rule::TypingOnlyThirdPartyImport,
         Path::new("runtime_evaluated_base_classes_5.py")
     )]
@@ -284,13 +288,14 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
-                flake8_type_checking: super::settings::Settings {
-                    runtime_required_base_classes: vec![
-                        "pydantic.BaseModel".to_string(),
-                        "sqlalchemy.orm.DeclarativeBase".to_string(),
-                    ],
-                    ..Default::default()
-                },
+                runtime_evaluated_annotations:
+                    settings::types::RuntimeEvaluatedAnnotationLocations {
+                        base_classes: settings::types::RuntimeEvaluatedAnnotationLocation {
+                            required: vec!["pydantic.BaseModel".to_string()],
+                            ambiguous: vec!["sqlalchemy.orm.DeclarativeBase".to_string()],
+                        },
+                        ..Default::default()
+                    },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -310,19 +315,31 @@ mod tests {
         Rule::TypingOnlyStandardLibraryImport,
         Path::new("runtime_evaluated_decorators_3.py")
     )]
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("runtime_evaluated_decorators_4.py")
+    )]
+    #[test_case(
+        Rule::RuntimeImportInTypeCheckingBlock,
+        Path::new("runtime_evaluated_decorators_4.py")
+    )]
     fn runtime_evaluated_decorators(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
-                flake8_type_checking: super::settings::Settings {
-                    runtime_required_decorators: vec![
-                        "attrs.define".to_string(),
-                        "attrs.frozen".to_string(),
-                        "pydantic.validate_call".to_string(),
-                    ],
-                    ..Default::default()
-                },
+                runtime_evaluated_annotations:
+                    settings::types::RuntimeEvaluatedAnnotationLocations {
+                        decorators: settings::types::RuntimeEvaluatedAnnotationLocation {
+                            required: vec![
+                                "attrs.define".to_string(),
+                                "attrs.frozen".to_string(),
+                                "pydantic.validate_call".to_string(),
+                            ],
+                            ambiguous: vec!["sqlalchemy.orm.declared_attr".to_string()],
+                        },
+                        ..Default::default()
+                    },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -341,10 +358,14 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
-                flake8_type_checking: super::settings::Settings {
-                    runtime_required_base_classes: vec!["module.direct.MyBaseClass".to_string()],
-                    ..Default::default()
-                },
+                runtime_evaluated_annotations:
+                    settings::types::RuntimeEvaluatedAnnotationLocations {
+                        base_classes: settings::types::RuntimeEvaluatedAnnotationLocation {
+                            required: vec!["module.direct.MyBaseClass".to_string()],
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -359,19 +380,23 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
-                flake8_type_checking: super::settings::Settings {
-                    runtime_required_decorators: vec![
-                        "fastapi.FastAPI.get".to_string(),
-                        "fastapi.FastAPI.put".to_string(),
-                        "module.app.AppContainer.app.get".to_string(),
-                        "module.app.AppContainer.app.put".to_string(),
-                        "module.app.app.get".to_string(),
-                        "module.app.app.put".to_string(),
-                        "module.app.app_container.app.get".to_string(),
-                        "module.app.app_container.app.put".to_string(),
-                    ],
-                    ..Default::default()
-                },
+                runtime_evaluated_annotations:
+                    settings::types::RuntimeEvaluatedAnnotationLocations {
+                        decorators: settings::types::RuntimeEvaluatedAnnotationLocation {
+                            required: vec![
+                                "fastapi.FastAPI.get".to_string(),
+                                "fastapi.FastAPI.put".to_string(),
+                                "module.app.AppContainer.app.get".to_string(),
+                                "module.app.AppContainer.app.put".to_string(),
+                                "module.app.app.get".to_string(),
+                                "module.app.app.put".to_string(),
+                                "module.app.app_container.app.get".to_string(),
+                                "module.app.app_container.app.put".to_string(),
+                            ],
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

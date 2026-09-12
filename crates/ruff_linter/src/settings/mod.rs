@@ -21,7 +21,10 @@ use crate::rules::{
     flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
     pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
-use crate::settings::types::{CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet};
+use crate::settings::types::{
+    CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet,
+    RuntimeEvaluatedAnnotationLocations,
+};
 use crate::{RuleSelector, fs};
 
 use super::line_width::IndentWidth;
@@ -252,6 +255,7 @@ pub struct LinterSettings {
     pub typing_modules: Vec<String>,
     pub typing_extensions: bool,
     pub future_annotations: bool,
+    pub runtime_evaluated_annotations: RuntimeEvaluatedAnnotationLocations,
 
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
@@ -316,6 +320,7 @@ impl Display for LinterSettings {
                 self.task_tags | array,
                 self.typing_modules | array,
                 self.typing_extensions,
+                self.runtime_evaluated_annotations,
             ]
         }
         writeln!(f, "\n# Linter Plugins")?;
@@ -855,6 +860,7 @@ impl LinterSettings {
             extension: ExtensionMapping::default(),
             typing_extensions: true,
             future_annotations: false,
+            runtime_evaluated_annotations: RuntimeEvaluatedAnnotationLocations::default(),
         }
     }
 

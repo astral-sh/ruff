@@ -22,6 +22,12 @@ pub(super) enum AnnotationContext {
     /// Python will evaluate the annotation at runtime, and it's required to be available at
     /// runtime, as a library (like Pydantic) needs access to it.
     RuntimeRequired,
+    /// Python may evaluate the annotation at runtime and may be required
+    /// but we are not allowed to make any assumptions about it. This is
+    /// necessary to support partially required annotations like SQLAlchemy's
+    /// `Mapped` which may contain forward references to models, which are not
+    /// available at runtime. We have to trust the code is already correct.
+    RuntimeAmbiguous,
     /// The annotation is only evaluated at type-checking time.
     TypingOnly,
 }
@@ -38,24 +44,42 @@ impl AnnotationContext {
         // class field) or a function scope, and that class or function is marked as
         // runtime-required, treat the annotation as runtime-required.
         match semantic.current_scope().kind {
-            ScopeKind::Class(class_def)
+            ScopeKind::Class(class_def) => {
                 if flake8_type_checking::helpers::runtime_required_class(
                     class_def,
-                    &settings.flake8_type_checking.runtime_required_base_classes,
-                    &settings.flake8_type_checking.runtime_required_decorators,
+                    &settings.runtime_evaluated_annotations.base_classes.required,
+                    &settings.runtime_evaluated_annotations.decorators.required,
                     semantic,
-                ) =>
-            {
-                return Self::RuntimeRequired;
+                ) {
+                    return Self::RuntimeRequired;
+                }
+                if flake8_type_checking::helpers::runtime_required_class(
+                    class_def,
+                    &settings
+                        .runtime_evaluated_annotations
+                        .base_classes
+                        .ambiguous,
+                    &settings.runtime_evaluated_annotations.decorators.ambiguous,
+                    semantic,
+                ) {
+                    return Self::RuntimeAmbiguous;
+                }
             }
-            ScopeKind::Function(function_def)
+            ScopeKind::Function(function_def) => {
                 if flake8_type_checking::helpers::runtime_required_function(
                     function_def,
-                    &settings.flake8_type_checking.runtime_required_decorators,
+                    &settings.runtime_evaluated_annotations.decorators.required,
                     semantic,
-                ) =>
-            {
-                return Self::RuntimeRequired;
+                ) {
+                    return Self::RuntimeRequired;
+                }
+                if flake8_type_checking::helpers::runtime_required_function(
+                    function_def,
+                    &settings.runtime_evaluated_annotations.decorators.ambiguous,
+                    semantic,
+                ) {
+                    return Self::RuntimeAmbiguous;
+                }
             }
             _ => {}
         }
@@ -89,10 +113,16 @@ impl AnnotationContext {
     ) -> Self {
         if flake8_type_checking::helpers::runtime_required_function(
             function_def,
-            &settings.flake8_type_checking.runtime_required_decorators,
+            &settings.runtime_evaluated_annotations.decorators.required,
             semantic,
         ) {
             Self::RuntimeRequired
+        } else if flake8_type_checking::helpers::runtime_required_function(
+            function_def,
+            &settings.runtime_evaluated_annotations.decorators.ambiguous,
+            semantic,
+        ) {
+            Self::RuntimeAmbiguous
         } else if semantic.future_annotations_or_stub() || version.defers_annotations() {
             Self::TypingOnly
         } else {
