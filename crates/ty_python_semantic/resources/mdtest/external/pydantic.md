@@ -1277,6 +1277,69 @@ derived = Derived(value=1)
 derived.value = 2  # error: [invalid-assignment]
 ```
 
+Pydantic allows a frozen model to be subclassed and then made mutable again. This is generally
+unsound (a violation of the Liskov substitution principle), but we currently support it without
+emitting any errors:
+
+```py
+class MutableChildOfFrozenBase(Base):
+    model_config = ConfigDict(frozen=False)
+
+mutable = MutableChildOfFrozenBase(value=1)
+mutable.value = 2
+```
+
+Subclasses of the mutable child (with unspecified `frozen`) are also mutable:
+
+```py
+class GrandChild(MutableChildOfFrozenBase):
+    text: str
+
+grandchild = GrandChild(value=1, text="before")
+grandchild.value = 2
+grandchild.text = "after"
+```
+
+Freezing the model again makes both fields read-only:
+
+```py
+class FrozenAgain(GrandChild):
+    model_config = ConfigDict(frozen=True)
+
+frozen_again = FrozenAgain(value=1, text="before")
+frozen_again.value = 2  # error: [invalid-assignment]
+frozen_again.text = "after"  # error: [invalid-assignment]
+```
+
+If there is a custom `__setattr__` method on a frozen model, we allow mutation, unless that
+`__setattr__` return `Never`:
+
+```py
+from typing_extensions import Never
+
+class FrozenWithCustomSetattr(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    value: int
+
+    def __setattr__(self, name, value):
+        object.__setattr__(self, name, value)
+
+frozen_custom = FrozenWithCustomSetattr(value=1)
+frozen_custom.value = 2
+
+class FrozenWithCustomSetattrNever(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    value: int
+
+    def __setattr__(self, name, value) -> Never:
+        raise AttributeError(name)
+
+frozen_custom_never = FrozenWithCustomSetattrNever(value=1)
+frozen_custom_never.value = 2  # error: [invalid-assignment]
+```
+
 Private attributes on models with `frozen=True` can be mutated:
 
 ```py

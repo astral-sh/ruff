@@ -77,7 +77,7 @@ impl<'db> ModelMetadata<'db> {
         validate_by_name.enabled_or(false)
     }
 
-    pub(in crate::types) fn is_frozen(self, db: &'db dyn Db) -> bool {
+    fn is_frozen(self, db: &'db dyn Db) -> bool {
         self.config(db).frozen.is_enabled()
     }
 }
@@ -502,15 +502,46 @@ pub(in crate::types) fn is_model<'db>(db: &'db dyn Db, class: StaticClassLiteral
         .any(|base| base.is_known(db, KnownClass::PydanticBaseModel))
 }
 
-/// Return whether `ty` is an instance of a Pydantic model.
-pub(in crate::types) fn is_model_instance(
+/// How a Pydantic model handles attribute assignments.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::types) enum SetAttrBehavior {
+    Frozen,
+    NonFrozen,
+    CustomSetAttr,
+}
+
+/// Return the model's assignment behavior, or `None` if it cannot be determined.
+pub(in crate::types) fn setattr_behavior(
     db: &dyn Db,
     env: &ProgramEnvironment<'_>,
     ty: Type<'_>,
-) -> bool {
-    ty.nominal_class(db, env)
-        .and_then(|class| class.static_class_literal(db))
-        .is_some_and(|(class, _)| is_model(db, class))
+) -> Option<SetAttrBehavior> {
+    let (class, _) = ty
+        .nominal_class(db, env)
+        .and_then(|class| class.static_class_literal(db))?;
+    let metadata = CodeGeneratorKind::from_class(db, class.into())?.pydantic_metadata()?;
+
+    // Pydantic checks the receiver's effective config in `BaseModel.__setattr__` rather than
+    // generating a setter on each frozen model. A custom setter can replace that behavior.
+    for base in class.iter_mro(db, None) {
+        if matches!(base, ClassBase::Generic | ClassBase::Protocol) {
+            continue;
+        }
+        let (base, _) = base
+            .into_class()
+            .and_then(|base| base.static_class_literal(db))?;
+        if base.is_known(db, KnownClass::PydanticBaseModel) {
+            return Some(if metadata.is_frozen(db) {
+                SetAttrBehavior::Frozen
+            } else {
+                SetAttrBehavior::NonFrozen
+            });
+        }
+        if !class_member(db, base.body_scope(db), "__setattr__").is_undefined() {
+            return Some(SetAttrBehavior::CustomSetAttr);
+        }
+    }
+    None
 }
 
 /// Return whether a field specifier's `default` argument provides a default value.
