@@ -155,6 +155,9 @@ PLE2513 [*] Invalid unescaped character ESC, use "\x1b" instead
 80 | nested_tstrings = t'␈{t'␚{t'␛'}'}'
 81 | nested_ftstrings = t'␈{f'␚{t'␛'}'}'
    |                              ^
+82 |
+83 | # https://github.com/astral-sh/ruff/issues/16309
+   |
 help: Replace with escape sequence
    |
 80 | nested_tstrings = t'␈{t'{t'␛'}'}'

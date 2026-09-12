@@ -137,14 +137,17 @@ impl Violation for InvalidCharacterEsc {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
-pub(crate) struct InvalidCharacterNul;
+pub(crate) struct InvalidCharacterNul {
+    replacement: &'static str,
+}
 
 impl Violation for InvalidCharacterNul {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Invalid unescaped character NUL, use \"\\0\" instead".to_string()
+        let InvalidCharacterNul { replacement } = self;
+        format!("Invalid unescaped character NUL, use \"{replacement}\" instead")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -230,10 +233,21 @@ pub(crate) fn invalid_string_characters(
                 "\\x1b",
                 context.report_diagnostic_if_enabled(InvalidCharacterEsc, range),
             ),
-            '\0' => (
-                "\\0",
-                context.report_diagnostic_if_enabled(InvalidCharacterNul, range),
-            ),
+            '\0' => {
+                let replacement = if matches!(
+                    text[column + match_.len()..].chars().next(),
+                    Some('0'..='7')
+                ) {
+                    "\\x00"
+                } else {
+                    "\\0"
+                };
+                (
+                    replacement,
+                    context
+                        .report_diagnostic_if_enabled(InvalidCharacterNul { replacement }, range),
+                )
+            }
             '\u{200b}' => (
                 "\\u200b",
                 context.report_diagnostic_if_enabled(InvalidCharacterZeroWidthSpace, range),
