@@ -33,7 +33,7 @@ struct AssignmentInference<'builder, 'db, 'ast> {
     value: &'ast ast::Expr,
     contextual_expressions: FxHashSet<ExpressionNodeKey>,
     validated_targets: FxHashSet<ExpressionNodeKey>,
-    /// Keep target bindings separate from bindings made while evaluating the source:
+    /// Bindings for unpacked targets, separate from bindings made while evaluating the source:
     ///
     /// ```python
     /// first, second = ((third := 1), 2)
@@ -41,16 +41,17 @@ struct AssignmentInference<'builder, 'db, 'ast> {
     ///
     /// The shared source inference owns `third`; this result owns `first` and `second`.
     binding_targets: UnpackElts<(Definition<'db>, Type<'db>)>,
-    /// Reuse each name's declaration lookup when validating its matched value. Looking it up
-    /// twice would also report conflicting declarations twice for the same assignment.
+    /// Cached declaration lookups for name targets. Looking up a name again when validating its
+    /// matched value would report conflicting declarations twice for the same assignment.
     name_bindings: FxHashMap<ExpressionNodeKey, AddBinding<'db, 'ast>>,
     needs_value_inference: bool,
     prior_contexts: &'builder FxHashMap<ExpressionNodeKey, TypeContext<'db>>,
     source_contexts: FxHashMap<ExpressionNodeKey, TypeContext<'db>>,
-    /// The first attempt can reuse ordinary source inference when a write selects no context.
+    /// The ordinary source inference shared by targets in the first attempt when a write
+    /// selects no context.
     shared_source: Option<&'builder SharedSource<'db>>,
-    /// A write may select context after another target has used the shared ordinary source.
-    /// Only then must another attempt infer the source with the selected contexts.
+    /// Contexts selected by writes after another target has used the shared ordinary source.
+    /// Another attempt then infers the source with those contexts.
     observed_contexts: Option<FxHashMap<ExpressionNodeKey, TypeContext<'db>>>,
 }
 
@@ -60,8 +61,8 @@ struct UnpackAttempt<'db> {
     observed_contexts: Option<FxHashMap<ExpressionNodeKey, TypeContext<'db>>>,
 }
 
-/// Share unconstrained source inference between the targets of one assignment. Infer it only
-/// when a target needs a source value without selecting a context for that value:
+/// The ordinary source inference shared between the targets of one assignment.
+/// It is computed only when a target needs a source value without selecting context for it:
 ///
 /// ```python
 /// first, second = third, fourth = make_values()
@@ -92,6 +93,7 @@ impl<'db> SharedSource<'db> {
     }
 }
 
+/// The write context selected by the current builder during assignment validation.
 /// A setter may try several value contexts through nested speculative inference:
 ///
 /// ```python

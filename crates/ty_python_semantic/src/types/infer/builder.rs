@@ -267,7 +267,8 @@ const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 /// don't infer its types more than once.
 pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     context: InferContext<'db, 'ast>,
-    /// Distinguish inference committed to this builder from nested speculative attempts.
+    /// The depth of speculative inference, used to distinguish this builder's writes from
+    /// those of nested trial attempts.
     speculation_depth: usize,
 
     index: &'db SemanticIndex<'db>,

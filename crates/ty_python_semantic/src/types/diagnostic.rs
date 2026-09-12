@@ -1824,7 +1824,7 @@ enum AssignmentDiagnosticKind {
     Unsound,
 }
 
-/// Keep inferred source elements available when an unpacked binding is rejected.
+/// The source-type lookup and contextual-expression markers for an unpacked assignment.
 ///
 /// ```python
 /// rest: list[int]

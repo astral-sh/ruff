@@ -93,8 +93,8 @@ struct InferredUnpackTarget<'db, 'ast> {
     ty: UnionBuilder<'db>,
     expression: Option<&'ast ast::Expr>,
     promote_literals: bool,
-    /// Cache the decision across source alternatives; unannotated names need only the
-    /// inferred list type for each alternative, not another copy of its elements.
+    /// Whether this capture needs its matched elements for contextual inference, cached across
+    /// source alternatives. Unannotated names need only the inferred list type of each alternative.
     capture_needs_context: Option<bool>,
     /// Each valid alternative creates a separate list; invalid alternatives supply no elements.
     /// A non-union source has one capture alternative.
@@ -689,8 +689,8 @@ pub(crate) struct UnpackResult<'db> {
     /// Validated assignment-target bindings; excludes bindings created by the source expression.
     bindings: FrozenMap<Definition<'db>, Type<'db>>,
     diagnostics: TypeCheckDiagnostics,
-    /// Reuse the ordinary source query when no target supplies context, retaining only
-    /// member-write expressions separately when necessary.
+    /// The source inference mode, which reuses the ordinary source query when no target supplies
+    /// context and retains member-write expressions separately when necessary.
     value_inference: UnpackValueInference<'db>,
     /// The fallback type for missing expressions.
     ///
