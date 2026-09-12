@@ -458,9 +458,9 @@ dependencies = [
 
 [[package]]
 name = "chrono"
-version = "0.4.44"
+version = "0.4.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c673075a2e0e5f4a1dde27ce9dee1ea4558c7ffe648f576438a20ca1d2acc4b0"
+checksum = "1aa79e62e7697b8e29b513a68abacf485adcd1fe8284a4316c5ae868e6633327"
 dependencies = [
  "iana-time-zone",
  "num-traits",
@@ -2796,9 +2796,9 @@ dependencies = [
 
 [[package]]
 name = "quick-junit"
-version = "0.6.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8216516c957e00535b3c91770524c219dd7df90dec439a182547f750dfe41591"
+checksum = "3eba1124f9c87c1b2f9e9665f0519ca75b09f9a5504e42e72d23cad8da63b52f"
 dependencies = [
  "chrono",
  "indexmap",
