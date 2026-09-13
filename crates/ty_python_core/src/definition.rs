@@ -152,8 +152,8 @@ impl<'db> Definition<'db> {
     }
 
     /// Extract a docstring from this definition, if applicable.
-    /// This method returns a docstring for function, class, and attribute definitions.
-    /// The docstring is extracted from the first statement in the body if it's a string literal.
+    /// Function and class docstrings come from the first statement in their body.
+    /// Attribute and type alias docstrings come from the following statement.
     pub fn docstring(self, db: &'db dyn Db) -> Option<String> {
         let module = parsed_module(db, self.python_file(db)).load(db);
         let kind = self.kind(db);
@@ -167,6 +167,11 @@ impl<'db> Definition<'db> {
             DefinitionKind::AnnotatedAssignment(assign_def) => {
                 let assign_node = assign_def.target(&module);
                 attribute_docstring(&module, assign_node)
+                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+            }
+            DefinitionKind::TypeAlias(alias_def) => {
+                let alias_node = alias_def.node(&module);
+                attribute_docstring(&module, &alias_node.name)
                     .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
             }
             DefinitionKind::Function(function_def) => {

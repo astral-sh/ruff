@@ -11,7 +11,7 @@ use ty_python_semantic::ProgramEnvironment;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeAliasType, TypeVarVariance};
 
-use ty_python_semantic::{SemanticModel, TypeQualifiers};
+use ty_python_semantic::{ResolvedDefinition, SemanticModel, TypeQualifiers};
 
 pub fn hover<'db>(
     db: &'db dyn Db,
@@ -58,7 +58,6 @@ pub fn hover<'db>(
                     )
                     .and_then(|definitions| definitions.docstring(db))
             })
-            .map(HoverContent::Docstring)
     } else {
         goto_target
             .definitions(
@@ -66,7 +65,6 @@ pub fn hover<'db>(
                 ty_python_semantic::ImportAliasResolution::ResolveAliases,
             )
             .and_then(|definitions| definitions.docstring(db))
-            .map(HoverContent::Docstring)
     };
 
     let mut contents = Vec::new();
@@ -103,13 +101,7 @@ pub fn hover<'db>(
             }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(alias))
             | Type::TypeAlias(alias) => {
-                let value_ty = alias.value_type(db);
-
-                alias_docstring = Definitions::from_ty(db, &env, ty)
-                    .and_then(|def| def.docstring(db))
-                    .or_else(|| {
-                        Definitions::from_ty(db, &env, value_ty).and_then(|def| def.docstring(db))
-                    });
+                alias_docstring = type_alias_docstring(db, &env, alias);
 
                 HoverContent::TypeAlias { alias, qualifiers }
             }
@@ -127,7 +119,12 @@ pub fn hover<'db>(
         contents.push(inferred_type_hover_content);
     }
 
-    contents.extend(docs);
+    if let Some(docstring) = docs {
+        if alias_docstring.as_ref() == Some(&docstring) {
+            alias_docstring = None;
+        }
+        contents.push(HoverContent::Docstring(docstring));
+    }
 
     // Aliased docs should come after the docs of the target, if they exist
     if let Some(alias_docstring) = alias_docstring {
@@ -145,6 +142,35 @@ pub fn hover<'db>(
             contents,
         },
     })
+}
+
+/// Prefer the alias's own documentation, then follow aliases to the target type.
+fn type_alias_docstring<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    mut alias: TypeAliasType<'db>,
+) -> Option<Docstring> {
+    let mut seen = Vec::new();
+    loop {
+        let definition = alias.definition(db);
+        if seen.contains(&definition) {
+            return None;
+        }
+        seen.push(definition);
+
+        let definitions = Definitions::new(vec![ResolvedDefinition::Definition(definition)]);
+        if let Some(docstring) = definitions.docstring(db) {
+            return Some(docstring);
+        }
+
+        match alias.value_type(db) {
+            Type::TypeAlias(target) => alias = target,
+            target => {
+                return Definitions::from_ty(db, env, target)
+                    .and_then(|definitions| definitions.docstring(db));
+            }
+        }
+    }
 }
 
 fn keyword_argument_hover_contents<'db>(
@@ -6785,6 +6811,206 @@ type U<CURSOR> = MyType
           |      ^- Cursor offset
           |      |
           |      source
+        ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/4499
+    #[test]
+    fn hover_pep695_type_alias_docstring_at_definition() {
+        let test = hover_test(
+            r#"
+class Collection[T]:
+    """A collection of values."""
+
+type Items<CURSOR>[T] = Collection[T]
+"""The items to process."""
+"#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        type Items[T] = Collection[T]
+        ---------------------------------------------
+        The items to process.
+
+        ---------------------------------------------
+        ```python
+        type Items[T] = Collection[T]
+        ```
+        ---
+        The items to process.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:5:6
+          |
+        5 | type Items[T] = Collection[T]
+          |      ^^^^^- Cursor offset
+          |      |
+          |      source
+        ");
+    }
+
+    #[test]
+    fn hover_type_alias_type_docstring() {
+        let test = hover_test(
+            r#"
+from typing import TypeAliasType
+
+Status = TypeAliasType("Status", int | str)
+"""The status of a task."""
+
+Status<CURSOR>
+"#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        type Status = int | str
+        ---------------------------------------------
+        The status of a task.
+
+        ---------------------------------------------
+        ```python
+        type Status = int | str
+        ```
+        ---
+        The status of a task.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:7:1
+          |
+        7 | Status
+          | ^^^^^^- Cursor offset
+          | |
+          | source
+        ");
+    }
+
+    #[test]
+    fn hover_type_alias_docstring_import_from_stub() {
+        let test = CursorTest::builder()
+            .source("library.pyi", "type Status = int | str")
+            .source(
+                "library.py",
+                r#"
+                type Status = int | str
+                """The status of a task."""
+                "#,
+            )
+            .source("main.py", "from library import Status<CURSOR>")
+            .build();
+
+        assert_snapshot!(test.hover(), @"
+        type Status = int | str
+        ---------------------------------------------
+        The status of a task.
+
+        ---------------------------------------------
+        ```python
+        type Status = int | str
+        ```
+        ---
+        The status of a task.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:1:21
+          |
+        1 | from library import Status
+          |                     ^^^^^^- Cursor offset
+          |                     |
+          |                     source
+        ");
+    }
+
+    #[test]
+    fn hover_type_alias_nested_docstrings() {
+        let test = hover_test(
+            r#"
+from typing import TypeAliasType
+
+type Status = int | str
+"""The status of a task."""
+
+Nested = TypeAliasType("Nested", Status)
+
+Copy = Nested
+"""The status reported by the worker."""
+
+status: Copy<CURSOR>
+"#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        type Nested = Status
+        ---------------------------------------------
+        The status reported by the worker.
+
+        ---------------------------------------------
+        The status of a task.
+
+        ---------------------------------------------
+        ```python
+        type Nested = Status
+        ```
+        ---
+        The status reported by the worker.
+        ---
+        The status of a task.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:12:9
+           |
+        12 | status: Copy
+           |         ^^^^- Cursor offset
+           |         |
+           |         source
+        ");
+    }
+
+    #[test]
+    fn hover_type_alias_cyclic_docstring() {
+        let test = hover_test(
+            r#"
+type First = Second
+type Second = First
+
+First<CURSOR>
+"#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        type First = Divergent
+        ---------------------------------------------
+        `Divergent` is a dynamic type inferred due to type-level recursion that does not converge.
+
+        Type inference can be recursive. ty analyzes inference cycles repeatedly, looking for a
+        stable result. If each iteration produces a new type, ty replaces the non-convergent part
+        with `Divergent`.
+
+        Like `Any` and `Unknown`, `Divergent` is a dynamic type, so ty allows any operation on it.
+        Unlike `Unknown`, it does not represent missing type information. It is an internal type
+        used by ty and cannot be used in annotations.
+
+        ---------------------------------------------
+        ```python
+        type First = Divergent
+        ```
+        ---
+        `Divergent` is a dynamic type inferred due to type-level recursion that does not converge.<HB>
+        <HB>
+        Type inference can be recursive. ty analyzes inference cycles repeatedly, looking for a<HB>
+        stable result. If each iteration produces a new type, ty replaces the non-convergent part<HB>
+        with `Divergent`.<HB>
+        <HB>
+        Like `Any` and `Unknown`, `Divergent` is a dynamic type, so ty allows any operation on it.<HB>
+        Unlike `Unknown`, it does not represent missing type information. It is an internal type<HB>
+        used by ty and cannot be used in annotations.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:5:1
+          |
+        5 | First
+          | ^^^^^- Cursor offset
+          | |
+          | source
         ");
     }
 
