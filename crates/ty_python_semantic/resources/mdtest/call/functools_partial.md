@@ -852,8 +852,8 @@ reveal_type(p)  # revealed: partial[bool]
 
 ### Kwargs splat with TypedDict
 
-An open `TypedDict` may contain hidden extra items, so it cannot be normalized to a precise partial
-signature.
+An open `TypedDict` may contain hidden extra items, so the wrapped function must accept arbitrary
+keyword arguments. The partial signature cannot be normalized precisely.
 
 ```py
 from functools import partial
@@ -866,7 +866,7 @@ def f(a: int, b: str) -> bool:
     return True
 
 kwargs: MyKwargs = {"b": "hello"}
-p = partial(f, **kwargs)
+p = partial(f, **kwargs)  # error: [unknown-argument]
 reveal_type(p)  # revealed: partial[bool]
 ```
 
@@ -885,6 +885,7 @@ def f(*, b: str) -> bool:
 
 kwargs: MyKwargs = {"b": 1}
 # error: [invalid-argument-type] "Argument to class `partial` is incorrect: Expected `str`, found `int`"
+# error: [unknown-argument]
 p = partial(f, **kwargs)
 reveal_type(p)  # revealed: partial[bool]
 ```
@@ -926,7 +927,7 @@ def f(*, b: str) -> bool:
     return True
 
 def make(kwargs: KwargsA | KwargsB) -> None:
-    p = partial(f, **kwargs)
+    p = partial(f, **kwargs)  # error: [unknown-argument]
     reveal_type(p)  # revealed: partial[bool]
 ```
 
@@ -964,7 +965,7 @@ def f(a: int, b: str, c: float) -> bool:
     return True
 
 kwargs: MyKwargs = {"c": 3.14}
-p = partial(f, b="hello", **kwargs)
+p = partial(f, b="hello", **kwargs)  # error: [unknown-argument]
 reveal_type(p)  # revealed: partial[bool]
 ```
 
@@ -1022,7 +1023,7 @@ def f(a: int, *, b: str) -> None:
     pass
 
 def make(kwargs: MaybeKwargs) -> None:
-    p = partial(f, **kwargs)
+    p = partial(f, **kwargs)  # error: [unknown-argument]
     reveal_type(p)  # revealed: partial[None]
 ```
 

@@ -161,7 +161,8 @@ fn synthesize_typed_dict_init<'db>(
         .collect();
 
     let keyword_rest_param = typed_dict
-        .explicit_extra_items(db)
+        .openness(db)
+        .effective_extra_items()
         .map(|extra_items| {
             Parameter::keyword_variadic(Name::new_static("kwargs"))
                 .with_annotated_type(extra_items.declared_ty)
