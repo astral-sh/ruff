@@ -86,3 +86,102 @@ operating_system._exit(1)
 from enum import Enum
 
 Enum._missing_(1)  # OK
+
+# Underscore-prefixed standard library members are public despite their leading
+# underscores.
+import __future__
+
+__future__._Feature  # OK
+
+import asyncio
+
+asyncio._enter_task  # OK
+asyncio._leave_task  # OK
+asyncio._register_task  # OK
+asyncio._unregister_task  # OK
+
+import ctypes
+
+ctypes._CFuncPtr  # OK
+ctypes._CData  # OK
+ctypes._Pointer  # OK
+ctypes._SimpleCData  # OK
+ctypes.CDLL._handle  # OK
+ctypes.CDLL._name  # OK
+
+import sys
+
+sys._emscripten_info  # OK
+sys._enablelegacywindowsfsencoding  # OK
+sys._clear_internal_caches  # OK
+sys._clear_type_cache  # OK
+sys._current_exceptions  # OK
+sys._current_frames  # OK
+sys._stats_clear  # OK
+sys._stats_dump  # OK
+sys._stats_off  # OK
+sys._stats_on  # OK
+sys._debugmallocstats  # OK
+sys._getframe  # OK
+sys._getframemodulename  # OK
+sys._is_gil_enabled  # OK
+sys._is_immortal  # OK
+sys._is_interned  # OK
+sys._jit  # OK
+sys._xoptions  # OK
+sys._base_executable  # OK
+sys.implementation._multiarch  # OK
+
+import sysconfig
+
+sysconfig._get_preferred_schemes  # OK
+
+import importlib.util
+
+importlib.util._incompatible_extension_module_restrictions  # OK
+
+import ssl
+
+ssl._create_unverified_context  # OK
+
+import subprocess
+
+subprocess._USE_POSIX_SPAWN  # OK
+subprocess._USE_VFORK  # OK
+
+import logging
+
+logging._defaultFormatter  # OK
+
+from collections import abc
+
+abc.Set._hash  # OK
+
+import ast
+
+ast.AST._field_types  # OK
+
+import gettext
+
+gettext.NullTranslations._parse  # OK
+gettext.NullTranslations._charset  # OK
+gettext.NullTranslations._fallback  # OK
+gettext.NullTranslations._info  # OK
+
+from multiprocessing import managers
+
+managers.BaseProxy._callmethod  # OK
+managers.BaseProxy._getvalue  # OK
+
+import unittest
+
+unittest.TestSuite._removeTestAtIndex  # OK
+
+import zipfile
+
+zipfile.ZipInfo._for_archive  # OK
+
+# SLF001: underscore-prefixed members that are not documented remain private.
+import sys
+
+sys._unknown_private_member  # SLF001
