@@ -17,7 +17,7 @@ use crate::{
         DefinedPlace, Place, PlaceWithDefinition, imported_symbol, place_from_bindings,
         place_from_declarations,
     },
-    reachability::ReachabilityConstraintsExtension,
+    reachability::{DeclarationsIteratorExtension, ReachabilityConstraintsExtension},
     types::{
         ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, StaticClassLiteral,
         SubclassOfInner, Type, TypeVarBoundOrConstraints, UnionType, class::CodeGeneratorKind,
@@ -25,9 +25,52 @@ use crate::{
     },
 };
 use ty_python_core::{
-    ProgramFile, attribute_scopes, definition::Definition, global_scope, place_table,
-    scope::ScopeId, semantic_index, use_def_map,
+    ProgramFile, attribute_scopes,
+    definition::{Definition, DefinitionKind},
+    global_scope, place_table,
+    scope::ScopeId,
+    semantic_index, use_def_map,
 };
+
+/// Return the names of instance attributes declared in methods belonging to `class_body_scope`.
+///
+/// Only call this when doing type inference on the same file as `class_body_scope`, otherwise
+/// inspecting the declaration kinds introduces a direct dependency on that file's AST.
+pub(crate) fn declared_instance_attribute_names<'db>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+) -> Vec<Name> {
+    let index = semantic_index(db, class_body_scope.program_file(db));
+    let mut names = Vec::new();
+
+    for function_scope_id in attribute_scopes(db, class_body_scope) {
+        let table = index.place_table(function_scope_id);
+        let use_def = index.use_def_map(function_scope_id);
+
+        for member in table.members() {
+            let Some(name) = member.as_instance_attribute() else {
+                continue;
+            };
+            let Some(member_id) = table.member_id_by_instance_attribute_name(name) else {
+                continue;
+            };
+            if use_def
+                .reachable_member_declarations(member_id)
+                .any_reachable(db, |declaration| {
+                    declaration.is_defined_and(|definition| {
+                        matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+                    })
+                })
+            {
+                names.push(Name::new(name));
+            }
+        }
+    }
+
+    names.sort_unstable();
+    names.dedup();
+    names
+}
 
 /// Iterate over all declarations and bindings that exist at the end
 /// of the given scope.

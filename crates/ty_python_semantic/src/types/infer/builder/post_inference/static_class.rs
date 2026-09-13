@@ -1,4 +1,6 @@
-use crate::Db;
+use crate::diagnostic::format_enumeration;
+use crate::reachability::ReachabilityConstraintsExtension;
+use crate::{Db, ProgramEnvironment};
 use itertools::{Either, Itertools};
 use ruff_db::{diagnostic::Annotation, source::source_text};
 use ruff_diagnostics::{Edit, Fix};
@@ -8,7 +10,10 @@ use rustc_hash::FxHashSet;
 
 use crate::{
     TypeQualifiers,
-    place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
+    place::{
+        DeclaredTypeBuilder, DefinedPlace, Place, TypeOrigin, place_from_bindings,
+        place_from_declarations,
+    },
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, DisplaySettings,
         KnownClass, KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, SpecialFormType,
@@ -18,16 +23,15 @@ use crate::{
         call::Argument,
         class::{
             CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind, expanded_class_base_entries,
-            implicit_attribute_names,
         },
         context::InferContext,
         definition_expression_type,
         diagnostic::{
-            ABSTRACT_METHOD_IN_FINAL_CLASS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
-            DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO,
-            INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_BASE, INVALID_DATACLASS,
-            INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
-            INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
+            ABSTRACT_METHOD_IN_FINAL_CLASS, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
+            CYCLIC_CLASS_DEFINITION, DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE,
+            INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_BASE,
+            INVALID_DATACLASS, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS,
+            INVALID_NAMED_TUPLE, INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
             SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
             report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
             report_duplicate_bases, report_inconsistent_generic_bases,
@@ -45,6 +49,7 @@ use crate::{
         generics::enclosing_generic_contexts,
         infer::builder::post_inference::typed_dict::validate_typed_dict_class,
         infer_definition_types, inferred_declaration,
+        list_members::declared_instance_attribute_names,
         mro::StaticMroErrorKind,
         overrides,
         special_form::TypeQualifier,
@@ -56,8 +61,8 @@ use crate::{
 };
 use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
-    SemanticIndex, attribute_scopes,
-    definition::{DefinitionKind, DefinitionState},
+    DeclarationsIterator, SemanticIndex, attribute_scopes,
+    definition::{Definition, DefinitionKind, DefinitionState},
     scope::ScopeId,
     semantic_index,
 };
@@ -129,6 +134,117 @@ fn check_class_slots<'db>(
     }
 }
 
+fn add_declarations<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    declarations: DeclarationsIterator<'_, 'db>,
+    declared_types: &mut DeclaredTypeBuilder<'db>,
+    definitions: &mut Vec<(Definition<'db>, Type<'db>)>,
+) {
+    let predicates = declarations.predicates();
+    let reachability_constraints = declarations.reachability_constraints();
+
+    for declaration in declarations {
+        let reachability =
+            reachability_constraints.evaluate(db, predicates, declaration.reachability_constraint);
+        if reachability.is_always_false() {
+            continue;
+        }
+
+        let DefinitionState::Defined(definition) = declaration.declaration else {
+            continue;
+        };
+        if !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_)) {
+            continue;
+        }
+
+        let Some(declared) = inferred_declaration(db, definition).declared() else {
+            continue;
+        };
+        declared_types.add(db, env, declared, reachability);
+        definitions.push((definition, declared.inner_type()));
+    }
+}
+
+fn add_class_body_declarations<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    index: &SemanticIndex<'db>,
+    class_body_scope: ScopeId<'db>,
+    name: &str,
+    declared_types: &mut DeclaredTypeBuilder<'db>,
+    definitions: &mut Vec<(Definition<'db>, Type<'db>)>,
+) {
+    let class_scope_id = class_body_scope.file_scope_id(db);
+    let class_table = index.place_table(class_scope_id);
+    let Some(symbol_id) = class_table.symbol_id(name) else {
+        return;
+    };
+
+    let class_use_def = index.use_def_map(class_scope_id);
+    add_declarations(
+        db,
+        env,
+        class_use_def.end_of_scope_symbol_declarations(symbol_id),
+        declared_types,
+        definitions,
+    );
+}
+
+fn check_conflicting_instance_attribute_declarations<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    index: &SemanticIndex<'db>,
+) {
+    let db = context.db();
+    let env = context.program_environment();
+    let class_body_scope = class.body_scope(db);
+
+    for name in declared_instance_attribute_names(db, class_body_scope) {
+        let mut declared_types = DeclaredTypeBuilder::new(db, env);
+        let mut definitions: Vec<(Definition<'db>, Type<'db>)> = Vec::new();
+
+        add_class_body_declarations(
+            db,
+            env,
+            index,
+            class_body_scope,
+            &name,
+            &mut declared_types,
+            &mut definitions,
+        );
+
+        for (declarations, _) in attribute_declarations(db, class_body_scope, &name) {
+            add_declarations(db, env, declarations, &mut declared_types, &mut definitions);
+        }
+
+        let (_, conflicting) = declared_types.build();
+        let Some(conflicting) = conflicting else {
+            continue;
+        };
+        let Some((_, first_type)) = definitions.first() else {
+            continue;
+        };
+        let Some((conflicting_definition, _)) = definitions
+            .iter()
+            .skip(1)
+            .find(|(_, ty)| !first_type.is_equivalent_to(db, env, *ty))
+        else {
+            continue;
+        };
+
+        if let Some(builder) = context.report_lint(
+            &CONFLICTING_DECLARATIONS,
+            conflicting_definition.focus_range(db, context.module()),
+        ) {
+            builder.into_diagnostic(format_args!(
+                "Conflicting declared types for `{name}`: {}",
+                format_enumeration(conflicting.iter().map(|ty| ty.display(db, env)))
+            ));
+        }
+    }
+}
+
 /// Iterate over all static class definitions (created using `class` statements) to check that
 /// the definition is semantically valid and will not cause an exception to be raised at runtime.
 /// This needs to be done after most other types in the scope have been inferred, due to the fact
@@ -174,65 +290,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     let env = context.program_environment();
 
-    let class_body_scope = class.body_scope(db);
-    let class_scope_id = class_body_scope.file_scope_id(db);
-    let class_table = index.place_table(class_scope_id);
-    let class_use_def = index.use_def_map(class_scope_id);
-
-    for name in implicit_attribute_names(db, class_body_scope).iter() {
-        let mut declarations_by_scope = Vec::new();
-
-        if let Some(symbol_id) = class_table.symbol_id(name) {
-            let declarations = class_use_def
-                .end_of_scope_symbol_declarations(symbol_id)
-                .filter_map(|declaration| declaration.declaration.definition())
-                .filter_map(|declaration| {
-                    inferred_declaration(db, declaration)
-                        .declared()
-                        .map(|declared| declared.inner_type())
-                })
-                .collect::<Vec<_>>();
-            if !declarations.is_empty() {
-                declarations_by_scope.push(("class body".to_owned(), declarations));
-            }
-        }
-
-        for (declarations, scope_id) in attribute_declarations(db, class_body_scope, name) {
-            let declarations = declarations
-                .filter_map(|declaration| {
-                    let DefinitionState::Defined(declaration) = declaration.declaration else {
-                        return None;
-                    };
-                    inferred_declaration(db, declaration)
-                        .declared()
-                        .map(|declared| declared.inner_type())
-                })
-                .collect::<Vec<_>>();
-            if declarations.is_empty() {
-                continue;
-            }
-
-            let method_name = index
-                .ancestor_scopes(scope_id)
-                .find_map(|(_, scope)| scope.node().as_function())
-                .map(|function| function.node(context.module()).name.to_string())
-                .unwrap_or_else(|| "<unknown method>".to_owned());
-            declarations_by_scope.push((method_name, declarations));
-        }
-
-        if !declarations_by_scope.is_empty() {
-            eprintln!("attribute `{name}`:");
-            for (scope, declarations) in declarations_by_scope {
-                eprintln!(
-                    "  {scope}: {}",
-                    declarations
-                        .iter()
-                        .map(|ty| ty.display(db, env))
-                        .format(", ")
-                );
-            }
-        }
-    }
+    check_conflicting_instance_attribute_declarations(context, class, index);
 
     check_class_slots(context, class, index);
 
