@@ -144,15 +144,15 @@ pub fn hover<'db>(
     })
 }
 
-/// Prefer the alias's own documentation, then follow aliases to the target type.
+/// Look up a docstring through source bindings, then fall back to inferred alias types.
 fn type_alias_docstring<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     mut alias: TypeAliasType<'db>,
     definitions: Option<Definitions<'db>>,
 ) -> Option<Docstring> {
-    // Inferred types erase assignment bindings such as `Copy = Alias`, which can
-    // have their own documentation. Follow those bindings before expanding types.
+    // `Copy = Alias` binds another name to the same type alias. Follow source
+    // bindings to find documentation attached to names that type inference skips.
     let mut pending = definitions
         .map(|definitions| definitions.iter().cloned().collect::<Vec<_>>())
         .unwrap_or_default();

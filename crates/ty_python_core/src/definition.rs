@@ -152,8 +152,9 @@ impl<'db> Definition<'db> {
     }
 
     /// Extract a docstring from this definition, if applicable.
-    /// Function and class docstrings come from the first statement in their body.
-    /// Attribute and type alias docstrings come from the following statement.
+    /// For functions and classes, use the first statement in the body.
+    /// For attributes and type aliases, use the following statement.
+    /// In either case, the statement must be a standalone string literal.
     pub fn docstring(self, db: &'db dyn Db) -> Option<String> {
         let module = parsed_module(db, self.python_file(db)).load(db);
         let kind = self.kind(db);
