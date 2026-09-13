@@ -6,7 +6,6 @@ use ruff_python_ast::{self as ast, PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
-use crate::attribute_assignments;
 use crate::{
     TypeQualifiers,
     place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
@@ -19,6 +18,7 @@ use crate::{
         call::Argument,
         class::{
             CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind, expanded_class_base_entries,
+            implicit_attribute_names,
         },
         context::InferContext,
         definition_expression_type,
@@ -54,6 +54,7 @@ use crate::{
         visitor::find_over_type,
     },
 };
+use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
     SemanticIndex, attribute_scopes, definition::DefinitionKind, scope::ScopeId, semantic_index,
 };
@@ -169,6 +170,13 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     let env = context.program_environment();
+
+    for name in implicit_attribute_names(db, class.body_scope(db)).iter() {
+        let declarations = attribute_declarations(db, class.body_scope(db), name)
+            .flat_map(|(declarations, _)| declarations)
+            .collect::<Vec<_>>();
+        dbg!(name, declarations);
+    }
 
     check_class_slots(context, class, index);
 

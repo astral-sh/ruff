@@ -459,7 +459,8 @@ fn implicit_attribute_binding_type<'db>(
 }
 
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(super) fn implicit_attribute_names<'db>(
+// TODO: check whether we can change this scope or if we are breaking architecture in some way
+pub(crate) fn implicit_attribute_names<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
 ) -> Box<[Name]> {

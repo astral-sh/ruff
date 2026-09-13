@@ -231,11 +231,9 @@ class C:
     def other_method(self):
         self.x = get_str()
 
-        # TODO: this redeclaration should be an error
-        self.y: str = "a"
+        self.y: str = "a"  # error: [conflicting-declarations]
 
-        # TODO: this redeclaration should be an error
-        self.z: str = "a"
+        self.z: str = "a"  # error: [conflicting-declarations]
 
 c_instance = C()
 
