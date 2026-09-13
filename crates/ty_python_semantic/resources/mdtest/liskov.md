@@ -3266,6 +3266,54 @@ class Narrow(Base):
     value: bool  # error: [invalid-mutable-override]
 ```
 
+## Synthesized members
+
+A dataclass-transform subclass synthesizes its own `__match_args__`. The generated member replaces
+inherited declarations with the same name, including when another base causes inherited contracts
+to be checked.
+
+```py
+from typing import ClassVar
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+class Base:
+    __match_args__: ClassVar[tuple[str, ...]]
+
+class Concrete(Base): ...
+class Mixin: ...
+class Child(Concrete, Mixin): ...
+
+reveal_type(Child.__match_args__)  # revealed: tuple[()]
+```
+
+## Inherited synthesized members
+
+A subclass can inherit generated `__match_args__` without synthesizing its own. The generated
+member takes precedence over a source declaration farther along the MRO. This example permits
+narrowing mutable attributes, as the default diagnostic configuration does.
+
+```toml
+[rules]
+invalid-mutable-override = "ignore"
+```
+
+```py
+from dataclasses import dataclass
+from typing import ClassVar
+
+class Base:
+    __match_args__: ClassVar[tuple[str, ...]]
+
+@dataclass
+class Generated(Base): ...
+
+class Mixin: ...
+class Child(Generated, Mixin): ...
+
+reveal_type(Child.__match_args__)  # revealed: tuple[()]
+```
+
 ## Inherited storage conflicts
 
 A class variable selected by the MRO cannot satisfy a base contract that permits instance writes.

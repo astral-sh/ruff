@@ -599,9 +599,24 @@ pub(super) fn check_inherited_conflicts<'db>(
             .chain(owner.own_instance_attribute_names(db).iter().cloned())
             .chain(literal.slot_names(db).unwrap_or_default().iter().cloned());
         for name in names {
-            if is_mangled_private(&name) || !seen.insert(name.clone()) {
+            if is_mangled_private(&name)
+                || !seen.insert(name.clone())
+                || class
+                    .own_synthesized_member(db, env, None, None, &name)
+                    .is_some()
+            {
                 continue;
             }
+            // Synthesized members can precede the first source declaration of this name.
+            // Resolve ownership before comparing contracts, just as ordinary lookup does.
+            let owner = mro[..=index]
+                .iter()
+                .copied()
+                .find(|owner| {
+                    !owner.own_class_member(db, env, None, &name).is_undefined()
+                        || !owner.own_instance_member(db, env, &name).is_undefined()
+                })
+                .unwrap_or(owner);
             let Some(source) = attribute_contract(db, env, owner, receiver, &name) else {
                 continue;
             };
