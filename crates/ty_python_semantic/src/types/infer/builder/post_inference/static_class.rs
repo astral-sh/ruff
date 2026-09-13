@@ -1,6 +1,6 @@
+use crate::Db;
 use crate::diagnostic::format_enumeration;
 use crate::reachability::ReachabilityConstraintsExtension;
-use crate::{Db, ProgramEnvironment};
 use itertools::{Either, Itertools};
 use ruff_db::{diagnostic::Annotation, source::source_text};
 use ruff_diagnostics::{Edit, Fix};
@@ -9,11 +9,8 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
 use crate::{
-    TypeQualifiers,
-    place::{
-        DeclaredTypeBuilder, DefinedPlace, Place, TypeOrigin, place_from_bindings,
-        place_from_declarations,
-    },
+    FxOrderSet, TypeQualifiers,
+    place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, DisplaySettings,
         KnownClass, KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, SpecialFormType,
@@ -136,9 +133,7 @@ fn check_class_slots<'db>(
 
 fn add_declarations<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
     declarations: DeclarationsIterator<'_, 'db>,
-    declared_types: &mut DeclaredTypeBuilder<'db>,
     definitions: &mut Vec<(Definition<'db>, Type<'db>)>,
 ) {
     let predicates = declarations.predicates();
@@ -161,18 +156,15 @@ fn add_declarations<'db>(
         let Some(declared) = inferred_declaration(db, definition).declared() else {
             continue;
         };
-        declared_types.add(db, env, declared, reachability);
         definitions.push((definition, declared.inner_type()));
     }
 }
 
 fn add_class_body_declarations<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
     index: &SemanticIndex<'db>,
     class_body_scope: ScopeId<'db>,
     name: &str,
-    declared_types: &mut DeclaredTypeBuilder<'db>,
     definitions: &mut Vec<(Definition<'db>, Type<'db>)>,
 ) {
     let class_scope_id = class_body_scope.file_scope_id(db);
@@ -184,9 +176,7 @@ fn add_class_body_declarations<'db>(
     let class_use_def = index.use_def_map(class_scope_id);
     add_declarations(
         db,
-        env,
         class_use_def.end_of_scope_symbol_declarations(symbol_id),
-        declared_types,
         definitions,
     );
 }
@@ -201,37 +191,29 @@ fn check_conflicting_instance_attribute_declarations<'db>(
     let class_body_scope = class.body_scope(db);
 
     for name in declared_instance_attribute_names(db, class_body_scope) {
-        let mut declared_types = DeclaredTypeBuilder::new(db, env);
         let mut definitions: Vec<(Definition<'db>, Type<'db>)> = Vec::new();
 
-        add_class_body_declarations(
-            db,
-            env,
-            index,
-            class_body_scope,
-            &name,
-            &mut declared_types,
-            &mut definitions,
-        );
+        add_class_body_declarations(db, index, class_body_scope, &name, &mut definitions);
 
         for (declarations, _) in attribute_declarations(db, class_body_scope, &name) {
-            add_declarations(db, env, declarations, &mut declared_types, &mut definitions);
+            add_declarations(db, declarations, &mut definitions);
         }
 
-        let (_, conflicting) = declared_types.build();
-        let Some(conflicting) = conflicting else {
-            continue;
-        };
         let Some((_, first_type)) = definitions.first() else {
             continue;
         };
-        let Some((conflicting_definition, _)) = definitions
-            .iter()
-            .skip(1)
-            .find(|(_, ty)| !first_type.is_equivalent_to(db, env, *ty))
-        else {
+        let mut conflicting_types = FxOrderSet::default();
+        let mut conflicting_definition = None;
+        for (definition, ty) in definitions.iter().skip(1) {
+            if !first_type.is_equivalent_to(db, env, *ty) {
+                conflicting_types.insert(*ty);
+                conflicting_definition.get_or_insert(*definition);
+            }
+        }
+        let Some(conflicting_definition) = conflicting_definition else {
             continue;
         };
+        conflicting_types.insert_before(0, *first_type);
 
         if let Some(builder) = context.report_lint(
             &CONFLICTING_DECLARATIONS,
@@ -239,7 +221,7 @@ fn check_conflicting_instance_attribute_declarations<'db>(
         ) {
             builder.into_diagnostic(format_args!(
                 "Conflicting declared types for `{name}`: {}",
-                format_enumeration(conflicting.iter().map(|ty| ty.display(db, env)))
+                format_enumeration(conflicting_types.iter().map(|ty| ty.display(db, env)))
             ));
         }
     }

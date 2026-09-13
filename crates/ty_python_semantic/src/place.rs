@@ -847,7 +847,7 @@ pub(crate) fn place_from_declarations_with_reachability_cache<'db>(
     )
 }
 
-pub(crate) type DeclaredTypeAndConflictingTypes<'db> = (
+type DeclaredTypeAndConflictingTypes<'db> = (
     TypeAndQualifiers<'db>,
     Option<Box<indexmap::set::Slice<Type<'db>>>>,
 );
@@ -2162,7 +2162,7 @@ impl<'db> PublicTypeBuilder<'db> {
 
 /// Accumulates multiple (potentially conflicting) declared types and type qualifiers,
 /// and eventually builds a union from them.
-pub(crate) struct DeclaredTypeBuilder<'db> {
+struct DeclaredTypeBuilder<'db> {
     inner: PublicTypeBuilder<'db>,
     qualifiers: TypeQualifiers,
     first_type: Option<Type<'db>>,
@@ -2170,7 +2170,7 @@ pub(crate) struct DeclaredTypeBuilder<'db> {
 }
 
 impl<'db> DeclaredTypeBuilder<'db> {
-    pub(crate) fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+    fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
         DeclaredTypeBuilder {
             inner: PublicTypeBuilder::new(db, env),
             qualifiers: TypeQualifiers::empty(),
@@ -2179,7 +2179,7 @@ impl<'db> DeclaredTypeBuilder<'db> {
         }
     }
 
-    pub(crate) fn add(
+    fn add(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -2203,7 +2203,7 @@ impl<'db> DeclaredTypeBuilder<'db> {
         self.qualifiers = self.qualifiers.union(element.qualifiers());
     }
 
-    pub(crate) fn build(mut self) -> DeclaredTypeAndConflictingTypes<'db> {
+    fn build(mut self) -> DeclaredTypeAndConflictingTypes<'db> {
         let type_and_quals =
             TypeAndQualifiers::new(self.inner.build(), TypeOrigin::Declared, self.qualifiers);
         if self.conflicting_types.is_empty() {
