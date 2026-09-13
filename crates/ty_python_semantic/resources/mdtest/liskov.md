@@ -2990,6 +2990,68 @@ class Child(Base):
     value = Descriptor()
 ```
 
+## Slot and descriptor read contracts
+
+A slot exposes its stored value through an instance. Its class-level descriptor is not the
+attribute's value type, including when another base supplies a declaration or property.
+
+```py
+class Slots:
+    __slots__ = ("value",)
+
+class Declared:
+    value: int
+
+class Combined(Declared, Slots): ...
+
+class Readable:
+    @property
+    def value(self) -> int:
+        return 0
+
+class SlotProperty(Slots, Readable): ...
+
+class ReceiverDeclaration(Slots):
+    def __init__(self, value: int) -> None:
+        self.value: int = value
+
+def check(slot: Slots, child: ReceiverDeclaration) -> None:
+    slot.value = 1
+    reveal_type(child.value)  # revealed: int
+```
+
+An annotation whose type implements `__get__` can also describe an instance-stored descriptor
+object. Ordinary reads include that object alongside its getter result. Replacing this storage with
+a slot preserves those possible reads.
+
+```py
+from dataclasses import dataclass
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 0
+
+class Base:
+    value: Descriptor
+
+class Slotted(Base):
+    __slots__ = ("value",)
+    value: Descriptor
+
+@dataclass(slots=True)
+class Generated(Base):
+    value: Descriptor = Descriptor()
+
+class Incompatible(Base):
+    __slots__ = ("value",)
+    value: str  # error: [invalid-attribute-override]
+
+def read(base: Base, slot: Slotted, generated: Generated) -> None:
+    reveal_type(base.value)  # revealed: int | Descriptor
+    reveal_type(slot.value)  # revealed: Descriptor
+    reveal_type(generated.value)  # revealed: Descriptor
+```
+
 ## Descriptor setters cannot narrow accepted writes
 
 Installing a descriptor establishes its own write type, even without an attribute annotation. A

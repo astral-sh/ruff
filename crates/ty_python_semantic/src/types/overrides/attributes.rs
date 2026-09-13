@@ -8,7 +8,8 @@ use crate::{
     Db, ProgramEnvironment,
     place::{Place, TypeOrigin},
     types::{
-        ClassType, IntersectionType, KnownInstanceType, MemberLookupPolicy, Type, TypeQualifiers,
+        ClassType, InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownInstanceType,
+        MemberLookupPolicy, Type, TypeQualifiers,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         class::CodeGeneratorKind,
         context::InferContext,
@@ -87,13 +88,15 @@ fn attribute_contract<'db>(
     let is_final = qualifiers.contains(TypeQualifiers::FINAL);
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
     let is_property = class_place.ty.as_property_instance().is_some();
+    let is_slot = matches!(class_place.ty, Type::SlotDescriptor(_));
     let is_descriptor = !is_class_var
-        && class_place
-            .ty
-            .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
-            .place
-            .ignore_possibly_undefined()
-            .is_some();
+        && (is_slot
+            || class_place
+                .ty
+                .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
+                .place
+                .ignore_possibly_undefined()
+                .is_some());
     // TODO: Check ordinary unannotated initializers once inherited type context is
     // available in ordinary inference. Raw binding types can retain literals that
     // attribute access widens; they do not define an independent write contract.
@@ -101,11 +104,19 @@ fn attribute_contract<'db>(
         return None;
     }
     let (read, write) = if is_descriptor {
-        let read = class_place
-            .ty
-            .try_call_dunder_get(db, env, Some(receiver), receiver.to_meta_type(db, env))
-            .ok()??
-            .return_type;
+        let read = Type::resolve_descriptor_access(
+            db,
+            env,
+            class_member,
+            receiver,
+            instance_member.into(),
+            InstanceFallbackShadowsNonDataDescriptor::No,
+        )
+        .ok()?
+        .member(db)
+        .place
+        .ignore_possibly_undefined()?
+        .bind_self_typevars(db, env, receiver);
         // Explicit `staticmethod(f)` and `classmethod(f)` assignments expose method
         // signatures, just like decorated definitions; the function's identity can change.
         let read = if matches!(
@@ -116,7 +127,15 @@ fn attribute_contract<'db>(
         } else {
             read
         };
-        let write = descriptor_write_domain(db, env, class_place.ty, receiver, read);
+        let write = if is_slot {
+            Some(
+                owner
+                    .converter_input_type_for_field(db, name)
+                    .unwrap_or(read),
+            )
+        } else {
+            descriptor_write_domain(db, env, class_place.ty, receiver, read)
+        };
         (read, write)
     } else {
         let place = if is_class_var || is_final {
