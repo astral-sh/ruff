@@ -1076,6 +1076,22 @@ impl<'db> StaticClassLiteral<'db> {
     /// and `None` if the class is not a dataclass-like class, or if the dataclass is neither frozen
     /// nor non-frozen.
     pub(crate) fn is_frozen_dataclass(self, db: &'db dyn Db) -> Option<bool> {
+        if self.is_neutral_dataclass(db) {
+            return None;
+        }
+
+        if let field_policy @ CodeGeneratorKind::DataclassLike(_) =
+            CodeGeneratorKind::from_class(db, self.into())?
+        {
+            Some(self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN))
+        } else {
+            None
+        }
+    }
+
+    /// Whether dataclass-transform inheritance permits both frozen and non-frozen children.
+    /// Unlike an ordinary non-dataclass, this class explicitly imposes neither frozen status.
+    pub(crate) fn is_neutral_dataclass(self, db: &'db dyn Db) -> bool {
         // Check if this is a base-class-based transformer that has dataclass_transformer_params directly
         // attached to it (because it is itself decorated with `@dataclass_transform`), or if this class
         // has an explicit metaclass that is decorated with `@dataclass_transform`.
@@ -1083,23 +1099,10 @@ impl<'db> StaticClassLiteral<'db> {
         // In both cases, this signifies that this class is neither frozen nor non-frozen.
         //
         // See <https://typing.python.org/en/latest/spec/dataclasses.html#dataclass-semantics> for details.
-        if self.dataclass_transformer_params(db).is_some()
+        self.dataclass_transformer_params(db).is_some()
             || self
                 .try_metaclass(db)
                 .is_ok_and(|(_, info)| info.is_some_and(|i| i.from_explicit_metaclass))
-        {
-            return None;
-        }
-
-        if let field_policy @ CodeGeneratorKind::DataclassLike(_) =
-            CodeGeneratorKind::from_class(db, self.into())?
-        {
-            // Otherwise, if this class is a dataclass-like class, determine its frozen status based on
-            // dataclass params and dataclass transformer params.
-            Some(self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN))
-        } else {
-            None
-        }
     }
 
     /// Checks if the given dataclass parameter flag is set for this class.
@@ -3126,7 +3129,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// should be treated as defining an instance attribute: dataclass fields are
     /// implicitly assigned in `__init__`, so they behave as instance attributes
     /// even though no explicit binding exists in the class body.
-    fn is_own_dataclass_instance_field(self, db: &'db dyn Db, name: &str) -> bool {
+    pub(crate) fn is_own_dataclass_instance_field(self, db: &'db dyn Db, name: &str) -> bool {
         let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self) else {
             return false;
         };
