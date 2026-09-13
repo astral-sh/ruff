@@ -8,7 +8,7 @@ use crate::{
     Db, ProgramEnvironment,
     place::{Place, TypeOrigin},
     types::{
-        ClassType, IntersectionType, MemberLookupPolicy, Type, TypeQualifiers,
+        ClassType, IntersectionType, KnownInstanceType, MemberLookupPolicy, Type, TypeQualifiers,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         class::CodeGeneratorKind,
         context::InferContext,
@@ -106,6 +106,16 @@ fn attribute_contract<'db>(
             .try_call_dunder_get(db, env, Some(receiver), receiver.to_meta_type(db, env))
             .ok()??
             .return_type;
+        // Explicit `staticmethod(f)` and `classmethod(f)` assignments expose method
+        // signatures, just like decorated definitions; the function's identity can change.
+        let read = if matches!(
+            class_place.ty,
+            Type::KnownInstance(KnownInstanceType::MethodWrapper(_))
+        ) {
+            read.try_upcast_to_callable(db, env)?.into_type(db, env)
+        } else {
+            read
+        };
         let write = descriptor_write_domain(db, env, class_place.ty, receiver, read);
         (read, write)
     } else {

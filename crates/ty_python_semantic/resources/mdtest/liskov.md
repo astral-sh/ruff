@@ -2739,6 +2739,34 @@ class ConcreteStatus(Generic[T], TaskStatus[T]):
     def started(self, value: T | None = None) -> None: ...
 ```
 
+## Explicit staticmethod wrappers
+
+Assigning `staticmethod(function)` exposes the function's signature. An override can wrap a
+different function with a compatible signature, just as an `@staticmethod` definition can.
+
+```py
+def first(value: int) -> int:
+    return value
+
+def second(value: int) -> int:
+    return value + 1
+
+def incompatible(value: str) -> str:
+    return value
+
+class Base:
+    method = staticmethod(first)
+
+class Compatible(Base):
+    method = staticmethod(second)
+
+class Incompatible(Base):
+    method = staticmethod(incompatible)  # error: [invalid-attribute-override]
+
+Base.method = staticmethod(second)
+reveal_type(Compatible().method(1))  # revealed: int
+```
+
 ## Attribute value types
 
 An overriding attribute must expose a value compatible with the superclass annotation. Mutable
