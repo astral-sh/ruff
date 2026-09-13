@@ -526,6 +526,13 @@ fn check_class_declaration<'db>(
     };
     let class_kind = CodeGeneratorKind::from_class(db, literal.into());
 
+    // Declarations and later bindings produce separate member entries, but resolve to
+    // the same attribute contract. Check that contract at its declaration when present.
+    let is_attribute_contract_definition = place_table(db, class_scope)
+        .symbol_id(&member.name)
+        .and_then(|symbol| symbol_definition(db, class_scope, symbol))
+        .is_none_or(|definition| definition == *first_reachable_definition);
+
     // Check for prohibited `NamedTuple` attribute overrides.
     //
     // `NamedTuple` classes have certain synthesized attributes (like `_asdict`, `_make`, etc.)
@@ -854,7 +861,8 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            if configuration.check_attribute_liskov_violations() {
+            if configuration.check_attribute_liskov_violations() && is_attribute_contract_definition
+            {
                 if let Some(superclass_variable_kind) =
                     effective_superclass_variable_kind(db, superclass, member.name.clone())
                 {
@@ -904,6 +912,7 @@ fn check_class_declaration<'db>(
             }
 
             if configuration.check_attribute_type_violations()
+                && is_attribute_contract_definition
                 && attributes::check_override(
                     context,
                     class,

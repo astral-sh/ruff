@@ -3269,8 +3269,8 @@ class Narrow(Base):
 ## Synthesized members
 
 A dataclass-transform subclass synthesizes its own `__match_args__`. The generated member replaces
-inherited declarations with the same name, including when another base causes inherited contracts
-to be checked.
+inherited declarations with the same name, including when another base causes inherited contracts to
+be checked.
 
 ```py
 from typing import ClassVar
@@ -3289,9 +3289,9 @@ reveal_type(Child.__match_args__)  # revealed: tuple[()]
 
 ## Inherited synthesized members
 
-A subclass can inherit generated `__match_args__` without synthesizing its own. The generated
-member takes precedence over a source declaration farther along the MRO. This example permits
-narrowing mutable attributes, as the default diagnostic configuration does.
+A subclass can inherit generated `__match_args__` without synthesizing its own. The generated member
+takes precedence over a source declaration farther along the MRO. This example permits narrowing
+mutable attributes, as the default diagnostic configuration does.
 
 ```toml
 [rules]
@@ -3312,6 +3312,26 @@ class Mixin: ...
 class Child(Generated, Mixin): ...
 
 reveal_type(Child.__match_args__)  # revealed: tuple[()]
+```
+
+## Repeated dataclass field assignments
+
+An instance field cannot replace a class variable. Assigning a default separately from the field
+annotation does not introduce another override: the conflict belongs to the declaration.
+
+```py
+from typing import ClassVar
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+class ModelMeta(type): ...
+
+class Base(metaclass=ModelMeta):
+    value: ClassVar[object]
+
+class Child(Base):
+    value: object  # error: [invalid-attribute-override]
+    value = None
 ```
 
 ## Inherited storage conflicts
