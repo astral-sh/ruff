@@ -2,98 +2,115 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
 RUF061 [*] Use context-manager form of `pytest.raises()`
-  --> RUF061_raises.py:19:5
+  --> RUF061_raises.py:34:9
    |
-18 | def test_error_trivial():
-19 |     pytest.raises(ZeroDivisionError, func, 1, b=0)
+32 | def test_error_nested_in_with():
+33 |     with pytest.raises(ValueError, "oops"):
+34 |         pytest.raises(ZeroDivisionError, func, 1, b=0)
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Use `pytest.raises()` as a context-manager
+   |
+33 |     with pytest.raises(ValueError, "oops"):
+   -         pytest.raises(ZeroDivisionError, func, 1, b=0)
+34 +         with pytest.raises(ZeroDivisionError):
+35 +             func(1, b=0)
+36 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF061 [*] Use context-manager form of `pytest.raises()`
+  --> RUF061_raises.py:38:5
+   |
+37 | def test_error_trivial():
+38 |     pytest.raises(ZeroDivisionError, func, 1, b=0)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `pytest.raises()` as a context-manager
    |
-18 | def test_error_trivial():
+37 | def test_error_trivial():
    -     pytest.raises(ZeroDivisionError, func, 1, b=0)
-19 +     with pytest.raises(ZeroDivisionError):
-20 +         func(1, b=0)
-21 |
+38 +     with pytest.raises(ZeroDivisionError):
+39 +         func(1, b=0)
+40 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.raises()`
-  --> RUF061_raises.py:23:5
+  --> RUF061_raises.py:42:5
    |
-22 | def test_error_match():
-23 |     pytest.raises(ZeroDivisionError, func, 1, b=0).match("division by zero")
+41 | def test_error_match():
+42 |     pytest.raises(ZeroDivisionError, func, 1, b=0).match("division by zero")
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `pytest.raises()` as a context-manager
    |
-22 | def test_error_match():
+41 | def test_error_match():
    -     pytest.raises(ZeroDivisionError, func, 1, b=0).match("division by zero")
-23 +     with pytest.raises(ZeroDivisionError, match="division by zero"):
-24 +         func(1, b=0)
-25 |
+42 +     with pytest.raises(ZeroDivisionError, match="division by zero"):
+43 +         func(1, b=0)
+44 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.raises()`
-  --> RUF061_raises.py:27:15
+  --> RUF061_raises.py:46:15
    |
-26 | def test_error_assign():
-27 |     excinfo = pytest.raises(ZeroDivisionError, func, 1, b=0)
+45 | def test_error_assign():
+46 |     excinfo = pytest.raises(ZeroDivisionError, func, 1, b=0)
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `pytest.raises()` as a context-manager
    |
-26 | def test_error_assign():
+45 | def test_error_assign():
    -     excinfo = pytest.raises(ZeroDivisionError, func, 1, b=0)
-27 +     with pytest.raises(ZeroDivisionError) as excinfo:
-28 +         func(1, b=0)
-29 |
+46 +     with pytest.raises(ZeroDivisionError) as excinfo:
+47 +         func(1, b=0)
+48 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.raises()`
-  --> RUF061_raises.py:31:5
+  --> RUF061_raises.py:50:5
    |
-30 | def test_error_kwargs():
-31 |     pytest.raises(func=func, expected_exception=ZeroDivisionError)
+49 | def test_error_kwargs():
+50 |     pytest.raises(func=func, expected_exception=ZeroDivisionError)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `pytest.raises()` as a context-manager
    |
-30 | def test_error_kwargs():
+49 | def test_error_kwargs():
    -     pytest.raises(func=func, expected_exception=ZeroDivisionError)
-31 +     with pytest.raises(ZeroDivisionError):
-32 +         func()
-33 |
+50 +     with pytest.raises(ZeroDivisionError):
+51 +         func()
+52 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.raises()`
-  --> RUF061_raises.py:35:15
+  --> RUF061_raises.py:54:15
    |
-34 | def test_error_multi_statement():
-35 |     excinfo = pytest.raises(ValueError, int, "hello")
+53 | def test_error_multi_statement():
+54 |     excinfo = pytest.raises(ValueError, int, "hello")
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-36 |     assert excinfo.match("^invalid literal")
+55 |     assert excinfo.match("^invalid literal")
    |
 help: Use `pytest.raises()` as a context-manager
    |
-34 | def test_error_multi_statement():
+53 | def test_error_multi_statement():
    -     excinfo = pytest.raises(ValueError, int, "hello")
-35 +     with pytest.raises(ValueError) as excinfo:
-36 +         int("hello")
-37 |     assert excinfo.match("^invalid literal")
+54 +     with pytest.raises(ValueError) as excinfo:
+55 +         int("hello")
+56 |     assert excinfo.match("^invalid literal")
    |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.raises()`
-  --> RUF061_raises.py:40:5
+  --> RUF061_raises.py:59:5
    |
-39 | def test_error_lambda():
-40 |     pytest.raises(ZeroDivisionError, lambda: 1 / 0)
+58 | def test_error_lambda():
+59 |     pytest.raises(ZeroDivisionError, lambda: 1 / 0)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `pytest.raises()` as a context-manager
    |
-39 | def test_error_lambda():
+58 | def test_error_lambda():
    -     pytest.raises(ZeroDivisionError, lambda: 1 / 0)
-40 +     with pytest.raises(ZeroDivisionError):
-41 +         (lambda: 1 / 0)()
+59 +     with pytest.raises(ZeroDivisionError):
+60 +         (lambda: 1 / 0)()
    |
 note: This is an unsafe fix and may change runtime behavior
