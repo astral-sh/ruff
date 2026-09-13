@@ -47,14 +47,11 @@ use crate::{Db, FxIndexMap, ProgramEnvironment};
 pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
     sequents: Vec<Sequent<ConstraintId>>,
-    /// Each assignment's source constraint and the first per-path fuel value with which it was
-    /// derived.
+    /// Each assignment's source constraint and greatest remaining per-path fuel.
     pub(super) assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
-    /// Additional per-path fuel values that can derive an assignment, keyed by its index in
-    /// `assignments`. These are stored separately so that branch-local additions can be rolled
-    /// back by truncating the set. Only the greatest fuel value participates in further
-    /// derivation.
-    additional_fuels: Vec<(usize, u16)>,
+    /// Previous fuel values, keyed by assignment index, for rolling back replenishments when
+    /// leaving a BDD branch. Keeping the maximum in `assignments` makes fuel lookups constant-time.
+    fuel_undo: Vec<(usize, u16)>,
     /// The amount of global fuel that remains across all assignments and paths.
     remaining_overall_fuel: u16,
     /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
@@ -211,7 +208,7 @@ impl PathAssignments {
         Self {
             sequents: Vec::default(),
             assignments: FxIndexMap::default(),
-            additional_fuels: Vec::default(),
+            fuel_undo: Vec::default(),
             discovered,
             elaborated_pairs: FxHashSet::default(),
             single_replay_consequents: FxHashMap::default(),
@@ -419,7 +416,7 @@ impl PathAssignments {
         // pass along the range of which assignments are new, and so that we can reset back to this
         // point before returning.
         let start = self.assignments.len();
-        let additional_fuels_start = self.additional_fuels.len();
+        let fuel_undo_start = self.fuel_undo.len();
         let previous_remaining_overall_fuel = self.remaining_overall_fuel;
 
         // Add the new assignment and anything we can derive from it.
@@ -464,8 +461,12 @@ impl PathAssignments {
         // Reset back to where we were before following this edge, so that the caller can reuse a
         // single instance for the entire BDD traversal.
         self.assignment_queue.clear();
+        // A branch can replenish an assignment more than once. Restore in reverse order while
+        // every referenced assignment still exists.
+        for (index, previous_fuel) in self.fuel_undo.drain(fuel_undo_start..).rev() {
+            self.assignments[index].1 = previous_fuel;
+        }
         self.assignments.truncate(start);
-        self.additional_fuels.truncate(additional_fuels_start);
         self.remaining_overall_fuel = previous_remaining_overall_fuel;
         result
     }
@@ -495,14 +496,7 @@ impl PathAssignments {
 
     /// Returns the greatest remaining fuel for any derivation of `assignment` on this path.
     fn max_remaining_fuel_for(&self, assignment: ConstraintAssignment) -> Option<u16> {
-        let (index, _, (_, first_fuel)) = self.assignments.get_full(&assignment)?;
-        let max_fuel = self
-            .additional_fuels
-            .iter()
-            .filter(|(fuel_index, _)| *fuel_index == index)
-            .map(|(_, fuel)| *fuel)
-            .fold(*first_fuel, u16::max);
-        Some(max_fuel)
+        self.assignments.get(&assignment).map(|(_, fuel)| *fuel)
     }
 
     fn add_sequents<'db>(
@@ -777,20 +771,12 @@ impl PathAssignments {
                 // There is another derivation of this assignment that already provides at least as
                 // much fuel as this constraint. That means replenishing the fuel won't have any
                 // effect.
-                if *existing_fuel >= fuel.remaining
-                    || self
-                        .additional_fuels
-                        .iter()
-                        .any(|(fuel_index, existing_fuel)| {
-                            *fuel_index == index && *existing_fuel >= fuel.remaining
-                        })
-                {
+                if *existing_fuel >= fuel.remaining {
                     return Ok(());
                 }
 
-                // Record the replenished fuel separately so that `walk_edge` can restore the
-                // parent branch by truncating `additional_fuels`.
-                self.additional_fuels.push((index, fuel.remaining));
+                self.fuel_undo.push((index, *existing_fuel));
+                *existing_fuel = fuel.remaining;
             }
         }
 
