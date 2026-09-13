@@ -2893,6 +2893,47 @@ class Writable(Base):
     def value(self, value: int) -> None: ...
 ```
 
+## Frozen fields overriding neutral dataclass-transform bases
+
+A base decorated with `dataclass_transform`, or explicitly using its metaclass, permits frozen
+subclasses. Those subclasses can make inherited fields read-only, but must preserve their read
+types. An ordinary base does not grant this exception.
+
+```py
+from dataclasses import dataclass
+from typing_extensions import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class ModelMeta(type): ...
+
+class Neutral(metaclass=ModelMeta):
+    value: int
+
+class Frozen(Neutral):
+    value: int
+
+class Incompatible(Neutral):
+    value: str  # error: [invalid-attribute-override]
+
+@dataclass_transform(frozen_default=True)
+class NeutralBase:
+    value: int
+
+class FrozenChild(NeutralBase):
+    value: int
+
+class Ordinary:
+    value: int
+
+@dataclass(frozen=True)
+class Invalid(Ordinary):
+    value: int  # error: [invalid-attribute-override]
+
+def check(base: Neutral, child: Frozen) -> None:
+    base.value = 1
+    child.value = 1  # error: [invalid-assignment]
+```
+
 ## Descriptors preserving instance access
 
 A descriptor may replace an ordinary attribute when its instance reads and writes preserve the

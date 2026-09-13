@@ -224,6 +224,23 @@ fn attribute_violation<'db>(
         });
     }
     let write = target.write?;
+    // A neutral dataclass-transform base explicitly permits frozen subclasses. Its
+    // fields can become read-only there, even though writes to the base are allowed.
+    if !target.is_property
+        && target_receiver
+            .nominal_class(db, env)
+            .and_then(|class| class.static_class_literal(db))
+            .is_some_and(|(literal, _)| literal.is_neutral_dataclass(db))
+        && receiver
+            .nominal_class(db, env)
+            .and_then(|class| class.static_class_literal(db))
+            .is_some_and(|(literal, _)| {
+                literal.is_frozen_dataclass(db) == Some(true)
+                    && literal.is_own_dataclass_instance_field(db, name)
+            })
+    {
+        return None;
+    }
     let receiver = if target.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
         receiver.to_meta_type(db, env)
     } else {
