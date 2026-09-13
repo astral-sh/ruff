@@ -2,7 +2,6 @@ use itertools::Either;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::helpers::is_dotted_name;
-use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_source_file::LineRanges;
@@ -18,7 +17,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
-use crate::types::signatures::{ConcatenateTail, Signature};
+use crate::types::signatures::{ARGS_PARAMETER, ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType};
@@ -2991,7 +2990,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             && typevar.is_typevartuple(self.db())
                         {
                             parameters.push(
-                                Parameter::variadic(Name::new_static("args"))
+                                ARGS_PARAMETER
+                                    .clone()
                                     .with_annotated_type(Type::TypeVar(typevar))
                                     .with_starred_annotation(),
                             );
@@ -3000,7 +3000,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                         if param_type.exact_tuple_instance_spec(self.db()).is_some() {
                             parameters.push(
-                                Parameter::variadic(Name::new_static("args"))
+                                ARGS_PARAMETER
+                                    .clone()
                                     .with_annotated_type(param_type)
                                     .with_starred_annotation(),
                             );

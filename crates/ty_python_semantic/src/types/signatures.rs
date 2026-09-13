@@ -4888,9 +4888,11 @@ impl<'db> Parameters<'db> {
     pub(crate) fn todo() -> Self {
         Self::new(
             [
-                Parameter::variadic(Name::new_static("args"))
+                ARGS_PARAMETER
+                    .clone()
                     .with_annotated_type(todo_type!("todo signature *args")),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
+                KWARGS_PARAMETER
+                    .clone()
                     .with_annotated_type(todo_type!("todo signature **kwargs")),
             ],
             ParametersKind::Gradual,
@@ -4905,9 +4907,11 @@ impl<'db> Parameters<'db> {
     pub(crate) fn gradual_form() -> Self {
         Self::new(
             [
-                Parameter::variadic(Name::new_static("args"))
+                ARGS_PARAMETER
+                    .clone()
                     .with_annotated_type(Type::Dynamic(DynamicType::Any)),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
+                KWARGS_PARAMETER
+                    .clone()
                     .with_annotated_type(Type::Dynamic(DynamicType::Any)),
             ],
             ParametersKind::Gradual,
@@ -4917,12 +4921,12 @@ impl<'db> Parameters<'db> {
     pub(crate) fn paramspec(db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Self {
         Self::new(
             [
-                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::TypeVar(
+                ARGS_PARAMETER.clone().with_annotated_type(Type::TypeVar(
                     typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
                 )),
-                Parameter::keyword_variadic(Name::new_static("kwargs")).with_annotated_type(
-                    Type::TypeVar(typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs)),
-                ),
+                KWARGS_PARAMETER.clone().with_annotated_type(Type::TypeVar(
+                    typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
+                )),
             ],
             ParametersKind::ParamSpec(typevar),
         )
@@ -4947,9 +4951,8 @@ impl<'db> Parameters<'db> {
             ),
         };
         prefix_params.extend([
-            Parameter::variadic(Name::new_static("args")).with_annotated_type(args_type),
-            Parameter::keyword_variadic(Name::new_static("kwargs"))
-                .with_annotated_type(kwargs_type),
+            ARGS_PARAMETER.clone().with_annotated_type(args_type),
+            KWARGS_PARAMETER.clone().with_annotated_type(kwargs_type),
         ]);
         Self::new(prefix_params, ParametersKind::Concatenate(concatenate_tail))
     }
@@ -4963,10 +4966,10 @@ impl<'db> Parameters<'db> {
     pub(crate) fn unknown() -> Self {
         Self::new(
             [
-                Parameter::variadic(Name::new_static("args"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
+                ARGS_PARAMETER.clone().with_annotated_type(Type::unknown()),
+                KWARGS_PARAMETER
+                    .clone()
+                    .with_annotated_type(Type::unknown()),
             ],
             ParametersKind::Gradual,
         )
@@ -4977,9 +4980,8 @@ impl<'db> Parameters<'db> {
     pub(crate) fn bottom() -> Self {
         Self::new(
             [
-                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::object()),
+                ARGS_PARAMETER.clone().with_annotated_type(Type::object()),
+                KWARGS_PARAMETER.clone().with_annotated_type(Type::object()),
             ],
             ParametersKind::Standard,
         )
@@ -4996,9 +4998,8 @@ impl<'db> Parameters<'db> {
             // `kind` below), so we otherwise give it the most permissive signature`(*object,
             // **object)`, so that we avoid emitting any other errors about arity mismatches.
             [
-                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::object()),
+                ARGS_PARAMETER.clone().with_annotated_type(Type::object()),
+                KWARGS_PARAMETER.clone().with_annotated_type(Type::object()),
             ],
             ParametersKind::Top,
         )
@@ -5516,7 +5517,7 @@ enum ParameterAnnotationKind {
 }
 
 impl<'db> Parameter<'db> {
-    pub(crate) fn positional_only(name: Option<Name>) -> Self {
+    pub(crate) const fn positional_only(name: Option<Name>) -> Self {
         Self {
             annotated_type: Type::unknown(),
             definition: None,
@@ -5530,7 +5531,7 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    pub(crate) fn positional_or_keyword(name: Name) -> Self {
+    pub(crate) const fn positional_or_keyword(name: Name) -> Self {
         Self {
             annotated_type: Type::unknown(),
             definition: None,
@@ -5544,7 +5545,7 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    pub(crate) fn variadic(name: Name) -> Self {
+    pub(crate) const fn variadic(name: Name) -> Self {
         Self {
             annotated_type: Type::unknown(),
             definition: None,
@@ -5555,7 +5556,7 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    pub(crate) fn keyword_only(name: Name) -> Self {
+    pub(crate) const fn keyword_only(name: Name) -> Self {
         Self {
             annotated_type: Type::unknown(),
             definition: None,
@@ -5569,7 +5570,7 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    pub(crate) fn keyword_variadic(name: Name) -> Self {
+    pub(crate) const fn keyword_variadic(name: Name) -> Self {
         Self {
             annotated_type: Type::unknown(),
             definition: None,
@@ -5582,20 +5583,20 @@ impl<'db> Parameter<'db> {
 
     /// Set the annotated type for this parameter. This also marks the annotation as explicit
     /// (not inferred), so it will be displayed.
-    pub(crate) fn with_annotated_type(mut self, annotated_type: Type<'db>) -> Self {
+    pub(crate) const fn with_annotated_type(mut self, annotated_type: Type<'db>) -> Self {
         self.annotated_type = annotated_type;
         self.inferred_annotation = false;
         self
     }
 
     /// Set the inferred type without displaying it as an explicit annotation.
-    pub(super) fn with_inferred_type(mut self, inferred_type: Type<'db>) -> Self {
+    pub(super) const fn with_inferred_type(mut self, inferred_type: Type<'db>) -> Self {
         self.annotated_type = inferred_type;
         self.inferred_annotation = true;
         self
     }
 
-    pub(crate) fn with_starred_annotation(mut self) -> Self {
+    pub(crate) const fn with_starred_annotation(mut self) -> Self {
         self.annotation_kind = ParameterAnnotationKind::Starred;
         self
     }
@@ -5623,7 +5624,7 @@ impl<'db> Parameter<'db> {
     }
 
     /// Set the source definition represented by this parameter.
-    pub(crate) fn with_definition(mut self, definition: Option<Definition<'db>>) -> Self {
+    pub(crate) const fn with_definition(mut self, definition: Option<Definition<'db>>) -> Self {
         self.definition = definition;
         self
     }
@@ -6160,6 +6161,29 @@ impl<'db> ParameterKind<'db> {
     }
 }
 
+pub(crate) static SELF_PARAMETER: Parameter =
+    Parameter::positional_only(Some(Name::new_static("self")));
+
+pub(crate) static ARGS_PARAMETER: Parameter = Parameter::variadic(Name::new_static("args"));
+
+pub(crate) static KWARGS_PARAMETER: Parameter =
+    Parameter::keyword_variadic(Name::new_static("kwargs"));
+
+pub(crate) static KEY_PARAMETER: Parameter =
+    Parameter::positional_only(Some(Name::new_static("key")));
+
+pub(crate) static VALUE_PARAMETER: Parameter =
+    Parameter::positional_only(Some(Name::new_static("value")));
+
+pub(crate) static DEFAULT_PARAMETER: Parameter =
+    Parameter::positional_only(Some(Name::new_static("default")));
+
+pub(crate) static INDEX_PARAMETER: Parameter =
+    Parameter::positional_only(Some(Name::new_static("index")));
+
+pub(crate) static ITEM_PARAMETER: Parameter =
+    Parameter::positional_only(Some(Name::new_static("item")));
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -6289,13 +6313,13 @@ mod tests {
                 Parameter::positional_or_keyword(Name::new_static("f"))
                     .with_annotated_type(LiteralValueType::unpromotable(4).into())
                     .with_default_type(LiteralValueType::unpromotable(4).into()),
-                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
+                ARGS_PARAMETER.clone().with_annotated_type(Type::object()),
                 Parameter::keyword_only(Name::new_static("g"))
                     .with_default_type(Type::int_literal(5)),
                 Parameter::keyword_only(Name::new_static("h"))
                     .with_annotated_type(LiteralValueType::unpromotable(6).into())
                     .with_default_type(LiteralValueType::unpromotable(6).into()),
-                Parameter::keyword_variadic(Name::new_static("kwargs")).with_annotated_type(
+                KWARGS_PARAMETER.clone().with_annotated_type(
                     KnownClass::Str.to_instance(&db, &db.program_environment()),
                 ),
             ],

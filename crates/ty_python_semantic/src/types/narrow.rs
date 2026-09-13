@@ -9,6 +9,7 @@ use crate::reachability::{
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
+use crate::types::signatures::{KEY_PARAMETER, SELF_PARAMETER};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::{TupleElement, TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema, TypedDictType};
@@ -16,12 +17,12 @@ use crate::types::unpacker::collected_list_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
-    callable_pattern_type, class_pattern_positional_sources,
-    definite_match_pattern_type_for_subject, exact_sequence_pattern_type, infer_expression_types,
-    mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
-    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
+    TypeContext, TypeVarBoundOrConstraints, UnionBuilder, binding_type, callable_pattern_type,
+    class_pattern_positional_sources, definite_match_pattern_type_for_subject,
+    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
+    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
+    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -5383,8 +5384,9 @@ fn key_membership_contains_protocol<'db>(
 ) -> Type<'db> {
     let signature = Signature::new(
         Parameters::standard([
-            Parameter::positional_only(Some(Name::new_static("self"))),
-            Parameter::positional_only(Some(Name::new_static("key")))
+            SELF_PARAMETER.clone(),
+            KEY_PARAMETER
+                .clone()
                 .with_annotated_type(Type::string_literal(db, key)),
         ]),
         Type::bool_literal(true),

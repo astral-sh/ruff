@@ -110,7 +110,7 @@ use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::narrow::pattern_success_types;
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
+use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, SELF_PARAMETER};
 use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
@@ -8795,7 +8795,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let getitem_overloads = elements.into_iter().map(|(name, ty)| {
             Signature::new(
                 Parameters::standard([
-                    Parameter::positional_only(Some(Name::new_static("self"))),
+                    SELF_PARAMETER.clone(),
                     Parameter::positional_or_keyword(Name::new_static("key"))
                         .with_annotated_type(Type::string_literal(db, name)),
                 ]),

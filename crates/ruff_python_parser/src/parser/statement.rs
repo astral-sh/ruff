@@ -773,12 +773,14 @@ impl<'src> Parser<'src> {
     /// - <https://docs.python.org/3/reference/simple_stmts.html#the-import-statement>
     /// - <https://docs.python.org/3/library/ast.html#ast.alias>
     fn parse_alias(&mut self, style: ImportStyle) -> ast::Alias {
+        static ASTERISK: Name = Name::new_static("*");
+
         let start = self.node_start();
         if self.eat(TokenKind::Star) {
             let range = self.node_range(start);
             return ast::Alias {
                 name: ast::Identifier {
-                    id: Name::new_static("*"),
+                    id: ASTERISK.clone(),
                     range,
                     node_index: AtomicNodeIndex::NONE,
                 },

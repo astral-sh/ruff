@@ -1,5 +1,7 @@
 use crate::Db;
 use crate::ProgramEnvironment;
+use crate::types::signatures::INDEX_PARAMETER;
+use crate::types::signatures::SELF_PARAMETER;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ty_python_core::Truthiness;
@@ -18,9 +20,8 @@ use crate::types::tuple::TupleType;
 use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
-    Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
-    TypeVarBoundOrConstraints, TypedDictType, UnionType, binding_type, equality_truthiness,
-    infer_same_file_expression_type,
+    Parameters, Signature, SpecialFormType, Type, TypeContext, TypeVarBoundOrConstraints,
+    TypedDictType, UnionType, binding_type, equality_truthiness, infer_same_file_expression_type,
 };
 
 pub(crate) fn singleton_pattern_type<'db>(
@@ -140,25 +141,26 @@ fn sequence_pattern_getitem_method<'db>(
     indexed_element_types: impl IntoIterator<Item = (i64, Type<'db>)>,
     fallback_return_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
-    let self_parameter = || Parameter::positional_only(Some(Name::new_static("self")));
-
     let overloads = indexed_element_types
         .into_iter()
         .map(|(index, element_type)| {
             Signature::new(
                 Parameters::standard([
-                    self_parameter(),
-                    Parameter::positional_only(Some(Name::new_static("index")))
+                    SELF_PARAMETER.clone(),
+                    INDEX_PARAMETER
+                        .clone()
                         .with_annotated_type(Type::int_literal(index)),
                 ]),
                 element_type,
             )
         });
+
     let fallback_overload = fallback_return_type.map(|fallback_return_type| {
         Signature::new(
             Parameters::standard([
-                self_parameter(),
-                Parameter::positional_only(Some(Name::new_static("index")))
+                SELF_PARAMETER.clone(),
+                INDEX_PARAMETER
+                    .clone()
                     .with_annotated_type(KnownClass::Int.to_instance(db, env)),
             ]),
             fallback_return_type,
@@ -201,9 +203,7 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
         _ => Type::int_literal(length),
     };
 
-    let self_parameter = || Parameter::positional_only(Some(Name::new_static("self")));
-
-    let len_signature = Signature::new(Parameters::standard([self_parameter()]), length_type);
+    let len_signature = Signature::new(Parameters::standard([SELF_PARAMETER.clone()]), length_type);
     let len_method = CallableType::function_like(db, len_signature);
 
     let getitem_method = (element_types.len() > 0).then(|| {

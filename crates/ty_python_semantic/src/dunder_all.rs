@@ -246,7 +246,7 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                             continue;
                         };
 
-                        if all_names.contains(&Name::new_static("__all__")) {
+                        if all_names.contains("__all__") {
                             self.update_origin(DunderAllOrigin::StarImport);
                             self.names.extend(all_names.iter().cloned());
                         }

@@ -1207,9 +1207,11 @@ impl<'db> BoundTypeVarInstance<'db> {
         upper_bound: Type<'db>,
         binding_context: BindingContext<'db>,
     ) -> Self {
+        static SELF: Name = Name::new_static("Self");
+
         let identity = TypeVarIdentity::new(
             db,
-            Name::new_static("Self"),
+            SELF.clone(),
             None, // definition
             TypeVarKind::TypingSelf,
         );

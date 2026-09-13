@@ -1,4 +1,4 @@
-use crate::ProgramEnvironment;
+use crate::{ProgramEnvironment, types::signatures::SELF_PARAMETER};
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_text_size::TextRange;
@@ -34,6 +34,8 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
     fields: impl Iterator<Item = NamedTupleField<'db>>,
     inherited_generic_context: Option<GenericContext<'db>>,
 ) -> Option<Type<'db>> {
+    static CLS_PARAMETER: Parameter = Parameter::positional_or_keyword(Name::new_static("_cls"));
+
     match name {
         "__new__" => {
             // __new__(cls, field1, field2, ...) -> Self
@@ -53,7 +55,8 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
 
             // CPython generates namedtuple `__new__` as `(_cls, field1, ...)` so field names like
             // `cls` remain usable as keyword arguments at call sites.
-            let first_parameter = Parameter::positional_or_keyword(Name::new_static("_cls"))
+            let first_parameter = CLS_PARAMETER
+                .clone()
                 .with_annotated_type(SubclassOfType::from(db, env, self_typevar));
 
             let parameters = std::iter::once(first_parameter).chain(fields.map(|field| {
@@ -628,10 +631,8 @@ impl get_size2::GetSize for NamedTupleSpec<'_> {}
 
 /// Create a property type for a namedtuple field.
 fn create_field_property<'db>(db: &'db dyn Db, field_ty: Type<'db>) -> Type<'db> {
-    let property_getter_signature = Signature::new(
-        Parameters::standard([Parameter::positional_only(Some(Name::new_static("self")))]),
-        field_ty,
-    );
+    let property_getter_signature =
+        Signature::new(Parameters::standard([SELF_PARAMETER.clone()]), field_ty);
     let property_getter = Type::single_callable(db, property_getter_signature);
     let property = PropertyInstanceType::new(db, Some(property_getter), None, None);
     Type::PropertyInstance(property)

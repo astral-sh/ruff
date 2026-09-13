@@ -97,7 +97,7 @@ pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDes
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
-use crate::types::signatures::{ConcatenateTail, walk_signature};
+use crate::types::signatures::{ConcatenateTail, SELF_PARAMETER, VALUE_PARAMETER, walk_signature};
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
@@ -3935,10 +3935,8 @@ impl<'db> Type<'db> {
                     }
                     && let Ok(length) = i64::try_from(length) =>
             {
-                let parameters = Parameters::standard([Parameter::positional_only(Some(
-                    Name::new_static("self"),
-                ))
-                .with_annotated_type(ty)]);
+                let parameters =
+                    Parameters::standard([SELF_PARAMETER.clone().with_annotated_type(ty)]);
                 Place::bound(Type::function_like_callable(
                     db,
                     Signature::new(parameters, Type::int_literal(length)),
@@ -6481,7 +6479,8 @@ impl<'db> Type<'db> {
                         Signature::new_generic(
                             Some(GenericContext::from_typevar_instances(db, env, [val_ty])),
                             Parameters::standard([
-                                Parameter::positional_only(Some(Name::new_static("value")))
+                                VALUE_PARAMETER
+                                    .clone()
                                     .with_annotated_type(Type::TypeVar(val_ty)),
                                 Parameter::positional_only(Some(Name::new_static("type")))
                                     .with_annotated_type(object_type_form(db)),

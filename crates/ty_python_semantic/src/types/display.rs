@@ -3920,6 +3920,7 @@ mod tests {
     use ruff_python_ast::name::Name;
 
     use crate::db::tests::{TestDb, setup_db};
+    use crate::types::signatures::ARGS_PARAMETER;
     use crate::types::{
         DisplaySettings, KnownClass, KnownUnion, Parameter, Parameters, Signature, Type,
         TypeDetail, UnionType,
@@ -4175,7 +4176,7 @@ mod tests {
                     Parameter::positional_or_keyword(Name::new_static("f"))
                         .with_annotated_type(KnownClass::Int.to_instance(db, &env))
                         .with_default_type(Type::int_literal(4)),
-                    Parameter::variadic(Name::new_static("args"))
+                    ARGS_PARAMETER.clone()
                         .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
                         .with_default_type(Type::int_literal(5)),
@@ -4331,7 +4332,7 @@ mod tests {
                     Parameter::positional_or_keyword(Name::new_static("f"))
                         .with_annotated_type(KnownClass::Int.to_instance(db, &env))
                         .with_default_type(Type::int_literal(4)),
-                    Parameter::variadic(Name::new_static("args"))
+                    ARGS_PARAMETER.clone()
                         .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
                         .with_default_type(Type::int_literal(5)),

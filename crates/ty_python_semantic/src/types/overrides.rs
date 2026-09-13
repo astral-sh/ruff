@@ -37,6 +37,7 @@ use crate::{
         list_members::{
             Member, MemberWithDefinition, all_end_of_scope_members, extract_underlying_functions,
         },
+        signatures::SELF_PARAMETER,
         tuple::Tuple,
     },
 };
@@ -1776,7 +1777,8 @@ fn check_post_init_signature<'db>(
             )
         });
 
-    let first_parameter = Parameter::positional_only(Some(Name::new_static("self")))
+    let first_parameter = SELF_PARAMETER
+        .clone()
         .with_annotated_type(Type::instance(db, env, class));
 
     let following_parameters = init_var_fields.map(|(name, field)| {

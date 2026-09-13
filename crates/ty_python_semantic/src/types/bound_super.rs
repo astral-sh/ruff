@@ -1,9 +1,9 @@
 //! Logic for inferring `super()`, `super(x)` and `super(x, y)` calls.
 
-use crate::ProgramEnvironment;
+use crate::{ProgramEnvironment, types::signatures::ITEM_PARAMETER};
 use itertools::{Either, Itertools};
 use ruff_db::diagnostic::Diagnostic;
-use ruff_python_ast::{AnyNodeRef, name::Name};
+use ruff_python_ast::AnyNodeRef;
 
 use crate::{
     Db, DisplaySettings,
@@ -18,7 +18,7 @@ use crate::{
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
         member_lookup_result,
         relation::EquivalenceChecker,
-        signatures::{Parameter, Parameters, Signature},
+        signatures::{Parameters, Signature},
         typevar::{TypeVarConstraints, TypeVarInstance},
         visitor,
     },
@@ -981,9 +981,7 @@ impl<'db> BoundSuperType<'db> {
             && mro_after_pivot
                 .any(|superclass| matches!(superclass, ClassBase::Generic | ClassBase::Protocol))
         {
-            let item_parameter = Parameter::positional_only(Some(Name::new_static("item")))
-                .with_annotated_type(Type::unknown());
-            let parameters = Parameters::standard([item_parameter]);
+            let parameters = Parameters::standard([ITEM_PARAMETER.clone()]);
             let return_type = self.owner(db).owner_type();
             let class_getitem = Type::single_callable(db, Signature::new(parameters, return_type));
             return Place::bound(class_getitem).into();

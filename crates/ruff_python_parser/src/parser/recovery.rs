@@ -26,6 +26,8 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 /// with both the pattern and name present. This is because it cannot be converted to an expression
 /// without dropping one of them as there's no way to represent `x as y` as a valid expression.
 pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
+    static UNDERSCORE: Name = Name::new_static("_");
+
     match pattern {
         Pattern::MatchSingleton(ast::PatternMatchSingleton {
             range,
@@ -144,7 +146,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                     node_index: node_index.clone(),
                     value: Box::new(Expr::Name(ast::ExprName {
                         range: TextRange::new(range.end() - "_".text_len(), range.end()),
-                        id: Name::new_static("_"),
+                        id: UNDERSCORE.clone(),
                         ctx: ExprContext::Store,
                         node_index,
                     })),
@@ -174,7 +176,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
             (None, None) => Expr::Name(ast::ExprName {
                 range,
                 node_index,
-                id: Name::new_static("_"),
+                id: UNDERSCORE.clone(),
                 ctx: ExprContext::Store,
             }),
         },

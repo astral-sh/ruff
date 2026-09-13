@@ -892,6 +892,8 @@ impl<'db> StaticClassLiteral<'db> {
     /// class Example(metaclass=Meta): ...
     /// ```
     fn has_own_custom_getattribute(self, db: &'db dyn Db) -> bool {
+        static DUNDER_GETATTRIBUTE: Name = Name::new_static("__getattribute__");
+
         if matches!(self.known(db), Some(KnownClass::Object | KnownClass::Type)) {
             return false;
         }
@@ -915,7 +917,7 @@ impl<'db> StaticClassLiteral<'db> {
             ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
             ClassBase::Class(base) => base.static_class_literal(db).is_none_or(|(base, _)| {
                 implicit_attribute_names(db, base.body_scope(db))
-                    .binary_search(&Name::new_static("__getattribute__"))
+                    .binary_search(&DUNDER_GETATTRIBUTE)
                     .is_ok()
             }),
             ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => false,

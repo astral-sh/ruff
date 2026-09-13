@@ -1,4 +1,7 @@
-use crate::ProgramEnvironment;
+use crate::{
+    ProgramEnvironment,
+    types::signatures::{SELF_PARAMETER, VALUE_PARAMETER},
+};
 use itertools::Either;
 use ruff_python_ast::name::Name;
 
@@ -409,8 +412,7 @@ impl<'db> KnownBoundMethodType<'db> {
                     Parameters::standard([
                         Parameter::positional_only(Some(Name::new_static("instance")))
                             .with_annotated_type(Type::object()),
-                        Parameter::positional_only(Some(Name::new_static("value")))
-                            .with_annotated_type(Type::object()),
+                        VALUE_PARAMETER.clone().with_annotated_type(Type::object()),
                     ]),
                     Type::unknown(),
                 )))
@@ -488,7 +490,8 @@ impl<'db> KnownBoundMethodType<'db> {
                     Parameters::standard([
                         Parameter::positional_only(Some(Name::new_static("typevar")))
                             .with_annotated_type(object_type_form()),
-                        Parameter::positional_only(Some(Name::new_static("value")))
+                        VALUE_PARAMETER
+                            .clone()
                             .with_annotated_type(object_type_form()),
                     ]),
                     KnownClass::ConstraintSet.to_instance(db, env),
@@ -778,8 +781,7 @@ impl WrapperDescriptorKind {
             [
                 Signature::new(
                     Parameters::standard([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(descriptor),
+                        SELF_PARAMETER.clone().with_annotated_type(descriptor),
                         Parameter::positional_only(Some(Name::new_static("instance")))
                             .with_annotated_type(none),
                         Parameter::positional_only(Some(Name::new_static("owner")))
@@ -789,8 +791,7 @@ impl WrapperDescriptorKind {
                 ),
                 Signature::new(
                     Parameters::standard([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(descriptor),
+                        SELF_PARAMETER.clone().with_annotated_type(descriptor),
                         Parameter::positional_only(Some(Name::new_static("instance")))
                             .with_annotated_type(Type::object()),
                         Parameter::positional_only(Some(Name::new_static("owner")))
@@ -818,12 +819,12 @@ impl WrapperDescriptorKind {
                 let object = Type::object();
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::standard([
-                        Parameter::positional_only(Some(Name::new_static("self")))
+                        SELF_PARAMETER
+                            .clone()
                             .with_annotated_type(KnownClass::Property.to_instance(db, env)),
                         Parameter::positional_only(Some(Name::new_static("instance")))
                             .with_annotated_type(object),
-                        Parameter::positional_only(Some(Name::new_static("value")))
-                            .with_annotated_type(object),
+                        VALUE_PARAMETER.clone().with_annotated_type(object),
                     ]),
                     Type::unknown(),
                 )))
@@ -831,7 +832,8 @@ impl WrapperDescriptorKind {
             WrapperDescriptorKind::PropertyDunderDelete => {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::standard([
-                        Parameter::positional_only(Some(Name::new_static("self")))
+                        SELF_PARAMETER
+                            .clone()
                             .with_annotated_type(KnownClass::Property.to_instance(db, env)),
                         Parameter::positional_only(Some(Name::new_static("instance")))
                             .with_annotated_type(Type::object()),

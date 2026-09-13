@@ -1,4 +1,7 @@
 use crate::ProgramEnvironment;
+use crate::types::signatures::{
+    DEFAULT_PARAMETER, KEY_PARAMETER, KWARGS_PARAMETER, SELF_PARAMETER, VALUE_PARAMETER,
+};
 use std::borrow::Cow;
 
 use itertools::Either;
@@ -163,16 +166,13 @@ fn synthesize_typed_dict_init<'db>(
     let keyword_rest_param = typed_dict
         .explicit_extra_items(db)
         .map(|extra_items| {
-            Parameter::keyword_variadic(Name::new_static("kwargs"))
+            KWARGS_PARAMETER
+                .clone()
                 .with_annotated_type(extra_items.declared_ty)
         })
-        .or_else(|| {
-            (keyword_fields.len() != fields.len())
-                .then(|| Parameter::keyword_variadic(Name::new_static("kwargs")))
-        });
+        .or_else(|| (keyword_fields.len() != fields.len()).then(|| KWARGS_PARAMETER.clone()));
 
-    let self_param =
-        Parameter::positional_only(Some(Name::new_static("self"))).with_annotated_type(instance_ty);
+    let self_param = SELF_PARAMETER.clone().with_annotated_type(instance_ty);
 
     let map_param =
         Parameter::positional_only(Some(Name::new_static("map"))).with_annotated_type(instance_ty);
@@ -236,18 +236,16 @@ fn synthesize_typed_dict_getitem<'db>(
         .map(|(field_name, field)| {
             let key_type = Type::string_literal(db, field_name);
             let parameters = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(key_type),
+                SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+                KEY_PARAMETER.clone().with_annotated_type(key_type),
             ];
             Signature::new(Parameters::standard(parameters), field.declared_ty)
         })
         .chain(std::iter::once(Signature::new(
             Parameters::standard([
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
+                SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+                KEY_PARAMETER
+                    .clone()
                     .with_annotated_type(KnownClass::Str.to_instance(db, env)),
             ]),
             if typed_dict.explicit_extra_items(db).is_some() {
@@ -280,12 +278,9 @@ fn synthesize_typed_dict_setitem<'db>(
 
     if writable_fields.peek().is_none() && arbitrary_key_mutation_type.is_none() {
         let parameters = [
-            Parameter::positional_only(Some(Name::new_static("self")))
-                .with_annotated_type(instance_ty),
-            Parameter::positional_only(Some(Name::new_static("key")))
-                .with_annotated_type(Type::Never),
-            Parameter::positional_only(Some(Name::new_static("value")))
-                .with_annotated_type(Type::any()),
+            SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+            KEY_PARAMETER.clone().with_annotated_type(Type::Never),
+            VALUE_PARAMETER.clone().with_annotated_type(Type::any()),
         ];
         let signature = Signature::new(Parameters::standard(parameters), Type::none(db, env));
         return Type::function_like_callable(db, signature);
@@ -295,23 +290,21 @@ fn synthesize_typed_dict_setitem<'db>(
         .map(|(field_name, field)| {
             let key_type = Type::string_literal(db, field_name);
             let parameters = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(key_type),
-                Parameter::positional_only(Some(Name::new_static("value")))
+                SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+                KEY_PARAMETER.clone().with_annotated_type(key_type),
+                VALUE_PARAMETER
+                    .clone()
                     .with_annotated_type(field.declared_ty),
             ];
             Signature::new(Parameters::standard(parameters), Type::none(db, env))
         })
         .chain(arbitrary_key_mutation_type.map(|value_ty| {
             let parameters = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
+                SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+                KEY_PARAMETER
+                    .clone()
                     .with_annotated_type(KnownClass::Str.to_instance(db, env)),
-                Parameter::positional_only(Some(Name::new_static("value")))
-                    .with_annotated_type(value_ty),
+                VALUE_PARAMETER.clone().with_annotated_type(value_ty),
             ];
             Signature::new(Parameters::standard(parameters), Type::none(db, env))
         }));
@@ -339,10 +332,8 @@ fn synthesize_typed_dict_delitem<'db>(
 
     if deletable_fields.peek().is_none() && !supports_arbitrary_key_deletion {
         let parameters = [
-            Parameter::positional_only(Some(Name::new_static("self")))
-                .with_annotated_type(instance_ty),
-            Parameter::positional_only(Some(Name::new_static("key")))
-                .with_annotated_type(Type::Never),
+            SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+            KEY_PARAMETER.clone().with_annotated_type(Type::Never),
         ];
         let signature = Signature::new(Parameters::standard(parameters), Type::none(db, env));
         return Type::function_like_callable(db, signature);
@@ -352,18 +343,16 @@ fn synthesize_typed_dict_delitem<'db>(
         .map(|(field_name, _)| {
             let key_type = Type::string_literal(db, field_name);
             let parameters = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(key_type),
+                SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+                KEY_PARAMETER.clone().with_annotated_type(key_type),
             ];
             Signature::new(Parameters::standard(parameters), Type::none(db, env))
         })
         .chain(supports_arbitrary_key_deletion.then(|| {
             let parameters = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
+                SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+                KEY_PARAMETER
+                    .clone()
                     .with_annotated_type(KnownClass::Str.to_instance(db, env)),
             ];
             Signature::new(Parameters::standard(parameters), Type::none(db, env))
@@ -395,10 +384,8 @@ fn synthesize_typed_dict_get<'db>(
             let key_type = Type::string_literal(db, field_name);
 
             let get_sig_params = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(key_type),
+                SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+                KEY_PARAMETER.clone().with_annotated_type(key_type),
             ];
             let get_sig = Signature::new(
                 Parameters::standard(get_sig_params),
@@ -417,11 +404,10 @@ fn synthesize_typed_dict_get<'db>(
             );
 
             let get_with_default_sig_params = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(key_type),
-                Parameter::positional_only(Some(Name::new_static("default")))
+                SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+                KEY_PARAMETER.clone().with_annotated_type(key_type),
+                DEFAULT_PARAMETER
+                    .clone()
                     .with_annotated_type(Type::TypeVar(t_default)),
             ];
             let get_with_default_sig = Signature::new_generic(
@@ -448,11 +434,10 @@ fn synthesize_typed_dict_get<'db>(
             } else {
                 let get_with_typed_default_sig = Signature::new(
                     Parameters::standard([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key")))
-                            .with_annotated_type(key_type),
-                        Parameter::positional_only(Some(Name::new_static("default")))
+                        SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+                        KEY_PARAMETER.clone().with_annotated_type(key_type),
+                        DEFAULT_PARAMETER
+                            .clone()
                             .with_annotated_type(field.declared_ty),
                     ]),
                     field.declared_ty,
@@ -465,9 +450,9 @@ fn synthesize_typed_dict_get<'db>(
         // Fallback overloads for unknown keys
         .chain(std::iter::once(Signature::new(
             Parameters::standard([
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
+                SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+                KEY_PARAMETER
+                    .clone()
                     .with_annotated_type(KnownClass::Str.to_instance(db, env)),
             ]),
             UnionType::from_two_elements(db, env, fallback_value_ty, Type::none(db, env)),
@@ -481,11 +466,12 @@ fn synthesize_typed_dict_get<'db>(
             );
 
             let parameters = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
+                SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+                KEY_PARAMETER
+                    .clone()
                     .with_annotated_type(KnownClass::Str.to_instance(db, env)),
-                Parameter::positional_only(Some(Name::new_static("default")))
+                DEFAULT_PARAMETER
+                    .clone()
                     .with_annotated_type(Type::TypeVar(t_default)),
             ];
 
@@ -529,7 +515,8 @@ fn synthesize_typed_dict_update<'db>(
                 .explicit_extra_items(db)
                 .filter(|extra_items| !extra_items.is_read_only())
                 .map(|extra_items| {
-                    Parameter::keyword_variadic(Name::new_static("kwargs"))
+                    KWARGS_PARAMETER
+                        .clone()
                         .with_annotated_type(extra_items.declared_ty)
                 }),
         );
@@ -562,8 +549,9 @@ fn synthesize_typed_dict_update<'db>(
     );
 
     let parameters = [
-        Parameter::positional_only(Some(Name::new_static("self"))).with_annotated_type(instance_ty),
-        Parameter::positional_only(Some(Name::new_static("value")))
+        SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+        VALUE_PARAMETER
+            .clone()
             .with_annotated_type(value_ty)
             .with_default_type(Type::none(db, env)),
     ]
@@ -584,20 +572,17 @@ fn synthesize_typed_dict_pop<'db>(
     let instance_ty = Type::TypedDict(typed_dict);
     let pop_overloads = |key_ty, value_ty| {
         let pop_parameters = [
-            Parameter::positional_only(Some(Name::new_static("self")))
-                .with_annotated_type(instance_ty),
-            Parameter::positional_only(Some(Name::new_static("key"))).with_annotated_type(key_ty),
+            SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+            KEY_PARAMETER.clone().with_annotated_type(key_ty),
         ];
         let pop_sig = Signature::new(Parameters::standard(pop_parameters), value_ty);
 
         // Non-generic overload that accepts the value type as the default,
         // providing bidirectional inference context for the default argument.
         let pop_with_typed_default_parameters = [
-            Parameter::positional_only(Some(Name::new_static("self")))
-                .with_annotated_type(instance_ty),
-            Parameter::positional_only(Some(Name::new_static("key"))).with_annotated_type(key_ty),
-            Parameter::positional_only(Some(Name::new_static("default")))
-                .with_annotated_type(value_ty),
+            SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+            KEY_PARAMETER.clone().with_annotated_type(key_ty),
+            DEFAULT_PARAMETER.clone().with_annotated_type(value_ty),
         ];
         let pop_with_typed_default_sig = Signature::new(
             Parameters::standard(pop_with_typed_default_parameters),
@@ -611,10 +596,10 @@ fn synthesize_typed_dict_pop<'db>(
             TypeVarVariance::Covariant,
         );
         let pop_with_default_parameters = [
-            Parameter::positional_only(Some(Name::new_static("self")))
-                .with_annotated_type(instance_ty),
-            Parameter::positional_only(Some(Name::new_static("key"))).with_annotated_type(key_ty),
-            Parameter::positional_only(Some(Name::new_static("default")))
+            SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+            KEY_PARAMETER.clone().with_annotated_type(key_ty),
+            DEFAULT_PARAMETER
+                .clone()
                 .with_annotated_type(Type::TypeVar(t_default)),
         ];
         let pop_with_default_sig = Signature::new_generic(
@@ -666,11 +651,10 @@ fn synthesize_typed_dict_setdefault<'db>(
         .map(|(field_name, field)| {
             let key_type = Type::string_literal(db, field_name);
             let parameters = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(key_type),
-                Parameter::positional_only(Some(Name::new_static("default")))
+                SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+                KEY_PARAMETER.clone().with_annotated_type(key_type),
+                DEFAULT_PARAMETER
+                    .clone()
                     .with_annotated_type(field.declared_ty),
             ];
 
@@ -681,12 +665,11 @@ fn synthesize_typed_dict_setdefault<'db>(
                 .arbitrary_key_mutation_type(db, env)
                 .map(|default_ty| {
                     let parameters = [
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key")))
+                        SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+                        KEY_PARAMETER
+                            .clone()
                             .with_annotated_type(KnownClass::Str.to_instance(db, env)),
-                        Parameter::positional_only(Some(Name::new_static("default")))
-                            .with_annotated_type(default_ty),
+                        DEFAULT_PARAMETER.clone().with_annotated_type(default_ty),
                     ];
                     Signature::new(
                         Parameters::standard(parameters),
@@ -710,7 +693,8 @@ fn synthesize_typed_dict_no_argument_method<'db>(
     Type::function_like_callable(
         db,
         Signature::new(
-            Parameters::standard([Parameter::positional_only(Some(Name::new_static("self")))
+            Parameters::standard([SELF_PARAMETER
+                .clone()
                 .with_annotated_type(Type::TypedDict(typed_dict))]),
             return_ty,
         ),
@@ -760,8 +744,9 @@ fn synthesize_typed_dict_merge<'db>(
     };
 
     let first_overload_parameters = [
-        Parameter::positional_only(Some(Name::new_static("self"))).with_annotated_type(instance_ty),
-        Parameter::positional_only(Some(Name::new_static("value")))
+        SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+        VALUE_PARAMETER
+            .clone()
             .with_annotated_type(first_overload_value_ty),
     ];
 
@@ -793,10 +778,8 @@ fn synthesize_typed_dict_merge<'db>(
         );
 
         let overload_two_parameters = [
-            Parameter::positional_only(Some(Name::new_static("self")))
-                .with_annotated_type(instance_ty),
-            Parameter::positional_only(Some(Name::new_static("value")))
-                .with_annotated_type(partial_ty),
+            SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+            VALUE_PARAMETER.clone().with_annotated_type(partial_ty),
         ];
         overloads.push(Signature::new(
             Parameters::standard(overload_two_parameters),
@@ -804,10 +787,8 @@ fn synthesize_typed_dict_merge<'db>(
         ));
 
         let overload_three_parameters = [
-            Parameter::positional_only(Some(Name::new_static("self")))
-                .with_annotated_type(instance_ty),
-            Parameter::positional_only(Some(Name::new_static("value")))
-                .with_annotated_type(dict_param_ty),
+            SELF_PARAMETER.clone().with_annotated_type(instance_ty),
+            VALUE_PARAMETER.clone().with_annotated_type(dict_param_ty),
         ];
         overloads.push(Signature::new(
             Parameters::standard(overload_three_parameters),

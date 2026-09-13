@@ -5,6 +5,7 @@ use std::collections::hash_map::Entry;
 
 use itertools::Itertools;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
@@ -255,12 +256,14 @@ pub(crate) fn typing_self<'db>(
     typevar_binding_context: Option<Definition<'db>>,
     class: ClassLiteral<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
+    static SELF: Name = Name::new_static("Self");
+
     let env = ProgramEnvironment::from_scope(scope_id);
     let index = semantic_index(db, scope_id.program_file(db));
 
     let identity = TypeVarIdentity::new(
         db,
-        ast::name::Name::new_static("Self"),
+        SELF.clone(),
         // `Self` has a different upper bound dependent on the containing class,
         // so pointing to the definition of the symbol `typing.Self` itself is
         // not useful here. We could point to the class definition, but the full

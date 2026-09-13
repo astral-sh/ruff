@@ -41,7 +41,8 @@ use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
 use crate::types::signatures::{
-    CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
+    CallableSignature, INDEX_PARAMETER, Parameter, Parameters, SELF_PARAMETER, Signature,
+    SignatureRelationVisitor,
 };
 use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::typevar::TypeVarSet;
@@ -1927,10 +1928,10 @@ impl<'db> ClassType<'db> {
             index_annotation: Type<'db>,
             return_annotation: Type<'db>,
         ) -> Signature<'db> {
-            let self_parameter = Parameter::positional_only(Some(Name::new_static("self")));
-            let index_parameter = Parameter::positional_only(Some(Name::new_static("index")))
+            let index_parameter = INDEX_PARAMETER
+                .clone()
                 .with_annotated_type(index_annotation);
-            let parameters = Parameters::standard([self_parameter, index_parameter]);
+            let parameters = Parameters::standard([SELF_PARAMETER.clone(), index_parameter]);
             Signature::new(parameters, return_annotation)
         }
 
@@ -1968,10 +1969,9 @@ impl<'db> ClassType<'db> {
                     .map(Type::int_literal)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db, env));
 
-                let parameters = Parameters::standard([Parameter::positional_only(Some(
-                    Name::new_static("self"),
-                ))
-                .with_annotated_type(Type::instance(db, env, self))]);
+                let parameters = Parameters::standard([SELF_PARAMETER
+                    .clone()
+                    .with_annotated_type(Type::instance(db, env, self))]);
 
                 let synthesized_dunder_method =
                     Type::function_like_callable(db, Signature::new(parameters, return_type));
@@ -2220,7 +2220,8 @@ impl<'db> ClassType<'db> {
                 }
 
                 let parameters = Parameters::standard([
-                    Parameter::positional_only(Some(Name::new_static("self")))
+                    SELF_PARAMETER
+                        .clone()
                         .with_annotated_type(SubclassOfType::from(db, env, self)),
                     iterable_parameter,
                 ]);

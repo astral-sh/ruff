@@ -847,6 +847,6 @@ class MyProtocol(Protocol, Generic[_T_co]):
         # Accessing parent's __class_getitem__ through super()
         reveal_type(super())  # revealed: <super: <class 'MyProtocol'>, type[Self@__class_getitem__]>
         parent_method = super().__class_getitem__
-        reveal_type(parent_method)  # revealed: (item: Unknown, /) -> type[Self@__class_getitem__]
+        reveal_type(parent_method)  # revealed: (item, /) -> type[Self@__class_getitem__]
         return parent_method(item)
 ```

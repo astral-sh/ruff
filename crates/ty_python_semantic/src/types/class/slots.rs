@@ -283,7 +283,10 @@ impl<'db> StaticClassLiteral<'db> {
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn slot_definition(self, db: &'db dyn Db) -> SlotDefinition {
+        static DUNDER_WEAKREF: Name = Name::new_static("__weakref__");
+
         let body_scope = self.body_scope(db);
+
         // A bare annotation does not bind `__slots__`, but an annotated assignment does:
         //
         //     __slots__: tuple[str, ...]
@@ -321,7 +324,6 @@ impl<'db> StaticClassLiteral<'db> {
                 .flatten()
                 .cloned()
                 .collect();
-            let weakref_name = Name::new_static("__weakref__");
             let mut names: Vec<_> = self
                 .fields(db, None, field_policy)
                 .keys()
@@ -329,9 +331,9 @@ impl<'db> StaticClassLiteral<'db> {
                 .cloned()
                 .collect();
             if self.has_dataclass_param(db, field_policy, DataclassFlags::WEAKREF_SLOT)
-                && !inherited_slots.contains(&weakref_name)
+                && !inherited_slots.contains(&DUNDER_WEAKREF)
             {
-                names.push(weakref_name);
+                names.push(DUNDER_WEAKREF.clone());
             }
             return SlotDefinition::Names(names.into_boxed_slice());
         };
