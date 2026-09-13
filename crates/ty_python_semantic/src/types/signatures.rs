@@ -14,7 +14,7 @@ use crate::ProgramEnvironment;
 use std::fmt;
 use std::num::NonZeroU32;
 use std::slice::Iter;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use itertools::{Either, EitherOrBoth, Itertools};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -4689,7 +4689,9 @@ impl<'db> Parameters<'db> {
 
     /// Create an empty parameter list.
     pub(crate) fn empty() -> Self {
-        Self::standard([])
+        static EMPTY: LazyLock<Parameters<'static>> = LazyLock::new(|| Parameters::standard([]));
+
+        EMPTY.clone()
     }
 
     /// Create a standard parameter list without inferring its kind or normalizing annotations.
@@ -4886,15 +4888,19 @@ impl<'db> Parameters<'db> {
 
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
     pub(crate) fn todo() -> Self {
-        Self::new(
-            [
-                Parameter::variadic(Name::new_static("args"))
-                    .with_annotated_type(todo_type!("todo signature *args")),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(todo_type!("todo signature **kwargs")),
-            ],
-            ParametersKind::Gradual,
-        )
+        static TODO: LazyLock<Parameters<'static>> = LazyLock::new(|| {
+            Parameters::new(
+                [
+                    Parameter::variadic(Name::new_static("args"))
+                        .with_annotated_type(todo_type!("todo signature *args")),
+                    Parameter::keyword_variadic(Name::new_static("kwargs"))
+                        .with_annotated_type(todo_type!("todo signature **kwargs")),
+                ],
+                ParametersKind::Gradual,
+            )
+        });
+
+        TODO.clone()
     }
 
     /// Return parameters that represents a gradual form using `...` as the only parameter.
@@ -4903,15 +4909,19 @@ impl<'db> Parameters<'db> {
     ///
     /// [`Any`]: DynamicType::Any
     pub(crate) fn gradual_form() -> Self {
-        Self::new(
-            [
-                Parameter::variadic(Name::new_static("args"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Any)),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Any)),
-            ],
-            ParametersKind::Gradual,
-        )
+        static GRADUAL_FORM: LazyLock<Parameters<'static>> = LazyLock::new(|| {
+            Parameters::new(
+                [
+                    Parameter::variadic(Name::new_static("args"))
+                        .with_annotated_type(Type::Dynamic(DynamicType::Any)),
+                    Parameter::keyword_variadic(Name::new_static("kwargs"))
+                        .with_annotated_type(Type::Dynamic(DynamicType::Any)),
+                ],
+                ParametersKind::Gradual,
+            )
+        });
+
+        GRADUAL_FORM.clone()
     }
 
     pub(crate) fn paramspec(db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Self {
@@ -4961,28 +4971,37 @@ impl<'db> Parameters<'db> {
     ///
     /// [`Unknown`]: crate::types::DynamicType::Unknown
     pub(crate) fn unknown() -> Self {
-        Self::new(
-            [
-                Parameter::variadic(Name::new_static("args"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
-            ],
-            ParametersKind::Gradual,
-        )
+        static UNKNOWN: LazyLock<Parameters<'static>> = LazyLock::new(|| {
+            Parameters::new(
+                [
+                    Parameter::variadic(Name::new_static("args"))
+                        .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
+                    Parameter::keyword_variadic(Name::new_static("kwargs"))
+                        .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
+                ],
+                ParametersKind::Gradual,
+            )
+        });
+
+        UNKNOWN.clone()
     }
 
     /// Return parameters that represents `(*args: object, **kwargs: object)`, the bottom signature
     /// (accepts any call, so subtype of all other signatures.)
     pub(crate) fn bottom() -> Self {
-        Self::new(
-            [
-                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::object()),
-            ],
-            ParametersKind::Standard,
-        )
+        static BOTTOM: LazyLock<Parameters<'static>> = LazyLock::new(|| {
+            Parameters::new(
+                [
+                    Parameter::variadic(Name::new_static("args"))
+                        .with_annotated_type(Type::object()),
+                    Parameter::keyword_variadic(Name::new_static("kwargs"))
+                        .with_annotated_type(Type::object()),
+                ],
+                ParametersKind::Standard,
+            )
+        });
+
+        BOTTOM.clone()
     }
 
     /// Return the "top" parameters (infinite union of all possible parameters), which cannot
@@ -4991,17 +5010,22 @@ impl<'db> Parameters<'db> {
     /// and still accepts the empty call `()`; it has to be represented instead as a special
     /// `ParametersKind`.
     pub(crate) fn top() -> Self {
-        Self::new(
-            // We always emit `called-top-callable` for any call to the top callable (based on the
-            // `kind` below), so we otherwise give it the most permissive signature`(*object,
-            // **object)`, so that we avoid emitting any other errors about arity mismatches.
-            [
-                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::object()),
-            ],
-            ParametersKind::Top,
-        )
+        static TOP: LazyLock<Parameters<'static>> = LazyLock::new(|| {
+            Parameters::new(
+                // We always emit `called-top-callable` for any call to the top callable (based on the
+                // `kind` below), so we otherwise give it the most permissive signature`(*object,
+                // **object)`, so that we avoid emitting any other errors about arity mismatches.
+                [
+                    Parameter::variadic(Name::new_static("args"))
+                        .with_annotated_type(Type::object()),
+                    Parameter::keyword_variadic(Name::new_static("kwargs"))
+                        .with_annotated_type(Type::object()),
+                ],
+                ParametersKind::Top,
+            )
+        });
+
+        TOP.clone()
     }
 
     fn from_parameters(
@@ -5155,6 +5179,7 @@ impl<'db> Parameters<'db> {
 
         Self::new(value, self.data.kind).expand_starred_variadic_annotations(db)
     }
+
     pub(crate) fn len(&self) -> usize {
         self.data.value.len()
     }
