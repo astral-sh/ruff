@@ -44,7 +44,7 @@ use crate::{
         function::KnownFunction,
         generics::enclosing_generic_contexts,
         infer::builder::post_inference::typed_dict::validate_typed_dict_class,
-        infer_definition_types,
+        infer_definition_types, inferred_declaration,
         mro::StaticMroErrorKind,
         overrides,
         special_form::TypeQualifier,
@@ -56,7 +56,10 @@ use crate::{
 };
 use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
-    SemanticIndex, attribute_scopes, definition::DefinitionKind, scope::ScopeId, semantic_index,
+    SemanticIndex, attribute_scopes,
+    definition::{DefinitionKind, DefinitionState},
+    scope::ScopeId,
+    semantic_index,
 };
 
 /// Rejects slot layouts that fail while Python constructs the runtime class.
@@ -171,11 +174,64 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     let env = context.program_environment();
 
-    for name in implicit_attribute_names(db, class.body_scope(db)).iter() {
-        let declarations = attribute_declarations(db, class.body_scope(db), name)
-            .flat_map(|(declarations, _)| declarations)
-            .collect::<Vec<_>>();
-        dbg!(name, declarations);
+    let class_body_scope = class.body_scope(db);
+    let class_scope_id = class_body_scope.file_scope_id(db);
+    let class_table = index.place_table(class_scope_id);
+    let class_use_def = index.use_def_map(class_scope_id);
+
+    for name in implicit_attribute_names(db, class_body_scope).iter() {
+        let mut declarations_by_scope = Vec::new();
+
+        if let Some(symbol_id) = class_table.symbol_id(name) {
+            let declarations = class_use_def
+                .end_of_scope_symbol_declarations(symbol_id)
+                .filter_map(|declaration| declaration.declaration.definition())
+                .filter_map(|declaration| {
+                    inferred_declaration(db, declaration)
+                        .declared()
+                        .map(|declared| declared.inner_type())
+                })
+                .collect::<Vec<_>>();
+            if !declarations.is_empty() {
+                declarations_by_scope.push(("class body".to_owned(), declarations));
+            }
+        }
+
+        for (declarations, scope_id) in attribute_declarations(db, class_body_scope, name) {
+            let declarations = declarations
+                .filter_map(|declaration| {
+                    let DefinitionState::Defined(declaration) = declaration.declaration else {
+                        return None;
+                    };
+                    inferred_declaration(db, declaration)
+                        .declared()
+                        .map(|declared| declared.inner_type())
+                })
+                .collect::<Vec<_>>();
+            if declarations.is_empty() {
+                continue;
+            }
+
+            let method_name = index
+                .ancestor_scopes(scope_id)
+                .find_map(|(_, scope)| scope.node().as_function())
+                .map(|function| function.node(context.module()).name.to_string())
+                .unwrap_or_else(|| "<unknown method>".to_owned());
+            declarations_by_scope.push((method_name, declarations));
+        }
+
+        if !declarations_by_scope.is_empty() {
+            eprintln!("attribute `{name}`:");
+            for (scope, declarations) in declarations_by_scope {
+                eprintln!(
+                    "  {scope}: {}",
+                    declarations
+                        .iter()
+                        .map(|ty| ty.display(db, env))
+                        .format(", ")
+                );
+            }
+        }
     }
 
     check_class_slots(context, class, index);
