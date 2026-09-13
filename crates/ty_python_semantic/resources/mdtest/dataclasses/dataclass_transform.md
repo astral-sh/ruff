@@ -2351,5 +2351,25 @@ def _(m: ModelA | ModelB):
     m.x = b"1"  # error: [invalid-assignment]
 ```
 
+## Generated match arguments preserve class-variable declarations
+
+A dataclass-transform subclass generates its own `__match_args__` tuple. The generated member
+remains a class variable when the base explicitly declares it as one.
+
+```py
+from typing import ClassVar, dataclass_transform
+
+@dataclass_transform()
+class Base:
+    __match_args__: ClassVar[tuple[str, ...]]
+
+class Child(Base): ...
+
+def check(child: Child) -> None:
+    reveal_type(Child.__match_args__)  # revealed: tuple[()]
+    Child.__match_args__ = ()
+    child.__match_args__ = ()  # error: [invalid-attribute-access]
+```
+
 [pyright's behavior]: https://github.com/microsoft/pyright/blob/1.1.396/packages/pyright-internal/src/analyzer/dataClasses.ts#L1024-L1033
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform

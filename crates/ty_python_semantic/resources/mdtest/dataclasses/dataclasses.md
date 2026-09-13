@@ -1383,6 +1383,25 @@ class NoMatchArgs:
 NoMatchArgs.__match_args__  # error: [unresolved-attribute]
 ```
 
+### `__match_args__` is a class variable
+
+The generated tuple describes positional patterns for the class. It can be read through an instance,
+but assigning to that instance does not change the class's pattern-matching fields. We classify it
+as a `ClassVar` and reject instance assignments.
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Example:
+    value: int
+
+def check(example: Example) -> None:
+    reveal_type(example.__match_args__)  # revealed: tuple[Literal["value"]]
+    Example.__match_args__ = ("value",)
+    example.__match_args__ = ("value",)  # error: [invalid-attribute-access]
+```
+
 ### `kw_only`
 
 An error is emitted if a dataclass is defined with `kw_only=True` and positional arguments are

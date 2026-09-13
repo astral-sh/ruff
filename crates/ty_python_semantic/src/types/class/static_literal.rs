@@ -1624,7 +1624,11 @@ impl<'db> StaticClassLiteral<'db> {
                 inherited_generic_context,
                 name,
             ) {
-                return Member::definitely_declared(synthesized_member);
+                let mut member = Member::definitely_declared(synthesized_member);
+                if name == "__match_args__" {
+                    member.inner.qualifiers |= TypeQualifiers::CLASS_VAR;
+                }
+                return member;
             }
             // The symbol was not found in the class scope. It might still be implicitly defined in `@classmethod`s.
             return self.implicit_attribute(db, name, MethodDecorator::ClassMethod);
