@@ -2347,6 +2347,13 @@ fn property_set_type<'db>(
     property: PropertyInstanceType<'db>,
     receiver_ty: Type<'db>,
 ) -> Option<Type<'db>> {
+    // A method-scoped type variable can be inferred afresh for each write. Comparing
+    // directly against that variable would incorrectly require one fixed type for all calls.
+    if let DescriptorSetterDomain::Known(domain) =
+        descriptor_setter_domain(db, env, Type::PropertyInstance(property), receiver_ty)
+    {
+        return Some(domain);
+    }
     property_set_member_type(db, env, property.setter(db)?)?.bind_self(db, env, receiver_ty)
 }
 

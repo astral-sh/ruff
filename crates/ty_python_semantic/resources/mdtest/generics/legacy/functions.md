@@ -1858,3 +1858,42 @@ def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1` does not satisfy upper bound `Base` of type variable `T`"
     reveal_type(first(x))  # revealed: Unknown
 ```
+
+## Generic property setters implementing protocols
+
+A setter's method-scoped type variable is inferred separately for each assignment. An unconstrained
+setter accepts every value of `object`, including writes through a protocol. A bounded setter still
+rejects values outside its bound.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+I = TypeVar("I", bound=int)
+
+class GenericSetter:
+    @property
+    def value(self) -> object:
+        return None
+
+    @value.setter
+    def value(self, value: T) -> None: ...
+
+class BoundedSetter:
+    @property
+    def value(self) -> object:
+        return None
+
+    @value.setter
+    def value(self, value: I) -> None: ...
+
+class HasValue(Protocol):
+    value: object
+
+def check(generic: GenericSetter, bounded: BoundedSetter, value: object) -> None:
+    generic.value = value
+    writable: HasValue = generic
+    bounded.value = 1
+    bounded.value = value  # error: [invalid-assignment]
+    writable = bounded  # error: [invalid-assignment]
+```

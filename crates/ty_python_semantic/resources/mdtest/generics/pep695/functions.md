@@ -2589,5 +2589,41 @@ def f(l: list[tuple[Any | str, Any | str]]) -> None:
     reveal_type(dict(l))
 ```
 
+## Generic property setters implementing protocols
+
+A setter's method-scoped type variable is inferred separately for each assignment. An unconstrained
+setter accepts every value of `object`, including writes through a protocol. A bounded setter still
+rejects values outside its bound.
+
+```py
+from typing import Protocol
+
+class GenericSetter:
+    @property
+    def value(self) -> object:
+        return None
+
+    @value.setter
+    def value[T](self, value: T) -> None: ...
+
+class BoundedSetter:
+    @property
+    def value(self) -> object:
+        return None
+
+    @value.setter
+    def value[I: int](self, value: I) -> None: ...
+
+class HasValue(Protocol):
+    value: object
+
+def check(generic: GenericSetter, bounded: BoundedSetter, value: object) -> None:
+    generic.value = value
+    writable: HasValue = generic
+    bounded.value = 1
+    bounded.value = value  # error: [invalid-assignment]
+    writable = bounded  # error: [invalid-assignment]
+```
+
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371
