@@ -28,6 +28,7 @@
 //! [`await_notification`]: TestServer::await_notification
 
 mod call_hierarchy;
+mod closed_documents;
 mod code_actions;
 mod commands;
 mod completions;
@@ -1567,7 +1568,6 @@ impl TestServerBuilder {
     }
 
     /// Write multiple files to the test directory
-    #[expect(dead_code)]
     pub(crate) fn with_files<P, C, I>(mut self, files: I) -> Result<Self>
     where
         I: IntoIterator<Item = (P, C)>,

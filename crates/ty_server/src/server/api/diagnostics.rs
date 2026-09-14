@@ -245,7 +245,10 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
 
     let db = session.project_db(document.notebook_or_file_path());
 
-    let Some(diagnostics) = compute_diagnostics(db, document, session.position_encoding()) else {
+    let Some(file) = document.notebook_or_file(db) else {
+        return;
+    };
+    let Some(diagnostics) = compute_diagnostics(db, file, session.position_encoding()) else {
         return;
     };
 
@@ -392,17 +395,9 @@ pub(crate) fn publish_settings_diagnostics(
 
 pub(super) fn compute_diagnostics(
     db: &ProjectDatabase,
-    document: &DocumentHandle,
+    file: File,
     encoding: PositionEncoding,
 ) -> Option<Diagnostics> {
-    let Some(file) = document.notebook_or_file(db) else {
-        tracing::info!(
-            "No file found for snapshot for `{}`",
-            document.notebook_or_file_path()
-        );
-        return None;
-    };
-
     // The first uv result supplies the module paths needed for correct diagnostics. Do not analyze
     // the script until that result is available. Waiting would not help: publishing the environment
     // advances the database revision and cancels this snapshot, so the request must retry anyway.
