@@ -3373,9 +3373,8 @@ class Same(Base):
 
 ## Unannotated initializers
 
-TODO: Ordinary unannotated class-body assignments are not checked for attribute type overrides. They
-keep their ordinary inferred types; an inherited annotation does not supply initializer context or
-preserve a wider write type. Attribute assignments and protocol checks still use the inferred types.
+An unannotated class-body assignment retains the inherited annotation. Its initializer is checked
+against that type, and later reads, writes, and protocol checks use the same contract.
 
 ```py
 from typing import Protocol
@@ -3393,12 +3392,13 @@ class HasValue(Protocol):
     value: int | str
 
 def check(child: Child) -> None:
-    child.value = 1  # error: [invalid-assignment]
-    value: HasValue = child  # error: [invalid-assignment]
+    reveal_type(child.value)  # revealed: int | str
+    child.value = 1
+    value: HasValue = child
 ```
 
-An explicit annotation supplies initializer context and preserves the declared type for subsequent
-writes and protocol matching.
+Repeating the inherited annotation preserves the same contract for later writes and protocol
+matching.
 
 ```py
 class Annotated(Base):
