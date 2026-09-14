@@ -103,8 +103,7 @@ export default function Playground() {
 
       if (
         SETTINGS_FILE_NAME in downloadFiles &&
-        !("ty.toml" in downloadFiles) &&
-        !("pyproject.toml" in downloadFiles)
+        !Object.keys(downloadFiles).some(isConfigurationFile)
       ) {
         try {
           const toml = await import("smol-toml");
