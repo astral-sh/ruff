@@ -97,9 +97,9 @@ fn attribute_contract<'db>(
                 .place
                 .ignore_possibly_undefined()
                 .is_some());
-    // TODO: Check ordinary unannotated initializers once inherited type context is
-    // available in ordinary inference. Raw binding types can retain literals that
-    // attribute access widens; they do not define an independent write contract.
+    // Unannotated defaults with an inherited annotation already have a declared type.
+    // Other inferred bindings do not define an independent write contract: their raw
+    // types can retain literals that ordinary attribute access widens.
     if class_place.origin == TypeOrigin::Inferred && !is_descriptor {
         return None;
     }
