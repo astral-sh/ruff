@@ -28,6 +28,7 @@
 //! [`await_notification`]: TestServer::await_notification
 
 mod call_hierarchy;
+mod closed_documents;
 mod code_actions;
 mod commands;
 mod completions;
