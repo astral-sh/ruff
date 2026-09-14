@@ -788,8 +788,10 @@ type Identity[T] = T
 
 def nested_type_variables[T]() -> None:
     static_assert(is_assignable_to(tuple[Any, ...], tuple[list[T]]))
+    # TODO: This should be ConstraintSet.equality(T, Any).
     static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[list[T]]) == ConstraintSet.never())
     static_assert(is_assignable_to(tuple[Any, ...], tuple[Identity[T]]))
+    # TODO: This should be ConstraintSet.lower_bound(Any, T).
     static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[Identity[T]]) == ConstraintSet.never())
 ```
 
