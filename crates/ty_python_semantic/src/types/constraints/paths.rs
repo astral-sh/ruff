@@ -46,7 +46,7 @@ use crate::{Db, FxIndexMap, ProgramEnvironment};
 #[derive(Debug)]
 pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
-    sequents: Vec<Sequent<ConstraintId>>,
+    sequents: Vec<Sequent<ConstraintId, u16>>,
     /// Each assignment's source constraint and greatest remaining per-path fuel.
     pub(super) assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
     /// Previous fuel values, keyed by assignment index, for rolling back replenishments when
@@ -511,7 +511,7 @@ impl PathAssignments {
             env: &ProgramEnvironment<'db>,
             storage: &mut ConstraintSetStorage<'db>,
             sequents: &[Sequent<Constraint<'db>>],
-            dest: &mut Vec<Sequent<ConstraintId>>,
+            dest: &mut Vec<Sequent<ConstraintId, u16>>,
         ) {
             let sequents = sequents.iter().map(|sequent| match sequent {
                 Sequent::SingleTautology { ante } => {
@@ -537,16 +537,33 @@ impl PathAssignments {
                         ante3,
                     }
                 }
-                Sequent::PairImplication { ante1, ante2, post } => {
+                Sequent::PairImplication {
+                    ante1, ante2, post, ..
+                } => {
                     let ante1 = storage.intern_constraint(db, env, *ante1);
                     let ante2 = storage.intern_constraint(db, env, *ante2);
                     let post = storage.intern_constraint(db, env, *post);
-                    Sequent::PairImplication { ante1, ante2, post }
+                    let (ante1_depth, _) = storage.cached_constraint_bound_depth(db, env, ante1);
+                    let (ante2_depth, _) = storage.cached_constraint_bound_depth(db, env, ante2);
+                    let fuel_cost =
+                        storage.sequent_fuel_cost(db, env, post, ante1_depth.max(ante2_depth));
+                    Sequent::PairImplication {
+                        ante1,
+                        ante2,
+                        post,
+                        fuel_cost,
+                    }
                 }
-                Sequent::SingleImplication { ante, post } => {
+                Sequent::SingleImplication { ante, post, .. } => {
                     let ante = storage.intern_constraint(db, env, *ante);
                     let post = storage.intern_constraint(db, env, *post);
-                    Sequent::SingleImplication { ante, post }
+                    let (ante_depth, _) = storage.cached_constraint_bound_depth(db, env, ante);
+                    let fuel_cost = storage.sequent_fuel_cost(db, env, post, ante_depth);
+                    Sequent::SingleImplication {
+                        ante,
+                        post,
+                        fuel_cost,
+                    }
                 }
             });
             dest.extend(sequents);
@@ -815,7 +832,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        sequent: Sequent<ConstraintId>,
+        sequent: Sequent<ConstraintId, u16>,
     ) -> Result<(), PathAssignmentConflict> {
         match sequent {
             Sequent::SingleTautology { ante } => {
@@ -829,12 +846,21 @@ impl PathAssignments {
                 ante2,
                 ante3,
             } => self.check_triple_impossibility(db, env, storage, ante1, ante2, ante3),
-            Sequent::PairImplication { ante1, ante2, post } => {
-                self.check_pair_implication(db, env, storage, ante1, ante2, post);
+            Sequent::PairImplication {
+                ante1,
+                ante2,
+                post,
+                fuel_cost,
+            } => {
+                self.check_pair_implication(db, storage, ante1, ante2, post, fuel_cost);
                 Ok(())
             }
-            Sequent::SingleImplication { ante, post } => {
-                self.check_single_implication(db, env, storage, ante, post);
+            Sequent::SingleImplication {
+                ante,
+                post,
+                fuel_cost,
+            } => {
+                self.check_single_implication(db, storage, ante, post, fuel_cost);
                 Ok(())
             }
         }
@@ -933,11 +959,11 @@ impl PathAssignments {
     fn check_pair_implication<'db>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
+        storage: &ConstraintSetStorage<'db>,
         ante1: ConstraintId,
         ante2: ConstraintId,
         post: ConstraintId,
+        fuel_cost: u16,
     ) {
         if storage
             .constraint_data(post)
@@ -952,10 +978,6 @@ impl PathAssignments {
             return;
         };
         let available_fuel = ante1_fuel.min(ante2_fuel);
-        let (ante1_constructor_depth, _) = storage.cached_constraint_bound_depth(db, env, ante1);
-        let (ante2_constructor_depth, _) = storage.cached_constraint_bound_depth(db, env, ante2);
-        let antecedent_constructor_depth = ante1_constructor_depth.max(ante2_constructor_depth);
-        let fuel_cost = storage.sequent_fuel_cost(db, env, post, antecedent_constructor_depth);
         if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
             self.enqueue_assignment(
                 post.when_true(),
@@ -967,10 +989,10 @@ impl PathAssignments {
     fn check_single_implication<'db>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
+        storage: &ConstraintSetStorage<'db>,
         ante: ConstraintId,
         post: ConstraintId,
+        fuel_cost: u16,
     ) {
         if storage
             .constraint_data(post)
@@ -981,9 +1003,6 @@ impl PathAssignments {
         let Some(available_fuel) = self.max_remaining_fuel_for(ante.when_true()) else {
             return;
         };
-        let (antecedent_constructor_depth, _) =
-            storage.cached_constraint_bound_depth(db, env, ante);
-        let fuel_cost = storage.sequent_fuel_cost(db, env, post, antecedent_constructor_depth);
         if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
             self.enqueue_assignment(
                 post.when_true(),
