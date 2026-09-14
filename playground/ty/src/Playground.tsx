@@ -132,18 +132,14 @@ export default function Playground() {
       const workspace = session.workspace;
       let handle = null;
 
-      if (name === SETTINGS_FILE_NAME) {
-        if (!session.hasConfigurationFile()) {
-          updateOptions(workspace, "{}", setError);
-        }
-      } else {
+      if (isOptionsFile(name) && !session.hasConfigurationFile()) {
+        updateOptions(workspace, "{}", setError);
+      }
+      if (!isSettingsFile(name)) {
         handle = workspace.openFile(name, "");
       }
 
       const model = session.openDocument(name, "", handle);
-      if (isOptionsFile(name) && name !== SETTINGS_FILE_NAME) {
-        session.syncOptions();
-      }
       dispatchFiles({
         type: "add",
         name,
@@ -155,38 +151,53 @@ export default function Playground() {
   );
 
   const handleFileRenamed = useCallback(
-    (session: PlaygroundSession, file: FileId, newName: string) => {
-      if (newName.startsWith("/")) {
+    (session: PlaygroundSession, file: FileId, name: string) => {
+      if (name.startsWith("/")) {
         setError("File names cannot start with '/'.");
         return;
       }
-      if (newName.startsWith("vendored:")) {
+      if (name.startsWith("vendored:")) {
         setError("File names cannot start with 'vendored:'.");
+        return;
+      }
+      if (!name) {
+        setError("Enter a file name, such as main.py.");
         return;
       }
 
       const workspace = session.workspace;
       const oldFile = files.metadata[file];
       const oldName = oldFile.name;
+      if (name === oldName) {
+        return;
+      }
+
       const content = session.text(oldName) ?? "";
       const handle = oldFile.handle;
       let newHandle: FileHandle | null = null;
+      // Invalid TOML settings would prevent clearing the JSON override after opening the file.
+      if (isConfigurationFile(name) && !session.hasConfigurationFile()) {
+        updateOptions(workspace, "{}", setError);
+      }
       if (handle != null) {
         workspace.closeFile(handle);
       }
 
-      if (newName !== SETTINGS_FILE_NAME) {
-        newHandle = workspace.openFile(newName, content);
+      if (!isSettingsFile(name)) {
+        newHandle = workspace.openFile(name, content);
       }
 
-      const model = session.renameDocument(oldName, newName, newHandle);
-      if (isOptionsFile(oldName) || isOptionsFile(newName)) {
+      const model = session.renameDocument(oldName, name, newHandle);
+      if (
+        (isOptionsFile(oldName) || isOptionsFile(name)) &&
+        !session.hasConfigurationFile()
+      ) {
         session.syncOptions();
       }
       dispatchFiles({
         type: "rename",
         id: file,
-        to: newName,
+        to: name,
         newUri: model.uri,
         newHandle,
       });
@@ -204,7 +215,7 @@ export default function Playground() {
       }
 
       session.closeDocument(name);
-      if (isOptionsFile(name)) {
+      if (isOptionsFile(name) && !session.hasConfigurationFile()) {
         session.syncOptions();
       }
       dispatchFiles({ type: "remove", id: file });
@@ -297,11 +308,15 @@ export default function Playground() {
 }
 
 function isOptionsFile(name: string): boolean {
-  return (
-    name === SETTINGS_FILE_NAME ||
-    name === "ty.toml" ||
-    name === "pyproject.toml"
-  );
+  return isSettingsFile(name) || isConfigurationFile(name);
+}
+
+function isSettingsFile(name: string): boolean {
+  return name === SETTINGS_FILE_NAME;
+}
+
+function isConfigurationFile(name: string): boolean {
+  return name === "ty.toml" || name === "pyproject.toml";
 }
 
 export const DEFAULT_SETTINGS = JSON.stringify(
