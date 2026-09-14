@@ -2490,6 +2490,21 @@ def intersected_constrained(value: Intersection[Source[OuterConstrainedT], Marke
     reveal_type(first_constrained(value))  # revealed: Unknown
 ```
 
+Capturing a separate callback's parameters with a `ParamSpec` does not relax the source's bound:
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def with_callback(source: Source[BoundedT], callback: Callable[P, None]) -> BoundedT:
+    return source.get()
+
+def outer_with_callback(source: Intersection[Source[OuterT], Marker]) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(with_callback(source, lambda: None))  # revealed: Unknown
+```
+
 Compatible outer variables retain their identity. The bound allows every type represented by
 `OuterStrT`, and every constraint of `OuterCompatibleT` is also a constraint of `ConstrainedT`:
 
@@ -2530,4 +2545,46 @@ def aliased_bounded(value: Intersection[Source[Alias[OuterT]], Marker]) -> None:
 
 def aliased_compatible(value: Intersection[Source[Alias[OuterStrT]], Marker]) -> None:
     reveal_type(first_bounded(value))  # revealed: OuterStrT@aliased_compatible
+```
+
+An unrestricted parameter accepts both the caller's type variable and a separate string element.
+Both specializations contribute to the intersection of return types:
+
+```py
+def first_unbounded(value: Source[OuterT]) -> OuterT:
+    return value.get()
+
+def intersected_outer(value: Intersection[Source[OuterT], Source[str]]) -> None:
+    reveal_type(first_unbounded(value))  # revealed: OuterT@intersected_outer & str
+```
+
+A subclass also retains the bound check when its source specialization is found through its MRO:
+
+```py
+class DerivedSource(Source[SourceT]): ...
+
+def inherited(source: Intersection[DerivedSource[OuterT], Marker]) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(first_bounded(source))  # revealed: Unknown
+```
+
+Protocol arguments also require the string bound to hold for every type permitted by the caller's
+variable, both with and without an intersection:
+
+```py
+from typing import Protocol
+
+class SourceProtocol(Protocol[SourceT]):
+    def get(self) -> SourceT: ...
+
+def first_protocol(value: SourceProtocol[BoundedT]) -> BoundedT:
+    return value.get()
+
+def plain_protocol(value: SourceProtocol[OuterT]) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(first_protocol(value))  # revealed: Unknown
+
+def intersected_protocol(value: Intersection[SourceProtocol[OuterT], Marker]) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(first_protocol(value))  # revealed: Unknown
 ```

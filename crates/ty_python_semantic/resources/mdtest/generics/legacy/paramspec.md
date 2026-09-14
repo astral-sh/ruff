@@ -1293,3 +1293,25 @@ def target(first: T, values: list[T]) -> None: ...
 target("a", ["a"])
 forward(target, "a", ["a"])
 ```
+
+### Generic constructors with bounded return types
+
+A generic constructor can specialize its class parameter to satisfy the required return type.
+Capturing its parameters with a `ParamSpec` does not make the constructor's type variable a fixed
+choice belonging to an outer caller:
+
+```py
+from typing import Callable, Generic, ParamSpec, TypeVar
+
+T = TypeVar("T")
+P = ParamSpec("P")
+R = TypeVar("R", bound="Factory[object]")
+
+class Factory(Generic[T]):
+    pass
+
+def factory_result(factory: Callable[P, R]) -> R:
+    raise NotImplementedError
+
+reveal_type(factory_result(Factory))  # revealed: Factory[object]
+```
