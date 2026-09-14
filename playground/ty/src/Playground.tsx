@@ -167,10 +167,6 @@ export default function Playground() {
       const workspace = session.workspace;
       const oldFile = files.metadata[file];
       const oldName = oldFile.name;
-      if (name === oldName) {
-        return;
-      }
-
       const content = session.text(oldName) ?? "";
       const handle = oldFile.handle;
       let newHandle: FileHandle | null = null;
