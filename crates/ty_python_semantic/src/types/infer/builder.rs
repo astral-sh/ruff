@@ -1604,6 +1604,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if place_and_quals.is_undefined()
             && is_local
+            // Avoid allocating inheritance-query cache entries for ordinary local variables.
+            && self.index.scope(file_scope_id).kind() == ScopeKind::Class
             && let Some(symbol) = place_id.as_symbol()
             && let Some(inherited) =
                 inherited_class_attribute_declaration(db, binding.scope(db), symbol)
