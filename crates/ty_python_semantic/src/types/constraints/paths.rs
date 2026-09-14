@@ -694,12 +694,21 @@ impl PathAssignments {
             Sequent::PairImpossibility { ante1, ante2 } => {
                 self.check_pair_impossibility(db, env, storage, ante1, ante2)
             }
-            Sequent::PairImplication { ante1, ante2, post } => {
-                self.check_pair_implication(db, env, storage, ante1, ante2, post);
+            Sequent::PairImplication {
+                ante1,
+                ante2,
+                post,
+                fuel_cost,
+            } => {
+                self.check_pair_implication(ante1, ante2, post, fuel_cost);
                 Ok(())
             }
-            Sequent::SingleImplication { ante, post } => {
-                self.check_single_implication(db, env, storage, ante, post);
+            Sequent::SingleImplication {
+                ante,
+                post,
+                fuel_cost,
+            } => {
+                self.check_single_implication(ante, post, fuel_cost);
                 Ok(())
             }
         }
@@ -761,14 +770,12 @@ impl PathAssignments {
         Ok(())
     }
 
-    fn check_pair_implication<'db>(
+    fn check_pair_implication(
         &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
         ante1: ConstraintId,
         ante2: ConstraintId,
         post: ConstraintId,
+        fuel_cost: u16,
     ) {
         let Some(ante1_fuel) = self.max_remaining_fuel_for(ante1.when_true()) else {
             return;
@@ -777,10 +784,6 @@ impl PathAssignments {
             return;
         };
         let available_fuel = ante1_fuel.min(ante2_fuel);
-        let (ante1_constructor_depth, _) = storage.cached_constraint_bound_depth(db, env, ante1);
-        let (ante2_constructor_depth, _) = storage.cached_constraint_bound_depth(db, env, ante2);
-        let antecedent_constructor_depth = ante1_constructor_depth.max(ante2_constructor_depth);
-        let fuel_cost = storage.sequent_fuel_cost(db, env, post, antecedent_constructor_depth);
         if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
             self.enqueue_assignment(
                 post.when_true(),
@@ -789,25 +792,9 @@ impl PathAssignments {
         }
     }
 
-    fn check_single_implication<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        ante: ConstraintId,
-        post: ConstraintId,
-    ) {
+    fn check_single_implication(&mut self, ante: ConstraintId, post: ConstraintId, fuel_cost: u16) {
         let Some(available_fuel) = self.max_remaining_fuel_for(ante.when_true()) else {
             return;
-        };
-        let ante_data = storage.constraint_data(ante);
-        let (antecedent_constructor_depth, _) =
-            storage.cached_constraint_bound_depth(db, env, ante);
-        let post_data = storage.constraint_data(post);
-        let fuel_cost = if post_data.is_bound_projection_of(db, ante_data) {
-            1
-        } else {
-            storage.sequent_fuel_cost(db, env, post, antecedent_constructor_depth)
         };
         if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
             self.enqueue_assignment(
