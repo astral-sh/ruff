@@ -142,12 +142,12 @@ export default function Playground() {
   );
 
   const handleFileRenamed = useCallback(
-    (session: PlaygroundSession, file: FileId, name: string) => {
-      if (name.startsWith("/")) {
+    (session: PlaygroundSession, file: FileId, newName: string) => {
+      if (newName.startsWith("/")) {
         setError("File names cannot start with '/'.");
         return;
       }
-      if (name.startsWith("vendored:")) {
+      if (newName.startsWith("vendored:")) {
         setError("File names cannot start with 'vendored:'.");
         return;
       }
@@ -158,21 +158,21 @@ export default function Playground() {
       const content = session.text(oldName) ?? "";
       const handle = oldFile.handle;
       let newHandle: FileHandle | null = null;
-      // Invalid TOML settings would prevent clearing the JSON override after opening the file.
-      if (isConfigurationFile(name) && !session.hasConfigurationFile()) {
-        updateOptions(workspace, "{}", setError);
-      }
       if (handle != null) {
         workspace.closeFile(handle);
       }
 
-      if (!isSettingsFile(name)) {
-        newHandle = workspace.openFile(name, content);
+      // Invalid TOML settings would prevent clearing the JSON override after opening the file.
+      if (isConfigurationFile(newName) && !session.hasConfigurationFile()) {
+        updateOptions(workspace, "{}", setError);
+      }
+      if (!isSettingsFile(newName)) {
+        newHandle = workspace.openFile(newName, content);
       }
 
-      const model = session.renameDocument(oldName, name, newHandle);
+      const model = session.renameDocument(oldName, newName, newHandle);
       if (
-        (isOptionsFile(oldName) || isOptionsFile(name)) &&
+        (isOptionsFile(oldName) || isOptionsFile(newName)) &&
         !session.hasConfigurationFile()
       ) {
         session.syncOptions();
@@ -180,7 +180,7 @@ export default function Playground() {
       dispatchFiles({
         type: "rename",
         id: file,
-        to: name,
+        to: newName,
         newUri: model.uri,
         newHandle,
       });
