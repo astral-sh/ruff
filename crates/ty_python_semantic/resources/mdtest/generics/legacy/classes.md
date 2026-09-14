@@ -757,6 +757,73 @@ class C(Generic[T]):
         invalid: C[int] = C(value)
 ```
 
+### Constructing with an intersection-bounded type variable
+
+A constructor call preserves an enclosing type variable even when its upper bound is an
+intersection. Constructor arguments must still satisfy both parts of the bound.
+
+```py
+from typing_extensions import Generic, TypeVar
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+T = TypeVar("T", bound=Intersection[A, B])
+
+class Box(Generic[T]):
+    def __init__(self, value: T) -> None:
+        reveal_type(Box(value))  # revealed: Box[T@Box]
+        Box(A())  # error: [invalid-argument-type]
+```
+
+### Constructing from callbacks with a NamedTuple bound
+
+Combining callbacks that accept the same type variable preserves that variable in the constructed
+instance. A `NamedTuple` bound, which describes an intersection type, does not make the
+constructor's implicit receiver incompatible.
+
+```py
+from collections.abc import Callable
+from typing_extensions import Generic, NamedTuple, TypeVar
+
+T = TypeVar("T", bound=NamedTuple)
+
+class Box(Generic[T]):
+    def __init__(self, *callbacks: Callable[[T], int]) -> None:
+        self.callbacks = callbacks
+
+    def combine(self, other: "Box[T]") -> "Box[T]":
+        result = Box(*self.callbacks, *other.callbacks)
+        reveal_type(result)  # revealed: Box[T@Box]
+        return result
+```
+
+### Constructing with an enclosing Self type
+
+An explicit `Self` type argument refers to the enclosing method's receiver even when another type
+argument is a class type variable that needs freshening. The result keeps that receiver type
+distinct from the class's type parameter, including in recursive calls from `__init__`.
+
+```py
+from typing_extensions import Generic, Self, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T, U]):
+    def __init__(self, value: T, receiver: U) -> None:
+        reveal_type(Box[T, Self](value, self))  # revealed: Box[T@Box, Self@__init__]
+
+    def wrap(self, value: T) -> "Box[T, Self]":
+        result = Box[T, Self](value, self)
+        reveal_type(result)  # revealed: Box[T@Box, Self@wrap]
+        return result
+
+    def wrong_wrap(self, value: T) -> "Box[T, T]":
+        return Box[T, Self](value, self)  # error: [invalid-return-type]
+```
+
 ### Constructing through a classmethod receiver
 
 A constructor call through a classmethod receiver keeps an enclosing `TypeVarTuple` when checking
