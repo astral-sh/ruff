@@ -5,12 +5,12 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssign, StmtRef};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::preview::is_type_var_default_enabled;
-use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 use super::{
@@ -61,10 +61,15 @@ use super::{
 ///
 /// ## Fix safety
 ///
-/// This fix is marked unsafe for `TypeAlias` assignments outside of stub files because of the
-/// runtime behavior around `isinstance()` calls noted above. The fix is also unsafe for
-/// `TypeAliasType` assignments if there are any comments in the replacement range that would be
-/// deleted.
+/// This fix is always marked unsafe because it can change runtime behavior and type-checking
+/// semantics, as described above. It may also remove comments.
+///
+/// The rule also cannot inspect type variables defined in another module. For `TypeAlias`
+/// annotations, this means the fix may fail to convert legacy type variables to type parameters,
+/// producing code that will be rejected by type checkers. For `TypeAliasType`, legacy type
+/// variables are recognized via the explicit `type_params` argument, but the type variable's
+/// definition cannot be resolved to preserve its bounds, constraints, defaults, or even kind,
+/// producing unconstrained `TypeVar`s.
 ///
 /// ## See also
 ///
@@ -278,7 +283,6 @@ fn create_diagnostic(
 
     let source = checker.source();
     let tokens = checker.tokens();
-    let comment_ranges = checker.comment_ranges();
 
     let range_with_parentheses =
         parenthesized_range(value.into(), stmt.into(), tokens).unwrap_or(value.range());
@@ -290,29 +294,6 @@ fn create_diagnostic(
     );
     let edit = Edit::range_replacement(content, stmt.range());
 
-    let applicability =
-        if type_alias_kind == TypeAliasKind::TypeAlias && !checker.source_type.is_stub() {
-            // The fix is always unsafe in non-stubs
-            // because new-style aliases have different runtime behavior.
-            // See https://github.com/astral-sh/ruff/issues/6434
-            Applicability::Unsafe
-        } else {
-            // In stub files, or in non-stub files for `TypeAliasType` assignments,
-            // the fix is only unsafe if it would delete comments.
-            //
-            // it would be easier to check for comments in the whole `stmt.range`, but because
-            // `create_diagnostic` uses the full source text of `value`, comments within `value` are
-            // actually preserved. thus, we have to check for comments in `stmt` but outside of `value`
-            let pre_value = TextRange::new(stmt.start(), range_with_parentheses.start());
-            let post_value = TextRange::new(range_with_parentheses.end(), stmt.end());
-
-            if comment_ranges.intersects(pre_value) || comment_ranges.intersects(post_value) {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
-            }
-        };
-
     checker
         .report_diagnostic(
             NonPEP695TypeAlias {
@@ -321,5 +302,5 @@ fn create_diagnostic(
             },
             stmt.range(),
         )
-        .set_fix(Fix::applicable_edit(edit, applicability));
+        .set_fix(Fix::unsafe_edit(edit));
 }

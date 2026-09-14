@@ -38,7 +38,7 @@ UP040 [*] Type alias `AnyList` uses `TypeAliasType` assignment instead of the `t
 95 | AnyList = TypeAliasType("AnyList", list[T], type_params=(T,))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 96 |
-97 | # unsafe fix if comments within the fix
+97 | # Comments outside the alias value are removed by the fix.
    |
 help: Use the `type` keyword
    |
@@ -47,6 +47,7 @@ help: Use the `type` keyword
 95 + type AnyList[T = Any] = list[T]
 96 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 
 UP040 [*] Type alias `DefaultList` uses `TypeAlias` annotation instead of the `type` keyword
