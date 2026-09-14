@@ -1604,7 +1604,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if place_and_quals.is_undefined()
             && is_local
-            && binding.kind(db).is_unannotated_assignment()
             && let Some(symbol) = place_id.as_symbol()
             && let Some(inherited) =
                 inherited_class_attribute_declaration(db, binding.scope(db), symbol)

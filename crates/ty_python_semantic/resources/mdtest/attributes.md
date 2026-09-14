@@ -3160,6 +3160,55 @@ class Independent(Inferred):
 reveal_type(Independent.value)  # revealed: str
 ```
 
+### Augmented assignments retain inherited declarations
+
+Updating a subclass default with augmented assignment preserves its inherited annotation, just like
+an ordinary assignment. The result must still be assignable to that annotation.
+
+```py
+class Base:
+    items: list[int] = []
+    value: int | str = 0
+
+class Child(Base):
+    items = []
+    items += [1]
+    value = "child"
+    value += "!"
+
+reveal_type(Child.items)  # revealed: list[int]
+reveal_type(Child.value)  # revealed: int | str
+
+class Invalid(Base):
+    value = 1
+    value /= 2  # error: [invalid-assignment]
+```
+
+### Inheriting conditional declarations
+
+An annotation can have several source locations. Identical annotations on both branches still
+provide a single declared type for subclass defaults.
+
+```py
+def flag() -> bool:
+    return True
+
+class Base:
+    if flag():
+        value: int | str = 0
+    else:
+        value: int | str = "base"
+
+class Child(Base):
+    value = "child"
+
+class Grandchild(Child):
+    value = 1
+
+reveal_type(Child.value)  # revealed: int | str
+reveal_type(Grandchild.value)  # revealed: int | str
+```
+
 ## Intersections of attributes
 
 ### Attribute only available on one element

@@ -4,7 +4,7 @@ use crate::place::{
     TypeOrigin, place_by_id, place_from_bindings, place_from_declarations,
 };
 use crate::types::{
-    MemberLookupPolicy, ProgramEnvironment, Type, TypeQualifiers, infer::nearest_enclosing_class,
+    ClassBase, ProgramEnvironment, Type, TypeQualifiers, infer::nearest_enclosing_class,
 };
 use ty_python_core::{
     definition::DefinitionKind, place_table, scope::ScopeId, semantic_index,
@@ -75,7 +75,14 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
                 && let Some(inherited) = inherited_class_attribute_declaration(db, scope, symbol_id)
                 && let Place::Defined(declared) = inherited.place
             {
-                *place = declared.with_definedness(place.definedness);
+                // The annotation determines the public type, but the value is still supplied
+                // by this class. Consumers such as Pydantic inspect that value's definition.
+                *place = DefinedPlace {
+                    ty: declared.ty,
+                    origin: declared.origin,
+                    public_type_policy: declared.public_type_policy,
+                    ..*place
+                };
                 place_and_quals.qualifiers = inherited.qualifiers;
             }
 
@@ -122,7 +129,7 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
         .unwrap_or_default()
 }
 
-/// Returns the inherited declaration for an unannotated class-body assignment.
+/// Returns the inherited annotation governing an unannotated class attribute.
 ///
 /// A subclass assignment such as `items = []` retains an inherited `items: list[int]`
 /// declaration. Both initializer inference and public member lookup use that declaration,
@@ -141,12 +148,6 @@ pub(super) fn inherited_class_attribute_declaration<'db>(
     if !place_from_declarations(db, &env, use_def.end_of_scope_symbol_declarations(symbol))
         .ignore_conflicting_declarations()
         .is_undefined()
-        || !use_def.end_of_scope_symbol_bindings(symbol).all(|binding| {
-            binding
-                .binding
-                .definition()
-                .is_none_or(|definition| definition.kind(db).is_unannotated_assignment())
-        })
     {
         return None;
     }
@@ -155,21 +156,48 @@ pub(super) fn inherited_class_attribute_declaration<'db>(
     let specialization = class
         .generic_context(db)
         .map(|context| context.identity_specialization(db));
-    let inherited = class.class_member_from_mro(
-        db,
-        &env,
-        name,
-        MemberLookupPolicy::default(),
-        class.iter_mro(db, specialization).skip(1),
-    );
-    if let Place::Defined(DefinedPlace { origin: TypeOrigin::Declared, provenance, .. }) = inherited.place
-        // A synthesized member's type is not an annotation for subclass assignments, and
-        // `Final` declarations cannot be reassigned by a subclass at all.
-        && !inherited.qualifiers.contains(TypeQualifiers::FINAL)
-        && provenance.definition().is_some_and(|definition| matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_)))
-    {
-        Some(inherited)
-    } else {
-        None
+    for base in class.iter_mro(db, specialization).skip(1) {
+        let base = match base {
+            ClassBase::Generic | ClassBase::Protocol => continue,
+            ClassBase::Class(base) => base,
+            _ => return None,
+        };
+        let (base, specialization) = base.static_class_literal(db)?;
+        let scope = base.body_scope(db);
+        let Some(symbol) = place_table(db, scope).symbol_id(name) else {
+            continue;
+        };
+        if place_by_id(
+            db,
+            scope,
+            symbol.into(),
+            RequiresExplicitReExport::No,
+            ConsideredDefinitions::EndOfScope,
+        )
+        .is_undefined()
+        {
+            continue;
+        }
+        let declarations = use_def_map(db, scope).end_of_scope_symbol_declarations(symbol);
+        let declared = place_from_declarations(db, &env, declarations.clone())
+            .ignore_conflicting_declarations();
+        let declaration = if declared.is_undefined() {
+            inherited_class_attribute_declaration(db, scope, symbol)
+        } else {
+            // Methods, imports, and nested classes declare their own types, but do not provide
+            // annotations for subclass assignments. Inspect declarations directly: public member
+            // provenance may instead describe a binding, or combine several definitions.
+            (!declared.qualifiers.contains(TypeQualifiers::FINAL)
+                && declarations
+                    .filter_map(|declaration| declaration.declaration.definition())
+                    .all(|definition| {
+                        matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+                    }))
+            .then_some(declared)
+        };
+        return declaration.map(|declaration| {
+            declaration.map_type(|ty| ty.apply_optional_specialization(db, specialization))
+        });
     }
+    None
 }
