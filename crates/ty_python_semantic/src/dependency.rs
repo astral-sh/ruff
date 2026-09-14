@@ -177,7 +177,7 @@ impl DependencyMetadata {
         let id = self.import_owner(db, importing_file, imported_module)?;
 
         // Runtime and optional declarations take precedence when a dependency is also in a group.
-        if project.distribution.as_ref() == Some(id) || project.dependencies.contains(id) {
+        if project.distribution.as_deref() == Some(id) || project.dependencies.contains(id) {
             return None;
         }
 
@@ -218,7 +218,7 @@ impl DependencyMetadata {
         db: &'db dyn Db,
         importing_file: ProgramFile<'db>,
         imported_module: Module<'db>,
-    ) -> Option<&CharStr> {
+    ) -> Option<&str> {
         let runtime_module = resolve_real_shadowable_module(
             db,
             ImportingFile::File(
@@ -231,7 +231,7 @@ impl DependencyMetadata {
         self.owner(db, runtime_module)
     }
 
-    fn owner<'db>(&self, db: &'db dyn Db, module: Module<'db>) -> Option<&CharStr> {
+    fn owner<'db>(&self, db: &'db dyn Db, module: Module<'db>) -> Option<&str> {
         // A namespace can also contain local modules that the package manager doesn't know about.
         // Only attribute concrete modules; inference checks the children of `from ns import x`.
         let search_path = module.search_path(db)?;
@@ -259,7 +259,7 @@ impl DependencyMetadata {
         self.module_owner(module.name(db))
     }
 
-    fn module_owner(&self, module: &ModuleName) -> Option<&CharStr> {
+    fn module_owner(&self, module: &ModuleName) -> Option<&str> {
         let owners = module
             .ancestors()
             .find_map(|name| self.module_owners.get(&name))?;
@@ -267,12 +267,12 @@ impl DependencyMetadata {
         // In particular, importing a namespace shared by several distributions doesn't establish
         // which of them is required. A more specific submodule may have an unambiguous owner.
         match owners.as_ref() {
-            [owner] => Some(owner),
+            [owner] => Some(owner.as_str()),
             _ => None,
         }
     }
 
-    fn editable_owner(&self, path: &SystemPath) -> Option<&CharStr> {
+    fn editable_owner(&self, path: &SystemPath) -> Option<&str> {
         let mut owner = None;
         let mut longest_root = 0;
 
@@ -287,7 +287,7 @@ impl DependencyMetadata {
             match root.as_str().len().cmp(&longest_root) {
                 std::cmp::Ordering::Greater => {
                     longest_root = root.as_str().len();
-                    owner = Some(id);
+                    owner = Some(id.as_str());
                 }
                 std::cmp::Ordering::Equal => owner = None,
                 std::cmp::Ordering::Less => {}
@@ -308,7 +308,7 @@ impl DependencyMetadata {
         };
 
         if let Some(module) = file_to_module(db, file.resolver_file(db))
-            && self.module_owner(module.name(db)) == Some(id)
+            && self.module_owner(module.name(db)) == Some(id.as_str())
         {
             return true;
         }

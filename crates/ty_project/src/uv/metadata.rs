@@ -51,8 +51,10 @@ impl UvMetadata {
         metadata: &[u8],
         system: &dyn System,
     ) -> Result<Self, UvMetadataError> {
-        let metadata = string_interner::from_slice::<WorkspaceMetadata>(metadata)
-            .map_err(UvMetadataError::InvalidMetadata)?;
+        let metadata: WorkspaceMetadata = {
+            let _interner = string_interner::InternerGuard::new();
+            serde_json::from_slice(metadata).map_err(UvMetadataError::InvalidMetadata)?
+        };
 
         let workspace_root = existing_directory(metadata.workspace_root, "workspace root", system)?;
 
@@ -167,7 +169,7 @@ struct WorkspaceMetadata {
     script: Option<PathNodeReference>,
     #[serde(default, deserialize_with = "string_interner::deserialize_map")]
     resolution: BTreeMap<CharStr, ResolutionNode>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_interner::deserialize_map")]
     module_owners: BTreeMap<CharStr, Box<[ModuleOwner]>>,
 }
 
@@ -247,6 +249,8 @@ struct NodeReference {
 mod tests {
     use std::assert_matches;
 
+    use anyhow::Context;
+    use char_str::CharStr;
     use ruff_db::system::{SystemPath, TestSystem};
     use serde_json::json;
 
@@ -306,6 +310,66 @@ mod tests {
             workspace.python_version().map(ToString::to_string),
             Some("3.13".to_string())
         );
+
+        Ok(())
+    }
+
+    fn assert_shared(expected: &CharStr, actual: &CharStr) {
+        assert_eq!(actual, expected);
+        assert!(expected.is_heap_allocated());
+        assert!(std::ptr::eq(actual.as_str(), expected.as_str()));
+    }
+
+    #[test]
+    fn shares_dependency_strings() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = if cfg!(windows) { "C:/app" } else { "/app" };
+        system.memory_file_system().create_directory_all(root)?;
+
+        let member_id = "app";
+        let dependency_id = "shareddistributionname==1.0.0 (registry:first)";
+        let name = "shareddistributionname";
+        let input = serde_json::to_vec(&json!({
+            "schema": {"version": "preview"},
+            "workspace_root": root,
+            "members": [{"id": member_id, "name": "app", "path": root}],
+            "resolution": {
+                (member_id): {
+                    "kind": "package", "name": "app",
+                    "dependencies": [{"id": dependency_id}]
+                },
+                (dependency_id): {"kind": "package", "name": name, "dependencies": []}
+            },
+            "module_owners": {
+                (name): [{"package_id": dependency_id}]
+            }
+        }))?;
+
+        let metadata = UvMetadata::from_metadata(&input, &system)?;
+        let (dependency_key, _) = metadata
+            .resolution
+            .get_key_value(dependency_id)
+            .context("expected the direct dependency")?;
+        let (module_name, owners) = metadata
+            .module_owners
+            .get_key_value(name)
+            .context("expected module ownership")?;
+
+        assert_shared(
+            dependency_key,
+            &metadata.resolution[member_id].dependencies[0].id,
+        );
+        assert_shared(dependency_key, &owners[0].package_id);
+
+        let dependencies = metadata.dependency_metadata()?;
+        assert_shared(
+            dependency_key,
+            dependencies.projects[0]
+                .dependencies
+                .get(dependency_id)
+                .context("expected a direct dependency")?,
+        );
+        assert_shared(module_name, &dependencies.distributions[dependency_id].name);
 
         Ok(())
     }

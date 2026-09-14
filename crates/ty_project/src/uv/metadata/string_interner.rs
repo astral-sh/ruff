@@ -11,32 +11,27 @@ use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 
 thread_local! {
-    // Serde field hooks cannot receive per-parse state. The guard in `with_interner` restores
+    // Serde field hooks cannot receive per-parse state. `InternerGuard` restores
     // an enclosing parse's table on return or unwinding, without retaining strings between parses.
     static STRINGS: RefCell<Option<FxHashSet<CharStr>>> = const { RefCell::new(None) };
 }
 
-struct InternerGuard {
+pub(super) struct InternerGuard {
     previous: Option<FxHashSet<CharStr>>,
+}
+
+impl InternerGuard {
+    pub(super) fn new() -> Self {
+        Self {
+            previous: STRINGS.replace(Some(FxHashSet::default())),
+        }
+    }
 }
 
 impl Drop for InternerGuard {
     fn drop(&mut self) {
         STRINGS.set(self.previous.take());
     }
-}
-
-fn with_interner<T>(parse: impl FnOnce() -> T) -> T {
-    let _guard = InternerGuard {
-        previous: STRINGS.replace(Some(FxHashSet::default())),
-    };
-    parse()
-}
-
-pub(super) fn from_slice<'de, T: Deserialize<'de>>(
-    input: &'de [u8],
-) -> Result<T, serde_json::Error> {
-    with_interner(|| serde_json::from_slice(input))
 }
 
 pub(super) fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<CharStr, D::Error> {
@@ -106,55 +101,4 @@ pub(super) fn deserialize_map<'de, D: Deserializer<'de>, V: Deserialize<'de>>(
     }
 
     deserializer.deserialize_map(MapVisitor(PhantomData))
-}
-
-#[cfg(test)]
-mod tests {
-    use std::panic::catch_unwind;
-
-    use rustc_hash::FxHashSet;
-
-    use super::{Interned, STRINGS, from_slice, with_interner};
-
-    const LONG_STRING: &[u8] = br#""a-string-longer-than-sixteen-bytes""#;
-
-    #[test]
-    fn skips_inline_strings() -> serde_json::Result<()> {
-        with_interner(|| {
-            let value: Interned = serde_json::from_slice(br#""short""#)?;
-            assert!(!value.0.is_heap_allocated());
-            assert!(
-                STRINGS.with_borrow(|strings| strings.as_ref().is_some_and(FxHashSet::is_empty))
-            );
-            Ok(())
-        })
-    }
-
-    #[test]
-    fn restores_enclosing_interner() -> serde_json::Result<()> {
-        with_interner(|| {
-            let first: Interned = serde_json::from_slice(LONG_STRING)?;
-            let nested: Interned = from_slice(LONG_STRING)?;
-            assert_ne!(first.0.as_str().as_ptr(), nested.0.as_str().as_ptr());
-            let second: Interned = serde_json::from_slice(LONG_STRING)?;
-            assert_eq!(first.0.as_str().as_ptr(), second.0.as_str().as_ptr());
-            Ok(())
-        })
-    }
-
-    #[test]
-    fn clears_interner_after_errors_and_unwinding() {
-        assert!(
-            from_slice::<Interned>(br#""a-string-longer-than-sixteen-bytes" trailing"#).is_err()
-        );
-        assert!(STRINGS.with_borrow(Option::is_none));
-        let result = catch_unwind(|| {
-            with_interner(|| {
-                let _value = serde_json::from_slice::<Interned>(LONG_STRING);
-                panic!("exercise interner cleanup during unwinding");
-            });
-        });
-        assert!(result.is_err());
-        assert!(STRINGS.with_borrow(Option::is_none));
-    }
 }
