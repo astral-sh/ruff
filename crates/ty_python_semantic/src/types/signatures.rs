@@ -561,10 +561,6 @@ impl<'db> CallableSignature<'db> {
     /// Checks an override for every valid class specialization where each target overload applies.
     /// Class type variables stay shared with the receiver constraints; method type variables remain
     /// generic for the usual callable compatibility check.
-    ///
-    /// TODO: The lazy callable relation quantifies away method type variables without validating
-    /// their declared bounds, so an override generic over `U: bytes` can still be accepted when
-    /// an inherited overload requires `int`.
     pub(crate) fn is_assignable_within_target_receiver_domains(
         &self,
         db: &'db dyn Db,
@@ -2573,7 +2569,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
         let when = checker.with_signature_recursion_guard(source, target, || {
-            source
+            let when = source
                 .receiver_constraints_when_satisfied(db, &checker)
                 .and(db, self.constraints, || {
                     target
@@ -2581,7 +2577,26 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         .and(db, self.constraints, || {
                             checker.check_signature_pair_inner(db, source, target)
                         })
+                });
+            if checker.typevar_evaluation == TypeVarEvaluation::Lazy {
+                // For `(value: U) -> object` with `U: bytes`, accepting an `int` requires
+                // `int <= U <= bytes`. Retain the declared domain before quantifying away U;
+                // otherwise the remaining `int <= U` would have a solution.
+                when.and(db, self.constraints, || {
+                    signature_inferable
+                        .iter(db)
+                        .when_all(db, self.constraints, |typevar| {
+                            ConstraintSet::constrain_typevar_to_declared_domain(
+                                db,
+                                env,
+                                self.constraints,
+                                typevar,
+                            )
+                        })
                 })
+            } else {
+                when
+            }
         });
 
         // But the caller does not need to consider those extra typevars. Whatever constraint set

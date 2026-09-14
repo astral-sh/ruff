@@ -76,6 +76,42 @@ reveal_type(generic_context(into_regular_callable(C)))
 reveal_type(into_regular_callable(C)(1))
 ```
 
+## Generic receiver bounds in callable assignments
+
+A bound method's receiver must satisfy the method type variable's declared bound, including when the
+variable is nested inside `list[T]`:
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T", bound=int)
+
+class InvalidNestedBoundedReceiver(list[str]):
+    def method(self: list[T]) -> None: ...
+
+class ValidNestedBoundedReceiver(list[int]):
+    def method(self: list[T]) -> None: ...
+
+invalid_bound: Callable[[], None] = InvalidNestedBoundedReceiver().method  # error: [invalid-assignment]
+valid_bound: Callable[[], None] = ValidNestedBoundedReceiver().method
+```
+
+The same applies to a constrained type variable inside a union. The receiver must match one of the
+declared choices or the other union member:
+
+```py
+U = TypeVar("U", int, str)
+
+class InvalidUnionConstrainedReceiver:
+    def method(self: U | None) -> None: ...
+
+class ValidUnionConstrainedReceiver(str):
+    def method(self: U | None) -> None: ...
+
+invalid_constraints: Callable[[], None] = InvalidUnionConstrainedReceiver().method  # error: [invalid-assignment]
+valid_constraints: Callable[[], None] = ValidUnionConstrainedReceiver().method
+```
+
 ## Naming a generic `Callable`: type aliases
 
 The easiest way to refer to a generic `Callable` type directly is via a type alias:

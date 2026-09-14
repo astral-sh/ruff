@@ -313,7 +313,11 @@ class E(enum.Enum):
 
 When the second argument to `super()` is a class object, the call can still be valid if that class
 object is an instance of the pivot metaclass. This includes both concrete class objects and
-`type[T]`-style annotations in metaclass methods:
+`type[T]`-style annotations in metaclass methods.
+
+The `__call__` annotations below restrict the receiver to classes producing `BaseWithMeta` or `int`
+instances. We reject these overrides of `type.__call__` independently of whether their `super()`
+expressions are valid.
 
 <!-- snapshot-diagnostics -->
 
@@ -329,7 +333,7 @@ class MetaBase(type):
         return self
 
 class Meta(MetaBase):
-    def __call__(cls: type[_TMeta], *args: Any, **kwargs: Any) -> _TMeta:
+    def __call__(cls: type[_TMeta], *args: Any, **kwargs: Any) -> _TMeta:  # error: [invalid-method-override]
         reveal_type(super(Meta, cls).meta_base_value)  # revealed: int
         reveal_type(super(Meta, cls).plain())  # revealed: type[_TMeta@__call__]
         return super().__call__(*args, **kwargs)
@@ -356,7 +360,7 @@ super(Meta, OtherBase)  # error: [invalid-super-argument]
 T = TypeVar("T", bound=int)
 
 class BoundIntMeta(type):
-    def __call__(cls: type[T]) -> T:
+    def __call__(cls: type[T]) -> T:  # error: [invalid-method-override]
         return super(BoundIntMeta, cls).__call__()  # error: [invalid-super-argument]
 ```
 

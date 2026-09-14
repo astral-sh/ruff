@@ -873,23 +873,39 @@ class ConstrainedMethod[T](Parent[T]):
 ```
 
 A method type parameter bounded by `int` cannot accept the inherited `str` overload, and one bounded
-by `bytes` cannot accept either overload. TODO: We incorrectly accept these overrides for generic
-subclasses, although we reject the equivalent concrete subclass:
+by `bytes` cannot accept either overload. We reject both generic and concrete subclasses:
 
 ```pyi
 class IntBoundedMethod[T](Parent[T]):
     @override
-    # TODO: error: [invalid-method-override]
-    def __new__[U: int](cls, value: U) -> object: ...
+    def __new__[U: int](cls, value: U) -> object: ...  # error: [invalid-method-override]
 
 class BytesBoundedMethod[T](Parent[T]):
     @override
-    # TODO: error: [invalid-method-override]
-    def __new__[U: bytes](cls, value: U) -> object: ...
+    def __new__[U: bytes](cls, value: U) -> object: ...  # error: [invalid-method-override]
 
 class ConcreteBytesBoundedMethod(Parent[int]):
     @override
     def __new__[U: bytes](cls, value: U) -> object: ...  # error: [invalid-method-override]
+```
+
+A constrained method type parameter must also include a choice compatible with each inherited
+overload. A bound of `int | str` or `Any` permits both argument types:
+
+```pyi
+from typing import Any
+
+class IncompatibleConstrainedMethod[T](Parent[T]):
+    @override
+    def __new__[U: (int, bytes)](cls, value: U) -> object: ...  # error: [invalid-method-override]
+
+class UnionBoundedMethod[T](Parent[T]):
+    @override
+    def __new__[U: int | str](cls, value: U) -> object: ...
+
+class GradualBoundedMethod[T](Parent[T]):
+    @override
+    def __new__[U: Any](cls, value: U) -> object: ...
 ```
 
 ## Generic subclass
