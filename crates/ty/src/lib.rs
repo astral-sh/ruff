@@ -25,6 +25,7 @@ use ruff_db::files::File;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
 use ruff_diagnostics::Applicability;
+use ruff_python_ast::script::ScriptTag;
 use salsa::Database;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
@@ -154,9 +155,14 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
             &system,
             UseUv::from_system(&system),
         )?,
-        None if check_paths.iter().any(|path| system.is_file(path)) => {
-            // `uv check --script` passes a file as its check path. Standalone scripts must not
-            // inherit the enclosing workspace; their environments are synchronized separately.
+        None if UseUv::from_system(&system) == UseUv::On
+            && let [path] = check_paths.as_slice()
+            && system
+                .read_to_string(path)
+                .is_ok_and(|source| ScriptTag::parse(source.as_bytes()).is_some()) =>
+        {
+            // A standalone PEP 723 script uses its own uv environment instead of the
+            // enclosing workspace. Other explicit paths still discover workspace metadata.
             ProjectMetadata::discover_without_uv(&project_path, &system)?
         }
         None => ProjectMetadata::discover(&project_path, &system)?,
