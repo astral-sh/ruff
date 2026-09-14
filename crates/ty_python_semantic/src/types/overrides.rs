@@ -1157,34 +1157,6 @@ impl VariableKind {
     }
 }
 
-/// Returns the variable kind for a superclass member.
-fn superclass_variable_kind<'db>(
-    db: &'db dyn Db,
-    superclass_scope: ScopeId<'db>,
-    superclass_symbol_id: Option<ScopedSymbolId>,
-    class_member: PlaceAndQualifiers<'db>,
-    instance_member: PlaceAndQualifiers<'db>,
-) -> Option<VariableKind> {
-    // Method definitions and properties are not instance-variable declarations. Check the symbol
-    // definition before class/instance member lookup can erase that distinction. For example,
-    // resolving an abstract `@property def f(self) -> int` through instance-member lookup would
-    // make it look like an instance variable of type `int`, causing this rule to report
-    // `f: ClassVar[int]` as an invalid attribute override even though the superclass member is not
-    // an instance-attribute declaration.
-    if superclass_symbol_id.is_some_and(|id| is_function_definition(db, superclass_scope, id)) {
-        return None;
-    }
-
-    // Final attributes have their own override rule and diagnostic. Treating them as class
-    // variables here would report both diagnostics for the same override.
-    if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
-        return None;
-    }
-
-    let env = ProgramEnvironment::from_scope(superclass_scope);
-    variable_kind(db, &env, class_member, instance_member)
-}
-
 /// Returns the variable kind for a superclass member, preserving inherited `ClassVar` declarations
 /// through unannotated class-body assignments.
 ///
@@ -1234,11 +1206,28 @@ pub(super) fn effective_superclass_variable_kind<'db>(
     };
 
     if has_own_member {
-        let superclass_variable_kind = superclass_variable_kind(
+        // Method definitions and properties are not instance-variable declarations. Check the symbol
+        // definition before class/instance member lookup can erase that distinction. For example,
+        // resolving an abstract `@property def f(self) -> int` through instance-member lookup would
+        // make it look like an instance variable of type `int`, causing this rule to report
+        // `f: ClassVar[int]` as an invalid attribute override even though the superclass member is not
+        // an instance-attribute declaration.
+        if superclass_symbol_id.is_some_and(|id| is_function_definition(db, superclass_scope, id)) {
+            return inherited_variable_kind();
+        }
+
+        let class_member = superclass.own_class_member(db, env, None, &name).inner;
+
+        // Final attributes have their own override rule and diagnostic. Treating them as class
+        // variables here would report both diagnostics for the same override.
+        if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
+            return inherited_variable_kind();
+        }
+
+        let superclass_variable_kind = variable_kind(
             db,
-            superclass_scope,
-            superclass_symbol_id,
-            superclass.own_class_member(db, env, None, &name).inner,
+            env,
+            class_member,
             superclass.own_instance_member(db, env, &name).inner,
         );
 
