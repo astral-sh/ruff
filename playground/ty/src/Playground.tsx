@@ -129,15 +129,7 @@ export default function Playground() {
   const handleFileAdded = useCallback(
     (session: PlaygroundSession, name: string) => {
       const workspace = session.workspace;
-      let handle = null;
-
-      if (isOptionsFile(name) && !session.hasConfigurationFile()) {
-        updateOptions(workspace, "{}", setError);
-      }
-      if (!isSettingsFile(name)) {
-        handle = workspace.openFile(name, "");
-      }
-
+      const handle = workspace.openFile(name, "");
       const model = session.openDocument(name, "", handle);
       dispatchFiles({
         type: "add",
