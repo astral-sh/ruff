@@ -4644,15 +4644,20 @@ impl<'db> Type<'db> {
                     // `find_name_in_mro` when called on function-like `Callable`s. This would
                     // allow us to correctly model the behavior of *explicit*
                     // `SomeDataclass.__init__.__get__` calls.
-                    let return_type = if instance.is_none() && is_function_like {
-                        ty
+                    let return_type = if is_function_like {
+                        instance.map_or(ty, |instance| {
+                            Type::Callable(callable.bind_self(db, env, Some(instance)))
+                        })
                     } else {
-                        let self_type = instance.unwrap_or_else(|| {
-                            // For classmethod-like callables, bind to the owner class.
-                            owner.to_instance_approximation(db, env).unwrap_or(owner)
-                        });
-
-                        Type::Callable(callable.bind_self(db, env, Some(self_type)))
+                        // Class methods receive the owner class even through an instance, while
+                        // `typing.Self` denotes an instance of that class.
+                        let typing_self = owner.to_instance_approximation(db, env).unwrap_or(owner);
+                        Type::Callable(callable.bind_self_with_receiver(
+                            db,
+                            env,
+                            Some(owner),
+                            Some(typing_self),
+                        ))
                     };
 
                     return Ok(Some(DescriptorGetResult {

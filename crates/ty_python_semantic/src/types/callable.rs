@@ -846,11 +846,26 @@ impl<'db> CallableType<'db> {
         env: &ProgramEnvironment<'db>,
         self_type: Option<Type<'db>>,
     ) -> CallableType<'db> {
+        self.bind_self_with_receiver(db, env, self_type, self_type)
+    }
+
+    /// Binds the runtime receiver while using `typing_self_type` to replace `typing.Self`.
+    pub(crate) fn bind_self_with_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Option<Type<'db>>,
+        typing_self_type: Option<Type<'db>>,
+    ) -> CallableType<'db> {
         if self.is_dunder_paramspec(db) {
             return self.into_regular(db);
         }
 
-        self.with_signatures(db, self.signatures(db).bind_self(db, env, self_type))
+        self.with_signatures(
+            db,
+            self.signatures(db)
+                .bind_self_with_receiver(db, env, receiver_type, typing_self_type),
+        )
     }
 
     pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {

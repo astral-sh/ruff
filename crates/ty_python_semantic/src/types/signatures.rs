@@ -459,18 +459,6 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    /// Binds the first (presumably `self`) parameter of this signature. If a `self_type` is
-    /// provided, we will replace any occurrences of `typing.Self` in the parameter and return
-    /// annotations with that type.
-    pub(crate) fn bind_self(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        self_type: Option<Type<'db>>,
-    ) -> Self {
-        self.bind_self_with_receiver(db, env, self_type, self_type)
-    }
-
     /// Binds the receiver using its runtime type while using `typing_self_type` to replace
     /// occurrences of `typing.Self`.
     ///
