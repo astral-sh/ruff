@@ -9,12 +9,18 @@ use indexmap::map::Entry;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
+use ruff_index::{IndexVec, newtype_index};
+
 use crate::types::constraints::sequents::{Sequent, SequentMap};
 use crate::types::constraints::{
     ConstraintAssignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor,
     SourceOrderId, TypeVarId,
 };
 use crate::{Db, FxIndexMap, ProgramEnvironment};
+
+/// The position of an assignment in insertion order.
+#[newtype_index]
+struct AssignmentIndex;
 
 /// The collection of constraints that we know to be true or false at a certain point when
 /// traversing a BDD.
@@ -48,6 +54,10 @@ pub(crate) struct PathAssignments {
     sequents: Vec<Sequent>,
     /// Each assignment's source constraint and greatest remaining per-path fuel.
     pub(super) assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
+    /// Positions in `assignments`, cleared when their branch is left. Fuel stays in the map so
+    /// replenishment and rollback do not need to update these indices.
+    positive_assignment_indices: IndexVec<ConstraintId, Option<AssignmentIndex>>,
+    negative_assignment_indices: IndexVec<ConstraintId, Option<AssignmentIndex>>,
     /// Previous fuel values, keyed by assignment index, for rolling back replenishments when
     /// leaving a BDD branch. Keeping the maximum in `assignments` makes fuel lookups constant-time.
     fuel_undo: Vec<(usize, u16)>,
@@ -197,6 +207,8 @@ impl PathAssignments {
         Self {
             sequents: Vec::default(),
             assignments: FxIndexMap::default(),
+            positive_assignment_indices: IndexVec::default(),
+            negative_assignment_indices: IndexVec::default(),
             fuel_undo: Vec::default(),
             discovered,
             elaborated_pairs: FxHashSet::default(),
@@ -453,6 +465,17 @@ impl PathAssignments {
         for (index, previous_fuel) in self.fuel_undo.drain(fuel_undo_start..).rev() {
             self.assignments[index].1 = previous_fuel;
         }
+        for assignment in self.assignments[start..].keys() {
+            match *assignment {
+                ConstraintAssignment::Positive(constraint) => {
+                    self.positive_assignment_indices[constraint] = None;
+                }
+                ConstraintAssignment::Negative(constraint) => {
+                    self.negative_assignment_indices[constraint] = None;
+                }
+                ConstraintAssignment::Unconstrained(_) => {}
+            }
+        }
         self.assignments.truncate(start);
         self.remaining_overall_fuel = previous_remaining_overall_fuel;
         result
@@ -472,7 +495,35 @@ impl PathAssignments {
     }
 
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
-        self.assignments.contains_key(&assignment)
+        self.assignment_index(assignment).is_some()
+    }
+
+    fn assignment_index(&self, assignment: ConstraintAssignment) -> Option<usize> {
+        let indices = match assignment {
+            ConstraintAssignment::Positive(_) => &self.positive_assignment_indices,
+            ConstraintAssignment::Negative(_) => &self.negative_assignment_indices,
+            ConstraintAssignment::Unconstrained(_) => {
+                return self.assignments.get_index_of(&assignment);
+            }
+        };
+        indices
+            .get(assignment.constraint())
+            .copied()
+            .flatten()
+            .map(AssignmentIndex::as_usize)
+    }
+
+    fn record_assignment_index(&mut self, assignment: ConstraintAssignment, index: usize) {
+        let indices = match assignment {
+            ConstraintAssignment::Positive(_) => &mut self.positive_assignment_indices,
+            ConstraintAssignment::Negative(_) => &mut self.negative_assignment_indices,
+            ConstraintAssignment::Unconstrained(_) => return,
+        };
+        let constraint = assignment.constraint();
+        if indices.len() <= constraint.as_usize() {
+            indices.resize(constraint.as_usize() + 1, None);
+        }
+        indices[constraint] = Some(AssignmentIndex::from_usize(index));
     }
 
     fn contains_constraint(&self, constraint: ConstraintId) -> bool {
@@ -483,7 +534,8 @@ impl PathAssignments {
 
     /// Returns the greatest remaining fuel for any derivation of `assignment` on this path.
     fn max_remaining_fuel_for(&self, assignment: ConstraintAssignment) -> Option<u16> {
-        self.assignments.get(&assignment).map(|(_, fuel)| *fuel)
+        self.assignment_index(assignment)
+            .map(|index| self.assignments[index].1)
     }
 
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
@@ -591,7 +643,7 @@ impl PathAssignments {
         }
 
         // First add this assignment. If it causes a conflict, return that as an error.
-        if self.assignments.contains_key(&assignment.negated()) {
+        if self.assignment_holds(assignment.negated()) {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
                 assignment = %assignment.display(db, env, storage),
@@ -615,7 +667,9 @@ impl PathAssignments {
                             None => return Ok(()),
                         };
                 }
+                let index = entry.index();
                 entry.insert((source_constraint, fuel.remaining));
+                self.record_assignment_index(assignment, index);
             }
 
             Entry::Occupied(mut entry) => {
