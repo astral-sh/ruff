@@ -4,8 +4,8 @@ use std::ops::ControlFlow;
 use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolutions, ConstraintId, ConstraintSetStorage, NodeId,
-    PathBoundBuilder, SolutionLimits,
+    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, ConstraintId,
+    ConstraintSetStorage, NodeId, PathBoundBuilder, SolutionLimits,
 };
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
@@ -146,11 +146,12 @@ impl<'db> SolutionWalker<'db> {
                 }
             }
 
-            let path_bounds = mappings
+            let typevars = mappings
                 .drain(..)
                 .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
                 .collect();
-            result.push(path_bounds);
+            let candidate = CandidateSolution { typevars };
+            result.push(candidate);
         }
 
         CandidateSolutions::Constrained(result.into_boxed_slice())

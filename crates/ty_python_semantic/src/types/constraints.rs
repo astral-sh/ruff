@@ -3341,7 +3341,12 @@ pub(crate) enum CandidateSolutions<'db> {
     Unconstrained,
     /// The constraint set has a fix set of solutions. Each solution provides a lower and upper
     /// bound for each inferable typevar.
-    Constrained(Box<[Box<[PathBound<'db>]>]>),
+    Constrained(Box<[CandidateSolution<'db>]>),
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct CandidateSolution<'db> {
+    pub(crate) typevars: Box<[PathBound<'db>]>,
 }
 
 /// Limits shared by the preprocessing and collection walks used to extract solutions.
@@ -3619,11 +3624,12 @@ impl<'db> CandidateSolutions<'db> {
             }
         }
 
-        let path = mappings
+        let typevars = mappings
             .drain(..)
             .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
             .collect();
-        ControlFlow::Continue(Some(CandidateSolutions::Constrained(Box::new([path]))))
+        let candidate = CandidateSolution { typevars };
+        ControlFlow::Continue(Some(CandidateSolutions::Constrained(Box::new([candidate]))))
     }
 
     pub(crate) fn solve(
@@ -3698,13 +3704,13 @@ impl<'db> CandidateSolutions<'db> {
     /// Solves one complete path, retaining whether any of its bindings used a fallback.
     /// A later unsatisfiable bound rejects the path even if an earlier bound exhausted its budget.
     fn solve_path_with(
-        path: &[PathBound<'db>],
+        candidate: &CandidateSolution<'db>,
         choose: &mut impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
     ) -> Option<(Solution<'db>, bool)> {
-        let mut solved_typevars = Vec::with_capacity(path.len());
+        let mut solved_typevars = Vec::with_capacity(candidate.typevars.len());
         let mut violations = Vec::new();
         let mut exceeded_budget = false;
-        for path_bound in path {
+        for path_bound in &candidate.typevars {
             let ty = match choose(path_bound.variance(), path_bound) {
                 PathBoundSolution::Solved(ty) => Some(ty),
                 PathBoundSolution::Unsolved => None,
@@ -5526,8 +5532,10 @@ mod tests {
         );
         assert_eq!(PathBoundSolution::Unsolved.as_type(), None);
         assert_eq!(
-            CandidateSolutions::Constrained(Box::new([Box::new([path_bound])]))
-                .solve(db, &env, &builder),
+            CandidateSolutions::Constrained(Box::new([CandidateSolution {
+                typevars: Box::new([path_bound])
+            }]))
+            .solve(db, &env, &builder),
             Solutions::Constrained(SolutionPaths::Complete(vec![solution([])]))
         );
     }
@@ -5674,8 +5682,13 @@ class E: ...
 
             for reverse in [false, true] {
                 let mut paths = vec![
-                    vec![exhausted.clone(), PathBound::exact(u, str)].into_boxed_slice(),
-                    vec![PathBound::exact(t, int)].into_boxed_slice(),
+                    CandidateSolution {
+                        typevars: vec![exhausted.clone(), PathBound::exact(u, str)]
+                            .into_boxed_slice(),
+                    },
+                    CandidateSolution {
+                        typevars: vec![PathBound::exact(t, int)].into_boxed_slice(),
+                    },
                 ];
                 let mut recovered = lower
                     .map(|ty| binding(t, ty))
@@ -5705,8 +5718,12 @@ class E: ...
                     rejected.reverse();
                 }
                 let paths = CandidateSolutions::Constrained(Box::new([
-                    rejected.into_boxed_slice(),
-                    Box::new([PathBound::exact(t, int)]),
+                    CandidateSolution {
+                        typevars: rejected.into_boxed_slice(),
+                    },
+                    CandidateSolution {
+                        typevars: Box::new([PathBound::exact(t, int)]),
+                    },
                 ]));
                 assert_eq!(
                     paths.solve(db, &env, &builder),

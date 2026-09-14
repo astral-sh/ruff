@@ -9,9 +9,9 @@ use super::{ProjectionError, ProjectionTypeBudget, SolutionBudget, SolutionProje
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::global_symbol;
 use crate::types::constraints::{
-    CandidateSolutions, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
-    PathBound, PathBoundSolution, Solution, SolutionPaths, SolutionValidity, Solutions,
-    TypeVarSolution,
+    CandidateSolution, CandidateSolutions, ConstraintSet, ConstraintSetBuilder,
+    IteratorConstraintsExtension, PathBound, PathBoundSolution, Solution, SolutionPaths,
+    SolutionValidity, Solutions, TypeVarSolution,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{
@@ -629,7 +629,9 @@ class E: ...
     for alternatives in [[left, right], [right, left]] {
         let paths = CandidateSolutions::Constrained(
             alternatives
-                .map(|ty| Box::new([PathBound::exact(t, ty)]) as Box<[_]>)
+                .map(|ty| CandidateSolution {
+                    typevars: Box::new([PathBound::exact(t, ty)]) as Box<[_]>,
+                })
                 .into(),
         );
 
