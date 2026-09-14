@@ -810,12 +810,11 @@ impl<'db> CallableType<'db> {
     /// Returns the reduced callable produced by partially applying selected overloads.
     pub(crate) fn partially_apply(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
         overloads: impl IntoIterator<Item = PartialSignatureApplication<'db>>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
-            CallableSignature::partially_apply(db, env, overloads)?,
+            CallableSignature::partially_apply(db, overloads)?,
             CallableTypeKind::Regular,
         ))
     }
