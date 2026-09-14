@@ -317,7 +317,7 @@ BENCHMARK_CONSTANT_{index:03} = {index}
             // Synthetic cases must not inherit configuration from the temporary directory's ancestors.
             let mut metadata =
                 ProjectMetadata::new("auto-import-benchmark", fixture.project_root.clone());
-            metadata.apply_override_options(Options {
+            metadata.set_override_options(Options {
                 environment: Some(EnvironmentOptions {
                     root: Some(
                         fixture
