@@ -2,7 +2,9 @@
 
 use rustc_hash::FxHashSet;
 
-use super::{ConstraintSet, PathBound, PathBoundSolution, PathBounds, Solutions, TypeVarSolution};
+use super::{
+    CandidateSolutions, ConstraintSet, PathBound, PathBoundSolution, Solutions, TypeVarSolution,
+};
 use crate::types::typevar::TypeVarSet;
 use crate::types::{Type, TypeVarVariance};
 use crate::{Db, ProgramEnvironment};
@@ -122,7 +124,7 @@ impl<'db> ConstraintSet<'db, '_> {
             env,
             inferable,
             SolutionBudget::default(),
-            |_variance, path_bound| PathBounds::default_solve(db, env, builder, path_bound),
+            |_variance, path_bound| CandidateSolutions::default_solve(db, env, builder, path_bound),
         )
     }
 
@@ -132,8 +134,8 @@ impl<'db> ConstraintSet<'db, '_> {
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
         budget: SolutionBudget,
-    ) -> Result<PathBounds<'db>, ProjectionError> {
-        PathBounds::compute_bounded(
+    ) -> Result<CandidateSolutions<'db>, ProjectionError> {
+        CandidateSolutions::compute_bounded(
             db,
             env,
             &mut self.builder.storage.borrow_mut(),
@@ -216,7 +218,7 @@ impl<'db> ConstraintSet<'db, '_> {
     }
 }
 
-impl<'db> PathBounds<'db> {
+impl<'db> CandidateSolutions<'db> {
     fn try_fold_with<T>(
         &self,
         mut choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,

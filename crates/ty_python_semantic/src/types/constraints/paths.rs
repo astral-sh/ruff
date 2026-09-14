@@ -1398,7 +1398,7 @@ mod tests {
             .storage
             .borrow()
             .calculate_source_orders(set.source_order);
-        let expected = PathBounds::compute(
+        let expected = CandidateSolutions::compute(
             db,
             &env,
             &mut builder.storage.borrow_mut(),
