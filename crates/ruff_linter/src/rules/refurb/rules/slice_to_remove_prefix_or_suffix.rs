@@ -1,6 +1,8 @@
+use std::borrow::Cow;
+
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_python_ast::{self as ast, OperatorPrecedence, PythonVersion};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -441,9 +443,10 @@ fn generate_assignment_with_removeaffix(
     locator: &Locator,
 ) -> String {
     let text_str = locator.slice(text);
+    let receiver_str = parenthesize_receiver_if_necessary(text, locator);
     let affix_str = locator.slice(affix_query.affix);
     let replacement = affix_query.kind.replacement();
-    format!("{text_str} = {text_str}.{replacement}({affix_str})")
+    format!("{text_str} = {receiver_str}.{replacement}({affix_str})")
 }
 
 /// Generates the source code string
@@ -461,10 +464,35 @@ fn generate_removeaffix_expr(
     affix_query: &AffixQuery,
     locator: &Locator,
 ) -> String {
-    let text_str = locator.slice(text);
+    let receiver_str = parenthesize_receiver_if_necessary(text, locator);
     let affix_str = locator.slice(affix_query.affix);
     let replacement = affix_query.kind.replacement();
-    format!("{text_str}.{replacement}({affix_str})")
+    format!("{receiver_str}.{replacement}({affix_str})")
+}
+
+/// Returns the source text of `text`, wrapped in parentheses if `text` binds less
+/// tightly than an attribute access.
+///
+/// `text` is the value of a subscript expression, so any expression that binds less
+/// tightly than attribute access is already parenthesized in the source. Those
+/// parentheses are not part of the expression's own range, however, so slicing `text`
+/// alone would drop them and change how the replacement parses. For example, in
+///
+/// ```python
+/// (a or b)[: -len(suffix)] if (a or b).endswith(suffix) else (a or b)
+/// ```
+///
+/// slicing `text` yields `a or b`, and the naive replacement `a or b.removesuffix(suffix)`
+/// parses as `a or (b.removesuffix(suffix))`. Re-adding the parentheses keeps the
+/// replacement equivalent to the original expression.
+fn parenthesize_receiver_if_necessary<'a>(text: &ast::Expr, locator: &'a Locator) -> Cow<'a, str> {
+    let text_str = locator.slice(text);
+
+    if OperatorPrecedence::from(text) < OperatorPrecedence::CallAttribute {
+        Cow::Owned(format!("({text_str})"))
+    } else {
+        Cow::Borrowed(text_str)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

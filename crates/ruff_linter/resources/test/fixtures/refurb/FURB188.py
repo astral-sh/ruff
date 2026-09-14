@@ -214,3 +214,36 @@ def example(filename: str, text: str):
         else filename
     )
 
+
+
+# The receiver of the generated `removeprefix`/`removesuffix` call must keep the
+# parentheses it had in the source, or the replacement re-associates.
+def parenthesized_receivers(a, b, c, x, y, s):
+    # should be linted, with fix `(a or b).removesuffix(s)`
+    print((a or b)[: -len(s)] if (a or b).endswith(s) else (a or b))
+
+    # should be linted, with fix `(a and b).removesuffix(s)`
+    print((a and b)[: -len(s)] if (a and b).endswith(s) else (a and b))
+
+    # should be linted, with fix `(a + b).removesuffix(s)`
+    print((a + b)[: -len(s)] if (a + b).endswith(s) else (a + b))
+
+    # should be linted, with fix `(x if c else y).removeprefix(s)`
+    print((x if c else y)[len(s) :] if (x if c else y).startswith(s) else (x if c else y))
+
+    # should be linted, with fix `(a := y).removesuffix(s)`
+    print((a := y)[: -len(s)] if (a := y).endswith(s) else (a := y))
+
+
+async def parenthesized_await(g, s):
+    # should be linted, with fix `(await g).removesuffix(s)`
+    return (await g)[: -len(s)] if (await g).endswith(s) else (await g)
+
+
+def unparenthesized_receivers(d, k, o, f, s):
+    # Receivers that already bind at least as tightly as an attribute access must
+    # not gain redundant parentheses.
+    print(d[k][: -len(s)] if d[k].endswith(s) else d[k])
+    print(o.attr[: -len(s)] if o.attr.endswith(s) else o.attr)
+    print(f()[: -len(s)] if f().endswith(s) else f())
+    print("literal"[: -len(s)] if "literal".endswith(s) else "literal")

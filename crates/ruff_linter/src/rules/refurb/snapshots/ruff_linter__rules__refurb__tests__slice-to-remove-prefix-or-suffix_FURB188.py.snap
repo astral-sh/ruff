@@ -304,3 +304,168 @@ help: Use removesuffix instead of ternary expression conditional upon endswith.
 213 |     )
     |
 note: This is an unsafe fix and may change runtime behavior
+
+FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+   --> FURB188.py:223:11
+    |
+221 | def parenthesized_receivers(a, b, c, x, y, s):
+222 |     # should be linted, with fix `(a or b).removesuffix(s)`
+223 |     print((a or b)[: -len(s)] if (a or b).endswith(s) else (a or b))
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+224 |
+225 |     # should be linted, with fix `(a and b).removesuffix(s)`
+    |
+help: Use removesuffix instead of ternary expression conditional upon endswith.
+    |
+222 |     # should be linted, with fix `(a or b).removesuffix(s)`
+    -     print((a or b)[: -len(s)] if (a or b).endswith(s) else (a or b))
+223 +     print((a or b).removesuffix(s))
+224 |
+    |
+
+FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+   --> FURB188.py:226:11
+    |
+225 |     # should be linted, with fix `(a and b).removesuffix(s)`
+226 |     print((a and b)[: -len(s)] if (a and b).endswith(s) else (a and b))
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+227 |
+228 |     # should be linted, with fix `(a + b).removesuffix(s)`
+    |
+help: Use removesuffix instead of ternary expression conditional upon endswith.
+    |
+225 |     # should be linted, with fix `(a and b).removesuffix(s)`
+    -     print((a and b)[: -len(s)] if (a and b).endswith(s) else (a and b))
+226 +     print((a and b).removesuffix(s))
+227 |
+    |
+
+FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+   --> FURB188.py:229:11
+    |
+228 |     # should be linted, with fix `(a + b).removesuffix(s)`
+229 |     print((a + b)[: -len(s)] if (a + b).endswith(s) else (a + b))
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+230 |
+231 |     # should be linted, with fix `(x if c else y).removeprefix(s)`
+    |
+help: Use removesuffix instead of ternary expression conditional upon endswith.
+    |
+228 |     # should be linted, with fix `(a + b).removesuffix(s)`
+    -     print((a + b)[: -len(s)] if (a + b).endswith(s) else (a + b))
+229 +     print((a + b).removesuffix(s))
+230 |
+    |
+
+FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
+   --> FURB188.py:232:11
+    |
+231 |     # should be linted, with fix `(x if c else y).removeprefix(s)`
+232 |     print((x if c else y)[len(s) :] if (x if c else y).startswith(s) else (x if c else y))
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+233 |
+234 |     # should be linted, with fix `(a := y).removesuffix(s)`
+    |
+help: Use removeprefix instead of ternary expression conditional upon startswith.
+    |
+231 |     # should be linted, with fix `(x if c else y).removeprefix(s)`
+    -     print((x if c else y)[len(s) :] if (x if c else y).startswith(s) else (x if c else y))
+232 +     print((x if c else y).removeprefix(s))
+233 |
+    |
+
+FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+   --> FURB188.py:235:11
+    |
+234 |     # should be linted, with fix `(a := y).removesuffix(s)`
+235 |     print((a := y)[: -len(s)] if (a := y).endswith(s) else (a := y))
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Use removesuffix instead of ternary expression conditional upon endswith.
+    |
+234 |     # should be linted, with fix `(a := y).removesuffix(s)`
+    -     print((a := y)[: -len(s)] if (a := y).endswith(s) else (a := y))
+235 +     print((a := y).removesuffix(s))
+236 |
+    |
+
+FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+   --> FURB188.py:240:12
+    |
+238 | async def parenthesized_await(g, s):
+239 |     # should be linted, with fix `(await g).removesuffix(s)`
+240 |     return (await g)[: -len(s)] if (await g).endswith(s) else (await g)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Use removesuffix instead of ternary expression conditional upon endswith.
+    |
+239 |     # should be linted, with fix `(await g).removesuffix(s)`
+    -     return (await g)[: -len(s)] if (await g).endswith(s) else (await g)
+240 +     return (await g).removesuffix(s)
+241 |
+    |
+
+FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+   --> FURB188.py:246:11
+    |
+244 |     # Receivers that already bind at least as tightly as an attribute access must
+245 |     # not gain redundant parentheses.
+246 |     print(d[k][: -len(s)] if d[k].endswith(s) else d[k])
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+247 |     print(o.attr[: -len(s)] if o.attr.endswith(s) else o.attr)
+248 |     print(f()[: -len(s)] if f().endswith(s) else f())
+    |
+help: Use removesuffix instead of ternary expression conditional upon endswith.
+    |
+245 |     # not gain redundant parentheses.
+    -     print(d[k][: -len(s)] if d[k].endswith(s) else d[k])
+246 +     print(d[k].removesuffix(s))
+247 |     print(o.attr[: -len(s)] if o.attr.endswith(s) else o.attr)
+    |
+
+FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+   --> FURB188.py:247:11
+    |
+245 |     # not gain redundant parentheses.
+246 |     print(d[k][: -len(s)] if d[k].endswith(s) else d[k])
+247 |     print(o.attr[: -len(s)] if o.attr.endswith(s) else o.attr)
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+248 |     print(f()[: -len(s)] if f().endswith(s) else f())
+249 |     print("literal"[: -len(s)] if "literal".endswith(s) else "literal")
+    |
+help: Use removesuffix instead of ternary expression conditional upon endswith.
+    |
+246 |     print(d[k][: -len(s)] if d[k].endswith(s) else d[k])
+    -     print(o.attr[: -len(s)] if o.attr.endswith(s) else o.attr)
+247 +     print(o.attr.removesuffix(s))
+248 |     print(f()[: -len(s)] if f().endswith(s) else f())
+    |
+
+FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+   --> FURB188.py:248:11
+    |
+246 |     print(d[k][: -len(s)] if d[k].endswith(s) else d[k])
+247 |     print(o.attr[: -len(s)] if o.attr.endswith(s) else o.attr)
+248 |     print(f()[: -len(s)] if f().endswith(s) else f())
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+249 |     print("literal"[: -len(s)] if "literal".endswith(s) else "literal")
+    |
+help: Use removesuffix instead of ternary expression conditional upon endswith.
+    |
+247 |     print(o.attr[: -len(s)] if o.attr.endswith(s) else o.attr)
+    -     print(f()[: -len(s)] if f().endswith(s) else f())
+248 +     print(f().removesuffix(s))
+249 |     print("literal"[: -len(s)] if "literal".endswith(s) else "literal")
+    |
+
+FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+   --> FURB188.py:249:11
+    |
+247 |     print(o.attr[: -len(s)] if o.attr.endswith(s) else o.attr)
+248 |     print(f()[: -len(s)] if f().endswith(s) else f())
+249 |     print("literal"[: -len(s)] if "literal".endswith(s) else "literal")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Use removesuffix instead of ternary expression conditional upon endswith.
+    |
+248 |     print(f()[: -len(s)] if f().endswith(s) else f())
+    -     print("literal"[: -len(s)] if "literal".endswith(s) else "literal")
+249 +     print("literal".removesuffix(s))
+    |
