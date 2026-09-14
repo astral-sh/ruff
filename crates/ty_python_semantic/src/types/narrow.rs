@@ -3866,67 +3866,31 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 Some(rhs_constraint.negate(db, &self.env))
             }
             ast::CmpOp::Is => {
-                let rhs_identity_ty = rhs_ty.identity_comparison_type(db, &self.env);
-                let mut builder = UnionBuilder::new(db, &self.env)
-                    .add(rhs_ty.identity_narrowing_type(db, &self.env));
-                let rhs_resolved = rhs_ty.resolve_type_alias(db);
-                let add_runtime_overlap = |builder: UnionBuilder<'db>, element: Type<'db>| {
-                    let overlaps_only_at_runtime = |rhs_element| {
-                        element.is_disjoint_from(db, &self.env, rhs_element)
-                            && element
-                                .identity_comparison_truthiness(db, &self.env, rhs_element)
-                                .may_be_true()
-                    };
-                    let has_runtime_only_overlap = match rhs_resolved {
-                        Type::Union(union) => union
-                            .elements(db)
-                            .iter()
-                            .copied()
-                            .any(overlaps_only_at_runtime),
-                        Type::TypeVar(typevar) => {
-                            match typevar.typevar(db).bound_or_constraints(db, &self.env) {
-                                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                                    overlaps_only_at_runtime(bound)
-                                }
-                                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                                    constraints
-                                        .elements(db)
-                                        .iter()
-                                        .copied()
-                                        .any(overlaps_only_at_runtime)
-                                }
-                                None => overlaps_only_at_runtime(rhs_ty),
-                            }
-                        }
-                        rhs_ty => overlaps_only_at_runtime(rhs_ty),
-                    };
-                    if !has_runtime_only_overlap {
-                        return builder;
+                let narrow_element = |element: Type<'db>| {
+                    if !element
+                        .identity_comparison_truthiness(db, &self.env, rhs_ty)
+                        .may_be_true()
+                    {
+                        return Type::Never;
                     }
 
-                    let runtime_overlap = IntersectionType::from_two_elements(
-                        db,
-                        &self.env,
-                        element,
-                        rhs_identity_ty,
-                    );
-                    builder.add(if runtime_overlap.is_never() {
+                    let constraint = rhs_ty.identity_narrowing_type(db, &self.env, element);
+                    let narrowed =
+                        IntersectionType::from_two_elements(db, &self.env, element, constraint);
+                    if narrowed.is_never() {
+                        // Static views can be disjoint even when they identify the same object.
                         element
                     } else {
-                        runtime_overlap
-                    })
+                        narrowed
+                    }
                 };
 
-                if let Type::Union(union) = lhs_ty.resolve_type_alias(db) {
-                    builder = union
-                        .elements(db)
-                        .iter()
-                        .copied()
-                        .fold(builder, add_runtime_overlap);
-                } else {
-                    builder = add_runtime_overlap(builder, lhs_ty);
-                }
-                Some(builder.build())
+                Some(match lhs_ty.resolve_type_alias(db) {
+                    Type::Union(union) => {
+                        union.map(db, &self.env, |element| narrow_element(*element))
+                    }
+                    lhs => narrow_element(lhs),
+                })
             }
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
             ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),

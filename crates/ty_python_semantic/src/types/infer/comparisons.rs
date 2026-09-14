@@ -16,10 +16,10 @@ use crate::types::equality::{
 use crate::types::known_instance::{FunctoolsPartialInstance, InternedType, MethodWrapper};
 use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::{
-    BoundMethodType, CallableType, DynamicType, FunctionType, IntersectionBuilder,
+    BoundMethodType, CallableType, ClassType, DynamicType, FunctionType, IntersectionBuilder,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueType,
-    LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType, Type, TypeContext,
-    TypeTransformer, TypeVarBoundOrConstraints, UnionBuilder,
+    LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType, SubclassOfInner,
+    SubclassOfType, Type, TypeContext, TypeTransformer, TypeVarBoundOrConstraints, UnionBuilder,
 };
 use ty_python_core::Truthiness;
 
@@ -43,6 +43,10 @@ impl<'db> Type<'db> {
     /// By contrast, we preserve invariant generic arguments because the same mutable object cannot
     /// satisfy incompatible commitments such as `list[int]` and `list[str]` without some other
     /// code already being unsound.
+    ///
+    /// Generic class objects can be shared across specializations: `type(C(0))` and
+    /// `type(C(None))` can both be `C`. Class-object comparisons therefore use the top
+    /// materialization of the class, without transferring one instance's type arguments.
     ///
     /// Function signature substitutions can likewise differ between views of the same function,
     /// bound method, property, or saved function wrapper. We therefore use the underlying function
@@ -293,6 +297,16 @@ impl<'db> Type<'db> {
             ))
         }
 
+        /// Recursively compute the view of `ty` used for runtime identity comparisons.
+        /// Erase distinctions such as `NewType` tags that can differ between references to
+        /// the same runtime object.
+        ///
+        /// The result's `ty` is the positive constraint. Its `negative_retention` says when
+        /// the original `ty` can remain a negative constraint in an enclosing intersection.
+        /// A change to the positive type does not justify negating the replacement: erasing
+        /// an integer `NewType` to `int` does not mean that excluding its tag excludes `int`.
+        ///
+        /// The visitor shares cycle detection and cached results across recursive calls.
         fn upcast<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
@@ -445,6 +459,42 @@ impl<'db> Type<'db> {
                         .ty,
                     )
                 }),
+                Type::SubclassOf(subclass_of)
+                    if let SubclassOfInner::Class(ClassType::Generic(alias)) =
+                        subclass_of.subclass_of() =>
+                {
+                    // `type[C[int]]` and `type[C[str]]` can describe the same runtime class.
+                    // The origin's top materialization is a fully static supertype of every
+                    // specialization, so intersecting with it preserves existing type arguments.
+                    // Materializing the existing alias would keep its concrete arguments;
+                    // using a gradual specialization would leave an additional dynamic constraint.
+                    let upcast =
+                        SubclassOfType::from(db, env, alias.origin(db).top_materialization(db));
+                    if upcast == ty {
+                        UpcastResult::stable(ty)
+                    } else {
+                        UpcastResult::unstable(upcast)
+                    }
+                }
+                Type::GenericAlias(alias) if alias.origin(db).is_final(db) => {
+                    // `type[C[T]]` is normalized to a generic alias when `C` is final. Keep
+                    // the alias representation, since an explicit `C[T]` can also occur here
+                    // and does not necessarily identify the runtime class object `C`.
+                    let upcast = Type::from(alias.origin(db).top_materialization(db));
+                    if upcast == ty {
+                        UpcastResult::stable(ty)
+                    } else {
+                        UpcastResult::unstable(upcast)
+                    }
+                }
+                Type::SubclassOf(subclass_of)
+                    if let SubclassOfInner::TypeVar(typevar) =
+                        subclass_of.subclass_of().with_transposed_type_var(db, env) =>
+                {
+                    visit_type(db, ty, visitor, || {
+                        upcast(db, env, Type::TypeVar(typevar), visitor)
+                    })
+                }
                 Type::Union(union) => {
                     let mut retention = NegativeRetention::Stable;
                     let ty = union.map(db, env, |element| {
@@ -517,16 +567,22 @@ impl<'db> Type<'db> {
         upcast(db, env, self, &UpcastingVisitor::default()).ty
     }
 
-    /// Return the other operand's type for narrowing after a successful identity check.
+    /// Return a constraint for narrowing `target` after a successful identity check with `self`.
     ///
-    /// A `NewType` tag or a type-variable selection belongs to a static view of an object, so
+    /// A `NewType` tag or a bare type variable belongs to a static view of an object, so
     /// neither transfers to a different reference. A callable's signature describes how the
     /// object can be used through that view, however, and can be retained when narrowing a
     /// reference whose type does not already provide a more specific view.
+    ///
+    /// Class-object types likewise retain their constructor signatures when narrowing an
+    /// `object` reference. Existing class references keep their own specializations while
+    /// retaining `type[T]` relationships. An unspecialized generic constructor uses only the
+    /// runtime constraint so it can infer fresh type arguments on later calls.
     pub(crate) fn identity_narrowing_type(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
     ) -> Type<'db> {
         struct IdentityNarrowing;
 
@@ -534,17 +590,25 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
+            target: Type<'db>,
             visitor: &TypeTransformer<'db, IdentityNarrowing>,
         ) -> Type<'db> {
             match ty {
                 Type::TypeAlias(alias) => visitor.visit_type(db, ty, || {
-                    remove_nontransferable_constraints(db, env, alias.value_type(db), visitor)
+                    remove_nontransferable_constraints(
+                        db,
+                        env,
+                        alias.value_type(db),
+                        target,
+                        visitor,
+                    )
                 }),
                 Type::NewTypeInstance(newtype) => visitor.visit_type(db, ty, || {
                     remove_nontransferable_constraints(
                         db,
                         env,
                         newtype.concrete_base_type(db),
+                        target,
                         visitor,
                     )
                 }),
@@ -555,12 +619,13 @@ impl<'db> Type<'db> {
                         typevar
                             .require_bound_or_constraints(db, env)
                             .as_type(db, env),
+                        target,
                         visitor,
                     )
                 }),
                 Type::Union(union) => visitor.visit_type(db, ty, || {
                     union.map(db, env, |element| {
-                        remove_nontransferable_constraints(db, env, *element, visitor)
+                        remove_nontransferable_constraints(db, env, *element, target, visitor)
                     })
                 }),
                 Type::Intersection(intersection) => visitor.visit_type(db, ty, || {
@@ -572,7 +637,7 @@ impl<'db> Type<'db> {
                     let mut builder = IntersectionBuilder::new(db, env);
                     for positive in intersection.positive(db) {
                         builder = builder.add_positive(remove_nontransferable_constraints(
-                            db, env, *positive, visitor,
+                            db, env, *positive, target, visitor,
                         ));
                     }
                     if let Type::Intersection(runtime) = runtime_ty {
@@ -582,11 +647,36 @@ impl<'db> Type<'db> {
                     }
                     builder.build()
                 }),
+                Type::SubclassOf(subclass_of)
+                    if matches!(subclass_of.subclass_of(), SubclassOfInner::TypeVar(_)) =>
+                {
+                    // Class identity can establish that an existing class reference is `type[T]`.
+                    ty
+                }
+                Type::GenericAlias(_) | Type::SubclassOf(_)
+                    if matches!(target, Type::GenericAlias(_))
+                        || matches!(target, Type::SubclassOf(subclass_of) if subclass_of
+                                .subclass_of()
+                                .into_class(db, env)
+                                .is_some_and(ClassType::is_generic)
+                        ) =>
+                {
+                    // Different specializations can share a class object. Preserve the target's
+                    // existing constructor signature instead of adding the other specialization.
+                    ty.identity_comparison_type(db, env)
+                }
                 _ => ty,
             }
         }
 
-        remove_nontransferable_constraints(db, env, self, &TypeTransformer::default())
+        let target = target.resolve_type_alias(db);
+        if let Type::ClassLiteral(class) = target
+            && class.generic_context(db).is_some()
+        {
+            return self.identity_comparison_type(db, env);
+        }
+
+        remove_nontransferable_constraints(db, env, self, target, &TypeTransformer::default())
     }
 
     /// Return whether values of these types always, never, or possibly identify the same object.
