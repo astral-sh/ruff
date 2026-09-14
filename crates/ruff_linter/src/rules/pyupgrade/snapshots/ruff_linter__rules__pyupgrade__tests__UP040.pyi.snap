@@ -68,10 +68,44 @@ UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keywo
 23 | |     # comment7
 24 | | ) # comment8
    | |_^
+25 |
+26 |   # Starred constraints remain safe in stub files, which are not executed.
+   |
 help: Use the `type` keyword
    |
 15 |
    - T: TypeAlias = ( # comment0
 16 + type T = ( # comment0
 17 |     # comment1
+   |
+
+UP040 [*] Type alias `StarredList` uses `TypeAlias` annotation instead of the `type` keyword
+  --> UP040.pyi:29:1
+   |
+27 | constraints = (int, str)
+28 | T_starred = typing.TypeVar("T_starred", *constraints)
+29 | StarredList: TypeAlias = list[T_starred]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+30 | StarredAlias = typing.TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
+   |
+help: Use the `type` keyword
+   |
+28 | T_starred = typing.TypeVar("T_starred", *constraints)
+   - StarredList: TypeAlias = list[T_starred]
+29 + type StarredList[T_starred: (*constraints,)] = list[T_starred]
+30 | StarredAlias = typing.TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
+   |
+
+UP040 [*] Type alias `StarredAlias` uses `TypeAliasType` assignment instead of the `type` keyword
+  --> UP040.pyi:30:1
+   |
+28 | T_starred = typing.TypeVar("T_starred", *constraints)
+29 | StarredList: TypeAlias = list[T_starred]
+30 | StarredAlias = typing.TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Use the `type` keyword
+   |
+29 | StarredList: TypeAlias = list[T_starred]
+   - StarredAlias = typing.TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
+30 + type StarredAlias[T_starred: (*constraints,)] = list[T_starred]
    |

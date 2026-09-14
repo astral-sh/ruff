@@ -122,3 +122,52 @@ help: Use type parameters
 57 |     c(t[0])
    |
 note: This is an unsafe fix and may change runtime behavior
+
+UP047 [*] Generic function `starred_constraints` should use type parameters
+  --> UP047_0.py:73:5
+   |
+73 | def starred_constraints(var: U) -> U:
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+74 |     return var
+   |
+help: Use type parameters
+   |
+72 |
+   - def starred_constraints(var: U) -> U:
+73 + def starred_constraints[U: (*constraints,)](var: U) -> U:
+74 |     return var
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP047 [*] Generic function `mixed_constraints` should use type parameters
+  --> UP047_0.py:81:5
+   |
+81 | def mixed_constraints(var: W) -> W:
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+82 |     return var
+   |
+help: Use type parameters
+   |
+80 |
+   - def mixed_constraints(var: W) -> W:
+81 + def mixed_constraints[W: (bool, *constraints)](var: W) -> W:
+82 |     return var
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP047 [*] Generic function `mixed_parameters` should use type parameters
+  --> UP047_0.py:86:5
+   |
+85 | # Both type variables are converted when only one has starred constraints.
+86 | def mixed_parameters(starred: U, bounded: T) -> tuple[U, T]:
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+87 |     return starred, bounded
+   |
+help: Use type parameters
+   |
+85 | # Both type variables are converted when only one has starred constraints.
+   - def mixed_parameters(starred: U, bounded: T) -> tuple[U, T]:
+86 + def mixed_parameters[U: (*constraints,), T: float](starred: U, bounded: T) -> tuple[U, T]:
+87 |     return starred, bounded
+   |
+note: This is an unsafe fix and may change runtime behavior

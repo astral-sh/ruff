@@ -253,3 +253,35 @@ UP046 Generic class `TooManyGenerics` uses `Generic` subclass instead of type pa
 100 |     var: S
     |
 help: Use type parameters
+
+UP046 [*] Generic class `StarredConstraints` uses `Generic` subclass instead of type parameters
+   --> UP046_0.py:152:26
+    |
+152 | class StarredConstraints(Generic[U]):
+    |                          ^^^^^^^^^^
+153 |     var: U
+    |
+help: Use type parameters
+    |
+151 |
+    - class StarredConstraints(Generic[U]):
+152 + class StarredConstraints[U: (*constraints,)]:
+153 |     var: U
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP046 [*] Generic class `MixedConstraints` uses `Generic` subclass instead of type parameters
+   --> UP046_0.py:160:24
+    |
+160 | class MixedConstraints(Generic[V]):
+    |                        ^^^^^^^^^^
+161 |     var: V
+    |
+help: Use type parameters
+    |
+159 |
+    - class MixedConstraints(Generic[V]):
+160 + class MixedConstraints[V: (bool, *constraints)]:
+161 |     var: V
+    |
+note: This is an unsafe fix and may change runtime behavior
