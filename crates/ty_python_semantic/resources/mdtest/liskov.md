@@ -2974,7 +2974,9 @@ def check(base: Neutral, child: Frozen) -> None:
 
 A descriptor may replace an ordinary attribute when its instance reads and writes preserve the
 inherited types. Class access can expose the descriptor itself; we allow that difference for
-attributes that are not explicitly declared as `ClassVar`.
+attributes that are not explicitly declared as `ClassVar`. The subclass explicitly annotates the
+descriptor to introduce its own contract; an unannotated default would retain the inherited value
+annotation.
 
 ```py
 class Descriptor:
@@ -2987,7 +2989,7 @@ class Base:
     value: str
 
 class Child(Base):
-    value = Descriptor()
+    value: Descriptor = Descriptor()
 ```
 
 ## Slot and descriptor read contracts
@@ -3054,9 +3056,9 @@ def read(base: Base, slot: Slotted, generated: Generated) -> None:
 
 ## Descriptor setters cannot narrow accepted writes
 
-Installing a descriptor establishes its own write type, even without an attribute annotation. A
-setter must accept every value that the inherited attribute accepts. The same restriction applies
-when assigning the subclass to a protocol with that writable attribute.
+An explicit descriptor annotation establishes its own write type. Its setter must accept every value
+that the inherited attribute accepts. The same restriction applies when assigning the subclass to a
+protocol with that writable attribute.
 
 ```toml
 [rules]
@@ -3076,7 +3078,7 @@ class Base:
     value: int
 
 class Child(Base):
-    value = Descriptor()  # error: [invalid-mutable-override]
+    value: Descriptor = Descriptor()  # error: [invalid-mutable-override]
 
 class HasValue(Protocol):
     value: int
