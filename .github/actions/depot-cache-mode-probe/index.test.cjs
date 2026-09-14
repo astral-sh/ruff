@@ -129,6 +129,44 @@ test("fails read mode when the backend grants write authority", async () => {
   assert.ok(!passed(summary));
 });
 
+test("accepts a runner-local HTTP cache proxy without allowing remote HTTP", async () => {
+  for (const host of ["127.0.0.1:40000", "[::1]:40000", "localhost:40000"]) {
+    let requests = 0;
+    const summary = await probe(
+      {
+        ...environment,
+        INPUT_BACKEND: "github",
+        ACTIONS_RESULTS_URL: `http://${host}/`,
+        DEPOT_CACHE_TOKEN: "",
+      },
+      async (url) => {
+        requests++;
+        assert.equal(url.host, host);
+        return { status: 200, json: async () => ({ ok: true, signed_upload_url: uploadUrl }) };
+      },
+    );
+    assert.equal(requests, 1);
+    assert.equal(summary.results[0].endpointDomain, "loopback");
+    assert.equal(summary.results[0].endpointScheme, "http");
+    assert.ok(passed(summary));
+  }
+
+  for (const host of ["remote.example.invalid", "127.0.0.1.example.invalid", "10.0.0.1"]) {
+    const summary = await probe(
+      {
+        ...environment,
+        INPUT_BACKEND: "github",
+        ACTIONS_RESULTS_URL: `http://${host}/`,
+        DEPOT_CACHE_TOKEN: "",
+      },
+      async () => assert.fail("non-loopback HTTP request"),
+    );
+    assert.equal(summary.results[0].result, "invalid-endpoint");
+    assert.equal(summary.results[0].endpointScheme, "http");
+    assert.ok(!passed(summary));
+  }
+});
+
 test("redacts transport failures and refuses an unintended repository", async () => {
   const summary = await probe(environment, async () => {
     throw new Error(`request to ${uploadUrl} with ${environment.DEPOT_CACHE_TOKEN}`);

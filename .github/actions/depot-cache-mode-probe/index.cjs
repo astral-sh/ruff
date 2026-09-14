@@ -94,6 +94,9 @@ function githubRequest(env, key) {
 }
 
 function endpointDomain(url) {
+  if (["127.0.0.1", "[::1]", "localhost"].includes(url.hostname)) {
+    return "loopback";
+  }
   if (url.hostname === "depot.dev" || url.hostname.endsWith(".depot.dev")) {
     return "depot.dev";
   }
@@ -109,12 +112,16 @@ async function reserve(request, token, fetcher) {
     surface: request.surface,
     credentialIssued: Boolean(token),
     endpointDomain: endpointDomain(url),
+    endpointScheme: ["http:", "https:"].includes(url.protocol)
+      ? url.protocol.slice(0, -1)
+      : "other",
   };
   if (!token) {
     return { ...details, result: "credential-not-issued" };
   }
   if (
-    url.protocol !== "https:" ||
+    (url.protocol !== "https:" &&
+      !(url.protocol === "http:" && details.endpointDomain === "loopback")) ||
     url.username ||
     url.password ||
     url.search ||
