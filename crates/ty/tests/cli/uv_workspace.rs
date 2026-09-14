@@ -409,7 +409,7 @@ fn uses_uv_workspace_root_without_checking_siblings() -> anyhow::Result<()> {
 #[cfg(feature = "test-uv")]
 #[test]
 fn explicit_script_path_disables_uv_workspace_discovery() -> anyhow::Result<()> {
-    let case = workspace_case()?;
+    let case = workspace_case()?.with_filter(r"exit code: 1", "exit status: 1");
     case.write_file(
         "packages/member/pyproject.toml",
         r#"
