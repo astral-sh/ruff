@@ -3347,6 +3347,7 @@ pub(crate) enum CandidateSolutions<'db> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct CandidateSolution<'db> {
     typevars: Box<[PathBound<'db>]>,
+    validity: SolutionValidity<'db>,
 }
 
 /// Limits shared by the preprocessing and collection walks used to extract solutions.
@@ -3628,7 +3629,10 @@ impl<'db> CandidateSolutions<'db> {
             .drain(..)
             .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
             .collect();
-        let candidate = CandidateSolution { typevars };
+        let candidate = CandidateSolution {
+            typevars,
+            validity: SolutionValidity::Valid,
+        };
         ControlFlow::Continue(Some(CandidateSolutions::Constrained(Box::new([candidate]))))
     }
 
@@ -5533,7 +5537,8 @@ mod tests {
         assert_eq!(PathBoundSolution::Unsolved.as_type(), None);
         assert_eq!(
             CandidateSolutions::Constrained(Box::new([CandidateSolution {
-                typevars: Box::new([path_bound])
+                typevars: Box::new([path_bound]),
+                validity: SolutionValidity::Valid,
             }]))
             .solve(db, &env, &builder),
             Solutions::Constrained(SolutionPaths::Complete(vec![solution([])]))
@@ -5685,9 +5690,11 @@ class E: ...
                     CandidateSolution {
                         typevars: vec![exhausted.clone(), PathBound::exact(u, str)]
                             .into_boxed_slice(),
+                        validity: SolutionValidity::Valid,
                     },
                     CandidateSolution {
                         typevars: vec![PathBound::exact(t, int)].into_boxed_slice(),
+                        validity: SolutionValidity::Valid,
                     },
                 ];
                 let mut recovered = lower
@@ -5720,9 +5727,11 @@ class E: ...
                 let paths = CandidateSolutions::Constrained(Box::new([
                     CandidateSolution {
                         typevars: rejected.into_boxed_slice(),
+                        validity: SolutionValidity::Valid,
                     },
                     CandidateSolution {
                         typevars: Box::new([PathBound::exact(t, int)]),
+                        validity: SolutionValidity::Valid,
                     },
                 ]));
                 assert_eq!(

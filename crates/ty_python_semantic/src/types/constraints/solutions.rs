@@ -5,7 +5,7 @@ use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, ConstraintId,
-    ConstraintSetStorage, NodeId, PathBoundBuilder, SolutionLimits,
+    ConstraintSetStorage, NodeId, PathBoundBuilder, SolutionLimits, SolutionValidity,
 };
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
@@ -150,7 +150,10 @@ impl<'db> SolutionWalker<'db> {
                 .drain(..)
                 .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
                 .collect();
-            let candidate = CandidateSolution { typevars };
+            let candidate = CandidateSolution {
+                typevars,
+                validity: SolutionValidity::Valid,
+            };
             result.push(candidate);
         }
 
