@@ -3209,6 +3209,81 @@ reveal_type(Child.value)  # revealed: int | str
 reveal_type(Grandchild.value)  # revealed: int | str
 ```
 
+### Unreachable declarations do not hide inherited annotations
+
+A method in an unreachable branch does not replace an attribute annotation. Subclass defaults still
+use that annotation for both assignment checks and public reads.
+
+```py
+class Base:
+    value: int = 0
+
+    if 1 == 2:
+        def value(self) -> str:
+            return "unreachable"
+
+class Child(Base):
+    value = 1
+
+class Invalid(Base):
+    value = "wrong"  # error: [invalid-assignment]
+
+reveal_type(Child.value)  # revealed: int
+reveal_type(Invalid.value)  # revealed: int
+```
+
+### Unreachable bindings do not mask inherited declarations
+
+A base with no reachable binding or declaration does not supply an attribute. Lookup continues to
+the next base in the MRO.
+
+```py
+class Left:
+    if 1 == 2:
+        value = 0
+
+class Right:
+    value: int = 0
+
+class Child(Left, Right):
+    value = "wrong"  # error: [invalid-assignment]
+
+reveal_type(Child.value)  # revealed: int
+```
+
+### Unannotated defaults retain their owner's declaration
+
+The first base that supplies a default determines the inherited declaration. Its own ancestors can
+provide that annotation; a later sibling in the subclass's MRO does not replace it.
+
+```py
+class Root:
+    value: int = 0
+
+class Left(Root):
+    value = 1
+
+class Right(Root):
+    value: str = "right"
+
+class Child(Left, Right):
+    value = "wrong"  # error: [invalid-assignment]
+
+reveal_type(Child.value)  # revealed: int
+```
+
+If the first base's default has no governing annotation, a later sibling does not supply one.
+
+```py
+class Inferred:
+    value = 0
+
+class Unannotated(Inferred, Right):
+    value = 1
+
+reveal_type(Unannotated.value)  # revealed: int
+```
+
 ## Intersections of attributes
 
 ### Attribute only available on one element
