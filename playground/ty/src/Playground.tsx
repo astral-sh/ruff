@@ -159,10 +159,6 @@ export default function Playground() {
         setError("File names cannot start with 'vendored:'.");
         return;
       }
-      if (!name) {
-        setError("Enter a file name, such as main.py.");
-        return;
-      }
 
       const workspace = session.workspace;
       const oldFile = files.metadata[file];

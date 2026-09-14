@@ -64,9 +64,10 @@ export function Files({
               onClicked={() => onSelect(id)}
               onRenamed={(newName) => {
                 const name = normalizeFileName(newName);
-                if (!hasFileNamed(name)) {
-                  onRename(id, name);
+                if (!name || hasFileNamed(name)) {
+                  return;
                 }
+                onRename(id, name);
               }}
             />
 
