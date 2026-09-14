@@ -5432,7 +5432,7 @@ fn visit_matching_typeddict_field_types<'db>(
                 env,
                 || (),
                 |unfolded| {
-                    visit_matching_typeddict_field_types(db, env, unfolded, field_name, visit)
+                    visit_matching_typeddict_field_types(db, env, unfolded, field_name, visit);
                 },
             );
         }
