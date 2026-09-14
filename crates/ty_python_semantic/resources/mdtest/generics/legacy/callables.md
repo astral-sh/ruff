@@ -553,6 +553,86 @@ reveal_type(callback)  # revealed: (*args: Any, **kwargs: Any) -> None
 static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
 ```
 
+## Inferring gradual tuple returns with concrete bounds
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+A callback returning `tuple[Any, ...]` satisfies a fixed-length tuple bound because both its
+elements and its length are gradual. Inference preserves the callback's return type.
+
+```py
+from typing import Any, Callable, TypeVar
+
+Fixed = TypeVar("Fixed", bound=tuple[int])
+
+def get_tuple() -> tuple[Any, ...]:
+    return ()
+
+def infer_fixed(callback: Callable[[], Fixed]) -> Fixed:
+    return callback()
+
+reveal_type(infer_fixed(get_tuple))  # revealed: tuple[Any, ...]
+```
+
+The gradual length can also supply required elements at either end of a variable-length bound.
+
+```py
+Prefix = TypeVar("Prefix", bound=tuple[int, *tuple[int, ...]])
+Suffix = TypeVar("Suffix", bound=tuple[*tuple[int, ...], int])
+
+def infer_prefix(callback: Callable[[], Prefix]) -> Prefix:
+    return callback()
+
+def infer_suffix(callback: Callable[[], Suffix]) -> Suffix:
+    return callback()
+
+reveal_type(infer_prefix(get_tuple))  # revealed: tuple[Any, ...]
+reveal_type(infer_suffix(get_tuple))  # revealed: tuple[Any, ...]
+```
+
+Fixed elements still have to satisfy the bound, and an ordinary homogeneous tuple does not have a
+gradual length.
+
+```py
+def wrong_element() -> tuple[str, *tuple[Any, ...]]:
+    return ("",)
+
+def get_ints() -> tuple[int, ...]:
+    return ()
+
+infer_fixed(wrong_element)  # error: [invalid-argument-type]
+infer_prefix(wrong_element)  # error: [invalid-argument-type]
+infer_fixed(get_ints)  # error: [invalid-argument-type]
+infer_prefix(get_ints)  # error: [invalid-argument-type]
+infer_suffix(get_ints)  # error: [invalid-argument-type]
+```
+
+## Source type variables in gradual tuple returns
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+A callback's fixed tuple element can contain an outer type variable and still satisfy a concrete
+bound. The gradual segment can be empty, and inference preserves the outer type variable.
+
+```py
+from typing import Any, Callable, TypeVar
+
+R = TypeVar("R", bound=tuple[object])
+T = TypeVar("T")
+
+def infer_tuple(callback: Callable[[], R]) -> R:
+    return callback()
+
+def outer(callback: Callable[[], tuple[list[T], *tuple[Any, ...]]]) -> None:
+    reveal_type(infer_tuple(callback))  # revealed: tuple[list[T@outer], *tuple[Any, ...]]
+```
+
 ## SymPy one-import MRE scaffold (multi-file)
 
 Reduced regression lock for a SymPy overload/protocol shape that can panic in the
