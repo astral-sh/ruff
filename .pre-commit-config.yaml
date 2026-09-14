@@ -72,6 +72,11 @@ repos:
     rev: 12e63946db2c5cfcc9030fac21c3883ba88c6ed8 # frozen: 0.38.0
     hooks:
       - id: check-github-workflows
+        # The bundled schema predates cache-mode. Use a pinned upstream schema
+        # until check-jsonschema includes it in a release.
+        entry: >-
+          check-jsonschema --schemafile
+          https://raw.githubusercontent.com/SchemaStore/schemastore/a1bfb2b17627062b6a938153c065cb58baef6fe7/src/schemas/json/github-workflow.json
         priority: 0
 
   # `actionlint` hook, for verifying correct syntax in GitHub Actions workflows.

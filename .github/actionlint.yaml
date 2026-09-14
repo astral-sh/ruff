@@ -18,3 +18,9 @@ self-hosted-runner:
     - github-windows-2025-x86_64-8
     - github-windows-2025-x86_64-16
     - codspeed-macro
+
+paths:
+  .github/workflows/depot-cache-mode-probe.yaml:
+    ignore:
+      # The schema hook validates cache-mode until actionlint supports it.
+      - '^unexpected key "cache-mode" for "(workflow|job)" section\.'

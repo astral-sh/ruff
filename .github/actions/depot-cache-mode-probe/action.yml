@@ -1,0 +1,12 @@
+name: Probe cache permissions
+description: Request cache-upload grants without uploading or finalizing cache entries.
+inputs:
+  backend:
+    description: The runner provider being tested.
+    required: true
+  mode:
+    description: The cache-mode requested by the job.
+    required: true
+runs:
+  using: node24
+  main: index.cjs

@@ -1,0 +1,80 @@
+name: Probe Depot cache permissions
+
+permissions:
+  contents: read
+
+cache-mode: read
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/depot-cache-mode-probe.yaml"
+      - ".github/actions/depot-cache-mode-probe/**"
+
+concurrency:
+  group: depot-cache-mode-probe-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  write-control:
+    name: Write control (${{ matrix.backend }})
+    if: >-
+      github.repository == 'astral-sh/ruff' &&
+      github.event.pull_request.head.repo.full_name == 'astral-sh/ruff' &&
+      github.head_ref == 'zsol/depot-cache-mode-probe' &&
+      github.actor == 'zsol'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - backend: github
+            runner: github-ubuntu-24.04-x86_64-4
+          - backend: depot
+            runner: depot-ubuntu-22.04-32
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 5
+    cache-mode: write
+    env:
+      PROBE_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/depot-cache-mode-probe
+        with:
+          backend: ${{ matrix.backend }}
+          mode: write
+
+  read-probe:
+    name: Read probe (${{ matrix.backend }})
+    needs: [write-control]
+    if: >-
+      !cancelled() &&
+      github.repository == 'astral-sh/ruff' &&
+      github.event.pull_request.head.repo.full_name == 'astral-sh/ruff' &&
+      github.head_ref == 'zsol/depot-cache-mode-probe' &&
+      github.actor == 'zsol'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - backend: github
+            runner: github-ubuntu-24.04-x86_64-4
+          - backend: depot
+            runner: depot-ubuntu-22.04-32
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 5
+    cache-mode: read
+    env:
+      PROBE_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/depot-cache-mode-probe
+        with:
+          backend: ${{ matrix.backend }}
+          mode: read
