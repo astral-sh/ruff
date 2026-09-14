@@ -221,6 +221,16 @@ impl<'db> SolutionWalker<'db> {
         self.found_satisfied_path(db, env, storage, limits, path)
     }
 
+    /// Create a pending candidate solution for the current path.
+    ///
+    /// This method is fallible because a path to the `true` terminal might still be unsatisfiable,
+    /// if it introduces conflicting bounds for a typevar. (The sequent map _should_ detect most
+    /// cases of conflicting bounds, but we have some final last-minute checks here to catch cases
+    /// that the sequent map can't handle yet.)
+    ///
+    /// TODO(dcreager): I consider this a bug in the sequent map, which should be addressed in its
+    /// own right, since there are many other methods that assume that a path to `true` terminal
+    /// indicates satisfiability.
     fn pending_candidate_solution(
         &self,
         db: &'db dyn Db,
@@ -228,7 +238,7 @@ impl<'db> SolutionWalker<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         path: &PathAssignments,
         upper_bound_violations: Option<&FxHashSet<BoundTypeVarInstance<'db>>>,
-    ) -> PendingCandidateSolution<'db> {
+    ) -> Option<PendingCandidateSolution<'db>> {
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
         // any unions or intersections in our type mappings in a stable order. Constraints might
         // come out of `PathAssignments` with identical `source_order`s, but if they do, those
@@ -289,10 +299,21 @@ impl<'db> SolutionWalker<'db> {
         }
 
         let mut violations = Vec::new();
-        let typevars = mappings
+        let typevars: Option<Box<[_]>> = mappings
             .into_iter()
             .map(|(bound_typevar, bounds)| {
                 let path_bound = bounds.finish(db, env, bound_typevar);
+
+                let lower = path_bound.effective_lower(db, env);
+                if !path_bound.upper.is_satisfied_by(db, env, lower) {
+                    let (when_upper, source_order) =
+                        path_bound.upper.when_satisfied_by(db, env, storage, lower);
+                    if when_upper.is_never_satisfied(db, env, storage, source_order) {
+                        // This path does not satisfy the accumulated upper bound, and is
+                        // therefore not a valid specialization.
+                        return None;
+                    }
+                }
 
                 if let Some(upper_bound_violations) = upper_bound_violations
                     && upper_bound_violations.contains(&bound_typevar)
@@ -305,21 +326,22 @@ impl<'db> SolutionWalker<'db> {
                     });
                 }
 
-                path_bound
+                Some(path_bound)
             })
             .collect();
+        let typevars = typevars?;
 
-        let validity = if violations.is_empty() {
-            SolutionValidity::Valid
-        } else {
-            SolutionValidity::Invalid(violations.into_boxed_slice())
+        let validity = match upper_bound_violations {
+            None => SolutionValidity::Valid,
+            Some(_) if violations.is_empty() => return None,
+            Some(_) => SolutionValidity::Invalid(violations.into_boxed_slice()),
         };
         let candidate = CandidateSolution { typevars, validity };
-
-        PendingCandidateSolution {
+        let pending = PendingCandidateSolution {
             candidate,
             source_orders,
-        }
+        };
+        Some(pending)
     }
 
     fn found_satisfied_path<L: SolutionLimits>(
@@ -330,9 +352,10 @@ impl<'db> SolutionWalker<'db> {
         limits: &mut L,
         path: &PathAssignments,
     ) -> ControlFlow<L::Break> {
-        limits.satisfied_path()?;
-        let pending = self.pending_candidate_solution(db, env, storage, path, None);
-        self.pending.push(pending);
+        if let Some(pending) = self.pending_candidate_solution(db, env, storage, path, None) {
+            limits.satisfied_path()?;
+            self.pending.push(pending);
+        }
         ControlFlow::Continue(())
     }
 
@@ -355,8 +378,11 @@ impl<'db> SolutionWalker<'db> {
                 limits,
                 path,
                 constraint,
-                &mut |_this, _storage, _limits, _path| {
-                    satisfied = true;
+                &mut |this, storage, _limits, path| {
+                    let pending = this.pending_candidate_solution(db, env, storage, path, None);
+                    if pending.is_some() {
+                        satisfied = true;
+                    }
                     ControlFlow::Continue(())
                 },
             )?;
@@ -365,9 +391,17 @@ impl<'db> SolutionWalker<'db> {
             }
         }
 
-        let pending =
-            self.pending_candidate_solution(db, env, storage, path, Some(&upper_bound_violations));
-        self.pending.push(pending);
+        // Complete validation failed, but no single declaration explains why. The declarations
+        // are only inconsistent in combination, so there is no attributable candidate to retain.
+        if upper_bound_violations.is_empty() {
+            return ControlFlow::Continue(());
+        }
+
+        if let Some(pending) =
+            self.pending_candidate_solution(db, env, storage, path, Some(&upper_bound_violations))
+        {
+            self.pending.push(pending);
+        }
         ControlFlow::Continue(())
     }
 
