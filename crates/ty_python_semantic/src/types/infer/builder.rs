@@ -4816,12 +4816,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && (
                         // Value type would be an enum member at runtime (exclude callables,
                         // which are never members)
-                        !inferred_ty.is_subtype_of(
-                            db,
-                            env,
-                            Type::Callable(CallableType::unknown(self.db()))
-                                .top_materialization(db, env),
-                        )
+                        !inferred_ty.is_subtype_of(db, env, Type::Callable(CallableType::top(db)))
                     )
                 {
                     let current_scope_id = self.scope().file_scope_id(self.db());

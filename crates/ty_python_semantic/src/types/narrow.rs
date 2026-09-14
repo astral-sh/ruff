@@ -18,10 +18,10 @@ use crate::types::{
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
     Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
-    callable_pattern_type, class_pattern_positional_sources,
-    definite_match_pattern_type_for_subject, exact_sequence_pattern_type, infer_expression_types,
-    mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
-    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    class_pattern_positional_sources, definite_match_pattern_type_for_subject,
+    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
+    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
+    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -687,7 +687,7 @@ impl ClassInfoConstraintFunction {
                         if use_generic_filtering {
                             Type::Callable(CallableType::unknown(db))
                         } else {
-                            callable_pattern_type(db, env)
+                            Type::Callable(CallableType::top(db))
                         }
                     })
                 }
@@ -1476,7 +1476,7 @@ fn positive_class_pattern_type<'db>(
             Some(if use_generic_filtering {
                 Type::Callable(CallableType::unknown(db))
             } else {
-                callable_pattern_type(db, env)
+                Type::Callable(CallableType::top(db))
             })
         }
         _ if class_expression_ty.is_assignable_to(

@@ -754,6 +754,11 @@ impl<'db> CallableType<'db> {
         Self::single(db, Signature::unknown())
     }
 
+    /// Create the fully static `Top[Callable[..., object]]` type.
+    pub(crate) fn top(db: &'db dyn Db) -> CallableType<'db> {
+        Self::single(db, Signature::new(Parameters::top(), Type::object()))
+    }
+
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::FunctionLike)
     }

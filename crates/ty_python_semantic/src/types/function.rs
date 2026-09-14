@@ -3048,8 +3048,7 @@ impl KnownFunction {
                             SpecialFormType::TypingCallable
                             | SpecialFormType::CollectionsAbcCallable,
                         ) => {
-                            let callable_top = Type::Callable(CallableType::unknown(db))
-                                .top_materialization(db, env);
+                            let callable_top = Type::Callable(CallableType::top(db));
                             if first_arg.is_subtype_of(db, env, callable_top) {
                                 Truthiness::AlwaysTrue
                             } else {
