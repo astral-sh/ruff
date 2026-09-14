@@ -677,34 +677,51 @@ fn check_class_declaration<'db>(
                 ClassBase::Class(class) => class,
             };
 
-            let Some((superclass_literal, superclass_specialization)) =
-                superclass.static_class_literal(db)
-            else {
-                continue;
-            };
-            let superclass_scope = superclass_literal.body_scope(db);
-            let superclass_symbol_table = place_table(db, superclass_scope);
-            let superclass_symbol_id = superclass_symbol_table.symbol_id(&member.name);
-
-            let mut method_kind = MethodKind::default();
-
-            // If the member is not defined on the class itself, skip it
-            if let Some(id) = superclass_symbol_id {
-                let superclass_symbol = superclass_symbol_table.symbol(id);
-                if !(superclass_symbol.is_bound() || superclass_symbol.is_declared()) {
-                    continue;
-                }
-            } else {
-                if superclass_literal
-                    .own_synthesized_member(db, env, superclass_specialization, None, &member.name)
-                    .is_none()
+            // If the member is not defined on the class itself, skip it. Functional named tuples
+            // have synthesized members but no class body in which to look up their definitions.
+            let (superclass_symbol, method_kind) =
+                if let Some((superclass_literal, superclass_specialization)) =
+                    superclass.static_class_literal(db)
                 {
+                    let superclass_scope = superclass_literal.body_scope(db);
+                    let superclass_symbol_table = place_table(db, superclass_scope);
+                    if let Some(id) = superclass_symbol_table.symbol_id(&member.name) {
+                        let superclass_symbol = superclass_symbol_table.symbol(id);
+                        if !(superclass_symbol.is_bound() || superclass_symbol.is_declared()) {
+                            continue;
+                        }
+                        (Some((superclass_scope, id)), MethodKind::default())
+                    } else {
+                        if superclass_literal
+                            .own_synthesized_member(
+                                db,
+                                env,
+                                superclass_specialization,
+                                None,
+                                &member.name,
+                            )
+                            .is_none()
+                        {
+                            continue;
+                        }
+                        (
+                            None,
+                            CodeGeneratorKind::from_class(db, superclass_literal.into())
+                                .map(MethodKind::Synthesized)
+                                .unwrap_or_default(),
+                        )
+                    }
+                } else if matches!(
+                    superclass.class_literal(db),
+                    ClassLiteral::DynamicNamedTuple(_)
+                ) && !superclass
+                    .own_class_member(db, env, None, &member.name)
+                    .is_undefined()
+                {
+                    (None, MethodKind::Synthesized(CodeGeneratorKind::NamedTuple))
+                } else {
                     continue;
-                }
-                method_kind = CodeGeneratorKind::from_class(db, superclass_literal.into())
-                    .map(MethodKind::Synthesized)
-                    .unwrap_or_default();
-            }
+                };
 
             let superclass_instance_member =
                 lookup_override_member(db, env, superclass, &member.name);
@@ -729,8 +746,7 @@ fn check_class_declaration<'db>(
                 missing_override_target = Some(MissingOverrideTarget::for_superclass(
                     db,
                     superclass,
-                    superclass_scope,
-                    superclass_symbol_id,
+                    superclass_symbol,
                 ));
             }
 
@@ -744,7 +760,7 @@ fn check_class_declaration<'db>(
 
                 if configuration.check_final_method_overridden() {
                     overridden_final_method = overridden_final_method.or_else(|| {
-                        let superclass_symbol_id = superclass_symbol_id?;
+                        let (superclass_scope, superclass_symbol_id) = superclass_symbol?;
 
                         // TODO: `@final` should be more like a type qualifier:
                         // we should also recognise `@final`-decorated methods that don't end up
@@ -777,8 +793,8 @@ fn check_class_declaration<'db>(
 
                         // Find the declaration definition in the superclass for the secondary
                         // annotation.
-                        let superclass_definition = superclass_symbol_id.and_then(|id| {
-                            use_def_map(db, superclass_scope)
+                        let superclass_definition = superclass_symbol.and_then(|(scope, id)| {
+                            use_def_map(db, scope)
                                 .end_of_scope_symbol_declarations(id)
                                 .find_map(|decl| decl.declaration.definition())
                         });
@@ -848,8 +864,8 @@ fn check_class_declaration<'db>(
                             continue;
                         }
 
-                        let superclass_definition = superclass_symbol_id
-                            .and_then(|id| symbol_definition(db, superclass_scope, id));
+                        let superclass_definition = superclass_symbol
+                            .and_then(|(scope, id)| symbol_definition(db, scope, id));
                         report_invalid_attribute_override(
                             context,
                             &member.name,
@@ -1700,11 +1716,9 @@ impl<'db> MissingOverrideTarget<'db> {
     fn for_superclass(
         db: &'db dyn Db,
         superclass: ClassType<'db>,
-        superclass_scope: ScopeId<'db>,
-        superclass_symbol_id: Option<ScopedSymbolId>,
+        superclass_symbol: Option<(ScopeId<'db>, ScopedSymbolId)>,
     ) -> Self {
-        let definition =
-            superclass_symbol_id.and_then(|id| symbol_definition(db, superclass_scope, id));
+        let definition = superclass_symbol.and_then(|(scope, id)| symbol_definition(db, scope, id));
 
         Self {
             superclass,

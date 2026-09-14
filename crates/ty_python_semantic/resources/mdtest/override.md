@@ -206,6 +206,16 @@ class Compatible(Parent):
     def __new__(cls, value: int) -> Compatible: ...
 ```
 
+Adding an optional parameter also preserves every call accepted by the parent:
+
+```pyi
+class Wider(Parent):
+    @override
+    def __init__(self, value: int, extra: int = 0) -> None: ...
+    @override
+    def __new__(cls, value: int, extra: int = 0) -> Wider: ...
+```
+
 Changing the parameter type from `int` to `str` is incompatible when the constructor is explicitly
 marked as an override:
 
@@ -469,6 +479,50 @@ class IncompatibleClassMethod(Parent):
     def __new__(cls, constructed_class: type[Self], value: str) -> Self: ...  # error: [invalid-method-override]
 ```
 
+## Overrides of decorated classmethod constructors
+
+A signature-preserving decorator on a classmethod `__new__` does not change which overrides are
+compatible. Both implicit receivers are class objects; the descriptor's `cls` is not an instance of
+the subclass:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing_extensions import Callable, Self, override
+
+def preserve_signature[**P, R](function: Callable[P, R]) -> Callable[P, R]: ...
+
+class Parent:
+    @classmethod
+    @preserve_signature
+    def __new__(cls: type[Parent], constructed_class: type[Parent], value: int) -> Parent: ...
+
+class Compatible(Parent):
+    @override
+    def __new__(cls, value: int) -> Compatible: ...
+
+class Incompatible(Parent):
+    @override
+    def __new__(cls, value: str) -> Incompatible: ...  # error: [invalid-method-override]
+```
+
+`type[Self]` annotates each implicit class receiver, while the return `Self` denotes an instance.
+Returning a subclass instance is compatible with the parent's covariant return type:
+
+```pyi
+class SelfParent:
+    @classmethod
+    @preserve_signature
+    def __new__(cls: type[Self], constructed_class: type[Self], value: int) -> Self: ...
+
+class SelfCompatible(SelfParent):
+    @override
+    def __new__(cls, value: int) -> Self: ...
+```
+
 ## Overrides of generated `NamedTuple` constructors
 
 A subclass can explicitly override a generated `NamedTuple` constructor with a compatible signature.
@@ -489,6 +543,25 @@ class Incompatible(Parent):
     def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
 ```
 
+## Overrides of functional `NamedTuple` constructors
+
+The functional `NamedTuple` form also generates a constructor from its declared fields. A compatible
+override accepts those fields rather than the iterable accepted by `tuple.__new__`:
+
+```pyi
+from typing_extensions import NamedTuple, Self, override
+
+Parent = NamedTuple("Parent", [("value", int)])
+
+class Compatible(Parent):
+    @override
+    def __new__(cls, value: int) -> Self: ...
+
+class Incompatible(Parent):
+    @override
+    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override] "Parent.__new__"
+```
+
 ## Constructor overrides with inherited incompatibilities
 
 An undecorated constructor can change the parameters accepted by its parent. An explicit override in
@@ -506,6 +579,42 @@ class Parent(Grandparent):
 class Child(Parent):
     @override
     def __new__(cls, value: str) -> Self: ...
+```
+
+## Constructor overrides checked against a grandparent
+
+The immediate parent can accept every call while the grandparent still imposes a narrower
+constructor signature. The diagnostic for the child names `Grandparent`, whose `int` argument the
+override does not accept:
+
+```pyi
+from typing import Any
+from typing_extensions import override
+
+class Grandparent:
+    def __init__(self, x: int) -> None: ...
+
+class Parent(Grandparent):
+    def __init__(self, *args: Any, **kwargs: Any) -> None: ...
+
+class Child(Parent):
+    @override
+    def __init__(self, x: str) -> None: ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `__init__`
+  --> src/mdtest_snippet.pyi:12:9
+   |
+12 |     def __init__(self, x: str) -> None: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Grandparent.__init__`
+   |
+  ::: src/mdtest_snippet.pyi:5:9
+   |
+ 5 |     def __init__(self, x: int) -> None: ...
+   |         ------------------------------ `Grandparent.__init__` defined here
+info: parameter `x` has an incompatible type: `int` is not assignable to `str`
+info: This violates the Liskov Substitution Principle
 ```
 
 ## Constructor overrides with inherited `Self` returns
