@@ -1,10 +1,15 @@
 use crate::Db;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
-    place_by_id, place_from_bindings,
+    TypeOrigin, place_by_id, place_from_bindings, place_from_declarations,
 };
-use crate::types::{ProgramEnvironment, Type};
-use ty_python_core::{place_table, scope::ScopeId, use_def_map};
+use crate::types::{
+    MemberLookupPolicy, ProgramEnvironment, Type, TypeQualifiers, infer::nearest_enclosing_class,
+};
+use ty_python_core::{
+    definition::DefinitionKind, place_table, scope::ScopeId, semantic_index,
+    symbol::ScopedSymbolId, use_def_map,
+};
 
 /// The return type of certain member-lookup operations. Contains information
 /// about the type, type qualifiers, boundness/declaredness.
@@ -57,13 +62,22 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
     place_table(db, scope)
         .symbol_id(name)
         .map(|symbol_id| {
-            let place_and_quals = place_by_id(
+            let mut place_and_quals = place_by_id(
                 db,
                 scope,
                 symbol_id.into(),
                 RequiresExplicitReExport::No,
                 ConsideredDefinitions::EndOfScope,
             );
+
+            if let Place::Defined(ref mut place) = place_and_quals.place
+                && place.origin == TypeOrigin::Inferred
+                && let Some(inherited) = inherited_class_attribute_declaration(db, scope, symbol_id)
+                && let Place::Defined(declared) = inherited.place
+            {
+                *place = declared.with_definedness(place.definedness);
+                place_and_quals.qualifiers = inherited.qualifiers;
+            }
 
             if !place_and_quals.is_undefined() && !place_and_quals.is_init_var() {
                 // Trust the declared type if we see a class-level declaration
@@ -106,4 +120,56 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
             }
         })
         .unwrap_or_default()
+}
+
+/// Returns the inherited declaration for an unannotated class-body assignment.
+///
+/// A subclass assignment such as `items = []` retains an inherited `items: list[int]`
+/// declaration. Both initializer inference and public member lookup use that declaration,
+/// while an explicit annotation or a new method definition supplies its own public type.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+pub(super) fn inherited_class_attribute_declaration<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    symbol: ScopedSymbolId,
+) -> Option<PlaceAndQualifiers<'db>> {
+    scope.node(db).as_class()?;
+    let table = place_table(db, scope);
+    let name = table.symbol(symbol).name();
+    let use_def = use_def_map(db, scope);
+    let env = ProgramEnvironment::from_scope(scope);
+    if !place_from_declarations(db, &env, use_def.end_of_scope_symbol_declarations(symbol))
+        .ignore_conflicting_declarations()
+        .is_undefined()
+        || !use_def.end_of_scope_symbol_bindings(symbol).all(|binding| {
+            binding
+                .binding
+                .definition()
+                .is_none_or(|definition| definition.kind(db).is_unannotated_assignment())
+        })
+    {
+        return None;
+    }
+
+    let class = nearest_enclosing_class(db, semantic_index(db, scope.program_file(db)), scope)?;
+    let specialization = class
+        .generic_context(db)
+        .map(|context| context.identity_specialization(db));
+    let inherited = class.class_member_from_mro(
+        db,
+        &env,
+        name,
+        MemberLookupPolicy::default(),
+        class.iter_mro(db, specialization).skip(1),
+    );
+    if let Place::Defined(DefinedPlace { origin: TypeOrigin::Declared, provenance, .. }) = inherited.place
+        // A synthesized member's type is not an annotation for subclass assignments, and
+        // `Final` declarations cannot be reassigned by a subclass at all.
+        && !inherited.qualifiers.contains(TypeQualifiers::FINAL)
+        && provenance.definition().is_some_and(|definition| matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_)))
+    {
+        Some(inherited)
+    } else {
+        None
+    }
 }

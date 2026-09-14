@@ -1305,8 +1305,8 @@ reveal_type(c_instance.variable_with_class_default1)  # revealed: Literal["value
 
 #### Augmented assignments to overriding class-level defaults
 
-An unannotated class-level default supplies the initial value for an augmented assignment, even when
-another branch of a diamond declares a wider instance attribute.
+An unannotated class-level default retains the inherited declaration, including through a diamond.
+An augmented assignment must accept every value permitted by that declaration.
 
 ```py
 class Base:
@@ -1321,9 +1321,10 @@ class Child(First, Second):
     value = 1
 
     def update(self) -> None:
+        # error: [unsupported-operator] "Operator `|=` is not supported between objects of type `None` and `Literal[2]`"
         self.value |= 2
 
-reveal_type(Child().value)  # revealed: int
+reveal_type(Child().value)  # revealed: int | None
 ```
 
 #### Descriptor attributes as class variables
@@ -1400,8 +1401,7 @@ class Intermediate(Base):
     # TODO: This should be an error
     redeclared_with_wider_type: str | int | None
 
-    # TODO: This should be an `invalid-assignment` error
-    overwritten_in_subclass_body = 1
+    overwritten_in_subclass_body = 1  # error: [invalid-assignment]
 
     # TODO: This should be an `invalid-assignment` error
     pure_overwritten_in_subclass_body = 1
@@ -1441,9 +1441,8 @@ reveal_type(Derived().redeclared_with_narrower_type)  # revealed: str
 reveal_type(Derived.redeclared_with_wider_type)  # revealed: str | int | None
 reveal_type(Derived().redeclared_with_wider_type)  # revealed: str | int | None
 
-# TODO: Both of these should be `str`
-reveal_type(Derived.overwritten_in_subclass_body)  # revealed: int
-reveal_type(Derived().overwritten_in_subclass_body)  # revealed: int | str
+reveal_type(Derived.overwritten_in_subclass_body)  # revealed: str
+reveal_type(Derived().overwritten_in_subclass_body)  # revealed: str
 
 reveal_type(Derived.redeclared_in_method_with_same_type)  # revealed: str | None
 reveal_type(Derived().redeclared_in_method_with_same_type)  # revealed: str | None
@@ -3048,6 +3047,117 @@ reveal_mro(A)
 reveal_type(A.X)  # revealed: int
 
 A.X = 100
+```
+
+### Unannotated assignments retain inherited declarations
+
+Assigning a new default in a subclass does not redeclare an annotated attribute. The inherited type
+provides context for the initializer and remains the public type for class and instance access.
+Inside the class body, the assigned value can still narrow the type of a bare name.
+
+```py
+from typing import Protocol
+
+class Base:
+    items: list[int] = []
+    values: tuple[int, ...] = ()
+    value: int | str = 0
+
+class Child(Base):
+    items = []
+    values = ()
+    value = "child"
+    reveal_type(items)  # revealed: list[int]
+    reveal_type(values)  # revealed: tuple[()]
+    reveal_type(value)  # revealed: Literal["child"]
+
+reveal_type(Child.items)  # revealed: list[int]
+reveal_type(Child.values)  # revealed: tuple[int, ...]
+reveal_type(Child.value)  # revealed: int | str
+
+class HasItems(Protocol):
+    items: list[int]
+    values: tuple[int, ...]
+    value: int | str
+
+def check(child: Child) -> None:
+    reveal_type(child.items)  # revealed: list[int]
+    reveal_type(child.values)  # revealed: tuple[int, ...]
+    reveal_type(child.value)  # revealed: int | str
+    child.items.append("wrong")  # error: [invalid-argument-type]
+    child.values = (1, 2)
+    child.value = 1
+    protocol: HasItems = child
+
+class Grandchild(Child):
+    value = 1
+
+reveal_type(Grandchild.value)  # revealed: int | str
+```
+
+The initializer must be assignable to the inherited declaration. An explicit subclass annotation
+instead supplies a new declared type.
+
+```py
+class Invalid(Base):
+    items = ["wrong"]  # error: [invalid-assignment]
+    values = ("wrong",)  # error: [invalid-assignment]
+
+class Redeclared(Base):
+    value: str = "child"
+
+reveal_type(Redeclared.value)  # revealed: str
+```
+
+### Gradual types and class-variable qualifiers are inherited
+
+An inherited `Any` annotation remains gradual. A `ClassVar` annotation still prevents instance
+writes after a subclass supplies a new default.
+
+```py
+from typing import Any, ClassVar
+
+class Base:
+    dynamic: Any
+    class_only: ClassVar[int | str] = 0
+
+class Child(Base):
+    dynamic = "child"
+    class_only = "child"
+
+def check(child: Child) -> None:
+    reveal_type(child.dynamic)  # revealed: Any
+    reveal_type(child.class_only)  # revealed: int | str
+    child.dynamic = 1
+    child.class_only = 1  # error: [invalid-attribute-access]
+
+Child.class_only = 1
+```
+
+### Inherited declarations follow the MRO
+
+The first member in the MRO supplies the declaration. An unannotated member with no inherited
+declaration still uses its inferred type.
+
+```py
+class Left:
+    value: int | str = 0
+
+class Right:
+    value: bytes = b""
+
+class Child(Left, Right):
+    value = "child"
+
+reveal_type(Child.value)  # revealed: int | str
+
+class Inferred:
+    value = 0
+
+class Independent(Inferred):
+    value = "child"
+
+reveal_type(Independent.value)  # revealed: str
 ```
 
 ## Intersections of attributes

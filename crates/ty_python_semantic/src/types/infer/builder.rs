@@ -108,6 +108,7 @@ use crate::types::infer::{
     nearest_enclosing_function, original_class_type,
 };
 use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
+use crate::types::member::inherited_class_attribute_declaration;
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::narrow::pattern_success_types;
 use crate::types::newtype::NewType;
@@ -1599,6 +1600,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     format_enumeration(conflicting.iter().map(|ty| ty.display(db, env)))
                 ));
             }
+        }
+
+        if place_and_quals.is_undefined()
+            && is_local
+            && binding.kind(db).is_unannotated_assignment()
+            && let Some(symbol) = place_id.as_symbol()
+            && let Some(inherited) =
+                inherited_class_attribute_declaration(db, binding.scope(db), symbol)
+        {
+            place_and_quals = inherited;
         }
 
         // Fall back to implicit module globals for (possibly) unbound names
