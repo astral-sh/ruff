@@ -912,7 +912,14 @@ fn check_class_declaration<'db>(
                 continue;
             };
 
-            if subclass_override_type.is_assignable_to(db, env, superclass_override_type) {
+            if override_types_are_assignable(
+                db,
+                env,
+                class,
+                &member.name,
+                subclass_override_type,
+                superclass_override_type,
+            ) {
                 continue;
             }
 
@@ -1064,13 +1071,26 @@ fn bind_new_for_override<'db>(
                     .iter()
                     .any(Signature::has_explicit_positional_receiver_annotation)
             {
-                // Overloads specialized for other subclasses do not constrain this override.
+                // A generic subclass must respect every overload that applies to one of its
+                // specializations. Concrete subclasses can discard overloads for other receivers.
+                let generic_receiver = receiver.has_typevar(db, env);
                 CallableSignature::from_overloads(
                     signature
                         .overloads
                         .iter()
                         .filter_map(|signature| {
-                            signature.bind_self_if_compatible(db, env, receiver, instance_of_class)
+                            if generic_receiver {
+                                signature
+                                    .bind_self_if_possible(db, env, receiver, instance_of_class)
+                                    .map(CallableSignature::single)
+                            } else {
+                                signature.bind_self_if_compatible(
+                                    db,
+                                    env,
+                                    receiver,
+                                    instance_of_class,
+                                )
+                            }
                         })
                         .flat_map(|signature| signature.overloads),
                 )
@@ -1085,6 +1105,38 @@ fn bind_new_for_override<'db>(
             )
         })
         .into_type(db, env)
+}
+
+/// Checks generic `__new__` overrides within each inherited overload's receiver domain.
+fn override_types_are_assignable<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassType<'db>,
+    name: &Name,
+    subclass_type: Type<'db>,
+    superclass_type: Type<'db>,
+) -> bool {
+    if name == "__new__"
+        && Type::from(class).has_typevar(db, env)
+        && let Some(subclass_callables) = subclass_type.try_upcast_to_callable(db, env)
+        && let Some(superclass_callables) = superclass_type.try_upcast_to_callable(db, env)
+        && superclass_callables
+            .iter()
+            .any(|callable| callable.signatures(db).has_receiver_constraints())
+    {
+        return subclass_callables.iter().all(|subclass| {
+            superclass_callables.iter().any(|superclass| {
+                subclass
+                    .signatures(db)
+                    .is_assignable_within_target_receiver_domains(
+                        db,
+                        env,
+                        superclass.signatures(db),
+                    )
+            })
+        });
+    }
+    subclass_type.is_assignable_to(db, env, superclass_type)
 }
 
 /// Returns whether the selected inherited method already violates this ancestor's contract.
@@ -1120,7 +1172,21 @@ fn is_inherited_method_violation<'db>(
             // An inherited violation belongs to the parent's own receiver domain.
             let parent_type = bind_new_for_override(db, env, parent, name, parent_type);
             let superclass_type = bind_new_for_override(db, env, parent, name, superclass_type);
-            if is_assignable_method_override(db, env, parent_type, superclass_type) {
+            let is_assignable = |subclass_type, superclass_type| {
+                if name == "__new__" {
+                    override_types_are_assignable(
+                        db,
+                        env,
+                        parent,
+                        name,
+                        subclass_type,
+                        superclass_type,
+                    )
+                } else {
+                    is_assignable_method_override(db, env, subclass_type, superclass_type)
+                }
+            };
+            if is_assignable(parent_type, superclass_type) {
                 return false;
             }
 
@@ -1140,9 +1206,7 @@ fn is_inherited_method_violation<'db>(
                     else {
                         return false;
                     };
-                    !is_assignable_method_override(
-                        db,
-                        env,
+                    !is_assignable(
                         parent_type,
                         bind_new_for_override(db, env, parent, name, ancestor_type),
                     )

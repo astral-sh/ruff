@@ -551,6 +551,49 @@ impl<'db> CallableSignature<'db> {
         );
         checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
     }
+
+    pub(crate) fn has_receiver_constraints(&self) -> bool {
+        self.overloads
+            .iter()
+            .any(|signature| signature.receiver_constraints().is_some())
+    }
+
+    /// Checks an override for every valid class specialization where each target overload applies.
+    /// Class type variables stay shared with the receiver constraints; method type variables remain
+    /// generic for the usual callable compatibility check.
+    ///
+    /// TODO: The lazy callable relation quantifies away method type variables without validating
+    /// their declared bounds, so an override generic over `U: bytes` can still be accepted when
+    /// an inherited overload requires `int`.
+    pub(crate) fn is_assignable_within_target_receiver_domains(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: &Self,
+    ) -> bool {
+        let source = Self::from_overloads(
+            self.overloads
+                .iter()
+                .map(|signature| signature.with_class_typevars_fixed(db, env)),
+        );
+        target.overloads.iter().all(|signature| {
+            let constraints = ConstraintSetBuilder::new();
+            let domain = signature.receiver_constraints().map_or_else(
+                || ConstraintSet::from_bool(&constraints, true),
+                |domain| constraints.load(db, env, domain),
+            );
+            let mut signature = signature.with_class_typevars_fixed(db, env);
+            signature.extras = SignatureExtras::new(signature.source_overload_index_raw(), None);
+            let target = Self::single(signature);
+            domain
+                .and(db, &constraints, || {
+                    source
+                        .when_constraint_set_assignable_to(db, env, &target, &constraints)
+                        .negate(db, &constraints)
+                })
+                .has_no_valid_solutions(db, env)
+        })
+    }
 }
 
 impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
@@ -1421,6 +1464,59 @@ impl<'db> Signature<'db> {
                     Some(typing_self_type),
                 )
             })
+    }
+
+    /// Binds the receiver if its constraints hold for at least one valid specialization.
+    /// The bound signature retains those constraints for subsequent compatibility checks.
+    pub(crate) fn bind_self_if_possible(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> Option<Self> {
+        let bound =
+            self.bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type));
+        if bound
+            .receiver_constraints()
+            .is_some_and(|receiver_constraints| {
+                let constraints = ConstraintSetBuilder::new();
+                constraints
+                    .load(db, env, receiver_constraints)
+                    .has_no_valid_solutions(db, env)
+            })
+        {
+            return None;
+        }
+        Some(bound)
+    }
+
+    /// Leaves class type variables free so a receiver domain and the callable relation can refer
+    /// to the same specialization instead of freshening it separately for each signature.
+    fn with_class_typevars_fixed(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+        let Some(context) = self.generic_context else {
+            return self.clone();
+        };
+        let is_class_typevar = |typevar: BoundTypeVarInstance<'db>| {
+            typevar
+                .binding_context(db)
+                .definition()
+                .is_some_and(|definition| matches!(definition.kind(db), DefinitionKind::Class(_)))
+        };
+        if !context.variables(db).any(is_class_typevar) {
+            return self.clone();
+        }
+        let context = GenericContext::from_typevar_instances(
+            db,
+            env,
+            context
+                .variables(db)
+                .filter(|typevar| !is_class_typevar(*typevar)),
+        );
+        Self {
+            generic_context: (context.variables(db).len() > 0).then_some(context),
+            ..self.clone()
+        }
     }
 
     /// Returns `true` if this signature's first parameter can accept the bound `self` type.
