@@ -2,16 +2,17 @@
 
 ## Overview
 
-The [CLI threat model](cli-threat-model.md) applies to the language servers. The workspace trust rules
-below take precedence when deciding which inputs are trusted. Browser integrations have a separate
+This model covers the Ruff and ty language servers and their interactions with editors. The
+[CLI threat model](cli-threat-model.md) also applies. The workspace trust rules below take precedence
+when deciding which inputs are trusted. Browser integrations have a separate
 [playground model](playground-threat-model.md).
 
 ## Trust boundaries and assumptions
 
 - **Attacker-controlled:** all inputs analyzed in an untrusted workspace, including source code,
     project configuration, and notebooks.
-- **Trusted local input:** the editor, its extensions, the local machine, including its file system,
-    and the user's configuration and trust decisions.
+- **Trusted local input:** the editor, its extensions and their bundled files, the local machine and
+    its file system, and the user's configuration and trust decisions.
 
 ty treats workspaces as trusted unless `untrustedWorkspace` is true at initialization. Trust extends
 to everything in the workspace, including source code, configuration, notebooks, and the targets of
@@ -21,10 +22,12 @@ symlinks that point outside it.
 
 - **Code Execution:** When `untrustedWorkspace` is true, ty must not execute code related to the
     workspace or its dependencies, including code run during installation.
-- **Edits:** Editing operations must not change unrelated files.
-- **Output:** Diagnostics, documentation, and logs must not allow attacker-controlled text to run
-    code or invoke editor commands.
-- **Availability:** An isolated parser panic or slow analysis is a correctness or performance bug.
+- **Edits:** Only editing operations may change source files, and they must not change unrelated
+    files.
+- **Output:** Attacker-controlled text in diagnostics, documentation, and logs must not inject code
+    or editor commands. Actions intentionally provided by the editor or language server may run when
+    the user chooses them.
+- **Availability:** An isolated analysis failure or slow analysis is a correctness or performance bug.
     A security issue requires repeatable, disproportionate resource use that materially disrupts
     the editor or the developer's machine beyond the failed analysis.
 

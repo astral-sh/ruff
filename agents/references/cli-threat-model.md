@@ -2,9 +2,8 @@
 
 ## Overview
 
-Ruff checks and formats Python code. ty checks Python types. Their commands and native libraries read
-source files, configuration, and dependencies; produce diagnostics; and edit files when requested.
-They run with the user's or CI worker's permissions.
+Ruff is a Python linter and formatter. ty is a Python type checker. Their commands and native
+libraries run with the user's or CI worker's permissions.
 
 A behavior is a security issue only when an independent attacker controls a concrete input, Ruff or
 ty uses it to cross a boundary defined below, and the crossing gives the attacker new power or harms
@@ -34,7 +33,7 @@ Editors, playgrounds, and repository automation have [separate models](threat-mo
     synchronization may install dependencies.
 - **Output:** Diagnostics may contain source text and paths. They must be encoded for the selected
     terminal or CI format so that attacker-controlled text cannot inject commands or active content.
-- **Availability:** An isolated parser panic or slow analysis is a correctness or performance bug.
+- **Availability:** Failing or slow analysis is a correctness or performance bug.
     A security issue requires repeatable, disproportionate resource use that materially disrupts
     the developer's machine or CI worker beyond the failed analysis.
 
