@@ -230,15 +230,15 @@ impl<'db> CandidateSolutions<'db> {
             &mut ProjectionTypeBudget,
         ) -> Result<T, ProjectionError>,
     ) -> Result<SolutionProjection<T>, ProjectionError> {
-        let paths = match self {
+        let candidates = match self {
             Self::Unsatisfiable => return Ok(SolutionProjection::Unsatisfiable),
             Self::Unconstrained => return Ok(SolutionProjection::Unconstrained),
-            Self::Constrained(paths) => paths,
+            Self::Constrained(candidates) => candidates,
         };
 
         let mut retained = false;
-        for path in paths {
-            let Some((solution, incomplete)) = Self::solve_path_with(path, &mut choose) else {
+        for candidate in candidates {
+            let Some((solution, incomplete)) = Self::solve_path_with(candidate, &mut choose) else {
                 continue;
             };
             if !solution.is_valid() {
