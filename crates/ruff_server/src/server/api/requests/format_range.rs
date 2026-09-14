@@ -78,7 +78,9 @@ fn format_text_document_range(
 
     let text = text_document.contents();
     let index = text_document.index();
-    let range = range.to_text_range(text, index, encoding);
+    let range = range
+        .to_text_range(text, index, encoding)
+        .with_failure_code(lsp_server::ErrorCode::InvalidParams)?;
     let formatted_range = crate::format::format_range(
         text_document,
         source_type,
