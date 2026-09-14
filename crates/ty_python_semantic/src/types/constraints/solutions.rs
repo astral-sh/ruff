@@ -12,15 +12,19 @@ use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,
-    sorted_paths: Vec<Vec<(ConstraintId, usize)>>,
+    pending: Vec<PendingCandidateSolution>,
     _phantom: PhantomData<&'db ()>,
+}
+
+struct PendingCandidateSolution {
+    typevars: Vec<(ConstraintId, usize)>,
 }
 
 impl<'db> SolutionWalker<'db> {
     pub(super) fn new(source_orders: FxIndexSet<ConstraintId>) -> Self {
         Self {
             source_orders,
-            sorted_paths: Vec::default(),
+            pending: Vec::default(),
             _phantom: PhantomData,
         }
     }
@@ -71,7 +75,7 @@ impl<'db> SolutionWalker<'db> {
     }
 
     fn found_satisfied_path(&mut self, path: &PathAssignments) {
-        let mut path: Vec<_> = path
+        let mut typevars: Vec<_> = path
             .positive_constraints()
             .map(|(constraint, source_constraint)| {
                 let source_order = self
@@ -86,8 +90,9 @@ impl<'db> SolutionWalker<'db> {
         // come out of `PathAssignments` with identical `source_order`s, but if they do, those
         // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
         // retain that stable per-tie ordering.
-        path.sort_by_key(|(_, source_order)| *source_order);
-        self.sorted_paths.push(path);
+        typevars.sort_by_key(|(_, source_order)| *source_order);
+        let pending = PendingCandidateSolution { typevars };
+        self.pending.push(pending);
     }
 
     pub(super) fn finish(
@@ -96,67 +101,83 @@ impl<'db> SolutionWalker<'db> {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
     ) -> CandidateSolutions<'db> {
-        if self.sorted_paths.is_empty() {
+        if self.pending.is_empty() {
             return CandidateSolutions::Unsatisfiable;
         }
 
-        self.sorted_paths.sort_by(|path1, path2| {
-            let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
-            let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
+        self.pending.sort_by(|pending1, pending2| {
+            let source_orders1 = pending1
+                .typevars
+                .iter()
+                .map(|(_, source_order)| *source_order);
+            let source_orders2 = pending2
+                .typevars
+                .iter()
+                .map(|(_, source_order)| *source_order);
             source_orders1.cmp(source_orders2)
         });
 
-        let mut result = Vec::with_capacity(self.sorted_paths.len());
+        let result = self
+            .pending
+            .drain(..)
+            .map(|pending| pending.into_candidate(db, env, storage))
+            .collect();
+        CandidateSolutions::Constrained(result)
+    }
+}
+
+impl PendingCandidateSolution {
+    fn into_candidate<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+    ) -> CandidateSolution<'db> {
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, PathBoundBuilder<'db>> =
             FxIndexMap::default();
 
-        for path in self.sorted_paths {
-            mappings.clear();
-            for (constraint, _) in path {
-                let constraint = storage.constraint_data(constraint);
-                match constraint {
-                    Constraint::ConcreteLower(lower) => {
-                        let bounds = mappings.entry(lower.typevar).or_default();
-                        bounds.add_lower(lower.provenance, lower.bound);
-                    }
-                    Constraint::ConcreteUpper(upper) => {
-                        let bounds = mappings.entry(upper.typevar).or_default();
-                        bounds.add_upper(upper.provenance, upper.bound);
-                    }
-                    Constraint::ConcreteEquivalence(equivalence) => {
-                        let bounds = mappings.entry(equivalence.typevar).or_default();
-                        bounds.add_lower(equivalence.provenance, equivalence.bound);
-                        bounds.add_upper(equivalence.provenance, equivalence.bound);
-                    }
-                    Constraint::TypeVarRange(bound) => {
-                        let bounds = mappings.entry(bound.left).or_default();
-                        bounds.add_upper(bound.provenance, Type::TypeVar(bound.right));
-                        let bounds = mappings.entry(bound.right).or_default();
-                        bounds.add_lower(bound.provenance, Type::TypeVar(bound.left));
-                    }
-                    Constraint::TypeVarEquivalence(bound) => {
-                        let (left, right) = bound.in_builder(db, storage);
-                        let bounds = mappings.entry(left).or_default();
-                        bounds.add_lower(bound.provenance, Type::TypeVar(right));
-                        bounds.add_upper(bound.provenance, Type::TypeVar(right));
-                        let bounds = mappings.entry(right).or_default();
-                        bounds.add_lower(bound.provenance, Type::TypeVar(left));
-                        bounds.add_upper(bound.provenance, Type::TypeVar(left));
-                    }
+        for (constraint, _) in self.typevars {
+            let constraint = storage.constraint_data(constraint);
+            match constraint {
+                Constraint::ConcreteLower(lower) => {
+                    let bounds = mappings.entry(lower.typevar).or_default();
+                    bounds.add_lower(lower.provenance, lower.bound);
+                }
+                Constraint::ConcreteUpper(upper) => {
+                    let bounds = mappings.entry(upper.typevar).or_default();
+                    bounds.add_upper(upper.provenance, upper.bound);
+                }
+                Constraint::ConcreteEquivalence(equivalence) => {
+                    let bounds = mappings.entry(equivalence.typevar).or_default();
+                    bounds.add_lower(equivalence.provenance, equivalence.bound);
+                    bounds.add_upper(equivalence.provenance, equivalence.bound);
+                }
+                Constraint::TypeVarRange(bound) => {
+                    let bounds = mappings.entry(bound.left).or_default();
+                    bounds.add_upper(bound.provenance, Type::TypeVar(bound.right));
+                    let bounds = mappings.entry(bound.right).or_default();
+                    bounds.add_lower(bound.provenance, Type::TypeVar(bound.left));
+                }
+                Constraint::TypeVarEquivalence(bound) => {
+                    let (left, right) = bound.in_builder(db, storage);
+                    let bounds = mappings.entry(left).or_default();
+                    bounds.add_lower(bound.provenance, Type::TypeVar(right));
+                    bounds.add_upper(bound.provenance, Type::TypeVar(right));
+                    let bounds = mappings.entry(right).or_default();
+                    bounds.add_lower(bound.provenance, Type::TypeVar(left));
+                    bounds.add_upper(bound.provenance, Type::TypeVar(left));
                 }
             }
-
-            let typevars = mappings
-                .drain(..)
-                .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
-                .collect();
-            let candidate = CandidateSolution {
-                typevars,
-                validity: SolutionValidity::Valid,
-            };
-            result.push(candidate);
         }
 
-        CandidateSolutions::Constrained(result.into_boxed_slice())
+        let typevars = mappings
+            .drain(..)
+            .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
+            .collect();
+
+        CandidateSolution {
+            typevars,
+            validity: SolutionValidity::Valid,
+        }
     }
 }
