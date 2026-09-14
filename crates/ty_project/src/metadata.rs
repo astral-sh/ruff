@@ -95,16 +95,18 @@ impl ProjectMetadata {
         }
     }
 
+    /// Loads a project from an explicit configuration file using the selected uv integrations.
     pub fn from_config_file(
         path: SystemPathBuf,
         root: &SystemPath,
         system: &dyn System,
+        use_uv: UseUv,
     ) -> Result<Self, ProjectMetadataError> {
-        Self::from_config_file_with_uv(path, root, system, UseUv::from_system(system))
+        let metadata = Self::load_config_file(path, root, system, use_uv)?;
+        Ok(metadata.with_environment(Self::uv_workspace_environment(root, system, use_uv)))
     }
 
-    /// Loads a project from a configuration file using the explicitly configured uv integrations.
-    pub fn from_config_file_with_uv(
+    fn load_config_file(
         path: SystemPathBuf,
         root: &SystemPath,
         system: &dyn System,
@@ -205,7 +207,18 @@ impl ProjectMetadata {
         system: &dyn System,
         use_uv: UseUv,
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
-        let environment = if use_uv.workspace_discovery_enabled() {
+        let environment = Self::uv_workspace_environment(path, system, use_uv);
+
+        Self::discover_with_uv_workspace(path, system, environment)
+            .map(|metadata| metadata.with_use_uv(use_uv))
+    }
+
+    fn uv_workspace_environment(
+        path: &SystemPath,
+        system: &dyn System,
+        use_uv: UseUv,
+    ) -> ProjectEnvironment {
+        if use_uv.workspace_discovery_enabled() {
             let metadata = uv::Uv::new(system)
                 .map_err(uv::uv_executable_error)
                 .map_err(uv::UvMetadataError::Invocation)
@@ -223,10 +236,7 @@ impl ProjectMetadata {
             }
         } else {
             ProjectEnvironment::default()
-        };
-
-        Self::discover_with_uv_workspace(path, system, environment)
-            .map(|metadata| metadata.with_use_uv(use_uv))
+        }
     }
 
     /// Discovers the closest project without considering uv workspace metadata.
@@ -424,13 +434,9 @@ impl ProjectMetadata {
         environment: ProjectEnvironment,
     ) -> Result<Self, ProjectMetadataError> {
         let mut metadata = if let Some(config_file) = self.config_file_override() {
-            Self::from_config_file_with_uv(
-                config_file.to_path_buf(),
-                self.root(),
-                system,
-                self.use_uv,
-            )?
-            .with_environment(environment)
+            // A background uv refresh has already run when the caller supplies updated metadata.
+            Self::load_config_file(config_file.to_path_buf(), self.root(), system, self.use_uv)?
+                .with_environment(environment)
         } else {
             Self::discover_with_uv_workspace(path, system, environment)?.with_use_uv(self.use_uv)
         };
