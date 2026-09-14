@@ -3462,6 +3462,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
     /// Solves one relation without recording it or changing the legacy type mappings.
     fn analyze_constraint_set(&self, set: ConstraintSet<'db, 'c>) -> ConstraintSetAnalysis<'db> {
+        self.analyze_constraint_set_with(set, |typevar, outcome| {
+            self.validate_noninferable_solution(typevar, outcome)
+        })
+    }
+
+    fn analyze_constraint_set_with(
+        &self,
+        set: ConstraintSet<'db, 'c>,
+        mut validate: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            PathBoundSolution<'db>,
+        ) -> Result<PathBoundSolution<'db>, SpecializationError<'db>>,
+    ) -> ConstraintSetAnalysis<'db> {
         let db = self.db;
         let mut failures = SmallVec::new();
         let solutions = set.solutions_with(
@@ -3470,7 +3483,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.inferable,
             SolutionBudget::default(),
             |_variance, path_bound| {
-                let solution = match self.validate_noninferable_solution(
+                let solution = match validate(
                     path_bound.bound_typevar,
                     CandidateSolutions::preliminary_solve(db, self.env, self.constraints, self.inferable, path_bound),
                 ) {
@@ -3963,7 +3976,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         formal_signature,
                         self.constraints,
                     );
-                self.infer_from_constraint_set(when)?;
+                // TODO: Account for callable-local variables captured by `P` before checking
+                // return bounds. For `Callable[P, R]`, a generic constructor can infer
+                // `R = Factory[T]` while `T` remains bound by the signature captured in `P`.
+                // Checking `R` alone treats `T` as fixed and can incorrectly reject a bound
+                // such as `Factory[object]`. Keep compatibility inference for this relation;
+                // other arguments must still validate genuinely fixed outer variables.
+                let analysis = self.analyze_constraint_set_with(when, |_, outcome| Ok(outcome));
+                self.record_constraint_set(when);
+                if let Some(error) = analysis.specialization_error(db, self.env) {
+                    return Err(error);
+                }
+                self.project_for_legacy_fallback(&analysis);
             } else {
                 // An overloaded actual callable is compatible if at least one overload matches.
                 // Analyze every alternative without changing the builder; only accepted overloads

@@ -1432,6 +1432,106 @@ def _(value: object, source: Intersection[Source[A], Source[B]]) -> None:
     reveal_type(is_type(value, source))  # revealed: TypeIs[A | B @ value]
 ```
 
+## Outer type variables in intersection arguments
+
+An argument containing a caller's type variable must satisfy the called function's bound or
+constraints for every type the caller permits. Adding an unrelated intersection element does not
+make an unrestricted element type satisfy a string bound, or make an integer-or-bytes element type
+satisfy integer-or-string constraints:
+
+```py
+from ty_extensions import Intersection
+
+class Source[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Marker: ...
+
+def first_bounded[T: str](value: Source[T]) -> T:
+    return value.get()
+
+def first_constrained[T: (int, str)](value: Source[T]) -> T:
+    return value.get()
+
+def bounded[S](value: Intersection[Source[S], Marker]) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(first_bounded(value))  # revealed: Unknown
+
+def constrained[S: (int, bytes)](value: Intersection[Source[S], Marker]) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(first_constrained(value))  # revealed: Unknown
+```
+
+Capturing a separate callback's parameters with a `ParamSpec` does not relax the source's bound:
+
+```py
+from typing import Callable
+
+def with_callback[T: str, **P](source: Source[T], callback: Callable[P, None]) -> T:
+    return source.get()
+
+def outer_with_callback[S](source: Intersection[Source[S], Marker]) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(with_callback(source, lambda: None))  # revealed: Unknown
+```
+
+A compatible caller variable keeps its identity. A separate valid intersection element can also
+satisfy the parameter without the caller's variable meeting the declaration:
+
+```py
+def compatible[S: str](value: Intersection[Source[S], Marker]) -> None:
+    reveal_type(first_bounded(value))  # revealed: S@compatible
+
+def valid_bounded_element[S](value: Intersection[Source[S], Source[str]]) -> None:
+    reveal_type(first_bounded(value))  # revealed: str
+
+def valid_constrained_element[S: (int, bytes)](value: Intersection[Source[S], Source[str]]) -> None:
+    reveal_type(first_constrained(value))  # revealed: str
+```
+
+A subclass also retains the bound check when its source specialization is found through its MRO:
+
+```py
+class DerivedSource[T](Source[T]): ...
+
+def inherited[S](source: Intersection[DerivedSource[S], Marker]) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(first_bounded(source))  # revealed: Unknown
+```
+
+An unrestricted parameter accepts both the caller's type variable and a separate string element.
+Both specializations contribute to the intersection of return types:
+
+```py
+def first_unbounded[T](value: Source[T]) -> T:
+    return value.get()
+
+def intersected_outer[S](value: Intersection[Source[S], Source[str]]) -> None:
+    reveal_type(first_unbounded(value))  # revealed: S@intersected_outer & str
+```
+
+Protocol arguments also require the string bound to hold for every type permitted by the caller's
+variable, both with and without an intersection:
+
+```py
+from typing import Protocol
+
+class SourceProtocol[T](Protocol):
+    def get(self) -> T: ...
+
+def first_protocol[T: str](value: SourceProtocol[T]) -> T:
+    return value.get()
+
+def plain_protocol[S](value: SourceProtocol[S]) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(first_protocol(value))  # revealed: Unknown
+
+def intersected_protocol[S](value: Intersection[SourceProtocol[S], Marker]) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(first_protocol(value))  # revealed: Unknown
+```
+
 ## Inferring tuple parameter types
 
 ```py
