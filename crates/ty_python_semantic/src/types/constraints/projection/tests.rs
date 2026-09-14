@@ -9,8 +9,8 @@ use super::{ProjectionError, ProjectionTypeBudget, SolutionBudget, SolutionProje
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::global_symbol;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
-    PathBoundSolution, PathBounds, Solution, SolutionPaths, SolutionValidity, Solutions,
+    CandidateSolutions, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    PathBound, PathBoundSolution, Solution, SolutionPaths, SolutionValidity, Solutions,
     TypeVarSolution,
 };
 use crate::types::typevar::TypeVarSet;
@@ -90,7 +90,7 @@ fn collect_paths<'db, 'c>(
         &env,
         TypeVarSet::from_typevars(db, typevars.iter().copied()),
         budget,
-        |_, bound| PathBounds::default_solve(db, &env, builder, bound),
+        |_, bound| CandidateSolutions::default_solve(db, &env, builder, bound),
         Paths::default(),
         |mut paths, path, budget| {
             for binding in path {
@@ -135,7 +135,7 @@ fn path_limit_is_checked_before_solving() {
             },
             |_, bound| {
                 selected += 1;
-                PathBounds::default_solve(db, &env, &builder, bound)
+                CandidateSolutions::default_solve(db, &env, &builder, bound)
             },
             0,
             |count, _, _| {
@@ -500,7 +500,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
         let mut selected = 0;
         let collected = set.solutions_with(db, &env, inferable, budget, |_, bound| {
             selected += 1;
-            PathBounds::default_solve(db, &env, &builder, bound)
+            CandidateSolutions::default_solve(db, &env, &builder, bound)
         });
         // One additional path is selected to discover that it exceeds the budget; later
         // paths are not solved.
@@ -512,7 +512,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
             &env,
             inferable,
             budget,
-            |_, bound| PathBounds::default_solve(db, &env, &builder, bound),
+            |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
             Type::Never,
             |accumulated, path, budget| {
                 assert_eq!(path.len(), 1);
@@ -627,7 +627,7 @@ class E: ...
     // Charging the input alone does not prevent that expansion; the fold also needs a bounded
     // intersection constructor.
     for alternatives in [[left, right], [right, left]] {
-        let paths = PathBounds::Constrained(
+        let paths = CandidateSolutions::Constrained(
             alternatives
                 .map(|ty| Box::new([PathBound::exact(t, ty)]) as Box<[_]>)
                 .into(),
@@ -635,7 +635,7 @@ class E: ...
 
         assert_eq!(
             paths.try_fold_with(
-                |_, bound| PathBounds::default_solve(db, &env, &builder, bound),
+                |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
                 Type::object(),
                 &mut ProjectionTypeBudget::new(7),
                 |accumulated, path, budget| {

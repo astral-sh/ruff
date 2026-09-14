@@ -34,8 +34,8 @@ use crate::types::ProgramEnvironment;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, PathBound, PathBoundSolution, PathBounds, SolutionPaths,
-    Solutions,
+    CandidateSolutions, ConstraintSet, ConstraintSetBuilder, PathBound, PathBoundSolution,
+    SolutionPaths, Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
@@ -6088,7 +6088,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         .entry(identity)
                         .and_modify(|current| *current = current.join(variance))
                         .or_insert(variance);
-                    PathBounds::preliminary_solve(db, self.env, constraints, path_bound)
+                    CandidateSolutions::preliminary_solve(db, self.env, constraints, path_bound)
                 });
 
                 let Solutions::Constrained(solutions) = solutions else {
@@ -6247,19 +6247,22 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             // Promotion must preserve unsatisfiable outcomes and the completeness of fallbacks.
             Some(
-                PathBounds::default_solve(db, self.env, constraints, bounds).map(|solution| {
-                    let promoted = solution.promote(db, self.env);
+                CandidateSolutions::default_solve(db, self.env, constraints, bounds).map(
+                    |solution| {
+                        let promoted = solution.promote(db, self.env);
 
-                    // If the TypeVar has an upper bound, only use the promoted type if it
-                    // still satisfies the bound.
-                    if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints
-                        && !promoted.is_assignable_to(db, self.env, bound)
-                    {
-                        return solution;
-                    }
+                        // If the TypeVar has an upper bound, only use the promoted type if it
+                        // still satisfies the bound.
+                        if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
+                            bound_or_constraints
+                            && !promoted.is_assignable_to(db, self.env, bound)
+                        {
+                            return solution;
+                        }
 
-                    promoted
-                }),
+                        promoted
+                    },
+                ),
             )
         };
 
@@ -7943,7 +7946,7 @@ impl<'db> Binding<'db> {
             );
 
             let solutions = path_bounds.solve_with(|_variance, path_bound| {
-                PathBounds::preliminary_solve(db, env, constraints, path_bound)
+                CandidateSolutions::preliminary_solve(db, env, constraints, path_bound)
             });
             if let Solutions::Constrained(solutions) = solutions {
                 for solution in solutions.into_vec() {

@@ -14,8 +14,8 @@ use crate::types::class_base::ClassBase;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget, SolutionProjection};
 use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
-    PathBoundSolution, PathBounds, Solution, SolutionPaths, SolutionViolation,
+    CandidateSolutions, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    PathBound, PathBoundSolution, Solution, SolutionPaths, SolutionViolation,
     SolutionViolationKind, Solutions, TypeVarSolution,
 };
 use crate::types::infer::original_class_type;
@@ -2727,7 +2727,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     |_variance, path_bound| {
                         let outcome = choose(path_bound.bound_typevar, Some(path_bound))
                             .unwrap_or_else(|| {
-                                PathBounds::default_solve(
+                                CandidateSolutions::default_solve(
                                     db,
                                     builder.env,
                                     builder.constraints,
@@ -2879,7 +2879,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 budget,
                 |_variance, path_bound| {
                     choose(path_bound.bound_typevar, Some(path_bound)).unwrap_or_else(|| {
-                        PathBounds::default_solve(db, builder.env, builder.constraints, path_bound)
+                        CandidateSolutions::default_solve(db, builder.env, builder.constraints, path_bound)
                     })
                 },
             )?;
@@ -3437,7 +3437,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.inferable,
             SolutionBudget::default(),
             |_variance, path_bound| {
-                PathBounds::preliminary_solve(db, self.env, self.constraints, path_bound)
+                CandidateSolutions::preliminary_solve(db, self.env, self.constraints, path_bound)
             },
         );
 
