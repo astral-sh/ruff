@@ -447,6 +447,39 @@ fn exclude_precedence_over_include() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// `src/keep.py` and `src/explicit` must be found under `dir[1]`. An unescaped
+/// `[1]` in their anchored globs would match paths under `dir1` instead,
+/// missing both files. `src/skip.py` must be excluded.
+#[test]
+fn project_directory_brackets_do_not_act_as_glob_syntax() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "dir[1]/ty.toml",
+            r#"
+            [src]
+            include = ["src/*.py", "src/explicit"]
+            exclude = ["src/skip.py"]
+            "#,
+        ),
+        ("dir[1]/src/keep.py", "print(undefined_keep)"),
+        ("dir[1]/src/skip.py", "print(undefined_skip)"),
+        ("dir[1]/src/explicit", "print(undefined_explicit)"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("dir[1]")).env("TY_OUTPUT_FORMAT", "concise"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    src/explicit:1:7: error[unresolved-reference] Name `undefined_explicit` used when not defined
+    src/keep.py:1:7: error[unresolved-reference] Name `undefined_keep` used when not defined
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
 /// Test that CLI exclude overrides configuration include
 #[test]
 fn exclude_argument_precedence_include_argument() -> anyhow::Result<()> {

@@ -1325,7 +1325,7 @@ jobs:
         run: rustup show
 
       - name: "Build benchmarks"
-        run: uv run --only-dev cargo codspeed build -m walltime --features "codspeed,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark --bench ty_walltime --bench ty_script
+        run: uv run --only-dev cargo codspeed build -m walltime --features "codspeed,ty_ide,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark --bench ty_walltime --bench ty_script --bench ty_ide
 
       - name: "Upload benchmark binary"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1349,6 +1349,9 @@ jobs:
         benchmark:
           - name: script
             target: ty_script
+          - name: ide
+            target: ty_ide
+            filter: auto_import
           - name: sympy
             target: ty_walltime
             filter: sympy

@@ -85,7 +85,7 @@ fn setup_tomllib_case() -> FileCase {
 
     let src_root = SystemPath::new("/src");
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_override_options(Options {
+    metadata.set_override_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             ..EnvironmentOptions::default()
@@ -1735,7 +1735,7 @@ impl<'a> ProjectBenchmark<'a> {
         let src_root = SystemPath::new("/");
         let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
 
-        metadata.apply_override_options(Options {
+        metadata.set_override_options(Options {
             environment: Some(EnvironmentOptions {
                 python_version: Some(RangedValue::cli(self.project.config.python_version)),
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),

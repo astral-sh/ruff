@@ -2,7 +2,7 @@ use crate::Db;
 use crate::FxOrderSet;
 use crate::ProgramEnvironment;
 use crate::place::PlaceAndQualifiers;
-use crate::types::class::DynamicClassLiteral;
+use crate::types::class::{DynamicClassLiteral, metaclass_instance_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::{VarianceInferable, VarianceTerm};
@@ -319,9 +319,7 @@ impl<'db> SubclassOfType<'db> {
         // And `to_meta_type` will transpose `type[T: C]` into `T: type[C]`, collapse to
         // the upper bound `type[C]`, and transform that to the meta-type `type[M]`, which
         // `to_instance` then resolves to `M`.
-        self.to_meta_type(db, env)
-            .to_instance_approximation(db, env)
-            .expect("the meta-type of a SubclassOf type should always be instantiable")
+        metaclass_instance_type(db, env, self.to_meta_type(db, env))
     }
 
     /// Compute the metatype of this `type[T]`.

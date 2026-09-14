@@ -22,6 +22,8 @@ mod hover;
 mod importer;
 mod inlay_hints;
 mod markup;
+#[cfg(test)]
+mod pytest_test_discovery;
 mod references;
 mod rename;
 mod selection_range;

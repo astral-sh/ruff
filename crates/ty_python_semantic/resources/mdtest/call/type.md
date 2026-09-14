@@ -1653,6 +1653,110 @@ reveal_type(instance.__hash__())  # revealed: int
 reveal_type(instance.__str__())  # revealed: str
 ```
 
+## Metaclasses with gradual bases
+
+A dynamically created class accepts an inherited metaclass with an unknown superclass. A known
+subclass of that metaclass still takes precedence, regardless of the order of the bases.
+
+```py
+from typing import Any
+
+def _(base: Any):
+    class Meta(base): ...
+    class DerivedMeta(Meta): ...
+    class Base(metaclass=Meta): ...
+    class Other(metaclass=DerivedMeta): ...
+    class Plain: ...
+
+    Child = type("Child", (Base, object), {})
+    Reversed = type("Reversed", (Plain, Base), {})
+    Combined = type("Combined", (Base, Other), {})
+
+    reveal_type(Child.__class__)  # revealed: <class 'Meta'>
+    reveal_type(Reversed.__class__)  # revealed: <class 'Meta'>
+    reveal_type(Combined.__class__)  # revealed: <class 'DerivedMeta'>
+```
+
+## Sibling metaclasses with an unknown ancestor
+
+An unknown ancestor cannot make sibling metaclasses inherit from each other without a cycle. We
+report the conflict and infer an unknown metaclass.
+
+```py
+from typing import Any
+
+def _(base: Any):
+    class RootMeta(base): ...
+    class LeftMeta(RootMeta): ...
+    class RightMeta(RootMeta): ...
+    class Left(metaclass=LeftMeta): ...
+    class Right(metaclass=RightMeta): ...
+
+    Combined = type("Combined", (Left, Right), {})  # error: [conflicting-metaclass]
+    Reversed = type("Reversed", (Right, Left), {})  # error: [conflicting-metaclass]
+
+    reveal_type(Combined.__class__)  # revealed: type[Unknown]
+    reveal_type(type(Reversed))  # revealed: type[Unknown]
+```
+
+## Metaclasses with a separate unknown base
+
+An unknown base outside the shared ancestry can make `LeftMeta` inherit from `RightMeta`. Only
+`LeftMeta` can be the winner, regardless of the order of the bases passed to `type()`.
+
+```py
+from typing import Any
+
+def _(extra: Any):
+    class RootMeta(type): ...
+    class RightMeta(RootMeta): ...
+    class LeftMeta(extra, RootMeta): ...
+    class Left(metaclass=LeftMeta): ...
+    class Right(metaclass=RightMeta): ...
+
+    Forward = type("Forward", (Left, Right), {})
+    Reverse = type("Reverse", (Right, Left), {})
+
+    reveal_type(Forward.__class__)  # revealed: <class 'LeftMeta'>
+    reveal_type(type(Reverse))  # revealed: <class 'LeftMeta'>
+```
+
+## Ambiguous metaclasses
+
+Unknown ancestry can leave either metaclass as the winner. Dynamic class creation preserves this
+uncertainty in both base orders and when inheriting from an ambiguous class.
+
+```py
+from typing import Any
+
+def _(base1: Any, base2: Any):
+    class Meta1(base1): ...
+    class Meta2(base2): ...
+    class A(metaclass=Meta1): ...
+    class B(metaclass=Meta2): ...
+
+    Forward = type("Forward", (A, B), {})
+    Reverse = type("Reverse", (B, A), {})
+    Child = type("Child", (Forward,), {})
+
+    reveal_type(Forward.__class__)  # revealed: type[Unknown]
+    reveal_type(type(Forward))  # revealed: type[Unknown]
+    reveal_type(Reverse.__class__)  # revealed: type[Unknown]
+    reveal_type(Child.__class__)  # revealed: type[Unknown]
+
+    # Once the metaclass is unknown, a later base does not resolve the ambiguity.
+    # The possible candidates are not retained, including when the unknown
+    # metaclass is inherited from a dynamic class.
+    class CommonMeta(Meta2, Meta1): ...
+    class Common(metaclass=CommonMeta): ...
+
+    WithCommonBase = type("WithCommonBase", (A, B, Common), {})
+    InheritedWithCommonBase = type("InheritedWithCommonBase", (Forward, Common), {})
+
+    reveal_type(WithCommonBase.__class__)  # revealed: type[Unknown]
+    reveal_type(InheritedWithCommonBase.__class__)  # revealed: type[Unknown]
+```
+
 ## Custom metaclass via bases
 
 When a base class has a custom metaclass, the dynamic class inherits that metaclass:

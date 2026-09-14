@@ -31,8 +31,8 @@ pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
 use self::cyclic::{ActiveRecursionDetector, HasIdentity, TypeIdentity};
 pub use self::dedicated::pytest::{
-    FixtureBinding, FixtureExposure, FixtureNameSource, fixture_bindings_for_parameter,
-    fixture_exposures_for_definition, pytest_global_plugin_files,
+    FixtureBinding, FixtureExposure, FixtureNameSource, PytestTest, fixture_bindings_for_parameter,
+    fixture_exposures_for_definition, pytest_global_plugin_files, pytest_tests_in_file,
 };
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
@@ -130,6 +130,7 @@ use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{ProgramFile, Truthiness, place_table, semantic_index, use_def_map};
 
+mod abstract_methods;
 mod attribute_write;
 mod bool;
 mod bound_super;
@@ -9069,7 +9070,7 @@ impl<'db> Type<'db> {
 
                     if union.recursively_defined(db).is_yes() {
                         expanded_callables =
-                            expanded_callables.recursively_defined(RecursivelyDefined::Yes);
+                            expanded_callables.or_recursively_defined(RecursivelyDefined::Yes);
                     }
                 }
 
@@ -11006,7 +11007,7 @@ impl std::fmt::Display for DynamicType<'_> {
 }
 
 bitflags! {
-    /// Type qualifiers that appear in an annotation expression.
+    /// Type qualifiers from annotations or synthesized member metadata.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, Hash)]
     pub struct TypeQualifiers: u8 {
         /// `typing.ClassVar`
@@ -11019,7 +11020,7 @@ bitflags! {
         const REQUIRED = 1 << 3;
         /// `typing_extensions.NotRequired`
         const NOT_REQUIRED = 1 << 4;
-        /// `typing_extensions.ReadOnly`
+        /// `typing_extensions.ReadOnly`, or a synthesized read-only class attribute.
         const READ_ONLY = 1 << 5;
         /// A non-standard type qualifier that marks implicit instance attributes, i.e.
         /// instance attributes that are only implicitly defined via `self.x = …` in
