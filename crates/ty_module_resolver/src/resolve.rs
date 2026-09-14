@@ -508,11 +508,13 @@ impl StubPackageIndex {
         }
     }
 
-    /// Splits the indexed paths between the stub-overlay pass and its normal fallback.
+    /// Splits the indexed stub package paths into extra paths and remaining paths.
     ///
-    /// The overlay contains only extra paths, which all precede stdlib. The fallback retains the
-    /// remaining paths' positions relative to stdlib.
-    fn split_overlay(&self) -> (StubPackagePaths<'_>, StubPackagePaths<'_>) {
+    /// The first-phase stub override search uses the extra paths. The second phase combines
+    /// candidates from the remaining paths with those already discovered in extra paths.
+    ///
+    /// Extra paths all precede stdlib. The remaining paths retain their positions relative to stdlib.
+    fn split_by_extra_paths(&self) -> (StubPackagePaths<'_>, StubPackagePaths<'_>) {
         let before_stdlib = self.before_stdlib();
         let (extra, remaining) =
             before_stdlib.split_at(before_stdlib.partition_point(SearchPath::is_extra));
@@ -1424,6 +1426,8 @@ impl<'db> ModuleResolutionCandidate<'db> {
     }
 }
 
+/// Provides the context and candidate selection operations used to search
+/// for a module name in either typing or runtime mode.
 struct NameResolver<'db, 'name> {
     context: ResolverContext<'db>,
     name: &'name ModuleName,
@@ -1468,7 +1472,7 @@ impl<'db, 'name> NameResolver<'db, 'name> {
         // Only submodules need separate overlay resolution: their extra-path namespace parent can
         // be shadowed before the resolver reaches the requested stub. Reuse those roots for the
         // normal fallback so that each extra path is probed only once.
-        let (overlay_stub_packages, remaining_stub_packages) = stub_packages.split_overlay();
+        let (overlay_stub_packages, remaining_stub_packages) = stub_packages.split_by_extra_paths();
         let mut candidates = self.discover_roots(
             self.name.first_component(),
             self.is_non_shadowable,
@@ -1559,7 +1563,23 @@ impl<'db, 'name> NameResolver<'db, 'name> {
         Some(cur_candidates)
     }
 
-    /// Finds candidates for a top-level name across the supplied search paths and stub packages.
+    /// Finds candidates for the root component of a module name (i.e. `foo`
+    /// from `foo.bar.baz`) across the supplied search paths and stub packages.
+    ///
+    /// Callers should pass `true` for `is_non_shadowable` only when the given
+    /// `root_component` is the complete module name being resolved and that name
+    /// is non-shadowable according to `ModuleResolveMode::is_non_shadowable`.
+    /// This prevents a standard library module name like `types` from being
+    /// shadowed by a local source.
+    ///
+    /// Conversely, if `root_component` is only the prefix of the module name
+    /// being resolved (e.g., when using this method to discover roots for the
+    /// module name `types.child`), `is_non_shadowable` should be `false`.
+    ///
+    /// Before the resulting candidates can be advanced for subsequent components
+    /// of a modules name (see [`NameResolver::advance_candidates`]), they should
+    /// be combined with candidates discovered from other search paths and normalized
+    /// with [`normalize_candidates`] (with `form_module_name_prefix` set to `true`).
     fn discover_roots<'a>(
         &self,
         root_component: &str,
@@ -1628,16 +1648,26 @@ impl<'db, 'name> NameResolver<'db, 'name> {
         cur_candidates
     }
 
-    /// Advances normalized prefix candidates, preserving terminal shadowing even on a failed probe.
+    /// Finds candidates for the next component of a module name, starting from
+    /// candidates for its parent prefix. `filter` determines which file types
+    /// may supply the component.
     ///
-    /// With `for_descendants`, retain partial stub-package namespaces for the next component.
-    /// At the final component, concrete packages and modules shadow those namespaces.
+    /// Input candidates must already be ordered by priority, with shadowed
+    /// namespace portions removed.
+    ///
+    /// Callers should pass `true` for `component_name_is_prefix` when more
+    /// module name components will be resolved. This preserves partial namespace
+    /// portions from stub-only packages so they can supply later components, even
+    /// when an ordinary package or module exists for the same prefix.
+    ///
+    /// Otherwise, callers should pass `false` to resolve the complete module
+    /// name. An ordinary package or plain module then shadows namespace portions.
     fn advance_candidates(
         &self,
         mut candidates: ResolvedNames<'db>,
-        component: &str,
+        component_name: &str,
         filter: ComponentFileFilter,
-        for_descendants: bool,
+        component_name_is_prefix: bool,
     ) -> ResolvedNames<'db> {
         let context = &self.context;
         let mut remaining_are_shadowed = false;
@@ -1646,7 +1676,7 @@ impl<'db, 'name> NameResolver<'db, 'name> {
                 return false;
             }
 
-            let resolved = resolve_component(context, candidate, component, filter).is_ok();
+            let resolved = resolve_component(context, candidate, component_name, filter).is_ok();
 
             // A terminal candidate shadows every lower-priority candidate, even if resolving
             // this component fails. Higher-priority candidates remain in play.
@@ -1654,7 +1684,7 @@ impl<'db, 'name> NameResolver<'db, 'name> {
 
             resolved
         });
-        normalize_candidates(context.db, candidates, for_descendants)
+        normalize_candidates(context.db, candidates, component_name_is_prefix)
     }
 }
 
@@ -1687,7 +1717,7 @@ fn resolve_stub_package_in_search_path<'db>(
 fn normalize_candidates<'db>(
     db: &dyn Db,
     mut candidates: ResolvedNames<'db>,
-    has_remaining_components: bool,
+    for_module_name_prefix: bool,
 ) -> ResolvedNames<'db> {
     let best_concrete_precedence = candidates
         .iter()
@@ -1710,7 +1740,7 @@ fn normalize_candidates<'db>(
         // A higher-precedence partial namespace remains available while resolving its descendants.
         // At the final component, a concrete package or module shadows it.
         let preserved_for_descendants = best_concrete_precedence.is_none_or(|precedence| {
-            has_remaining_components
+            for_module_name_prefix
                 && candidate.py_typed == PyTyped::Partial
                 && candidate.precedence < precedence
         });
