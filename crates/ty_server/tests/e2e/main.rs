@@ -28,10 +28,12 @@
 //! [`await_notification`]: TestServer::await_notification
 
 mod call_hierarchy;
+mod closed_documents;
 mod code_actions;
 mod commands;
 mod completions;
 mod configuration;
+mod diagnostic_snapshots;
 mod file_watching;
 mod folding_range;
 mod goto_definition;
@@ -71,16 +73,16 @@ use lsp_types::{
     DidCloseTextDocumentNotification, DidCloseTextDocumentParams, DidOpenTextDocumentNotification,
     DidOpenTextDocumentParams, DidSaveTextDocumentNotification, DidSaveTextDocumentParams,
     DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticRequest,
-    ExitNotification, FileEvent, FileSystemWatcher, FoldingRange, FoldingRangeParams, Hover,
-    HoverParams, HoverRequest, InitializeParams, InitializeRequest, InitializeResult,
-    InitializedNotification, InitializedParams, InlayHint, InlayHintClientCapabilities,
-    InlayHintParams, InlayHintRequest, LanguageKind, Notification, PartialResultParams, Position,
-    PrepareRenameRequest, PreviousResultId, PublishDiagnosticsClientCapabilities, Range,
-    RegistrationRequest, Request, SemanticTokens, ShutdownRequest, SignatureHelp,
-    SignatureHelpParams, SignatureHelpRequest, SignatureHelpTriggerKind,
-    TextDocumentClientCapabilities, TextDocumentContentChangeEvent, TextDocumentIdentifier,
-    TextDocumentItem, TextDocumentPositionParams, UnregistrationRequest, Uri,
-    VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
+    ExitNotification, FileChangeType, FileEvent, FileSystemWatcher, FoldingRange,
+    FoldingRangeParams, Hover, HoverParams, HoverRequest, InitializeParams, InitializeRequest,
+    InitializeResult, InitializedNotification, InitializedParams, InlayHint,
+    InlayHintClientCapabilities, InlayHintParams, InlayHintRequest, LanguageKind, Notification,
+    PartialResultParams, Position, PrepareRenameRequest, PreviousResultId,
+    PublishDiagnosticsClientCapabilities, Range, RegistrationRequest, Request, SemanticTokens,
+    ShutdownRequest, SignatureHelp, SignatureHelpParams, SignatureHelpRequest,
+    SignatureHelpTriggerKind, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
+    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, UnregistrationRequest,
+    Uri, VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
     WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest,
     WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
 };
@@ -945,6 +947,18 @@ impl TestServer {
     pub(crate) fn did_change_watched_files(&mut self, events: Vec<FileEvent>) {
         let params = DidChangeWatchedFilesParams { changes: events };
         self.send_notification::<DidChangeWatchedFilesNotification>(params);
+    }
+
+    /// Sends a `workspace/didChangeWatchedFiles` notification for one path.
+    pub(crate) fn did_change_watched_file(
+        &mut self,
+        path: impl AsRef<SystemPath>,
+        kind: FileChangeType,
+    ) {
+        self.did_change_watched_files(vec![FileEvent {
+            uri: self.file_uri(path),
+            kind,
+        }]);
     }
 
     /// Send a `workspace/didChangeWorkspaceFolders` notification with the given added/removed

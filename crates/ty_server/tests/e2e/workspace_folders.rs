@@ -1,19 +1,21 @@
 use anyhow::{Context, Result};
 use insta::assert_snapshot;
 use lsp_types::{
-    Contents, DiagnosticSeverity, DocumentDiagnosticReport, FullDocumentDiagnosticReport, Message,
-    Position, RegistrationRequest, TextDocumentContentChangeEvent, UnregistrationRequest,
-    WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport,
+    Contents, DocumentDiagnosticReport, Position, RegistrationRequest,
+    TextDocumentContentChangeEvent, UnregistrationRequest, WorkspaceDiagnosticReport,
 };
 use ruff_db::system::SystemPath;
 use ruff_python_trivia::textwrap::dedent;
 use ty_server::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
 
+use crate::diagnostic_snapshots::{
+    condensed_document_diagnostic_snapshot, condensed_workspace_diagnostic_snapshot,
+};
 use crate::{
     TestServer, TestServerBuilder,
     pull_diagnostics::{
         assert_workspace_diagnostics_suspends_for_long_polling, send_workspace_diagnostic_request,
-        shutdown_and_await_workspace_diagnostic, sort_workspace_diagnostic_response,
+        shutdown_and_await_workspace_diagnostic,
     },
 };
 
@@ -991,85 +993,6 @@ fn global_settings_change() -> Result<()> {
     );
 
     Ok(())
-}
-
-/// A helper routine for creating a snapshot for a collection of
-/// workspace diagnostics.
-///
-/// We mostly use this in our workspace folder tests to check that the
-/// LSP is correctly recognizing and reporting diagnostics for each
-/// workspace folder. This isn't really meant to test the diagnostics
-/// themselves, hence the condensed output.
-pub(crate) fn condensed_workspace_diagnostic_snapshot(
-    mut report: WorkspaceDiagnosticReport,
-) -> String {
-    sort_workspace_diagnostic_response(&mut report);
-    let items = report.items;
-    items
-        .into_iter()
-        .map(|item| match item {
-            WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(
-                doc_report,
-            ) => {
-                let diagnostics = condensed_full_document_diagnostic_report(
-                    doc_report.full_document_diagnostic_report,
-                )
-                .join("\n\t");
-                format!("{}\n\t{diagnostics}", doc_report.uri)
-            }
-            WorkspaceDocumentDiagnosticReport::WorkspaceUnchangedDocumentDiagnosticReport(
-                doc_report,
-            ) => {
-                format!("{}\n\tUNCHANGED", doc_report.uri)
-            }
-        })
-        .collect::<Vec<String>>()
-        .join("\n")
-}
-
-pub(crate) fn condensed_document_diagnostic_snapshot(report: DocumentDiagnosticReport) -> String {
-    match report {
-        DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(full) => {
-            condensed_full_document_diagnostic_report(full.full_document_diagnostic_report)
-                .join("\n")
-        }
-        // NOTE: It might be worth providing more details for these
-        // cases, but I don't think there's currently a use case for
-        // it.
-        DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
-            "UNCHANGED".to_string()
-        }
-    }
-}
-
-fn condensed_full_document_diagnostic_report(report: FullDocumentDiagnosticReport) -> Vec<String> {
-    report
-        .items
-        .into_iter()
-        .map(|d| {
-            let range = format!(
-                "{start_line}:{start_char}..{end_line}:{end_char}",
-                start_line = d.range.start.line,
-                start_char = d.range.start.character,
-                end_line = d.range.end.line,
-                end_char = d.range.end.character,
-            );
-            let severity = match d.severity {
-                Some(DiagnosticSeverity::Error) => "ERROR",
-                Some(DiagnosticSeverity::Warning) => "WARNING",
-                Some(DiagnosticSeverity::Information) => "INFORMATION",
-                Some(DiagnosticSeverity::Hint) => "HINT",
-                Some(DiagnosticSeverity::Custom(_)) | None => "unknown",
-            };
-            let Message::String(message) = d.message else {
-                panic!(
-                    "Only string-type diagnostic messages supported, got: {:?}",
-                    d.message
-                );
-            };
-            format!("{range}[{severity}]: {message}")
-        })
-        .collect()
 }
 
 /// Asks for workspace diagnostics in a way that anticipates "long polling."

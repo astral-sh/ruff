@@ -18,7 +18,7 @@ use lsp_types::{
 };
 use lsp_types::{ExitNotification, Notification};
 use ruff_db::Db;
-use ruff_db::files::{File, system_path_to_file};
+use ruff_db::files::{File, system_path_to_file, vendored_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
@@ -340,7 +340,7 @@ impl Session {
         } else if let Some(project) = self.projects.get(project_root) {
             for file in changes.scripts {
                 if let Some(document) = project.db.document(file) {
-                    let document = DocumentHandle::from_document(document);
+                    let document = OpenDocumentHandle::from_document(document);
                     publish_diagnostics_if_needed(&document, self, client);
                 }
             }
@@ -1030,7 +1030,7 @@ impl Session {
 
         // Collect all of the documents to clear upfront to
         // work around borrowck.
-        let documents_to_clear: Vec<DocumentHandle> = self
+        let documents_to_clear: Vec<OpenDocumentHandle> = self
             .text_document_handles()
             .filter_map(|doc| {
                 if let AnySystemPath::System(ref path) = *doc.notebook_or_file_path()
@@ -1053,7 +1053,11 @@ impl Session {
         Ok(())
     }
 
-    pub(crate) fn clear_diagnostics_if_needed(&self, document: &DocumentHandle, client: &Client) {
+    pub(crate) fn clear_diagnostics_if_needed(
+        &self,
+        document: &OpenDocumentHandle,
+        client: &Client,
+    ) {
         if self.client_capabilities().supports_pull_diagnostics() && !document.is_cell_or_notebook()
         {
             return;
@@ -1217,22 +1221,50 @@ impl Session {
         );
     }
 
-    /// Creates a document snapshot with the URI referencing the document to snapshot.
+    /// Captures client settings and a target for a document request.
     pub(crate) fn snapshot_document(&self, uri: &Uri) -> Result<DocumentSnapshot, DocumentError> {
-        let index = self.index();
-        let document_handle = index.open_document_handle(uri)?;
+        let document = self.document_target(uri)?;
 
         Ok(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
             global_settings: self.global_settings.clone(),
             workspace_settings: self
-                .project_state_for_document(document_handle.notebook_or_file_path())
+                .project_state_for_document(document.notebook_or_file_path())
                 .and_then(|(workspace_root, _)| self.workspaces.settings_for_path(workspace_root))
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
-            document: document_handle,
+            document,
             client_name: self.client_name,
         })
+    }
+
+    /// Selects an open document or a supported closed document for a request.
+    fn document_target(&self, uri: &Uri) -> Result<DocumentRequestTarget, DocumentError> {
+        match self.index().open_document_handle(uri) {
+            Ok(handle) => Ok(DocumentRequestTarget::Open(handle)),
+            Err(DocumentError::NotFound(key))
+                if let DocumentKey::File(path) = &key
+                    && self.is_supported_closed_file(path) =>
+            {
+                Ok(DocumentRequestTarget::Closed {
+                    uri: uri.clone(),
+                    path: key.into_file_path(),
+                })
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Returns whether requests may target this file while it is closed.
+    fn is_supported_closed_file(&self, path: &SystemPath) -> bool {
+        // Closed notebooks lack the client's cell URI and position mappings.
+        if PySourceType::try_from_path(path) == Some(PySourceType::Ipynb) {
+            return false;
+        }
+
+        // A request needs a project, but the file need not belong to it:
+        // unrelated files use the same fallback project as open files.
+        !self.projects.is_empty()
     }
 
     /// Creates a snapshot of the current state of the [`Session`].
@@ -1254,21 +1286,21 @@ impl Session {
         }
     }
 
-    /// Iterates over the document keys for all open text documents.
-    pub(super) fn text_document_handles(&self) -> impl Iterator<Item = DocumentHandle> + '_ {
+    /// Iterates over handles to all open text documents.
+    pub(super) fn text_document_handles(&self) -> impl Iterator<Item = OpenDocumentHandle> + '_ {
         self.index()
             .text_documents()
-            .map(|(_, document)| DocumentHandle::from_text_document(document))
+            .map(|(_, document)| OpenDocumentHandle::from_text_document(document))
     }
 
     /// Iterates over all open file-level documents.
     ///
     /// Notebook cells are excluded because their file-level representation is the containing
     /// notebook.
-    pub(super) fn file_document_handles(&self) -> impl Iterator<Item = DocumentHandle> + '_ {
+    pub(super) fn file_document_handles(&self) -> impl Iterator<Item = OpenDocumentHandle> + '_ {
         self.index()
             .file_documents()
-            .map(DocumentHandle::from_document)
+            .map(OpenDocumentHandle::from_document)
     }
 
     /// Returns a handle to the open document specified by its URI.
@@ -1279,7 +1311,7 @@ impl Session {
     pub(crate) fn open_document_handle(
         &self,
         uri: &lsp_types::Uri,
-    ) -> Result<DocumentHandle, DocumentError> {
+    ) -> Result<OpenDocumentHandle, DocumentError> {
         self.index().open_document_handle(uri)
     }
 
@@ -1291,7 +1323,7 @@ impl Session {
         &mut self,
         client: &Client,
         document: NotebookDocument,
-    ) -> DocumentHandle {
+    ) -> OpenDocumentHandle {
         let handle = self.index_mut().open_notebook_document(document);
         self.open_document_in_db(client, &handle, None);
         handle
@@ -1307,7 +1339,7 @@ impl Session {
         &mut self,
         client: &Client,
         document: TextDocument,
-    ) -> DocumentHandle {
+    ) -> OpenDocumentHandle {
         let language_id = document.language_id();
 
         // Request synchronization before installing the editor contents because uv reads the
@@ -1345,7 +1377,7 @@ impl Session {
     fn open_document_in_db(
         &mut self,
         client: &Client,
-        document: &DocumentHandle,
+        document: &OpenDocumentHandle,
         language_id: Option<LanguageId>,
     ) {
         let path = document.notebook_or_file_path();
@@ -1486,13 +1518,15 @@ impl Drop for MutIndexGuard<'_> {
 }
 
 /// An immutable snapshot of [`Session`] that references a specific document.
+///
+/// The document may be open or closed. Creating the snapshot does not open it.
 #[derive(Debug)]
 pub(crate) struct DocumentSnapshot {
     resolved_client_capabilities: ResolvedClientCapabilities,
     global_settings: Arc<GlobalSettings>,
     workspace_settings: Arc<WorkspaceSettings>,
     position_encoding: PositionEncoding,
-    document: DocumentHandle,
+    document: DocumentRequestTarget,
     client_name: ClientName,
 }
 
@@ -1517,8 +1551,8 @@ impl DocumentSnapshot {
         &self.workspace_settings
     }
 
-    /// Returns the result of the document query for this snapshot.
-    pub(crate) fn document(&self) -> &DocumentHandle {
+    /// Returns the document targeted by this snapshot.
+    pub(crate) fn document(&self) -> &DocumentRequestTarget {
         &self.document
     }
 
@@ -1526,15 +1560,8 @@ impl DocumentSnapshot {
         self.document.uri()
     }
 
-    pub(crate) fn to_notebook_or_file(&self, db: &dyn Db) -> Option<File> {
-        let file = self.document.notebook_or_file(db);
-        if file.is_none() {
-            tracing::debug!(
-                "Failed to resolve file: file not found for `{}`",
-                self.document.uri()
-            );
-        }
-        file
+    pub(crate) fn to_notebook_or_file(&self, db: &ProjectDatabase) -> Option<File> {
+        self.document.to_notebook_or_file(db)
     }
 
     pub(crate) fn notebook_or_file_path(&self) -> &AnySystemPath {
@@ -1543,6 +1570,72 @@ impl DocumentSnapshot {
 
     pub(crate) fn client_name(&self) -> ClientName {
         self.client_name
+    }
+}
+
+/// A document targeted by a request, whether open or closed.
+///
+/// Request handlers use this type to resolve a database file without requiring the client to
+/// open the document. Updating or closing a client document requires an [`OpenDocumentHandle`].
+#[derive(Debug)]
+pub(crate) enum DocumentRequestTarget {
+    /// A document opened by the client.
+    Open(OpenDocumentHandle),
+    /// A closed document identified by its URI and path.
+    Closed {
+        /// The URI supplied by the client.
+        uri: Uri,
+        /// The path used to resolve the document in the database.
+        path: AnySystemPath,
+    },
+}
+
+impl DocumentRequestTarget {
+    /// Returns the database file for this document, or its containing notebook for a cell.
+    ///
+    /// Returns [`None`] if the file cannot be resolved.
+    fn to_notebook_or_file(&self, db: &ProjectDatabase) -> Option<File> {
+        let file = match self {
+            Self::Open(handle) => handle.notebook_or_file(db),
+            Self::Closed { path, .. } => {
+                let path = path.as_system()?;
+                if let Some(root) = ty_ide::cached_vendored_root(db)
+                    && let Some(vendored) = ty_ide::map_system_to_vendored(&root, path)
+                {
+                    // Reuse the bundled file's database identity instead of creating
+                    // a separate file for its cached copy.
+                    vendored_path_to_file(db, vendored).ok()
+                } else {
+                    system_path_to_file(db, path).ok()
+                }
+            }
+        };
+        if file.is_none() {
+            tracing::debug!(
+                "Failed to resolve file: file not found for `{}`",
+                self.uri()
+            );
+        }
+        file
+    }
+
+    /// Returns whether the document is a cell in a notebook opened by the client.
+    pub(crate) fn is_cell(&self) -> bool {
+        matches!(self, Self::Open(handle) if handle.is_cell())
+    }
+
+    fn uri(&self) -> &Uri {
+        match self {
+            Self::Open(handle) => handle.uri(),
+            Self::Closed { uri, .. } => uri,
+        }
+    }
+
+    fn notebook_or_file_path(&self) -> &AnySystemPath {
+        match self {
+            Self::Open(handle) => handle.notebook_or_file_path(),
+            Self::Closed { path, .. } => path,
+        }
     }
 }
 
@@ -1798,14 +1891,13 @@ impl SuspendedWorkspaceDiagnosticRequest {
     }
 }
 
-/// A handle to a document stored within [`Index`].
+/// A handle to a document opened by the client and stored in [`Index`].
 ///
-/// Allows identifying the document within the index but it also carries the URI used by the
-/// client to reference the document as well as the version of the document.
+/// Carries the client's URI and document version and supports updating or closing the document.
 ///
-/// It also exposes methods to get the file-path of the corresponding ty-file.
+/// Requests that also accept closed files use [`DocumentRequestTarget`].
 #[derive(Clone, Debug)]
-pub(crate) enum DocumentHandle {
+pub(crate) enum OpenDocumentHandle {
     Text {
         uri: lsp_types::Uri,
         path: AnySystemPath,
@@ -1823,7 +1915,7 @@ pub(crate) enum DocumentHandle {
     },
 }
 
-impl DocumentHandle {
+impl OpenDocumentHandle {
     fn from_text_document(document: &TextDocument) -> Self {
         match document.notebook() {
             None => Self::Text {
@@ -1895,9 +1987,9 @@ impl DocumentHandle {
     #[expect(unused)]
     fn notebook_path(&self) -> Option<&AnySystemPath> {
         match self {
-            DocumentHandle::Notebook { path, .. } => Some(path),
-            DocumentHandle::Cell { notebook_path, .. } => Some(notebook_path),
-            DocumentHandle::Text { .. } => None,
+            OpenDocumentHandle::Notebook { path, .. } => Some(path),
+            OpenDocumentHandle::Cell { notebook_path, .. } => Some(notebook_path),
+            OpenDocumentHandle::Text { .. } => None,
         }
     }
 
@@ -1916,7 +2008,7 @@ impl DocumentHandle {
         }
     }
 
-    pub(crate) fn is_cell(&self) -> bool {
+    fn is_cell(&self) -> bool {
         matches!(self, Self::Cell { .. })
     }
 
@@ -2043,9 +2135,9 @@ impl DocumentHandle {
 
     fn set_version(&mut self, version: DocumentVersion) {
         let self_version = match self {
-            DocumentHandle::Text { version, .. }
-            | DocumentHandle::Notebook { version, .. }
-            | DocumentHandle::Cell { version, .. } => version,
+            OpenDocumentHandle::Text { version, .. }
+            | OpenDocumentHandle::Notebook { version, .. }
+            | OpenDocumentHandle::Cell { version, .. } => version,
         };
 
         *self_version = version;
@@ -2170,10 +2262,45 @@ mod tests {
     use std::sync::Arc;
 
     use anyhow::Context;
-    use ruff_db::system::{Command, CommandExecutor, OsSystem, System as _};
+    use lsp_types::Uri;
+    use ruff_db::files::vendored_path_to_file;
+    use ruff_db::system::{Command, CommandExecutor, OsSystem, System as _, SystemPath};
+    use ruff_db::vendored::VendoredPath;
+    use ty_project::metadata::Options;
+    use ty_project::{ProjectDatabase, ProjectMetadata};
+    use ty_python_core::program::UseDefaultStrategy;
 
-    use super::Index;
-    use crate::system::{LSPSystem, WorkspaceTrust};
+    use super::{DocumentRequestTarget, Index};
+    use crate::system::{AnySystemPath, LSPSystem, WorkspaceTrust};
+
+    #[test]
+    fn closed_cached_stub_resolves_to_vendored_file() -> anyhow::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let root = SystemPath::from_std_path(directory.path()).context("UTF-8 project path")?;
+        let Ok(metadata) = ProjectMetadata::from_options(
+            Options::default(),
+            root.to_path_buf(),
+            None,
+            &UseDefaultStrategy,
+        );
+        let db = ProjectDatabase::use_defaults(metadata, OsSystem::new(root));
+        let vendored_path = VendoredPath::new("stdlib/builtins.pyi");
+        let cached_path = ty_ide::cached_vendored_root(&db)
+            .context("typeshed cache root")?
+            .join(vendored_path.as_str());
+        let target = DocumentRequestTarget::Closed {
+            uri: Uri::from_file_path(cached_path.as_std_path())
+                .ok()
+                .context("cached stub URI")?,
+            path: AnySystemPath::System(cached_path),
+        };
+
+        assert_eq!(
+            target.to_notebook_or_file(&db),
+            Some(vendored_path_to_file(&db, vendored_path)?),
+        );
+        Ok(())
+    }
 
     /// Mutating the document index requires exclusive ownership after Salsa cancels the current
     /// database snapshots. A background command executor must not retain an `LSPSystem`, because

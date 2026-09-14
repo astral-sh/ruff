@@ -318,7 +318,7 @@ where
         let uri = R::document_uri(&params);
 
         let Ok(document) = session.snapshot_document(&uri) else {
-            let reason = format!("Document {uri} is not open in the session");
+            let reason = format!("Document {uri} is neither open nor a supported closed file");
             tracing::warn!(
                 "Ignoring request id={id} method={} because {reason}",
                 R::METHOD
@@ -441,7 +441,13 @@ where
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         let uri = N::document_uri(&params);
-        let Ok(snapshot) = session.snapshot_document(&uri) else {
+        // Requiring an open document here assumes the notification is invalid for closed documents.
+        // TODO: Revisit this check before routing a notification that can target closed documents through
+        // `background_notification_thread`. Note that `snapshot_document` can already resolve closed files.
+        let Ok(snapshot) = session
+            .open_document_handle(&uri)
+            .and_then(|_| session.snapshot_document(&uri))
+        else {
             let reason = format!("Document {uri} is not open in the session");
             tracing::warn!(
                 "Ignoring notification id={id} method={} because {reason}",
