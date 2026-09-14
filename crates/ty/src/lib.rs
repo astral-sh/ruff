@@ -25,12 +25,13 @@ use ruff_db::files::File;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
 use ruff_diagnostics::Applicability;
+use ruff_python_ast::script::ScriptTag;
 use salsa::Database;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{
-    ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UvSyncProgress,
-    watch,
+    ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UseUv,
+    UvSyncProgress, watch,
 };
 use ty_project::{ProjectDatabase, ProjectMetadata, ProjectReloadResult};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
@@ -151,9 +152,14 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         Some(config_file) => {
             ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
         }
-        None if check_paths.iter().any(|path| system.is_file(path)) => {
-            // `uv check --script` passes a file as its check path. Standalone scripts must not
-            // inherit the enclosing workspace; their environments are synchronized separately.
+        None if UseUv::from_system(&system) == UseUv::On
+            && let [path] = check_paths.as_slice()
+            && system
+                .read_to_string(path)
+                .is_ok_and(|source| ScriptTag::parse(source.as_bytes()).is_some()) =>
+        {
+            // A standalone PEP 723 script uses its own uv environment instead of the
+            // enclosing workspace. Other explicit paths still discover workspace metadata.
             ProjectMetadata::discover_without_uv(&project_path, &system)?
         }
         None => ProjectMetadata::discover(&project_path, &system)?,
