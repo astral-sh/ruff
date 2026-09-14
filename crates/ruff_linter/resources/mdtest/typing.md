@@ -135,3 +135,59 @@ from decimal import Decimal  # error: [unused-import] "`decimal.Decimal` importe
 class Record(extra_items="Decimal"):
     pass
 ```
+
+## Functional `TypedDict` keywords
+
+`total` and `closed` are boolean flags, so even invalid strings passed to them are ordinary values
+and do not mark imports as used. `extra_items` accepts a type expression, so a quoted type does
+mark its import as used.
+
+```py
+from decimal import Decimal  # error: [unused-import] "`decimal.Decimal` imported but unused"
+from fractions import Fraction  # error: [unused-import] "`fractions.Fraction` imported but unused"
+from pathlib import Path  # no diagnostic
+from typing import TypedDict
+
+Closed = TypedDict("Closed", {}, total="Decimal", closed="Fraction")
+ExtraItems = TypedDict("ExtraItems", {}, extra_items="Path")
+```
+
+## Legacy `TypedDict` keyword fields
+
+Before Python 3.13, when the field mapping is omitted or `None`, keyword arguments define fields,
+including a field named `closed`. Their quoted types mark imports as used. `total` remains a value
+argument.
+
+```toml
+target-version = "py312"
+lint.select = ["F401"]
+```
+
+```py
+from decimal import Decimal  # no diagnostic
+from fractions import Fraction  # no diagnostic
+from pathlib import Path  # error: [unused-import] "`pathlib.Path` imported but unused"
+from typing import TypedDict
+
+Implicit = TypedDict("Implicit", closed="Decimal", total="Path")
+Explicit = TypedDict("Explicit", None, closed="Fraction")
+```
+
+## Removal of `TypedDict` keyword fields
+
+Starting in Python 3.13, keyword arguments no longer define fields. Even with the field mapping
+omitted, quoted values for `closed` or unknown keywords do not mark their imports as used. This
+example also raises a `TypeError` at runtime for the unknown keyword argument.
+
+```toml
+target-version = "py313"
+lint.select = ["F401"]
+```
+
+```py
+from decimal import Decimal  # error: [unused-import] "`decimal.Decimal` imported but unused"
+from fractions import Fraction  # error: [unused-import] "`fractions.Fraction` imported but unused"
+from typing_extensions import TypedDict
+
+Example = TypedDict("Example", closed="Decimal", field="Fraction")
+```
