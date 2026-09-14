@@ -57,6 +57,13 @@ test("requires a complete successful reservation response", () => {
     classify("github-v2", 200, { ok: true, signed_upload_url: uploadUrl }).result,
     "write-grant-issued",
   );
+  assert.equal(
+    classify("github-v2", 200, {
+      ok: true,
+      signed_upload_url: "http://cache.internal:40000/upload?secret=local-grant",
+    }).result,
+    "write-grant-issued",
+  );
   assert.equal(classify("github-v2", 200, { ok: true }).result, "inconclusive");
   assert.equal(
     classify("depot-native", 200, { entryId: "entry", uploadPartUrls: [uploadUrl] }).result,
@@ -129,13 +136,18 @@ test("fails read mode when the backend grants write authority", async () => {
   assert.ok(!passed(summary));
 });
 
-test("accepts a runner-local HTTP cache proxy without allowing remote HTTP", async () => {
-  for (const host of ["127.0.0.1:40000", "[::1]:40000", "localhost:40000"]) {
+test("allows only the Depot runner's injected HTTP cache origin", async () => {
+  for (const host of [
+    "127.0.0.1:40000",
+    "[::1]:40000",
+    "localhost:40000",
+    "10.0.0.1:40000",
+    "cache.internal:40000",
+  ]) {
     let requests = 0;
     const summary = await probe(
       {
         ...environment,
-        INPUT_BACKEND: "github",
         ACTIONS_RESULTS_URL: `http://${host}/`,
         DEPOT_CACHE_TOKEN: "",
       },
@@ -146,9 +158,9 @@ test("accepts a runner-local HTTP cache proxy without allowing remote HTTP", asy
       },
     );
     assert.equal(requests, 1);
-    assert.equal(summary.results[0].endpointDomain, "loopback");
     assert.equal(summary.results[0].endpointScheme, "http");
-    assert.ok(passed(summary));
+    assert.equal(summary.results[0].result, "write-grant-issued");
+    assert.equal(summary.results[1].result, "credential-not-issued");
   }
 
   for (const host of ["remote.example.invalid", "127.0.0.1.example.invalid", "10.0.0.1"]) {
@@ -159,12 +171,23 @@ test("accepts a runner-local HTTP cache proxy without allowing remote HTTP", asy
         ACTIONS_RESULTS_URL: `http://${host}/`,
         DEPOT_CACHE_TOKEN: "",
       },
-      async () => assert.fail("non-loopback HTTP request"),
+      async () => assert.fail("HTTP outside the Depot runner's injected cache origin"),
     );
     assert.equal(summary.results[0].result, "invalid-endpoint");
     assert.equal(summary.results[0].endpointScheme, "http");
     assert.ok(!passed(summary));
   }
+
+  let requests = 0;
+  const nativeOverride = await probe(
+    { ...environment, DEPOT_CACHE_HOST: "http://10.0.0.1:40000" },
+    async () => {
+      requests++;
+      return { status: 200, json: async () => ({ ok: true, signed_upload_url: uploadUrl }) };
+    },
+  );
+  assert.equal(requests, 1);
+  assert.equal(nativeOverride.results[1].result, "unexpected-endpoint");
 });
 
 test("redacts transport failures and refuses an unintended repository", async () => {

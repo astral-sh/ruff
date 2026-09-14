@@ -27,7 +27,7 @@ function isUploadUrl(value) {
     return false;
   }
   try {
-    return new URL(value).protocol === "https:";
+    return ["http:", "https:"].includes(new URL(value).protocol);
   } catch {
     return false;
   }
@@ -106,8 +106,11 @@ function endpointDomain(url) {
   return "other";
 }
 
-async function reserve(request, token, fetcher) {
+async function reserve(request, token, fetcher, runnerCacheOrigin) {
   const { url } = request;
+  const runnerHttpAllowed =
+    ["github-v1", "github-v2"].includes(request.surface) &&
+    runnerCacheOrigin === url.origin;
   const details = {
     surface: request.surface,
     credentialIssued: Boolean(token),
@@ -121,7 +124,7 @@ async function reserve(request, token, fetcher) {
   }
   if (
     (url.protocol !== "https:" &&
-      !(url.protocol === "http:" && details.endpointDomain === "loopback")) ||
+      !(url.protocol === "http:" && runnerHttpAllowed)) ||
     url.username ||
     url.password ||
     url.search ||
@@ -183,11 +186,15 @@ async function probe(env = process.env, fetcher = fetch) {
   // Use the same reservation protocols as actions/toolkit, but bypass its
   // cooperative ACTIONS_CACHE_MODE check. Do not upload or finalize anything.
   try {
+    const request = githubRequest(env, newKey("github"));
     summary.results.push(
       await reserve(
-        githubRequest(env, newKey("github")),
+        request,
         env.ACTIONS_RUNTIME_TOKEN,
         fetcher,
+        // Depot supplies an internal HTTP proxy as the cache service URL.
+        // Authorize only that injected origin in the scoped Depot job.
+        backend === "depot" ? request.url.origin : undefined,
       ),
     );
   } catch {
