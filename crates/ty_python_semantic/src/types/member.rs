@@ -3,12 +3,9 @@ use crate::place::{
     ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
     TypeOrigin, place_by_id, place_from_bindings, place_from_declarations,
 };
-use crate::types::{
-    ClassBase, ProgramEnvironment, Type, TypeQualifiers, infer::nearest_enclosing_class,
-};
+use crate::types::{ProgramEnvironment, Type, class::MroLookup, infer::nearest_enclosing_class};
 use ty_python_core::{
-    definition::DefinitionKind, place_table, scope::ScopeId, semantic_index,
-    symbol::ScopedSymbolId, use_def_map,
+    place_table, scope::ScopeId, semantic_index, symbol::ScopedSymbolId, use_def_map,
 };
 
 /// The return type of certain member-lookup operations. Contains information
@@ -153,51 +150,10 @@ pub(super) fn inherited_class_attribute_declaration<'db>(
     }
 
     let class = nearest_enclosing_class(db, semantic_index(db, scope.program_file(db)), scope)?;
-    let specialization = class
-        .generic_context(db)
-        .map(|context| context.identity_specialization(db));
-    for base in class.iter_mro(db, specialization).skip(1) {
-        let base = match base {
-            ClassBase::Generic | ClassBase::Protocol => continue,
-            ClassBase::Class(base) => base,
-            _ => return None,
-        };
-        let (base, specialization) = base.static_class_literal(db)?;
-        let scope = base.body_scope(db);
-        let Some(symbol) = place_table(db, scope).symbol_id(name) else {
-            continue;
-        };
-        if place_by_id(
-            db,
-            scope,
-            symbol.into(),
-            RequiresExplicitReExport::No,
-            ConsideredDefinitions::EndOfScope,
-        )
-        .is_undefined()
-        {
-            continue;
-        }
-        let declarations = use_def_map(db, scope).end_of_scope_symbol_declarations(symbol);
-        let declared = place_from_declarations(db, &env, declarations.clone())
-            .ignore_conflicting_declarations();
-        let declaration = if declared.is_undefined() {
-            inherited_class_attribute_declaration(db, scope, symbol)
-        } else {
-            // Methods, imports, and nested classes declare their own types, but do not provide
-            // annotations for subclass assignments. Inspect declarations directly: public member
-            // provenance may instead describe a binding, or combine several definitions.
-            (!declared.qualifiers.contains(TypeQualifiers::FINAL)
-                && declarations
-                    .filter_map(|declaration| declaration.declaration.definition())
-                    .all(|definition| {
-                        matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
-                    }))
-            .then_some(declared)
-        };
-        return declaration.map(|declaration| {
-            declaration.map_type(|ty| ty.apply_optional_specialization(db, specialization))
-        });
-    }
-    None
+    MroLookup::new(
+        db,
+        &env,
+        class.identity_specialization(db).iter_mro(db).skip(1),
+    )
+    .class_attribute_declaration(name)
 }
