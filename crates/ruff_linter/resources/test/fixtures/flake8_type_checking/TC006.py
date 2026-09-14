@@ -97,3 +97,24 @@ def f():
 
     cast(typ=int, val=3.0)  # TC006
     cast(val=3.0, typ=int)  # TC006
+
+
+def f():
+    # No fix: the escape survives every quote style
+    from typing import cast, Literal
+
+    cast(Literal["\n"], "\n")  # TC006
+
+
+def f():
+    # A trailing quote would run into a `"""` closing delimiter, so this falls back to `'''`
+    from typing import cast, Literal
+
+    cast(Literal["it's"] | "(", "")  # TC006
+
+
+def f():
+    # No fix: the trailing quote rules out `"""` and the content already holds `'''`
+    from typing import cast, Literal
+
+    cast(Literal["'''"] | "(", "")  # TC006
