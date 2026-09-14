@@ -65,9 +65,8 @@ impl<'db> Type<'db> {
     /// instantiated as an integer `NewType`. We therefore expand `TypeVar`s to their upcast bounds
     /// or constraints instead of transferring that potentially tagged relationship.
     ///
-    /// We use this upcast both to decide whether identity is possible and to narrow the other
-    /// operand when it succeeds. Each operand retains its own existing tags, substituted
-    /// signatures, and type-variable relationships when the resulting constraint is applied.
+    /// We use this upcast to decide whether identity is possible. It can erase a callable
+    /// signature that remains valid after narrowing; see [`Type::identity_narrowing_type`].
     ///
     /// [is operator]: https://docs.python.org/3/reference/expressions.html#identity-comparisons
     /// [object identity]: https://docs.python.org/3/reference/datamodel.html#objects-values-and-types
@@ -516,6 +515,78 @@ impl<'db> Type<'db> {
         }
 
         upcast(db, env, self, &UpcastingVisitor::default()).ty
+    }
+
+    /// Return the other operand's type for narrowing after a successful identity check.
+    ///
+    /// A `NewType` tag or a type-variable selection belongs to a static view of an object, so
+    /// neither transfers to a different reference. A callable's signature describes how the
+    /// object can be used through that view, however, and can be retained when narrowing a
+    /// reference whose type does not already provide a more specific view.
+    pub(crate) fn identity_narrowing_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        struct IdentityNarrowing;
+
+        fn remove_nontransferable_constraints<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            ty: Type<'db>,
+            visitor: &TypeTransformer<'db, IdentityNarrowing>,
+        ) -> Type<'db> {
+            match ty {
+                Type::TypeAlias(alias) => visitor.visit_type(db, ty, || {
+                    remove_nontransferable_constraints(db, env, alias.value_type(db), visitor)
+                }),
+                Type::NewTypeInstance(newtype) => visitor.visit_type(db, ty, || {
+                    remove_nontransferable_constraints(
+                        db,
+                        env,
+                        newtype.concrete_base_type(db),
+                        visitor,
+                    )
+                }),
+                Type::TypeVar(typevar) => visitor.visit_type(db, ty, || {
+                    remove_nontransferable_constraints(
+                        db,
+                        env,
+                        typevar
+                            .require_bound_or_constraints(db, env)
+                            .as_type(db, env),
+                        visitor,
+                    )
+                }),
+                Type::Union(union) => visitor.visit_type(db, ty, || {
+                    union.map(db, env, |element| {
+                        remove_nontransferable_constraints(db, env, *element, visitor)
+                    })
+                }),
+                Type::Intersection(intersection) => visitor.visit_type(db, ty, || {
+                    let runtime_ty = ty.identity_comparison_type(db, env);
+                    if runtime_ty.is_never() {
+                        return runtime_ty;
+                    }
+
+                    let mut builder = IntersectionBuilder::new(db, env);
+                    for positive in intersection.positive(db) {
+                        builder = builder.add_positive(remove_nontransferable_constraints(
+                            db, env, *positive, visitor,
+                        ));
+                    }
+                    if let Type::Intersection(runtime) = runtime_ty {
+                        for negative in runtime.negative(db) {
+                            builder.add_negative_in_place(*negative);
+                        }
+                    }
+                    builder.build()
+                }),
+                _ => ty,
+            }
+        }
+
+        remove_nontransferable_constraints(db, env, self, &TypeTransformer::default())
     }
 
     /// Return whether values of these types always, never, or possibly identify the same object.
