@@ -2,6 +2,10 @@ name: ty ecosystem-analyzer
 
 permissions: {}
 
+# Third-party builds must not write caches consumed by other jobs.
+# GitHub-hosted runners use GitHub's cache service, which enforces this mode.
+cache-mode: read
+
 on:
   pull_request:
     paths:
@@ -53,8 +57,8 @@ jobs:
     strategy:
       matrix:
         revision: [base, pr]
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 5
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -64,6 +68,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           lookup-only: false
+          save-if: false
 
       - name: Install Rust toolchain
         run: rustup show
@@ -132,8 +137,8 @@ jobs:
     strategy:
       matrix:
         shard: [0, 1, 2, 3]
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 10
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    timeout-minutes: 30
     env:
       EXCLUDE_NEWER: ${{ github.event.pull_request.updated_at }}
       # Enable experimental support for installing PEP 723 script dependencies.
