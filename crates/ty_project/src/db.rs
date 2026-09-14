@@ -13,12 +13,14 @@ use get_size2::StandardTracker;
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
-use ruff_db::system::{DbWithWritableSystem, System, WritableSystem};
+use ruff_db::system::{DbWithWritableSystem, System, SystemPath, WritableSystem};
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
 use ty_module_resolver::system_module_search_paths;
 use ty_python_core::ProgramFile;
-use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
+use ty_python_core::program::{
+    FallibleStrategy, MisconfigurationStrategy, Program, UseDefaultStrategy,
+};
 use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, PythonVersionWithSource};
@@ -49,14 +51,25 @@ fn program_file(db: &dyn Db, file: File) -> ProgramFile<'_> {
         return project_program.program_file(db, file);
     };
 
-    if project.is_file_included(db, path).is_included()
-        || system_module_search_paths(db, project_program.resolver_environment(db))
-            .any(|search_path| path.starts_with(search_path))
-    {
+    if project.is_file_included(db, path).is_included() {
         return project_program.program_file(db, file);
     }
 
-    let program = project
+    program_for_dependency(db, path)
+        .unwrap_or(project_program)
+        .program_file(db, file)
+}
+
+fn program_for_dependency<'db>(db: &'db dyn Db, path: &SystemPath) -> Option<Program<'db>> {
+    let project = db.project();
+    let project_program = project.program(db);
+    if system_module_search_paths(db, project_program.resolver_environment(db))
+        .any(|search_path| path.starts_with(search_path))
+    {
+        return Some(project_program);
+    }
+
+    project
         .script_files(db)
         .iter()
         .filter_map(|script| Script::for_file(db, script))
@@ -65,9 +78,6 @@ fn program_file(db: &dyn Db, file: File) -> ProgramFile<'_> {
             system_module_search_paths(db, program.resolver_environment(db))
                 .any(|search_path| path.starts_with(search_path))
         })
-        .unwrap_or(project_program);
-
-    program.program_file(db, file)
 }
 
 /// Tracked so that a change to the open-file set only invalidates queries
@@ -239,6 +249,14 @@ impl ProjectDatabase {
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn check_file(&self, file: File) -> Vec<Diagnostic> {
         crate::check_file(self, file)
+    }
+
+    /// Returns a program whose configured search paths contain `path`.
+    ///
+    /// Prefers the project environment, then existing script environments. This does not require
+    /// the file to exist or to have been imported, and does not synchronize environments.
+    pub fn program_for_dependency(&self, path: &SystemPath) -> Option<Program<'_>> {
+        program_for_dependency(self, path)
     }
 
     /// Set the check mode for the project.

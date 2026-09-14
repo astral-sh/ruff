@@ -471,7 +471,8 @@ impl Session {
     /// Returns a reference to the project's [`ProjectDatabase`] in which the given `path` belongs.
     ///
     /// If the path is a system path, it will return the project database that is closest to the
-    /// given path, or the first project if no project is found for the path.
+    /// given path, then one whose search paths contain it, then the first project when sorted by
+    /// workspace folder path.
     ///
     /// If the path is a virtual path, it will return the first project database in the session.
     pub(crate) fn project_db(&self, path: &AnySystemPath) -> &ProjectDatabase {
@@ -499,7 +500,8 @@ impl Session {
     /// Returns a reference to the project's [`ProjectState`] in which the given `path` belongs.
     ///
     /// If the path is a system path, it will return the project database that is closest to the
-    /// given path, or the first project if no project is found for the path.
+    /// given path, then one whose search paths contain it, then the first project when sorted by
+    /// workspace folder path.
     ///
     /// If the path is a virtual path, it will return the first project database in the session.
     fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
@@ -525,9 +527,9 @@ impl Session {
     /// by path).
     ///
     /// When the given document path is a system path, we select the project registered under the
-    /// closest containing workspace folder. For (1) paths that fall outside of any workspace folder,
-    /// and (2) virtual paths, we select the project associated with the workspace root path that
-    /// sorts first lexicographically.
+    /// closest containing workspace folder. Otherwise, we select the first project by workspace-root
+    /// path whose import search paths contain the file. If no project matches, or the path is virtual,
+    /// we select the project associated with the workspace root path that sorts first lexicographically.
     ///
     /// Returns a tuple where the first element is the workspace root of the
     /// selected project and the second element is the state object for the selected project.
@@ -542,6 +544,11 @@ impl Session {
                 self.projects
                     .range(..=path.to_path_buf())
                     .rfind(|(root, _)| path.starts_with(root))
+                    .or_else(|| {
+                        self.projects
+                            .iter()
+                            .find(|(_, project)| project.db.program_for_dependency(path).is_some())
+                    })
             })
             .or_else(|| self.projects.first_key_value())
             .map(|(workspace_root, project)| (workspace_root.as_path(), project))
@@ -1970,7 +1977,7 @@ impl DocumentHandle {
             self.set_version(document.version());
         }
 
-        self.update_in_db(session, client);
+        self.update_in_databases(session, client);
 
         Ok(())
     }
@@ -1998,22 +2005,40 @@ impl DocumentHandle {
             self.set_version(new_version);
         }
 
-        self.update_in_db(session, client);
+        self.update_in_databases(session, client);
         Ok(())
     }
 
-    fn update_in_db(&self, session: &mut Session, client: &Client) {
+    fn update_in_databases(&self, session: &mut Session, client: &Client) {
         let path = self.notebook_or_file_path();
-        let changes = match path {
-            AnySystemPath::System(system_path) => {
-                [ChangeEvent::file_content_changed(system_path.clone())]
-            }
-            AnySystemPath::SystemVirtual(virtual_path) => {
-                [ChangeEvent::ChangedVirtual(virtual_path.clone())]
-            }
+        let (containing_workspace, is_virtual, changes) = match path {
+            AnySystemPath::System(system_path) => (
+                session.workspaces().for_path(system_path),
+                false,
+                [ChangeEvent::file_content_changed(system_path.clone())],
+            ),
+            AnySystemPath::SystemVirtual(virtual_path) => (
+                None,
+                true,
+                [ChangeEvent::ChangedVirtual(virtual_path.clone())],
+            ),
         };
 
-        session.apply_changes(client, path, &changes);
+        if containing_workspace.is_some() || is_virtual {
+            // A containing workspace determines the project for a system file, while virtual
+            // documents select a single, arbitrary project. Neither selection depends on import
+            // search paths, so update only the selected database.
+            session.apply_changes(client, path, &changes);
+        } else {
+            // This is both a system file and an external file (it has no containing workspace
+            // that defines how to select a single project for it). For external files, a change in
+            // import search paths can change the selected project, so here we update all databases
+            // to keep previously selected projects' cached contents fresh.
+            let roots: Vec<_> = session.projects.keys().cloned().collect();
+            for root in roots {
+                session.apply_changes(client, &AnySystemPath::System(root), &changes);
+            }
+        }
     }
 
     fn set_version(&mut self, version: DocumentVersion) {
@@ -2070,7 +2095,7 @@ impl DocumentHandle {
                         // unsaved script metadata can bring a file back into the project when
                         // `exclude-scripts` is enabled. Also request synchronization for saved
                         // metadata changes that were skipped while the editor overlay was present.
-                        self.update_in_db(session, client);
+                        self.update_in_databases(session, client);
                     } else {
                         // This can only fail when the path is a directory or it doesn't exists but the
                         // file should exists for this handler in this branch. This is because every
