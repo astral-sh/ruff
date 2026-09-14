@@ -426,7 +426,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(unix)]
     fn match_file_with_metacharacters_in_cwd() {
         let mut builder = IncludeFilterBuilder::new();
         builder
