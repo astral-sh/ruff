@@ -1441,7 +1441,7 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args([".", "--config", r#"lint=123"#]),
-        @"
+        @r###"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1481,9 +1481,10 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     - `lint.preview`
     - `lint.typing-extensions`
     - `lint.future-annotations`
+    - `lint.runtime-evaluated-annotations`
 
     For more information, try '--help'.
-    ");
+    "###);
 }
 
 #[test]

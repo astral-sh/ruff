@@ -25,6 +25,8 @@ use crate::settings::LinterSettings;
 pub(crate) enum TypingReference {
     /// The reference is in a runtime-evaluated context.
     Runtime,
+    /// The reference is in a runtime-ambiguous context.
+    RuntimeAmbiguous,
     /// The reference is in a runtime-evaluated context, but the
     /// `lint.future-annotations` setting is enabled.
     ///
@@ -58,6 +60,11 @@ impl TypingReference {
             // type definition to be considered a typing reference
             if !reference.in_type_definition() {
                 return Self::Runtime;
+            }
+
+            if reference.in_runtime_ambiguous_annotation() {
+                kind = kind.combine(Self::RuntimeAmbiguous);
+                continue;
             }
 
             if reference.in_typing_only_annotation() || reference.in_string_type_definition() {
