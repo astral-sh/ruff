@@ -1715,6 +1715,236 @@ def _(value: int, text: str) -> None:
 reveal_type(invoke(defaulted))  # revealed: list[str]
 ```
 
+### Selecting forwarded overloads
+
+Forwarded arguments select a parameter list together with its corresponding return type.
+
+```py
+from typing import Callable, ParamSpec, TypeVar, overload
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+@overload
+def convert(value: int, /) -> bytes: ...
+@overload
+def convert(*, text: str) -> bool: ...
+def convert(value: int = 0, *, text: str = "") -> bytes | bool:
+    return b"" if value else bool(text)
+
+def invoke(fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return fn(*args, **kwargs)
+
+def retain(fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> Callable[P, R]:
+    return fn
+
+reveal_type(invoke(convert, 1))  # revealed: bytes
+reveal_type(invoke(convert, text="a"))  # revealed: bool
+reveal_type(retain(convert, 1))  # revealed: (value: int, /) -> bytes
+reveal_type(retain(convert, text="a"))  # revealed: (*, text: str) -> bool
+invoke(convert, text=1)  # error: [invalid-argument-type]
+invoke(convert, 1, text="a")  # error: [too-many-positional-arguments]
+```
+
+### Generic forwarded overloads
+
+Each invocation solves the selected overload's variables from its own forwarded arguments.
+
+```py
+from typing import Callable, ParamSpec, TypeVar, overload
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
+
+@overload
+def boxed() -> None: ...
+@overload
+def boxed(value: T, /) -> list[T]: ...
+def boxed(value=None, /):
+    return None if value is None else [value]
+
+def invoke(fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return fn(*args, **kwargs)
+
+def check(value: int, text: str):
+    reveal_type(invoke(boxed, value))  # revealed: list[int]
+    reveal_type(invoke(boxed))  # revealed: None
+    reveal_type(invoke(boxed, text))  # revealed: list[str]
+```
+
+### Expanding forwarded overload arguments
+
+Every union member must match an overload; the result combines their return types.
+
+```py
+from typing import Callable, ParamSpec, TypeVar, overload
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
+U = TypeVar("U")
+
+@overload
+def convert(value: int, /) -> bytes: ...
+@overload
+def convert(value: str, /) -> bool: ...
+def convert(value: int | str, /) -> bytes | bool:
+    return b"" if isinstance(value, int) else bool(value)
+
+def invoke(fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return fn(*args, **kwargs)
+
+def check(value: int | str, invalid: int | None):
+    reveal_type(invoke(convert, value))  # revealed: bytes | bool
+    invoke(convert, invalid)  # error: [invalid-argument-type]
+
+@overload
+def box(value: list[T], /) -> list[T]: ...
+@overload
+def box(value: set[U], /) -> list[U]: ...
+def box(value, /):
+    return list(value)
+
+def generic(value: list[int] | list[str] | set[bytes]):
+    reveal_type(invoke(box, value))  # revealed: list[int] | list[str] | list[bytes]
+```
+
+The same selection applies when the wrapper also accepts an absent callback.
+
+```py
+def optional(fn: Callable[P, R] | None, /, *args: P.args, **kwargs: P.kwargs) -> R:
+    if fn is None:
+        raise ValueError
+    return fn(*args, **kwargs)
+
+def optional_generic(value: list[int] | list[str] | set[bytes]):
+    reveal_type(optional(box, value))  # revealed: list[int] | list[str] | list[bytes]
+```
+
+### Ambiguous forwarded overloads
+
+An `Any` argument has an unknown result when matching overloads return different types.
+
+```py
+from typing import Callable, ParamSpec, TypeVar, overload
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
+U = TypeVar("U")
+from typing import Any
+
+@overload
+def convert(value: int, /) -> bytes: ...
+@overload
+def convert(value: str, /) -> bool: ...
+def convert(value: int | str, /) -> bytes | bool:
+    return b"" if isinstance(value, int) else bool(value)
+
+def invoke(fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return fn(*args, **kwargs)
+
+def check(value: Any):
+    reveal_type(invoke(convert, value))  # revealed: Unknown
+
+@overload
+def same(value: int, /) -> bytes: ...
+@overload
+def same(value: str, /) -> bytes: ...
+def same(value: int | str, /) -> bytes:
+    return b""
+
+def equivalent(value: Any):
+    reveal_type(invoke(same, value))  # revealed: bytes
+```
+
+Generic return types are compared after solving the selected overloads' type variables.
+
+```py
+@overload
+def pair(key: int, value: T, /) -> list[T]: ...
+@overload
+def pair(key: str, value: U, /) -> list[U]: ...
+def pair(key, value, /):
+    return [value]
+
+def generic_equivalent(key: Any, value: int):
+    reveal_type(invoke(pair, key, value))  # revealed: list[int]
+```
+
+### Joint constraints for forwarded overloads
+
+A selected generic overload remains constrained by the other arguments to the outer function.
+
+```py
+from typing import Callable, ParamSpec, TypeVar, overload
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
+
+@overload
+def boxed(value: T, /) -> list[T]: ...
+@overload
+def boxed() -> None: ...
+def boxed(value=None, /):
+    return None if value is None else [value]
+
+def into(fn: Callable[P, list[R]], target: list[R], /, *args: P.args, **kwargs: P.kwargs) -> list[R]:
+    return fn(*args, **kwargs)
+
+def check(value: int, objects: list[object], strings: list[str]):
+    reveal_type(into(boxed, objects, value))  # revealed: list[object]
+    into(boxed, strings, value)  # error: [invalid-argument-type]
+```
+
+### Invoking and retaining overloaded callbacks
+
+Invoking one callback preserves the generic parameters of a separately retained callback.
+
+```py
+from typing import Callable, overload, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+Q = ParamSpec("Q")
+R = TypeVar("R")
+T = TypeVar("T")
+
+@overload
+def boxed() -> None: ...
+@overload
+def boxed(value: T, /) -> list[T]: ...
+def boxed(value=None, /):
+    return None if value is None else [value]
+
+def run_and_keep(
+    run: Callable[P, R], keep: Callable[Q, object], /, *args: P.args, **kwargs: P.kwargs
+) -> tuple[R, Callable[Q, object]]:
+    return run(*args, **kwargs), keep
+
+def check(value: int):
+    result, kept = run_and_keep(boxed, boxed, value)
+    reveal_type(result)  # revealed: list[int]
+    reveal_type(kept("a"))  # revealed: object
+```
+
+The invoked overload can be nongeneric while the retained callback remains generic.
+
+```py
+@overload
+def convert() -> None: ...
+@overload
+def convert(value: int, /) -> bytes: ...
+def convert(value=None, /) -> bytes | None:
+    return None if value is None else b""
+
+def concrete(value: int):
+    result, kept = run_and_keep(convert, boxed, value)
+    reveal_type(result)  # revealed: bytes
+    reveal_type(kept("a"))  # revealed: object
+```
+
 ### Parameter lists after incomplete inference
 
 Inferring `T` can exceed the work limit without losing a known parameter list.
@@ -1839,4 +2069,30 @@ constructor = capture(Example)
 reveal_type(constructor(1))  # revealed: Example
 # TODO: Combine both constructor parameter lists and report [missing-argument].
 constructor()
+```
+
+### Context for transformed overload returns
+
+The assignment constrains the wrapper's result, including the extra list added by the wrapper.
+
+```py
+from typing import Any, Callable, overload, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
+
+@overload
+def boxed() -> None: ...
+@overload
+def boxed(value: T, /) -> list[T]: ...
+def boxed(value=None, /):
+    return None if value is None else [value]
+
+def nest(fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> list[R]:
+    return [fn(*args, **kwargs)]
+
+def check(value: Any):
+    result: list[list[int]] = nest(boxed, value)
+    reveal_type(result)  # revealed: list[list[int]]
 ```
