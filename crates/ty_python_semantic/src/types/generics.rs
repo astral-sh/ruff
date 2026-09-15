@@ -25,14 +25,16 @@ use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
     TypeRelationChecker, TypeVarEvaluation,
 };
-use crate::types::signatures::{Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor};
+use crate::types::signatures::{
+    CallableSignature, Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor,
+};
 use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
 use crate::types::type_alias::walk_type_alias_arguments;
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarIdentity, TypeVarInstance,
-    TypeVarSet,
+    TypeVarSet, freshening_delta,
 };
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
@@ -2567,8 +2569,77 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     constraints: &'c ConstraintSetBuilder<'db>,
     generic_context: GenericContext<'db>,
     inferable: TypeVarSet<'db>,
+    invoked_context: Option<GenericContext<'db>>,
+    invocation_specialization: Option<Specialization<'db>>,
+    invoked_paramspec: Option<BoundTypeVarInstance<'db>>,
+    freshened_callbacks: FxHashMap<(CallableType<'db>, CallableType<'db>), CallableType<'db>>,
     pending: ConstraintSet<'db, 'c>,
+    invocation_constraints: ConstraintSet<'db, 'c>,
     types: LegacyTypeMappings<'db>,
+}
+
+/// Evidence exported by an invocation, including the variables introduced by nested invocations.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct InvocationConstraints<'db, 'c> {
+    context: GenericContext<'db>,
+    constraints: ConstraintSet<'db, 'c>,
+}
+
+/// Completed callback renaming and specialization used when validating the outer arguments.
+#[derive(Default)]
+pub(crate) struct InvocationSpecialization<'db> {
+    invocation_specialization: Option<Specialization<'db>>,
+    freshened_callbacks: FxHashMap<(CallableType<'db>, CallableType<'db>), CallableType<'db>>,
+}
+
+impl<'db> InvocationSpecialization<'db> {
+    pub(crate) fn specialize_invoked_argument(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        formal: Type<'db>,
+        actual: Type<'db>,
+    ) -> Type<'db> {
+        let formal_callable = || {
+            let formal = formal.resolve_type_alias(db);
+            let elements = match formal {
+                Type::Union(union) => union.elements(db),
+                _ => std::slice::from_ref(&formal),
+            };
+            let mut found = None;
+            for element in elements {
+                let Some(callables) = element.try_upcast_to_callable(db, env) else {
+                    continue;
+                };
+                for callable in &callables {
+                    if found.is_some_and(|previous| previous != *callable) {
+                        return None;
+                    }
+                    found = Some(*callable);
+                }
+            }
+            found
+        };
+        let actual = if !self.freshened_callbacks.is_empty()
+            && let Some(formal) = formal_callable()
+            && let Some(actuals) = actual.try_upcast_to_callable(db, env)
+            && actuals
+                .iter()
+                .any(|actual| self.freshened_callbacks.contains_key(&(formal, *actual)))
+        {
+            actuals
+                .map(|actual| {
+                    self.freshened_callbacks
+                        .get(&(formal, actual))
+                        .copied()
+                        .unwrap_or(actual)
+                })
+                .to_type(db, env)
+        } else {
+            actual
+        };
+        actual.apply_optional_specialization(db, self.invocation_specialization)
+    }
 }
 
 /// The legacy mapping is usable only if no accepted relation was omitted in its entirety.
@@ -2816,7 +2887,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             constraints,
             generic_context,
             inferable: generic_context.inferable_typevars(db),
+            invoked_context: None,
+            invocation_specialization: None,
+            invoked_paramspec: None,
+            freshened_callbacks: FxHashMap::default(),
             pending: ConstraintSet::from_bool(constraints, true),
+            invocation_constraints: ConstraintSet::from_bool(constraints, true),
             types: LegacyTypeMappings::Available(FxHashMap::default()),
         }
     }
@@ -2828,6 +2904,49 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         set: ConstraintSet<'db, 'c>,
     ) -> Result<(), SpecializationError<'db>> {
         self.infer_from_constraint_set(set)
+    }
+
+    pub(crate) fn pending_constraints(&self) -> InvocationConstraints<'db, 'c> {
+        InvocationConstraints {
+            context: self
+                .invoked_context
+                .map_or(self.generic_context, |context| {
+                    self.generic_context.merge(self.db, context)
+                }),
+            constraints: self.pending_for_projection(),
+        }
+    }
+
+    pub(crate) fn with_paramspec_invocation(
+        mut self,
+        paramspec: Option<BoundTypeVarInstance<'db>>,
+    ) -> Self {
+        self.invoked_paramspec = paramspec;
+        self
+    }
+
+    /// Retain callback renaming and solved invocation types after collecting all evidence.
+    pub(crate) fn into_invocation_specialization(self) -> InvocationSpecialization<'db> {
+        InvocationSpecialization {
+            invocation_specialization: self.invocation_specialization,
+            freshened_callbacks: self.freshened_callbacks,
+        }
+    }
+
+    /// Callback-local variables become inferable only when the captured callback is invoked.
+    pub(crate) fn incorporate_call_constraints(
+        &mut self,
+        evidence: &InvocationConstraints<'db, 'c>,
+    ) {
+        let db = self.db;
+        let context = evidence.context;
+        self.inferable = self.inferable.merge(db, context.inferable_typevars(db));
+        self.invoked_context = Some(
+            self.invoked_context
+                .map_or(context, |previous| previous.merge(db, context)),
+        );
+        self.invocation_constraints
+            .intersect(db, self.constraints, evidence.constraints);
     }
 
     /// Build a merged specialization, using a caller-provided hook to select the solution for
@@ -2853,7 +2972,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         };
         let inference = self
             .solve_pending_projection(&mut choose_solution, |builder, choose| {
-                builder.pending.try_fold_solutions(
+                builder.pending_for_projection().try_fold_solutions(
                     db,
                     builder.env,
                     builder.inferable,
@@ -2938,6 +3057,26 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         ) -> Option<PathBoundSolution<'db>>,
     ) -> TypeVarInference<'db> {
         let db = self.db;
+        if self.invoked_context.is_some() {
+            // Keep the outer arguments' requirements when diagnosing a conflicting forwarded
+            // argument. The resulting parameter list lets the binder report the precise argument.
+            let invocation_constraints = self.invocation_constraints;
+            self.invocation_constraints = ConstraintSet::from_bool(self.constraints, true);
+            let inference = self.solve_pending_with(
+                SolutionBudget::default(),
+                ReportDiagnostics::No,
+                &mut choose,
+            );
+            self.invocation_constraints = invocation_constraints;
+            if let Ok(inference) = inference {
+                return TypeVarInference::new(
+                    db,
+                    inference.generic_context(db),
+                    inference.merged_types(db),
+                    TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::Unsatisfiable),
+                );
+            }
+        }
         for (formal, actual) in argument_relations {
             let when =
                 actual.when_constraint_set_assignable_to(db, self.env, formal, self.constraints);
@@ -3006,11 +3145,33 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         types: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
     ) -> Box<[Option<Type<'db>>]> {
         let db = self.db;
+        let invoked = self.specialize_invocation(types);
         self.generic_context
             .variables_inner(db)
             .keys()
-            .map(|identity| types.get(identity).copied())
+            .map(|identity| {
+                types
+                    .get(identity)
+                    .copied()
+                    .map(|ty| ty.apply_optional_specialization(db, invoked))
+            })
             .collect()
+    }
+
+    fn specialize_invocation(
+        &self,
+        types: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+    ) -> Option<Specialization<'db>> {
+        let db = self.db;
+        self.invoked_context.map(|context| {
+            let context = self.generic_context.merge(db, context);
+            context.specialize_recursive(
+                db,
+                context
+                    .variables(db)
+                    .map(|typevar| types.get(&typevar.identity(db)).copied()),
+            )
+        })
     }
 
     /// Solves the call once, retaining correlated alternatives and deriving their compatibility
@@ -3026,8 +3187,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Result<TypeVarInference<'db>, Vec<SpecializationError<'db>>> {
         let db = self.db;
         let mut specialization_errors = Vec::new();
+        self.invocation_specialization = None;
         let inference = self.solve_pending_projection(choose, |builder, choose| {
-            let solutions = builder.pending.solutions_with(
+            let solutions = builder.pending_for_projection().solutions_with(
                 db,
                 builder.env,
                 builder.inferable,
@@ -3089,6 +3251,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         })
         .map_err(|()| specialization_errors)?;
 
+        self.invocation_specialization = self.specialize_invocation(&inference.merged_types);
         Ok(self.finish_inference(inference, budget))
     }
 
@@ -3138,8 +3301,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let db = self.db;
         let generic_context = self.generic_context;
         // TODO: Move `TypeVarTuple` handling to the new constraint solver.
-        if generic_context
-            .variables(db)
+        if self
+            .inferable
+            .iter(db)
             .any(|typevar| typevar.is_typevartuple(db))
         {
             return Ok(
@@ -3186,9 +3350,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // TODO: This is a solution-level projection. A more principled version would live in the
         // constraint-set solution extraction layer, taking an explicit domain of typevars to solve
         // for and existentially quantifying away the other typevars in that domain.
-        for (identity, variable) in generic_context.variables_inner(db) {
-            if let Some(ty) = inference.merged_types.get_mut(identity) {
-                *ty = self.remove_inferable_typevar_artifacts_from_solution(*variable, *ty);
+        for variable in self.inferable.iter(db) {
+            if let Some(ty) = inference.merged_types.get_mut(&variable.identity(db)) {
+                *ty = self.remove_inferable_typevar_artifacts_from_solution(variable, *ty);
             }
         }
 
@@ -3215,13 +3379,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         };
         let complete = matches!(solutions, SolutionPaths::Complete(_));
         let single = complete && solutions.as_slice().len() == 1;
+        let invocation_specialization = self.specialize_invocation(&types);
 
         // The compatibility projection must be cleaned after merging, independently of these
         // alternatives: a bare `U` survives on one path, but is removed from a merged `U | int`.
         let mut paths = Vec::with_capacity(solutions.as_slice().len());
         for mut path in solutions.into_vec() {
+            // Outer bindings can refer to callback-local variables. Keep those variables until
+            // dependency resolution, then project only the outer context into the result below.
             path.solved_typevars.retain_mut(|binding| {
-                if !generic_context.contains(db, binding.bound_typevar.identity(db)) {
+                if !binding.bound_typevar.is_inferable(db, self.inferable) {
                     return false;
                 }
                 binding.solution = self.remove_inferable_typevar_artifacts_from_solution(
@@ -3239,10 +3406,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 .collect();
             if single
                 && generic_context.variables_inner(db).keys().all(|identity| {
-                    match (path_types.get(identity), types.get(identity)) {
+                    match (
+                        path_types.get(identity),
+                        types.get(identity).map(|ty| {
+                            ty.apply_optional_specialization(db, invocation_specialization)
+                        }),
+                    ) {
                         (None, None) => true,
                         (Some(SolutionType::Resolved(resolved)), Some(merged)) => {
-                            resolved == merged
+                            *resolved == merged
                         }
                         _ => false,
                     }
@@ -3453,7 +3625,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let db = self.db;
         // Check every binding against the original map so recovery is independent of iteration order.
         let mut replacements = Vec::new();
-        for (&identity, variable) in self.generic_context.variables_inner(db) {
+        for variable in self.inferable.iter(db) {
+            let identity = variable.identity(db);
             let Some(&ty) = types.get(&identity) else {
                 continue;
             };
@@ -3706,6 +3879,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// type-variable declaration error.
     pub(super) fn record_constraint_set(&mut self, when: ConstraintSet<'db, 'c>) {
         self.pending.intersect(self.db, self.constraints, when);
+    }
+
+    fn pending_for_projection(&self) -> ConstraintSet<'db, 'c> {
+        self.pending
+            .and(self.db, self.constraints, || self.invocation_constraints)
     }
 
     /// Records a relation and projects its solutions into the legacy type mapping.
@@ -3963,8 +4141,57 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
 
         let formal_signature = formal.signatures(db);
-        let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
+        let formal_paramspec = formal_signature
+            .is_single_paramspec()
+            .map(|(paramspec, _)| paramspec);
+        let formal_is_single_paramspec = formal_paramspec.is_some();
         for actual_callable in &actual_callables {
+            // A callback can be another invocation of the outer generic function. Rename its
+            // parameters and return together before capturing either side of their relationship.
+            let actual_callable = if let Some(freshened) =
+                self.freshened_callbacks.get(&(formal, *actual_callable))
+            {
+                *freshened
+            } else if formal_is_single_paramspec
+                && let Some(context) = actual_callable
+                    .signatures(db)
+                    .iter()
+                    .filter_map(|signature| signature.generic_context)
+                    .reduce(|left, right| left.merge(db, right))
+            {
+                let invoked = formal_paramspec == self.invoked_paramspec;
+                let delta = freshening_delta(
+                    db,
+                    self.inferable
+                        .iter(db)
+                        .chain(context.variables(db).filter(|_| invoked))
+                        .map(Type::TypeVar)
+                        .chain(
+                            self.freshened_callbacks
+                                .values()
+                                .copied()
+                                .map(Type::Callable),
+                        ),
+                    context,
+                );
+                if let Some(delta) = delta {
+                    let freshened = actual_callable.with_signatures(
+                        db,
+                        CallableSignature::from_overloads(
+                            actual_callable.signatures(db).iter().map(|signature| {
+                                signature.freshen_bound_typevars(db, self.env, delta)
+                            }),
+                        ),
+                    );
+                    self.freshened_callbacks
+                        .insert((formal, *actual_callable), freshened);
+                    freshened
+                } else {
+                    *actual_callable
+                }
+            } else {
+                *actual_callable
+            };
             if formal_is_single_paramspec {
                 let when = actual_callable
                     .signatures(db)
