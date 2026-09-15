@@ -7,11 +7,12 @@ use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt::{self, Display};
 use ty_python_core::ProgramFile;
+use ty_python_core::definition::DefinitionKind;
 use ty_python_semantic::ProgramEnvironment;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeAliasType, TypeVarVariance};
 
-use ty_python_semantic::{SemanticModel, TypeQualifiers};
+use ty_python_semantic::{ResolvedDefinition, SemanticModel, TypeQualifiers};
 
 pub fn hover<'db>(
     db: &'db dyn Db,
@@ -39,8 +40,6 @@ pub fn hover<'db>(
         _ => None,
     };
 
-    let mut alias_docstring: Option<Docstring> = None;
-
     let docs = if keyword_argument.is_some() || typed_dict_key.is_some() {
         None
     } else if let GotoTarget::Call { call, .. } = goto_target {
@@ -58,7 +57,6 @@ pub fn hover<'db>(
                     )
                     .and_then(|definitions| definitions.docstring(db))
             })
-            .map(HoverContent::Docstring)
     } else {
         goto_target
             .definitions(
@@ -66,8 +64,8 @@ pub fn hover<'db>(
                 ty_python_semantic::ImportAliasResolution::ResolveAliases,
             )
             .and_then(|definitions| definitions.docstring(db))
-            .map(HoverContent::Docstring)
     };
+    let mut docs: Vec<_> = docs.into_iter().collect();
 
     let mut contents = Vec::new();
     if let Some(keyword_argument) = keyword_argument {
@@ -103,14 +101,15 @@ pub fn hover<'db>(
             }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(alias))
             | Type::TypeAlias(alias) => {
-                let value_ty = alias.value_type(db);
-
-                alias_docstring = Definitions::from_ty(db, &env, ty)
-                    .and_then(|def| def.docstring(db))
-                    .or_else(|| {
-                        Definitions::from_ty(db, &env, value_ty).and_then(|def| def.docstring(db))
-                    });
-
+                docs = type_alias_docstrings(
+                    db,
+                    &env,
+                    alias,
+                    goto_target.definitions(
+                        &model,
+                        ty_python_semantic::ImportAliasResolution::ResolveAliases,
+                    ),
+                );
                 HoverContent::TypeAlias { alias, qualifiers }
             }
             Type::TypeVar(typevar) => HoverContent::Type {
@@ -127,12 +126,7 @@ pub fn hover<'db>(
         contents.push(inferred_type_hover_content);
     }
 
-    contents.extend(docs);
-
-    // Aliased docs should come after the docs of the target, if they exist
-    if let Some(alias_docstring) = alias_docstring {
-        contents.push(HoverContent::Docstring(alias_docstring));
-    }
+    contents.extend(docs.into_iter().map(HoverContent::Docstring));
 
     if contents.is_empty() {
         return None;
@@ -145,6 +139,128 @@ pub fn hover<'db>(
             contents,
         },
     })
+}
+
+/// Append copy binding docs from the hovered name inward, then the nearest alias or target docs.
+/// An alias's own documentation takes precedence over documentation from its value.
+fn type_alias_docstrings<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    mut alias: TypeAliasType<'db>,
+    definitions: Option<Definitions<'db>>,
+) -> Vec<Docstring> {
+    // `Copy = Alias` binds another name to the same type alias. Follow source
+    // bindings to find documentation attached to names that type inference skips.
+    let mut pending = definitions
+        .map(|definitions| definitions.iter().cloned().collect::<Vec<_>>())
+        .unwrap_or_default();
+    let mut docs = Vec::new();
+    let mut seen = Vec::new();
+    let mut reached_alias = false;
+    while !pending.is_empty() {
+        let mut definitions = std::mem::take(&mut pending);
+        definitions.retain(|resolved| {
+            let Some(definition) = resolved.definition() else {
+                return true;
+            };
+            if seen.contains(&definition) {
+                return false;
+            }
+            seen.push(definition);
+
+            // A `TypeAliasType(...)` assignment defines the alias itself; it is
+            // not a separate copy binding whose docs should be appended again.
+            reached_alias |= definition == alias.definition(db)
+                || SemanticModel::new(db, definition.program_file(db))
+                    .is_type_alias_definition(definition);
+            true
+        });
+        if let Some(docstring) = Definitions::new(definitions.clone()).docstring(db) {
+            docs.push(docstring);
+            if reached_alias {
+                return docs;
+            }
+        }
+        for resolved in definitions {
+            let Some(definition) = resolved.definition() else {
+                continue;
+            };
+            let module = parsed_module(db, definition.python_file(db)).load(db);
+            let value = match definition.kind(db) {
+                DefinitionKind::TypeAlias(alias) => Some(alias.node(&module).value.as_ref()),
+                kind => kind.value(&module),
+            };
+            let Some(mut value) = value else {
+                continue;
+            };
+            let model = SemanticModel::new(db, definition.program_file(db));
+            if let ast::Expr::Call(call) = value {
+                if !matches!(
+                    GotoTarget::Expression(value.into()).inferred_type(&model),
+                    Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)))
+                        if alias.definition(db) == definition
+                ) {
+                    continue;
+                }
+                let Some(argument) = call.arguments.find_argument_value("value", 1) else {
+                    continue;
+                };
+                value = argument;
+            }
+            if let ast::Expr::Subscript(subscript) = value {
+                value = &subscript.value;
+            }
+            let target = GotoTarget::Expression(value.into());
+            let is_alias_type = matches!(
+                target.inferred_type(&model),
+                Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(_)) | Type::TypeAlias(_))
+            );
+            if let Some(definitions) = target.expression_definitions(
+                &model,
+                ty_python_semantic::ImportAliasResolution::ResolveAliases,
+            ) {
+                pending.extend(
+                    definitions
+                        .iter()
+                        .filter(|resolved| {
+                            is_alias_type
+                                || resolved.definition().is_some_and(|definition| {
+                                    model.is_type_alias_definition(definition)
+                                })
+                        })
+                        .cloned(),
+                );
+            }
+        }
+    }
+
+    // Resolve expressions that cannot be followed through source names, such as
+    // string annotations, and retain the target type's documentation as a fallback.
+    let mut seen = Vec::new();
+    loop {
+        let definition = alias.definition(db);
+        if seen.contains(&definition) {
+            return docs;
+        }
+        seen.push(definition);
+
+        let definitions = Definitions::new(vec![ResolvedDefinition::Definition(definition)]);
+        if let Some(docstring) = definitions.docstring(db) {
+            docs.push(docstring);
+            return docs;
+        }
+
+        match alias.value_type(db) {
+            Type::TypeAlias(target) => alias = target,
+            target => {
+                docs.extend(
+                    Definitions::from_ty(db, env, target)
+                        .and_then(|definitions| definitions.docstring(db)),
+                );
+                return docs;
+            }
+        }
+    }
 }
 
 fn keyword_argument_hover_contents<'db>(
@@ -6723,6 +6839,7 @@ class MyType:
     """Awesome docs"""
 
 type U = MyType
+"""The documented alias."""
 
 class CoolType(str):
     u: U<CURSOR>
@@ -6734,22 +6851,22 @@ class CoolType(str):
         assert_snapshot!(test.hover(), @"
         type U = MyType
         ---------------------------------------------
-        Awesome docs
+        The documented alias.
 
         ---------------------------------------------
         ```python
         type U = MyType
         ```
         ---
-        Awesome docs
+        The documented alias.
         ---------------------------------------------
         info[hover]: Hovered content is
-         --> main.py:9:8
-          |
-        9 |     u: U
-          |        ^- Cursor offset
-          |        |
-          |        source
+          --> main.py:10:8
+           |
+        10 |     u: U
+           |        ^- Cursor offset
+           |        |
+           |        source
         ");
     }
 
@@ -6758,33 +6875,330 @@ class CoolType(str):
         let test = hover_test(
             r#"
 
-class MyType:
+from typing import TypeAlias
+
+class MyType[T]:
     """Awesome docs"""
 
-type U<CURSOR> = MyType
+Middle: TypeAlias = MyType
+"""The middle binding."""
+
+type U<CURSOR>[T] = Middle[T]
 
         "#,
         );
 
         assert_snapshot!(test.hover(), @"
-        type U = MyType
+        type U[T] = MyType[T]
         ---------------------------------------------
-        Awesome docs
+        The middle binding.
 
         ---------------------------------------------
         ```python
-        type U = MyType
+        type U[T] = MyType[T]
         ```
         ---
-        Awesome docs
+        The middle binding.
         ---------------------------------------------
         info[hover]: Hovered content is
-         --> main.py:6:6
+          --> main.py:11:6
+           |
+        11 | type U[T] = Middle[T]
+           |      ^- Cursor offset
+           |      |
+           |      source
+        ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/4499
+    #[test]
+    fn hover_pep695_type_alias_docstring_at_definition() {
+        let test = hover_test(
+            r#"
+class Collection[T]:
+    """A collection of values."""
+
+type Items<CURSOR>[T] = Collection[T]
+"""The items to process."""
+"#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        type Items[T] = Collection[T]
+        ---------------------------------------------
+        The items to process.
+
+        ---------------------------------------------
+        ```python
+        type Items[T] = Collection[T]
+        ```
+        ---
+        The items to process.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:5:6
           |
-        6 | type U = MyType
-          |      ^- Cursor offset
+        5 | type Items[T] = Collection[T]
+          |      ^^^^^- Cursor offset
           |      |
           |      source
+        ");
+    }
+
+    #[test]
+    fn hover_type_alias_type_docstring() {
+        let test = hover_test(
+            r#"
+from typing import TypeAliasType
+
+type Inner = int | str
+"""The inner alias."""
+Middle = TypeAliasType("Middle", Inner)
+"""The middle alias."""
+
+Status = TypeAliasType("Status", Middle)
+"""The status of a task."""
+
+Status<CURSOR>
+"#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        type Status = Middle
+        ---------------------------------------------
+        The status of a task.
+
+        ---------------------------------------------
+        ```python
+        type Status = Middle
+        ```
+        ---
+        The status of a task.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:12:1
+           |
+        12 | Status
+           | ^^^^^^- Cursor offset
+           | |
+           | source
+        ");
+    }
+
+    #[test]
+    fn hover_type_alias_docstring_import_from_stub() {
+        let test = CursorTest::builder()
+            .source("library.pyi", "type Status = int | str")
+            .source(
+                "library.py",
+                r#"
+                type Status = int | str
+                """The status of a task."""
+                "#,
+            )
+            .source("main.py", "from library import Status<CURSOR>")
+            .build();
+
+        assert_snapshot!(test.hover(), @"
+        type Status = int | str
+        ---------------------------------------------
+        The status of a task.
+
+        ---------------------------------------------
+        ```python
+        type Status = int | str
+        ```
+        ---
+        The status of a task.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:1:21
+          |
+        1 | from library import Status
+          |                     ^^^^^^- Cursor offset
+          |                     |
+          |                     source
+        ");
+    }
+
+    #[test]
+    fn hover_type_alias_nested_docstring_fallback() {
+        let test = hover_test(
+            r#"
+from typing import TypeAliasType
+
+type Status = int | str
+"""The status of a task."""
+
+Middle = Status
+"""The status reported by the worker."""
+
+Nested = TypeAliasType("Nested", Middle)
+
+status: Nested<CURSOR>
+"#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        type Nested = Status
+        ---------------------------------------------
+        The status reported by the worker.
+
+        ---------------------------------------------
+        ```python
+        type Nested = Status
+        ```
+        ---
+        The status reported by the worker.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:12:9
+           |
+        12 | status: Nested
+           |         ^^^^^^- Cursor offset
+           |         |
+           |         source
+        ");
+    }
+
+    #[test]
+    fn hover_type_alias_copy_docstrings() {
+        let test = hover_test(
+            r#"
+type Inner = int | str
+"""The inner alias."""
+
+Middle = Inner
+"""The middle binding."""
+
+Undocumented = Middle
+Outer = Undocumented
+"""The outer binding."""
+Outer<CURSOR>
+"#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        type Inner = int | str
+        ---------------------------------------------
+        The outer binding.
+
+        ---------------------------------------------
+        The middle binding.
+
+        ---------------------------------------------
+        The inner alias.
+
+        ---------------------------------------------
+        ```python
+        type Inner = int | str
+        ```
+        ---
+        The outer binding.
+        ---
+        The middle binding.
+        ---
+        The inner alias.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:11:1
+           |
+        11 | Outer
+           | ^^^^^- Cursor offset
+           | |
+           | source
+        ");
+    }
+
+    #[test]
+    fn hover_type_alias_from_container() {
+        let test = hover_test(
+            r#"
+type Inner = int | str
+"""The inner alias."""
+
+Aliases = (Inner,)
+"""A container of aliases."""
+
+Outer = Aliases[0]
+"""The selected alias."""
+Outer<CURSOR>
+"#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        type Inner = int | str
+        ---------------------------------------------
+        The selected alias.
+
+        ---------------------------------------------
+        The inner alias.
+
+        ---------------------------------------------
+        ```python
+        type Inner = int | str
+        ```
+        ---
+        The selected alias.
+        ---
+        The inner alias.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:10:1
+           |
+        10 | Outer
+           | ^^^^^- Cursor offset
+           | |
+           | source
+        ");
+    }
+
+    #[test]
+    fn hover_type_alias_cycle() {
+        let test = hover_test(
+            r#"
+type First = Second
+type Second = First
+
+First<CURSOR>
+"#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        type First = Divergent
+        ---------------------------------------------
+        `Divergent` is a dynamic type inferred due to type-level recursion that does not converge.
+
+        Type inference can be recursive. ty analyzes inference cycles repeatedly, looking for a
+        stable result. If each iteration produces a new type, ty replaces the non-convergent part
+        with `Divergent`.
+
+        Like `Any` and `Unknown`, `Divergent` is a dynamic type, so ty allows any operation on it.
+        Unlike `Unknown`, it does not represent missing type information. It is an internal type
+        used by ty and cannot be used in annotations.
+
+        ---------------------------------------------
+        ```python
+        type First = Divergent
+        ```
+        ---
+        `Divergent` is a dynamic type inferred due to type-level recursion that does not converge.<HB>
+        <HB>
+        Type inference can be recursive. ty analyzes inference cycles repeatedly, looking for a<HB>
+        stable result. If each iteration produces a new type, ty replaces the non-convergent part<HB>
+        with `Divergent`.<HB>
+        <HB>
+        Like `Any` and `Unknown`, `Divergent` is a dynamic type, so ty allows any operation on it.<HB>
+        Unlike `Unknown`, it does not represent missing type information. It is an internal type<HB>
+        used by ty and cannot be used in annotations.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:5:1
+          |
+        5 | First
+          | ^^^^^- Cursor offset
+          | |
+          | source
         ");
     }
 
@@ -6928,6 +7342,49 @@ type U<CURSOR> = MyType
            |    ^^^^- Cursor offset
            |    |
            |    source
+        ");
+    }
+
+    #[test]
+    fn hover_type_alias_copy_identical_docstrings() {
+        let test = hover_test(
+            r#"
+from typing import TypeAliasType
+
+Alias = TypeAliasType("Alias", int | str)
+"""Shared documentation."""
+
+Copy = Alias
+"""Shared documentation."""
+
+Copy<CURSOR>
+"#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        type Alias = int | str
+        ---------------------------------------------
+        Shared documentation.
+
+        ---------------------------------------------
+        Shared documentation.
+
+        ---------------------------------------------
+        ```python
+        type Alias = int | str
+        ```
+        ---
+        Shared documentation.
+        ---
+        Shared documentation.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:10:1
+           |
+        10 | Copy
+           | ^^^^- Cursor offset
+           | |
+           | source
         ");
     }
 
