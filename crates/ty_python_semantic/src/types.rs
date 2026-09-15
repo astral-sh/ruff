@@ -2262,7 +2262,7 @@ impl<'db> Type<'db> {
         // So we avoid unioning in the first couple iterations, and just use the later iteration's
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
-        if cycle.iteration() <= crate::TAINTED_CYCLES {
+        let result = if cycle.iteration() <= crate::TAINTED_CYCLES {
             let self_degraded_by_overload =
                 any_over_type(db, env, self, false, |ty| {
                     matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
@@ -2287,8 +2287,13 @@ impl<'db> Type<'db> {
             // We should use the previous union type as the base and only add new element types in
             // this cycle, if any.
             UnionType::from_elements_cycle_recovery(db, env, [previous, self])
-        }
-        .recursive_type_normalized_impl_with_cycle(db, env, cycle)
+        };
+        // An inferred attribute updated with `self.items += (item,)` can settle on the
+        // initializer plus a single update during the first few iterations. Widen new tuple
+        // lengths during those iterations too, so repeated updates are represented.
+        UnionType::widen_growing_tuples(db, env, previous, result)
+            .unwrap_or(result)
+            .recursive_type_normalized_impl_with_cycle(db, env, cycle)
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {

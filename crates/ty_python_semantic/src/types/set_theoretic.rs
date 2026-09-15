@@ -154,6 +154,78 @@ impl<'db> UnionType<'db> {
         builder.build()
     }
 
+    /// Widen tuple unions that acquire new lengths between successive cycle results.
+    ///
+    /// Normalizing an existing union during cycle recovery does not imply that its tuple lengths
+    /// are growing. Compare the results of successive iterations so stable, finite unions keep
+    /// their shapes, including unions nested in a collection's type arguments.
+    pub(crate) fn widen_growing_tuples(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: Type<'db>,
+        current: Type<'db>,
+    ) -> Option<Type<'db>> {
+        if previous == current {
+            return None;
+        }
+        let previous_types = match &previous {
+            Type::Union(union) => union.elements(db),
+            ty => std::slice::from_ref(ty),
+        };
+        let current_types = match &current {
+            Type::Union(union) => union.elements(db),
+            ty => std::slice::from_ref(ty),
+        };
+        let previous_lengths: Vec<_> = previous_types
+            .iter()
+            .filter_map(|ty| ty.exact_tuple_instance_spec(db).map(|tuple| tuple.len()))
+            .collect();
+        if previous_lengths.is_empty()
+            || !current_types.iter().any(|ty| {
+                ty.exact_tuple_instance_spec(db)
+                    .is_some_and(|tuple| !previous_lengths.contains(&tuple.len()))
+            })
+        {
+            return None;
+        }
+
+        // Recovery cannot perform relation queries, including when combining tuple elements.
+        // Mark those elements recursive so growing literal unions also widen promptly.
+        let mut elements = UnionBuilder::new(db, env)
+            .cycle_recovery(true)
+            .or_recursively_defined(RecursivelyDefined::Yes);
+        let mut result = UnionBuilder::new(db, env)
+            .cycle_recovery(true)
+            .or_recursively_defined(current.as_union().map_or(RecursivelyDefined::No, |union| {
+                union.recursively_defined(db)
+            }));
+        // During the first cycle iterations, the caller can discard previous alternatives.
+        // Retain their tuple elements for widening without restoring unrelated alternatives.
+        for ty in current_types {
+            if ty.exact_tuple_instance_spec(db).is_none() {
+                result.add_in_place(*ty);
+            }
+        }
+        for ty in previous_types.iter().chain(current_types) {
+            if let Some(tuple) = ty.exact_tuple_instance_spec(db) {
+                for element in tuple.iter_element_types(db) {
+                    elements.add_in_place(element);
+                }
+            }
+        }
+        let element_type = match elements.build() {
+            // `tuple[Never, ...]` normalizes to the empty tuple, which does not contain
+            // fixed-length types like `tuple[Never]`. Preserve a static upper bound.
+            Type::Never => Type::object(),
+            element_type => element_type,
+        };
+        Some(
+            result
+                .add(Type::homogeneous_tuple(db, env, element_type))
+                .build(),
+        )
+    }
+
     /// A fallible version of [`UnionType::from_elements`].
     ///
     /// If all items in `elements` are `Some()`, the result of unioning all elements is returned.

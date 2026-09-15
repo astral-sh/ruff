@@ -717,6 +717,23 @@ def check(i: int, s: str) -> None:
     two(i, i)  # error: [invalid-argument-type]
 ```
 
+## Tuple concatenation with type variables
+
+Concatenation preserves type variables in fixed positions and an unpacked type variable tuple
+between them. The inferred result satisfies the corresponding generic return annotation.
+
+```py
+from typing import TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+def enclose(edge: tuple[T], middle: tuple[*Ts]) -> tuple[T, *Ts, T]:
+    result = edge + middle + edge
+    reveal_type(result)  # revealed: tuple[T@enclose, *Ts@enclose, T@enclose]
+    return result
+```
+
 ## Type Aliases
 
 ### Legacy generic aliases

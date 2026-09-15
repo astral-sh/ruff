@@ -1,5 +1,6 @@
 use std::cell::{OnceCell, RefCell};
 use std::collections::hash_map;
+use std::convert::Infallible;
 use std::rc::Rc;
 
 use compact_str::CompactString;
@@ -4960,8 +4961,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 infer_value_ty.infer_loud(self, TypeContext::default());
 
                 let mut operation_failed = false;
-                let result_ty = union.map(db, env, |&elem_type| {
-                    match self.infer_augmented_op(
+                let Ok(result_ty) = state.try_map_union(db, env, union, |elem_type, state| {
+                    let result_ty = match self.infer_augmented_op(
                         assignment,
                         elem_type,
                         value_expr,
@@ -4973,7 +4974,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             operation_failed = true;
                             recovery_ty
                         }
-                    }
+                    };
+                    Ok::<_, Infallible>(result_ty)
                 });
 
                 if operation_failed {
