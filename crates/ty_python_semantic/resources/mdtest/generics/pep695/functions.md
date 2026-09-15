@@ -2308,6 +2308,32 @@ def get_int() -> int | None: ...
 reveal_type(my_iter(get_int))  # revealed: Box[int]
 ```
 
+### Mapping an overloaded callback with an `Any` fallback
+
+The fallback overload accepts strings and returns `Result`, so mapping the callback over strings is
+valid. We currently infer a wider result for `map` than for the equivalent comprehension.
+
+```py
+from typing import Any, overload
+
+class Result: ...
+
+@overload
+def convert(value: int) -> Result: ...
+@overload
+def convert[T: Result](value: T) -> T: ...
+@overload
+def convert(value: Any) -> Result: ...
+def convert(value: Any) -> Result:
+    return value if isinstance(value, Result) else Result()
+
+def check(values: list[str]) -> None:
+    reveal_type(convert(values[0]))  # revealed: Result
+    # TODO: revealed: map[Result]
+    reveal_type(map(convert, values))  # revealed: map[Result | int | Any | str]
+    reveal_type([convert(value) for value in values])  # revealed: list[Result]
+```
+
 ### Callable return union order does not affect inference
 
 ```py

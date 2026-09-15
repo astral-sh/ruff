@@ -250,6 +250,8 @@ impl<'db> SolutionBounds<'db> {
         let subject = Type::TypeVar(constraint.typevar());
         let lower = constraint.lower_bound(db).ty();
         let upper = constraint.upper_bound(db).ty();
+        // Missing endpoints still participate in implication: e.g. `int <= T` implies `T <= Any`
+        // through its implicit upper bound, without adding that bound as inference evidence.
         let lower_holds = lower.is_never()
             || relations.is_subtype(db, env, lower, subject, &builder)
             || self
@@ -258,11 +260,9 @@ impl<'db> SolutionBounds<'db> {
                 .into_iter()
                 .flatten()
                 .any(|fact| {
-                    fact.stored_lower_bound().is_some_and(|known| {
-                        lower
-                            .when_constraint_set_assignable_to_owned(db, env, known.ty())
-                            .query(|_, when| when.is_trivially_always_satisfied())
-                    })
+                    lower
+                        .when_constraint_set_assignable_to_owned(db, env, fact.lower_bound(db).ty())
+                        .query(|_, when| when.is_trivially_always_satisfied())
                 });
         let upper_holds = upper.is_object()
             || relations.is_subtype(db, env, subject, upper, &builder)
@@ -272,12 +272,10 @@ impl<'db> SolutionBounds<'db> {
                 .into_iter()
                 .flatten()
                 .any(|fact| {
-                    fact.stored_upper_bound().is_some_and(|known| {
-                        known
-                            .ty()
-                            .when_constraint_set_assignable_to_owned(db, env, upper)
-                            .query(|_, when| when.is_trivially_always_satisfied())
-                    })
+                    fact.upper_bound(db)
+                        .ty()
+                        .when_constraint_set_assignable_to_owned(db, env, upper)
+                        .query(|_, when| when.is_trivially_always_satisfied())
                 });
         lower_holds && upper_holds
     }
