@@ -1022,6 +1022,36 @@ reveal_type(wrapper.__wrapped__(1))  # revealed: str
 wrapper.__get__(None, object)(1)
 ```
 
+### Overloaded staticmethod assignment
+
+A staticmethod preserves the parameter and return types of each overload. It can satisfy a callable
+context using a matching overload, but the context cannot make it accept an unsupported argument
+type.
+
+```py
+from typing import Callable, overload
+from typing_extensions import assert_type
+
+@overload
+def callback() -> str: ...
+@overload
+def callback(value: bytes) -> bytes: ...
+def callback(value: bytes | None = None) -> str | bytes:
+    return value or ""
+
+class Owner:
+    target: Callable[[], str]
+    incompatible: Callable[[int], str]
+
+    @classmethod
+    def setup(cls) -> None:
+        cls.target = staticmethod(callback)
+        cls.incompatible = staticmethod(callback)  # error: [invalid-assignment]
+
+assert_type(staticmethod(callback)(), str)
+assert_type(staticmethod(callback)(b""), bytes)
+```
+
 ### Accessing the staticmethod as a static member
 
 ```py

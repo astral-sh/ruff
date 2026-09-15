@@ -416,9 +416,9 @@ def _(xs: Unknown):
     # TODO: should be `map[str]`
     reveal_type(map("{}".format, xs))  # revealed: map[object]
 
-    # TODO: should not emit an error and should reveal `str`
-    # error: [no-matching-overload]
-    reveal_type("".join(map("{}".format, xs)))  # revealed: Unknown
+    # TODO: The gradual iterable permits the context to select the `LiteralString` overload.
+    # This should reveal `str`.
+    reveal_type("".join(map("{}".format, xs)))  # revealed: LiteralString
 ```
 
 ## Mapping methods accept arbitrary object types
@@ -546,6 +546,26 @@ class Function:
 # error: [invalid-argument-type]
 for function in map(Function, [object()]):
     function()
+```
+
+## Constructing a dictionary from gradual-length tuples
+
+Each tuple supplied to `dict` must contain two elements. A gradual tuple can materialize to that
+length, and its element type supplies both the key and value types.
+
+```py
+from typing import Any
+
+def copy_pairs(values: list[tuple[Any, ...]]) -> None:
+    reveal_type(dict(values))  # revealed: dict[Any, Any]
+```
+
+Unpacking an unknown sequence of iterables into `zip` also produces gradual-length tuples, which can
+be used as key-value pairs.
+
+```py
+def copy_unknown(values) -> None:
+    dict(zip(*values))
 ```
 
 ## Failed `dict` calls do not expose internal type variables

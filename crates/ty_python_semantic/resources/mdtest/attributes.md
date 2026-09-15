@@ -244,6 +244,89 @@ reveal_type(c_instance.y)  # revealed: int
 reveal_type(c_instance.z)  # revealed: int
 ```
 
+#### Inferred attribute types do not provide declared evidence
+
+An inferred attribute type restricts assignments without supplying a preferred type for generic
+calls. An unknown right-hand side remains unknown rather than inheriting the initializer's type:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+class C:
+    def __init__(self):
+        self.value = None
+        self.nested = (None,)
+
+    def update(self, value):
+        self.value = identity(value)
+        reveal_type(self.value)  # revealed: Unknown
+
+        self.value = identity(identity(value))
+        reveal_type(self.value)  # revealed: Unknown
+
+        self.nested = (identity(value),)
+        reveal_type(self.nested)  # revealed: tuple[Unknown]
+
+C().value = "new value"
+
+class Static:
+    def __init__(self):
+        self.value = 1
+
+Static().value = "incompatible"  # error: [invalid-assignment]
+```
+
+#### Declared attribute types still provide inference evidence
+
+An explicit attribute annotation provides declared evidence, including for a generic call with an
+unknown argument:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+class C:
+    def __init__(self):
+        self.value: None = None
+
+    def update(self, value):
+        self.value = identity(identity(value))
+        reveal_type(self.value)  # revealed: None
+
+C().value = "incompatible"  # error: [invalid-assignment]
+```
+
+#### Inferred class attributes do not provide declared evidence
+
+The same distinction applies to attributes inferred from assignments in a class body:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+class C:
+    value = None
+
+def update(value):
+    C.value = identity(value)
+    reveal_type(C.value)  # revealed: Unknown
+
+C.value = "new value"
+```
+
 #### Singleton promotion happens after unioning implicit assignments
 
 ```py

@@ -411,8 +411,8 @@ impl<'db> CallableSignature<'db> {
         }
 
         if let TypeMapping::ApplySpecialization(specialization)
-        | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
-            type_mapping
+        | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
+        | TypeMapping::ApplySpecializationForTypeContext { specialization, .. } = type_mapping
         {
             Self::from_overloads(self.overloads.iter().flat_map(|signature| {
                 if let Some((prefix, paramspec)) = signature.parameters.as_paramspec_with_prefix()
@@ -1554,6 +1554,42 @@ impl<'db> Signature<'db> {
         self.parameters
             .get(0)
             .is_some_and(|parameter| parameter.is_positional() && parameter.inferred_annotation)
+    }
+
+    /// Returns an implicit `Self` that is not referenced by the rest of the signature.
+    pub(super) fn unused_implicit_self(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<BoundTypeVarInstance<'db>> {
+        if !self.has_implicit_positional_receiver_annotation()
+            || self.needs_self_mapping(db, env, true)
+        {
+            return None;
+        }
+        let self_typevar = match self.parameters.get(0)?.annotated_type() {
+            Type::TypeVar(typevar) => typevar,
+            Type::SubclassOf(subclass) => subclass.into_type_var()?,
+            _ => return None,
+        };
+        if !self_typevar.typevar(db).is_self(db) {
+            return None;
+        }
+
+        for typevar in self.generic_context?.variables(db) {
+            if typevar.identity(db) == self_typevar.identity(db) {
+                continue;
+            }
+            let bound = typevar.typevar(db).bound_or_constraints(db, env);
+            if bound.is_some_and(|bound| bound.as_type(db, env).contains_self(db, env))
+                || typevar
+                    .default_type(db)
+                    .is_some_and(|ty| ty.contains_self(db, env))
+            {
+                return None;
+            }
+        }
+        Some(self_typevar)
     }
 
     fn apply_self_with_receiver(

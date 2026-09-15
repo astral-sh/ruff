@@ -1021,6 +1021,326 @@ However, if we pass something that does not match _any_ union element, we do emi
 reveal_type(f(P[bytes]()))  # revealed: tuple[Unknown, Unknown]
 ```
 
+## Return context prefers mutually assignable type arguments
+
+For each type variable, we prefer the declared type when it is mutually assignable with the inferred
+type. This applies to both covariant and invariant return contexts. A wider static type only
+replaces the inferred type when required for assignability.
+
+```py
+from collections.abc import MutableSequence, Sequence
+from typing import Any, TypeVar
+
+T = TypeVar("T")
+
+def make(value: T) -> list[T]:
+    return [value]
+
+def _(value: int):
+    reveal_type(make(value))  # revealed: list[int]
+
+    x1: Sequence[Any] = reveal_type(make(value))  # revealed: list[Any]
+    x2: MutableSequence[Any] = reveal_type(make(value))  # revealed: list[Any]
+    x3: Sequence[object] = reveal_type(make(value))  # revealed: list[int]
+    x4: list[object] = reveal_type(make(value))  # revealed: list[object]
+```
+
+We apply the preference to each type variable, while satisfying the complete return context. The
+first type variable takes the gradual type from the context; the second retains its narrower
+inferred type.
+
+```py
+U = TypeVar("U")
+
+def pair(first: T, second: U) -> tuple[list[T], list[U]]:
+    return [first], [second]
+
+def _(first: int, second: str):
+    # revealed: tuple[list[Any], list[str]]
+    result: tuple[Sequence[Any], Sequence[object]] = reveal_type(pair(first, second))
+```
+
+## Gradual return context preserves constrained arguments
+
+A gradual return context can supply a valid specialization of a constrained type variable. It does
+not allow us to select a concrete constraint that rejects the argument.
+
+```py
+from typing import Any, TypeVar
+
+T = TypeVar("T", object, str)
+S = TypeVar("S", str, bytes)
+
+def f(value: T) -> T:
+    return value
+
+def g(value: S) -> S:
+    return value
+
+def unannotated():
+    return f(object())
+
+x: Any = reveal_type(f(object()))  # revealed: Any
+y: Any = reveal_type(g(b""))  # revealed: Any
+```
+
+## Return context preserves a wider callback parameter
+
+A callback accepting `object` also accepts `int`. The return context therefore does not require us
+to narrow its parameter type. Since `object` and `int` are not mutually assignable, we preserve the
+inferred parameter type.
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+
+def wrap(callback: Callable[[T], None]) -> Callable[[T], None]:
+    return callback
+
+def accepts_object(value: object) -> None:
+    pass
+
+reveal_type(wrap(accepts_object))  # revealed: (object, /) -> None
+result: Callable[[int], None] = reveal_type(wrap(accepts_object))  # revealed: (object, /) -> None
+```
+
+## Return context without argument evidence
+
+An annotated assignment determines the return type when the arguments do not constrain it. This also
+applies when the function's arguments use unrelated type variables.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def make() -> T:
+    raise NotImplementedError
+
+def make_with_value(value: U) -> T:
+    raise NotImplementedError
+
+def make_optional(value: T | None = None) -> T:
+    raise NotImplementedError
+
+reveal_type(make())  # revealed: Unknown
+x1: int = reveal_type(make())  # revealed: int
+x2: str = reveal_type(make_with_value(1))  # revealed: str
+x3: int = reveal_type(make_optional())  # revealed: int
+```
+
+Union context still prefers the first compatible member. An identity wrapper preserves that context.
+
+```py
+def identity(value: T) -> T:
+    return value
+
+x4: int | str = reveal_type(make())  # revealed: int
+x5: int = reveal_type(identity(make()))  # revealed: int
+x6: int = reveal_type(identity(identity(make())))  # revealed: int
+x7: int = reveal_type(identity(identity(identity(make()))))  # revealed: int
+```
+
+An identity wrapper does not supply independent scalar context. Gradual alternatives inferred from
+the arguments remain intact through nested wrappers.
+
+```py
+from typing import Any
+
+def pair(first: T, second: T) -> T:
+    raise NotImplementedError
+
+def _(first: int, second: Any):
+    x1 = pair(first, second)
+    reveal_type(x1)  # revealed: int | Any
+    x2 = identity(pair(first, second))
+    reveal_type(x2)  # revealed: int | Any
+    x3 = identity(identity(pair(first, second)))
+    reveal_type(x3)  # revealed: int | Any
+    x4 = identity(identity(identity(pair(first, second))))
+    reveal_type(x4)  # revealed: int | Any
+```
+
+## Scalar context selects compatible protocol alternatives
+
+An overloaded method can offer more than one solution for a protocol's return type. Scalar context
+selects a compatible solution instead of retaining an incompatible union of all solutions.
+
+```py
+from typing import Any, Literal, Protocol, TypeVar, overload
+
+K_contra = TypeVar("K_contra", contravariant=True)
+T_co = TypeVar("T_co", covariant=True)
+K = TypeVar("K")
+T = TypeVar("T")
+
+class Getter(Protocol[K_contra, T_co]):
+    def __getitem__(self, key: K_contra) -> T_co: ...
+
+class Data:
+    @overload
+    def __getitem__(self, key: Literal["a"]) -> Any: ...
+    @overload
+    def __getitem__(self, key: str) -> object: ...
+    def __getitem__(self, key: str) -> object:
+        raise NotImplementedError
+
+def get(data: Getter[K, T], key: K) -> T:
+    return data[key]
+
+value = get(Data(), "a")
+reveal_type(value)  # revealed: object
+contextual: int = reveal_type(get(Data(), "a"))  # revealed: int
+incompatible: int = get(Data(), "b")  # error: [invalid-assignment]
+```
+
+## Scalar context with a default candidate
+
+A default supplies a candidate even when no argument constrains the type variable. A scalar context
+does not replace that candidate with a wider type.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", default=str)
+
+def make() -> T:
+    raise NotImplementedError
+
+reveal_type(make())  # revealed: str
+value: object = reveal_type(make())  # revealed: str
+```
+
+## Scalar return context preserves class arguments
+
+The return type does not depend on `T`, so its context does not change the class objects inferred
+from the arguments. Their class attributes remain available in the callback, including when the
+class object is nested in a tuple.
+
+```py
+from typing import Callable, ClassVar, TypeVar
+
+T = TypeVar("T")
+
+class A:
+    flag: ClassVar[int] = 1
+
+def use(value: T, callback: Callable[[T], object]) -> int:
+    return 1
+
+direct: int = use(A, lambda cls: cls.flag)
+nested: int = use((A,), lambda classes: classes[0].flag)
+```
+
+## Return context selects a callback overload
+
+The return context requires a callback that accepts `int`, which excludes the `str` overload. The
+remaining overload returns `int`, so we retain that return type rather than widening it to `object`.
+
+```py
+from typing import Callable, TypeVar, overload
+
+A = TypeVar("A")
+T = TypeVar("T")
+
+@overload
+def parse(value: int) -> int: ...
+@overload
+def parse(value: str) -> str: ...
+def parse(value: int | str) -> int | str:
+    return value
+
+def wrap(callback: Callable[[A], T]) -> Callable[[A], T]:
+    return callback
+
+wrapped: Callable[[int], object] = wrap(parse)
+reveal_type(wrapped)  # revealed: (int, /) -> int
+```
+
+Removing the incompatible overload does not change the inferred type.
+
+```py
+def parse_int(value: int) -> int:
+    return value
+
+single: Callable[[int], object] = wrap(parse_int)
+reveal_type(single)  # revealed: (int, /) -> int
+```
+
+## Return context requires every callback signature
+
+An overloaded callback protocol requires both signatures to match. Its return type must account for
+both overloads, so a context requiring only `int` is incompatible with the callback.
+
+```py
+from typing import Protocol, TypeVar, overload
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+
+class Parser(Protocol[T_co]):
+    @overload
+    def __call__(self, value: int, /) -> T_co: ...
+    @overload
+    def __call__(self, value: str, /) -> T_co: ...
+
+@overload
+def parse(value: int) -> int: ...
+@overload
+def parse(value: str) -> str: ...
+def parse(value: int | str) -> int | str:
+    return value
+
+def wrap(callback: Parser[T]) -> Parser[T]:
+    return callback
+
+compatible: Parser[int | str] = wrap(parse)
+incompatible: Parser[int] = wrap(parse)  # error: [invalid-assignment]
+```
+
+## Correlated overloads in return context
+
+Each overload supplies a different pair of parameter and return types. A union nested in the return
+context can accept either pair, but merging the pairs into `list[int | str]` loses their correlation
+and satisfies neither union member. We select one complete specialization instead.
+
+```py
+from typing import Callable, TypeAlias, TypeVar, overload
+
+A = TypeVar("A")
+B = TypeVar("B")
+
+@overload
+def callback(value: int) -> str: ...
+@overload
+def callback(value: str) -> int: ...
+def callback(value: int | str) -> int | str:
+    raise NotImplementedError
+
+def f(callback: Callable[[A], B]) -> tuple[tuple[list[A], list[B]]]:
+    raise NotImplementedError
+
+Choice: TypeAlias = tuple[list[int], list[str]] | tuple[list[str], list[int]]
+
+result: tuple[Choice] = f(callback)
+```
+
+Neither overload accepts and returns the same type, so a context requiring either such pair is
+incompatible with the result.
+
+```py
+Same: TypeAlias = tuple[list[int], list[int]] | tuple[list[str], list[str]]
+
+invalid: tuple[Same] = f(callback)  # error: [invalid-assignment]
+```
+
 ## Inferring nested generic function calls
 
 We can infer type assignments in nested calls to multiple generic functions. If they use the same
@@ -1171,6 +1491,65 @@ T = TypeVar("T", Instance, type[ClassObject])
 
 def read(value: T) -> list[str]:
     return value.keys()
+```
+
+## Nested calls in bounded argument contexts
+
+A parameter's upper bound validates the result of a nested call without replacing its inferred
+gradual type. An explicit annotation still provides declared evidence:
+
+```py
+from typing import Any, TypeVar
+
+T = TypeVar("T", bound=str)
+S = TypeVar("S")
+
+def f(value: T) -> T:
+    return value
+
+def g(value: tuple[S]) -> S:
+    raise NotImplementedError
+
+def _(any_value: Any, unknown_value):
+    reveal_type(f(f(any_value)))  # revealed: Any
+    reveal_type(f(f(unknown_value)))  # revealed: Unknown
+    reveal_type(f(g(unknown_value)))  # revealed: Unknown
+
+    result: str = reveal_type(f(any_value))  # revealed: str
+```
+
+## Upper-bound context for dictionary literals
+
+A `TypedDict` upper bound provides the field types needed to infer a dictionary literal:
+
+```py
+from typing import TypedDict, TypeVar
+
+class Payload(TypedDict):
+    value: int
+
+T = TypeVar("T", bound=Payload)
+
+def f(value: T) -> T:
+    return value
+
+reveal_type(f({"value": 1}))  # revealed: Payload
+```
+
+## Upper-bound context for lambdas
+
+A callable upper bound provides parameter types for an unannotated lambda:
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T", bound=Callable[[int], int])
+
+def f(value: T) -> T:
+    return value
+
+callback = f(lambda value: reveal_type(value))  # revealed: int
+reveal_type(callback(1))  # revealed: int
 ```
 
 ## Solving TypeVars with upper bounds in unions
@@ -1639,6 +2018,92 @@ def narrow(x: Narrow) -> Narrow:
 
 reveal_type(narrow(1))  # revealed: int
 reveal_type(narrow("hello"))  # revealed: str
+```
+
+## Class-valued callback parameters
+
+A class inferred from another argument retains its attributes when used as a callback parameter. Its
+constructor signature alone does not describe the value passed to the callback.
+
+```py
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class P(Generic[T]):
+    class_attribute = 1
+
+def use(value: T, callback: Callable[[T], int]) -> None: ...
+
+use(P[int], lambda cls: cls.class_attribute)
+use([P[int]], lambda classes: classes[0].class_attribute)
+
+def use_list(value: T, callback: Callable[[list[T]], int]) -> None: ...
+
+use_list(P[int], lambda classes: classes[0].class_attribute)
+```
+
+## Explicit class context in generic calls
+
+An explicit class annotation checks the class's default specialization, even when another parameter
+of the function is generic. It does not infer a different specialization for the bare class value.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVar, final
+
+T = TypeVar("T")
+S = TypeVar("S", default=str)
+
+@final
+class P(Generic[S]): ...
+
+def use(value: T, cls: type[P[int]]) -> T:
+    return value
+
+use(1, P)  # error: [invalid-argument-type]
+```
+
+## Context for mutually dependent callbacks
+
+The return context can determine the parameter types of mutually dependent identity callbacks. The
+type variables in the called function remain inferable while checking that context.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+K = TypeVar("K")
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+def f(extract: Callable[[T], U], store: Callable[[U], T], key: Callable[[K], str]) -> list[U]:
+    raise NotImplementedError
+
+def _(key: Callable[[V], str]) -> list[V]:
+    return f(key=key, extract=lambda x: x, store=lambda x: x)
+```
+
+Type variables from the enclosing function remain fixed. The return context cannot specialize `V` to
+`int`:
+
+```py
+def singleton(value: T) -> list[T]:
+    return [value]
+
+def _(value: V) -> list[int]:
+    return singleton(value)  # error: [invalid-return-type]
 ```
 
 ## Redundant callback bounds preserve constrained type-variable relationships

@@ -1313,6 +1313,22 @@ def check_never(value: Never) -> None:
     reveal_type(collect_prefixed(1, value))  # revealed: tuple[Never]
 ```
 
+### Unannotated callbacks with variadic arguments
+
+An unsolved `TypeVarTuple` uses an unknown variadic argument shape instead of leaking a provisional
+type variable into an unannotated callback.
+
+```py
+from typing import Callable
+
+def schedule[*Ts](callback: Callable[[*Ts], object], *args: *Ts) -> None:
+    callback(*args)
+
+items: list[int] = []
+schedule(lambda item: items.append(item), 1)
+schedule(lambda item, /: items.append(item), 1)
+```
+
 ### Unsupported callable checks are deferred
 
 A generic callback can leave the expected callable with a gradual positional parameter list until

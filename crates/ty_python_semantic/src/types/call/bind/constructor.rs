@@ -5,13 +5,48 @@ use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::generics::{GenericContext, Specialization};
+use crate::types::generics::{ApplySpecialization, GenericContext, Specialization};
 use crate::types::signatures::Parameter;
 use crate::types::typevar::TypeVarNonceGenerator;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext,
     TypeMapping,
 };
+
+impl<'db> CallableBinding<'db> {
+    pub(crate) fn bind_constructor_receiver(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class_type: Type<'db>,
+    ) {
+        self.bound_type = Some(class_type);
+        let Some(instance_type) = class_type.to_instance_approximation(db, env) else {
+            return;
+        };
+
+        // When `Self` only describes the implicit receiver, binding it cannot affect inference
+        // for the rest of the signature. Its generic upper bound would otherwise couple method
+        // type variables that have independent argument and return constraints.
+        for overload in &mut self.overloads {
+            let Some(self_typevar) = overload.signature.unused_implicit_self(db, env) else {
+                continue;
+            };
+            let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                self_typevar,
+                instance_type,
+            ));
+            let visitor = ApplyTypeMappingVisitor::new(env);
+            overload.signature = overload.signature.apply_type_mapping_impl(
+                db,
+                &mapping,
+                TypeContext::default(),
+                &visitor,
+            );
+            overload.return_ty = overload.initial_return_type(db);
+        }
+    }
+}
 
 /// Bindings for a constructor call.
 ///

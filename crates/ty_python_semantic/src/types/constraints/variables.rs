@@ -26,24 +26,39 @@ use crate::{Db, ProgramEnvironment};
 /// don't want to choose a validity bound as a solution unless we have no other choice. There is
 /// often an evidence bound that is a better choice.
 ///
-/// A bound derived only from validity remains validity. Any derivation that also depends on
-/// evidence is itself evidence.
+/// The expected type of a call supplies _declared_ evidence. Bounds derived from both argument and
+/// declared evidence are _mixed_: they constrain the solution, but do not contribute to either
+/// source's preferred type independently.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum ConstraintProvenance {
     Validity,
     Evidence,
+    Declared,
+    Mixed,
 }
 
 impl ConstraintProvenance {
+    pub(super) const fn is_evidence(self) -> bool {
+        !matches!(self, Self::Validity)
+    }
+
+    pub(super) const fn as_declared(self) -> Self {
+        match self {
+            Self::Validity => self,
+            Self::Evidence | Self::Declared | Self::Mixed => Self::Declared,
+        }
+    }
+
     /// Returns the provenance of a constraint derived from two existing constraints.
     ///
-    /// Derived constraints must retain any call-site evidence that contributed to them. Otherwise,
-    /// a derivation could downgrade evidence to a background validity restriction, causing the
-    /// solver to ignore a specialization justified by the call site.
+    /// Validity bounds do not change the evidence source. Combining inferred and declared evidence
+    /// produces mixed evidence, which cannot independently supply either source's preferred type.
     pub(super) const fn derived(left: Self, right: Self) -> Self {
         match (left, right) {
-            (Self::Validity, Self::Validity) => Self::Validity,
-            _ => Self::Evidence,
+            (Self::Validity, other) | (other, Self::Validity) => other,
+            (Self::Evidence, Self::Evidence) => Self::Evidence,
+            (Self::Declared, Self::Declared) => Self::Declared,
+            _ => Self::Mixed,
         }
     }
 
@@ -82,6 +97,27 @@ pub(crate) enum Constraint<'db> {
 }
 
 impl<'db> Constraint<'db> {
+    pub(super) fn provenance(self) -> ConstraintProvenance {
+        match self {
+            Self::ConcreteLower(bound) => bound.provenance,
+            Self::ConcreteUpper(bound) => bound.provenance,
+            Self::ConcreteEquivalence(bound) => bound.provenance,
+            Self::TypeVarRange(bound) => bound.provenance,
+            Self::TypeVarEquivalence(bound) => bound.provenance,
+        }
+    }
+
+    pub(super) fn with_provenance(mut self, provenance: ConstraintProvenance) -> Self {
+        match &mut self {
+            Self::ConcreteLower(bound) => bound.provenance = provenance,
+            Self::ConcreteUpper(bound) => bound.provenance = provenance,
+            Self::ConcreteEquivalence(bound) => bound.provenance = provenance,
+            Self::TypeVarRange(bound) => bound.provenance = provenance,
+            Self::TypeVarEquivalence(bound) => bound.provenance = provenance,
+        }
+        self
+    }
+
     pub(super) fn new_node(
         self,
         db: &'db dyn Db,

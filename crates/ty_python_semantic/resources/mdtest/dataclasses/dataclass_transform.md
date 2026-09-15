@@ -1246,6 +1246,57 @@ class Person:
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
 ```
 
+### Ambiguous field specifiers with identical field options
+
+Overloads with different return types can still describe the same field. If neither overload
+provides a default, the field remains required, even when the argument matches both overloads:
+
+```py
+from typing import Any, overload
+from typing_extensions import dataclass_transform
+
+@overload
+def field(value: int) -> int: ...
+@overload
+def field(value: str) -> str: ...
+def field(value: Any) -> Any: ...
+
+@dataclass_transform(field_specifiers=(field,))
+class Model: ...
+
+def make_model(value: Any):
+    class Person(Model):
+        id: int = field(value)
+        name: str
+
+    reveal_type(Person.__init__)  # revealed: (self: Person, id: int, name: str) -> None
+```
+
+### Ambiguous field specifiers with different field options
+
+When matching overloads disagree about field options, we cannot select one overload's options. The
+ambiguous return type is treated as an ordinary default value:
+
+```py
+from typing import Any, Literal, overload
+from typing_extensions import dataclass_transform
+
+@overload
+def field(value: int, *, init: Literal[True] = True) -> int: ...
+@overload
+def field(value: str, *, init: Literal[False] = False) -> str: ...
+def field(value: Any, *, init: bool = True) -> Any: ...
+
+@dataclass_transform(field_specifiers=(field,))
+class Model: ...
+
+def make_model(value: Any):
+    class Person(Model):
+        id: int = field(value)
+
+    reveal_type(Person.__init__)  # revealed: (self: Person, id: int = ...) -> None
+```
+
 ### Converter field specifier with overloaded callables
 
 ```py

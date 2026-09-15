@@ -24,7 +24,8 @@ use super::{
 };
 use crate::ProgramEnvironment;
 use crate::place::{
-    DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol, place_from_bindings,
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_symbol,
+    place_from_bindings,
 };
 
 /// The operation required to write an attribute.
@@ -186,6 +187,7 @@ pub(super) enum ExplicitAttributeWriteRequirement<'db> {
     AssignableTo {
         ty: Type<'db>,
         qualifiers: TypeQualifiers,
+        origin: TypeOrigin,
     },
 }
 
@@ -205,6 +207,7 @@ pub(super) enum FallbackAttributeWriteRequirement<'db> {
     AssignableTo {
         ty: Type<'db>,
         qualifiers: TypeQualifiers,
+        origin: TypeOrigin,
         possibly_missing: bool,
     },
     /// The fallback may exist, but lookup did not produce a usable write type.
@@ -421,7 +424,7 @@ fn instance_attribute_write_member_requirement<'db>(
     match type_member {
         type_member if type_member.is_class_var() => InstanceAttributeWriteMember::ClassVar,
         PlaceAndQualifiers {
-            place: Place::Defined(DefinedPlace { ty, .. }),
+            place: Place::Defined(DefinedPlace { ty, origin, .. }),
             qualifiers,
         } => {
             let member = explicit_attribute_write_requirement(
@@ -431,6 +434,7 @@ fn instance_attribute_write_member_requirement<'db>(
                 attribute,
                 ty.bind_self_typevars(db, env, object_ty),
                 qualifiers,
+                origin,
             );
 
             // Built-in classes can expose writable C-level descriptors that their stubs model as
@@ -530,6 +534,7 @@ fn class_attribute_write_requirement<'db>(
                     attribute,
                     descriptor_ty,
                     qualifiers,
+                    place.origin,
                 ),
                 fallback: receiver_fallback.map(|fallback| {
                     class_fallback_write_requirement(
@@ -625,10 +630,11 @@ fn explicit_attribute_write_requirement<'db>(
     attribute: &str,
     attr_ty: Type<'db>,
     qualifiers: TypeQualifiers,
+    origin: TypeOrigin,
 ) -> ExplicitAttributeWriteRequirement<'db> {
     if matches!(attr_ty, Type::SlotDescriptor(_))
         && let PlaceAndQualifiers {
-            place: Place::Defined(DefinedPlace { ty, .. }),
+            place: Place::Defined(DefinedPlace { ty, origin, .. }),
             qualifiers: storage_qualifiers,
         } = object_ty.instance_member(db, env, attribute)
     {
@@ -641,6 +647,7 @@ fn explicit_attribute_write_requirement<'db>(
                 ty.bind_self_typevars(db, env, object_ty),
             ),
             qualifiers: qualifiers.union(storage_qualifiers),
+            origin,
         };
     }
 
@@ -656,6 +663,7 @@ fn explicit_attribute_write_requirement<'db>(
         ExplicitAttributeWriteRequirement::AssignableTo {
             ty: effective_write_type(db, env, object_ty, attribute, attr_ty),
             qualifiers,
+            origin,
         }
     }
 }
@@ -672,9 +680,13 @@ fn instance_fallback_write_requirement<'db>(
     fallback: PlaceAndQualifiers<'db>,
 ) -> FallbackAttributeWriteRequirement<'db> {
     let PlaceAndQualifiers {
-        place: Place::Defined(DefinedPlace {
-            ty, definedness, ..
-        }),
+        place:
+            Place::Defined(DefinedPlace {
+                ty,
+                origin,
+                definedness,
+                ..
+            }),
         qualifiers,
     } = fallback
     else {
@@ -684,6 +696,7 @@ fn instance_fallback_write_requirement<'db>(
     FallbackAttributeWriteRequirement::AssignableTo {
         ty: effective_write_type(db, env, object_ty, attribute, ty),
         qualifiers,
+        origin,
         possibly_missing: definedness == Definedness::PossiblyUndefined,
     }
 }
@@ -697,9 +710,13 @@ fn class_fallback_write_requirement<'db>(
     fallback: PlaceAndQualifiers<'db>,
 ) -> FallbackAttributeWriteRequirement<'db> {
     let PlaceAndQualifiers {
-        place: Place::Defined(DefinedPlace {
-            ty, definedness, ..
-        }),
+        place:
+            Place::Defined(DefinedPlace {
+                ty,
+                origin,
+                definedness,
+                ..
+            }),
         qualifiers,
     } = fallback
     else {
@@ -717,6 +734,7 @@ fn class_fallback_write_requirement<'db>(
     FallbackAttributeWriteRequirement::AssignableTo {
         ty,
         qualifiers,
+        origin,
         possibly_missing: definedness == Definedness::PossiblyUndefined,
     }
 }

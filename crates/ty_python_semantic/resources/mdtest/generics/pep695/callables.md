@@ -637,6 +637,34 @@ infer_prefix(get_ints)  # error: [invalid-argument-type]
 infer_suffix(get_ints)  # error: [invalid-argument-type]
 ```
 
+## Gradual tuple parameters in generic callbacks
+
+A callback accepting a fixed-length tuple can be passed where a gradual-length tuple is expected. An
+unrelated type parameter does not change the callback's assignability.
+
+```py
+from typing import Any, Callable
+
+def regular(value: int, callback: Callable[[tuple[Any, ...]], None]) -> None: ...
+def generic[T](value: T, callback: Callable[[tuple[Any, ...]], None]) -> None: ...
+def callback(value: tuple[int]) -> None: ...
+
+regular(0, callback)
+generic(0, callback)
+```
+
+Gradual tuple elements also provide inference evidence when they appear in a callback's return type.
+
+```py
+def infer_pair[K, V](callback: Callable[[], tuple[K, V]]) -> tuple[K, V]:
+    return callback()
+
+def get_tuple() -> tuple[Any, ...]:
+    return ()
+
+reveal_type(infer_pair(get_tuple))  # revealed: tuple[Any, Any]
+```
+
 ## Source type variables in gradual tuple returns
 
 A callback's fixed tuple element can contain an outer type variable and still satisfy a concrete
@@ -1317,4 +1345,73 @@ class IPolys[T](Protocol):
     def __getitem__(self, key: int) -> IPolys[T]: ...
     @overload
     def __getitem__(self, key: slice) -> IPolys[T] | Domain[T]: ...
+```
+
+## Contradictory bounds from a callback
+
+A callback's parameter and return types can impose incompatible bounds on the same type variable. We
+reject the argument even when inference cannot produce a specialization, with or without a declared
+return context.
+
+```py
+from typing import Any, Callable, overload
+
+def f[T](callback: Callable[[T], T]) -> list[T]:
+    raise NotImplementedError
+
+def incompatible(value: int) -> str:
+    return str(value)
+
+f(incompatible)  # error: [invalid-argument-type]
+result: list[int] = f(incompatible)  # error: [invalid-argument-type]
+
+def compatible(value: int) -> int:
+    return value
+
+def gradual(value: Any) -> Any:
+    return value
+
+valid: list[int] = f(compatible)
+dynamic: list[int] = f(gradual)
+```
+
+Overloads do not resolve the contradiction when every alternative has incompatible parameter and
+return types.
+
+```py
+@overload
+def crossed(value: int) -> str: ...
+@overload
+def crossed(value: str) -> int: ...
+def crossed(value: int | str) -> int | str:
+    raise NotImplementedError
+
+f(crossed)  # error: [invalid-argument-type]
+overloaded: list[int] = f(crossed)  # error: [invalid-argument-type]
+```
+
+The same contradiction is diagnosed for generic constructors. A declared specialization can make the
+diagnostic more precise, but cannot make the callback compatible.
+
+```py
+from typing import Self
+
+class Init[T]:
+    def __init__(self, callback: Callable[[T], T]) -> None: ...
+
+class New[T]:
+    def __new__(cls, callback: Callable[[T], T]) -> Self:
+        return super().__new__(cls)
+
+Init(incompatible)  # error: [invalid-argument-type]
+# error: [invalid-argument-type] "Expected `(int, /) -> int`"
+invalid_init: Init[int] = Init(incompatible)
+New(incompatible)  # error: [invalid-argument-type]
+# error: [invalid-argument-type] "Expected `(int, /) -> int`"
+invalid_new: New[int] = New(incompatible)
+
+reveal_type(Init(compatible))  # revealed: Init[int]
+valid_init: Init[int] = Init(compatible)
+reveal_type(New(compatible))  # revealed: New[int]
+valid_new: New[int] = New(compatible)
 ```
