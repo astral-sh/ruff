@@ -51,7 +51,9 @@ use crate::types::function::{
     OverloadLiteral,
 };
 use crate::types::generics::{
-    GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
+    GenericContext, InvocationConstraints, InvocationSpecialization, Specialization,
+    SpecializationBuilder, SpecializationError, TypeVarInference, TypeVarInferenceFallback,
+    TypeVarInferenceSolutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::known_instance::{
@@ -3811,6 +3813,25 @@ impl<'db> CallableBinding<'db> {
         call_arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) {
+        self.check_types_with_inference(
+            db,
+            env,
+            constraints,
+            call_arguments,
+            call_expression_tcx,
+            &mut CallConstraints::default(),
+        );
+    }
+
+    fn check_types_with_inference<'c>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &'c ProgramEnvironment<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        call_arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        inference: &mut CallConstraints<'db, 'c>,
+    ) {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
         let call_arguments = call_arguments.with_self(self.bound_type);
@@ -3846,13 +3867,15 @@ impl<'db> CallableBinding<'db> {
                         // still perform type checking for non-overloaded function to provide better
                         // user experience.
                         if let [overload] = self.overloads.as_mut_slice() {
-                            overload.check_types(
+                            let evidence = overload.check_types(
                                 db,
                                 env,
                                 constraints,
                                 call_arguments.as_ref(),
                                 call_expression_tcx,
+                                inference.is_enabled(),
                             );
+                            inference.record(0, evidence);
                         }
                         return;
                     }
@@ -3860,13 +3883,15 @@ impl<'db> CallableBinding<'db> {
                         // If only one candidate overload remains, it is the winning match. Evaluate
                         // it as a regular (non-overloaded) call.
                         self.matching_overload_before_type_checking = Some(index);
-                        self.overloads[index].check_types(
+                        let evidence = self.overloads[index].check_types(
                             db,
                             env,
                             constraints,
                             call_arguments.as_ref(),
                             call_expression_tcx,
+                            inference.is_enabled(),
                         );
+                        inference.record(index, evidence);
                         return;
                     }
                     MatchingOverloadIndex::Multiple(indexes) => (false, indexes),
@@ -3875,14 +3900,16 @@ impl<'db> CallableBinding<'db> {
 
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
         // whether it is compatible with the supplied argument list.
-        for (_, overload) in self.matching_overloads_mut() {
-            overload.check_types(
+        for (index, overload) in self.matching_overloads_mut() {
+            let evidence = overload.check_types(
                 db,
                 env,
                 constraints,
                 call_arguments.as_ref(),
                 call_expression_tcx,
+                inference.is_enabled(),
             );
+            inference.record(index, evidence);
         }
 
         tracing::trace!(
@@ -4063,12 +4090,13 @@ impl<'db> CallableBinding<'db> {
                 );
 
                 for (_, overload) in self.matching_overloads_mut() {
-                    overload.check_types(
+                    let _ = overload.check_types(
                         db,
                         env,
                         constraints,
                         expanded_arguments,
                         call_expression_tcx,
+                        false,
                     );
                 }
 
@@ -4910,6 +4938,31 @@ struct ExpandedCallEvaluation<'db> {
     snapshot: CallableBindingSnapshot<'db>,
 }
 
+/// Inference evidence needed only while a call is being checked. The nested call and its
+/// caller share the constraint builder, so these roots need not outlive that builder.
+#[derive(Default)]
+struct CallConstraints<'db, 'c> {
+    overloads: Vec<Option<InvocationConstraints<'db, 'c>>>,
+}
+
+impl<'db, 'c> CallConstraints<'db, 'c> {
+    fn new(overload_count: usize) -> Self {
+        Self {
+            overloads: vec![None; overload_count],
+        }
+    }
+
+    fn is_enabled(&self) -> bool {
+        !self.overloads.is_empty()
+    }
+
+    fn record(&mut self, index: usize, evidence: Option<InvocationConstraints<'db, 'c>>) {
+        if let Some(slot) = self.overloads.get_mut(index) {
+            *slot = evidence;
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) enum MatchingOverloadIndex {
     /// No matching overloads found.
@@ -5668,7 +5721,6 @@ struct ArgumentTypeChecker<'a, 'db> {
     argument_matches: &'a [MatchedArgument<'db>],
     parameter_tys: &'a mut [Option<Type<'db>>],
     parameter_ty_builders: Vec<Option<UnionBuilder<'db>>>,
-    call_expression_tcx: TypeContext<'db>,
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
 
@@ -5684,6 +5736,10 @@ struct ArgumentTypeChecker<'a, 'db> {
     /// TODO: Once specialization inference fully owns generic argument validation, this field can
     /// be removed.
     constraint_set_errors: Vec<bool>,
+    /// Callback invocation checked while collecting evidence, before outer validation.
+    paramspec_call: Option<InferredParamSpecCall<'db>>,
+    /// Callback identities and types solved together with the outer call.
+    invocation_specialization: InvocationSpecialization<'db>,
 }
 
 /// The formal and actual types associated with one matched argument-parameter pair.
@@ -5779,7 +5835,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         arguments: &'a CallArguments<'a, 'db>,
         argument_matches: &'a [MatchedArgument<'db>],
         parameter_tys: &'a mut [Option<Type<'db>>],
-        call_expression_tcx: TypeContext<'db>,
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
         inferred: InferredCall<'db>,
@@ -5789,6 +5844,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             inference,
             errors: inference_errors,
             constraint_set_errors,
+            paramspec_call,
+            invocation_specialization,
         } = inferred;
         errors.extend(inference_errors);
         Self {
@@ -5801,12 +5858,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             argument_matches,
             parameter_tys,
             parameter_ty_builders: Vec::new(),
-            call_expression_tcx,
             return_ty,
             errors,
             inferable_typevars,
             inference,
             constraint_set_errors,
+            paramspec_call,
+            invocation_specialization,
         }
     }
 }
@@ -5856,13 +5914,30 @@ struct InferredCall<'db> {
     errors: Vec<BindingError<'db>>,
     /// Flags indexed by call argument, including synthetic receivers, to suppress duplicate errors.
     constraint_set_errors: Vec<bool>,
+    /// Callback invocation checked while collecting evidence, before outer validation.
+    paramspec_call: Option<InferredParamSpecCall<'db>>,
+    /// Callback identities and types solved together with the outer call.
+    invocation_specialization: InvocationSpecialization<'db>,
+}
+
+/// A checked callback invocation whose evidence has contributed to the outer inference.
+struct InferredParamSpecCall<'db> {
+    bindings: Bindings<'db>,
+    /// Captured signature before invocation, for sibling argument type context.
+    callable: CallableType<'db>,
+    paramspec: BoundTypeVarInstance<'db>,
+    /// Outer argument indices and their source indices for remapping callback diagnostics.
+    argument_indices: Option<Vec<(usize, Option<usize>)>>,
+    /// First parameter checked by this invocation, or `None` when no arguments were forwarded.
+    component_start: Option<usize>,
 }
 
 /// Fixed inputs used to infer a call before its arguments are validated.
 /// No validation result can be written through this object.
-struct CallInference<'a, 'db> {
+struct CallInference<'a, 'db, 'c> {
     db: &'db dyn Db,
-    env: &'a ProgramEnvironment<'db>,
+    env: &'c ProgramEnvironment<'db>,
+    signature_type: Type<'db>,
     /// Signature used for argument matching, before this call's specialization.
     signature: &'a Signature<'db>,
     /// Argument types for each available type context, including synthetic receivers.
@@ -5879,7 +5954,7 @@ struct CallInference<'a, 'db> {
     inferable_typevars: TypeVarSet<'db>,
 }
 
-impl<'a, 'db> CallInference<'a, 'db> {
+impl<'a, 'db, 'c> CallInference<'a, 'db, 'c> {
     /// Yields the effective formal and actual types for each matched argument-parameter pair.
     ///
     /// Gradual variadic parameters do not contribute constraints. For unpacked tuple parameters,
@@ -5923,29 +5998,6 @@ impl<'a, 'db> CallInference<'a, 'db> {
 }
 
 impl<'db> ArgumentTypeChecker<'_, 'db> {
-    /// Returns argument-index mappings for arguments matched to the `ParamSpec` component.
-    ///
-    /// `prefix_len` is the number of parameters before the `ParamSpec` components in a callable like
-    /// `Concatenate[Prefix, P]`. Any argument matched to a later parameter belongs to `P`. The
-    /// first item is the matched-argument index; the second is the source argument index, or `None`
-    /// for synthetic arguments such as bound `self` or `cls`.
-    ///
-    /// ```py
-    /// def wrapper[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R: ...
-    /// wrapper(f, 1, y="x")  # returns the indices for `1` and `y="x"`
-    /// ```
-    fn paramspec_argument_indices(&self, prefix_len: usize) -> Vec<(usize, Option<usize>)> {
-        enumerate_argument_types(self.arguments)
-            .filter_map(|(argument_index, adjusted_argument_index, _, _)| {
-                self.argument_matches[argument_index]
-                    .parameters
-                    .iter()
-                    .any(|parameter| parameter.index >= prefix_len)
-                    .then_some((argument_index, adjusted_argument_index))
-            })
-            .collect()
-    }
-
     /// Returns the source callable whose parameters supplied a `ParamSpec` specialization.
     ///
     /// Forwarded arguments are checked against the wrapped callable, not the wrapper's
@@ -6085,22 +6137,59 @@ impl<'db> ArgumentTypeChecker<'_, 'db> {
     }
 }
 
-impl<'db> CallInference<'_, 'db> {
-    fn infer(self, constraints: &ConstraintSetBuilder<'db>) -> InferredCall<'db> {
+impl<'db, 'c> CallInference<'_, 'db, 'c> {
+    /// Returns argument-index mappings for arguments matched to the `ParamSpec` component.
+    ///
+    /// `prefix_len` is the number of parameters before the `ParamSpec` components in a callable like
+    /// `Concatenate[Prefix, P]`. Any argument matched to a later parameter belongs to `P`. The
+    /// first item is the matched-argument index; the second is the source argument index, or `None`
+    /// for synthetic arguments such as bound `self` or `cls`.
+    ///
+    /// ```py
+    /// def wrapper[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R: ...
+    /// wrapper(f, 1, y="x")  # returns the indices for `1` and `y="x"`
+    /// ```
+    fn paramspec_argument_indices(&self, prefix_len: usize) -> Vec<(usize, Option<usize>)> {
+        enumerate_argument_types(self.arguments)
+            .filter_map(|(argument_index, adjusted_argument_index, _, _)| {
+                self.argument_matches[argument_index]
+                    .parameters
+                    .iter()
+                    .any(|parameter| parameter.index >= prefix_len)
+                    .then_some((argument_index, adjusted_argument_index))
+            })
+            .collect()
+    }
+
+    fn infer(
+        self,
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> (InferredCall<'db>, Option<InvocationConstraints<'db, 'c>>) {
         let db = self.db;
         let mut constraint_set_errors = vec![false; self.arguments.len()];
         let Some(generic_context) = self.signature.generic_context else {
-            return InferredCall {
-                inferable_typevars: self.inferable_typevars,
-                inference: None,
-                errors: Vec::new(),
-                constraint_set_errors,
-            };
+            return (
+                InferredCall {
+                    inferable_typevars: self.inferable_typevars,
+                    inference: None,
+                    errors: Vec::new(),
+                    constraint_set_errors,
+                    paramspec_call: None,
+                    invocation_specialization: InvocationSpecialization::default(),
+                },
+                None,
+            );
         };
 
         let return_with_tcx = Some(self.return_ty).zip(self.call_expression_tcx.annotation);
 
-        let mut builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
+        let mut builder = SpecializationBuilder::new(db, self.env, constraints, generic_context)
+            .with_paramspec_invocation(
+                self.signature
+                    .parameters()
+                    .as_paramspec_with_prefix()
+                    .map(|(_, p)| p),
+            );
 
         // Type variables for which we inferred a declared type based on a partially specialized
         // type from an outer generic context. For these type variables, we may infer types that
@@ -6275,7 +6364,13 @@ impl<'db> CallInference<'_, 'db> {
         // Note that this will still lead to an invalid specialization, but may
         // produce more precise diagnostics.
         if !assignable_to_declared_type {
-            builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
+            builder = SpecializationBuilder::new(db, self.env, constraints, generic_context)
+                .with_paramspec_invocation(
+                    self.signature
+                        .parameters()
+                        .as_paramspec_with_prefix()
+                        .map(|(_, paramspec)| paramspec),
+                );
             specialization_errors.clear();
             constraint_set_errors.fill(false);
 
@@ -6288,33 +6383,165 @@ impl<'db> CallInference<'_, 'db> {
             );
         }
 
-        let inference = self.solve(
+        let mut inference_errors = specialization_errors.clone();
+        let mut inference = self.solve(
             constraints,
             generic_context,
-            builder,
+            &mut builder,
             &preferred_type_mappings,
             preferred_solutions_incomplete,
-            &mut specialization_errors,
+            &mut inference_errors,
         );
-        InferredCall {
-            inferable_typevars: self.inferable_typevars,
-            inference: Some(inference),
-            errors: specialization_errors,
-            constraint_set_errors,
+        let (mut paramspec_call, refined) =
+            self.infer_paramspec_sub_call(constraints, &mut builder, inference);
+        if refined {
+            // Earlier solver errors describe the provisional result, not the combined evidence.
+            inference = self.solve(
+                constraints,
+                generic_context,
+                &mut builder,
+                &preferred_type_mappings,
+                preferred_solutions_incomplete,
+                &mut specialization_errors,
+            );
+            inference_errors = specialization_errors;
         }
+        if let Some(call) = &mut paramspec_call
+            && call
+                .bindings
+                .single_element()
+                .is_some_and(|binding| binding.selected_overloads().next().is_some())
+            && matches!(
+                inference.solutions(db),
+                TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::Unsatisfiable)
+            )
+            && let Some(Type::Callable(refined)) =
+                inference.merged_specialization(db).get(db, call.paramspec)
+            && refined != call.callable
+        {
+            let sub_arguments = if let Some(indices) = &call.argument_indices {
+                self.arguments
+                    .select(&indices.iter().map(|(index, _)| *index).collect::<Vec<_>>())
+            } else {
+                CallArguments::none()
+            };
+            let binding = CallableBinding::from_overloads(
+                self.signature_type,
+                refined.signatures(db).iter().cloned(),
+            );
+            call.bindings = match Bindings::from(binding)
+                .match_parameters(db, self.env, &sub_arguments)
+                .check_types(
+                    db,
+                    self.env,
+                    constraints,
+                    &sub_arguments,
+                    self.call_expression_tcx,
+                    &[],
+                ) {
+                Ok(bindings) => bindings,
+                Err(CallError(_, bindings)) => *bindings,
+            };
+        }
+        let evidence = (!matches!(
+            inference.solutions(db),
+            TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::TypeVarTuple)
+        ))
+        .then(|| builder.pending_constraints());
+        let invocation_specialization = builder.into_invocation_specialization();
+        (
+            InferredCall {
+                inferable_typevars: self.inferable_typevars,
+                inference: Some(inference),
+                errors: inference_errors,
+                constraint_set_errors,
+                paramspec_call,
+                invocation_specialization,
+            },
+            evidence,
+        )
     }
 
-    /// Solve the collected constraints, consuming the builder before argument validation.
+    /// Check a captured callback to collect its evidence before validating outer arguments.
+    fn infer_paramspec_sub_call(
+        &self,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        builder: &mut SpecializationBuilder<'db, 'c>,
+        inference: TypeVarInference<'db>,
+    ) -> (Option<InferredParamSpecCall<'db>>, bool) {
+        let db = self.db;
+        let Some((prefix, paramspec)) = self.signature.parameters().as_paramspec_with_prefix()
+        else {
+            return (None, false);
+        };
+        let Some(Type::Callable(callable)) = inference.merged_specialization(db).get(db, paramspec)
+        else {
+            return (None, false);
+        };
+        if callable.kind(db) != CallableTypeKind::ParamSpecValue {
+            return (None, false);
+        }
+        let signatures = &callable.signatures(db).overloads;
+        if signatures.is_empty() {
+            return (None, false);
+        }
+        let indices = self.paramspec_argument_indices(prefix.len());
+        let forwards_arguments = indices.iter().any(|(index, _)| {
+            let [parameter] = self.argument_matches[*index].parameters.as_slice() else { return false; };
+            matches!(self.signature.parameters()[parameter.index].annotated_type(), Type::TypeVar(typevar) if typevar.is_paramspec(db))
+        });
+        let argument_indices = forwards_arguments.then_some(indices);
+        let sub_arguments = if let Some(indices) = &argument_indices {
+            self.arguments
+                .select(&indices.iter().map(|(index, _)| *index).collect::<Vec<_>>())
+        } else {
+            CallArguments::none()
+        };
+        let callable_binding =
+            CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
+        let mut evidence = CallConstraints::new(signatures.len());
+        let mut bindings =
+            Bindings::from(callable_binding).match_parameters(db, self.env, &sub_arguments);
+        for binding in bindings.iter_flat_mut() {
+            binding.check_types_with_inference(
+                db,
+                self.env,
+                constraints,
+                &sub_arguments,
+                TypeContext::default(),
+                &mut evidence,
+            );
+        }
+        let _ = bindings.finalize_argument_inference(db, self.env, &sub_arguments, &[]);
+        let refined = if let [Some(evidence)] = evidence.overloads.as_slice() {
+            builder.incorporate_call_constraints(evidence);
+            true
+        } else {
+            false
+        };
+        (
+            Some(InferredParamSpecCall {
+                bindings,
+                callable,
+                paramspec,
+                argument_indices,
+                component_start: forwards_arguments.then_some(prefix.len()),
+            }),
+            refined,
+        )
+    }
+
+    /// Solve the evidence collected so far; the builder stays local to inference.
     ///
     /// `preferred_type_mappings` contains choices from the expected result type, such as `T = object`
     /// for `list[T]` in a `list[object]` context, used only when compatible with the argument evidence.
     /// `preferred_solutions_incomplete` marks inference as incomplete when it uses preferences whose
     /// computation reached a work limit.
-    fn solve<'c>(
+    fn solve(
         &self,
         constraints: &'c ConstraintSetBuilder<'db>,
         generic_context: GenericContext<'db>,
-        mut builder: SpecializationBuilder<'db, 'c>,
+        builder: &mut SpecializationBuilder<'db, 'c>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         preferred_solutions_incomplete: bool,
         specialization_errors: &mut Vec<BindingError<'db>>,
@@ -6467,9 +6694,9 @@ impl<'db> CallInference<'_, 'db> {
     /// collect(1, "value")
     /// nested((1, "value"), True, b"last")
     /// ```
-    fn infer_typevartuple_argument_constraints<'c>(
+    fn infer_typevartuple_argument_constraints<'b>(
         &self,
-        builder: &mut SpecializationBuilder<'db, 'c>,
+        builder: &mut SpecializationBuilder<'db, 'b>,
         check_type_context: bool,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
@@ -6728,9 +6955,9 @@ impl<'db> CallInference<'_, 'db> {
         ))
     }
 
-    fn infer_argument_constraints<'c>(
+    fn infer_argument_constraints<'b>(
         &self,
-        builder: &mut SpecializationBuilder<'db, 'c>,
+        builder: &mut SpecializationBuilder<'db, 'b>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
@@ -6849,6 +7076,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             );
 
         let mut expected_ty = declared_type;
+        if !constructor_receiver {
+            argument_type = self.invocation_specialization.specialize_invoked_argument(
+                db,
+                self.env,
+                declared_type,
+                argument_type,
+            );
+        }
         if let Some(specialization) = self.merged_specialization() {
             if !constructor_receiver {
                 argument_type = argument_type.apply_specialization(db, specialization);
@@ -7024,47 +7259,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
-        let db = self.db;
-        let paramspec = self.signature.parameters().as_paramspec_with_prefix();
-        let paramspec_component_start = paramspec.and_then(|(prefix, paramspec)| {
-            let prefix_len = prefix.len();
-            let paramspec_argument_indices = self.paramspec_argument_indices(prefix_len);
-            if paramspec_argument_indices.is_empty() {
-                self.evaluate_paramspec_sub_call(constraints, None, paramspec);
-                return None;
-            }
-
-            let has_paramspec_component_argument =
-                paramspec_argument_indices
-                    .iter()
-                    .any(|(argument_index, _)| {
-                        let [parameter_index] =
-                            self.argument_matches[*argument_index].parameters.as_slice()
-                        else {
-                            return false;
-                        };
-
-                        let Type::TypeVar(typevar) =
-                            self.signature.parameters()[parameter_index.index].annotated_type()
-                        else {
-                            return false;
-                        };
-
-                        typevar.is_paramspec(db)
-                    });
-
-            if has_paramspec_component_argument
-                && self.evaluate_paramspec_sub_call(
-                    constraints,
-                    Some(&paramspec_argument_indices),
-                    paramspec,
-                )
-            {
-                Some(prefix_len)
-            } else {
-                self.evaluate_paramspec_sub_call(constraints, None, paramspec);
-                None
-            }
+        let paramspec_component_start = self.paramspec_call.take().and_then(|call| {
+            let start = call.component_start;
+            self.check_paramspec_call(call);
+            start
         });
 
         let is_paramspec_component_parameter = |parameter_index: usize| {
@@ -7125,80 +7323,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
     }
 
-    /// Invoke a sub-call for the given `ParamSpec` type variable, using the forwarded arguments.
-    ///
-    /// The forwarded arguments are those matched to the `ParamSpec` components if provided,
-    /// otherwise no arguments are passed. No forwarded arguments can still require a sub-call:
-    ///
-    /// ```py
-    /// from typing import Callable
-    ///
-    /// def foo[**P](f: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
-    /// def f(x: int) -> None: ...
-    ///
-    /// foo(f)  # P specializes to `(x: int)`, so `f` is checked with no arguments.
-    /// ```
-    ///
-    /// This method returns `false` if the specialization does not contain a mapping for the given
-    /// `paramspec` or contains an invalid mapping (i.e., not a `Callable` of kind `ParamSpecValue`).
-    fn evaluate_paramspec_sub_call(
-        &mut self,
-        constraints: &ConstraintSetBuilder<'db>,
-        paramspec_arguments: Option<&[(usize, Option<usize>)]>,
-        paramspec: BoundTypeVarInstance<'db>,
-    ) -> bool {
+    /// Remap the completed callback's diagnostics into the outer argument list.
+    fn check_paramspec_call(&mut self, call: InferredParamSpecCall<'db>) {
         let db = self.db;
-        let Some(Type::Callable(callable)) = self
-            .merged_specialization()
-            .and_then(|specialization| specialization.get(db, paramspec))
-        else {
-            return false;
-        };
-
-        if callable.kind(db) != CallableTypeKind::ParamSpecValue {
-            return false;
-        }
-
-        let signatures = &callable.signatures(db).overloads;
-        if signatures.is_empty() {
-            return false;
-        }
-
-        let (sub_arguments, error_argument_indices) =
-            if let Some(paramspec_arguments) = paramspec_arguments {
-                let (paramspec_argument_indices, error_argument_indices): (Vec<_>, Vec<_>) =
-                    paramspec_arguments.iter().copied().unzip();
-
-                (
-                    self.arguments.select(&paramspec_argument_indices),
-                    Some(error_argument_indices),
-                )
-            } else {
-                (CallArguments::none(), None)
-            };
+        let paramspec = call.paramspec;
+        let paramspec_arguments = call.argument_indices.as_deref();
+        let error_argument_indices = paramspec_arguments
+            .map(|indices| indices.iter().map(|(_, index)| *index).collect::<Vec<_>>());
         let error_argument_indices = error_argument_indices.as_deref();
-
-        let callable_binding =
-            CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
-        let bindings = match Bindings::from(callable_binding)
-            .match_parameters(db, self.env, &sub_arguments)
-            .check_types(
-                db,
-                self.env,
-                constraints,
-                &sub_arguments,
-                self.call_expression_tcx,
-                &[],
-            ) {
-            Ok(bindings) => bindings,
-            Err(CallError(_, bindings)) => *bindings,
+        let Some(callable_binding) = call.bindings.single_element() else {
+            return;
         };
-
-        // SAFETY: `bindings` was created from a single `CallableBinding` above.
-        let callable_binding = bindings
-            .single_element()
-            .expect("ParamSpec sub-call should only contain a single CallableBinding");
-
         let mut extend_errors = |binding: &Binding<'db>| {
             let parameter_source = binding
                 .errors
@@ -7270,8 +7405,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 }
             }
         }
-
-        true
     }
 
     fn check_variadic_argument_type(
@@ -7651,6 +7784,10 @@ pub(crate) struct Binding<'db> {
     /// The type-variable inference result for this binding, if the callable is generic.
     inference: Option<TypeVarInference<'db>>,
 
+    /// The captured signature before invocation, used to infer each forwarded argument from
+    /// its siblings without feeding its own previous specialization back into that inference.
+    paramspec_context: Option<CallableType<'db>>,
+
     /// Whether these arguments construct a partial instead of completing a call.
     is_partial_application: bool,
 
@@ -7738,6 +7875,7 @@ impl<'db> Binding<'db> {
             constructor_context: None,
             inferable_typevars: TypeVarSet::None,
             inference: None,
+            paramspec_context: None,
             is_partial_application: false,
             argument_matches: Box::from([]),
             variadic_argument_matched_to_variadic_parameter: false,
@@ -8009,6 +8147,9 @@ impl<'db> Binding<'db> {
             .expected_type
             .unwrap_or(original_parameter_type);
         let paramspec_callable = |paramspec| {
+            if let Some(callable) = self.paramspec_context {
+                return Some(callable);
+            }
             let Type::Callable(callable) = self
                 .merged_specialization(db)
                 .and_then(|specialization| specialization.get(db, paramspec))
@@ -8275,20 +8416,21 @@ impl<'db> Binding<'db> {
         self.argument_matches = matcher.finish(db, env);
     }
 
-    fn check_types(
+    fn check_types<'c>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
+        env: &'c ProgramEnvironment<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
-    ) {
+        retain_constraints: bool,
+    ) -> Option<InvocationConstraints<'db, 'c>> {
         let parameters = self.signature.parameters();
 
         if parameters.is_top() {
             self.errors
                 .push(BindingError::CalledTopCallable(self.signature_type));
-            return;
+            return None;
         }
 
         if matches!(parameters.kind(), ParametersKind::Gradual)
@@ -8298,12 +8440,13 @@ impl<'db> Binding<'db> {
                 .all(|parameter| parameter.is_variadic() || parameter.is_keyword_variadic())
         {
             self.check_keyword_unpack_key_types(db, env, constraints, arguments);
-            return;
+            return None;
         }
 
-        let inferred = CallInference {
+        let (inferred, inference_constraints) = CallInference {
             db,
             env,
+            signature_type: self.signature_type,
             signature: &self.signature,
             arguments,
             argument_matches: &self.argument_matches,
@@ -8317,6 +8460,11 @@ impl<'db> Binding<'db> {
         }
         .infer(constraints);
 
+        self.paramspec_context = inferred.paramspec_call.as_ref().map(|call| call.callable);
+        let inference_constraints = retain_constraints
+            .then_some(inference_constraints)
+            .flatten();
+
         let mut checker = ArgumentTypeChecker::new(
             db,
             env,
@@ -8326,13 +8474,13 @@ impl<'db> Binding<'db> {
             arguments,
             &self.argument_matches,
             &mut self.parameter_tys,
-            call_expression_tcx,
             self.return_ty,
             &mut self.errors,
             inferred,
         );
         checker.check_argument_types(constraints);
         (self.inferable_typevars, self.inference, self.return_ty) = checker.finish();
+        inference_constraints
     }
 
     fn check_keyword_unpack_key_types(
@@ -8627,6 +8775,7 @@ impl<'db> Binding<'db> {
             return_ty: self.return_ty,
             inferable_typevars: self.inferable_typevars,
             inference: self.inference,
+            paramspec_context: self.paramspec_context,
             argument_matches: self.argument_matches.clone(),
             parameter_tys: self.parameter_tys.clone(),
             errors: self.errors.clone(),
@@ -8638,6 +8787,7 @@ impl<'db> Binding<'db> {
             return_ty,
             inferable_typevars,
             inference,
+            paramspec_context,
             argument_matches,
             parameter_tys,
             errors,
@@ -8646,6 +8796,7 @@ impl<'db> Binding<'db> {
         self.return_ty = return_ty;
         self.inferable_typevars = inferable_typevars;
         self.inference = inference;
+        self.paramspec_context = paramspec_context;
         self.argument_matches = argument_matches;
         self.parameter_tys = parameter_tys;
         self.errors = errors;
@@ -8689,6 +8840,7 @@ impl<'db> Binding<'db> {
         self.return_ty = self.initial_return_type(db);
         self.inferable_typevars = TypeVarSet::None;
         self.inference = None;
+        self.paramspec_context = None;
         self.argument_matches = Box::from([]);
         self.parameter_tys = Box::from([]);
         self.errors.clear();
@@ -8700,6 +8852,7 @@ struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
     inferable_typevars: TypeVarSet<'db>,
     inference: Option<TypeVarInference<'db>>,
+    paramspec_context: Option<CallableType<'db>>,
     argument_matches: Box<[MatchedArgument<'db>]>,
     parameter_tys: Box<[Option<Type<'db>>]>,
     errors: Vec<BindingError<'db>>,
@@ -8740,6 +8893,7 @@ impl CallableBindingSnapshot<'_> {
                 snapshot.return_ty = binding.return_ty;
                 snapshot.inferable_typevars = binding.inferable_typevars;
                 snapshot.inference = binding.inference;
+                snapshot.paramspec_context = binding.paramspec_context;
                 snapshot
                     .argument_matches
                     .clone_from(&binding.argument_matches);
