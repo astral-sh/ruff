@@ -449,6 +449,14 @@ reason = "the public control-flow graph supports downstream predecessor inspecti
 [[override]]
 lint = "hawk::dead_public"
 crate = "ruff_python_semantic"
+item = "model::SemanticModel::<'a>::current_expression_id"
+kind = "inherent_method"
+level = "expect"
+reason = "the public semantic model exposes this for symmetry with the equivalent API for statement nodes"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_semantic"
 item = "model::SemanticModel::<'a>::node"
 kind = "inherent_method"
 level = "expect"
