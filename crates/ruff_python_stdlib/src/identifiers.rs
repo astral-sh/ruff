@@ -94,9 +94,29 @@ pub fn is_migration_name(name: &str) -> bool {
     true
 }
 
+/// Returns `true` if a string is a valid Python identifier, or would be one if
+/// not for a leading digit (e.g., `0001_initial`).
+///
+/// Migration files use such names by convention, as frameworks like Django
+/// load them by path rather than through an `import` statement.
+pub fn is_migration_module_name(name: &str) -> bool {
+    // Is the name a valid identifier?
+    if is_identifier(name) {
+        return true;
+    }
+
+    // Otherwise, is the name only invalid because it starts with a digit?
+    let mut chars = name.chars();
+    chars.next().is_some_and(|c| c.is_ascii_digit())
+        && chars.all(is_identifier_continuation)
+        && !is_keyword(name)
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::identifiers::{is_identifier, is_migration_name, is_module_name};
+    use crate::identifiers::{
+        is_identifier, is_migration_module_name, is_migration_name, is_module_name,
+    };
 
     #[test]
     fn valid_identifiers() {
@@ -146,5 +166,20 @@ mod tests {
         assert!(!is_migration_name("a_B_c"));
         assert!(!is_migration_name("class"));
         assert!(!is_migration_name("δ"));
+    }
+
+    #[test]
+    fn migration_module_name() {
+        assert!(is_migration_module_name("0001_initial"));
+        assert!(is_migration_module_name("0abc"));
+        assert!(is_migration_module_name("0001_Initial"));
+        assert!(is_migration_module_name("_abc"));
+        assert!(is_migration_module_name("a"));
+        assert!(is_migration_module_name("a_B_c"));
+        assert!(is_migration_module_name("δ"));
+        assert!(!is_migration_module_name("a-b-c"));
+        assert!(!is_migration_module_name("a b c"));
+        assert!(!is_migration_module_name("class"));
+        assert!(!is_migration_module_name(""));
     }
 }
