@@ -151,6 +151,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .inference_flags()
                     .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
         };
+        let ignore_experimental_runtime_errors = |builder: &Self| {
+            ignore_runtime_errors(builder)
+                || matches!(builder.scope.scope(db).kind(), ScopeKind::TypeAlias)
+        };
 
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
@@ -405,7 +409,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let left_ty = self.infer_type_expression(&binary.left);
                         let right_ty = self.infer_type_expression(&binary.right);
 
-                        if !ignore_runtime_errors(self) {
+                        if !ignore_experimental_runtime_errors(self) {
                             // Infer the operands as values to report the types used by the runtime
                             // operation rather than their interpretation as type expressions.
                             let mut speculative_builder = self.speculate_without_diagnostics();
@@ -718,7 +722,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let operand_ty = self.infer_type_expression(operand);
 
-                if !ignore_runtime_errors(self) {
+                if !ignore_experimental_runtime_errors(self) {
                     let operand_value = self
                         .speculate_without_diagnostics()
                         .infer_expression(operand, TypeContext::default());

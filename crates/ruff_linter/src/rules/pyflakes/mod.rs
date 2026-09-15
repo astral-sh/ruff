@@ -4543,6 +4543,9 @@ lambda: fu
             List[TypedDict("x", x=int)]
             List[NamedTuple("a", a=int)]
             List[NamedTuple("a", [("a", int)])]
+
+            # Keyword arguments no longer define fields on Python 3.13+.
+            List[TypedDict("x", x="Y")]
         "#,
             &[],
         );
@@ -4551,7 +4554,6 @@ lambda: fu
             from typing import TypedDict, List, NamedTuple, TypeVar
 
             List[TypedDict("x", {"x": "Y"})]
-            List[TypedDict("x", x="Y")]
             List[NamedTuple("a", [("a", "Y")])]
             List[NamedTuple("a", a="Y")]
             List[TypedDict("x", {"x": List["a"]})]
@@ -4559,7 +4561,6 @@ lambda: fu
             List[TypeVar("A", List["C"])]
         "#,
             &[
-                Rule::UndefinedName,
                 Rule::UndefinedName,
                 Rule::UndefinedName,
                 Rule::UndefinedName,

@@ -4684,6 +4684,9 @@ impl<'db> Type<'db> {
             // returns the method itself; older versions have no descriptor slot on MethodType.
             return Ok(None);
         }
+        // Bind known callable descriptors outside the tracked lookup. Checking a protocol
+        // receiver can recursively access this method; the lookup's `None` cycle value would
+        // leave it unbound and falsely reject the protocol match.
         if let Some(return_type) = self.function_like_descriptor_get(db, env, instance, Some(owner))
         {
             return Ok(Some(DescriptorGetResult {

@@ -1015,6 +1015,7 @@ class DisabledUnit(unittest.TestCase):
             "/src/test_example.py",
             r#"
 from abc import ABC, abstractmethod
+from typing import Protocol
 import unittest
 
 class TestAbstract(ABC):
@@ -1035,26 +1036,38 @@ class TestABCWithoutAbstractMethods(ABC):
 class TestWithoutABCMeta:
     @abstractmethod
     def test_without_abcmeta(self): ...
+
+class ImplicitlyAbstract(Protocol):
+    def value(self) -> int: ...
+
+class TestImplicitlyAbstract(ImplicitlyAbstract):
+    def test_implicitly_abstract(self): ...
 "#,
         );
         assert_snapshot!(test.collected_tests(), @"
         info[pytest-collection]: Collected pytest test
-          --> src/test_example.py:12:9
+          --> src/test_example.py:13:9
            |
-        12 |     def test_concrete(self): ...
+        13 |     def test_concrete(self): ...
            |         ^^^^^^^^^^^^^
 
         info[pytest-collection]: Collected pytest test
-          --> src/test_example.py:18:9
+          --> src/test_example.py:19:9
            |
-        18 |     def test_concrete_abc(self): ...
+        19 |     def test_concrete_abc(self): ...
            |         ^^^^^^^^^^^^^^^^^
 
         info[pytest-collection]: Collected pytest test
-          --> src/test_example.py:22:9
+          --> src/test_example.py:23:9
            |
-        22 |     def test_without_abcmeta(self): ...
+        23 |     def test_without_abcmeta(self): ...
            |         ^^^^^^^^^^^^^^^^^^^^
+
+        info[pytest-collection]: Collected pytest test
+          --> src/test_example.py:29:9
+           |
+        29 |     def test_implicitly_abstract(self): ...
+           |         ^^^^^^^^^^^^^^^^^^^^^^^^
         ");
     }
 
