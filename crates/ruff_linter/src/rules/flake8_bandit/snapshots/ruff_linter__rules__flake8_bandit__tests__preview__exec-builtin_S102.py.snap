@@ -1,0 +1,31 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 2
+
+--- Added ---
+S102 Use of `exec` detected
+  --> S102.py:20:10
+   |
+18 | ## https://github.com/astral-sh/ruff/issues/28011
+19 | ## References to `exec` are only flagged in preview.
+20 | list(map(exec, ["x = 2"]))  # Error in preview
+   |          ^^^^
+21 |
+22 | my_exec = exec  # Error in preview
+   |
+
+
+S102 Use of `exec` detected
+  --> S102.py:22:11
+   |
+20 | list(map(exec, ["x = 2"]))  # Error in preview
+21 |
+22 | my_exec = exec  # Error in preview
+   |           ^^^^

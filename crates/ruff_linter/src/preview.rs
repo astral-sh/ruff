@@ -36,6 +36,11 @@ pub(crate) const fn is_suspicious_function_reference_enabled(settings: &LinterSe
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/issues/28011
+pub(crate) const fn is_exec_builtin_reference_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/10759
 pub(crate) const fn is_comprehension_with_min_max_sum_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
