@@ -2438,6 +2438,97 @@ def _(source: Intersection[Source[A], Source[B]], value: tuple[int, str]) -> Non
     reveal_type(with_tuple(source, value))  # revealed: tuple[A | B, int]
 ```
 
+## Mutable returns from intersection arguments
+
+A function can construct and return a new mutable container. Independently specializing that
+container to incompatible invariant types must not make the call appear non-returning:
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import Intersection
+
+SourceT = TypeVar("SourceT", covariant=True)
+T = TypeVar("T")
+
+class Source(Generic[SourceT]):
+    def get(self) -> SourceT:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+
+def make_list(source: Source[T]) -> list[T]:
+    return []
+
+def _(source: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(make_list(source))  # revealed: list[A | B]
+```
+
+The same applies when an alias hides the mutable result:
+
+```py
+from typing_extensions import TypeAliasType
+
+Mutable = TypeAliasType("Mutable", list[T], type_params=(T,))
+
+def aliased_list(source: Source[T]) -> Mutable[T]:
+    return []
+
+def _(source: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(aliased_list(source))  # revealed: list[A | B]
+```
+
+An invariant parameter that has the same inferred type in every specialization does not prevent the
+independent, covariant part of the return type from being intersected:
+
+```py
+U = TypeVar("U")
+
+def with_fixed_list(source: Source[T], value: U) -> tuple[T, list[U]]:
+    return source.get(), [value]
+
+def _(source: Intersection[Source[A], Source[B]], value: str) -> None:
+    reveal_type(with_fixed_list(source, value))  # revealed: tuple[A, list[str]] & tuple[B, list[str]]
+```
+
+## Type guards inferred from intersection arguments
+
+Type-guard functions return booleans. The types inside `TypeGuard` and `TypeIs` describe how their
+arguments can be narrowed, not the values they return. When an intersection argument permits two
+valid specializations of a guard, the call can still return a boolean. Intersecting the specialized
+guard annotations as ordinary return types could instead produce `Never`, incorrectly suggesting
+that the call cannot return.
+
+Until narrowing can preserve the separate specializations, we merge the inferred types for `T`
+before applying the guard annotation. The result is a guard for `A | B`, rather than an intersection
+of guards for `A` and `B`:
+
+```py
+from typing import Generic, TypeGuard, TypeVar
+from typing_extensions import TypeIs
+from ty_extensions import Intersection
+
+SourceT = TypeVar("SourceT", covariant=True)
+T = TypeVar("T")
+
+class Source(Generic[SourceT]):
+    def get(self) -> SourceT:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+
+def guard(value: object, source: Source[T]) -> TypeGuard[T]:
+    return False
+
+def is_type(value: object, source: Source[T]) -> TypeIs[T]:
+    return False
+
+def _(value: object, source: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(guard(value, source))  # revealed: TypeGuard[A | B @ value]
+    reveal_type(is_type(value, source))  # revealed: TypeIs[A | B @ value]
+```
+
 ## Outer type variables in intersection arguments
 
 When one generic function calls another, an argument can contain a type variable belonging to the
