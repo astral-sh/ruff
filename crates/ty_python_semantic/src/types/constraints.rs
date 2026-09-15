@@ -3346,7 +3346,7 @@ pub(crate) enum CandidateSolutions<'db> {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct CandidateSolution<'db> {
-    pub(crate) typevars: Box<[PathBound<'db>]>,
+    typevars: Box<[PathBound<'db>]>,
 }
 
 /// Limits shared by the preprocessing and collection walks used to extract solutions.
@@ -4513,7 +4513,7 @@ pub(crate) struct Solution<'db> {
 }
 
 impl<'db> Solution<'db> {
-    pub(crate) fn is_valid(&self) -> bool {
+    fn is_valid(&self) -> bool {
         matches!(self.validity, SolutionValidity::Valid)
     }
 
