@@ -743,6 +743,84 @@ assert_type(infer_return((callback, callback, callback), 0), Unknown)
 assert_type(infer_return(default=0, callback=(callback, callback, callback)), Unknown)
 ```
 
+## Inferred type-guard return alternatives
+
+Type-guard functions return booleans. The types inside `TypeGuard` and `TypeIs` describe how their
+arguments can be narrowed, not the values they return. A callback can have two type-guard signatures
+and still return normally. Intersecting those return annotations as ordinary types can instead
+produce `Never`, incorrectly suggesting that the call cannot return.
+
+A generic function that calls the callback and returns its result has the same behavior, even if its
+own return annotation is only a type variable. Its inferred return type therefore retains the union
+of the guard annotations rather than becoming `Never`.
+
+```py
+from collections.abc import Callable
+from typing import TypeGuard, TypeVar
+from typing_extensions import TypeIs
+from ty_extensions import Intersection
+
+R = TypeVar("R")
+
+class A: ...
+class B: ...
+
+def invoke(callback: Callable[[object], R], value: object) -> R:
+    return callback(value)
+
+def _(callback: Intersection[Callable[[object], TypeGuard[A]], Callable[[object], TypeGuard[B]]]) -> None:
+    reveal_type(invoke(callback, object()))  # revealed: TypeGuard[A] | TypeGuard[B]
+
+def _(callback: Intersection[Callable[[object], TypeIs[A]], Callable[[object], TypeIs[B]]]) -> None:
+    reveal_type(invoke(callback, object()))  # revealed: TypeIs[A] | TypeIs[B]
+```
+
+## Inferred mutable return alternatives
+
+Multiple return types can be intersected when they describe properties that hold simultaneously for
+the same returned value. A fresh list (or other invariant container) introduces a different
+situation: the same expression, `[]`, can be correctly typed as either `list[A]` or `list[B]`,
+depending on the expected type. These successful typings make different (and mutually exclusive)
+choices for the newly constructed list's static element type. They do not give one returned list
+both specializations at once.
+
+The two signatures therefore provide alternative valid typings for each call, not two simultaneous
+properties of a single result. Their return-type intersection is `Never`, since these incompatible
+invariant list specializations are disjoint, but that does not mean the callback cannot return. We
+conservatively keep `list[A] | list[B]` instead for now. TODO this may be overly conservative; in
+the absence of type context it would be less restrictive to just pick one type or the other (since
+either is a valid inference), though it's hard to find a compelling rationale for which to pick.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+from ty_extensions import Intersection
+
+R = TypeVar("R")
+
+class A: ...
+class B: ...
+
+def invoke(callback: Callable[[object], R], value: object) -> R:
+    return callback(value)
+
+def _(callback: Intersection[Callable[[object], list[A]], Callable[[object], list[B]]]) -> None:
+    reveal_type(invoke(callback, object()))  # revealed: list[A] | list[B]
+```
+
+An assignment to a variable annotated as `list[A]` or `list[B]` should select the corresponding
+callback signature. Each signature independently accepts the call and returns the required type:
+
+```py
+def _(callback: Intersection[Callable[[object], list[A]], Callable[[object], list[B]]]) -> None:
+    # TODO: This assignment should succeed with `R = list[A]`.
+    # error: [invalid-assignment] "Object of type `list[A] | list[B]` is not assignable to `list[A]`"
+    a: list[A] = invoke(callback, object())
+    # TODO: This assignment should succeed with `R = list[B]`.
+    # error: [invalid-assignment] "Object of type `list[A] | list[B]` is not assignable to `list[B]`"
+    b: list[B] = invoke(callback, object())
+```
+
 ## Multiple occurrences of a higher-order generic callable
 
 If a generic callable is used more than once in a higher-order call, each occurrence should get its
