@@ -173,6 +173,7 @@ export default function Editor({
         fontSize: 14,
         roundedSelection: false,
         scrollBeyondLastLine: false,
+        quickSuggestions: { strings: "on" },
         contextmenu: true,
         "semanticHighlighting.enabled": true,
       }}
