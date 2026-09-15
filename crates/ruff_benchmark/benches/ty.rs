@@ -905,14 +905,15 @@ from collections.abc import Callable, Iterable
 from typing import Protocol
 
 class Chain[T](Protocol):
-    def value(self) -> T: ...
+    def value(self) -> T:
+        raise RuntimeError
 "
     .to_string();
 
     for i in 0..NUM_METHODS {
         writeln!(
             &mut code,
-            "    def method_{i}[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]: ..."
+            "    def method_{i}[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]:\n        raise RuntimeError"
         )
         .ok();
     }

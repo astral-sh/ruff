@@ -3893,7 +3893,7 @@ pub(crate) fn report_attempted_instantiation_of_abstract_class<'db>(
     abstract_methods: &AbstractMethods<'db>,
 ) {
     let db = context.db();
-    let Some(first_name) = abstract_methods.first_name(db) else {
+    let Some(first_name) = abstract_methods.first_name() else {
         return;
     };
     let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, call) else {
@@ -3903,9 +3903,9 @@ pub(crate) fn report_attempted_instantiation_of_abstract_class<'db>(
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Cannot instantiate abstract class `{class_name}`"
     ));
-    abstract_methods.annotate_diagnostic(db, &mut diagnostic);
+    abstract_methods.annotate_diagnostic(db, context.program_environment(), &mut diagnostic);
 
-    let num_abstract_methods = abstract_methods.len(db);
+    let num_abstract_methods = abstract_methods.len();
     if num_abstract_methods == 1 {
         diagnostic.set_concise_message(format_args!(
             "Cannot instantiate `{class_name}` with unimplemented abstract method `{first_name}`",

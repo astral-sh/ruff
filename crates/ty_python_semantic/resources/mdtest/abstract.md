@@ -100,7 +100,7 @@ class AbstractOrdered(ABC):
 @dataclass(order=True)
 class ConcreteOrdered(AbstractOrdered): ...
 
-ConcreteOrdered()  # fine
+ConcreteOrdered()  # no diagnostic
 
 @total_ordering
 class AlsoConcreteOrdered(AbstractOrdered):
@@ -132,7 +132,7 @@ class ConcreteDynamic(AbstractDynamic):
     f: ClassVar[int]
     g: ClassVar[Callable[..., str]]
 
-ConcreteDynamic()  # no error
+ConcreteDynamic()  # no diagnostic
 ```
 
 But if the annotation does not use `ClassVar`, we do not see that as overriding the abstract method:
@@ -180,7 +180,7 @@ class Sub1(AbstractMixin, ConcreteMixin): ...
 class Sub2(ConcreteMixin, AbstractMixin): ...
 
 Sub1()  # error: [call-non-callable]
-Sub2()  # fine
+Sub2()  # no diagnostic
 ```
 
 When a class has many unimplemented abstract methods, the diagnostic lists only a few unless
@@ -289,7 +289,7 @@ class Concrete(Abstract):
     def method(self) -> int:
         return super().method()
 
-Concrete()
+Concrete()  # no diagnostic
 ```
 
 ## Generic abstract classes and aliases
@@ -317,7 +317,7 @@ class Concrete[T](Abstract[T]):
     def method(self) -> T:
         raise NotImplementedError
 
-Concrete[int]()
+Concrete[int]()  # no diagnostic
 ```
 
 ## Constructor calls through `type[]`
@@ -338,10 +338,10 @@ class Concrete(Abstract):
         return 42
 
 def construct(cls: type[Abstract]) -> Abstract:
-    return cls()
+    return cls()  # no diagnostic
 
-construct(Concrete)
-construct(Abstract)
+construct(Concrete)  # no diagnostic
+construct(Abstract)  # no diagnostic
 ```
 
 ## Abstract property accessors
@@ -367,7 +367,7 @@ class ConcreteSetter(AbstractSetter):
     @AbstractSetter.value.setter
     def value(self, value: int) -> None: ...
 
-ConcreteSetter()
+ConcreteSetter()  # no diagnostic
 
 class AbstractDeleter(ABC):
     @property
@@ -384,7 +384,7 @@ class ConcreteDeleter(AbstractDeleter):
     @AbstractDeleter.value.deleter
     def value(self) -> None: ...
 
-ConcreteDeleter()
+ConcreteDeleter()  # no diagnostic
 ```
 
 ## Methods in stub files
@@ -417,5 +417,5 @@ class Concrete(Interface):
     def required(self) -> int:
         return 42
 
-Concrete()
+Concrete()  # no diagnostic
 ```

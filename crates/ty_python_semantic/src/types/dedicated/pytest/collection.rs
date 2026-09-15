@@ -71,7 +71,6 @@ use ty_python_core::{ProgramFile, global_scope, place_table, semantic_index, use
 use crate::Db;
 use crate::place::definitions::DefinitionResolution;
 use crate::place::{ConsideredDefinitions, Place, symbol};
-use crate::types::abstract_methods::has_explicit_abstract_methods;
 use crate::types::function::FunctionType;
 use crate::types::infer::{function_known_decorators, original_class_type};
 use crate::types::{
@@ -387,7 +386,11 @@ fn pytest_test_class_kind<'db>(
     // Implicit abstract methods in protocols affect only type checking and are ignored here.
     // Custom metaclass behavior is approximated.
     if Type::ClassLiteral(class).is_subtype_of(db, &env, KnownClass::ABCMeta.to_instance(db, &env))
-        && has_explicit_abstract_methods(db, class.identity_specialization(db))
+        && class
+            .identity_specialization(db)
+            .abstract_methods(db)
+            .values()
+            .any(|method| method.kind.is_explicit())
     {
         return None;
     }
