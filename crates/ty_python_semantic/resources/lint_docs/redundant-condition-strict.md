@@ -99,6 +99,8 @@ def check_saved(value: Comparable):
 
 ## Exemptions
 
+### Boolean operators used to compute values
+
 Like `redundant-condition`, this rule checks subexpressions of an `and` or `or` expression only when
 the outer expression is used as a condition. This is to avoid emitting false-positive diagnostics on
 code like the following, where the `and` expression is clearly not redundant despite the fact that
@@ -124,6 +126,8 @@ def do_something(coinflip: bool):
 Unlike `and` and `or`, however, `not` explicitly converts its operand to a boolean, so the rule
 checks `not` expressions in every context.
 
+### `assert`s where the test is an `int` or `bool`
+
 Another exemption applied by this rule concerns `assert`-statement tests. A common pattern in Python
 code is to use defensive `assert`s to enforce behaviour at runtime, even when the asserted condition
 can be inferred statically to be always true. For example:
@@ -139,7 +143,7 @@ that end users of the library will run a type checker on code calling into the l
 it's entirely possible at runtime for an object passed into the `x`a parameter above to be a `str`
 (for example) even though the parameter annotation states that only `int`s can ever be passed in.
 This rule therefore also exempts all assertion tests or subexpressions that evaluate to a subtype of
-`int` or `bool`:
+`int` or `bool`.
 
 `redundant-condition-strict` can still trigger on `assert` statements in some contexts, however. For
 example, `redundant-condition-strict` will be emitted on the below example, where the left-hand side
@@ -155,6 +159,8 @@ def func() -> bool:
 def test_func():
     assert (result := func) and result != func()  # error: [redundant-condition-strict]
 ```
+
+### Fixed-truthiness `if`s or `elif`s followed by defensive exits
 
 For similar reasons to the `assert` exemptions, this rule also exempts always-false `if` or `elif`
 conditions when their bodies end in a defensive check: a `raise`, an assertion that could fail, a
@@ -225,6 +231,8 @@ def parse_data_early_return(data: int | str):
     raise AssertionError("unexpected data")
 ```
 
+### `sys.version_info`, `sys.platform`, `os.name`, `typing.TYPE_CHECKING`
+
 Any conditions defined in relation to `sys.version_info`, `sys.platform`, `os.name` or
 `typing.TYPE_CHECKING` are also exempted. The rule recursively follows the definitions of names and
 attributes across module boundaries to determine if a name or attribute was indirectly defined in
@@ -265,6 +273,8 @@ system might very well be always false on another operating system (for example)
 conditions as being always true or always false would only add noise: the aim of the rule is to flag
 conditions that are *unintentionally* always true or always false.
 
+### AST-literal bool or ints
+
 Lastly, some conditions involving literal integers and booleans in the AST are also exempted:
 there's no reason why you'd use a condition like this unless it was intentional.
 
@@ -274,6 +284,13 @@ if True:  # inferred as always true (obviously), but no diagnostic
 
 if 0:
     pass  # inferred as always false, but no diagnostic
+```
+
+And this also ensures that common patterns for creating infinite `while` loops are allowed:
+
+```py
+while True:  # no diagnostic
+    ...
 ```
 
 ## Known issues and workarounds

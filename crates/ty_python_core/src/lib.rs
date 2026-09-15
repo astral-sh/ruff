@@ -29,7 +29,9 @@ use narrowing_constraints::ScopedNarrowingConstraint;
 pub use place::{PlaceExprRef, PlaceTable};
 pub use reachability_constraints::ReachabilityConstraintsBuilder;
 pub use scope::FileScopeId;
-use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness};
+use scope::{
+    NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeFlags, ScopeId, ScopeKind, ScopeLaziness,
+};
 use symbol::ScopedSymbolId;
 pub use use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
@@ -339,11 +341,8 @@ pub struct SemanticIndex<'db> {
     /// List of all semantic syntax errors in this file.
     semantic_syntax_errors: Vec<SemanticSyntaxError>,
 
-    /// Set of all generator functions in this file.
-    generator_functions: FrozenSet<FileScopeId>,
-
-    /// Set of all asynchronous comprehensions in this file.
-    async_comprehensions: FrozenSet<FileScopeId>,
+    /// Sparse properties of scopes in this file; scopes with no flags have no entry.
+    scope_flags: FrozenMap<FileScopeId, ScopeFlags>,
 
     /// Node indices of syntactic annotation roots, sorted in source order. Annotations cannot
     /// contain other syntactic annotations, so their ranges do not overlap. Storing only indices
