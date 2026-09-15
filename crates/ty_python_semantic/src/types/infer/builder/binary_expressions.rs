@@ -36,7 +36,7 @@ const MAX_TUPLE_ADDITION_ELEMENTS: usize = 4096;
 /// State shared across the alternatives of one binary or augmented operation.
 #[derive(Default)]
 pub(super) struct BinaryInferenceState<'db> {
-    pub(super) emitted_division_by_zero_diagnostic: bool,
+    emitted_division_by_zero_diagnostic: bool,
     pub(super) deprecated_functions: Vec<OverloadLiteral<'db>>,
     used_tuple_addition: bool,
 }
