@@ -111,7 +111,7 @@ class Grandchild(OtherChild):
     # error: [invalid-method-override]
     def foo(): ...
     @property
-    # TODO: we should emit a Liskov violation here too
+    # error: [invalid-property-type-override]
     # error: [override-of-final-method]
     def my_property1(self) -> str: ...
     # TODO: we should emit a Liskov violation here too
