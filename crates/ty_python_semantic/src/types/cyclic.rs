@@ -36,8 +36,8 @@ use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ProtocolInstanceType, StaticClassLiteral, Type,
-    TypeAliasType, TypedDictType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, ProtocolInstanceType,
+    StaticClassLiteral, Type, TypeAliasType, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -49,10 +49,34 @@ pub enum TypeIdentity<'db> {
     GrowingProtocol(Definition<'db>),
     GrowingTypeAlias(Definition<'db>),
     GrowingTypedDict(Definition<'db>),
+    GrowingCallable(Definition<'db>),
     Other(Type<'db>),
 }
 
 impl<'db> Type<'db> {
+    /// Callable conversion follows `__call__`, not the class's other members. Different
+    /// specializations retain distinct identities unless this chain can grow without bound.
+    pub(super) fn to_callable_type_identity(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> TypeIdentity<'db> {
+        if !matches!(
+            self,
+            Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::TypeAlias(_)
+        ) {
+            return self.to_type_identity(db);
+        }
+
+        if let Some((target, _)) = CallableDefinition::from_type(db, env, self)
+            && target.may_have_unbounded_specialization(db)
+        {
+            TypeIdentity::GrowingCallable(target.definition(db))
+        } else {
+            TypeIdentity::Other(self)
+        }
+    }
+
     pub(crate) fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
         self.recursive_identity(db)
             .unwrap_or(TypeIdentity::Other(self))
@@ -203,16 +227,108 @@ struct SpecializationFlowGraph<'db> {
     inconclusive: bool,
 }
 
+/// Records parameter flow for one definition, independently of how its references are discovered.
+struct SpecializationFlowRecorder<'db> {
+    source_parameters: FxHashSet<BoundTypeVarIdentity<'db>>,
+    env: ProgramEnvironment<'db>,
+    edges: RefCell<Vec<FlowEdge<'db>>>,
+    inconclusive: Cell<bool>,
+}
+
+impl<'db> SpecializationFlowRecorder<'db> {
+    fn parameter_identity(
+        db: &'db dyn Db,
+        parameter: BoundTypeVarInstance<'db>,
+    ) -> BoundTypeVarIdentity<'db> {
+        let identity = parameter.identity(db);
+        if identity.is_paramspec(db) {
+            identity.without_paramspec_attr(db)
+        } else {
+            identity
+        }
+    }
+
+    /// Returns `None` if two formal parameters share an identity, since their flows could not be
+    /// distinguished.
+    fn new(
+        source: Definition<'db>,
+        parameters: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+    ) -> Option<Self> {
+        let mut source_parameters = FxHashSet::default();
+        for parameter in parameters {
+            if !source_parameters.insert(parameter) {
+                return None;
+            }
+        }
+        Some(Self {
+            source_parameters,
+            env: ProgramEnvironment::from_definition(source),
+            edges: RefCell::default(),
+            inconclusive: Cell::default(),
+        })
+    }
+
+    fn record_typevar(&self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) {
+        let identity = Self::parameter_identity(db, typevar);
+        if !self.source_parameters.contains(&identity) {
+            // Nested definitions can capture a type variable from an outer generic scope.
+            // Specialization does not yet retain the parent mapping needed to model it.
+            self.inconclusive.set(true);
+        }
+    }
+
+    fn record_reference(
+        &self,
+        db: &'db dyn Db,
+        target_context: Option<GenericContext<'db>>,
+        specialization: Option<Specialization<'db>>,
+    ) {
+        let Some(target_context) = target_context else {
+            if specialization.is_some() {
+                self.inconclusive.set(true);
+            }
+            return;
+        };
+        let Some(specialization) = specialization else {
+            self.inconclusive.set(true);
+            return;
+        };
+        if specialization.generic_context(db) != target_context {
+            self.inconclusive.set(true);
+            return;
+        }
+
+        let target_parameters = target_context
+            .variables(db)
+            .map(|parameter| Self::parameter_identity(db, parameter))
+            .collect::<Vec<_>>();
+        let arguments = specialization.types(db);
+        if target_parameters.len() != arguments.len() {
+            self.inconclusive.set(true);
+            return;
+        }
+
+        for (target, argument) in target_parameters.into_iter().zip(arguments.iter().copied()) {
+            for (from, kind) in
+                SourceParameterCollector::classify(db, &self.env, &self.source_parameters, argument)
+            {
+                self.edges.borrow_mut().push(FlowEdge {
+                    from,
+                    to: target,
+                    kind,
+                });
+            }
+        }
+    }
+}
+
 /// Walks one identity-specialized definition body and records references as graph edges.
 ///
 /// Referenced definitions are queued for a separate walk instead of being expanded here.
 struct SpecializationFlowVisitor<'db> {
-    source_parameters: FxHashSet<BoundTypeVarIdentity<'db>>,
-    env: ProgramEnvironment<'db>,
+    flow: SpecializationFlowRecorder<'db>,
     visited_types: TypeCollector<'db>,
-    edges: RefCell<Vec<FlowEdge<'db>>>,
     referenced_definitions: RefCell<Vec<RecursiveDefinition<'db>>>,
-    inconclusive: Cell<bool>,
 }
 
 /// Finds which parameters of the current source definition occur in one actual argument.
@@ -283,36 +399,12 @@ impl<'db> RecursiveDefinition<'db> {
         generic_context.default_specialization(db, known_class)
     }
 
-    fn parameter_identity(
-        db: &'db dyn Db,
-        parameter: BoundTypeVarInstance<'db>,
-    ) -> BoundTypeVarIdentity<'db> {
-        let identity = parameter.identity(db);
-        if identity.is_paramspec(db) {
-            identity.without_paramspec_attr(db)
-        } else {
-            identity
-        }
-    }
-
     /// The identities of this definition's formal parameters, in declaration order.
     fn parameters(self, db: &'db dyn Db) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> {
         self.generic_context(db)
             .into_iter()
             .flat_map(|context| context.variables(db))
-            .map(move |parameter| Self::parameter_identity(db, parameter))
-    }
-
-    /// Returns `None` if two formal parameters share an identity, since their flows could not be
-    /// distinguished.
-    fn source_parameters(self, db: &'db dyn Db) -> Option<FxHashSet<BoundTypeVarIdentity<'db>>> {
-        let mut parameters = FxHashSet::default();
-        for identity in self.parameters(db) {
-            if !parameters.insert(identity) {
-                return None;
-            }
-        }
-        Some(parameters)
+            .map(move |parameter| SpecializationFlowRecorder::parameter_identity(db, parameter))
     }
 
     fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
@@ -327,7 +419,84 @@ impl<'db> RecursiveDefinition<'db> {
             _: (),
         ) -> bool {
             let graph = SpecializationFlowGraph::build(db, root);
-            graph.root_may_have_unbounded_specialization(db, root)
+            graph.root_may_have_unbounded_specialization(root.definition(db), root.parameters(db))
+        }
+
+        may_have_unbounded_specialization_inner(db, self, ())
+    }
+}
+
+/// A definition expanded while following a callable's `__call__` chain.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum CallableDefinition<'db> {
+    TypeAlias(TypeAliasType<'db>),
+    Class(StaticClassLiteral<'db>),
+}
+
+impl<'db> CallableDefinition<'db> {
+    fn from_type(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Option<(Self, Option<Specialization<'db>>)> {
+        let (target, specialization, known_class) = match ty {
+            Type::TypeAlias(alias) => (
+                Self::TypeAlias(alias.unspecialized(db)),
+                alias.specialization(db),
+                None,
+            ),
+            _ => {
+                let class = match ty {
+                    Type::NominalInstance(instance) => instance.class(db, env),
+                    Type::ProtocolInstance(protocol) => *protocol.class_origin(db)?,
+                    _ => return None,
+                };
+                let (origin, specialization) = class.static_class_literal(db)?;
+                (Self::Class(origin), specialization, origin.known(db))
+            }
+        };
+        let specialization = specialization.or_else(|| {
+            target
+                .generic_context(db)
+                .map(|context| context.default_specialization(db, known_class))
+        });
+        Some((target, specialization))
+    }
+
+    fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        match self {
+            Self::TypeAlias(alias) => alias.definition(db),
+            Self::Class(origin) => origin.definition(db),
+        }
+    }
+
+    fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        match self {
+            Self::TypeAlias(alias) => alias.generic_context(db),
+            Self::Class(origin) => origin.generic_context(db),
+        }
+    }
+
+    fn parameters(self, db: &'db dyn Db) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> {
+        self.generic_context(db)
+            .into_iter()
+            .flat_map(|context| context.variables(db))
+            .map(move |parameter| SpecializationFlowRecorder::parameter_identity(db, parameter))
+    }
+
+    fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _, ()| true,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn may_have_unbounded_specialization_inner<'db>(
+            db: &'db dyn Db,
+            root: CallableDefinition<'db>,
+            _: (),
+        ) -> bool {
+            let graph = CallableSpecializationFlowVisitor::build_graph(db, root);
+            graph.root_may_have_unbounded_specialization(root.definition(db), root.parameters(db))
         }
 
         may_have_unbounded_specialization_inner(db, self, ())
@@ -362,31 +531,42 @@ impl<'db> SpecializationFlowGraph<'db> {
             if !visitor.visit_definition_body(db, source) {
                 graph.inconclusive = true;
             }
-            let (edges, referenced_definitions, inconclusive) = visitor.finish();
-            graph.edges.extend(edges);
-            if inconclusive {
-                graph.inconclusive_definitions.insert(source_definition);
-            }
-            graph.definition_edges.extend(
+            let referenced_definitions = visitor.referenced_definitions.into_inner();
+            graph.add_source(
+                source_definition,
+                visitor.flow,
                 referenced_definitions
                     .iter()
-                    .map(|target| (source_definition, target.definition(db))),
+                    .map(|target| target.definition(db)),
             );
             pending.extend(referenced_definitions);
         }
         graph
     }
 
+    fn add_source(
+        &mut self,
+        source: Definition<'db>,
+        flow: SpecializationFlowRecorder<'db>,
+        references: impl IntoIterator<Item = Definition<'db>>,
+    ) {
+        self.edges.extend(flow.edges.into_inner());
+        if flow.inconclusive.get() {
+            self.inconclusive_definitions.insert(source);
+        }
+        self.definition_edges
+            .extend(references.into_iter().map(|target| (source, target)));
+    }
+
     fn root_may_have_unbounded_specialization(
         &self,
-        db: &'db dyn Db,
-        root: RecursiveDefinition<'db>,
+        root_definition: Definition<'db>,
+        root_parameters: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
     ) -> bool {
         if self.inconclusive {
             return true;
         }
 
-        let root_definition = root.definition(db);
         if self.inconclusive_definition_reaches(root_definition) {
             return true;
         }
@@ -395,7 +575,7 @@ impl<'db> SpecializationFlowGraph<'db> {
             return false;
         }
 
-        let root_parameters = root.parameters(db).collect::<Vec<_>>();
+        let root_parameters = root_parameters.into_iter().collect::<Vec<_>>();
         let components =
             self.strongly_connected_parameter_components(root_parameters.iter().copied());
         let root_components = root_parameters
@@ -536,21 +716,10 @@ impl<'db> SpecializationFlowGraph<'db> {
 impl<'db> SpecializationFlowVisitor<'db> {
     fn new(db: &'db dyn Db, source: RecursiveDefinition<'db>) -> Option<Self> {
         Some(Self {
-            source_parameters: source.source_parameters(db)?,
-            env: ProgramEnvironment::from_definition(source.definition(db)),
+            flow: SpecializationFlowRecorder::new(source.definition(db), source.parameters(db))?,
             visited_types: TypeCollector::default(),
-            edges: RefCell::default(),
             referenced_definitions: RefCell::default(),
-            inconclusive: Cell::default(),
         })
-    }
-
-    fn finish(self) -> (Vec<FlowEdge<'db>>, Vec<RecursiveDefinition<'db>>, bool) {
-        (
-            self.edges.into_inner(),
-            self.referenced_definitions.into_inner(),
-            self.inconclusive.get(),
-        )
     }
 
     /// Visits the definition with each formal parameter mapped to itself.
@@ -584,45 +753,17 @@ impl<'db> SpecializationFlowVisitor<'db> {
             .borrow_mut()
             .push(reference.target);
 
-        let Some(target_context) = reference.target.generic_context(db) else {
-            if reference.specialization.is_some() {
-                self.inconclusive.set(true);
-            }
-            return;
-        };
-        let Some(specialization) = reference.specialization else {
-            self.inconclusive.set(true);
-            return;
-        };
-        if specialization.generic_context(db) != target_context {
-            self.inconclusive.set(true);
-            return;
-        }
-
-        let target_parameters = reference.target.parameters(db).collect::<Vec<_>>();
-        let arguments = specialization.types(db);
-        if target_parameters.len() != arguments.len() {
-            self.inconclusive.set(true);
-            return;
-        }
-
-        for (target, argument) in target_parameters.into_iter().zip(arguments.iter().copied()) {
-            for (from, kind) in
-                SourceParameterCollector::classify(db, &self.env, &self.source_parameters, argument)
-            {
-                self.edges.borrow_mut().push(FlowEdge {
-                    from,
-                    to: target,
-                    kind,
-                });
-            }
-        }
+        self.flow.record_reference(
+            db,
+            reference.target.generic_context(db),
+            reference.specialization,
+        );
     }
 }
 
 impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
     fn program_environment(&self) -> &ProgramEnvironment<'db> {
-        &self.env
+        &self.flow.env
     }
 
     fn should_visit_lazy_type_attributes(&self) -> bool {
@@ -631,18 +772,124 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         if let Type::TypeVar(typevar) = ty {
-            let identity = RecursiveDefinition::parameter_identity(db, typevar);
-            if !self.source_parameters.contains(&identity) {
-                // Nested definitions can capture a type variable from an outer generic scope.
-                // Specialization does not yet retain the parent mapping needed to model it.
-                self.inconclusive.set(true);
-            }
+            self.flow.record_typevar(db, typevar);
             return;
         }
 
         if let Some(reference) = RecursiveDefinition::from_type(db, ty) {
             self.record_reference(db, reference);
             reference.walk_arguments(db, self);
+            return;
+        }
+
+        walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
+    }
+
+    fn visit_bound_type_var_type(
+        &self,
+        _db: &'db dyn Db,
+        _bound_typevar: BoundTypeVarInstance<'db>,
+    ) {
+    }
+}
+
+/// Discovers references along a callable's `__call__` chain without inspecting other members or
+/// traversing a callable signature's parameter and return types.
+struct CallableSpecializationFlowVisitor<'db> {
+    flow: SpecializationFlowRecorder<'db>,
+    visited_types: TypeCollector<'db>,
+    referenced_definitions: RefCell<Vec<CallableDefinition<'db>>>,
+}
+
+impl<'db> CallableSpecializationFlowVisitor<'db> {
+    fn build_graph(db: &'db dyn Db, root: CallableDefinition<'db>) -> SpecializationFlowGraph<'db> {
+        let mut graph = SpecializationFlowGraph::default();
+        let mut pending = vec![root];
+        let mut visited = FxHashSet::default();
+
+        while let Some(source) = pending.pop() {
+            let source_definition = source.definition(db);
+            if !visited.insert(source_definition) {
+                continue;
+            }
+            let Some(flow) =
+                SpecializationFlowRecorder::new(source_definition, source.parameters(db))
+            else {
+                graph.inconclusive = true;
+                continue;
+            };
+            let visitor = Self {
+                flow,
+                visited_types: TypeCollector::default(),
+                referenced_definitions: RefCell::default(),
+            };
+            visitor.visit_definition_body(db, source);
+            let referenced_definitions = visitor.referenced_definitions.into_inner();
+            graph.add_source(
+                source_definition,
+                visitor.flow,
+                referenced_definitions
+                    .iter()
+                    .map(|target| target.definition(db)),
+            );
+            pending.extend(referenced_definitions);
+        }
+        graph
+    }
+
+    fn visit_definition_body(&self, db: &'db dyn Db, source: CallableDefinition<'db>) {
+        match source {
+            CallableDefinition::TypeAlias(alias) => self.visit_type(db, alias.raw_value_type(db)),
+            CallableDefinition::Class(origin) => {
+                let instance =
+                    Type::instance(db, &self.flow.env, origin.identity_specialization(db));
+                if let Some(call) = instance
+                    .member_lookup_with_policy(
+                        db,
+                        &self.flow.env,
+                        "__call__",
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .place
+                    .ignore_possibly_undefined()
+                {
+                    self.visit_type(db, call);
+                }
+            }
+        }
+    }
+}
+
+impl<'db> TypeVisitor<'db> for CallableSpecializationFlowVisitor<'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        &self.flow.env
+    }
+
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        match ty {
+            Type::Callable(_) | Type::FunctionLiteral(_) | Type::BoundMethod(_) => return,
+            Type::TypeVar(typevar) => {
+                self.flow.record_typevar(db, typevar);
+                return;
+            }
+            _ => {}
+        }
+
+        if let Some((target, specialization)) =
+            CallableDefinition::from_type(db, &self.flow.env, ty)
+        {
+            self.referenced_definitions.borrow_mut().push(target);
+            self.flow
+                .record_reference(db, target.generic_context(db), specialization);
+            if let Some(specialization) = specialization {
+                for argument in specialization.types(db) {
+                    self.visit_type(db, *argument);
+                }
+            }
             return;
         }
 
@@ -700,7 +947,7 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         if let Type::TypeVar(typevar) = ty {
-            let identity = RecursiveDefinition::parameter_identity(db, typevar);
+            let identity = SpecializationFlowRecorder::parameter_identity(db, typevar);
             if self.source_parameters.contains(&identity) {
                 self.found
                     .borrow_mut()
@@ -1454,7 +1701,10 @@ type Helper[U] = U
                 ..SpecializationFlowGraph::default()
             };
             assert_eq!(
-                graph.root_may_have_unbounded_specialization(&db, root),
+                graph.root_may_have_unbounded_specialization(
+                    root.definition(&db),
+                    root.parameters(&db),
+                ),
                 expected,
             );
         }

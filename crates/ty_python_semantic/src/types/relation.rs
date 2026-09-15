@@ -2248,7 +2248,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     && let Some(bound_or_constraints) =
                         bound_typevar.typevar(db).bound_or_constraints(db, env) =>
             {
-                self.check_source_typevar_bounds(db, bound_or_constraints, target)
+                if let Type::Callable(target_callable) = target
+                    && let Some(callables) = source.try_upcast_to_callable_with_policy(
+                        db,
+                        env,
+                        UpcastPolicy::from(self.relation),
+                    )
+                {
+                    // Preserve the type variable as the receiver of `__call__`, so a return
+                    // annotation of `Self` does not widen to the variable's upper bound.
+                    self.with_recursion_guard(db, source, target, || {
+                        self.check_callables_vs_callable(db, &callables, target_callable)
+                    })
+                } else {
+                    self.check_source_typevar_bounds(db, bound_or_constraints, target)
+                }
             }
 
             // `Never` is the bottom type, the empty set.
