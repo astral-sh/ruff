@@ -259,6 +259,7 @@ pub(crate) struct FunctionDecoratorInference<'db> {
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
     known_decorators: FunctionDecorators,
+    has_only_non_abstract_decorators: bool,
     diagnostics: TypeCheckDiagnostics,
 }
 
@@ -286,6 +287,11 @@ impl<'db> FunctionDecoratorInference<'db> {
 
     fn known_decorators(&self) -> FunctionDecorators {
         self.known_decorators
+    }
+
+    /// Whether every decorator is known to preserve a concrete method's non-abstractness.
+    pub(crate) fn has_only_non_abstract_decorators(&self) -> bool {
+        self.has_only_non_abstract_decorators
     }
 
     fn diagnostics(&self) -> &TypeCheckDiagnostics {

@@ -11822,23 +11822,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn finish_function_decorator_inference(mut self) -> FunctionDecoratorInference<'db> {
         self.infer_region();
 
-        let known_decorators = match self.region {
+        let (known_decorators, has_only_non_abstract_decorators) = match self.region {
             InferenceRegion::FunctionDecorators(definition) => match definition.kind(self.db()) {
                 DefinitionKind::Function(function) => {
                     function.node(self.module()).decorator_list.iter().fold(
-                        FunctionDecorators::empty(),
-                        |known_decorators, decorator| {
-                            known_decorators
-                                | FunctionDecorators::from_decorator_type(
-                                    self.db(),
-                                    self.expression_type(&decorator.expression),
-                                )
+                        (FunctionDecorators::empty(), true),
+                        |(known_decorators, has_only_non_abstract_decorators), decorator| {
+                            let ty = self.expression_type(&decorator.expression);
+                            let flags = FunctionDecorators::from_decorator_type(self.db(), ty);
+                            let is_non_abstract = (!flags.is_empty()
+                                && !flags.contains(FunctionDecorators::ABSTRACT_METHOD))
+                                || matches!(ty, Type::ClassLiteral(class)
+                                        if class.known(self.db()) == Some(KnownClass::Property));
+                            (
+                                known_decorators | flags,
+                                has_only_non_abstract_decorators && is_non_abstract,
+                            )
                         },
                     )
                 }
-                _ => FunctionDecorators::empty(),
+                _ => (FunctionDecorators::empty(), false),
             },
-            _ => FunctionDecorators::empty(),
+            _ => (FunctionDecorators::empty(), false),
         };
 
         let Self {
@@ -11878,6 +11883,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
             known_decorators,
+            has_only_non_abstract_decorators,
             diagnostics,
         }
     }
