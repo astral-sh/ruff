@@ -39,7 +39,9 @@
 //! shares exactly the same possible super-types, and none of them are subtypes of each other
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
+use std::convert::Infallible;
 use std::hint::cold_path;
+use std::ops::ControlFlow;
 
 use super::RecursivelyDefined;
 use super::generic_gradual_intersections::{GenericIntersection, generic_gradual_intersection};
@@ -1198,6 +1200,41 @@ impl<'db> UnionBuilder<'db> {
     }
 }
 
+/// Controls expansion without making ordinary intersection construction fallible.
+trait IntersectionLimits {
+    type Break;
+    const BOUNDED: bool;
+
+    fn check_terms(terms: usize) -> ControlFlow<Self::Break>;
+}
+
+struct UnboundedIntersection;
+
+impl IntersectionLimits for UnboundedIntersection {
+    type Break = Infallible;
+    const BOUNDED: bool = false;
+
+    fn check_terms(_terms: usize) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+}
+
+struct BoundedIntersection;
+
+impl IntersectionLimits for BoundedIntersection {
+    type Break = ();
+    const BOUNDED: bool = true;
+
+    fn check_terms(terms: usize) -> ControlFlow<Self::Break> {
+        const MAX_INTERSECTION_DNF_TERMS: usize = 4;
+        if terms > MAX_INTERSECTION_DNF_TERMS {
+            ControlFlow::Break(())
+        } else {
+            ControlFlow::Continue(())
+        }
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct IntersectionBuilder<'db> {
     // Really this builds a union-of-intersections, because we always keep our set-theoretic types
@@ -1208,6 +1245,9 @@ pub(crate) struct IntersectionBuilder<'db> {
     intersections: Vec<InnerIntersectionBuilder<'db>>,
     db: &'db dyn Db,
     env: ProgramEnvironment<'db>,
+    // One disjunction does not multiply alternatives. Only subsequent distributions consume
+    // the bounded constructor's budget, after impossible and redundant branches are removed.
+    has_disjunction: bool,
 }
 
 impl<'db> IntersectionBuilder<'db> {
@@ -1216,6 +1256,7 @@ impl<'db> IntersectionBuilder<'db> {
             db,
             env: env.clone(),
             intersections: vec![InnerIntersectionBuilder::default()],
+            has_disjunction: false,
         }
     }
 
@@ -1224,18 +1265,89 @@ impl<'db> IntersectionBuilder<'db> {
             db,
             env: env.clone(),
             intersections: vec![],
+            has_disjunction: false,
         }
     }
 
     /// Add DNF branches, dropping those that have already collapsed to `Never` so that later
     /// union distribution does not multiply dead branches.
-    fn extend(&mut self, other: Self) {
-        self.intersections.extend(
-            other
-                .intersections
-                .into_iter()
-                .filter(|intersection| !intersection.contains_never()),
-        );
+    fn extend<L: IntersectionLimits>(
+        &mut self,
+        other: Self,
+        check_budget: bool,
+    ) -> ControlFlow<L::Break> {
+        // Retain the whole first disjunction: a later factor can eliminate all but a few of its
+        // alternatives, including alternatives that occur beyond the budget's position.
+        if !L::BOUNDED || !check_budget {
+            self.intersections.extend(
+                other
+                    .intersections
+                    .into_iter()
+                    .filter(|intersection| !intersection.contains_never()),
+            );
+            return ControlFlow::Continue(());
+        }
+
+        let db = self.db;
+        let env = &self.env;
+        for candidate in other.intersections {
+            // Some branches only collapse during `build`, for example when a constrained
+            // type variable has no remaining constraints. Those do not consume the budget.
+            let candidate_type = candidate.clone().build(db, env);
+            if candidate_type.is_never()
+                || self.intersections.iter().any(|old| {
+                    candidate_type.is_redundant_with(db, env, old.clone().build(db, env))
+                })
+            {
+                continue;
+            }
+            self.intersections.retain(|old| {
+                !old.clone()
+                    .build(db, env)
+                    .is_redundant_with(db, env, candidate_type)
+            });
+            L::check_terms(self.intersections.len() + 1)?;
+            self.intersections.push(candidate);
+        }
+        ControlFlow::Continue(())
+    }
+
+    pub(super) fn bounded_from_elements<I, T>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        elements: I,
+    ) -> Option<Type<'db>>
+    where
+        I: IntoIterator<Item = T>,
+        I::IntoIter: Clone,
+        Type<'db>: From<T>,
+    {
+        let elements = elements.into_iter().map(Type::from);
+        let mut first_elements = elements.clone();
+        let Some(first) = first_elements.next() else {
+            return Some(Type::object());
+        };
+        if first_elements.next().is_none() {
+            return Some(first);
+        }
+
+        // Before distributing multiple unions, apply narrowing factors regardless of their
+        // input order. With at most one union, retain the original intersection element order.
+        // Resolving a top-level alias only classifies the factor; the builder expands its value
+        // under the same budget and recursion guard as an explicit union.
+        let is_union = |ty: &Type<'db>| ty.resolve_type_alias(db).is_union();
+        let multiple_unions = elements.clone().filter(is_union).nth(1).is_some();
+        let mut builder = Self::new(db, env);
+        for element in elements
+            .clone()
+            .filter(|ty| !multiple_unions || !is_union(ty))
+            .chain(elements.filter(|ty| multiple_unions && is_union(ty)))
+        {
+            builder
+                .add_positive_impl::<BoundedIntersection>(element, &mut vec![])
+                .continue_value()?;
+        }
+        Some(builder.build())
     }
 
     pub(crate) fn add_positive(mut self, ty: Type<'db>) -> Self {
@@ -1244,10 +1356,15 @@ impl<'db> IntersectionBuilder<'db> {
     }
 
     pub(crate) fn add_positive_in_place(&mut self, ty: Type<'db>) {
-        self.add_positive_impl(ty, &mut vec![]);
+        let ControlFlow::Continue(()) =
+            self.add_positive_impl::<UnboundedIntersection>(ty, &mut vec![]);
     }
 
-    fn add_positive_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+    fn add_positive_impl<L: IntersectionLimits>(
+        &mut self,
+        ty: Type<'db>,
+        seen_aliases: &mut Vec<Type<'db>>,
+    ) -> ControlFlow<L::Break> {
         let db = self.db;
         match ty {
             Type::TypeAlias(alias) => {
@@ -1256,11 +1373,11 @@ impl<'db> IntersectionBuilder<'db> {
                     for inner in &mut self.intersections {
                         inner.positive.insert(ty);
                     }
-                    return;
+                    return ControlFlow::Continue(());
                 }
                 seen_aliases.push(ty);
                 let value_type = alias.value_type(db);
-                self.add_positive_impl(value_type, seen_aliases);
+                self.add_positive_impl::<L>(value_type, seen_aliases)?;
             }
             Type::Union(union) => {
                 // Distribute ourself over this union: for each union element, clone ourself and
@@ -1274,23 +1391,24 @@ impl<'db> IntersectionBuilder<'db> {
                 let mut distributed = IntersectionBuilder::empty(db, &self.env);
                 for elem in union.elements(db) {
                     let mut branch = self.clone();
-                    branch.add_positive_impl(*elem, seen_aliases);
-                    distributed.extend(branch);
+                    branch.add_positive_impl::<L>(*elem, seen_aliases)?;
+                    distributed.extend::<L>(branch, self.has_disjunction)?;
                 }
                 self.intersections = distributed.intersections;
+                self.has_disjunction = true;
             }
             // `(A & B & ~C) & (D & E & ~F)` -> `A & B & D & E & ~C & ~F`
             Type::Intersection(other) => {
                 for pos in other.positive(db) {
-                    self.add_positive_impl(*pos, seen_aliases);
+                    self.add_positive_impl::<L>(*pos, seen_aliases)?;
                 }
                 for neg in other.negative(db) {
-                    self.add_negative_impl(*neg, seen_aliases);
+                    self.add_negative_impl::<L>(*neg, seen_aliases)?;
                 }
             }
             Type::EnumComplement(complement) => {
                 let intersection = complement.to_intersection(db, &self.env);
-                self.add_positive_impl(intersection, seen_aliases);
+                self.add_positive_impl::<L>(intersection, seen_aliases)?;
             }
             _ => {
                 // If we are already a union-of-intersections, distribute the new intersected element
@@ -1300,6 +1418,7 @@ impl<'db> IntersectionBuilder<'db> {
                 }
             }
         }
+        ControlFlow::Continue(())
     }
 
     pub(crate) fn add_negative(mut self, ty: Type<'db>) -> Self {
@@ -1308,10 +1427,15 @@ impl<'db> IntersectionBuilder<'db> {
     }
 
     pub(crate) fn add_negative_in_place(&mut self, ty: Type<'db>) {
-        self.add_negative_impl(ty, &mut vec![]);
+        let ControlFlow::Continue(()) =
+            self.add_negative_impl::<UnboundedIntersection>(ty, &mut vec![]);
     }
 
-    fn add_negative_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+    fn add_negative_impl<L: IntersectionLimits>(
+        &mut self,
+        ty: Type<'db>,
+        seen_aliases: &mut Vec<Type<'db>>,
+    ) -> ControlFlow<L::Break> {
         let db = self.db;
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
@@ -1321,15 +1445,15 @@ impl<'db> IntersectionBuilder<'db> {
                     for inner in &mut self.intersections {
                         inner.negative.insert(ty);
                     }
-                    return;
+                    return ControlFlow::Continue(());
                 }
                 seen_aliases.push(ty);
                 let value_type = alias.value_type(db);
-                self.add_negative_impl(value_type, seen_aliases);
+                self.add_negative_impl::<L>(value_type, seen_aliases)?;
             }
             Type::Union(union) => {
                 for elem in union.elements(db) {
-                    self.add_negative_impl(*elem, seen_aliases);
+                    self.add_negative_impl::<L>(*elem, seen_aliases)?;
                 }
             }
             Type::Intersection(intersection) => {
@@ -1341,23 +1465,31 @@ impl<'db> IntersectionBuilder<'db> {
                 // is (existing & ~C) | (existing & D)
 
                 let mut distributed = IntersectionBuilder::empty(db, &self.env);
+                // A single negative element can encode double negation. It only introduces a
+                // disjunction if expanding that element does, for example `~~Alias` for a union.
+                let branches = intersection.positive(db).len() + intersection.negative(db).len();
+                let check_budget = self.has_disjunction && branches > 1;
+                let mut has_disjunction = self.has_disjunction || branches > 1;
                 // We negate all the positive constraints while distributing.
                 for elem in intersection.positive(db) {
                     let mut branch = self.clone();
-                    branch.add_negative_impl(*elem, &mut seen_aliases.clone());
-                    distributed.extend(branch);
+                    branch.add_negative_impl::<L>(*elem, &mut seen_aliases.clone())?;
+                    has_disjunction |= branch.has_disjunction;
+                    distributed.extend::<L>(branch, check_budget)?;
                 }
                 // All negative constraints end up becoming positive constraints.
                 for elem in intersection.negative(db) {
                     let mut branch = self.clone();
-                    branch.add_positive_impl(*elem, &mut seen_aliases.clone());
-                    distributed.extend(branch);
+                    branch.add_positive_impl::<L>(*elem, &mut seen_aliases.clone())?;
+                    has_disjunction |= branch.has_disjunction;
+                    distributed.extend::<L>(branch, check_budget)?;
                 }
                 self.intersections = distributed.intersections;
+                self.has_disjunction = has_disjunction;
             }
             Type::EnumComplement(complement) => {
                 let intersection = complement.to_intersection(db, &self.env);
-                self.add_negative_impl(intersection, seen_aliases);
+                self.add_negative_impl::<L>(intersection, seen_aliases)?;
             }
             _ => {
                 for inner in &mut self.intersections {
@@ -1365,6 +1497,7 @@ impl<'db> IntersectionBuilder<'db> {
                 }
             }
         }
+        ControlFlow::Continue(())
     }
 
     pub(crate) fn positive_elements<I, T>(mut self, elements: I) -> Self

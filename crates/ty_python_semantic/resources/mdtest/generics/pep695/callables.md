@@ -430,10 +430,22 @@ def consume(value: A | B | C | D | E) -> None: ...
 reveal_type(infer_from_consumer(consume))  # revealed: A | B | C | D | E
 ```
 
-## Overlapping inferred union upper bounds exceeding the solution budget
+The same union remains precise when it is defined through nested type aliases:
 
-Even if the precise intersection of two large union upper bounds is small, processing either union
-currently exceeds the solution budget before we can discover that intersection.
+```py
+type FirstTwo = A | B
+type NextTwo = C | D
+type Options = FirstTwo | NextTwo | E
+
+def consume_alias(value: Options) -> None: ...
+
+reveal_type(infer_from_consumer(consume_alias))  # revealed: A | B | C | D | E
+```
+
+## Overlapping inferred union upper bounds with few surviving alternatives
+
+The individual union upper bounds can exceed the solution budget when only a few alternatives
+survive their intersection. Disjoint alternatives do not count toward the budget.
 
 ```py
 from typing import Callable, final
@@ -472,6 +484,81 @@ def consume_left(value: A | B | C | D | E) -> None: ...
 def consume_right(value: A | B | F | G | H) -> None: ...
 
 reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: A | B
+```
+
+Aliases for these unions also preserve the precise intersection in either argument order:
+
+```py
+type Left = A | B | C | D | E
+type Right = A | B | F | G | H
+
+def consume_left_alias(value: Left) -> None: ...
+def consume_right_alias(value: Right) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left_alias, consume_right_alias))  # revealed: A | B
+reveal_type(infer_from_consumers(consume_right_alias, consume_left_alias))  # revealed: A | B
+```
+
+## Intersecting aliased upper bounds exceeding the solution budget
+
+Each consumer constrains `T` to a different union. The classes can share subclasses, so their
+intersection has eight distinct alternatives. Type aliases do not exempt this expansion from the
+solution budget: inference falls back to `Unknown` instead of constructing the entire intersection.
+
+```py
+from typing import Callable
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+
+type First = A | B
+type Second = C | D
+type Third = E | F
+
+def infer_from_consumers[T](
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+    third: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+def consume_first(value: First) -> None: ...
+def consume_second(value: Second) -> None: ...
+def consume_third(value: Third) -> None: ...
+
+reveal_type(infer_from_consumers(consume_first, consume_second, consume_third))  # revealed: Unknown
+```
+
+The same budget applies when an explicit union is intersected with aliased unions:
+
+```py
+def consume_explicit(value: E | F) -> None: ...
+
+reveal_type(infer_from_consumers(consume_first, consume_second, consume_explicit))  # revealed: Unknown
+```
+
+## Intersecting recursive inferred union upper bounds
+
+A recursive alias can contribute an upper bound without expanding its nested occurrences. Here, only
+`int` satisfies both consumers, regardless of their order.
+
+```py
+from typing import Callable
+
+type Recursive = int | list[Recursive]
+
+def infer_from_consumers[T](left: Callable[[T], None], right: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume_recursive(value: Recursive) -> None: ...
+def consume_int_or_str(value: int | str) -> None: ...
+
+reveal_type(infer_from_consumers(consume_recursive, consume_int_or_str))  # revealed: int
+reveal_type(infer_from_consumers(consume_int_or_str, consume_recursive))  # revealed: int
 ```
 
 ## Contextual generic return exceeding the solution budget
