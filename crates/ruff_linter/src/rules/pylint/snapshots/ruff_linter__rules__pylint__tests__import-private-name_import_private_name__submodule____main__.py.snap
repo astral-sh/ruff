@@ -115,3 +115,23 @@ PLC2701 Private name import `_other_private_member` from external module `os`
 58 | from os import _private_member
 59 | from os import _exit as os_exit, _other_private_member
    |                                  ^^^^^^^^^^^^^^^^^^^^^
+60 |
+61 | # PLC2701 exceptions: more underscore-prefixed standard library members are
+   |
+
+PLC2701 Private name import `_private_member_again` from external module `sys`
+   --> __main__.py:100:17
+    |
+ 99 | # PLC2701 errors: standard library members that are not documented.
+100 | from sys import _private_member_again
+    |                 ^^^^^^^^^^^^^^^^^^^^^
+101 | from sys import _getframe as frame_getter, _undeclared_private_member
+    |
+
+PLC2701 Private name import `_undeclared_private_member` from external module `sys`
+   --> __main__.py:101:44
+    |
+ 99 | # PLC2701 errors: standard library members that are not documented.
+100 | from sys import _private_member_again
+101 | from sys import _getframe as frame_getter, _undeclared_private_member
+    |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^

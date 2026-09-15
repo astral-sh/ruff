@@ -11,8 +11,80 @@ use crate::settings::LinterSettings;
 
 /// Returns `true` if a module member is public despite having an
 /// underscore-prefixed name.
+///
+/// Python's documentation often doesn't clearly distinguish underscore-prefixed
+/// members that are part of the public API from those that are private.
+/// Assume that someone using one of these members knows what they're doing,
+/// and bias against reporting false positives.
+#[expect(
+    clippy::unnested_or_patterns,
+    reason = "Nesting the patterns by module would obscure the category comments"
+)]
 pub(crate) fn is_underscore_prefixed_public_member(qualified_name: &QualifiedName) -> bool {
-    matches!(qualified_name.segments(), ["os", "_exit"])
+    match qualified_name.segments() {
+        // Fields of module members, e.g., `sys.implementation._multiarch`.
+        ["sys", "implementation", member] if member.starts_with('_') => true,
+
+        // Module members.
+        ["__future__", "_Feature"]
+        | ["asyncio", "_enter_task"]
+        | ["asyncio", "_leave_task"]
+        | ["asyncio", "_register_task"]
+        | ["asyncio", "_unregister_task"]
+        | ["ctypes", "_CFuncPtr"]
+        | ["sys", "_emscripten_info"]
+        | ["sys", "_enablelegacywindowsfsencoding"]
+        // Module members for use in special circumstances.
+        | ["importlib", "util", "_incompatible_extension_module_restrictions"]
+        | ["ssl", "_create_unverified_context"]
+        | ["subprocess", "_USE_POSIX_SPAWN"]
+        | ["subprocess", "_USE_VFORK"]
+        | ["sys", "_clear_internal_caches"]
+        | ["sys", "_clear_type_cache"]
+        | ["sys", "_current_exceptions"]
+        | ["sys", "_current_frames"]
+        | ["sys", "_stats_clear"]
+        | ["sys", "_stats_dump"]
+        | ["sys", "_stats_off"]
+        | ["sys", "_stats_on"]
+        // Module members documented as private.
+        | ["ctypes", "_CData"]
+        | ["ctypes", "_Pointer"]
+        | ["ctypes", "_SimpleCData"]
+        | ["sysconfig", "_get_preferred_schemes"]
+        // Module members documented as CPython implementation details.
+        | ["sys", "_debugmallocstats"]
+        | ["sys", "_getframe"]
+        | ["sys", "_getframemodulename"]
+        | ["sys", "_is_gil_enabled"]
+        | ["sys", "_is_immortal"]
+        | ["sys", "_is_interned"]
+        | ["sys", "_jit"]
+        | ["sys", "_xoptions"]
+        // Module members mentioned only in passing.
+        | ["logging", "_defaultFormatter"]
+        | ["sys", "_base_executable"]
+        // `os._exit` terminates the process, so treating it as private serves
+        // no purpose.
+        | ["os", "_exit"]
+        // Static class members.
+        | ["collections", "abc", "Set", "_hash"]
+        // Class members.
+        | ["ast", "AST", "_field_types"]
+        | ["ctypes", "CDLL", "_handle"]
+        | ["ctypes", "CDLL", "_name"]
+        | ["gettext", "NullTranslations", "_parse"]
+        | ["multiprocessing", "managers", "BaseProxy", "_callmethod"]
+        | ["multiprocessing", "managers", "BaseProxy", "_getvalue"]
+        | ["unittest", "TestSuite", "_removeTestAtIndex"]
+        | ["zipfile", "ZipInfo", "_for_archive"]
+        // Class members documented as "protected".
+        | ["gettext", "NullTranslations", "_charset"]
+        | ["gettext", "NullTranslations", "_fallback"]
+        | ["gettext", "NullTranslations", "_info"] => true,
+
+        _ => false,
+    }
 }
 
 /// Returns the value of the `name` parameter to, e.g., a `TypeVar` constructor.

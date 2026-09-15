@@ -105,7 +105,8 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         }
     }
 
-    // Allow some public functions whose names start with an underscore, like `os._exit()`.
+    // Allow standard library members with underscore-prefixed names that are
+    // documented as public, like `os._exit()` or `sys._getframe()`.
     if let Some(qualified_name) = semantic.resolve_qualified_name(expr) {
         if is_underscore_prefixed_public_member(&qualified_name) {
             return;
