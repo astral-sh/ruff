@@ -760,7 +760,7 @@ impl ImportFixStyle {
     fn fix_title(self) -> &'static str {
         match self {
             Self::TypeCheckingBlock => "Move into type-checking block",
-            Self::LazyImport => "Convert to a lazy import",
+            Self::LazyImport => "Convert to a lazy import (or move into a type-checking block)",
         }
     }
 }

@@ -29,7 +29,7 @@ error[TC001]: Make application import `app` lazy
   |
 1 | import app as local  # snapshot: typing-only-first-party-import
   |               ^^^^^
-help: Convert to a lazy import
+help: Convert to a lazy import (or move into a type-checking block)
   |
   - import app as local  # snapshot: typing-only-first-party-import
 1 + lazy import app as local  # snapshot: typing-only-first-party-import
@@ -43,7 +43,7 @@ error[TC002]: Make third-party import `vendor.Model` lazy
   |
 2 | from vendor import Model  # snapshot: typing-only-third-party-import
   |                    ^^^^^
-help: Convert to a lazy import
+help: Convert to a lazy import (or move into a type-checking block)
   |
 1 | import app as local  # snapshot: typing-only-first-party-import
   - from vendor import Model  # snapshot: typing-only-third-party-import
@@ -58,7 +58,7 @@ error[TC003]: Make standard library import `pathlib` lazy
   |
 3 | import pathlib  # snapshot: typing-only-standard-library-import
   |        ^^^^^^^
-help: Convert to a lazy import
+help: Convert to a lazy import (or move into a type-checking block)
   |
 2 | from vendor import Model  # snapshot: typing-only-third-party-import
   - import pathlib  # snapshot: typing-only-standard-library-import
