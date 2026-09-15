@@ -7286,7 +7286,7 @@ impl<'db> Type<'db> {
                 // Note: This intentionally preserves `type.__call__` behavior for `@classmethod __new__`,
                 // which receives an extra implicit `cls` and errors at call sites.
                 binding.bake_bound_type_into_overloads(db, env);
-                binding.bound_type = Some(self_type);
+                binding.bind_constructor_receiver(db, env, self_type);
                 binding
             })
         }

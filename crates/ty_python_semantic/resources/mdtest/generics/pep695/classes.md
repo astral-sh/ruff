@@ -760,6 +760,58 @@ def calls(c_str: C[str], c_int: C[int]) -> None:
     C[int].__init__(c_str, 1)
 ```
 
+### Independent type variables in `__new__`
+
+Each argument supplies evidence for its own method type variable. The implicit `cls` receiver does
+not couple those variables when the return type combines them into a generic specialization. The
+recursive union exercises inference with multiple bounds for every variable.
+
+```pyi
+from typing import Iterable, Iterator, Protocol, Sequence, assert_type
+
+class Hashable(Protocol):
+    def __hash__(self) -> int: ...
+
+type Label = Hashable | tuple[Label, ...]
+
+class Product[T]:
+    def __new__[A, B, C, D, E, F, G](
+        cls,
+        a: Iterable[A],
+        b: Iterable[B],
+        c: Iterable[C],
+        d: Iterable[D],
+        e: Iterable[E],
+        f: Iterable[F],
+        g: Iterable[G],
+    ) -> Product[tuple[A, B, C, D, E, F, G]]: ...
+    def __iter__(self) -> Iterator[T]: ...
+
+def _(values: Sequence[Label]) -> None:
+    result = list(Product(values, values, values, values, values, values, values))
+    assert_type(result, list[tuple[Label, Label, Label, Label, Label, Label, Label]])
+```
+
+### Enclosing `Self` in constructor arguments
+
+An explicit `Self` type argument belongs to the enclosing method, not the constructor's implicit
+receiver. Binding the receiver preserves that type argument and still rejects an incompatible
+return.
+
+```pyi
+from typing import Self
+
+class Box[T, U]:
+    def __new__(cls, value: T, receiver: U) -> Box[T, U]: ...
+    def wrap(self, value: T) -> Box[T, Self]:
+        result = Box[T, Self](value, self)
+        reveal_type(result)  # revealed: Box[T@Box, Self@wrap]
+        return result
+
+    def wrong_wrap(self, value: T) -> Box[T, T]:
+        return Box[T, Self](value, self)  # error: [invalid-return-type]
+```
+
 ### Generic class inherits `__init__` from generic base class
 
 ```py

@@ -1113,6 +1113,71 @@ reveal_type(generic_context(into_regular_callable(D)))
 reveal_type(D(1))  # revealed: D[int]
 ```
 
+### Independent type variables in `__new__`
+
+Each argument supplies evidence for its own method type variable. The implicit `cls` receiver does
+not couple those variables when the return type combines them into a generic specialization. The
+recursive union exercises inference with multiple bounds for every variable.
+
+```pyi
+from typing import Generic, Iterable, Iterator, Protocol, Sequence, TypeVar
+from typing_extensions import assert_type
+
+class Hashable(Protocol):
+    def __hash__(self) -> int: ...
+
+Label = Hashable | tuple["Label", ...]
+T_co = TypeVar("T_co", covariant=True)
+A = TypeVar("A")
+B = TypeVar("B")
+C = TypeVar("C")
+D = TypeVar("D")
+E = TypeVar("E")
+F = TypeVar("F")
+G = TypeVar("G")
+
+class Product(Generic[T_co]):
+    def __new__(
+        cls,
+        a: Iterable[A],
+        b: Iterable[B],
+        c: Iterable[C],
+        d: Iterable[D],
+        e: Iterable[E],
+        f: Iterable[F],
+        g: Iterable[G],
+    ) -> Product[tuple[A, B, C, D, E, F, G]]: ...
+    def __iter__(self) -> Iterator[T_co]: ...
+
+def _(values: Sequence[Label]) -> None:
+    result = list(Product(values, values, values, values, values, values, values))
+    assert_type(result, list[tuple[Label, Label, Label, Label, Label, Label, Label]])
+```
+
+### Enclosing `Self` in constructor arguments
+
+An explicit `Self` type argument belongs to the enclosing method, not the constructor's implicit
+receiver. Binding the receiver preserves that type argument and still rejects an incompatible
+return.
+
+```pyi
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T, U]):
+    def __new__(cls, value: T, receiver: U) -> Box[T, U]: ...
+    def wrap(self, value: T) -> Box[T, Self]:
+        result = Box[T, Self](value, self)
+        reveal_type(result)  # revealed: Box[T@Box, Self@wrap]
+        return result
+
+    def wrong_wrap(self, value: T) -> Box[T, T]:
+        return Box[T, Self](value, self)  # error: [invalid-return-type]
+```
+
 ### Generic class inherits `__init__` from generic base class
 
 ```py
