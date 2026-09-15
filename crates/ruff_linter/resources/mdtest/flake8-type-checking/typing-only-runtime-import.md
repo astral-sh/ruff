@@ -152,3 +152,25 @@ from decimal import Decimal  # error: [typing-only-standard-library-import] "typ
 
 def load(value: Path) -> Decimal: ...
 ```
+
+## Banned lazy imports
+
+With `ban-lazy = "all"`, both cases above receive a type-checking block suggestion.
+
+```toml
+target-version = "py315"
+
+[lint]
+preview = true
+select = ["TC003", "TID254", "TID255"]
+
+[lint.flake8-tidy-imports]
+ban-lazy = "all"
+```
+
+```py
+from pathlib import Path  # error: [typing-only-standard-library-import] "type-checking block"
+from decimal import Decimal  # error: [typing-only-standard-library-import] "type-checking block"
+
+def load(value: Path) -> Decimal: ...
+```
