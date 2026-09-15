@@ -505,10 +505,11 @@ impl MainLoop {
                             let scripts: Vec<_> = db.project().script_files(db).iter().collect();
                             self.synchronize_scripts(db, &scripts);
                         }
-
-                        if let Some(watcher) = self.watcher.as_mut() {
-                            watcher.update(db);
-                        }
+                    }
+                    if !changes.is_empty()
+                        && let Some(watcher) = self.watcher.as_mut()
+                    {
+                        watcher.update(db);
                     }
                     request_check(&check_sender);
                 }
