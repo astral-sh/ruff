@@ -3321,6 +3321,20 @@ impl<'db> Bindings<'db> {
                     _ => {}
                 }
             }
+
+            // Known cases can resolve return-type ambiguity. In particular, field specifiers
+            // with different declared return types can describe exactly the same field.
+            if matches!(
+                binding.overload_call_result,
+                Some(OverloadCallResult::Ambiguous)
+            ) && binding
+                .matching_overloads()
+                .map(|(_, overload)| overload.return_type())
+                .all_equal_value()
+                .is_ok()
+            {
+                binding.overload_call_result = None;
+            }
         }
 
         self.evaluate_property_calls(db, env, call_arguments);
