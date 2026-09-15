@@ -25,7 +25,7 @@ use crate::types::relation::{
     TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::signatures::{
-    CallableSignature, Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor,
+    CallableSignature, Parameters, ReturnCallableTypeVarScope, Signature, SignatureRelationVisitor,
 };
 use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
@@ -2525,6 +2525,7 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     freshened_callbacks: FxHashMap<(CallableType<'db>, CallableType<'db>), CallableType<'db>>,
     pending: ConstraintSet<'db, 'c>,
     invocation_constraints: ConstraintSet<'db, 'c>,
+    paramspec_capture: Option<ParamSpecCapture<'db>>,
     types: LegacyTypeMappings<'db>,
     /// Keep the first supplied parameter list. Argument checking still validates later
     /// occurrences against the chosen list.
@@ -2546,6 +2547,8 @@ pub(crate) struct InvocationConstraints<'db, 'c> {
 pub(crate) struct InvocationSpecialization<'db> {
     invocation_specialization: Option<Specialization<'db>>,
     freshened_callbacks: FxHashMap<(CallableType<'db>, CallableType<'db>), CallableType<'db>>,
+    /// A callback instantiated separately for each expanded argument list stays generic for validation.
+    repeated_callback: Option<Signature<'db>>,
 }
 
 impl<'db> InvocationSpecialization<'db> {
@@ -2576,6 +2579,14 @@ impl<'db> InvocationSpecialization<'db> {
             }
             found
         };
+        if self.repeated_callback.as_ref().is_some_and(|signature| {
+            formal_callable().is_some_and(|callable| {
+                callable.signatures(db).overloads.as_slice() == std::slice::from_ref(signature)
+            })
+        }) {
+            // Each expanded argument list instantiates this callback separately.
+            return actual;
+        }
         let actual = if !self.freshened_callbacks.is_empty()
             && let Some(formal) = formal_callable()
             && let Some(actuals) = actual.try_upcast_to_callable(db, env)
@@ -2596,6 +2607,21 @@ impl<'db> InvocationSpecialization<'db> {
         };
         actual.apply_optional_specialization(db, self.invocation_specialization)
     }
+}
+
+struct ParamSpecCapture<'db> {
+    paramspec: BoundTypeVarInstance<'db>,
+    formal: Signature<'db>,
+    signatures: CallableSignature<'db>,
+    binding: CallableType<'db>,
+    multiple_invocations: bool,
+}
+
+/// Successful overload choices for one (possibly expanded) forwarded argument list.
+#[derive(Clone)]
+pub(crate) struct ParamSpecCallCase<'db, 'c> {
+    pub(crate) alternatives: SmallVec<[(usize, Option<InvocationConstraints<'db, 'c>>); 2]>,
+    pub(crate) ambiguous_return: Option<Type<'db>>,
 }
 
 /// The legacy mapping is usable only if no accepted relation was omitted in its entirety.
@@ -2837,6 +2863,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             freshened_callbacks: FxHashMap::default(),
             pending: ConstraintSet::from_bool(constraints, true),
             invocation_constraints: ConstraintSet::from_bool(constraints, true),
+            paramspec_capture: None,
             types: LegacyTypeMappings::Available(FxHashMap::default()),
             paramspec_seen: FxHashSet::default(),
         }
@@ -2871,11 +2898,136 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         self
     }
 
+    pub(crate) fn paramspec_overloads(
+        &self,
+        paramspec: BoundTypeVarInstance<'db>,
+    ) -> Option<&CallableSignature<'db>> {
+        self.paramspec_capture
+            .as_ref()
+            .filter(|capture| capture.paramspec == paramspec)
+            .map(|capture| &capture.signatures)
+    }
+
+    /// Add the selected callback return relationships after matching the forwarded arguments.
+    /// Expanded argument lists use `AND`; overload alternatives within each list use `OR`.
+    pub(crate) fn refine_paramspec_overloads(
+        &mut self,
+        paramspec: BoundTypeVarInstance<'db>,
+        cases: &[ParamSpecCallCase<'db, 'c>],
+    ) {
+        let db = self.db;
+        let Some(capture) = &self.paramspec_capture else {
+            return;
+        };
+        if capture.paramspec != paramspec {
+            return;
+        }
+        if cases.is_empty() {
+            // An invalid invocation still uses the callback's declared returns for recovery.
+            let when = capture.signatures.when_constraint_set_assignable_to(
+                db,
+                self.env,
+                &CallableSignature::single(capture.formal.clone()),
+                self.constraints,
+            );
+            self.pending.intersect(db, self.constraints, when);
+            return;
+        }
+        let signatures = capture.signatures.clone();
+        let formal_return = capture.formal.return_ty;
+        let mut selected = Vec::new();
+        let mut invocation = ConstraintSet::from_bool(self.constraints, true);
+        let mut selected_returns = ConstraintSet::from_bool(self.constraints, true);
+        for (case_index, case) in cases.iter().enumerate() {
+            let mut alternatives = ConstraintSet::from_bool(self.constraints, false);
+            let mut returns = ConstraintSet::from_bool(self.constraints, false);
+            for (index, evidence) in &case.alternatives {
+                let Some(signature) = signatures.overloads.get(*index) else {
+                    continue;
+                };
+                let mut signature = signature.clone();
+                let mut when = ConstraintSet::from_bool(self.constraints, true);
+                if let Some(evidence) = evidence {
+                    let mut context = evidence.context;
+                    when = evidence.constraints;
+                    if case_index > 0 {
+                        // A generic overload can be called more than once during expansion.
+                        // Rename its raw constraints and original return together for each call.
+                        let delta = max_typevar_freshness_matching_generic_context(
+                            db,
+                            self.inferable.iter(db).map(Type::TypeVar),
+                            context,
+                        )
+                        .map_or(1, |freshness| freshness.increment().value());
+                        let mapping = TypeMapping::FreshenBoundTypeVars {
+                            generic_context: context,
+                            delta,
+                        };
+                        let visitor = ApplyTypeMappingVisitor::new(self.env);
+                        signature = signature.apply_type_mapping_impl(
+                            db,
+                            &mapping,
+                            TypeContext::default(),
+                            &visitor,
+                        );
+                        when = when.apply_type_mapping_impl(
+                            db,
+                            &mapping,
+                            TypeContext::default(),
+                            &visitor,
+                        );
+                        context = mapping.update_signature_generic_context(db, self.env, context);
+                    }
+                    self.inferable = self.inferable.merge(db, context.inferable_typevars(db));
+                    self.invoked_context = Some(
+                        self.invoked_context
+                            .map_or(context, |previous| previous.merge(db, context)),
+                    );
+                }
+                let return_when = case
+                    .ambiguous_return
+                    .unwrap_or(signature.return_ty)
+                    .when_constraint_set_assignable_to(
+                        db,
+                        self.env,
+                        formal_return,
+                        self.constraints,
+                    );
+                returns = returns.or(db, self.constraints, || return_when);
+                when.intersect(db, self.constraints, return_when);
+                alternatives = alternatives.or(db, self.constraints, || when);
+                if !selected.contains(&signature) {
+                    selected.push(signature);
+                }
+            }
+            invocation.intersect(db, self.constraints, alternatives);
+            selected_returns.intersect(db, self.constraints, returns);
+        }
+        let binding = CallableType::paramspec_value_from_signatures(
+            db,
+            CallableSignature::from_overloads(selected),
+        );
+        if let Some(capture) = &mut self.paramspec_capture {
+            capture.binding = binding;
+            capture.multiple_invocations = cases.len() > 1;
+        }
+        // Keep the selected return relationship when diagnostic recovery temporarily drops
+        // forwarded arguments. It connects outer requirements back to callback parameters.
+        self.pending
+            .intersect(db, self.constraints, selected_returns);
+        self.invocation_constraints
+            .intersect(db, self.constraints, invocation);
+    }
+
     /// Retain callback renaming and solved invocation types after collecting all evidence.
     pub(crate) fn into_invocation_specialization(self) -> InvocationSpecialization<'db> {
         InvocationSpecialization {
             invocation_specialization: self.invocation_specialization,
             freshened_callbacks: self.freshened_callbacks,
+            repeated_callback: self
+                .paramspec_capture
+                .filter(|capture| capture.multiple_invocations)
+                .map(|capture| capture.formal),
         }
     }
 
@@ -3860,9 +4012,27 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         when.reduce_inferable(self.db, self.env, self.constraints, seen)
     }
 
+    /// Include the parameter list selected by an overloaded callback's sub-call. Keep it outside
+    /// invocation constraints so diagnostic recovery can retain it when dropping sub-call evidence.
     fn pending_for_projection(&self) -> ConstraintSet<'db, 'c> {
-        self.pending
-            .and(self.db, self.constraints, || self.invocation_constraints)
+        let db = self.db;
+        let mut pending = self
+            .pending
+            .and(db, self.constraints, || self.invocation_constraints);
+        if let Some(capture) = &self.paramspec_capture {
+            pending.intersect(
+                db,
+                self.constraints,
+                ConstraintSet::constrain_typevar_equivalence_bound(
+                    db,
+                    self.env,
+                    self.constraints,
+                    capture.paramspec,
+                    Type::Callable(capture.binding),
+                ),
+            );
+        }
+        pending
     }
 
     /// Records a relation and projects its solutions into the legacy type mapping.
@@ -4181,7 +4351,64 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         formal_signature,
                         self.constraints,
                     );
-                self.infer_from_constraint_set(when)?;
+                if let Some((paramspec, formal_signature)) = formal_signature.is_single_paramspec()
+                    && Some(paramspec) == self.invoked_paramspec
+                    && actual_callable.signatures(db).overloads.len() > 1
+                    && self.paramspec_capture.is_none()
+                    && !self.paramspec_seen.contains(&paramspec.identity(db))
+                {
+                    let analysis = self.analyze_constraint_set(when);
+                    let binding = match &analysis {
+                        ConstraintSetAnalysis::Constrained(SolutionPaths::Complete(solutions)) => {
+                            // Capturing overloads needs one list shared by every alternative.
+                            solutions
+                                .iter()
+                                .map(|solution| {
+                                    solution.solved_typevars.iter().find_map(|binding| {
+                                        (binding.bound_typevar.identity(db)
+                                            == paramspec.identity(db))
+                                        .then_some(binding.solution)
+                                    })
+                                })
+                                .all_equal_value()
+                                .ok()
+                                .flatten()
+                        }
+                        _ => None,
+                    };
+                    if let Some(Type::Callable(value)) = binding {
+                        // Preserve the original returns and source order before the parameter
+                        // list value erases them. Return-incompatible overloads are already absent.
+                        let signatures = CallableSignature::from_overloads(
+                            actual_callable
+                                .signatures(db)
+                                .iter()
+                                .filter(|signature| {
+                                    value.signatures(db).iter().any(|captured| {
+                                        captured.parameters() == signature.parameters()
+                                            && captured.source_overload_index()
+                                                == signature.source_overload_index()
+                                    })
+                                })
+                                .cloned(),
+                        );
+                        self.paramspec_capture = Some(ParamSpecCapture {
+                            paramspec,
+                            formal: formal_signature.clone(),
+                            signatures,
+                            binding: value,
+                            multiple_invocations: false,
+                        });
+                    } else {
+                        self.record_constraint_set(when);
+                    }
+                    if let Some(error) = analysis.specialization_error(db, self.env) {
+                        return Err(error);
+                    }
+                    self.record_constraint_analysis(&analysis);
+                } else {
+                    self.infer_from_constraint_set(when)?;
+                }
             } else {
                 // An overloaded actual callable is compatible if at least one overload matches.
                 // Analyze every alternative without changing the builder; only accepted overloads

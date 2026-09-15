@@ -51,9 +51,9 @@ use crate::types::function::{
     OverloadLiteral,
 };
 use crate::types::generics::{
-    GenericContext, InvocationConstraints, InvocationSpecialization, Specialization,
-    SpecializationBuilder, SpecializationError, TypeVarInference, TypeVarInferenceFallback,
-    TypeVarInferenceSolutions,
+    GenericContext, InvocationConstraints, InvocationSpecialization, ParamSpecCallCase,
+    Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
+    TypeVarInferenceFallback, TypeVarInferenceSolutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::known_instance::{
@@ -4051,11 +4051,13 @@ impl<'db> CallableBinding<'db> {
         // State of the bindings _after_ evaluating (type checking) the matching overloads using
         // the non-expanded argument types.
         let post_evaluation_snapshot = snapshotter.take(self);
+        let post_evaluation_inference = inference.overloads.clone();
 
         for expansion in expansions {
             let expanded_argument_lists = match expansion {
                 Expansion::LimitReached(index) => {
                     snapshotter.restore(self, post_evaluation_snapshot);
+                    inference.overloads = post_evaluation_inference;
                     self.overload_call_result =
                         Some(OverloadCallResult::ArgumentTypeExpansionLimitReached(index));
                     return;
@@ -4064,11 +4066,13 @@ impl<'db> CallableBinding<'db> {
             };
 
             let mut cases = Vec::with_capacity(expanded_argument_lists.len());
+            let mut inference_cases = inference.is_enabled().then(Vec::new);
 
             for expanded_arguments in &expanded_argument_lists {
                 // Ambiguity belongs to one expanded argument list. In particular, an earlier
                 // ambiguous case must not replace a later case's equivalent return types.
                 self.overload_call_result = None;
+                inference.overloads.fill(None);
                 // The spec mentions that each expanded argument list should be re-evaluated from
                 // step 2 but we need to re-evaluate from step 1 because our step 1 does more than
                 // what the spec mentions. Step 1 of the spec means only "eliminate impossible
@@ -4089,15 +4093,16 @@ impl<'db> CallableBinding<'db> {
                     "after step 1",
                 );
 
-                for (_, overload) in self.matching_overloads_mut() {
-                    let _ = overload.check_types(
+                for (index, overload) in self.matching_overloads_mut() {
+                    let evidence = overload.check_types(
                         db,
                         env,
                         constraints,
                         expanded_arguments,
                         call_expression_tcx,
-                        false,
+                        inference.is_enabled(),
                     );
+                    inference.record(index, evidence);
                 }
 
                 tracing::trace!(
@@ -4150,6 +4155,10 @@ impl<'db> CallableBinding<'db> {
                 };
 
                 if let Some(return_type) = return_type {
+                    inference_cases = inference_cases.and_then(|mut cases| {
+                        cases.push(inference.call_case(self)?);
+                        Some(cases)
+                    });
                     cases.push(ExpandedCallEvaluation {
                         return_type,
                         selected_overloads: self
@@ -4176,6 +4185,7 @@ impl<'db> CallableBinding<'db> {
                     merged_evaluation_state.update(&case.snapshot);
                 }
                 snapshotter.restore(self, merged_evaluation_state);
+                inference.expanded_cases = inference_cases;
 
                 // Every expanded argument list must succeed. Alternative matches within a case
                 // cannot compensate for a different argument list with no matches.
@@ -4199,6 +4209,7 @@ impl<'db> CallableBinding<'db> {
         // argument types. This is necessary because we restore the state to the pre-evaluation
         // snapshot when processing the expanded argument lists.
         snapshotter.restore(self, post_evaluation_snapshot);
+        inference.overloads = post_evaluation_inference;
     }
 
     /// Returns the set of overload candidates that may contribute to the call evaluation.
@@ -4943,12 +4954,14 @@ struct ExpandedCallEvaluation<'db> {
 #[derive(Default)]
 struct CallConstraints<'db, 'c> {
     overloads: Vec<Option<InvocationConstraints<'db, 'c>>>,
+    expanded_cases: Option<Vec<ParamSpecCallCase<'db, 'c>>>,
 }
 
 impl<'db, 'c> CallConstraints<'db, 'c> {
     fn new(overload_count: usize) -> Self {
         Self {
             overloads: vec![None; overload_count],
+            expanded_cases: None,
         }
     }
 
@@ -4959,6 +4972,46 @@ impl<'db, 'c> CallConstraints<'db, 'c> {
     fn record(&mut self, index: usize, evidence: Option<InvocationConstraints<'db, 'c>>) {
         if let Some(slot) = self.overloads.get_mut(index) {
             *slot = evidence;
+        }
+    }
+
+    fn call_case(&self, binding: &CallableBinding<'db>) -> Option<ParamSpecCallCase<'db, 'c>> {
+        let alternatives = binding
+            .selected_overloads()
+            .map(|(index, overload)| {
+                let evidence = self.overloads.get(index).copied().flatten();
+                if overload.signature.generic_context.is_some() && evidence.is_none() {
+                    return None;
+                }
+                Some((index, evidence))
+            })
+            .collect::<Option<SmallVec<_>>>()?;
+        Some(ParamSpecCallCase {
+            alternatives,
+            ambiguous_return: matches!(
+                binding.overload_call_result,
+                Some(OverloadCallResult::Ambiguous)
+            )
+            .then(|| binding.return_type()),
+        })
+    }
+
+    fn paramspec_call_cases(
+        &self,
+        binding: &CallableBinding<'db>,
+    ) -> Option<Vec<ParamSpecCallCase<'db, 'c>>> {
+        if matches!(
+            binding.overload_call_result,
+            Some(OverloadCallResult::ArgumentTypeExpansion(_))
+        ) {
+            self.expanded_cases.clone()
+        } else {
+            let case = self.call_case(binding)?;
+            Some(if case.alternatives.is_empty() {
+                Vec::new()
+            } else {
+                vec![case]
+            })
         }
     }
 }
@@ -6493,7 +6546,10 @@ impl<'db, 'c> CallInference<'_, 'db, 'c> {
         if callable.kind(db) != CallableTypeKind::ParamSpecValue {
             return (None, false);
         }
-        let signatures = &callable.signatures(db).overloads;
+        let signatures = builder
+            .paramspec_overloads(paramspec)
+            .unwrap_or_else(|| callable.signatures(db));
+        let signatures = &signatures.overloads;
         if signatures.is_empty() {
             return (None, false);
         }
@@ -6532,7 +6588,14 @@ impl<'db, 'c> CallInference<'_, 'db, 'c> {
             );
         }
         let _ = bindings.finalize_argument_inference(db, self.env, &sub_arguments, &[]);
-        let refined = if let [Some(evidence)] = evidence.overloads.as_slice() {
+        let refined = if builder.paramspec_overloads(paramspec).is_some() {
+            let cases = bindings
+                .single_element()
+                .and_then(|binding| evidence.paramspec_call_cases(binding))
+                .unwrap_or_default();
+            builder.refine_paramspec_overloads(paramspec, &cases);
+            true
+        } else if let [Some(evidence)] = evidence.overloads.as_slice() {
             builder.incorporate_call_constraints(evidence);
             true
         } else {
@@ -7405,14 +7468,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             FailingOverloadSelection::AffectsOverloadResolution,
                         )
                         .unwrap_or(0);
-                    // TODO: We should also update the specialization for the `ParamSpec` to reflect
-                    // the matching overload here.
                     extend_errors(&callable_binding.overloads()[index]);
                 }
             }
             (Some((_, binding)), None) => {
-                // TODO: We should also update the specialization for the `ParamSpec` to reflect the
-                // matching overload here.
                 extend_errors(binding);
             }
             (Some(_), Some(_)) => {
