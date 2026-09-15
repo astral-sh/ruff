@@ -298,11 +298,9 @@ def _(
     reveal_type(union_internal.f)
     reveal_type(union_internal.f())  # revealed: G1[P1] | G2[P2]
 
-    # TODO: this should not leak the Self@f type variables
-    # revealed: (() -> G1[Self@f]) & (() -> G2[Self@f])
+    # revealed: (() -> G1[P1 & P2]) & (() -> G2[P1 & P2])
     reveal_type(intersection_external.f)
-    # TODO: this should be `G1[P1 & P2] & G2[P1 & P2]`
-    reveal_type(intersection_external.f())  # revealed: G1[Self@f] & G2[Self@f]
+    reveal_type(intersection_external.f())  # revealed: G1[P1 & P2] & G2[P1 & P2]
 
     # TODO: these should work as well (same results as `intersection_external`)
     # revealed: @Todo(unsupported type[X] special form)
@@ -432,16 +430,24 @@ def _(
     # error: [unresolved-attribute]
     reveal_type(union_internal.f())  # revealed: list[P1]
 
-    # TODO: this should not leak the Self@f type variable
-    # revealed: () -> list[Self@f]
+    # revealed: () -> list[P1 & Other]
     reveal_type(intersection_external.f)
-    # TODO: this should be list[P1 & Other]
-    reveal_type(intersection_external.f())  # revealed: list[Self@f]
+    reveal_type(intersection_external.f())  # revealed: list[P1 & Other]
 
     # TODO: these should work as well (same results as `intersection_external`)
     # revealed: @Todo(unsupported type[X] special form)
     reveal_type(intersection_internal.f)
     reveal_type(intersection_internal.f())  # revealed: @Todo(unsupported type[X] special form)
+```
+
+The extracted classmethod also satisfies a callback protocol with the intersection return type:
+
+```py
+class Callback[R](Protocol):
+    def __call__(self) -> R: ...
+
+def as_callback(cls: type[P1] & type[Other]) -> Callback[list[P1 & Other]]:
+    return cls.f
 ```
 
 ### Method defined on a single element and a dynamic type

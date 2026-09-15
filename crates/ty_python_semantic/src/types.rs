@@ -91,6 +91,7 @@ use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{
     InternedConstraintSet, InternedType, SentinelInstance, UnionTypeInstance,
 };
+use crate::types::member::{ClassObjectMember, LookupMember};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
@@ -3769,9 +3770,9 @@ impl<'db> Type<'db> {
                     .map_type(|member| property_wrapper_descriptor(db, env, name, member)),
             ),
 
-            Type::SubclassOf(subclass_of_ty) => {
-                subclass_of_ty.find_name_in_mro_with_policy(db, env, name, policy)
-            }
+            Type::SubclassOf(subclass_of_ty) => subclass_of_ty
+                .find_name_in_mro_with_policy(db, env, name, policy)
+                .map(|member| member.into_place(db, env)),
 
             // Note: `super(pivot, owner).__class__` is `builtins.super`, not the owner's class.
             // `BoundSuper` should look up the name in the MRO of `builtins.super`.
@@ -3900,7 +3901,7 @@ impl<'db> Type<'db> {
         {
             let interface = protocol.interface(db);
             return if interface.includes_member(db, name) {
-                interface.instance_member(db, env, name)
+                interface.instance_member(db, env, name).into_place(db, env)
             } else {
                 Type::instance(db, env, *origin).class_member_with_policy(db, env, name, policy)
             };
@@ -3972,7 +3973,8 @@ impl<'db> Type<'db> {
 
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => ty
                 .to_meta_type(db, env)
-                .class_object_member(db, env, name, policy),
+                .class_object_member(db, env, name, policy)
+                .into_place(db, env),
 
             _ => ty
                 .to_meta_type(db, env)
@@ -3996,6 +3998,16 @@ impl<'db> Type<'db> {
         receiver: Type<'db>,
     ) -> PlaceAndQualifiers<'db> {
         let ty = key.ty(db);
+
+        if let Type::ProtocolInstance(protocol) = ty
+            && protocol.materialization_kind(db).is_some()
+            && protocol.interface(db).includes_member(db, key.name(db))
+        {
+            return protocol
+                .interface(db)
+                .instance_member(db, env, key.name(db))
+                .bind_receiver(db, env, receiver.to_meta_type(db, env), receiver);
+        }
 
         // `object.__dict__` is a typeshed approximation: a concrete slotted instance without
         // dictionary storage does not inherit that attribute at runtime. Keep normal lookup for
@@ -4027,7 +4039,17 @@ impl<'db> Type<'db> {
             }
         }
 
-        Self::class_member_with_policy_inner(db, key)
+        let member = Self::class_member_with_policy_inner(db, key);
+        if ty.is_protocol_instance() {
+            LookupMember::from_attribute(db, env, member).bind_receiver(
+                db,
+                env,
+                receiver.to_meta_type(db, env),
+                receiver,
+            )
+        } else {
+            member
+        }
     }
 
     /// Look up attributes stored in the namespace of a class object.
@@ -4035,19 +4057,28 @@ impl<'db> Type<'db> {
     /// Besides attributes present in the class MRO, this includes attributes assigned to
     /// instances of its metaclass. For example, `cls.x = ...` in `Meta.__init__` stores `x`
     /// on each class object constructed by `Meta`.
+    ///
+    /// The result retains protocol classmethod binding information and keeps fallback candidates
+    /// separate until the caller binds the receiver or requests the raw member type.
     fn class_object_member(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
-    ) -> PlaceAndQualifiers<'db> {
-        let class_attr = self
-            .find_name_in_mro_with_policy(db, env, name, policy)
-            .expect(
-                "Calling `class_object_member` on class literals and subclass-of types \
-                should always find an MRO",
-            );
+    ) -> ClassObjectMember<'db> {
+        let class_attr = match self {
+            Type::SubclassOf(subclass) => {
+                subclass.find_name_in_mro_with_policy(db, env, name, policy)
+            }
+            _ => self
+                .find_name_in_mro_with_policy(db, env, name, policy)
+                .map(LookupMember::new),
+        }
+        .expect(
+            "Calling `class_object_member` on class literals and subclass-of types \
+            should always find an MRO",
+        );
 
         let own_class = match self {
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
@@ -4078,23 +4109,23 @@ impl<'db> Type<'db> {
             _ => None,
         };
         if own_declaration_definedness == Some(Definedness::AlwaysDefined) {
-            return class_attr;
+            return class_attr.into();
         }
 
         let Some(metaclass_instance) = self
             .to_meta_type(db, env)
             .to_instance_approximation(db, env)
         else {
-            return class_attr;
+            return class_attr.into();
         };
-        let metaclass_attr = metaclass_instance.instance_member(db, env, name);
+        let metaclass_attr = LookupMember::new(metaclass_instance.instance_member(db, env, name));
 
         if own_declaration_definedness.is_some() {
             // A conditionally-declared attribute is a contract only on paths where that
             // declaration is present; the metaclass value is the fallback on other paths.
-            class_attr.or_fall_back_to(db, env, || metaclass_attr)
+            class_attr.or_fall_back_to(metaclass_attr)
         } else {
-            metaclass_attr.or_fall_back_to(db, env, || class_attr)
+            metaclass_attr.or_fall_back_to(class_attr)
         }
     }
 
@@ -4308,7 +4339,9 @@ impl<'db> Type<'db> {
                 .concrete_base_type(db)
                 .instance_member(db, env, name),
 
-            Type::ProtocolInstance(protocol) => protocol.instance_member(db, env, name),
+            Type::ProtocolInstance(protocol) => {
+                protocol.instance_member(db, env, name).into_place(db, env)
+            }
 
             Type::FunctionLiteral(function) => function
                 .runtime_class(db)
@@ -5267,12 +5300,9 @@ impl<'db> Type<'db> {
         {
             return false;
         }
-        let member = Type::from(class.identity_specialization(db)).class_object_member(
-            db,
-            env,
-            name,
-            MemberLookupPolicy::default(),
-        );
+        let member = Type::from(class.identity_specialization(db))
+            .class_object_member(db, env, name, MemberLookupPolicy::default())
+            .into_place(db, env);
         let Place::Defined(DefinedPlace {
             ty,
             origin: TypeOrigin::Declared,
@@ -5429,7 +5459,12 @@ impl<'db> Type<'db> {
                     .into();
                 }
 
-                let fallback = this.instance_member(db, env, name_str);
+                let fallback = match this {
+                    Type::ProtocolInstance(protocol) => protocol
+                        .instance_member(db, env, name_str)
+                        .bind_receiver(db, env, receiver.to_meta_type(db, env), receiver),
+                    _ => this.instance_member(db, env, name_str),
+                };
 
                 let result = Type::invoke_descriptor_protocol(
                     db,
@@ -6050,6 +6085,7 @@ impl<'db> Type<'db> {
                         "The receiver for a class-object lookup should always be instantiable",
                     );
                     let class_attr_plain = class_attr_plain
+                        .bind_receiver(db, env, receiver, self_instance)
                         .map_type(|ty| ty.bind_self_typevars(db, env, self_instance));
 
                     let (class_attr_fallback, _, class_attr_error) =
