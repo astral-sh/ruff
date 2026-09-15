@@ -11,13 +11,13 @@ use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
     MaterializationKind, SubclassOfType, Type, TypeAliasType,
 };
-use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
 };
 use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::walk_specialization;
+use crate::types::member::LookupMember;
 use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_instance_member,
     walk_protocol_interface,
@@ -1582,7 +1582,7 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
-    ) -> Option<PlaceAndQualifiers<'db>> {
+    ) -> Option<LookupMember<'db>> {
         self.materialization_kind(db)?;
         let interface = self.interface(db);
         interface
@@ -1590,20 +1590,25 @@ impl<'db> ProtocolInstanceType<'db> {
             .then(|| interface.instance_member(db, env, name))
     }
 
-    pub(crate) fn instance_member(
+    pub(super) fn instance_member(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
-    ) -> PlaceAndQualifiers<'db> {
+    ) -> LookupMember<'db> {
         match self.inner {
-            Protocol::FromClass(class) => class.instance_member(db, env, name),
+            Protocol::FromClass(class) => {
+                let member = class.instance_member(db, env, name);
+                LookupMember::from_attribute(db, env, member)
+            }
             Protocol::Synthesized(synthesized) => {
                 synthesized.interface().instance_member(db, env, name)
             }
             Protocol::Materialized(materialized) => self
                 .materialized_interface_member(db, env, name)
-                .unwrap_or_else(|| materialized.origin(db).instance_member(db, env, name)),
+                .unwrap_or_else(|| {
+                    LookupMember::new(materialized.origin(db).instance_member(db, env, name))
+                }),
         }
     }
 

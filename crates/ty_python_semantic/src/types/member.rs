@@ -3,6 +3,7 @@ use crate::place::{
     ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
     place_by_id, place_from_bindings,
 };
+use crate::types::protocol_class::ProtocolMemberType;
 use crate::types::{ProgramEnvironment, Type};
 use ty_python_core::{place_table, scope::ScopeId, use_def_map};
 
@@ -47,6 +48,125 @@ impl<'db> Member<'db> {
     pub(super) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         Self {
             inner: self.inner.map_type(f),
+        }
+    }
+}
+
+/// A member together with any binding information that is not represented by its value type.
+pub(super) type LookupMember<'db> = ProtocolMemberType<'db, PlaceAndQualifiers<'db>>;
+
+impl<'db> LookupMember<'db> {
+    pub(super) fn from_attribute(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        member: PlaceAndQualifiers<'db>,
+    ) -> Self {
+        if let Place::Defined(place) = member.place
+            && place.ty.supports_self_binding(db, env)
+        {
+            Self::with_attribute_definition(db, member, place.provenance.definition())
+        } else {
+            Self::new(member)
+        }
+    }
+
+    /// Expose the member without binding it to a receiver, as required by raw member lookups.
+    pub(super) fn into_place(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> PlaceAndQualifiers<'db> {
+        self.map_type(|member| member.resolve(db, env).map(ProtocolMemberType::ty))
+    }
+
+    pub(super) fn bind_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
+        self_type: Type<'db>,
+    ) -> PlaceAndQualifiers<'db> {
+        self.map_type(|member| match member {
+            ProtocolMemberType::Value {
+                ty,
+                self_binding_context,
+            } if self_binding_context.is_none() || !ty.supports_self_binding(db, env) => Some(ty),
+            _ => member.bind_self_with_receiver(db, env, receiver, self_type),
+        })
+    }
+
+    fn map_type(
+        self,
+        f: impl FnOnce(ProtocolMemberType<'db>) -> Option<Type<'db>>,
+    ) -> PlaceAndQualifiers<'db> {
+        let member = self.into_inner();
+        let Some(ty) = member.place.ignore_possibly_undefined() else {
+            return member;
+        };
+        match f(self.map_value(|_| ty)) {
+            Some(ty) => member.map_type(|_| ty),
+            None => Place::Undefined.with_qualifiers(member.qualifiers),
+        }
+    }
+
+    pub(super) fn or_fall_back_to(self, fallback: Self) -> ClassObjectMember<'db> {
+        ClassObjectMember {
+            primary: self,
+            fallback: Some(fallback),
+        }
+    }
+}
+
+/// Class-namespace candidates in lookup order, before receiver binding.
+///
+/// Keep a metaclass-provided value separate from a protocol classmethod until binding is
+/// complete. Combining their types first would lose which callable needs the class receiver.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct ClassObjectMember<'db> {
+    primary: LookupMember<'db>,
+    fallback: Option<LookupMember<'db>>,
+}
+
+impl<'db> ClassObjectMember<'db> {
+    pub(super) fn into_place(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> PlaceAndQualifiers<'db> {
+        self.map_members(db, env, |member| member.into_place(db, env))
+    }
+
+    pub(super) fn bind_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
+        self_type: Type<'db>,
+    ) -> PlaceAndQualifiers<'db> {
+        self.map_members(db, env, |member| {
+            member.bind_receiver(db, env, receiver, self_type)
+        })
+    }
+
+    fn map_members(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut f: impl FnMut(LookupMember<'db>) -> PlaceAndQualifiers<'db>,
+    ) -> PlaceAndQualifiers<'db> {
+        let primary = f(self.primary);
+        match self.fallback {
+            Some(fallback) => primary.or_fall_back_to(db, env, || f(fallback)),
+            None => primary,
+        }
+    }
+}
+
+impl<'db> From<LookupMember<'db>> for ClassObjectMember<'db> {
+    fn from(primary: LookupMember<'db>) -> Self {
+        Self {
+            primary,
+            fallback: None,
         }
     }
 }

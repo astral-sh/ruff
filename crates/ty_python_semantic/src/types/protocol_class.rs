@@ -11,6 +11,8 @@ use crate::types::attribute_write::{
     DescriptorSetterDomain, ProtocolMemberWriteRequirement, descriptor_setter_domain,
     property_setter_value_type,
 };
+use crate::types::infer::nearest_enclosing_class;
+use crate::types::member::LookupMember;
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::visitor::any_over_type_expanding_aliases;
@@ -18,8 +20,7 @@ use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
     place::{
-        DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, place_from_bindings,
-        place_from_declarations,
+        DefinedPlace, Definedness, Place, Provenance, place_from_bindings, place_from_declarations,
     },
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
@@ -36,7 +37,9 @@ use crate::{
         variance::infer_protocol_variance,
     },
 };
-use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map};
+use ty_python_core::{
+    definition::Definition, place::ScopedPlaceId, place_table, semantic_index, use_def_map,
+};
 
 impl<'db> StaticClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
@@ -608,24 +611,30 @@ impl<'db> ProtocolInterfaceView<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
-    ) -> PlaceAndQualifiers<'db> {
+    ) -> LookupMember<'db> {
         self.member_by_name(db, name)
-            .map(|member| PlaceAndQualifiers {
-                place: member
+            .map(|member| {
+                member
                     .access(db, env, ProtocolMemberAccessMode::Instance)
                     .read
-                    .and_then(|read| read.resolve(db, env))
-                    .map(|read| Place::bound(read.ty()))
-                    .unwrap_or(Place::Undefined)
-                    .with_provenance(Provenance::from_definition(member.definition())),
-                qualifiers: member.qualifiers(),
+                    .map(|read| {
+                        read.map_value(|ty| {
+                            Place::bound(ty)
+                                .with_provenance(Provenance::from_definition(member.definition()))
+                                .with_qualifiers(member.qualifiers())
+                        })
+                    })
+                    .unwrap_or_else(|| {
+                        LookupMember::new(Place::Undefined.with_qualifiers(member.qualifiers()))
+                    })
             })
-            .unwrap_or_else(|| Type::object().member(db, env, name))
+            .unwrap_or_else(|| LookupMember::new(Type::object().member(db, env, name)))
     }
 
     /// Looks up a member guaranteed to exist on every inhabitant of `type[Protocol]`.
     ///
-    /// Methods retain their unbound signatures and `ClassVar`s retain their class-side types.
+    /// Classmethods retain their receiver-binding information until attribute access. Ordinary
+    /// instance methods retain their unbound signatures and `ClassVar`s retain their class-side types.
     /// Properties are only required on the constructed instance, so they are undefined even when
     /// the nominal protocol origin provides a property descriptor.
     pub(super) fn meta_member(
@@ -633,17 +642,19 @@ impl<'db> ProtocolInterfaceView<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
-    ) -> Option<PlaceAndQualifiers<'db>> {
+    ) -> Option<LookupMember<'db>> {
         self.member_by_name(db, name).map(|member| {
             let read = member.access(db, env, ProtocolMemberAccessMode::Class).read;
-            PlaceAndQualifiers {
-                place: read
-                    .and_then(|read| read.resolve(db, env))
-                    .map(|read| Place::bound(read.ty()))
-                    .unwrap_or(Place::Undefined)
-                    .with_provenance(Provenance::from_definition(member.definition())),
-                qualifiers: member.qualifiers(),
-            }
+            let qualifiers = member.qualifiers();
+            let provenance = Provenance::from_definition(member.definition());
+            read.map(|read| {
+                read.map_value(|ty| {
+                    Place::bound(ty)
+                        .with_provenance(provenance)
+                        .with_qualifiers(qualifiers)
+                })
+            })
+            .unwrap_or_else(|| LookupMember::new(Place::Undefined.with_qualifiers(qualifiers)))
         })
     }
 
@@ -913,7 +924,7 @@ impl<'db> ProtocolInterface<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
-    ) -> PlaceAndQualifiers<'db> {
+    ) -> LookupMember<'db> {
         ProtocolInterfaceView::new(self, None).instance_member(db, env, name)
     }
 
@@ -1232,74 +1243,122 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
     }
 }
 
+/// The class whose body gives an attribute annotation its `Self` binding context.
+#[salsa::tracked(returns(copy))]
+fn attribute_owner_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<Definition<'db>> {
+    nearest_enclosing_class(
+        db,
+        semantic_index(db, definition.program_file(db)),
+        definition.scope(db),
+    )
+    .map(|class| class.definition(db))
+}
+
 /// A protocol member's exposed type and the context required to resolve it lazily.
 ///
-/// Property accessors remain as callables until a relation needs their read or write type. Once
+/// Property accessors remain as callables until their read or write type is needed. Once
 /// resolved, `Value` retains the accessor's binding context so that only its own `Self` type is
 /// rebound during protocol checks.
+///
+/// Interfaces store `Type` values. Member lookup uses the same representation with
+/// [`PlaceAndQualifiers`](crate::place::PlaceAndQualifiers), preserving qualifiers and definedness
+/// until the caller resolves and binds the member.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-enum ProtocolMemberType<'db> {
+pub(super) enum ProtocolMemberType<'db, T = Type<'db>> {
     Value {
-        ty: Type<'db>,
-        // Accessor annotations can contain `Self` bound by the accessor definition. Retain that
-        // context after reducing a property to its read/write types so relation checks only bind
-        // the `Self` that belongs to this member.
+        ty: T,
+        // `Self` belongs to the accessor definition for properties and the enclosing class
+        // definition for attributes. Retain that context after reducing a property to its
+        // read/write types so only the `Self` that belongs to this member is bound.
         self_binding_context: Option<BindingContext<'db>>,
     },
+    /// A classmethod signature whose `cls` parameter has been removed, with its receiver
+    /// constraint still waiting to be bound at attribute access.
+    ClassMethod(T),
     // Property accessors remain as raw callable types until a relation or ordinary member access
     // needs the exposed value type. Resolving every property while constructing a protocol
     // interface causes unrelated protocol checks to materialize large return-type unions.
-    PropertyGetter(Type<'db>),
-    PropertySetter(Type<'db>),
+    PropertyGetter(T),
+    PropertySetter(T),
 }
 
-impl<'db> ProtocolMemberType<'db> {
-    const fn new(ty: Type<'db>) -> Self {
+impl<'db, T> ProtocolMemberType<'db, T> {
+    pub(super) const fn new(ty: T) -> Self {
         Self::Value {
             ty,
             self_binding_context: None,
         }
     }
 
-    fn with_definition(ty: Type<'db>, definition: Option<Definition<'db>>) -> Self {
+    fn with_definition(ty: T, definition: Option<Definition<'db>>) -> Self {
         Self::Value {
             ty,
             self_binding_context: definition.map(BindingContext::Definition),
         }
     }
 
-    const fn property_getter(ty: Type<'db>) -> Self {
+    pub(super) fn with_attribute_definition(
+        db: &'db dyn Db,
+        ty: T,
+        definition: Option<Definition<'db>>,
+    ) -> Self {
+        Self::with_definition(
+            ty,
+            definition.and_then(|definition| attribute_owner_definition(db, definition)),
+        )
+    }
+
+    const fn property_getter(ty: T) -> Self {
         Self::PropertyGetter(ty)
     }
 
-    const fn property_setter(ty: Type<'db>) -> Self {
+    const fn property_setter(ty: T) -> Self {
         Self::PropertySetter(ty)
     }
 
-    const fn ty(self) -> Type<'db> {
-        match self {
-            Self::Value { ty, .. } | Self::PropertyGetter(ty) | Self::PropertySetter(ty) => ty,
-        }
-    }
-
-    const fn with_ty(self, ty: Type<'db>) -> Self {
+    pub(super) fn map_value<U>(self, f: impl FnOnce(T) -> U) -> ProtocolMemberType<'db, U> {
         match self {
             Self::Value {
-                self_binding_context,
-                ..
-            } => Self::Value {
                 ty,
                 self_binding_context,
+            } => ProtocolMemberType::Value {
+                ty: f(ty),
+                self_binding_context,
             },
-            Self::PropertyGetter(_) => Self::PropertyGetter(ty),
-            Self::PropertySetter(_) => Self::PropertySetter(ty),
+            Self::ClassMethod(ty) => ProtocolMemberType::ClassMethod(f(ty)),
+            Self::PropertyGetter(ty) => ProtocolMemberType::PropertyGetter(f(ty)),
+            Self::PropertySetter(ty) => ProtocolMemberType::PropertySetter(f(ty)),
         }
+    }
+}
+
+impl<T: Copy> ProtocolMemberType<'_, T> {
+    pub(super) const fn into_inner(self) -> T {
+        match self {
+            Self::Value { ty, .. }
+            | Self::ClassMethod(ty)
+            | Self::PropertyGetter(ty)
+            | Self::PropertySetter(ty) => ty,
+        }
+    }
+}
+
+impl<'db> ProtocolMemberType<'db> {
+    pub(super) const fn ty(self) -> Type<'db> {
+        self.into_inner()
+    }
+
+    fn with_ty(self, ty: Type<'db>) -> Self {
+        self.map_value(|_| ty)
     }
 
     /// Resolves a stored property accessor to the value type exposed by that access.
-    fn resolve(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Self> {
+    pub(super) fn resolve(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Self> {
         match self {
-            Self::Value { .. } => Some(self),
+            Self::Value { .. } | Self::ClassMethod(_) => Some(self),
             Self::PropertyGetter(getter) => property_get_member_type(db, env, getter),
             Self::PropertySetter(setter) => property_set_member_type(db, env, setter),
         }
@@ -1332,6 +1391,24 @@ impl<'db> ProtocolMemberType<'db> {
         env: &ProgramEnvironment<'db>,
         self_type: Type<'db>,
     ) -> Option<Type<'db>> {
+        self.bind_self_with_receiver(db, env, self_type, self_type)
+    }
+
+    pub(super) fn bind_self_with_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
+        self_type: Type<'db>,
+    ) -> Option<Type<'db>> {
+        if let Self::ClassMethod(ty) = self {
+            return Some(match ty {
+                Type::Callable(callable) => {
+                    Type::Callable(callable.apply_self_with_receiver(db, env, receiver, self_type))
+                }
+                _ => ty,
+            });
+        }
         let Self::Value {
             ty,
             self_binding_context,
@@ -1552,13 +1629,14 @@ impl<'db> ProtocolMemberData<'db> {
     }
 
     fn attribute(
+        db: &'db dyn Db,
         ty: Type<'db>,
         qualifiers: TypeQualifiers,
         definition: Option<Definition<'db>>,
     ) -> Self {
         Self {
-            kind: ProtocolMemberKind::Attribute(ProtocolMemberType::with_definition(
-                ty, definition,
+            kind: ProtocolMemberKind::Attribute(ProtocolMemberType::with_attribute_definition(
+                db, ty, definition,
             )),
             qualifiers,
             definition,
@@ -1576,6 +1654,11 @@ impl<'db> ProtocolMemberData<'db> {
     ) -> ProtocolMemberCapabilities<'db> {
         match self.kind {
             ProtocolMemberKind::Method(member, kind) => {
+                let member = if kind == ProtocolMethodKind::Class {
+                    ProtocolMemberType::ClassMethod(member.ty())
+                } else {
+                    member
+                };
                 let instance_method = match (member.ty(), kind) {
                     (Type::Callable(callable), ProtocolMethodKind::Instance) => member.with_ty(
                         Type::Callable(protocol_bind_self(db, env.program(db), callable, None)),
@@ -3333,10 +3416,10 @@ fn cached_protocol_interface<'db>(
                 {
                     descriptor
                 } else {
-                    ProtocolMemberData::attribute(ty, qualifiers, definition)
+                    ProtocolMemberData::attribute(db, ty, qualifiers, definition)
                 }
             }
-            _ => ProtocolMemberData::attribute(ty, qualifiers, definition),
+            _ => ProtocolMemberData::attribute(db, ty, qualifiers, definition),
         };
 
         members.insert(name.clone(), member);
