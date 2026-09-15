@@ -394,6 +394,7 @@ jobs:
       - name: "Install uv"
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
           enable-cache: "true"
       - name: ty mdtests (GitHub annotations)
@@ -458,6 +459,7 @@ jobs:
       - name: "Install uv"
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
           enable-cache: "true"
       - name: "Run tests"
@@ -493,6 +495,7 @@ jobs:
       - name: "Install uv"
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
           enable-cache: "true"
       - name: "Run tests"
@@ -584,6 +587,7 @@ jobs:
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
       - run: uv run --only-dev cargo fuzz build -s none
 
@@ -601,6 +605,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -643,6 +648,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
@@ -690,6 +696,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           activate-environment: true
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
 
       - name: "Install Rust toolchain"
@@ -804,6 +811,7 @@ jobs:
         run: git fetch --no-tags --filter=blob:none --unshallow origin
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -854,6 +862,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
       - run: uv run --only-dev cargo shear --deny-warnings
 
@@ -871,6 +880,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -946,6 +956,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -983,6 +994,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           python-version: 3.13
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
       - name: "Update README File"
         run: uv run scripts/transform_readme.py --target mkdocs
@@ -1053,6 +1065,8 @@ jobs:
 
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.11"
           # ruff-lsp's archived CI only tested through Python 3.12.
           python-version: "3.12"
 
@@ -1142,6 +1156,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
 
       - name: "Install Rust toolchain"
@@ -1190,6 +1205,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
 
       - name: "Install Rust toolchain"
@@ -1262,6 +1278,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
 
       - name: "Download benchmark binary"
@@ -1319,6 +1336,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
 
       - name: "Install Rust toolchain"
@@ -1372,6 +1390,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
 
       - name: "Download benchmark binary"
