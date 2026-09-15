@@ -478,9 +478,8 @@ class Box[T: Intersection[A, B]]:
 
 ### Constructing from callbacks with a NamedTuple bound
 
-Combining callbacks that accept the same type variable preserves that variable in the constructed
-instance. A `NamedTuple` bound, which describes an intersection type, does not make the
-constructor's implicit receiver incompatible.
+Regression test for [ty#4526](https://github.com/astral-sh/ty/issues/4526): combining callbacks with
+a `NamedTuple` bound preserves `Box[T]`.
 
 ```py
 from collections.abc import Callable
@@ -498,9 +497,9 @@ class Box[T: NamedTuple]:
 
 ### Constructing with an enclosing Self type
 
-An explicit `Self` type argument refers to the enclosing method's receiver even when another type
-argument is a class type variable that needs freshening. The result keeps that receiver type
-distinct from the class's type parameter, including in recursive calls from `__init__`.
+The recursive call in `__init__` shares a source-level `Self` binding with the constructor it calls,
+while `wrap` has a different `Self` binding. In both cases, freshening the constructor's type
+variables preserves the caller's `Self` argument. The result cannot be returned as `Box[T, T]`.
 
 ```py
 from typing import Self
