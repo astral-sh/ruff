@@ -184,6 +184,52 @@ struct BooleanTest<'ast, 'db> {
     evaluation: ExpressionContext,
 }
 
+impl BooleanTest<'_, '_> {
+    /// An annotation belongs to a diagnostic when the reported test alone determines the complete
+    /// test's outcome. Treat every other operand as unknown, preserving `and`, `or`, and `not`.
+    /// Tests inside calls or conditional expressions select control flow independently.
+    fn truthiness_for_annotation(self, condition: &RedundantCondition<'_, '_>) -> Option<bool> {
+        fn truthiness_from_reported_test(
+            expression: &ast::Expr,
+            condition: &RedundantCondition<'_, '_>,
+        ) -> Truthiness {
+            if expression.range() == condition.expression.range() {
+                return Truthiness::from(condition.is_truthy);
+            }
+
+            match expression {
+                ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
+                    values
+                        .iter()
+                        .fold(Truthiness::from(op.is_and()), |result, value| match op {
+                            ast::BoolOp::Or => {
+                                result.or_else(|| truthiness_from_reported_test(value, condition))
+                            }
+                            ast::BoolOp::And => {
+                                result.and_then(|| truthiness_from_reported_test(value, condition))
+                            }
+                        })
+                }
+                ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    operand,
+                    ..
+                }) => truthiness_from_reported_test(operand, condition).negate(),
+                _ => Truthiness::Ambiguous,
+            }
+        }
+
+        let is_truthy = match self.truthiness {
+            Truthiness::AlwaysTrue => true,
+            Truthiness::AlwaysFalse => false,
+            Truthiness::Ambiguous => return None,
+        };
+
+        (truthiness_from_reported_test(self.expression, condition) == self.truthiness)
+            .then_some(is_truthy)
+    }
+}
+
 /// A condition with known truthiness, and the rule category needed to report it.
 ///
 /// We may or may not eventually report a diagnostic for this condition! A condition is classified
@@ -350,19 +396,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let truthiness = self.condition_truthiness(test);
 
-        for condition in self.redundant_conditions(
-            BooleanTest {
-                expression: test,
-                value_type: test_type,
-                truthiness,
-                evaluation: ExpressionContext::Condition,
-            },
-            RedundantConditionContext::Standalone,
-        ) {
+        let boolean_test = BooleanTest {
+            expression: test,
+            value_type: test_type,
+            truthiness,
+            evaluation: ExpressionContext::Condition,
+        };
+
+        for condition in
+            self.redundant_conditions(boolean_test, RedundantConditionContext::Standalone)
+        {
             if let Some(mut diagnostic) = self.report_redundant_condition(&condition)
-                && condition.expression.range() == test.range()
+                && let Some(test_is_truthy) = boolean_test.truthiness_for_annotation(&condition)
             {
-                self.annotate_redundant_match(&condition, &mut diagnostic, branch_suite);
+                self.annotate_redundant_match(&mut diagnostic, test_is_truthy, branch_suite);
             }
         }
     }
@@ -481,19 +528,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             &suite[i + 1..],
                         );
 
-                        for condition in self.redundant_conditions(
-                            self.boolean_test(test, ExpressionContext::Condition),
-                            context,
-                        ) {
+                        let boolean_test = self.boolean_test(test, ExpressionContext::Condition);
+                        for condition in self.redundant_conditions(boolean_test, context) {
                             if let Some(mut diagnostic) =
                                 self.report_redundant_condition(&condition)
-                                && condition.expression.range() == test.range()
+                                && let Some(test_is_truthy) =
+                                    boolean_test.truthiness_for_annotation(&condition)
                             {
-                                // An operand's truthiness can differ from the complete condition's,
-                                // so only annotate branch reachability for the complete test.
                                 self.annotate_redundant_if_or_elif(
                                     &condition,
                                     &mut diagnostic,
+                                    test_is_truthy,
                                     if_stmt,
                                     branch_index,
                                     &suite[i + 1..],
@@ -503,46 +548,36 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
                 ast::Stmt::Assert(assert_statement) => {
-                    let test_type = self.expression_type(&assert_statement.test);
-                    let truthiness = self.condition_truthiness(&assert_statement.test);
-                    for condition in self.redundant_conditions(
-                        BooleanTest {
-                            expression: &assert_statement.test,
-                            value_type: test_type,
-                            truthiness,
-                            evaluation: ExpressionContext::Condition,
-                        },
-                        RedundantConditionContext::Assertion,
-                    ) {
+                    let boolean_test =
+                        self.boolean_test(&assert_statement.test, ExpressionContext::Condition);
+                    for condition in self
+                        .redundant_conditions(boolean_test, RedundantConditionContext::Assertion)
+                    {
                         if let Some(mut diagnostic) = self.report_redundant_condition(&condition)
-                            && condition.expression.range() == assert_statement.test.range()
+                            && let Some(test_is_truthy) =
+                                boolean_test.truthiness_for_annotation(&condition)
                         {
                             self.annotate_redundant_assert(
-                                &condition,
                                 &mut diagnostic,
+                                test_is_truthy,
                                 &suite[i + 1..],
                             );
                         }
                     }
                 }
                 ast::Stmt::While(while_statement) => {
-                    let test_type = self.expression_type(&while_statement.test);
-                    let truthiness = self.condition_truthiness(&while_statement.test);
-                    for condition in self.redundant_conditions(
-                        BooleanTest {
-                            expression: &while_statement.test,
-                            value_type: test_type,
-                            truthiness,
-                            evaluation: ExpressionContext::Condition,
-                        },
-                        RedundantConditionContext::Standalone,
-                    ) {
+                    let boolean_test =
+                        self.boolean_test(&while_statement.test, ExpressionContext::Condition);
+                    for condition in self
+                        .redundant_conditions(boolean_test, RedundantConditionContext::Standalone)
+                    {
                         if let Some(mut diagnostic) = self.report_redundant_condition(&condition)
-                            && condition.expression.range() == while_statement.test.range()
+                            && let Some(test_is_truthy) =
+                                boolean_test.truthiness_for_annotation(&condition)
                         {
                             self.annotate_redundant_while(
-                                &condition,
                                 &mut diagnostic,
+                                test_is_truthy,
                                 &while_statement.body,
                                 &suite[i + 1..],
                             );

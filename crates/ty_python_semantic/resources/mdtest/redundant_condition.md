@@ -803,6 +803,66 @@ warning[redundant-condition]: An empty tuple is always falsy
    |         ------ This statement is unreachable
 ```
 
+The condition of a loop guard can be false because it negates an always-truthy operand. The
+diagnostic identifies the operand, while the unreachable annotation identifies the code that cannot
+execute:
+
+```py
+def negated_loop(nonempty: tuple[str, str]):
+    while not nonempty:  # snapshot: redundant-condition
+        print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:64:15
+   |
+64 |     while not nonempty:  # snapshot: redundant-condition
+   |               ^^^^^^^^ Inferred type is `tuple[str, str]`
+65 |         print("unreachable")
+   |         -------------------- This statement is unreachable
+```
+
+The same is true for `match` guards:
+
+```py
+def negated_guard(nonempty: tuple[str, str]):
+    match nonempty:
+        case _ if not nonempty:  # snapshot: redundant-condition
+            print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:68:23
+   |
+68 |         case _ if not nonempty:  # snapshot: redundant-condition
+   |                       ^^^^^^^^ Inferred type is `tuple[str, str]`
+69 |             print("unreachable")
+   |             -------------------- This statement is unreachable
+```
+
+Negating an empty tuple makes a loop condition true. Without a reachable `break`, the statement
+after the loop is unreachable:
+
+```py
+def negated_infinite_loop(empty: tuple[()]):
+    while not empty:  # snapshot: redundant-condition
+        print("reachable")
+    print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: An empty tuple is always falsy
+  --> src/mdtest_snippet.py:71:15
+   |
+71 |     while not empty:  # snapshot: redundant-condition
+   |               ^^^^^ Inferred type is `tuple[()]`
+72 |         print("reachable")
+73 |     print("unreachable")
+   |     -------------------- This following statement is unreachable
+```
+
 ## Always truthy values appearing later in compound conditions
 
 A subexpression in a compound condition can be inferred as always truthy or always falsy even if the
@@ -2455,6 +2515,46 @@ error[redundant-condition-strict]: Condition is always false
    |         ------------------- This statement is unreachable
 ```
 
+Negating an always-truthy tuple makes the `if` body unreachable:
+
+```py
+def negated_tuple(x: tuple[str, str]):
+    if not x:  # snapshot: redundant-condition
+        print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:88:12
+   |
+88 |     if not x:  # snapshot: redundant-condition
+   |            ^ Inferred type is `tuple[str, str]`
+89 |         print("unreachable")
+   |         -------------------- This statement is unreachable
+```
+
+while negating it twice makes the `else` branch unreachable:
+
+```py
+def negated_tuple(x: tuple[str, str]):
+    if not not x:  # snapshot: redundant-condition
+        pass
+    else:
+        print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:91:16
+   |
+91 |       if not not x:  # snapshot: redundant-condition
+   |                  ^ Inferred type is `tuple[str, str]`
+92 |           pass
+93 | /     else:
+94 | |         print("unreachable")
+   | |____________________________- This following branch is unreachable
+```
+
 We also warn when always-true, always-terminal `if`s make the remaining suite unreachable:
 
 ```py
@@ -2467,13 +2567,13 @@ def f(x: int):
 
 ```snapshot
 error[redundant-condition-strict]: Condition is always true
-  --> src/mdtest_snippet.py:88:8
+  --> src/mdtest_snippet.py:96:8
    |
-88 |     if isinstance(x, int):  # snapshot: redundant-condition-strict
+96 |     if isinstance(x, int):  # snapshot: redundant-condition-strict
    |        ^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
-89 |         return
-90 |
-91 |     print("hi")
+97 |         return
+98 |
+99 |     print("hi")
    |     ----------- This following statement is unreachable
 ```
 
@@ -2508,18 +2608,18 @@ def compound_conditions(x: str):
 
 ```snapshot
 error[redundant-condition-strict]: Condition is always true
-   --> src/mdtest_snippet.py:101:11
+   --> src/mdtest_snippet.py:109:11
     |
-101 |     while isinstance(x, str) and isinstance(x, str):  # snapshot: redundant-condition-strict
+109 |     while isinstance(x, str) and isinstance(x, str):  # snapshot: redundant-condition-strict
     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
 
 
 error[redundant-condition-strict]: Condition is always false
-   --> src/mdtest_snippet.py:105:23
+   --> src/mdtest_snippet.py:113:23
     |
-105 |         case str() if not isinstance(x, str) or not isinstance(x, str):  # snapshot: redundant-condition-strict
+113 |         case str() if not isinstance(x, str) or not isinstance(x, str):  # snapshot: redundant-condition-strict
     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[False]`
-106 |             print("unreachable")
+114 |             print("unreachable")
     |             -------------------- This statement is unreachable
 ```
 
@@ -2761,33 +2861,169 @@ def unreachable_branches():
 
 ## Reachability annotations for compound conditions
 
-Branch reachability annotations accompany diagnostics on complete conditions. A diagnostic on an
-operand does not receive a branch annotation, even when that operand makes the complete condition
-always false:
+An always-false `and` operand makes the body unreachable, even when an earlier operand is unknown.
+The same operand can determine the reachability of a loop body:
 
 ```py
 def check(empty: tuple[()], enabled: bool):
-    while empty and enabled:  # snapshot: redundant-condition
+    while enabled and empty:  # snapshot: redundant-condition
         print("unreachable")
+```
 
+```snapshot
+warning[redundant-condition]: An empty tuple is always falsy
+ --> src/mdtest_snippet.py:2:23
+  |
+2 |     while enabled and empty:  # snapshot: redundant-condition
+  |                       ^^^^^ Inferred type is `tuple[()]`
+3 |         print("unreachable")
+  |         -------------------- This statement is unreachable
+```
+
+or a guarded `match` case:
+
+```py
+def check(empty: tuple[()], enabled: bool):
     match enabled:
-        case _ if empty and enabled:  # snapshot: redundant-condition
+        case _ if enabled and empty:  # snapshot: redundant-condition
             print("unreachable")
 ```
 
 ```snapshot
 warning[redundant-condition]: An empty tuple is always falsy
- --> src/mdtest_snippet.py:2:11
+ --> src/mdtest_snippet.py:6:31
   |
-2 |     while empty and enabled:  # snapshot: redundant-condition
-  |           ^^^^^ Inferred type is `tuple[()]`
+6 |         case _ if enabled and empty:  # snapshot: redundant-condition
+  |                               ^^^^^ Inferred type is `tuple[()]`
+7 |             print("unreachable")
+  |             -------------------- This statement is unreachable
+```
+
+An always-true `or` operand makes the `else` branch unreachable:
+
+```py
+def true_or_operand(flag: bool, nonempty: tuple[str, str]):
+    if flag or nonempty:  # snapshot: redundant-condition
+        pass
+    else:
+        print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:9:16
+   |
+ 9 |       if flag or nonempty:  # snapshot: redundant-condition
+   |                  ^^^^^^^^ Inferred type is `tuple[str, str]`
+10 |           pass
+11 | /     else:
+12 | |         print("unreachable")
+   | |____________________________- This following branch is unreachable
+```
+
+Negating the compound test instead makes the `if` body unreachable:
+
+```py
+def true_or_operand(flag: bool, nonempty: tuple[str, str]):
+    if not (flag or nonempty):  # snapshot: redundant-condition
+        print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:14:21
+   |
+14 |     if not (flag or nonempty):  # snapshot: redundant-condition
+   |                     ^^^^^^^^ Inferred type is `tuple[str, str]`
+15 |         print("unreachable")
+   |         -------------------- This statement is unreachable
+```
+
+An operand does not explain the branch's reachability when another operand determines the result. In
+this condition, the empty tuple makes the `and` test false:
+
+```py
+def contributing_operands(empty: tuple[()], nonempty: tuple[str, str]):
+    # snapshot: redundant-condition
+    # snapshot: redundant-condition
+    if nonempty and empty:
+        print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:19:8
+   |
+19 |     if nonempty and empty:
+   |        ^^^^^^^^ Inferred type is `tuple[str, str]`
 
 
 warning[redundant-condition]: An empty tuple is always falsy
- --> src/mdtest_snippet.py:6:19
-  |
-6 |         case _ if empty and enabled:  # snapshot: redundant-condition
-  |                   ^^^^^ Inferred type is `tuple[()]`
+  --> src/mdtest_snippet.py:19:21
+   |
+19 |     if nonempty and empty:
+   |                     ^^^^^ Inferred type is `tuple[()]`
+20 |         print("unreachable")
+   |         -------------------- This statement is unreachable
+```
+
+But here, the nonempty tuple makes the `or` test true:
+
+```py
+def contributing_operands(empty: tuple[()], nonempty: tuple[str, str]):
+    # snapshot: redundant-condition
+    # snapshot: redundant-condition
+    if empty or nonempty:
+        pass
+    else:
+        print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: An empty tuple is always falsy
+  --> src/mdtest_snippet.py:24:8
+   |
+24 |     if empty or nonempty:
+   |        ^^^^^ Inferred type is `tuple[()]`
+
+
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:24:17
+   |
+24 |       if empty or nonempty:
+   |                   ^^^^^^^^ Inferred type is `tuple[str, str]`
+25 |           pass
+26 | /     else:
+27 | |         print("unreachable")
+   | |____________________________- This following branch is unreachable
+```
+
+If each operand must be truthy for an `and` expression to be true, neither operand alone explains
+why the `else` branch is unreachable:
+
+```py
+def jointly_truthy(first: tuple[str, str], second: tuple[int, int]):
+    # snapshot: redundant-condition
+    # snapshot: redundant-condition
+    if first and second:
+        pass
+    else:
+        print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:31:8
+   |
+31 |     if first and second:
+   |        ^^^^^ Inferred type is `tuple[str, str]`
+
+
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:31:18
+   |
+31 |     if first and second:
+   |                  ^^^^^^ Inferred type is `tuple[int, int]`
 ```
 
 ## Boolean tests inside value expressions
@@ -4370,6 +4606,44 @@ warning[redundant-condition]: `None` is always falsy
 36 |     pass
 37 |     print(
    |     ------ This following statement is unreachable
+```
+
+Negating an always-truthy operand also makes an assertion fail, leaving its following statements
+unreachable:
+
+```py
+def negated_assertion(nonempty: tuple[str, str]):
+    assert not nonempty  # snapshot: redundant-condition
+    print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:41:16
+   |
+41 |     assert not nonempty  # snapshot: redundant-condition
+   |                ^^^^^^^^ Inferred type is `tuple[str, str]`
+42 |     print("unreachable")
+   |     -------------------- This following statement is unreachable
+```
+
+An always-false operand of an `and` expression also makes an assertion fail even when the other
+operand is unknown:
+
+```py
+def compound_assertion(enabled: bool, empty: tuple[()]):
+    assert enabled and empty  # snapshot: redundant-condition
+    print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: An empty tuple is always falsy
+  --> src/mdtest_snippet.py:44:24
+   |
+44 |     assert enabled and empty  # snapshot: redundant-condition
+   |                        ^^^^^ Inferred type is `tuple[()]`
+45 |     print("unreachable")
+   |     -------------------- This following statement is unreachable
 ```
 
 ## `sys.version_info` checks, `sys.platform` checks, `os.name` checks, `if TYPE_CHECKING` checks

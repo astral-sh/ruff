@@ -888,12 +888,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     pub(super) fn annotate_redundant_while(
         &self,
-        condition: &RedundantCondition<'_, 'db>,
         diagnostic: &mut Diagnostic,
+        test_is_truthy: bool,
         suite_if_true: &[ast::Stmt],
         following_suite: &[ast::Stmt],
     ) {
-        if condition.is_truthy {
+        if test_is_truthy {
             if !suite_ends_with_exit(self, following_suite, SuiteExitKind::Defensive)
                 && let Some(stmt) = first_nontrivial_statement(following_suite)
                 && self.is_unreachable(stmt)
@@ -919,11 +919,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     pub(super) fn annotate_redundant_assert(
         &self,
-        condition: &RedundantCondition<'_, 'db>,
         diagnostic: &mut Diagnostic,
+        test_is_truthy: bool,
         following_suite: &[ast::Stmt],
     ) {
-        if condition.is_truthy {
+        if test_is_truthy {
             return;
         }
 
@@ -940,11 +940,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     pub(super) fn annotate_redundant_match(
         &self,
-        condition: &RedundantCondition<'_, 'db>,
         diagnostic: &mut Diagnostic,
+        test_is_truthy: bool,
         suite_if_true: &[ast::Stmt],
     ) {
-        if condition.is_truthy {
+        if test_is_truthy {
             return;
         }
 
@@ -963,6 +963,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &self,
         condition: &RedundantCondition<'_, 'db>,
         diagnostic: &mut Diagnostic,
+        test_is_truthy: bool,
         if_stmt: &ast::StmtIf,
         branch_index: usize,
         following_suite: &[ast::Stmt],
@@ -970,7 +971,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let RedundantCondition {
             expression: test,
             value_type: _,
-            is_truthy,
+            is_truthy: _,
             kind,
         } = condition;
 
@@ -978,7 +979,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .chain(if_stmt.elif_else_clauses.iter().map(|clause| &*clause.body))
             .collect();
 
-        if *is_truthy {
+        if test_is_truthy {
             let mut implicit_else_is_unreachable = false;
 
             // The branch index includes the initial `if`, but `elif_else_clauses` does not.
