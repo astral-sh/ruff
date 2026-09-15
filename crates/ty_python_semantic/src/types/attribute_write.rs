@@ -902,9 +902,9 @@ pub(super) fn assignment_attribute_members<'db>(
             | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => object_ty.instance_member(db, env, attribute),
-            Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
-                object_ty.class_object_member(db, env, attribute, MemberLookupPolicy::default())
-            }
+            Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => object_ty
+                .class_object_member(db, env, attribute, MemberLookupPolicy::default())
+                .into_place(db, env),
             Type::Union(..)
             | Type::Intersection(..)
             | Type::TypeAlias(..)

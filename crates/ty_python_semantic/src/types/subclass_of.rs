@@ -1,9 +1,9 @@
 use crate::Db;
 use crate::FxOrderSet;
 use crate::ProgramEnvironment;
-use crate::place::PlaceAndQualifiers;
 use crate::types::class::{DynamicClassLiteral, metaclass_instance_type};
 use crate::types::constraints::ConstraintSet;
+use crate::types::member::LookupMember;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::{
@@ -266,13 +266,13 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    pub(crate) fn find_name_in_mro_with_policy(
+    pub(super) fn find_name_in_mro_with_policy(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
-    ) -> Option<PlaceAndQualifiers<'db>> {
+    ) -> Option<LookupMember<'db>> {
         if let SubclassOfInner::Protocol(protocol) = self.subclass_of
             && let Some(member) = protocol.interface(db).meta_member(db, env, name)
         {
@@ -294,7 +294,9 @@ impl<'db> SubclassOfType<'db> {
             }
         };
 
-        class_like.find_name_in_mro_with_policy(db, env, name, policy)
+        class_like
+            .find_name_in_mro_with_policy(db, env, name, policy)
+            .map(LookupMember::new)
     }
 
     pub(super) fn recursive_type_normalized_impl(
