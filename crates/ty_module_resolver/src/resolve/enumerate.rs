@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use camino::Utf8PathBuf;
 use ruff_db::files::directory_listing;
 use ruff_db::system::{FileType, SystemPath};
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -61,7 +62,7 @@ impl<'db> NameResolver<'db> {
         };
         if prefix.is_none() {
             for path in search_paths(db, context.resolver_environment, context.mode) {
-                collect(&ModuleDirectory::new(context, path.to_module_path()));
+                collect(&ModuleDirectory::new(context, path.clone()));
             }
         } else {
             for candidate in search.candidates().filter(|candidate| {
@@ -160,12 +161,12 @@ fn candidate_is_eligible(
     candidate: &ModuleResolutionCandidate,
 ) -> bool {
     let db = resolver.context.db;
-    let Some(root) = candidate.directory.path().search_path().as_system_path() else {
+    let Some(root) = candidate.directory.search_path().as_system_path() else {
         return true;
     };
     let path = match candidate.module {
         ResolvedModule::Module(file) => file.path(db).as_system_path().map(SystemPath::to_path_buf),
-        _ => candidate.directory.path().to_system_path(),
+        _ => candidate.directory.to_system_path(),
     };
     let Some(path) = path else { return false };
     // Exempt the resolved package's ancestry only for locations beneath its directory.
@@ -239,22 +240,18 @@ fn child_directory_names<'db>(
     parent: Option<ModuleNameIngredient<'db>>,
 ) -> Box<[String]> {
     let context = ResolverContext::new(db, mode.resolver_environment(db), mode.mode(db));
+    let relative_path: Utf8PathBuf = parent
+        .map(|parent| parent.name(db).components().collect())
+        .unwrap_or_default();
     let mut names = BTreeSet::new();
     for search_path in search_paths(db, context.resolver_environment, context.mode) {
-        let mut path = search_path.to_module_path();
-        if let Some(parent) = parent {
-            for component_name in parent.name(db).components() {
-                path.push(component_name);
-            }
-        }
-        let directory = ModuleDirectory::new(&context, path.clone());
+        let directory =
+            ModuleDirectory::from_parts(&context, search_path.clone(), relative_path.clone());
         for_each_entry(db, &directory, |name, kind| {
             if matches!(kind, FileType::Directory | FileType::Symlink) && is_identifier(name) {
-                let mut child = path.clone();
-                child.push(name);
                 // Follow directory symlinks and record target-status dependencies.
                 // Keep typeshed's Python-version availability checks.
-                if child.is_directory(&context) {
+                if ModuleDirectory::exists_at(&context, search_path, &relative_path.join(name)) {
                     names.insert(name.to_owned());
                 }
             }
@@ -269,7 +266,7 @@ fn for_each_entry(db: &dyn Db, directory: &ModuleDirectory, mut visit: impl FnMu
             db.unwind_if_revision_cancelled();
             visit(name, kind);
         }
-    } else if let Some(path) = directory.path().to_vendored_path() {
+    } else if let Some(path) = directory.to_vendored_path() {
         for entry in db.vendored().read_directory(&path) {
             if let Some(name) = entry.path().file_name() {
                 let kind = if entry.file_type().is_directory() {
