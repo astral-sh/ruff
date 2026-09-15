@@ -67,6 +67,7 @@ pub(super) enum Sequent {
     SingleImplication {
         ante: ConstraintId,
         post: ConstraintId,
+        fuel_cost: u16,
     },
 
     /// Sequent of the form `C₁ ∧ C₂ → D`
@@ -78,6 +79,7 @@ pub(super) enum Sequent {
         ante1: ConstraintId,
         ante2: ConstraintId,
         post: ConstraintId,
+        fuel_cost: u16,
     },
 }
 
@@ -220,17 +222,43 @@ impl SequentMap {
             return;
         }
 
-        self.sequents
-            .push(Sequent::PairImplication { ante1, ante2, post });
+        // A rule's fuel cost depends only on its fixed antecedents and consequent.
+        let (ante1_depth, _) = storage.cached_constraint_bound_depth(db, env, ante1);
+        let (ante2_depth, _) = storage.cached_constraint_bound_depth(db, env, ante2);
+        let fuel_cost = storage.sequent_fuel_cost(db, env, post, ante1_depth.max(ante2_depth));
+        self.sequents.push(Sequent::PairImplication {
+            ante1,
+            ante2,
+            post,
+            fuel_cost,
+        });
     }
 
-    fn add_single_implication(&mut self, ante: ConstraintId, post: ConstraintId) {
+    fn add_single_implication<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        ante: ConstraintId,
+        post: ConstraintId,
+    ) {
         if ante == post {
             return;
         }
 
-        self.sequents
-            .push(Sequent::SingleImplication { ante, post });
+        let ante_data = storage.constraint_data(ante);
+        let post_data = storage.constraint_data(post);
+        let fuel_cost = if post_data.is_bound_projection_of(db, ante_data) {
+            1
+        } else {
+            let (ante_depth, _) = storage.cached_constraint_bound_depth(db, env, ante);
+            storage.sequent_fuel_cost(db, env, post, ante_depth)
+        };
+        self.sequents.push(Sequent::SingleImplication {
+            ante,
+            post,
+            fuel_cost,
+        });
     }
 
     fn add_sequents_for_single<'db>(
@@ -386,7 +414,7 @@ impl SequentMap {
                             .map(|bound| bound.with_source_provenance(constraint_data)),
                     );
                     if interior.if_true != ALWAYS_FALSE {
-                        self.add_single_implication(constraint, derived);
+                        self.add_single_implication(db, env, storage, constraint, derived);
                         node = interior.if_true;
                     } else {
                         self.add_pair_impossibility(constraint, derived);
@@ -1275,7 +1303,7 @@ impl SequentMap {
                 right = %right_constraint.display(db, env, storage),
                 "left implies right",
             );
-            self.add_single_implication(left_constraint, right_constraint);
+            self.add_single_implication(db, env, storage, left_constraint, right_constraint);
         }
         if storage.cached_constraint_implies(db, env, right_constraint, left_constraint) {
             tracing::trace!(
@@ -1284,7 +1312,7 @@ impl SequentMap {
                 right = %right_constraint.display(db, env, storage),
                 "right implies left",
             );
-            self.add_single_implication(right_constraint, left_constraint);
+            self.add_single_implication(db, env, storage, right_constraint, left_constraint);
         }
 
         match left_constraint.intersect(db, env, storage, right_constraint) {
@@ -1306,8 +1334,20 @@ impl SequentMap {
                     right_constraint,
                     intersection_constraint,
                 );
-                self.add_single_implication(intersection_constraint, left_constraint);
-                self.add_single_implication(intersection_constraint, right_constraint);
+                self.add_single_implication(
+                    db,
+                    env,
+                    storage,
+                    intersection_constraint,
+                    left_constraint,
+                );
+                self.add_single_implication(
+                    db,
+                    env,
+                    storage,
+                    intersection_constraint,
+                    right_constraint,
+                );
             }
 
             // The sequent map only needs to include constraints that might appear in a BDD. If the
@@ -1360,7 +1400,9 @@ impl SequentMap {
                         )?;
                     }
 
-                    Sequent::PairImplication { ante1, ante2, post } => {
+                    Sequent::PairImplication {
+                        ante1, ante2, post, ..
+                    } => {
                         maybe_write_prefix(f)?;
                         write!(
                             f,
@@ -1371,7 +1413,7 @@ impl SequentMap {
                         )?;
                     }
 
-                    Sequent::SingleImplication { ante, post } => {
+                    Sequent::SingleImplication { ante, post, .. } => {
                         maybe_write_prefix(f)?;
                         write!(
                             f,
@@ -1455,7 +1497,7 @@ impl<'db> ConstraintSetStorage<'db> {
     /// type constructors. Each sequent is charged the _increase_ in that complexity between its
     /// antecedents and its consequent. (Measuring growth rather than absolute depth avoids
     /// penalizing a complex concrete bound that is merely propagated unchanged.)
-    pub(super) fn sequent_fuel_cost(
+    fn sequent_fuel_cost(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

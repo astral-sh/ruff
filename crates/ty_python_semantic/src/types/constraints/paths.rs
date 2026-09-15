@@ -9,12 +9,18 @@ use indexmap::map::Entry;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
+use ruff_index::{IndexVec, newtype_index};
+
 use crate::types::constraints::sequents::{Sequent, SequentMap};
 use crate::types::constraints::{
     ConstraintAssignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor,
     SourceOrderId, TypeVarId,
 };
 use crate::{Db, FxIndexMap, ProgramEnvironment};
+
+/// The position of an assignment in insertion order.
+#[newtype_index]
+struct AssignmentIndex;
 
 /// The collection of constraints that we know to be true or false at a certain point when
 /// traversing a BDD.
@@ -46,14 +52,15 @@ use crate::{Db, FxIndexMap, ProgramEnvironment};
 pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
     sequents: Vec<Sequent>,
-    /// Each assignment's source constraint and the first per-path fuel value with which it was
-    /// derived.
+    /// Each assignment's source constraint and greatest remaining per-path fuel.
     pub(super) assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
-    /// Additional per-path fuel values that can derive an assignment, keyed by its index in
-    /// `assignments`. These are stored separately so that branch-local additions can be rolled
-    /// back by truncating the set. Only the greatest fuel value participates in further
-    /// derivation.
-    additional_fuels: Vec<(usize, u16)>,
+    /// Positions in `assignments`, cleared when their branch is left. Fuel stays in the map so
+    /// replenishment and rollback do not need to update these indices.
+    positive_assignment_indices: IndexVec<ConstraintId, Option<AssignmentIndex>>,
+    negative_assignment_indices: IndexVec<ConstraintId, Option<AssignmentIndex>>,
+    /// Previous fuel values, keyed by assignment index, for rolling back replenishments when
+    /// leaving a BDD branch. Keeping the maximum in `assignments` makes fuel lookups constant-time.
+    fuel_undo: Vec<(usize, u16)>,
     /// The amount of global fuel that remains across all assignments and paths.
     remaining_overall_fuel: u16,
     /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
@@ -200,7 +207,9 @@ impl PathAssignments {
         Self {
             sequents: Vec::default(),
             assignments: FxIndexMap::default(),
-            additional_fuels: Vec::default(),
+            positive_assignment_indices: IndexVec::default(),
+            negative_assignment_indices: IndexVec::default(),
+            fuel_undo: Vec::default(),
             discovered,
             elaborated_pairs: FxHashSet::default(),
             independent_typevars,
@@ -406,7 +415,7 @@ impl PathAssignments {
         // pass along the range of which assignments are new, and so that we can reset back to this
         // point before returning.
         let start = self.assignments.len();
-        let additional_fuels_start = self.additional_fuels.len();
+        let fuel_undo_start = self.fuel_undo.len();
         let previous_remaining_overall_fuel = self.remaining_overall_fuel;
 
         // Add the new assignment and anything we can derive from it.
@@ -451,8 +460,23 @@ impl PathAssignments {
         // Reset back to where we were before following this edge, so that the caller can reuse a
         // single instance for the entire BDD traversal.
         self.assignment_queue.clear();
+        // A branch can replenish an assignment more than once. Restore in reverse order while
+        // every referenced assignment still exists.
+        for (index, previous_fuel) in self.fuel_undo.drain(fuel_undo_start..).rev() {
+            self.assignments[index].1 = previous_fuel;
+        }
+        for assignment in self.assignments[start..].keys() {
+            match *assignment {
+                ConstraintAssignment::Positive(constraint) => {
+                    self.positive_assignment_indices[constraint] = None;
+                }
+                ConstraintAssignment::Negative(constraint) => {
+                    self.negative_assignment_indices[constraint] = None;
+                }
+                ConstraintAssignment::Unconstrained(_) => {}
+            }
+        }
         self.assignments.truncate(start);
-        self.additional_fuels.truncate(additional_fuels_start);
         self.remaining_overall_fuel = previous_remaining_overall_fuel;
         result
     }
@@ -471,7 +495,35 @@ impl PathAssignments {
     }
 
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
-        self.assignments.contains_key(&assignment)
+        self.assignment_index(assignment).is_some()
+    }
+
+    fn assignment_index(&self, assignment: ConstraintAssignment) -> Option<usize> {
+        let indices = match assignment {
+            ConstraintAssignment::Positive(_) => &self.positive_assignment_indices,
+            ConstraintAssignment::Negative(_) => &self.negative_assignment_indices,
+            ConstraintAssignment::Unconstrained(_) => {
+                return self.assignments.get_index_of(&assignment);
+            }
+        };
+        indices
+            .get(assignment.constraint())
+            .copied()
+            .flatten()
+            .map(AssignmentIndex::as_usize)
+    }
+
+    fn record_assignment_index(&mut self, assignment: ConstraintAssignment, index: usize) {
+        let indices = match assignment {
+            ConstraintAssignment::Positive(_) => &mut self.positive_assignment_indices,
+            ConstraintAssignment::Negative(_) => &mut self.negative_assignment_indices,
+            ConstraintAssignment::Unconstrained(_) => return,
+        };
+        let constraint = assignment.constraint();
+        if indices.len() <= constraint.as_usize() {
+            indices.resize(constraint.as_usize() + 1, None);
+        }
+        indices[constraint] = Some(AssignmentIndex::from_usize(index));
     }
 
     fn contains_constraint(&self, constraint: ConstraintId) -> bool {
@@ -482,14 +534,8 @@ impl PathAssignments {
 
     /// Returns the greatest remaining fuel for any derivation of `assignment` on this path.
     fn max_remaining_fuel_for(&self, assignment: ConstraintAssignment) -> Option<u16> {
-        let (index, _, (_, first_fuel)) = self.assignments.get_full(&assignment)?;
-        let max_fuel = self
-            .additional_fuels
-            .iter()
-            .filter(|(fuel_index, _)| *fuel_index == index)
-            .map(|(_, fuel)| *fuel)
-            .fold(*first_fuel, u16::max);
-        Some(max_fuel)
+        self.assignment_index(assignment)
+            .map(|index| self.assignments[index].1)
     }
 
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
@@ -597,7 +643,7 @@ impl PathAssignments {
         }
 
         // First add this assignment. If it causes a conflict, return that as an error.
-        if self.assignments.contains_key(&assignment.negated()) {
+        if self.assignment_holds(assignment.negated()) {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
                 assignment = %assignment.display(db, env, storage),
@@ -621,7 +667,9 @@ impl PathAssignments {
                             None => return Ok(()),
                         };
                 }
+                let index = entry.index();
                 entry.insert((source_constraint, fuel.remaining));
+                self.record_assignment_index(assignment, index);
             }
 
             Entry::Occupied(mut entry) => {
@@ -647,20 +695,12 @@ impl PathAssignments {
                 // There is another derivation of this assignment that already provides at least as
                 // much fuel as this constraint. That means replenishing the fuel won't have any
                 // effect.
-                if *existing_fuel >= fuel.remaining
-                    || self
-                        .additional_fuels
-                        .iter()
-                        .any(|(fuel_index, existing_fuel)| {
-                            *fuel_index == index && *existing_fuel >= fuel.remaining
-                        })
-                {
+                if *existing_fuel >= fuel.remaining {
                     return Ok(());
                 }
 
-                // Record the replenished fuel separately so that `walk_edge` can restore the
-                // parent branch by truncating `additional_fuels`.
-                self.additional_fuels.push((index, fuel.remaining));
+                self.fuel_undo.push((index, *existing_fuel));
+                *existing_fuel = fuel.remaining;
             }
         }
 
@@ -708,12 +748,21 @@ impl PathAssignments {
             Sequent::PairImpossibility { ante1, ante2 } => {
                 self.check_pair_impossibility(db, env, storage, ante1, ante2)
             }
-            Sequent::PairImplication { ante1, ante2, post } => {
-                self.check_pair_implication(db, env, storage, ante1, ante2, post);
+            Sequent::PairImplication {
+                ante1,
+                ante2,
+                post,
+                fuel_cost,
+            } => {
+                self.check_pair_implication(ante1, ante2, post, fuel_cost);
                 Ok(())
             }
-            Sequent::SingleImplication { ante, post } => {
-                self.check_single_implication(db, env, storage, ante, post);
+            Sequent::SingleImplication {
+                ante,
+                post,
+                fuel_cost,
+            } => {
+                self.check_single_implication(ante, post, fuel_cost);
                 Ok(())
             }
         }
@@ -775,14 +824,12 @@ impl PathAssignments {
         Ok(())
     }
 
-    fn check_pair_implication<'db>(
+    fn check_pair_implication(
         &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
         ante1: ConstraintId,
         ante2: ConstraintId,
         post: ConstraintId,
+        fuel_cost: u16,
     ) {
         let Some(ante1_fuel) = self.max_remaining_fuel_for(ante1.when_true()) else {
             return;
@@ -791,10 +838,6 @@ impl PathAssignments {
             return;
         };
         let available_fuel = ante1_fuel.min(ante2_fuel);
-        let (ante1_constructor_depth, _) = storage.cached_constraint_bound_depth(db, env, ante1);
-        let (ante2_constructor_depth, _) = storage.cached_constraint_bound_depth(db, env, ante2);
-        let antecedent_constructor_depth = ante1_constructor_depth.max(ante2_constructor_depth);
-        let fuel_cost = storage.sequent_fuel_cost(db, env, post, antecedent_constructor_depth);
         if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
             self.enqueue_assignment(
                 post.when_true(),
@@ -803,25 +846,9 @@ impl PathAssignments {
         }
     }
 
-    fn check_single_implication<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        ante: ConstraintId,
-        post: ConstraintId,
-    ) {
+    fn check_single_implication(&mut self, ante: ConstraintId, post: ConstraintId, fuel_cost: u16) {
         let Some(available_fuel) = self.max_remaining_fuel_for(ante.when_true()) else {
             return;
-        };
-        let ante_data = storage.constraint_data(ante);
-        let (antecedent_constructor_depth, _) =
-            storage.cached_constraint_bound_depth(db, env, ante);
-        let post_data = storage.constraint_data(post);
-        let fuel_cost = if post_data.is_bound_projection_of(db, ante_data) {
-            1
-        } else {
-            storage.sequent_fuel_cost(db, env, post, antecedent_constructor_depth)
         };
         if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
             self.enqueue_assignment(
