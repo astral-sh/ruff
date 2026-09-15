@@ -2115,6 +2115,32 @@ sort = build_sort_spec(params) or {"name": -1}
 use_sort(sort)
 ```
 
+A generic constructor can also provide a structured context whose type parameters are not yet
+specialized. The other branch still supplies the literal's element types, for either operand order
+and for boolean expressions.
+
+```py
+def generic_dictionary_context(values: dict[str | None, object], flag: bool) -> None:
+    reveal_type(dict(values if flag else {None: None}))  # revealed: dict[str | None, object]
+    reveal_type(dict({None: None} if flag else values))  # revealed: dict[str | None, object]
+    reveal_type(dict(values or {None: None}))  # revealed: dict[str | None, object]
+```
+
+Explicit gradual element types remain preferred over the other branch's specialization. Rigid outer
+type variables also remain constraints: an integer literal cannot satisfy every possible
+specialization of `T`.
+
+```py
+from typing import Any
+
+def declared_gradual_context(values: list[int], flag: bool) -> None:
+    result: list[Any] = values if flag else reveal_type([])  # revealed: list[Any]
+    reveal_type(result)  # revealed: list[Any]
+
+def rigid_context[T](values: list[T], flag: bool) -> list[T]:
+    return values if flag else [1]  # error: [invalid-return-type]
+```
+
 ## Lambda expressions
 
 If a lambda expression is annotated as a `Callable` type, the body of the lambda is inferred with
