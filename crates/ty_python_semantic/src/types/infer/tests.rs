@@ -6,14 +6,14 @@ use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::lint::{LintSource, RuleSelection};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
-use crate::types::{KnownClass, KnownInstanceType, check_types};
+use crate::types::{KnownClass, KnownInstanceType, UnionType, check_types};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 use ruff_python_ast::PythonVersion;
 use salsa::Database as _;
-use salsa::plumbing::AsId;
+use salsa::plumbing::{AsId, FromId};
 use ty_python_core::definition::Definition;
 use ty_python_core::program::{Program, ProgramSettings};
 use ty_python_core::scope::FileScopeId;
@@ -761,6 +761,71 @@ if value_{index}:
         assert!(
             (1..=max_queries).contains(&lookups),
             "{query_name} should be shared across conditions; executed {lookups} queries"
+        );
+    }
+    Ok(())
+}
+
+/// Tuple addition widens while combining alternatives, before constructing their full Cartesian
+/// product. Inspecting intermediate unions catches excessive work even when late widening produces
+/// the same final type, without a machine-dependent timing threshold.
+#[test]
+fn tuple_addition_bounds_intermediate_unions() -> anyhow::Result<()> {
+    // Eight three-element shapes produce 64 distinct six-element concatenations.
+    let choice = (0..8)
+        .map(|bits| {
+            format!(
+                "tuple[Literal[{}], Literal[{}], Literal[{}]]",
+                bits & 1,
+                (bits >> 1) & 1,
+                (bits >> 2) & 1,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" | ");
+
+    for operation in [
+        "result = value + value",
+        "result = value\n    result += value",
+    ] {
+        let source = format!(
+            "from typing import Literal, reveal_type
+Choice = {choice}
+def concatenate(value: Choice):
+    {operation}
+    reveal_type(result)
+"
+        );
+        let mut db = TestDbBuilder::new()
+            .with_python_version(PythonVersion::PY311)
+            .with_file("/src/main.py", &source)
+            .build()?;
+        assert_revealed_type(&db, "/src/main.py", "tuple[Literal[0, 1], ...]");
+
+        let events = db.take_salsa_events();
+        let largest_tuple_union = events
+            .iter()
+            .filter_map(|event| match event.kind {
+                salsa::EventKind::DidInternValue { key, .. }
+                    if db.ingredient_debug_name(key.ingredient_index()) == "UnionType" =>
+                {
+                    Some(UnionType::from_id(key.key_index()))
+                }
+                _ => None,
+            })
+            .filter(|union| {
+                union.elements(&db).iter().all(|element| {
+                    element
+                        .exact_tuple_instance_spec(&db)
+                        .is_some_and(|tuple| tuple.len().into_fixed_length() == Some(6))
+                })
+            })
+            .map(|union| union.elements(&db).len())
+            .max()
+            .unwrap_or_default();
+        assert!(
+            largest_tuple_union < 64,
+            "{operation} constructed a union of {largest_tuple_union} tuple alternatives",
         );
     }
     Ok(())

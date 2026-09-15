@@ -13,7 +13,20 @@ reveal_type(x)  # revealed: float
 
 x = (1, 2)
 x += (3, 4)
-reveal_type(x)  # revealed: tuple[Literal[1, 2, 3, 4], ...]
+reveal_type(x)  # revealed: tuple[Literal[1], Literal[2], Literal[3], Literal[4]]
+```
+
+## Fixed-length tuples of `Any`
+
+Dynamic element types do not make a fixed-length tuple accept a different number of elements.
+Augmented concatenation reports the incompatible length and retains the declared type.
+
+```py
+from typing import Any
+
+def append(value: tuple[Any, Any]) -> None:
+    value += (1,)  # error: [invalid-assignment]
+    reveal_type(value)  # revealed: tuple[Any, Any]
 ```
 
 ## Walrus target

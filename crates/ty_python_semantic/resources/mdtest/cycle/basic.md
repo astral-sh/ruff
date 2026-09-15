@@ -50,6 +50,19 @@ while 1:
     y = (y, *y)
 ```
 
+## Concatenating a recursively growing tuple
+
+A loop can append any number of elements. The inferred tuple becomes variable-length instead of
+accumulating a new fixed-length alternative on each inference iteration.
+
+```py
+def repeat(flag: bool) -> None:
+    value = ()
+    while flag:
+        value += (1,)
+    reveal_type(value)  # revealed: tuple[Literal[1], ...]
+```
+
 ## Generic `NamedTuple` with recursive fields
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3872>. Computing the
