@@ -82,6 +82,12 @@ pub(super) fn uv_sync_command(
     );
 
     let mut command = case.command();
+    set_uv_envs(&mut command, case, virtual_env);
+    Ok(command)
+}
+
+#[cfg(feature = "test-uv")]
+fn set_uv_envs(command: &mut Command, case: &CliTest, virtual_env: Option<&Path>) {
     command
         .envs(uv_test_env_vars())
         .env("TY_UV", "1")
@@ -93,8 +99,6 @@ pub(super) fn uv_sync_command(
     if let Some(virtual_env) = virtual_env {
         command.env("VIRTUAL_ENV", virtual_env);
     }
-
-    Ok(command)
 }
 
 #[cfg(feature = "test-uv")]
@@ -400,33 +404,138 @@ fn uses_uv_workspace_root_without_checking_siblings() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// An explicit file is treated as a script, so workspace discovery stays disabled even when
-/// `TY_UV` is set.
+/// Checking a script uses its own environment; the project's uv metadata
+/// is not queried.
 #[cfg(feature = "test-uv")]
 #[test]
-fn explicit_file_path_disables_uv_workspace_discovery() -> anyhow::Result<()> {
-    let case = workspace_case()?;
+fn explicit_script_path_disables_uv_workspace_discovery() -> anyhow::Result<()> {
+    let case = workspace_case()?.with_filter(r"exit code: 1", "exit status: 1");
+    case.write_file(
+        "packages/member/pyproject.toml",
+        r#"
+        [project]
+        name = "member"
+        version = "0.1.0"
+        requires-python = ">=3.8"
+        dependencies = ["missing-workspace-dependency==99.0.0"]
+        "#,
+    )?;
+
+    let member_directory = case.root().join("packages/member");
+    let mut command = case.command();
+    set_uv_envs(&mut command, &case, None);
+
+    assert_cmd_snapshot!(command.current_dir(&member_directory).arg("member.py"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    member.py:1:14: error[invalid-assignment] Object of type `Literal["selected-member"]` is not assignable to `int`
+    pyproject.toml: warning[uv-metadata] `uv workspace metadata` failed with status exit status: 1:   × No solution found when resolving dependencies:
+      ╰─▶ Because missing-workspace-dependency was not found in the cache and
+          member depends on missing-workspace-dependency==99.0.0, we can conclude
+          that member's requirements are unsatisfiable.
+          And because your workspace requires member, we can conclude that your
+          workspace's requirements are unsatisfiable.
+
+    hint: Packages were unavailable because the network was disabled. When the network is disabled, registry packages may only be read from the cache.
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
+
     case.write_file("shared.py", "value: int = 'unselected-workspace-root'")?;
     case.write_file(
         "packages/member/member.py",
-        "import shared\nvalue: int = 'selected-script'",
+        r#"
+        # /// script
+        # dependencies = []
+        # ///
+        import shared
+        value: int = 'selected-script'
+        "#,
     )?;
 
-    let mut command = uv_sync_command(&case, None)?;
-    command
-        .current_dir(case.root().join("packages/member"))
-        .arg("member.py");
+    // Checking a script reports its own diagnostics without querying the project's uv metadata.
+    let mut command = case.command();
+    set_uv_envs(&mut command, &case, None);
+    command.current_dir(&member_directory).arg("member.py");
 
     assert_cmd_snapshot!(command, @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    member.py:1:8: error[unresolved-import] Cannot resolve imported module `shared`
-    member.py:2:14: error[invalid-assignment] Object of type `Literal["selected-script"]` is not assignable to `int`
+    member.py:5:8: error[unresolved-import] Cannot resolve imported module `shared`
+    member.py:6:14: error[invalid-assignment] Object of type `Literal["selected-script"]` is not assignable to `int`
     Found 2 diagnostics
 
     ----- stderr -----
     "#);
+
+    Ok(())
+}
+
+/// Checking an ordinary file in a uv workspace uses the project's uv metadata.
+#[cfg(feature = "test-uv")]
+#[test]
+fn explicit_ordinary_file_uses_uv_workspace_discovery() -> anyhow::Result<()> {
+    let case = dependency_workspace_case()?;
+
+    let mut command = uv_sync_command(&case, None)?;
+    command
+        .current_dir(case.root().join("packages/member"))
+        .args(["member.py", "--error", "missing-direct-dependency"]);
+
+    assert_cmd_snapshot!(command, @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    member.py:3:6: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+    member.py:4:8: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// When ty directly checks a script alongside another file, the other file still gets dependency
+/// diagnostics from uv workspace metadata.
+#[cfg(feature = "test-uv")]
+#[test]
+fn multiple_explicit_files_use_uv_workspace_discovery() -> anyhow::Result<()> {
+    let case = dependency_workspace_case()?;
+    case.write_file(
+        "packages/member/script.py",
+        r#"
+        # /// script
+        # dependencies = []
+        # ///
+        value = 1
+        "#,
+    )?;
+
+    let mut command = uv_sync_command(&case, None)?;
+    command
+        .current_dir(case.root().join("packages/member"))
+        .args([
+            "script.py",
+            "member.py",
+            "--error",
+            "missing-direct-dependency",
+        ]);
+
+    assert_cmd_snapshot!(command, @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    member.py:3:6: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+    member.py:4:8: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
