@@ -3,6 +3,7 @@
 See https://data.iana.org/time-zones/tz-link.html for
 time zone and DST data sources.
 """
+
 import sys
 from abc import abstractmethod
 from time import struct_time
@@ -20,17 +21,21 @@ MAXYEAR: Final = 9999
 class tzinfo:
     """Abstract base class for time zone info objects.
 
-Subclasses must override the tzname(), utcoffset() and dst() methods.
-"""
+    Subclasses must override the tzname(), utcoffset() and dst() methods.
+    """
+
     @abstractmethod
     def tzname(self, dt: datetime | None, /) -> str | None:
         """datetime -> string name of time zone."""
+
     @abstractmethod
     def utcoffset(self, dt: datetime | None, /) -> timedelta | None:
         """datetime -> timedelta showing offset from UTC, negative values indicating West of UTC"""
+
     @abstractmethod
     def dst(self, dt: datetime | None, /) -> timedelta | None:
         """datetime -> DST offset as timedelta positive east of UTC."""
+
     def fromutc(self, dt: datetime, /) -> datetime:
         """datetime in UTC -> datetime in local time."""
 
@@ -40,16 +45,20 @@ _TzInfo: TypeAlias = tzinfo
 @final
 class timezone(tzinfo):
     """Fixed offset from UTC implementation of tzinfo."""
+
     utc: ClassVar[timezone]
     min: ClassVar[timezone]
     max: ClassVar[timezone]
     def __new__(cls, offset: timedelta, name: str = ...) -> Self: ...
     def tzname(self, dt: datetime | None, /) -> str:
         """If name is specified when timezone is created, returns the name.  Otherwise returns offset as 'UTC(+|-)HH:MM'."""
+
     def utcoffset(self, dt: datetime | None, /) -> timedelta:
         """Return fixed offset."""
+
     def dst(self, dt: datetime | None, /) -> None:
         """Return None."""
+
     def __hash__(self) -> int: ...
     def __eq__(self, value: object, /) -> bool: ...
 
@@ -71,6 +80,7 @@ class _IsoCalendarDate(tuple[int, int, int]):
 @disjoint_base
 class date:
     """Concrete date type."""
+
     min: ClassVar[date]
     max: ClassVar[date]
     resolution: ClassVar[timedelta]
@@ -79,22 +89,24 @@ class date:
     def fromtimestamp(cls, timestamp: float, /) -> Self:
         """Create a date from a POSIX timestamp.
 
-The timestamp is a number, e.g. created via time.time(), that is
-interpreted as local time.
-"""
+        The timestamp is a number, e.g. created via time.time(), that is
+        interpreted as local time.
+        """
+
     @classmethod
     def today(cls) -> Self:
         """Current date or datetime.
 
-Equivalent to fromtimestamp(time.time()).
-"""
+        Equivalent to fromtimestamp(time.time()).
+        """
+
     @classmethod
     def fromordinal(cls, n: int, /) -> Self:
         """Construct a date from a proleptic Gregorian ordinal.
 
-January 1 of year 1 is day 1.  Only the year, month and day are
-non-zero in the result.
-"""
+        January 1 of year 1 is day 1.  Only the year, month and day are
+        non-zero in the result.
+        """
 
     if sys.version_info >= (3, 15):
         @classmethod
@@ -109,8 +121,9 @@ non-zero in the result.
     def fromisocalendar(cls, year: int, week: int, day: int) -> Self:
         """Construct a date from the ISO year, week number and weekday.
 
-This is the inverse of the date.isocalendar() function.
-"""
+        This is the inverse of the date.isocalendar() function.
+        """
+
     @property
     def year(self) -> int: ...
     @property
@@ -126,9 +139,9 @@ This is the inverse of the date.isocalendar() function.
             def strptime(cls, string: str, format: str, /) -> Self:
                 """Parse string according to the given date format (like time.strptime()).
 
-For a list of supported format codes, see the documentation:
-    https://docs.python.org/3/library/datetime.html#format-codes
-"""
+                For a list of supported format codes, see the documentation:
+                    https://docs.python.org/3/library/datetime.html#format-codes
+                """
         else:
             @classmethod
             def strptime(cls, date_string: str, format: str, /) -> Self:
@@ -141,29 +154,35 @@ For a list of supported format codes, see the documentation:
         def strftime(self, format: str) -> str:
             """Format using strftime().
 
-Example: "%d/%m/%Y, %H:%M:%S".
+            Example: "%d/%m/%Y, %H:%M:%S".
 
-For a list of supported format codes, see the documentation:
-    https://docs.python.org/3/library/datetime.html#format-codes
-"""
+            For a list of supported format codes, see the documentation:
+                https://docs.python.org/3/library/datetime.html#format-codes
+            """
+
     else:
         def strftime(self, format: str, /) -> str:
             """format -> strftime() style string."""
 
     def __format__(self, fmt: str, /) -> str:
         """Formats self with strftime."""
+
     def isoformat(self) -> str:
         """Return string in ISO 8601 format, YYYY-MM-DD."""
+
     def timetuple(self) -> struct_time:
         """Return time tuple, compatible with time.localtime()."""
+
     def toordinal(self) -> int:
         """Return proleptic Gregorian ordinal.  January 1 of year 1 is day 1."""
+
     if sys.version_info >= (3, 13):
         def __replace__(self, /, *, year: SupportsIndex = ..., month: SupportsIndex = ..., day: SupportsIndex = ...) -> Self:
             """The same as replace()."""
 
     def replace(self, year: SupportsIndex = ..., month: SupportsIndex = ..., day: SupportsIndex = ...) -> Self:
         """Return date with new specified fields."""
+
     def __le__(self, value: date, /) -> bool: ...
     def __lt__(self, value: date, /) -> bool: ...
     def __ge__(self, value: date, /) -> bool: ...
@@ -171,6 +190,7 @@ For a list of supported format codes, see the documentation:
     def __eq__(self, value: object, /) -> bool: ...
     def __add__(self, value: timedelta, /) -> Self:
         """Return self+value."""
+
     def __radd__(self, value: timedelta, /) -> Self:
         """Return value+self."""
 
@@ -185,12 +205,14 @@ For a list of supported format codes, see the documentation:
     def __hash__(self) -> int: ...
     def weekday(self) -> int:
         """Return the day of the week represented by the date.
-Monday == 0 ... Sunday == 6
-"""
+        Monday == 0 ... Sunday == 6
+        """
+
     def isoweekday(self) -> int:
         """Return the day of the week represented by the date.
-Monday == 1 ... Sunday == 7
-"""
+        Monday == 1 ... Sunday == 7
+        """
+
     def isocalendar(self) -> _IsoCalendarDate:
         """Return a named tuple containing ISO year, week number, and weekday."""
 
@@ -198,9 +220,10 @@ Monday == 1 ... Sunday == 7
 class time:
     """Time with time zone.
 
-All arguments are optional. tzinfo may be None, or an instance of
-a tzinfo subclass. The remaining arguments may be ints.
-"""
+    All arguments are optional. tzinfo may be None, or an instance of
+    a tzinfo subclass. The remaining arguments may be ints.
+    """
+
     min: ClassVar[time]
     max: ClassVar[time]
     resolution: ClassVar[timedelta]
@@ -235,13 +258,13 @@ a tzinfo subclass. The remaining arguments may be ints.
     def isoformat(self, timespec: str = "auto") -> str:
         """Return the time formatted according to ISO.
 
-The full format is 'HH:MM:SS.mmmmmm+zz:zz'. By default, the
-fractional part is omitted if self.microsecond == 0.
+        The full format is 'HH:MM:SS.mmmmmm+zz:zz'. By default, the
+        fractional part is omitted if self.microsecond == 0.
 
-The optional argument timespec specifies the number of additional
-terms of the time to include. Valid options are 'auto', 'hours',
-'minutes', 'seconds', 'milliseconds' and 'microseconds'.
-"""
+        The optional argument timespec specifies the number of additional
+        terms of the time to include. Valid options are 'auto', 'hours',
+        'minutes', 'seconds', 'milliseconds' and 'microseconds'.
+        """
 
     if sys.version_info >= (3, 15):
         @classmethod
@@ -258,9 +281,9 @@ terms of the time to include. Valid options are 'auto', 'hours',
             def strptime(cls, string: str, format: str, /) -> Self:
                 """Parse string according to the given time format (like time.strptime()).
 
-For a list of supported format codes, see the documentation:
-    https://docs.python.org/3/library/datetime.html#format-codes
-"""
+                For a list of supported format codes, see the documentation:
+                    https://docs.python.org/3/library/datetime.html#format-codes
+                """
         else:
             @classmethod
             def strptime(cls, date_string: str, format: str, /) -> Self:
@@ -273,24 +296,29 @@ For a list of supported format codes, see the documentation:
         def strftime(self, format: str) -> str:
             """Format using strftime().
 
-The date part of the timestamp passed to underlying strftime should
-not be used.
+            The date part of the timestamp passed to underlying strftime should
+            not be used.
 
-For a list of supported format codes, see the documentation:
-    https://docs.python.org/3/library/datetime.html#format-codes
-"""
+            For a list of supported format codes, see the documentation:
+                https://docs.python.org/3/library/datetime.html#format-codes
+            """
+
     else:
         def strftime(self, format: str, /) -> str:
             """format -> strftime() style string."""
 
     def __format__(self, fmt: str, /) -> str:
         """Formats self with strftime."""
+
     def utcoffset(self) -> timedelta | None:
         """Return self.tzinfo.utcoffset(self)."""
+
     def tzname(self) -> str | None:
         """Return self.tzinfo.tzname(self)."""
+
     def dst(self) -> timedelta | None:
         """Return self.tzinfo.dst(self)."""
+
     if sys.version_info >= (3, 13):
         def __replace__(
             self,
@@ -324,9 +352,10 @@ _Time: TypeAlias = time
 class timedelta:
     """Difference between two datetime values.
 
-All arguments are optional and default to 0.
-Arguments may be integers or floats, and may be positive or negative.
-"""
+    All arguments are optional and default to 0.
+    Arguments may be integers or floats, and may be positive or negative.
+    """
+
     min: ClassVar[timedelta]
     max: ClassVar[timedelta]
     resolution: ClassVar[timedelta]
@@ -343,30 +372,42 @@ Arguments may be integers or floats, and may be positive or negative.
     @property
     def days(self) -> int:
         """Number of days."""
+
     @property
     def seconds(self) -> int:
         """Number of seconds (>= 0 and less than 1 day)."""
+
     @property
     def microseconds(self) -> int:
         """Number of microseconds (>= 0 and less than 1 second)."""
+
     def total_seconds(self) -> float:
         """Total seconds in the duration."""
+
     def __add__(self, value: timedelta, /) -> timedelta:
         """Return self+value."""
+
     def __radd__(self, value: timedelta, /) -> timedelta:
         """Return value+self."""
+
     def __sub__(self, value: timedelta, /) -> timedelta:
         """Return self-value."""
+
     def __rsub__(self, value: timedelta, /) -> timedelta:
         """Return value-self."""
+
     def __neg__(self) -> timedelta:
         """-self"""
+
     def __pos__(self) -> timedelta:
         """+self"""
+
     def __abs__(self) -> timedelta:
         """abs(self)"""
+
     def __mul__(self, value: float, /) -> timedelta:
         """Return self*value."""
+
     def __rmul__(self, value: float, /) -> timedelta:
         """Return value*self."""
 
@@ -384,8 +425,10 @@ Arguments may be integers or floats, and may be positive or negative.
 
     def __mod__(self, value: timedelta, /) -> timedelta:
         """Return self%value."""
+
     def __divmod__(self, value: timedelta, /) -> tuple[int, timedelta]:
         """Return divmod(self, value)."""
+
     def __le__(self, value: timedelta, /) -> bool: ...
     def __lt__(self, value: timedelta, /) -> bool: ...
     def __ge__(self, value: timedelta, /) -> bool: ...
@@ -393,15 +436,17 @@ Arguments may be integers or floats, and may be positive or negative.
     def __eq__(self, value: object, /) -> bool: ...
     def __bool__(self) -> bool:
         """True if self else False"""
+
     def __hash__(self) -> int: ...
 
 @disjoint_base
 class datetime(date):
     """A combination of a date and a time.
 
-The year, month and day arguments are required. tzinfo may be None, or
-an instance of a tzinfo subclass. The remaining arguments may be ints.
-"""
+    The year, month and day arguments are required. tzinfo may be None, or
+    an instance of a tzinfo subclass. The remaining arguments may be ints.
+    """
+
     min: ClassVar[datetime]
     max: ClassVar[datetime]
     def __new__(
@@ -437,9 +482,9 @@ an instance of a tzinfo subclass. The remaining arguments may be ints.
         def fromtimestamp(cls, timestamp: float, tz: _TzInfo | None = None) -> Self:
             """Create a datetime from a POSIX timestamp.
 
-The timestamp is a number, e.g. created via time.time(), that is
-interpreted as local time.
-"""
+            The timestamp is a number, e.g. created via time.time(), that is
+            interpreted as local time.
+            """
     else:
         @classmethod
         def fromtimestamp(cls, timestamp: float, /, tz: _TzInfo | None = None) -> Self:
@@ -449,22 +494,26 @@ interpreted as local time.
     @deprecated("Use timezone-aware objects to represent datetimes in UTC; e.g. by calling .fromtimestamp(datetime.timezone.utc)")
     def utcfromtimestamp(cls, t: float, /) -> Self:
         """Create a naive UTC datetime from a POSIX timestamp."""
+
     @classmethod
     def now(cls, tz: _TzInfo | None = None) -> Self:
         """Returns new datetime object representing current time local to tz.
 
-  tz
-    Timezone object.
+          tz
+            Timezone object.
 
-If no tz is specified, uses local timezone.
-"""
+        If no tz is specified, uses local timezone.
+        """
+
     @classmethod
     @deprecated("Use timezone-aware objects to represent datetimes in UTC; e.g. by calling .now(datetime.timezone.utc)")
     def utcnow(cls) -> Self:
         """Return a new datetime representing UTC day and time."""
+
     @classmethod
     def combine(cls, date: _Date, time: _Time, tzinfo: _TzInfo | None = ...) -> Self:
         """Construct a datetime from a given date and a given time."""
+
     if sys.version_info >= (3, 15):
         @classmethod
         def fromisoformat(cls, string: str, /) -> Self:
@@ -472,14 +521,19 @@ If no tz is specified, uses local timezone.
 
     def timestamp(self) -> float:
         """Return POSIX timestamp as float."""
+
     def utctimetuple(self) -> struct_time:
         """Return UTC time tuple, compatible with time.localtime()."""
+
     def date(self) -> _Date:
         """Return date object with same year, month and day."""
+
     def time(self) -> _Time:
         """Return time object with same time but with tzinfo=None."""
+
     def timetz(self) -> _Time:
         """Return time object with same time and tzinfo."""
+
     if sys.version_info >= (3, 13):
         def __replace__(
             self,
@@ -511,33 +565,35 @@ If no tz is specified, uses local timezone.
         fold: int = ...,
     ) -> Self:
         """Return datetime with new specified fields."""
+
     def astimezone(self, tz: _TzInfo | None = None) -> Self:
         """Convert to local time in new timezone tz."""
+
     def isoformat(self, sep: str = "T", timespec: str = "auto") -> str:
         """Return the time formatted according to ISO.
 
-The full format looks like 'YYYY-MM-DD HH:MM:SS.mmmmmm'.
-By default, the fractional part is omitted if self.microsecond == 0.
+        The full format looks like 'YYYY-MM-DD HH:MM:SS.mmmmmm'.
+        By default, the fractional part is omitted if self.microsecond == 0.
 
-If self.tzinfo is not None, the UTC offset is also attached, giving
-a full format of 'YYYY-MM-DD HH:MM:SS.mmmmmm+HH:MM'.
+        If self.tzinfo is not None, the UTC offset is also attached, giving
+        a full format of 'YYYY-MM-DD HH:MM:SS.mmmmmm+HH:MM'.
 
-Optional argument sep specifies the separator between date and
-time, default 'T'.
+        Optional argument sep specifies the separator between date and
+        time, default 'T'.
 
-The optional argument timespec specifies the number of additional
-terms of the time to include. Valid options are 'auto', 'hours',
-'minutes', 'seconds', 'milliseconds' and 'microseconds'.
-"""
+        The optional argument timespec specifies the number of additional
+        terms of the time to include. Valid options are 'auto', 'hours',
+        'minutes', 'seconds', 'milliseconds' and 'microseconds'.
+        """
 
     if sys.version_info >= (3, 15):
         @classmethod
         def strptime(cls, string: str, format: str, /) -> Self:
             """Parse string according to the given date and time format (like time.strptime()).
 
-For a list of supported format codes, see the documentation:
-    https://docs.python.org/3/library/datetime.html#format-codes
-"""
+            For a list of supported format codes, see the documentation:
+                https://docs.python.org/3/library/datetime.html#format-codes
+            """
     else:
         @classmethod
         def strptime(cls, date_string: str, format: str, /) -> Self:
@@ -545,10 +601,13 @@ For a list of supported format codes, see the documentation:
 
     def utcoffset(self) -> timedelta | None:
         """Return self.tzinfo.utcoffset(self)."""
+
     def tzname(self) -> str | None:
         """Return self.tzinfo.tzname(self)."""
+
     def dst(self) -> timedelta | None:
         """Return self.tzinfo.dst(self)."""
+
     def __le__(self, value: datetime, /) -> bool: ...  # type: ignore[override]
     def __lt__(self, value: datetime, /) -> bool: ...  # type: ignore[override]
     def __ge__(self, value: datetime, /) -> bool: ...  # type: ignore[override]

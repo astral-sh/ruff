@@ -9,6 +9,7 @@ Written by Marc-Andre Lemburg (mal@lemburg.com).
 (c) Copyright CNRI, All Rights Reserved. NO WARRANTY.
 
 """
+
 import codecs
 from _codecs import _DecodeCharMap, _EncodeCharMap
 from _typeshed import ReadableBuffer

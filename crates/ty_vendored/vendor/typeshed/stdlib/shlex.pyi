@@ -1,4 +1,5 @@
 """A lexical analyzer class for simple shell-like syntaxes."""
+
 import sys
 from collections import deque
 from collections.abc import Iterable
@@ -28,12 +29,14 @@ else:
 
 def join(split_command: Iterable[str]) -> str:
     """Return a shell-escaped string from *split_command*."""
+
 def quote(s: str) -> str:
     """Return a shell-escaped version of the string *s*."""
 
 # TODO: Make generic over infile once PEP 696 is implemented.
 class shlex:
     """A lexical analyzer class for simple shell-like syntaxes."""
+
     commenters: str
     wordchars: str
     whitespace: str
@@ -60,16 +63,22 @@ class shlex:
     ) -> None: ...
     def get_token(self) -> str | None:
         """Get a token from the input stream (or from stack if it's nonempty)"""
+
     def push_token(self, tok: str) -> None:
         """Push a token onto the stack popped by the get_token method"""
+
     def read_token(self) -> str | None: ...
     def sourcehook(self, newfile: str) -> tuple[str, TextIOWrapper] | None:
         """Hook called on a filename to be sourced."""
+
     def push_source(self, newstream: str | _ShlexInstream, newfile: str | None = None) -> None:
         """Push an input source onto the lexer's input source stack."""
+
     def pop_source(self) -> None:
         """Pop the input source stack."""
+
     def error_leader(self, infile: str | None = None, lineno: int | None = None) -> str:
         """Emit a C-compiler-like, Emacs-friendly error-message leader."""
+
     def __iter__(self) -> Self: ...
     def __next__(self) -> str: ...

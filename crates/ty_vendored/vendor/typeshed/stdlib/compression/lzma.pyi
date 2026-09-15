@@ -7,4 +7,5 @@ one-shot (de)compression.
 These classes and functions support both the XZ and legacy LZMA
 container formats, as well as raw compressed data streams.
 """
+
 from lzma import *

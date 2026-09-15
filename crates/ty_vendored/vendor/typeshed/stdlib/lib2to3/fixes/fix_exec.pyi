@@ -5,6 +5,7 @@ exec() function.
 
 exec code in ns1, ns2 -> exec(code, ns1, ns2)
 """
+
 from typing import ClassVar, Literal
 
 from .. import fixer_base

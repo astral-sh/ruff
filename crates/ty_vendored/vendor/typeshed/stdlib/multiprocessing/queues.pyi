@@ -30,9 +30,9 @@ class Queue(Generic[_T]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-For example, for t = list[int], t.__origin__ is list and t.__args__
-is (int,).
-"""
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
+            """
 
 class JoinableQueue(Queue[_T]):
     def __getstate__(self) -> _JoinableQueueState: ...  # type: ignore[override]
@@ -51,6 +51,6 @@ class SimpleQueue(Generic[_T]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-For example, for t = list[int], t.__origin__ is list and t.__args__
-is (int,).
-"""
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
+        """

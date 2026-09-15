@@ -2,6 +2,7 @@
 
 Written by Brian Quinlan (brian@sweetapp.com).
 """
+
 import codecs
 from _typeshed import ReadableBuffer
 
