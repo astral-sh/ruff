@@ -101,8 +101,12 @@ def _(a_and_b: "A & B", not_a: "~A") -> None:
 
 ## PEP 695 aliases
 
-PEP 695 aliases are evaluated lazily, so intersection and negation syntax can be used, even before
-Python 3.14.
+We allow experimental intersection and negation syntax in PEP 695 aliases. Defining an alias does
+not evaluate its value, so these `type` definitions can execute even before Python 3.14. Explicitly
+accessing e.g. `AAndB.__value__` would actually evaluate the `A & B` expression and raise a
+`TypeError` at runtime. However, we consider this to be an edge case. Also note that we still do
+emit `experimental-syntax` diagnostics for all of these definitions (that rule is just globally
+deactivated for mdtests).
 
 ```toml
 [environment]
