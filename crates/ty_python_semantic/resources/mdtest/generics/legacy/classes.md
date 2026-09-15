@@ -687,6 +687,84 @@ If a typevar does not provide a default, we use `Unknown`:
 reveal_type(C())  # revealed: C[Unknown]
 ```
 
+## Inferring generic class parameters from bounded receivers
+
+An implicit `self` argument carries the enclosing class specialization. We infer those type
+parameters instead of choosing their defaults, while preserving `Self` when the parameter is a bare
+type variable.
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T", default=None)
+
+class Box(Generic[T]):
+    value: T
+
+    def get(self) -> T:
+        reveal_type(read(self))  # revealed: T@Box
+        reveal_type(identity(self))  # revealed: Self@get
+        return read(self)
+
+def read(box: Box[T]) -> T:
+    return box.value
+
+def identity(value: T) -> T:
+    return value
+```
+
+An explicit upper bound provides the same specialization information.
+
+```py
+S = TypeVar("S", bound=Box[int])
+
+def bounded(box: S) -> None:
+    reveal_type(read(box))  # revealed: int
+    reveal_type(identity(box))  # revealed: S@bounded
+```
+
+The specialization inferred from a bounded receiver must agree with the other arguments. A
+constrained type variable cannot select a different alternative for each argument.
+
+```py
+ConstrainedT = TypeVar("ConstrainedT", int, str)
+
+def combine(box: Box[ConstrainedT], value: ConstrainedT) -> ConstrainedT:
+    return value
+
+def constrained(box: S) -> None:
+    reveal_type(combine(box, 1))  # revealed: int
+    combine(box, "")  # error: [invalid-argument-type]
+```
+
+## Bounded receivers in nested overloaded calls
+
+The argument's upper bound still constrains an inner call when an outer overload supplies its return
+context. An incompatible overload does not replace the specialization inferred from `self`.
+
+```py
+from typing import Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Visitor(Generic[T]):
+    value: T
+
+def visit(visitor: Visitor[T]) -> T:
+    return visitor.value
+
+@overload
+def consume(value: str) -> None: ...
+@overload
+def consume(value: object) -> None: ...
+def consume(value: object) -> None: ...
+
+class ObjectVisitor(Visitor[object]):
+    def run(self) -> None:
+        consume(visit(self))
+        reveal_type(visit(self))  # revealed: object
+```
+
 ## Inferring generic class parameters from constructors
 
 If the type of a constructor parameter is a class typevar, we can use that to infer the type

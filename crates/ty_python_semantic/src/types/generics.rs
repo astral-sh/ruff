@@ -4487,6 +4487,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
+            // Infer a nominal specialization from a rigid argument's upper bound, such as
+            // `Self <: Visitor[int]`. Only the forward relation follows from the upper bound;
+            // the bound cannot replace the variable in an invariant or contravariant position.
+            (Type::NominalInstance(_), Type::TypeVar(actual_typevar))
+                if polarity.is_covariant()
+                    && let Some(bound) = actual_typevar.typevar(db).upper_bound(db, self.env) =>
+            {
+                let when = self.constraint_for_relation(formal, bound, relation_polarity);
+                return self.infer_from_constraint_set(when);
+            }
+
             (Type::Intersection(formal_intersection), _) => {
                 // The actual type must be assignable to every (positive) element of the
                 // formal intersection, so we must infer type mappings for each of them. (The

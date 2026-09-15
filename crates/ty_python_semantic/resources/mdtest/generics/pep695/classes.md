@@ -334,6 +334,74 @@ If a typevar does not provide a default, we use `Unknown`:
 reveal_type(C())  # revealed: C[Unknown]
 ```
 
+## Inferring generic class parameters from bounded receivers
+
+An implicit `self` argument carries the enclosing class specialization. We infer those type
+parameters instead of choosing their defaults, while preserving `Self` when the parameter is a bare
+type variable.
+
+```py
+class Box[T = None]:
+    value: T
+
+    def get(self) -> T:
+        reveal_type(read(self))  # revealed: T@Box
+        reveal_type(identity(self))  # revealed: Self@get
+        return read(self)
+
+def read[T = None](box: Box[T]) -> T:
+    return box.value
+
+def identity[T](value: T) -> T:
+    return value
+```
+
+An explicit upper bound provides the same specialization information.
+
+```py
+def bounded[S: Box[int]](box: S) -> None:
+    reveal_type(read(box))  # revealed: int
+    reveal_type(identity(box))  # revealed: S@bounded
+```
+
+The specialization inferred from a bounded receiver must agree with the other arguments. A
+constrained type variable cannot select a different alternative for each argument.
+
+```py
+def combine[T: (int, str)](box: Box[T], value: T) -> T:
+    return value
+
+def constrained[S: Box[int]](box: S) -> None:
+    reveal_type(combine(box, 1))  # revealed: int
+    combine(box, "")  # error: [invalid-argument-type]
+```
+
+## Bounded receivers in nested overloaded calls
+
+The argument's upper bound still constrains an inner call when an outer overload supplies its return
+context. An incompatible overload does not replace the specialization inferred from `self`.
+
+```py
+from typing import overload
+
+class Visitor[T]:
+    value: T
+
+def visit[T](visitor: Visitor[T]) -> T:
+    return visitor.value
+
+@overload
+def consume(value: str) -> None: ...
+@overload
+def consume(value: object) -> None: ...
+def consume(value: object) -> None: ...
+
+class ObjectVisitor(Visitor[object]):
+    def run(self) -> None:
+        consume(visit(self))
+        reveal_type(visit(self))  # revealed: object
+```
+
 ## Calls within the generic class
 
 A call to a generic class from one of its own methods creates an independent generic occurrence. The
