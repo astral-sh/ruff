@@ -519,6 +519,48 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, node, source_order)
     }
 
+    /// Restricts a type variable to its declared bound or choices. These are validity constraints,
+    /// not evidence from a use of the type variable. Include them before existentially quantifying
+    /// the variable, so an invalid specialization cannot make the resulting constraint set true.
+    pub(crate) fn constrain_typevar_to_declared_domain(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Self {
+        match typevar.typevar(db).bound_or_constraints(db, env) {
+            None => Self::always(builder),
+            Some(TypeVarBoundOrConstraints::UpperBound(upper)) => {
+                Self::constrain_typevar_with_bounds(
+                    db,
+                    env,
+                    builder,
+                    typevar,
+                    None,
+                    Some(ConstraintBound::Validity(
+                        upper.top_materialization(db, env),
+                    )),
+                )
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(choices)) => {
+                choices.elements(db).iter().when_any(db, builder, |choice| {
+                    Self::constrain_typevar_with_bounds(
+                        db,
+                        env,
+                        builder,
+                        typevar,
+                        Some(ConstraintBound::Validity(
+                            choice.bottom_materialization(db, env),
+                        )),
+                        Some(ConstraintBound::Validity(
+                            choice.top_materialization(db, env),
+                        )),
+                    )
+                })
+            }
+        }
+    }
+
     /// Verifies that this constraint set was created by `builder`
     #[track_caller]
     fn verify_builder(self, builder: &'c ConstraintSetBuilder<'db>) {

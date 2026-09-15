@@ -93,7 +93,13 @@ class InvalidAliasedBoundedReceiver:
 class InvalidNestedBoundedReceiver(list[str]):
     def method[T: int](self: list[T]) -> None: ...
 
+class ValidNestedBoundedReceiver(list[int]):
+    def method[T: int](self: list[T]) -> None: ...
+
 class InvalidUnionConstrainedReceiver:
+    def method[T: (int, str)](self: T | None) -> None: ...
+
+class ValidUnionConstrainedReceiver(str):
     def method[T: (int, str)](self: T | None) -> None: ...
 
 invalid_bound: Callable[[], None] = InvalidBoundedReceiver().method  # error: [invalid-assignment]
@@ -104,9 +110,11 @@ valid_constraints: Callable[[], None] = ValidConstrainedReceiver().method
 
 invalid_aliased_bound: Callable[[], None] = InvalidAliasedBoundedReceiver().method  # error: [invalid-assignment]
 
-# TODO: Enforce valid specializations for TypeVars nested inside receiver annotations.
-invalid_nested_bound: Callable[[], None] = InvalidNestedBoundedReceiver().method  # TODO: error: [invalid-assignment]
-invalid_union_constraints: Callable[[], None] = InvalidUnionConstrainedReceiver().method  # TODO: error: [invalid-assignment]
+invalid_nested_bound: Callable[[], None] = InvalidNestedBoundedReceiver().method  # error: [invalid-assignment]
+valid_nested_bound: Callable[[], None] = ValidNestedBoundedReceiver().method
+
+invalid_union_constraints: Callable[[], None] = InvalidUnionConstrainedReceiver().method  # error: [invalid-assignment]
+valid_union_constraints: Callable[[], None] = ValidUnionConstrainedReceiver().method
 ```
 
 When we coerce a generic callable into a `Callable` type, it remembers that it is generic:
