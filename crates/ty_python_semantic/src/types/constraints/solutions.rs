@@ -23,8 +23,8 @@ pub(super) struct SolutionWalker<'db> {
 }
 
 struct PendingCandidateSolution<'db> {
-    typevars: Vec<(ConstraintId, usize)>,
-    upper_bound_violations: Option<FxHashSet<BoundTypeVarInstance<'db>>>,
+    candidate: CandidateSolution<'db>,
+    source_orders: Vec<usize>,
 }
 
 impl<'db> SolutionWalker<'db> {
@@ -35,26 +35,6 @@ impl<'db> SolutionWalker<'db> {
             upper_bounds: Vec::default(),
             _phantom: PhantomData,
         }
-    }
-
-    fn pending_typevars(&self, path: &PathAssignments) -> Vec<(ConstraintId, usize)> {
-        let mut typevars: Vec<_> = path
-            .positive_constraints()
-            .map(|(constraint, source_constraint)| {
-                let source_order = self
-                    .source_orders
-                    .get_index_of(&source_constraint)
-                    .expect("every TDD constraint should have a source order");
-                (constraint, source_order)
-            })
-            .collect();
-        // Sort the constraints in each path by their `source_order`s, to ensure that we construct
-        // any unions or intersections in our type mappings in a stable order. Constraints might
-        // come out of `PathAssignments` with identical `source_order`s, but if they do, those
-        // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
-        // retain that stable per-tie ordering.
-        typevars.sort_by_key(|(_, source_order)| *source_order);
-        typevars
     }
 
     #[expect(clippy::too_many_arguments)]
@@ -79,7 +59,7 @@ impl<'db> SolutionWalker<'db> {
                 Some(all_typevars) => {
                     this.validate_satisfied_path(db, env, storage, limits, path, all_typevars)
                 }
-                None => this.found_satisfied_path(limits, path),
+                None => this.found_satisfied_path(db, env, storage, limits, path),
             },
         )
     }
@@ -238,104 +218,43 @@ impl<'db> SolutionWalker<'db> {
             );
         }
 
-        self.found_satisfied_path(limits, path)
+        self.found_satisfied_path(db, env, storage, limits, path)
     }
 
-    fn found_satisfied_path<L: SolutionLimits>(
-        &mut self,
-        limits: &mut L,
+    fn pending_candidate_solution(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
         path: &PathAssignments,
-    ) -> ControlFlow<L::Break> {
-        limits.satisfied_path()?;
-        let typevars = self.pending_typevars(path);
-        let pending = PendingCandidateSolution {
-            typevars,
-            upper_bound_violations: None,
-        };
-        self.pending.push(pending);
-        ControlFlow::Continue(())
-    }
-
-    fn attribute_typevar_failures<L: SolutionLimits>(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        limits: &mut L,
-        path: &mut PathAssignments,
-    ) -> ControlFlow<L::Break> {
-        let mut upper_bound_violations = FxHashSet::default();
-        let upper_bounds = std::mem::take(&mut self.upper_bounds);
-        for (bound_typevar, constraint) in upper_bounds {
-            let mut satisfied = false;
-            self.visit_node_and_then(
-                db,
-                env,
-                storage,
-                limits,
-                path,
-                constraint,
-                &mut |_this, _storage, _limits, _path| {
-                    satisfied = true;
-                    ControlFlow::Continue(())
-                },
-            )?;
-            if !satisfied {
-                upper_bound_violations.insert(bound_typevar);
-            }
-        }
-
-        let typevars = self.pending_typevars(path);
-        let pending = PendingCandidateSolution {
-            typevars,
-            upper_bound_violations: Some(upper_bound_violations),
-        };
-        self.pending.push(pending);
-        ControlFlow::Continue(())
-    }
-
-    pub(super) fn finish(
-        mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-    ) -> CandidateSolutions<'db> {
-        if self.pending.is_empty() {
-            return CandidateSolutions::Unsatisfiable;
-        }
-
-        self.pending.sort_by(|pending1, pending2| {
-            let source_orders1 = pending1
-                .typevars
-                .iter()
-                .map(|(_, source_order)| *source_order);
-            let source_orders2 = pending2
-                .typevars
-                .iter()
-                .map(|(_, source_order)| *source_order);
-            source_orders1.cmp(source_orders2)
-        });
-
-        let result = self
-            .pending
-            .drain(..)
-            .map(|pending| pending.into_candidate(db, env, storage))
+        upper_bound_violations: Option<&FxHashSet<BoundTypeVarInstance<'db>>>,
+    ) -> PendingCandidateSolution<'db> {
+        // Sort the constraints in each path by their `source_order`s, to ensure that we construct
+        // any unions or intersections in our type mappings in a stable order. Constraints might
+        // come out of `PathAssignments` with identical `source_order`s, but if they do, those
+        // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
+        // retain that stable per-tie ordering.
+        let mut typevars: Vec<_> = path
+            .positive_constraints()
+            .map(|(constraint, source_constraint)| {
+                let source_order = self
+                    .source_orders
+                    .get_index_of(&source_constraint)
+                    .expect("every TDD constraint should have a source order");
+                (constraint, source_order)
+            })
             .collect();
-        CandidateSolutions::Constrained(result)
-    }
-}
+        typevars.sort_by_key(|(_, source_order)| *source_order);
+        let source_orders = typevars
+            .iter()
+            .map(|(_, source_order)| *source_order)
+            .collect();
 
-impl<'db> PendingCandidateSolution<'db> {
-    fn into_candidate(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-    ) -> CandidateSolution<'db> {
+        // Then collect the combined lower and upper bounds for each typevar.
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, PathBoundBuilder<'db>> =
             FxIndexMap::default();
 
-        for (constraint, _) in self.typevars {
+        for (constraint, _) in typevars {
             let constraint = storage.constraint_data(constraint);
             match constraint {
                 Constraint::ConcreteLower(lower) => {
@@ -371,11 +290,11 @@ impl<'db> PendingCandidateSolution<'db> {
 
         let mut violations = Vec::new();
         let typevars = mappings
-            .drain(..)
+            .into_iter()
             .map(|(bound_typevar, bounds)| {
                 let path_bound = bounds.finish(db, env, bound_typevar);
 
-                if let Some(upper_bound_violations) = self.upper_bound_violations.as_ref()
+                if let Some(upper_bound_violations) = upper_bound_violations
                     && upper_bound_violations.contains(&bound_typevar)
                 {
                     violations.push(SolutionViolation {
@@ -395,6 +314,79 @@ impl<'db> PendingCandidateSolution<'db> {
         } else {
             SolutionValidity::Invalid(violations.into_boxed_slice())
         };
-        CandidateSolution { typevars, validity }
+        let candidate = CandidateSolution { typevars, validity };
+
+        PendingCandidateSolution {
+            candidate,
+            source_orders,
+        }
+    }
+
+    fn found_satisfied_path<L: SolutionLimits>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        path: &PathAssignments,
+    ) -> ControlFlow<L::Break> {
+        limits.satisfied_path()?;
+        let pending = self.pending_candidate_solution(db, env, storage, path, None);
+        self.pending.push(pending);
+        ControlFlow::Continue(())
+    }
+
+    fn attribute_typevar_failures<L: SolutionLimits>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        path: &mut PathAssignments,
+    ) -> ControlFlow<L::Break> {
+        let mut upper_bound_violations = FxHashSet::default();
+        let upper_bounds = std::mem::take(&mut self.upper_bounds);
+        for (bound_typevar, constraint) in upper_bounds {
+            let mut satisfied = false;
+            self.visit_node_and_then(
+                db,
+                env,
+                storage,
+                limits,
+                path,
+                constraint,
+                &mut |_this, _storage, _limits, _path| {
+                    satisfied = true;
+                    ControlFlow::Continue(())
+                },
+            )?;
+            if !satisfied {
+                upper_bound_violations.insert(bound_typevar);
+            }
+        }
+
+        let pending =
+            self.pending_candidate_solution(db, env, storage, path, Some(&upper_bound_violations));
+        self.pending.push(pending);
+        ControlFlow::Continue(())
+    }
+
+    pub(super) fn finish(mut self) -> CandidateSolutions<'db> {
+        if self.pending.is_empty() {
+            return CandidateSolutions::Unsatisfiable;
+        }
+
+        self.pending.sort_by(|pending1, pending2| {
+            let source_orders1 = pending1.source_orders.iter().copied();
+            let source_orders2 = pending2.source_orders.iter().copied();
+            source_orders1.cmp(source_orders2)
+        });
+
+        let result = self
+            .pending
+            .drain(..)
+            .map(|pending| pending.candidate)
+            .collect();
+        CandidateSolutions::Constrained(result)
     }
 }

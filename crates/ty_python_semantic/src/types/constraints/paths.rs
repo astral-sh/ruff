@@ -1445,7 +1445,7 @@ mod tests {
                 None,
                 set.node,
             );
-            assert_eq!(walker.finish(db, &env, &mut storage), expected);
+            assert_eq!(walker.finish(), expected);
         }
     }
 }
