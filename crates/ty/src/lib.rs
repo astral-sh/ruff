@@ -29,8 +29,8 @@ use salsa::Database;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{
-    ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UvSyncProgress,
-    watch,
+    ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UseUv,
+    UvSyncProgress, watch,
 };
 use ty_project::{ProjectDatabase, ProjectMetadata, ProjectReloadResult};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
@@ -148,9 +148,12 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let force_exclude = args.force_exclude();
 
     let mut project_metadata = match &config_file {
-        Some(config_file) => {
-            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
-        }
+        Some(config_file) => ProjectMetadata::from_config_file(
+            config_file.clone(),
+            &project_path,
+            &system,
+            UseUv::from_system(&system),
+        )?,
         None if check_paths.iter().any(|path| system.is_file(path)) => {
             // `uv check --script` passes a file as its check path. Standalone scripts must not
             // inherit the enclosing workspace; their environments are synchronized separately.

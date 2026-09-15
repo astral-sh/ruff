@@ -767,7 +767,7 @@ impl Session {
         let configuration_file = workspace.settings.configuration_file();
 
         let metadata = if let Some(configuration_file) = configuration_file {
-            ProjectMetadata::from_config_file_with_uv(
+            ProjectMetadata::from_config_file(
                 configuration_file.clone(),
                 workspace_directory,
                 &system,
