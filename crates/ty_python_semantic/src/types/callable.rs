@@ -598,7 +598,6 @@ pub enum CallableTypeKind {
     /// materializations from ordinary callable types in type-relation checks. It does not
     /// carry the runtime `typing.ParamSpec` instance behavior of a `ParamSpec` declaration.
     ParamSpecValue,
-
 }
 
 /// A "policy" enum that describes how `type[]` types should be upcast
@@ -863,7 +862,7 @@ impl<'db> CallableType<'db> {
     }
 
     /// Binds the runtime receiver while using `typing_self_type` to replace `typing.Self`.
-    pub(crate) fn bind_self_with_receiver(
+    fn bind_self_with_receiver(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -1078,7 +1077,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         {
             return self.never();
         }
-
         self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
     }
 
