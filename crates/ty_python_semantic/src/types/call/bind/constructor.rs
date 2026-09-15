@@ -127,11 +127,29 @@ impl<'db> ConstructorBinding<'db> {
             bound_type.apply_type_mapping_impl(db, &type_mapping, TypeContext::default(), &visitor)
         });
         for overload in &mut self.entry.overloads {
+            // The constructor's `Self` bound must use the same fresh class type variables as
+            // its receiver. Include only `Self` variables owned by this signature, so a caller's
+            // `Self` used as an explicit class type argument retains its original bound.
+            let signature_context = GenericContext::from_typevar_instances(
+                db,
+                env,
+                generic_context.variables(db).chain(
+                    overload
+                        .signature
+                        .generic_context
+                        .into_iter()
+                        .flat_map(|context| context.variables(db))
+                        .filter(|typevar| typevar.typevar(db).is_self(db)),
+                ),
+            );
             overload.signature = overload.signature.apply_type_mapping_impl(
                 db,
-                &type_mapping,
+                &TypeMapping::FreshenBoundTypeVars {
+                    generic_context: signature_context,
+                    delta,
+                },
                 TypeContext::default(),
-                &visitor,
+                &ApplyTypeMappingVisitor::new(env),
             );
             overload.set_constructor_context(db, constructor_context);
         }
