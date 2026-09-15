@@ -2180,6 +2180,10 @@ from overloaded import A, B, C, f
 def _(arg: tuple[A | B, Any]):
     reveal_type(f(arg))  # revealed: A | Unknown
     reveal_type(f(*(arg,)))  # revealed: A | Unknown
+
+# Ambiguity from the first expansion must not affect the second expansion's return type.
+def _(arg: tuple[B | A, Any]):
+    reveal_type(f(arg))  # revealed: Unknown | A
 ```
 
 #### Both argument lists ambiguous
