@@ -18,7 +18,6 @@ use ruff_source_file::{LineRanges, UniversalNewlineIterator, find_newline};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::{SearchPath, file_to_module};
 use ty_python_core::{
-    Truthiness,
     ast_ids::HasScopedUseId,
     definition::DefinitionKind,
     place::PlaceExpr,
@@ -35,6 +34,7 @@ use crate::{
         KnownClass, LintDiagnosticGuard, LintDiagnosticGuardBuilder, MemberLookupPolicy, Type,
         TypeContext,
         call::bind::CallableDescription,
+        context::InferContext,
         diagnostic::typing_module_for_fix,
         enum_metadata,
         function::KnownFunction,
@@ -90,7 +90,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let RedundantCondition {
             expression: test,
             value_type: test_type,
-            is_truthy,
+            truthiness,
             kind,
         } = condition;
 
@@ -113,6 +113,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let describe_condition = |diagnostic: &mut LintDiagnosticGuard| {
             let source = source_text(db, self.file());
+            let is_truthy = if truthiness.is_always_true() {
+                "true"
+            } else {
+                "false"
+            };
             if source.contains_line_break(test.range()) {
                 diagnostic.set_concise_message(format_args!("Condition is always {is_truthy}"));
             } else {
@@ -172,12 +177,113 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Short-circuit evaluation can determine a condition's truthiness even when its
         // value type does not. In that case, describe the condition rather than the type.
-        let describe_as_condition =
-            test_type.is_subtype_of(db, env, KnownClass::Bool.to_instance(db, env))
-                || test_type.bool(db, env) != Truthiness::from(*is_truthy);
+        let describe_as_condition = !truthiness.is_ambiguous()
+            && (test_type.is_subtype_of(db, env, KnownClass::Bool.to_instance(db, env))
+                || test_type.bool(db, env) != *truthiness);
 
         let builder = self.context.report_lint(rule, test)?;
-        let diagnostic = if *is_truthy {
+
+        let diagnostic = if let ConditionKind::Callable(callables) = kind {
+            let mut diagnostic = builder.into_diagnostic("Suspicious boolean test of a `Callable`");
+            let source = source_text(db, self.file());
+
+            if source.contains_line_break(test.range()) {
+                diagnostic.set_concise_message(format_args!(
+                    "Object of type `{}` might always be truthy (did you mean to call it?)",
+                    test_type.display(db, env)
+                ));
+            } else if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+                diagnostic.set_concise_message(format_args!(
+                    "Callable `{}` might always be truthy \
+                        (has type `{}` -- did you mean to call it?)",
+                    &source[test.range()],
+                    test_type.display(db, env)
+                ));
+            } else {
+                diagnostic.set_concise_message(format_args!(
+                    "Expression `{}` of type `{}` might always be truthy \
+                        (did you mean to call it?)",
+                    &source[test.range()],
+                    test_type.display(db, env)
+                ));
+            }
+            diagnostic.set_primary_annotation_message(format_args!(
+                "Has type `{}`",
+                test_type.display(db, env)
+            ));
+            diagnostic
+                .info("Callable objects are usually functions, and functions are always truthy");
+
+            let should_await = self.should_await_call(
+                test,
+                callables.iter().flat_map(|callable| {
+                    callable
+                        .signatures(db)
+                        .iter()
+                        .map(|signature| signature.return_ty)
+                }),
+            );
+
+            if should_await {
+                diagnostic.help("Did you mean to call and await this callable?");
+            } else {
+                diagnostic.help("Did you mean to call this callable?");
+            }
+
+            let uncalled_function = UncalledFunction {
+                has_parameters: callables
+                    .iter()
+                    .any(|callable| callable.signatures(db).has_parameters()),
+                should_await,
+            };
+
+            uncalled_function.suggest_call(&self.context, &mut diagnostic, test);
+
+            diagnostic
+        } else if kind == &ConditionKind::Iterable {
+            let mut diagnostic =
+                builder.into_diagnostic("Suspicious boolean test of an `Iterable`");
+            let source = source_text(db, self.file());
+
+            if source.contains_line_break(test.range()) {
+                diagnostic.set_concise_message(format_args!(
+                    "Object might be truthy even if its length is 0 (has type `{}`)",
+                    test_type.display(db, env)
+                ));
+            } else {
+                let kind = if test.is_name_expr() {
+                    "Variable"
+                } else {
+                    "Expression"
+                };
+                diagnostic.set_concise_message(format_args!(
+                    "{kind} `{}` might be truthy even if its length is 0 (has type `{}`)",
+                    &source[test.range()],
+                    test_type.display(db, env)
+                ));
+            }
+            diagnostic.set_primary_annotation_message(format_args!(
+                "Has type `{}`",
+                test_type.display(db, env)
+            ));
+            diagnostic.info(
+                "Iterable objects can be generators, \
+                    and generators are truthy even when empty",
+            );
+            diagnostic.help("Test the length of the iterable instead of its truthiness");
+            let semantic_model = SemanticModel::new(db, self.program_file());
+            let test_ref = ast::AnyNodeRef::from(*test);
+            if semantic_model.definitely_has_builtin_binding("len", test_ref)
+                && semantic_model.definitely_has_builtin_binding("tuple", test_ref)
+            {
+                diagnostic.set_fix(Fix::display_only_edits(
+                    Edit::insertion("len(tuple(".to_string(), test.start()),
+                    [Edit::insertion("))".to_string(), test.end())],
+                ));
+            }
+
+            diagnostic
+        } else if truthiness.is_always_true() {
             let add_always_truthy_concise_message = |diagnostic: &mut LintDiagnosticGuard| {
                 if should_quote_test_expression()
                     && let source = source_text(db, self.file())
@@ -230,31 +336,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut diagnostic =
                     builder.into_diagnostic(format_args!("{function} is always truthy"));
 
-                // Add a suggestion and fix that they might have meant to call (and possibly
-                // also await) this function.
-                //
-                // It's true that calling the function might not actually fix this diagnostic
-                // if the function returns something that is always truthy. They still probably
-                // meant to call the function, though, so it's still a useful suggestion/fix!
-
-                // A coroutine return type establishes that calling and awaiting the function
-                // is appropriate. `Any`, `Unknown`, and `Never` do not establish this, even
-                // though they are assignable to `CoroutineType`.
-                // Use the top materialization so the unspecified generic arguments do not
-                // prevent concrete coroutine types from being subtypes.
-                let coroutine = KnownClass::CoroutineType
-                    .to_instance(db, env)
-                    .top_materialization(db, env);
-
-                let is_awaitable_coro_function = self.can_await_here(test)
-                    && function.signature().iter().all(|signature| {
-                        !signature.return_ty.is_equivalent_to(db, env, Type::Never)
-                            && signature.return_ty.is_subtype_of(db, env, coroutine)
-                    });
+                let should_await = self.should_await_call(
+                    test,
+                    function
+                        .signature()
+                        .iter()
+                        .map(|signature| signature.return_ty),
+                );
 
                 let kind = function.kind();
 
-                if is_awaitable_coro_function {
+                if should_await {
                     diagnostic.set_primary_annotation_message(format_args!(
                         "Did you mean to `await` and call this {kind}?",
                     ));
@@ -264,35 +356,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ));
                 }
 
-                if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
-                    let (call, applicability) = if function.signature().has_parameters() {
-                        ("(...)", Applicability::DisplayOnly)
-                    } else {
-                        ("()", Applicability::Unsafe)
-                    };
-                    let call_edit = Edit::insertion(call.to_string(), test.end());
+                let uncalled_function = UncalledFunction {
+                    has_parameters: function.signature().has_parameters(),
+                    should_await,
+                };
 
-                    let fix = if is_awaitable_coro_function {
-                        Fix::applicable_edits(
-                            Edit::insertion("await ".to_string(), test.start()),
-                            [call_edit],
-                            applicability,
-                        )
-                    } else {
-                        Fix::applicable_edit(call_edit, applicability)
-                    };
-                    let source = source_text(db, self.file());
-                    let expression_text = &source[test.range()];
-                    let prefix = if is_awaitable_coro_function {
-                        "await "
-                    } else {
-                        ""
-                    };
-                    diagnostic.help(format_args!(
-                        "Replace with `{prefix}{expression_text}{call}`"
-                    ));
-                    diagnostic.set_fix(fix);
-                }
+                uncalled_function.suggest_call(&self.context, &mut diagnostic, test);
 
                 diagnostic
             } else if let Some(tuple_spec) = test_type.tuple_instance_spec(db, env)
@@ -794,6 +863,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Whether every callable return type is known to be awaitable in this context.
+    fn should_await_call(
+        &self,
+        expression: &ast::Expr,
+        return_types: impl IntoIterator<Item = Type<'db>>,
+    ) -> bool {
+        if !self.can_await_here(expression) {
+            return false;
+        }
+
+        let db = self.db();
+        let env = self.program_environment();
+
+        // Use the top materialization so concrete return types can be subtypes regardless of
+        // the awaitable's generic arguments. `Any`, `Unknown`, and `Never` do not establish
+        // that a call returns an awaitable.
+        let awaitable = KnownClass::Awaitable
+            .to_instance(db, env)
+            .top_materialization(db, env);
+
+        return_types.into_iter().all(|return_ty| {
+            !return_ty.is_equivalent_to(db, env, Type::Never)
+                && return_ty.is_subtype_of(db, env, awaitable)
+        })
+    }
+
     /// Returns `true` if adding `await` at `expression` would produce valid Python.
     ///
     /// Accounts for asynchronous functions, notebook cells, annotation restrictions, enclosing
@@ -869,12 +964,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let RedundantCondition {
             expression: test,
             value_type: _,
-            is_truthy,
+            truthiness,
             kind,
         } = condition;
 
-        if *is_truthy
-            && *kind == ConditionKind::Boolean
+        if truthiness.is_always_true()
+            && kind.is_boolean()
             && let Some(clause) = if_stmt.elif_else_clauses.last()
             && clause.test.as_ref() == Some(test)
             && !diagnostic.has_applicable_fix(Applicability::DisplayOnly)
@@ -1117,4 +1212,45 @@ fn logical_line_end(source: &str, tokens: &Tokens, offset: TextSize) -> TextSize
         .iter()
         .find(|token| token.kind() == TokenKind::Newline)
         .map_or_else(|| source.full_line_end(offset), Ranged::end)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct UncalledFunction {
+    has_parameters: bool,
+    should_await: bool,
+}
+
+impl UncalledFunction {
+    /// Add a suggestion and fix that they might have meant to call (and possibly
+    /// also await) this function.
+    ///
+    /// It's true that calling the function might not actually fix this diagnostic
+    /// if the function returns something that is always truthy. They still probably
+    /// meant to call the function, though, so it's still a useful suggestion/fix!
+    fn suggest_call(self, context: &InferContext, diagnostic: &mut Diagnostic, test: &ast::Expr) {
+        if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+            let (call, applicability) = if self.has_parameters {
+                ("(...)", Applicability::DisplayOnly)
+            } else {
+                ("()", Applicability::Unsafe)
+            };
+            let call_edit = Edit::insertion(call.to_string(), test.end());
+            let prefix = if self.should_await { "await " } else { "" };
+            let fix = if self.should_await {
+                Fix::applicable_edits(
+                    Edit::insertion(prefix.to_string(), test.start()),
+                    [call_edit],
+                    applicability,
+                )
+            } else {
+                Fix::applicable_edit(call_edit, applicability)
+            };
+            let source = source_text(context.db(), context.file());
+            diagnostic.help(format_args!(
+                "Replace with `{prefix}{}{call}`",
+                &source[test.range()]
+            ));
+            diagnostic.set_fix(fix);
+        }
+    }
 }
