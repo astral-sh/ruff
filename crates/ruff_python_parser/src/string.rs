@@ -1,6 +1,7 @@
 //! Parsing of string literals, bytes literals, and implicit string concatenation.
 
 use bstr::ByteSlice;
+use char_str::{CharStr, CharString};
 use std::fmt;
 
 use ruff_python_ast::token::TokenKind;
@@ -289,7 +290,7 @@ impl<'src> StringParser<'src> {
             });
         };
 
-        let mut value = String::with_capacity(self.source.len());
+        let mut value = CharString::with_capacity(self.source.len());
         loop {
             // Add the characters before the escape sequence (or curly brace) to the string.
             let before_with_slash_or_brace = self.skip_bytes(index + 1);
@@ -367,7 +368,7 @@ impl<'src> StringParser<'src> {
         }
 
         Ok(ast::InterpolatedStringLiteralElement {
-            value: value.into_boxed_str(),
+            value: CharStr::new_inline(value.as_str()).unwrap_or_else(|| value.freeze()),
             range: self.range,
             node_index: AtomicNodeIndex::NONE,
         })
@@ -465,7 +466,7 @@ impl<'src> StringParser<'src> {
         };
 
         // If the string contains escape sequences, we need to parse them.
-        let mut value = String::with_capacity(self.source.len());
+        let mut value = CharString::with_capacity(self.source.len());
 
         loop {
             // Add the characters before the escape sequence to the string.
@@ -495,7 +496,7 @@ impl<'src> StringParser<'src> {
         }
 
         Ok(StringType::Str(ast::StringLiteral {
-            value: value.into_boxed_str(),
+            value: CharStr::new_inline(value.as_str()).unwrap_or_else(|| value.freeze()),
             range: self.range,
             flags: self.flags.into(),
             node_index: AtomicNodeIndex::NONE,
@@ -529,6 +530,7 @@ pub(crate) fn parse_interpolated_string_literal_element(
 
 #[cfg(test)]
 mod tests {
+    use char_str::CharStr;
     use ruff_python_ast::Suite;
 
     use crate::error::LexicalErrorType;
@@ -540,6 +542,52 @@ mod tests {
 
     fn parse_suite(source: &str) -> Result<Suite, ParseError> {
         parse_module(source).map(Parsed::into_suite)
+    }
+
+    #[test]
+    fn literal_storage_matches_decoded_length() {
+        for (source, expected) in [
+            ("''", ""),
+            ("r'short'", "short"),
+            ("'abcdefghijklmnop'", "abcdefghijklmnop"),
+            (r"'\u0061\u0062\u0063'", "abc"),
+            (r"'\U0001f980'", "🦀"),
+            (r"'\u0061abcdefghijklmnop'", "aabcdefghijklmnop"),
+            (
+                "'a literal longer than inline storage'",
+                "a literal longer than inline storage",
+            ),
+        ] {
+            let parsed = crate::parse_expression(source).unwrap();
+            let literal = parsed.expr().as_string_literal_expr().unwrap();
+            let value = &literal.value.as_slice()[0].value;
+            assert_eq!(value, expected);
+            assert_eq!(
+                value.is_heap_allocated(),
+                expected.len() > CharStr::INLINE_CAPACITY
+            );
+
+            if value.is_heap_allocated() {
+                let cloned = value.clone();
+                assert!(std::ptr::eq(value.as_ptr(), cloned.as_ptr()));
+            }
+        }
+    }
+
+    #[test]
+    fn decoded_interpolated_literals_fit_inline() {
+        let parsed = crate::parse_expression(r#"f"\u0061\u0062\u0063{x}{{a}}""#).unwrap();
+        let fstring = parsed.expr().as_f_string_expr().unwrap();
+        let values: Vec<_> = fstring
+            .value
+            .elements()
+            .filter_map(|element| element.as_literal())
+            .collect();
+        assert_eq!(values.len(), 2);
+        for (literal, expected) in values.iter().zip(["abc", "{a}"]) {
+            assert_eq!(literal.value, expected);
+            assert!(!literal.value.is_heap_allocated());
+        }
     }
 
     fn nested_format_spec(prefix: char, depth: usize) -> String {

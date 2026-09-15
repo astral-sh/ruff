@@ -429,7 +429,7 @@ impl<'a> QuoteAnnotator<'a> {
         generator.expr(&Expr::from(ast::StringLiteral {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            value: annotation.into_boxed_str(),
+            value: annotation.into(),
             flags: self.flags,
         }))
     }

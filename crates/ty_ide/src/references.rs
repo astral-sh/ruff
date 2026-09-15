@@ -920,7 +920,7 @@ impl<'a> LocalReferencesFinder<'a> {
         let [part] = string_expr.value.as_slice() else {
             return;
         };
-        if part.value.as_ref() != self.search.target_text {
+        if part.value.as_str() != self.search.target_text {
             return;
         }
 
