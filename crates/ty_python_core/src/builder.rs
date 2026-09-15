@@ -2537,16 +2537,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 operand,
                 ..
             }) => Self::condition_evaluation_is_known_safe(operand),
-            ast::Expr::Compare(ast::ExprCompare {
-                left,
-                ops,
-                comparators,
-                ..
-            }) => {
+            ast::Expr::Compare(ast::ExprCompare { ops, operands, .. }) => {
                 ops.iter()
                     .all(|op| matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot))
-                    && Self::expression_evaluation_is_known_safe(left)
-                    && comparators
+                    && operands
                         .iter()
                         .all(Self::expression_evaluation_is_known_safe)
             }
@@ -3639,15 +3633,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         || !Self::condition_evaluation_is_known_safe(&unary.operand),
                 );
             }
-            ast::Expr::Compare(ast::ExprCompare {
-                left,
-                ops,
-                comparators,
-                ..
-            }) => {
-                self.visit_expr(left);
-                for (op, comparator) in ops.iter().zip(comparators) {
-                    self.visit_expr(comparator);
+            ast::Expr::Compare(compare) => {
+                self.visit_expr(compare.first_operand());
+                for (_, op, right) in compare.iter() {
+                    self.visit_expr(right);
                     self.record_exception_checkpoint_if(!matches!(
                         op,
                         ast::CmpOp::Is | ast::CmpOp::IsNot
@@ -5866,9 +5855,15 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
         for scope_info in self.scope_stack.iter().rev() {
             let scope = &self.scopes[scope_info.file_scope_id];
             let generators = match scope.node() {
-                NodeWithScopeKind::ListComprehension(node) => &node.node(self.module).generators,
-                NodeWithScopeKind::SetComprehension(node) => &node.node(self.module).generators,
-                NodeWithScopeKind::DictComprehension(node) => &node.node(self.module).generators,
+                NodeWithScopeKind::ListComprehension(node) => {
+                    node.node(self.module).generators.as_ref()
+                }
+                NodeWithScopeKind::SetComprehension(node) => {
+                    node.node(self.module).generators.as_ref()
+                }
+                NodeWithScopeKind::DictComprehension(node) => {
+                    node.node(self.module).generators.as_ref()
+                }
                 _ => continue,
             };
             if generators

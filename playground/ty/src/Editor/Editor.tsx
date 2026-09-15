@@ -229,6 +229,18 @@ class PlaygroundServer
     private props: PlaygroundServerProps,
   ) {
     this.providerDisposables = [
+      editor.addAction({
+        id: "toggle-inlay-hints",
+        label: "Toggle Inlay Hints",
+        run(editor) {
+          const enabled =
+            editor.getOption(monaco.editor.EditorOption.inlayHints).enabled !==
+            "on";
+          editor.updateOptions({
+            inlayHints: { enabled: enabled ? "on" : "off" },
+          });
+        },
+      }),
       monaco.languages.registerTypeDefinitionProvider("python", this),
       monaco.languages.registerDeclarationProvider("python", this),
       monaco.languages.registerDefinitionProvider("python", this),

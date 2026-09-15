@@ -56,8 +56,8 @@ use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, GeneratorKind, Globals,
-    Import, Module, ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel,
-    SemanticModelFlags, StarImport, SubmoduleImport,
+    Import, ImportLaziness, Module, ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind,
+    SemanticModel, SemanticModelFlags, StarImport, SubmoduleImport,
 };
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{OneIndexed, SourceFile, SourceFileBuilder, SourceRow};
@@ -359,6 +359,24 @@ impl<'a> Checker<'a> {
         }
 
         None
+    }
+
+    /// Whether changing this import's module preserves membership in `__lazy_modules__`.
+    pub(crate) fn import_rewrite_preserves_laziness(&self, original: &str, target: &str) -> bool {
+        if self.lazy_import_context().is_some()
+            || matches!(self.semantic.current_statement(), Stmt::ImportFrom(import)
+                if import.names.iter().any(|alias| alias.name.as_str() == "*"))
+        {
+            return true;
+        }
+        matches!(
+            (
+                self.semantic.module_laziness(original),
+                self.semantic.module_laziness(target)
+            ),
+            (ImportLaziness::Lazy, ImportLaziness::Lazy)
+                | (ImportLaziness::Eager, ImportLaziness::Eager)
+        )
     }
 
     /// Return the preferred quote for a generated `StringLiteral` node, given where we are in the
@@ -1094,6 +1112,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     // Mark the top-level module as "seen" by the semantic model.
                     self.semantic.add_module(module);
 
+                    let mut flags = BindingFlags::EXTERNAL;
+                    if self.lazy_import_context().is_none()
+                        && self.semantic.import_laziness(stmt, alias).is_lazy()
+                    {
+                        flags |= BindingFlags::LAZY;
+                    }
+
                     if alias.asname.is_none() && alias.name.contains('.') {
                         let qualified_name = QualifiedName::user_defined(&alias.name);
                         self.add_binding(
@@ -1102,10 +1127,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             BindingKind::SubmoduleImport(SubmoduleImport {
                                 qualified_name: Box::new(qualified_name),
                             }),
-                            BindingFlags::EXTERNAL,
+                            flags,
                         );
                     } else {
-                        let mut flags = BindingFlags::EXTERNAL;
                         if alias.asname.is_some() {
                             flags |= BindingFlags::ALIAS;
                         }
@@ -1168,6 +1192,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             .add_star_import(StarImport { level, module });
                     } else {
                         let mut flags = BindingFlags::EXTERNAL;
+                        if self.lazy_import_context().is_none()
+                            && self.semantic.import_laziness(stmt, alias).is_lazy()
+                        {
+                            flags |= BindingFlags::LAZY;
+                        }
                         if alias.asname.is_some() {
                             flags |= BindingFlags::ALIAS;
                         }
@@ -1880,6 +1909,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 Some(typing::Callable::Cast)
                             } else if self
                                 .semantic
+                                .match_typing_qualified_name(&qualified_name, "TypeForm")
+                            {
+                                Some(typing::Callable::TypeForm)
+                            } else if self
+                                .semantic
                                 .match_typing_qualified_name(&qualified_name, "NewType")
                             {
                                 Some(typing::Callable::NewType)
@@ -1948,6 +1982,18 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                     }
                                 }
                             }
+                        }
+                    }
+                    Some(typing::Callable::TypeForm) => {
+                        let mut args = arguments.args.iter();
+                        if let Some(arg) = args.next() {
+                            self.visit_type_definition(arg);
+                        }
+                        for arg in args {
+                            self.visit_non_type_definition(arg);
+                        }
+                        for keyword in &*arguments.keywords {
+                            self.visit_non_type_definition(&keyword.value);
                         }
                     }
                     Some(typing::Callable::NewType) => {
@@ -2837,6 +2883,27 @@ impl<'a> Checker<'a> {
         if self.semantic.in_named_expression_assignment() {
             self.add_binding(id, expr.range(), BindingKind::NamedExprAssignment, flags);
             return;
+        }
+
+        if id == "__lazy_modules__" && self.semantic.current_scope().kind.is_module() {
+            match parent {
+                Stmt::Assign(ast::StmtAssign { targets, value, .. })
+                    if let [Expr::Name(name)] = targets.as_slice()
+                        && name.id == id =>
+                {
+                    self.semantic.set_lazy_modules(value);
+                }
+                Stmt::AnnAssign(ast::StmtAnnAssign {
+                    target,
+                    value: Some(value),
+                    ..
+                }) if let Expr::Name(name) = target.as_ref()
+                    && name.id == id =>
+                {
+                    self.semantic.set_lazy_modules(value);
+                }
+                _ => {}
+            }
         }
 
         // Match the left-hand side of an annotated assignment without a value,

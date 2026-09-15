@@ -22,7 +22,7 @@ uv run --script "$project_root/scripts/generate-crate-readmes.py"
 
 echo "Updating lockfiles..."
 cargo update -p ruff
-uv lock
+uv lock --no-locked
 
 echo "Checking crates.io publish setup..."
 crates_policies="$(mktemp -d)"

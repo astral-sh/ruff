@@ -201,8 +201,8 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
-        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
+        CallableType, CallableTypes, ComparisonSoundnessPolicy, EnumClassLiteral,
+        KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
         expand_type, infer_expression_types, infer_narrowing_constraints,
         infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
@@ -1661,7 +1661,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
                         Type::instance(db, env, class.top_materialization(db))
                     }
                     Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                        callable_pattern_type(db, env)
+                        Type::Callable(CallableType::top(db))
                     }
                     _ => return Truthiness::Ambiguous,
                 };

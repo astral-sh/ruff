@@ -124,7 +124,7 @@ fn generate_dict_comprehension(
     let dict_comp = ast::ExprDictComp {
         key: Some(Box::new(key.into())),
         value: Box::new(value.clone()),
-        generators: vec![comp],
+        generators: Box::new([comp]),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };

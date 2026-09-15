@@ -429,9 +429,9 @@ impl<'db> CallableItem<'db> {
         match self {
             CallableItem::Regular(binding) => CallableType::partially_apply(
                 db,
-                env,
                 binding.partial_signature_applications(
                     db,
+                    env,
                     partial_overload,
                     bound_call_arguments,
                 )?,
@@ -3616,6 +3616,7 @@ impl<'db> CallableBinding<'db> {
     fn partial_signature_applications<'a>(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
     ) -> Option<SmallVec<[PartialSignatureApplication<'db>; 1]>> {
@@ -3655,7 +3656,7 @@ impl<'db> CallableBinding<'db> {
             .into_iter()
             .filter_map(|index| {
                 self.overloads().get(index).map(|overload| {
-                    overload.partial_signature_application(db, signature_arguments.as_ref())
+                    overload.partial_signature_application(db, env, signature_arguments.as_ref())
                 })
             })
             .collect();
@@ -8282,14 +8283,29 @@ impl<'db> Binding<'db> {
     fn partial_signature_application(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> PartialSignatureApplication<'db> {
-        PartialSignatureApplication::new(
-            self.signature.clone(),
-            self.partial_application(arguments),
+        let partial_application = self.partial_application(arguments);
+        let signature = self.signature.specialize_for_partial_application(
+            db,
+            env,
+            &partial_application,
             self.inference,
             self.unspecialized_return_type(db),
-        )
+        );
+
+        if signature.parameters() == self.signature.parameters() {
+            return PartialSignatureApplication::new(signature, partial_application);
+        }
+
+        // Specializing `*args: *Ts` can replace one parameter with several positional parameters.
+        // Rematch before reducing so bound arguments consume those positions and keyword bindings
+        // still refer to the correct parameters after the expansion.
+        let mut binding = Self::single(self.signature_type, signature);
+        binding.match_parameters(db, env, arguments);
+        let partial_application = binding.partial_application(arguments);
+        PartialSignatureApplication::new(binding.signature, partial_application)
     }
 
     /// Returns the bound type for the specified parameter, or `None` if no argument was matched to
@@ -10054,6 +10070,7 @@ mod tests {
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
+    use crate::types::constraints::resolution::SolutionType::Resolved;
     use crate::types::generics::TypeVarInferenceSolutions;
 
     fn call_inference<'db>(
@@ -10119,9 +10136,69 @@ def swap(value: int | str) -> int | str:
         assert_eq!(
             paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
             FxHashSet::from_iter([
-                [Some(int), Some(str)].as_slice(),
-                [Some(str), Some(int)].as_slice(),
+                [Some(Resolved(int)), Some(Resolved(str))].as_slice(),
+                [Some(Resolved(str)), Some(Resolved(int))].as_slice(),
             ])
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generic_callback_resolves_dependencies_per_alternative() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+from typing import Callable, overload
+
+class A: ...
+class B: ...
+a: A
+b: B
+
+def infer_result[T, R](callback: Callable[[T], R], consumer: Callable[[T], None]) -> R:
+    raise NotImplementedError
+
+def identity[T](value: T) -> T:
+    return value
+
+@overload
+def consume(value: A) -> None: ...
+@overload
+def consume(value: B) -> None: ...
+def consume(value: A | B) -> None: ...
+"#,
+        )?;
+        let db = &db;
+        let env = db.program_environment();
+        let file = system_path_to_file(db, "/src/a.py")?;
+        let file = ProgramFile::new(db, file, env.program(db));
+        let callable = global_symbol(db, file, "infer_result").place.expect_type();
+        let callback = global_symbol(db, file, "identity").place.expect_type();
+        let consumer = global_symbol(db, file, "consume").place.expect_type();
+        let inference = call_inference(db, callable, [callback, consumer], TypeContext::default())?;
+        let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
+            anyhow::bail!("expected correlated alternatives");
+        };
+        let a = global_symbol(db, file, "a").place.expect_type();
+        let b = global_symbol(db, file, "b").place.expect_type();
+
+        // The callback relates R to T. Each consumer overload selects a different T, and
+        // resolving R within that alternative preserves the relationship between them.
+        assert_eq!(
+            paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
+            FxHashSet::from_iter([
+                [Some(Resolved(a)); 2].as_slice(),
+                [Some(Resolved(b)); 2].as_slice(),
+            ])
+        );
+        let union = UnionType::from_two_elements(db, &env, a, b);
+        assert!(
+            inference
+                .merged_specialization(db)
+                .types(db)
+                .iter()
+                .all(|ty| ty.is_equivalent_to(db, &env, union))
         );
         Ok(())
     }
@@ -10165,7 +10242,7 @@ expected: tuple[list[object], A | B, C | D | E]
         };
         assert_eq!(
             paths.iter().map(AsRef::as_ref).collect::<Vec<_>>(),
-            [[Some(Type::object()), None].as_slice()]
+            [[Some(Resolved(Type::object())), None].as_slice()]
         );
         Ok(())
     }

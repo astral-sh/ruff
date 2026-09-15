@@ -22,6 +22,10 @@ documentation, and architectural conventions in this `AGENTS.md`. Report
 meaningful violations introduced by the changes; do not apply agent-only workflow
 instructions to PR authors or flag unrelated pre-existing issues.
 
+For security reviews of repository, CI, and release changes, use the
+[repository threat model](agents/references/repository-threat-model.md) to assess
+trust boundaries and calibrate severity.
+
 ## Writing for human readers
 
 Write every mdtest paragraph, code comment, piece of documentation, PR description, and GitHub issue for its eventual reader, not for the current Codex conversation. Determine the reader's knowledge, purpose, and likely questions privately; do not add an audience-analysis section to the artifact.

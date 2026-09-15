@@ -210,7 +210,7 @@ impl<'db> UnionType<'db> {
                     builder.add_in_place(transform_fn(element));
                 }
                 return builder
-                    .recursively_defined(self.recursively_defined(db))
+                    .or_recursively_defined(self.recursively_defined(db))
                     .build();
             }
         }
@@ -255,7 +255,7 @@ impl<'db> UnionType<'db> {
                     builder.add_in_place(transform_fn(element)?);
                 }
                 return Ok(builder
-                    .recursively_defined(self.recursively_defined(db))
+                    .or_recursively_defined(self.recursively_defined(db))
                     .build());
             }
         }
@@ -358,7 +358,7 @@ impl<'db> UnionType<'db> {
         } else {
             Place::Defined(DefinedPlace {
                 ty: builder
-                    .recursively_defined(self.recursively_defined(db))
+                    .or_recursively_defined(self.recursively_defined(db))
                     .build(),
                 origin,
                 definedness: if possibly_unbound {
@@ -419,7 +419,7 @@ impl<'db> UnionType<'db> {
             } else {
                 Place::Defined(DefinedPlace {
                     ty: builder
-                        .recursively_defined(self.recursively_defined(db))
+                        .or_recursively_defined(self.recursively_defined(db))
                         .build(),
                     origin,
                     definedness: if possibly_unbound {
@@ -445,7 +445,7 @@ impl<'db> UnionType<'db> {
         let mut builder = UnionBuilder::new(db, env)
             .unpack_aliases(false)
             .cycle_recovery(true)
-            .recursively_defined(self.recursively_defined(db));
+            .or_recursively_defined(self.recursively_defined(db));
         let mut empty = true;
         for ty in self.elements(db) {
             if nested {
@@ -460,7 +460,7 @@ impl<'db> UnionType<'db> {
                 // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
                 // e.g. T | Divergent == T | (T | (T | (T | ...))) == T
                 if (*ty).same_divergent_marker(div) {
-                    builder = builder.recursively_defined(RecursivelyDefined::Yes);
+                    builder = builder.or_recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }
                 builder.add_in_place(

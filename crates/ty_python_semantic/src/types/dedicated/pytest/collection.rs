@@ -61,7 +61,8 @@
 //! [test-discovery]: https://docs.pytest.org/en/stable/explanation/goodpractices.html#conventions-for-python-test-discovery
 //! [unittest-tests]: https://docs.pytest.org/en/stable/how-to/unittest.html
 
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_python_ast::StmtClassDef;
 use ruff_text_size::Ranged;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::scope::ScopeKind;
@@ -79,7 +80,10 @@ use crate::types::{
 
 /// Returns the tests that pytest collects from `file` under the default collection conventions.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-fn pytest_tests_in_file<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> Box<[PytestTest<'db>]> {
+pub fn pytest_tests_in_file<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+) -> Box<[PytestTest<'db>]> {
     if !is_default_pytest_test_file(db, file) {
         return Box::default();
     }
@@ -117,14 +121,33 @@ fn pytest_tests_in_file<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> Box<[Py
 
 /// A function that pytest collects as a test.
 #[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct PytestTest<'db> {
+pub struct PytestTest<'db> {
     binding: Definition<'db>,
     function: Definition<'db>,
     kind: PytestTestKind,
     enclosing_class: Option<Definition<'db>>,
 }
 
-impl PytestTest<'_> {
+impl<'db> PytestTest<'db> {
+    /// Returns the definition that binds the test's collected name.
+    pub fn binding(&self) -> Definition<'db> {
+        self.binding
+    }
+
+    /// Returns the eligible classes enclosing the test's binding, from innermost to outermost.
+    ///
+    /// `module` must be the current parsed module containing the test's binding.
+    pub fn enclosing_classes<'ast>(
+        &self,
+        db: &'db dyn Db,
+        module: &'ast ParsedModuleRef,
+    ) -> Vec<&'ast StmtClassDef> {
+        semantic_index(db, self.binding.program_file(db))
+            .ancestor_scopes(self.binding.file_scope(db))
+            .filter_map(|(_, scope)| scope.node().as_class().map(|class| class.node(module)))
+            .collect()
+    }
+
     /// Returns the collection mechanism responsible for this test.
     pub(crate) fn kind(&self) -> PytestTestKind {
         self.kind
@@ -566,6 +589,55 @@ def test_fixture(): ...
                 .enclosing_class
                 .is_some()
         );
+    }
+
+    #[test]
+    fn enclosing_classes_follow_binding_scope() {
+        let test = CollectionTest::new(
+            "/src/test_example.py",
+            r#"
+def test_module(): ...
+
+class TestOuter[T]:
+    def test_method(self): ...
+
+    class TestInner[U]:
+        def test_nested(self): ...
+
+class Helper:
+    @staticmethod
+    def check(): ...
+
+test_alias = Helper.check
+"#,
+        );
+        let module =
+            parsed_module(&test.db, test.program_file().python_file(&test.db)).load(&test.db);
+
+        for (selector, expected) in [
+            ("test_module", vec![]),
+            ("TestOuter.test_method", vec!["TestOuter"]),
+            (
+                "TestOuter.TestInner.test_nested",
+                vec!["TestInner", "TestOuter"],
+            ),
+        ] {
+            let collected = pytest_test_for_binding(&test.db, test.function(selector))
+                .expect("test should be collected");
+            let classes = collected
+                .enclosing_classes(&test.db, &module)
+                .into_iter()
+                .map(|class| class.name.as_str())
+                .collect::<Vec<_>>();
+            assert_eq!(classes, expected);
+        }
+
+        let helper = test.function("Helper.check");
+        let alias = pytest_tests_in_file(&test.db, test.program_file())
+            .iter()
+            .find(|collected| collected.function == helper)
+            .expect("module-level alias should be collected");
+        assert!(alias.enclosing_classes(&test.db, &module).is_empty());
     }
 
     #[test]

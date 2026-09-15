@@ -6407,6 +6407,22 @@ def match_one_tag(u: Foo | MultiTag):
         reveal_type(u)  # revealed: Foo | MultiTag
 ```
 
+A comparison value can itself be a union of literals. Only `Foo` has a tag that can match here, but
+either dictionary can fail to match when the comparison value is `"other"`:
+
+```py
+def union_comparator(u: Foo | Bing, other: Literal["foo", "other"]):
+    if u["tag"] == other:
+        reveal_type(u)  # revealed: Foo
+    else:
+        reveal_type(u)  # revealed: Foo | Bing
+
+    if other != u["tag"]:
+        reveal_type(u)  # revealed: Foo | Bing
+    else:
+        reveal_type(u)  # revealed: Foo
+```
+
 Boolean tags can be narrowed by truthiness, including through a generic `TypedDict` and a type
 alias:
 
@@ -6451,6 +6467,17 @@ class FalsyIntTag(TypedDict):
 
 def _(response: Response | TruthyIntTag | FalsyIntTag):
     if response["success"]:
+        reveal_type(response)  # revealed: Success[int] | TruthyIntTag
+    else:
+        reveal_type(response)  # revealed: Failure | FalsyIntTag
+```
+
+Boolean literals can also be compared explicitly. Since `True == 1`, both matching boolean and
+integer tags remain in the positive branch:
+
+```py
+def boolean_comparator(response: Response | TruthyIntTag | FalsyIntTag):
+    if response["success"] == True:
         reveal_type(response)  # revealed: Success[int] | TruthyIntTag
     else:
         reveal_type(response)  # revealed: Failure | FalsyIntTag
@@ -6510,6 +6537,64 @@ def _(u: WithAliasTagA | WithAliasTagAlsoA | WithAliasTagB):
         reveal_type(u)  # revealed: WithAliasTagB
 ```
 
+An `IntEnum` member compares equal to its integer value without having the same literal type. The
+enum and integer tags both match, so fields unique to one dictionary are not safe to access. The
+dictionary with the enum tag remains possible when equality is false because it also permits
+`"other"`:
+
+```py
+from enum import IntEnum
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+class EnumTag(TypedDict):
+    tag: Literal[Number.ONE, "other"]
+
+class IntegerTag(TypedDict):
+    tag: Literal[1]
+    integer_only: int
+
+def enum_tag(u: EnumTag | IntegerTag | Foo):
+    if u["tag"] == 1:
+        reveal_type(u)  # revealed: EnumTag | IntegerTag
+        u["integer_only"]  # error: [invalid-key]
+    else:
+        reveal_type(u)  # revealed: EnumTag | Foo
+```
+
+Integer tags can also match an enum member used as the comparison value:
+
+```py
+def enum_comparator(u: EnumTag | IntegerTag | Foo):
+    if u["tag"] == Number.ONE:
+        reveal_type(u)  # revealed: EnumTag | IntegerTag
+    else:
+        reveal_type(u)  # revealed: EnumTag | Foo
+```
+
+An enum can customize `__ne__` independently of `__eq__`. An ambiguous inequality keeps the
+dictionary with that enum tag in both branches, including the branch where the inequality is false:
+
+```py
+class NeverUnequal(Enum):
+    A = 1
+    B = 2
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+class UnequalTag(TypedDict):
+    tag: Literal[NeverUnequal.A]
+
+def custom_inequality(u: UnequalTag | Foo | Bar):
+    if u["tag"] != "foo":
+        reveal_type(u)  # revealed: UnequalTag | Bar
+    else:
+        reveal_type(u)  # revealed: UnequalTag | Foo
+```
+
 We can descend into intersections to discover `TypedDict` types that need narrowing:
 
 ```py
@@ -6533,8 +6618,8 @@ def _(u: Foo):
         reveal_type(u)  # revealed: Never
 ```
 
-Narrowing is restricted to `Literal` tags, though, because `x == "foo"` doesn't generally tell us
-anything about the type of `x`. Here's an example where narrowing would be tempting but unsound:
+An `int` tag can contain subclasses that compare equal to unrelated values, so that dictionary
+remains possible in the equality branch:
 
 ```py
 from ty_extensions import static_assert
@@ -6560,7 +6645,7 @@ class WackyInt(int):
 _: NonLiteralTD = {"tag": WackyInt(99)}  # allowed
 ```
 
-The same restriction applies to a tag union containing a non-literal type. The `int` alternative can
+The same reasoning applies to a tag union containing a non-literal type. The `int` alternative can
 still hold a `WackyInt` that compares equal to `"foo"`:
 
 ```py
@@ -6590,7 +6675,7 @@ def _(x: Intersection[Foo, Any]):
         reveal_type(x)  # revealed: Never
 ```
 
-But intersections with non-literal fields cannot be narrowed:
+Intersections with an `int` field remain possible in both branches:
 
 ```py
 from ty_extensions import Intersection
@@ -6619,6 +6704,66 @@ def _(x: Intersection[StrTagTD, Any]):
         reveal_type(x)  # revealed: Never
     else:
         reveal_type(x)  # revealed: StrTagTD & Any
+```
+
+A broad tag does not prevent other dictionaries from being excluded. Although `str` contains both
+literal tag types, comparing each dictionary's field separately rules out `Bing` when equality is
+true and `Foo` when it is false:
+
+```py
+def mixed_string_tags(u: Foo | Bing | StrTagTD):
+    if u["tag"] == "foo":
+        reveal_type(u)  # revealed: Foo | StrTagTD
+    else:
+        reveal_type(u)  # revealed: Bing | StrTagTD
+```
+
+A broad string tag might also contain a subclass that compares equal to an integer. The comparison
+does not establish that a field unique to the integer-tagged dictionary exists:
+
+```py
+class MatchesInteger(str):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+_: StrTagTD = {"tag": MatchesInteger("other")}
+
+def broad_string_tag(u: StrTagTD | IntegerTag):
+    if u["tag"] == 1:
+        reveal_type(u)  # revealed: StrTagTD | IntegerTag
+        u["integer_only"]  # error: [invalid-key]
+    else:
+        reveal_type(u)  # revealed: StrTagTD
+```
+
+An `Any` tag remains possible in both branches, while a known literal tag can still be excluded:
+
+```py
+class DynamicTag(TypedDict):
+    tag: Any
+
+def dynamic_tag(u: Foo | Bing | DynamicTag):
+    if u["tag"] == "foo":
+        reveal_type(u)  # revealed: Foo | (DynamicTag & ~<TypedDict with items 'tag'>)
+    else:
+        reveal_type(u)  # revealed: Bing | (DynamicTag & ~<TypedDict with items 'tag'>)
+```
+
+An unknown or custom comparison value can match either literal tag, so it cannot exclude either
+dictionary:
+
+```py
+def dynamic_comparator(u: Foo | Bing, other: Any):
+    if u["tag"] == other:
+        reveal_type(u)  # revealed: Foo | Bing
+    else:
+        reveal_type(u)  # revealed: Foo | Bing
+
+def custom_comparator(u: Foo | Bing, other: MatchesInteger):
+    if other == u["tag"]:
+        reveal_type(u)  # revealed: Foo | Bing
+    else:
+        reveal_type(u)  # revealed: Foo | Bing
 ```
 
 We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:
@@ -6889,6 +7034,40 @@ def match_enum_tags(u: WithEnumTagA | WithEnumTagB | WithEnumTagC):
             reveal_type(u)  # revealed: WithEnumTagC
 ```
 
+An integer pattern can match an `IntEnum` tag because matching uses runtime equality:
+
+```py
+from enum import IntEnum
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+class EnumTag(TypedDict):
+    tag: Literal[Number.ONE]
+
+class IntegerTag(TypedDict):
+    tag: Literal[1]
+
+def match_enum_and_integer_tags(u: EnumTag | IntegerTag | Foo):
+    match u["tag"]:
+        case 1:
+            reveal_type(u)  # revealed: EnumTag | IntegerTag
+        case _:
+            reveal_type(u)  # revealed: Foo
+```
+
+Conversely, an enum member used as a value pattern can match an integer tag:
+
+```py
+def match_integer_tags_with_enum(u: EnumTag | IntegerTag | Foo):
+    match u["tag"]:
+        case Number.ONE:
+            reveal_type(u)  # revealed: EnumTag | IntegerTag
+        case _:
+            reveal_type(u)  # revealed: Foo
+```
+
 We can also narrow a single `TypedDict` type to `Never`:
 
 ```py
@@ -6900,7 +7079,8 @@ def match_single(u: Foo):
             reveal_type(u)  # revealed: Never
 ```
 
-Narrowing is restricted to `Literal` tags:
+A non-literal tag can match the pattern or fail to match it, so its dictionary remains possible in
+both branches. Other dictionaries can still be excluded based on their literal tags:
 
 ```py
 from ty_extensions import static_assert
@@ -6909,17 +7089,16 @@ from ty_extensions._internal import is_assignable_to
 class NonLiteralTD(TypedDict):
     tag: int
 
-def match_non_literal(u: Foo | NonLiteralTD):
+def match_non_literal(u: Foo | Bing | NonLiteralTD):
     match u["tag"]:
         case "foo":
-            # We can't narrow the union here...
             reveal_type(u)  # revealed: Foo | NonLiteralTD
         case _:
-            # ...(but we *can* narrow here)...
-            reveal_type(u)  # revealed: NonLiteralTD
+            reveal_type(u)  # revealed: Bing | NonLiteralTD
 ```
 
-and it is also restricted to `match` patterns that solely consist of value patterns:
+A broad value pattern can match either tag, so another alternative in the same OR pattern does not
+rule out either dictionary:
 
 ```py
 class Config:

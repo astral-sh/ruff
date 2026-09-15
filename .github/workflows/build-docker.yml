@@ -31,7 +31,7 @@ permissions:
 jobs:
   docker-build:
     name: Build Docker image (ghcr.io/astral-sh/ruff) for ${{ matrix.platform }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     environment:
       name: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit && 'release' || '' }}
     strategy:
@@ -112,7 +112,7 @@ jobs:
 
   docker-publish:
     name: Publish Docker image (ghcr.io/astral-sh/ruff)
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     environment:
       name: release
     needs:
@@ -182,7 +182,7 @@ jobs:
 
   docker-publish-extra:
     name: Publish additional Docker image based on ${{ matrix.image-mapping }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     environment:
       name: release
     needs:
@@ -290,7 +290,7 @@ jobs:
   # This works by annotating the original digests (previously non-annotated) which triggers an update to ghcr.io
   docker-republish:
     name: Annotate Docker image (ghcr.io/astral-sh/ruff)
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     environment:
       name: release
     needs:

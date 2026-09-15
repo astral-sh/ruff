@@ -149,8 +149,6 @@ fn merge_receiver_constraints<'db>(
 pub(crate) struct PartialSignatureApplication<'db> {
     signature: Signature<'db>,
     partial_application: PartialApplication<'db>,
-    inference: Option<TypeVarInference<'db>>,
-    unspecialized_return_ty: Type<'db>,
 }
 
 impl<'db> PartialSignatureApplication<'db> {
@@ -158,14 +156,10 @@ impl<'db> PartialSignatureApplication<'db> {
     pub(crate) fn new(
         signature: Signature<'db>,
         partial_application: PartialApplication<'db>,
-        inference: Option<TypeVarInference<'db>>,
-        unspecialized_return_ty: Type<'db>,
     ) -> Self {
         Self {
             signature,
             partial_application,
-            inference,
-            unspecialized_return_ty,
         }
     }
 }
@@ -248,20 +242,15 @@ impl<'db> CallableSignature<'db> {
     /// Returns the reduced overloaded signature exposed by a `functools.partial(...)` object.
     pub(crate) fn partially_apply(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
         overloads: impl IntoIterator<Item = PartialSignatureApplication<'db>>,
     ) -> Option<Self> {
         let mut new_overloads = Vec::new();
         let mut seen_overloads = FxHashSet::default();
 
         for overload in overloads {
-            let signature = overload.signature.partially_apply(
-                db,
-                env,
-                &overload.partial_application,
-                overload.inference,
-                overload.unspecialized_return_ty,
-            );
+            let signature = overload
+                .signature
+                .partially_apply(db, &overload.partial_application);
             let dedup_key = signature
                 .clone()
                 .with_definition(None)
@@ -468,18 +457,6 @@ impl<'db> CallableSignature<'db> {
         for signature in &self.overloads {
             signature.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
         }
-    }
-
-    /// Binds the first (presumably `self`) parameter of this signature. If a `self_type` is
-    /// provided, we will replace any occurrences of `typing.Self` in the parameter and return
-    /// annotations with that type.
-    pub(crate) fn bind_self(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        self_type: Option<Type<'db>>,
-    ) -> Self {
-        self.bind_self_with_receiver(db, env, self_type, self_type)
     }
 
     /// Binds the receiver using its runtime type while using `typing_self_type` to replace
@@ -1713,8 +1690,8 @@ impl<'db> Signature<'db> {
         )
     }
 
-    /// Returns the callable signature produced by partially applying this signature.
-    fn partially_apply(
+    /// Specializes a partial's full signature before matching its bound arguments again.
+    pub(crate) fn specialize_for_partial_application(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -1729,12 +1706,21 @@ impl<'db> Signature<'db> {
             |specialization| self.apply_specialization(db, specialization),
         );
 
-        let parameters = signature.parameters().as_slice();
         let return_ty = signature_specialization.map_or_else(
             || unspecialized_return_ty,
             |specialization| unspecialized_return_ty.apply_specialization(db, specialization),
         );
 
+        signature.with_return_type(return_ty)
+    }
+
+    /// Reduces a specialized signature using bindings matched against that same signature.
+    fn partially_apply(
+        &self,
+        db: &'db dyn Db,
+        partial_application: &PartialApplication<'db>,
+    ) -> Self {
+        let parameters = self.parameters().as_slice();
         let mut remaining = Vec::with_capacity(parameters.len());
         let mut first_keyword_bound_positional_or_keyword = None;
         for (index, parameter) in parameters.iter().enumerate() {
@@ -1759,7 +1745,7 @@ impl<'db> Signature<'db> {
 
         // Expand `P.args`/`P.kwargs` while the pair is still adjacent. The keyword-only reshuffle
         // below can separate them, which would otherwise prevent expansion.
-        let remaining = signature
+        let remaining = self
             .parameters
             .with_transformed_parameters(remaining)
             .expand_paramspec_variadics(db);
@@ -1791,9 +1777,7 @@ impl<'db> Signature<'db> {
 
         let reordered = remaining.with_transformed_parameters(reordered);
 
-        signature
-            .with_parameters(reordered)
-            .with_return_type(return_ty)
+        self.clone().with_parameters(reordered)
     }
 
     /// Returns the specialization used for the callable signature exposed by a partial object.

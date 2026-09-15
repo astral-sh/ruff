@@ -823,6 +823,11 @@ static_assert(is_assignable_to(LiteralString & ~Literal["", "a"], AlwaysTruthy))
 static_assert(is_assignable_to(LiteralString & ~Literal[""], ~AlwaysFalsy))
 # error: [static-assert-error]
 static_assert(is_assignable_to(LiteralString & ~Literal["", "a"], ~AlwaysFalsy))
+
+# Each member of a union must be assignable to the target intersection
+static_assert(is_assignable_to(Literal[1, 2], int & ~Literal[3]))
+static_assert(not is_assignable_to(Literal[1, 2], int & ~Literal[2]))
+static_assert(not is_assignable_to(Literal[1, "a"], int & ~Literal[3]))
 ```
 
 ## Callable types with Unknown/missing return type
