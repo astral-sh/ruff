@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 
 #[test]
 fn custom_error() {
@@ -86,7 +87,12 @@ fn struct_name_as_context() {
 
 #[track_caller]
 fn assert_example(target: &str, expected: snapbox::Data) {
-    let bin_path = snapbox::cmd::compile_example(target, ["--features=testing-colors"]).unwrap();
+    // CI builds every example with the test profile before starting the test runner.
+    let bin_path = std::env::var_os(format!("RUFF_ANNOTATE_SNIPPETS_EXAMPLE_{target}"))
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            snapbox::cmd::compile_example(target, ["--features=testing-colors"]).unwrap()
+        });
     snapbox::cmd::Command::new(bin_path)
         .env("CLICOLOR_FORCE", "1")
         .env_remove("NO_COLOR")
