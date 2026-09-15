@@ -200,9 +200,6 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
         &target_name.id,
         &vars,
         TypeAliasKind::TypeAliasType,
-        // The call is dropped, so the argument may need parentheses of its own
-        // to keep its grouping once it spans several lines on the right-hand
-        // side of the `type` statement.
         &unwrapped_call_argument(
             call,
             value,
