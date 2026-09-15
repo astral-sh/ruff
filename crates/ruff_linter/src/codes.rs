@@ -1034,6 +1034,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         // flake8-commas
         (Flake8Commas, "812") => rules::flake8_commas::rules::MissingTrailingComma,
+        (Flake8Commas, "817") => rules::flake8_commas::rules::MissingTrailingCommaInMultilineList,
         (Flake8Commas, "818") => rules::flake8_commas::rules::TrailingCommaOnBareTuple,
         (Flake8Commas, "819") => rules::flake8_commas::rules::ProhibitedTrailingComma,
 
