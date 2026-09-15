@@ -2735,7 +2735,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     err.report_diagnostic(&self.context, guard);
                 }
 
-                self.check_condition_redundancy(guard, guard_ty);
+                self.check_match_condition_redundancy(guard, guard_ty, body);
             }
 
             self.infer_body(body);
