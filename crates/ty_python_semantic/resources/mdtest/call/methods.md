@@ -234,12 +234,12 @@ from typing import Self
 
 class E1:
     @classmethod
-    def f(cls) -> list[Self]:
+    def f(cls: type[Self]) -> list[Self]:
         return [cls()]
 
 class E2:
     @classmethod
-    def f(cls) -> list[Self]:
+    def f(cls: type[Self]) -> list[Self]:
         return [cls()]
 
 def _(
@@ -278,11 +278,11 @@ class G2[T]: ...
 
 class P1(Protocol):
     @classmethod
-    def f(cls) -> G1[Self]: ...
+    def f(cls: type[Self]) -> G1[Self]: ...
 
 class P2(Protocol):
     @classmethod
-    def f(cls) -> G2[Self]: ...
+    def f(cls: type[Self]) -> G2[Self]: ...
 
 def _(
     union_external: type[P1] | type[P2],
@@ -371,7 +371,7 @@ from typing import Self
 
 class E1:
     @classmethod
-    def f(cls) -> list[Self]:
+    def f(cls: type[Self]) -> list[Self]:
         return [cls()]
 
 class E2: ...
@@ -410,7 +410,7 @@ from typing import Protocol
 
 class P1(Protocol):
     @classmethod
-    def f(cls) -> list[Self]: ...
+    def f(cls: type[Self]) -> list[Self]: ...
 
 class Other: ...
 
