@@ -760,10 +760,11 @@ class C(Generic[T]):
 ### Constructing with an intersection-bounded type variable
 
 A constructor call preserves an enclosing type variable even when its upper bound is an
-intersection. Constructor arguments must still satisfy both parts of the bound.
+intersection, including when passing `self` to a parameter annotated with `Self`. Constructor
+arguments must still satisfy their bounds.
 
 ```py
-from typing_extensions import Generic, TypeVar
+from typing_extensions import Generic, Self, TypeVar
 from ty_extensions import Intersection
 
 class A: ...
@@ -772,9 +773,11 @@ class B: ...
 T = TypeVar("T", bound=Intersection[A, B])
 
 class Box(Generic[T]):
-    def __init__(self, value: T) -> None:
+    def __init__(self, value: T, other: Self | None = None) -> None:
         reveal_type(Box(value))  # revealed: Box[T@Box]
+        reveal_type(Box(value, self))  # revealed: Box[T@Box]
         Box(A())  # error: [invalid-argument-type]
+        Box(value, A())  # error: [invalid-argument-type]
 ```
 
 ### Constructing from callbacks with a NamedTuple bound
@@ -796,6 +799,21 @@ class Box(Generic[T]):
         result = Box(*self.callbacks, *other.callbacks)
         reveal_type(result)  # revealed: Box[T@Box]
         return result
+```
+
+### Passing Self to a NamedTuple-bounded constructor
+
+A `NamedTuple` bound also allows passing `self` to a constructor parameter annotated with `Self`.
+
+```py
+from typing_extensions import Generic, NamedTuple, Self, TypeVar
+
+T = TypeVar("T", bound=NamedTuple)
+
+class Box(Generic[T]):
+    def __init__(self, value: T, other: Self | None = None) -> None:
+        if other is None:
+            reveal_type(Box(value, self))  # revealed: Box[T@Box]
 ```
 
 ### Constructing with an enclosing Self type
