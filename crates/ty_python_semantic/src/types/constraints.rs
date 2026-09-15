@@ -118,6 +118,7 @@ use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
 pub(crate) mod paths;
 pub(crate) mod projection;
+pub(super) mod relations;
 pub(crate) mod resolution;
 mod sequents;
 mod solutions;
@@ -3529,24 +3530,6 @@ impl NodeId {
         result
     }
 
-    fn remove_noninferable<'db, L: SolutionLimits>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        inferable: TypeVarSet<'db>,
-        source_order: Option<SourceOrderId>,
-        limits: &mut L,
-    ) -> ControlFlow<L::Break, (Self, Option<SourceOrderId>)> {
-        match self.node() {
-            Node::AlwaysTrue => ControlFlow::Continue((ALWAYS_TRUE, None)),
-            Node::AlwaysFalse => ControlFlow::Continue((ALWAYS_FALSE, None)),
-            Node::Interior(interior) => {
-                interior.remove_noninferable(db, env, storage, inferable, source_order, limits)
-            }
-        }
-    }
-
     /// Invokes a closure for each unique BDD node that appears anywhere in a BDD.
     ///
     /// This treats the BDD as a DAG and does not revisit shared subgraphs. Use this when the
@@ -4091,7 +4074,46 @@ fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'
     types
         .first(db)
         .when_constraint_set_assignable_to_owned(db, env, types.second(db))
-        .query(|_storage, when| !when.is_never_satisfied(db, env))
+        .query(|builder, when| {
+            when.node
+                .bound_consistency(
+                    db,
+                    env,
+                    &mut builder.storage.borrow_mut(),
+                    when.source_order,
+                )
+                .unwrap_or(true)
+        })
+}
+
+impl NodeId {
+    fn bound_consistency<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        source_order: Option<SourceOrderId>,
+    ) -> Option<bool> {
+        let source_orders = storage.calculate_source_orders(source_order);
+        let inferable = TypeVarSet::from_typevars(
+            db,
+            storage
+                .node_support(self)
+                .into_iter()
+                .flat_map(Support::iter)
+                .map(|id| storage.typevar_data(id)),
+        );
+        let mut walker = SolutionWalker::new(source_orders, inferable);
+        let budget = SolutionBudget::default();
+        let mut limits = FirstSolutionLimits(BoundedSolutionLimits {
+            remaining_paths: budget.paths,
+            remaining_visits: budget.visits,
+        });
+        match walker.find_path(db, env, storage, self, &mut limits) {
+            ControlFlow::Continue(()) => Some(false),
+            ControlFlow::Break(result) => result,
+        }
+    }
 }
 
 /// Per-path bounds for all typevars. Each element is the set of typevar bounds for one BDD path.
@@ -4102,7 +4124,7 @@ pub(crate) enum PathBounds<'db> {
     Constrained(Box<[Box<[PathBound<'db>]>]>),
 }
 
-/// Limits shared by the preprocessing and collection walks used to extract solutions.
+/// Limits shared by the fast path and the propagation walk used to extract solutions.
 trait SolutionLimits {
     type Break;
 
@@ -4146,6 +4168,17 @@ impl SolutionLimits for BoundedSolutionLimits {
     }
 }
 
+/// Stops after one compatible path, retaining uncertainty at the traversal limit.
+struct FirstSolutionLimits(BoundedSolutionLimits);
+
+impl SolutionLimits for FirstSolutionLimits {
+    type Break = Option<bool>;
+
+    fn visit_node(&mut self) -> ControlFlow<Self::Break> {
+        self.0.visit_node().map_break(|_| None)
+    }
+}
+
 impl<'db> PathBounds<'db> {
     /// Computes sorted BDD paths and accumulates per-typevar lower/upper bounds for each path.
     ///
@@ -4171,9 +4204,9 @@ impl<'db> PathBounds<'db> {
         result
     }
 
-    /// Computes complete path bounds within limits shared by preprocessing and collection.
+    /// Computes complete path bounds within limits shared by the fast path and propagation.
     ///
-    /// Visits include the concrete-conjunction fast path and both BDD walks. The path limit
+    /// Visits include the concrete-conjunction fast path and derived relation checks. The path limit
     /// counts materialized constrained paths; an unconstrained or unsatisfiable result needs no
     /// path allowance. No partially collected family is returned when either limit is exhausted.
     fn compute_bounded(
@@ -4212,7 +4245,7 @@ impl<'db> PathBounds<'db> {
         source_order: Option<SourceOrderId>,
         limits: &mut L,
     ) -> ControlFlow<L::Break, Self> {
-        let mut source_orders = storage.calculate_source_orders(source_order);
+        let source_orders = storage.calculate_source_orders(source_order);
         if let Some(path_bounds) = Self::compute_simple_bound_conjunction(
             db,
             env,
@@ -4224,11 +4257,7 @@ impl<'db> PathBounds<'db> {
         )? {
             return ControlFlow::Continue(path_bounds);
         }
-
-        let (node, derived_source_order) =
-            node.remove_noninferable(db, env, storage, inferable, source_order, limits)?;
-        source_orders.extend(storage.calculate_source_orders(derived_source_order));
-        let interior = match node.node() {
+        match node.node() {
             Node::AlwaysTrue => {
                 limits.visit_node()?;
                 return ControlFlow::Continue(PathBounds::Unconstrained);
@@ -4237,17 +4266,12 @@ impl<'db> PathBounds<'db> {
                 limits.visit_node()?;
                 return ControlFlow::Continue(PathBounds::Unsatisfiable);
             }
-            Node::Interior(interior) => interior,
-        };
+            Node::Interior(_) => {}
+        }
 
-        let mut walker = SolutionWalker::new(source_orders);
-        // Sequent discovery must also happen in source order. Sorting the collected paths is
-        // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
-        // discard gradual evidence before solution extraction.
-        let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
-        let mut path = interior.path_assignments(db, env, storage, path_source_order);
-        walker.visit_node(db, env, storage, &mut path, node, limits)?;
-        ControlFlow::Continue(walker.finish(db, env, storage))
+        let mut walker = SolutionWalker::new(source_orders, inferable);
+        walker.visit_node(db, env, storage, node, limits)?;
+        ControlFlow::Continue(walker.finish())
     }
 
     /// Accumulates a conjunction of concrete bound constraints without constructing a
@@ -4478,7 +4502,10 @@ impl<'db> PathBounds<'db> {
                             path_bound
                                 .upper
                                 .when_satisfied_by(db, env, &mut storage, lower);
-                        if when_upper.is_never_satisfied(db, env, &mut storage, source_order) {
+                        if !when_upper
+                            .bound_consistency(db, env, &mut storage, source_order)
+                            .unwrap_or(true)
+                        {
                             // This path does not satisfy the accumulated upper bound, and is
                             // therefore not a valid specialization.
                             return PathBoundSolution::Unsatisfiable;
@@ -4593,7 +4620,10 @@ impl<'db> PathBounds<'db> {
                     let when = when_lower.and(&mut storage, when_upper);
                     let source_order =
                         storage.ordered_source_order(lower_source_order, upper_source_order);
-                    if when.is_never_satisfied(db, env, &mut storage, source_order) {
+                    if !when
+                        .bound_consistency(db, env, &mut storage, source_order)
+                        .unwrap_or(true)
+                    {
                         continue;
                     }
 
@@ -4842,48 +4872,6 @@ impl InteriorNode {
             },
         );
         result
-    }
-
-    fn remove_noninferable<'db, L: SolutionLimits>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        inferable: TypeVarSet<'db>,
-        source_order: Option<SourceOrderId>,
-        limits: &mut L,
-    ) -> ControlFlow<L::Break, (NodeId, Option<SourceOrderId>)> {
-        let is_bare_inferable_typevar = |bound: Option<ConstraintBound<'_>>| {
-            bound.is_some_and(|bound| {
-                matches!(
-                    bound,
-                    ConstraintBound::Evidence(Type::TypeVar(bound_typevar))
-                        if bound_typevar.is_inferable(db, inferable)
-                )
-            })
-        };
-        self.abstract_inner(
-            db,
-            env,
-            storage,
-            source_order,
-            limits,
-            // We only want to keep constraints on inferable typevars. If the constraint's typevar
-            // is itself inferable, we keep it. We also need to keep some constraints in
-            // non-inferable typevars, if an evidence bound is a bare inferable typevar. This
-            // ensures that our quantification logic does not depend on typevar ordering.
-            //
-            // For example, `I ≤ N` (where I is inferable and N is non-inferable) could be encoded
-            // either as `Never ≤ I ≤ N` or `I ≤ N ≤ object`, depending on typevar ordering. If we
-            // only checked the inferability of the constrained typevar, we would keep the first
-            // encoding but remove the second.
-            &mut |storage: &ConstraintSetStorage<'_>, constraint| {
-                let constraint = storage.constraint_data(constraint);
-                !constraint.typevar.is_inferable(db, inferable)
-                    && !is_bare_inferable_typevar(constraint.stored_lower_bound())
-                    && !is_bare_inferable_typevar(constraint.stored_upper_bound())
-            },
-        )
     }
 
     fn abstract_inner<'db, F, L>(
@@ -6092,7 +6080,7 @@ mod tests {
     }
 
     #[test]
-    fn bounded_path_collection_shares_preprocessing_visits() {
+    fn bounded_path_collection_counts_hidden_alternatives() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -6107,27 +6095,6 @@ mod tests {
         let set = visible.and(db, &builder, || hidden_alternatives);
         let inferable = TypeVarSet::from_typevars(db, [t]);
         let mut storage = builder.storage.borrow_mut();
-        let source_orders = storage.calculate_source_orders(set.source_order);
-        let mut preprocessing = CountSolutionLimits::default();
-        let ControlFlow::Continue(fast_path) = PathBounds::compute_simple_bound_conjunction(
-            db,
-            &env,
-            &mut storage,
-            &source_orders,
-            set.node,
-            inferable,
-            &mut preprocessing,
-        );
-        assert_eq!(fast_path, None);
-        let ControlFlow::Continue(_) = set.node.remove_noninferable(
-            db,
-            &env,
-            &mut storage,
-            inferable,
-            set.source_order,
-            &mut preprocessing,
-        );
-
         let mut complete = CountSolutionLimits::default();
         let ControlFlow::Continue(expected) = PathBounds::compute_with_limits(
             db,
@@ -6138,24 +6105,19 @@ mod tests {
             set.source_order,
             &mut complete,
         );
-        assert_eq!(complete.paths, 1);
-        assert!(complete.visits > preprocessing.visits);
+        assert_eq!(complete.paths, 2);
         drop(storage);
 
         assert_eq!(
-            bounded_path_bounds(db, set, inferable, 1, preprocessing.visits),
+            bounded_path_bounds(db, set, inferable, 2, complete.visits - 1),
             Err(ProjectionError::TraversalBudgetExceeded)
         );
         assert_eq!(
-            bounded_path_bounds(db, set, inferable, 1, complete.visits - 1),
-            Err(ProjectionError::TraversalBudgetExceeded)
-        );
-        assert_eq!(
-            bounded_path_bounds(db, set, inferable, 1, complete.visits),
+            bounded_path_bounds(db, set, inferable, 2, complete.visits),
             Ok(expected)
         );
         assert_eq!(
-            bounded_path_bounds(db, set, inferable, 0, complete.visits),
+            bounded_path_bounds(db, set, inferable, 1, complete.visits),
             Err(ProjectionError::PathBudgetExceeded)
         );
     }

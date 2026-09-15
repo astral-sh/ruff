@@ -45,7 +45,7 @@ def grounded[X, A]() -> None:
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[X=int, A=list[int]]]
-    # revealed: tuple[Solution[X=int, A=Invariant[int] & Invariant[X@grounded]]]
+    # revealed: tuple[Solution[X=int, A=Invariant[X@grounded]]]
     reveal_type(body.solutions(inferable=tuple[X, A]))
     # TODO: revealed: tuple[Solution[A=list[int]]]
     # revealed: tuple[Solution[A=Invariant[int]]]
@@ -195,7 +195,7 @@ def correlated_outputs[X, Y, Z]() -> None:
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[X=int, Y=int, Z=Invariant[int]], Solution[X=str, Y=str, Z=Invariant[str]]]
-    # revealed: tuple[Solution[X=int | Y@correlated_outputs, Z=Invariant[X@correlated_outputs] | Invariant[int], Y=int], Solution[X=str | Y@correlated_outputs, Z=Invariant[X@correlated_outputs] | Invariant[str], Y=str]]
+    # revealed: tuple[Solution[X=int, Y=int, Z=Invariant[X@correlated_outputs]], Solution[X=str, Y=str, Z=Invariant[X@correlated_outputs]]]
     reveal_type(body.solutions(inferable=tuple[X, Y, Z]))
     # revealed: tuple[Solution[Y=int, Z=Invariant[int]], Solution[Y=str, Z=Invariant[str]]]
     reveal_type(quantified.solutions(inferable=tuple[Y, Z]))
@@ -237,7 +237,7 @@ def finite_domain[X: (int, str), Y, Z]() -> None:
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[X=int, Y=int, Z=Invariant[int]], Solution[X=str, Y=str, Z=Invariant[str]]]
-    # revealed: tuple[Solution[X=Y@finite_domain, Y=X@finite_domain, Z=Invariant[X@finite_domain] | Invariant[Y@finite_domain]]]
+    # revealed: tuple[Solution[X=Y@finite_domain, Y=X@finite_domain, Z=Invariant[X@finite_domain]]]
     reveal_type(body.solutions(inferable=tuple[X, Y, Z]))
     # TODO: revealed: tuple[Solution[Y=int, Z=Invariant[int]], Solution[Y=str, Z=Invariant[str]]]
     # revealed: tuple[Solution[Z=Invariant[Y@finite_domain]]]
