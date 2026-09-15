@@ -18,7 +18,7 @@ use crate::{
         ClassBase, ClassLiteral, ClassType, LintDiagnosticGuard, Parameters, Signature, Type,
         binding_type,
         diagnostic::{AbstractMethodAnnotationPolicy, abstract_method_span},
-        function::{AbstractMethodKind, ExplicitAbstractness},
+        function::{AbstractMethodKind, FunctionDecorators},
         infer::{function_known_decorators, infer_definition_types},
     },
 };
@@ -372,7 +372,7 @@ impl<'db> ClassType<'db> {
     }
 }
 
-/// Whether a binding needs type inference to rule out an explicitly abstract method.
+/// Whether a binding could resolve to a method marked with `@abstractmethod`.
 ///
 /// Keep the definition dependency in this query so unrelated edits to a superclass's module do
 /// not invalidate abstract-method discovery for all of its subclasses. Use cached decorator
@@ -382,9 +382,14 @@ fn might_be_explicitly_abstract<'db>(db: &'db dyn Db, definition: Definition<'db
     let DefinitionKind::Function(function) = definition.kind(db) else {
         return true;
     };
-    function.has_decorators()
-        && function_known_decorators(db, definition).explicit_abstractness()
-            == ExplicitAbstractness::PossiblyAbstract
+    if !function.has_decorators() {
+        return false;
+    }
+    let decorators = function_known_decorators(db, definition);
+    decorators
+        .known_decorators()
+        .contains(FunctionDecorators::ABSTRACT_METHOD)
+        || decorators.has_unknown_decorators()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]

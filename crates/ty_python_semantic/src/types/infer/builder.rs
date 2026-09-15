@@ -92,8 +92,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
-    ExplicitAbstractness, FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral,
-    report_revealed_type, same_module_uncached_raw_signature,
+    FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral, report_revealed_type,
+    same_module_uncached_raw_signature,
 };
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, bind_typevar, enclosing_binding_contexts,
@@ -11823,21 +11823,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_region();
 
         let mut known_decorators = FunctionDecorators::empty();
-        let mut explicit_abstractness = ExplicitAbstractness::PossiblyAbstract;
+        let mut has_unknown_decorators = true;
         if let InferenceRegion::FunctionDecorators(definition) = self.region
             && let DefinitionKind::Function(function) = definition.kind(self.db())
         {
-            explicit_abstractness = ExplicitAbstractness::NonAbstract;
+            has_unknown_decorators = false;
             for decorator in &function.node(self.module()).decorator_list {
                 let ty = self.expression_type(&decorator.expression);
                 let flags = FunctionDecorators::from_decorator_type(self.db(), ty);
                 known_decorators |= flags;
-                if flags.contains(FunctionDecorators::ABSTRACT_METHOD)
-                    || (flags.is_empty()
-                        && !matches!(ty, Type::ClassLiteral(class)
-                            if class.known(self.db()) == Some(KnownClass::Property)))
+                if flags.is_empty()
+                    && !matches!(ty, Type::ClassLiteral(class)
+                        if class.known(self.db()) == Some(KnownClass::Property))
                 {
-                    explicit_abstractness = ExplicitAbstractness::PossiblyAbstract;
+                    has_unknown_decorators = true;
                 }
             }
         }
@@ -11879,7 +11878,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
             known_decorators,
-            explicit_abstractness,
+            has_unknown_decorators,
             diagnostics,
         }
     }
