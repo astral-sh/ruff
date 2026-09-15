@@ -61,7 +61,7 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, MethodDecorator,
 };
-use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
+use crate::types::constraints::{CandidateSolutions, ConstraintSetBuilder, Solutions};
 use crate::types::context::InferContext;
 use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
@@ -6781,7 +6781,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut type_context_mappings: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>> =
             FxHashMap::default();
         for solution in solutions.into_vec() {
-            for binding in solution {
+            for binding in solution.solved_typevars {
                 let inferred_ty = binding
                     .solution
                     .filter_union(db, env, |ty| !ty.has_provisional_marker(db, env));
@@ -7579,7 +7579,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .entry(identity)
                         .and_modify(|current| *current = current.join(variance))
                         .or_insert(variance);
-                    PathBounds::preliminary_solve(db, env, &constraints, path_bound)
+                    CandidateSolutions::preliminary_solve(db, env, &constraints, path_bound)
                 });
 
                 match solutions {
@@ -7588,10 +7588,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // produces an unsatisfiable result. In that case, we simply proceed without
                     // type context constraints rather than aborting the entire collection literal
                     // inference.
-                    Solutions::Unsatisfiable | Solutions::Unconstrained => {}
+                    Solutions::Unsatisfiable(_) | Solutions::Unconstrained => {}
                     Solutions::Constrained(solutions) => {
                         for solution in solutions.as_slice() {
-                            for binding in solution {
+                            for binding in &solution.solved_typevars {
                                 // The SequentMap's transitivity reasoning can inject
                                 // cross-typevar references into the solution bounds.
                                 // For example, `_KT ≤ str ∧ str ≤ _VT` derives `_KT ≤ _VT`,
@@ -8003,7 +8003,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut yield_tcx: Option<UnionAccumulator<'db>> = None;
         for solution in solutions.into_vec() {
-            for binding in solution {
+            for binding in solution.solved_typevars {
                 if binding.bound_typevar != yield_typevar {
                     continue;
                 }

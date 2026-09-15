@@ -34,8 +34,8 @@ use crate::types::ProgramEnvironment;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, PathBound, PathBoundSolution, PathBounds, SolutionPaths,
-    Solutions,
+    CandidateSolutions, ConstraintSet, ConstraintSetBuilder, PathBound, PathBoundSolution,
+    SolutionPaths, Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
@@ -3166,6 +3166,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 paths.into_vec().into_iter().map(|path| {
                                     let path: Box<[_]> = path
+                                        .solved_typevars
                                         .into_iter()
                                         .filter(|binding| binding.bound_typevar == typevar)
                                         .collect();
@@ -3174,7 +3175,7 @@ impl<'db> Bindings<'db> {
                                     ))
                                 }),
                             ),
-                            Ok(Solutions::Unsatisfiable) => Type::none(db, env),
+                            Ok(Solutions::Unsatisfiable(_)) => Type::none(db, env),
                             Ok(Solutions::Unconstrained) => Type::empty_tuple(db, env),
                             Err(_) => Type::unknown(),
                         };
@@ -3206,12 +3207,12 @@ impl<'db> Bindings<'db> {
                                     Type::KnownInstance(KnownInstanceType::ConstraintSetSolution(
                                         InternedConstraintSetSolution::new(
                                             db,
-                                            path.into_boxed_slice(),
+                                            path.solved_typevars.into_boxed_slice(),
                                         ),
                                     ))
                                 }),
                             ),
-                            Ok(Solutions::Unsatisfiable) => Type::none(db, env),
+                            Ok(Solutions::Unsatisfiable(_)) => Type::none(db, env),
                             Ok(Solutions::Unconstrained) => Type::empty_tuple(db, env),
                             Err(_) => Type::unknown(),
                         };
@@ -6087,7 +6088,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         .entry(identity)
                         .and_modify(|current| *current = current.join(variance))
                         .or_insert(variance);
-                    PathBounds::preliminary_solve(db, self.env, constraints, path_bound)
+                    CandidateSolutions::preliminary_solve(db, self.env, constraints, path_bound)
                 });
 
                 let Solutions::Constrained(solutions) = solutions else {
@@ -6098,7 +6099,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     FxHashMap::default();
 
                 for solution in solutions.as_slice() {
-                    for binding in solution {
+                    for binding in &solution.solved_typevars {
                         let identity = binding.bound_typevar.identity(db);
 
                         // Avoid unnecessarily widening the return type based on a covariant
@@ -6157,7 +6158,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 // Add preferred types to the builder so they serve as the base mapping
                 // when argument inference adds more types.
                 for solution in solutions.as_slice() {
-                    for binding in solution {
+                    for binding in &solution.solved_typevars {
                         let identity = binding.bound_typevar.identity(db);
                         // A `ParamSpec` keeps its first binding, so seeding it here would discard
                         // the inferred parameter list of the argument.
@@ -6246,19 +6247,22 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             // Promotion must preserve unsatisfiable outcomes and the completeness of fallbacks.
             Some(
-                PathBounds::default_solve(db, self.env, constraints, bounds).map(|solution| {
-                    let promoted = solution.promote(db, self.env);
+                CandidateSolutions::default_solve(db, self.env, constraints, bounds).map(
+                    |solution| {
+                        let promoted = solution.promote(db, self.env);
 
-                    // If the TypeVar has an upper bound, only use the promoted type if it
-                    // still satisfies the bound.
-                    if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints
-                        && !promoted.is_assignable_to(db, self.env, bound)
-                    {
-                        return solution;
-                    }
+                        // If the TypeVar has an upper bound, only use the promoted type if it
+                        // still satisfies the bound.
+                        if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
+                            bound_or_constraints
+                            && !promoted.is_assignable_to(db, self.env, bound)
+                        {
+                            return solution;
+                        }
 
-                    promoted
-                }),
+                        promoted
+                    },
+                ),
             )
         };
 
@@ -7942,11 +7946,11 @@ impl<'db> Binding<'db> {
             );
 
             let solutions = path_bounds.solve_with(|_variance, path_bound| {
-                PathBounds::preliminary_solve(db, env, constraints, path_bound)
+                CandidateSolutions::preliminary_solve(db, env, constraints, path_bound)
             });
             if let Solutions::Constrained(solutions) = solutions {
                 for solution in solutions.into_vec() {
-                    for binding in solution {
+                    for binding in solution.solved_typevars {
                         let identity = binding.bound_typevar.identity(db);
                         return_type_solutions
                             .entry(identity)
