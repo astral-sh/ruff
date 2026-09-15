@@ -55,7 +55,7 @@ use std::borrow::Cow;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
 use crate::types::diagnostic::TypeCheckDiagnostics;
-use crate::types::function::{FunctionDecorators, FunctionType};
+use crate::types::function::{ExplicitAbstractness, FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
@@ -259,7 +259,7 @@ pub(crate) struct FunctionDecoratorInference<'db> {
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
     known_decorators: FunctionDecorators,
-    has_only_non_abstract_decorators: bool,
+    explicit_abstractness: ExplicitAbstractness,
     diagnostics: TypeCheckDiagnostics,
 }
 
@@ -289,9 +289,8 @@ impl<'db> FunctionDecoratorInference<'db> {
         self.known_decorators
     }
 
-    /// Whether every decorator is known to preserve a concrete method's non-abstractness.
-    pub(crate) fn has_only_non_abstract_decorators(&self) -> bool {
-        self.has_only_non_abstract_decorators
+    pub(super) fn explicit_abstractness(&self) -> ExplicitAbstractness {
+        self.explicit_abstractness
     }
 
     fn diagnostics(&self) -> &TypeCheckDiagnostics {

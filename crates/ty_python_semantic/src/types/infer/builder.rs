@@ -92,8 +92,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
-    FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral, report_revealed_type,
-    same_module_uncached_raw_signature,
+    ExplicitAbstractness, FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral,
+    report_revealed_type, same_module_uncached_raw_signature,
 };
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, bind_typevar, enclosing_binding_contexts,
@@ -11822,29 +11822,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn finish_function_decorator_inference(mut self) -> FunctionDecoratorInference<'db> {
         self.infer_region();
 
-        let (known_decorators, has_only_non_abstract_decorators) = match self.region {
-            InferenceRegion::FunctionDecorators(definition) => match definition.kind(self.db()) {
-                DefinitionKind::Function(function) => {
-                    function.node(self.module()).decorator_list.iter().fold(
-                        (FunctionDecorators::empty(), true),
-                        |(known_decorators, has_only_non_abstract_decorators), decorator| {
-                            let ty = self.expression_type(&decorator.expression);
-                            let flags = FunctionDecorators::from_decorator_type(self.db(), ty);
-                            let is_non_abstract = (!flags.is_empty()
-                                && !flags.contains(FunctionDecorators::ABSTRACT_METHOD))
-                                || matches!(ty, Type::ClassLiteral(class)
-                                        if class.known(self.db()) == Some(KnownClass::Property));
-                            (
-                                known_decorators | flags,
-                                has_only_non_abstract_decorators && is_non_abstract,
-                            )
-                        },
-                    )
+        let mut known_decorators = FunctionDecorators::empty();
+        let mut explicit_abstractness = ExplicitAbstractness::PossiblyAbstract;
+        if let InferenceRegion::FunctionDecorators(definition) = self.region
+            && let DefinitionKind::Function(function) = definition.kind(self.db())
+        {
+            explicit_abstractness = ExplicitAbstractness::NonAbstract;
+            for decorator in &function.node(self.module()).decorator_list {
+                let ty = self.expression_type(&decorator.expression);
+                let flags = FunctionDecorators::from_decorator_type(self.db(), ty);
+                known_decorators |= flags;
+                if flags.contains(FunctionDecorators::ABSTRACT_METHOD)
+                    || (flags.is_empty()
+                        && !matches!(ty, Type::ClassLiteral(class)
+                            if class.known(self.db()) == Some(KnownClass::Property)))
+                {
+                    explicit_abstractness = ExplicitAbstractness::PossiblyAbstract;
                 }
-                _ => (FunctionDecorators::empty(), false),
-            },
-            _ => (FunctionDecorators::empty(), false),
-        };
+            }
+        }
 
         let Self {
             context,
@@ -11883,7 +11879,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
             known_decorators,
-            has_only_non_abstract_decorators,
+            explicit_abstractness,
             diagnostics,
         }
     }

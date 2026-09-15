@@ -1078,6 +1078,16 @@ pub(super) fn same_module_uncached_raw_signature<'db>(
         .last_definition_raw_signature(db, return_callable_typevar_scope)
 }
 
+/// Whether decorator metadata rules out an explicitly abstract method.
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) enum ExplicitAbstractness {
+    /// No decorator can introduce explicit abstractness.
+    NonAbstract,
+    /// Full inference is needed, including for unknown decorators or incomplete inference.
+    #[default]
+    PossiblyAbstract,
+}
+
 /// Indicates whether a method is explicitly or implicitly abstract.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) enum AbstractMethodKind {
