@@ -1,4 +1,4 @@
-//! Abstract-method discovery and diagnostics for class validation.
+//! Abstract-method discovery and diagnostics shared by class validation and constructor calls.
 
 use ruff_db::{
     diagnostic::{Annotation, Span, SubDiagnostic, SubDiagnosticSeverity},
@@ -235,6 +235,10 @@ impl<'db> AbstractMethods<'db> {
     pub(super) fn len(&self) -> usize {
         self.methods.len()
     }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.methods.is_empty()
+    }
 }
 
 #[salsa::tracked]
@@ -243,7 +247,9 @@ impl<'db> ClassType<'db> {
     /// and have not been overridden with a concrete implementation anywhere in the MRO
     ///
     /// The value of the map is a struct containing information about the abstract method.
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    // Inferring class members can call constructors that query abstractness again.
+    // Start with no abstract methods while resolving these cycles.
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size, cycle_initial=|_, _, _| FxIndexMap::default())]
     pub(in crate::types) fn abstract_methods(
         self,
         db: &'db dyn Db,
