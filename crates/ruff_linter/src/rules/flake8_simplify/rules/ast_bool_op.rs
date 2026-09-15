@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::iter;
 
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, UnaryOp};
@@ -561,7 +562,7 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
             },
             expr.range(),
         );
-        let mut unmatched: Vec<Expr> = values
+        let unmatched: Vec<Expr> = values
             .iter()
             .enumerate()
             .filter(|(index, _)| !indices.contains(index))
@@ -572,11 +573,12 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
         } else {
             // Wrap in a `x in (a, b) or ...` boolean operation, preserving the original
             // left-to-right order of the replacement and any unmatched operands.
-            unmatched.push(in_expr);
-            unmatched.sort_by_key(Ranged::start);
             let node = ast::ExprBoolOp {
                 op: BoolOp::Or,
-                values: unmatched,
+                values: iter::once(in_expr)
+                    .chain(unmatched)
+                    .sorted_by_key(Ranged::start)
+                    .collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
