@@ -717,6 +717,180 @@ OptionalCallback(empty).callback()
 OptionalCallback(empty).callback(1)  # error: [too-many-positional-arguments]
 ```
 
+### Invoking generic callbacks through parameter lists
+
+Forwarded arguments specialize the callback's type variables before the wrapper returns its result.
+
+```py
+from typing import Callable
+
+def invoke[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+def identity[T](value: T) -> T:
+    return value
+
+def boxed[T](value: T) -> list[T]:
+    return [value]
+
+def pair[T](first: T, *, second: T) -> tuple[T, T]:
+    return first, second
+
+def _(value: int, text: str) -> None:
+    reveal_type(invoke(identity, value))  # revealed: int
+    reveal_type(invoke(identity, value=text))  # revealed: str
+    reveal_type(invoke(boxed, value))  # revealed: list[int]
+    reveal_type(invoke(pair, value, second=text))  # revealed: tuple[int | str, int | str]
+    invoke(pair, value)  # error: [missing-argument]
+    # error: [missing-argument]
+    # error: [unknown-argument]
+    invoke(identity, unexpected=value)
+
+def outer[U](value: U) -> U:
+    result = invoke(identity, value)
+    reveal_type(result)  # revealed: U@outer
+    return result
+```
+
+### Nested generic forwarding
+
+Each forwarded invocation keeps the type variables introduced by the callbacks it invokes.
+
+```py
+from typing import Callable
+
+def invoke[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+def forward[**Q, S](callback: Callable[Q, S], /, *args: Q.args, **kwargs: Q.kwargs) -> S:
+    return callback(*args, **kwargs)
+
+def identity[T](value: T) -> T:
+    return value
+
+def _(value: int) -> None:
+    reveal_type(invoke(forward, identity, value))  # revealed: int
+    reveal_type(invoke(invoke, identity, value))  # revealed: int
+```
+
+Optional callbacks preserve the same relationship when the callable is selected from a union.
+
+```py
+def optional[**P, R](callback: Callable[P, R] | None, /, *args: P.args, **kwargs: P.kwargs) -> R:
+    if callback is None:
+        raise ValueError
+    return callback(*args, **kwargs)
+
+def _(value: int) -> None:
+    reveal_type(optional(optional, identity, value))  # revealed: int
+```
+
+### Combining callback and outer argument constraints
+
+The callback's return and an ordinary argument can require a wider callback specialization.
+
+```py
+from typing import Callable
+
+def into[**P, R](callback: Callable[P, list[R]], target: list[R], /, *args: P.args, **kwargs: P.kwargs) -> list[R]:
+    return callback(*args, **kwargs)
+
+def boxed[T](value: T) -> list[T]:
+    return [value]
+
+def _(value: int, objects: list[object], strings: list[str]) -> None:
+    reveal_type(into(boxed, objects, value))  # revealed: list[object]
+    into(boxed, strings, value)  # error: [invalid-argument-type]
+```
+
+### Preserving generic callbacks until invocation
+
+Capturing a generic callback preserves its type parameters; invoking it resolves them.
+
+```py
+from typing import Callable
+
+def capture[**P, R](callback: Callable[P, R]) -> Callable[P, R]:
+    return callback
+
+def checked[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> Callable[P, R]:
+    callback(*args, **kwargs)
+    return callback
+
+def identity[T](value: T) -> T:
+    return value
+
+captured = capture(identity)
+reveal_type(captured(1))  # revealed: Literal[1]
+reveal_type(captured("a"))  # revealed: Literal["a"]
+
+def _(value: int) -> None:
+    specialized = checked(identity, value)
+    reveal_type(specialized)  # revealed: (value: int) -> int
+    specialized("a")  # error: [invalid-argument-type]
+```
+
+### Independent callback invocations
+
+Invoking one occurrence of a generic callback does not specialize another captured occurrence.
+
+```py
+from typing import Callable
+
+def run_and_keep[**P, **Q, R, S](
+    run: Callable[P, R], keep: Callable[Q, S], /, *args: P.args, **kwargs: P.kwargs
+) -> tuple[R, Callable[Q, S]]:
+    return run(*args, **kwargs), keep
+
+def identity[T](value: T) -> T:
+    return value
+
+def _(value: int) -> None:
+    result, kept = run_and_keep(identity, identity, value)
+    reveal_type(result)  # revealed: int
+    reveal_type(kept("a"))  # revealed: Literal["a"]
+```
+
+A recursive callback invocation also keeps its local type variable separate from its caller's.
+
+```py
+def invoke[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+def recursive[T](value: T) -> T:
+    result = invoke(recursive, value)
+    reveal_type(result)  # revealed: T@recursive
+    return result
+```
+
+### Bounds and defaults in forwarded generic calls
+
+A forwarded call checks callback bounds and applies defaults even when no arguments are supplied.
+
+```py
+from typing import Callable
+
+def invoke[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+def bounded[T: int](value: T) -> list[T]:
+    return [value]
+
+def constrained[C: (int, str)](value: C) -> list[C]:
+    return [value]
+
+def defaulted[D = str]() -> list[D]:
+    return []
+
+def _(value: int, text: str) -> None:
+    reveal_type(invoke(bounded, value))  # revealed: list[int]
+    invoke(bounded, text)  # error: [invalid-argument-type]
+    reveal_type(invoke(constrained, text))  # revealed: list[str]
+    invoke(constrained, b"bad")  # error: [invalid-argument-type]
+
+reveal_type(invoke(defaulted))  # revealed: list[str]
+```
+
 ### Return type change using `ParamSpec` once
 
 ```py
