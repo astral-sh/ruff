@@ -32,6 +32,7 @@ For implementors, see `import-resolution-diagram.svg` for a flow diagram that
 specifies ty's implementation of Python's import resolution algorithm.
 */
 
+mod enumerate;
 mod search;
 
 use std::borrow::Cow;
