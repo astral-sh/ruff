@@ -5,18 +5,21 @@ use ruff_db::{
     parsed::parsed_module,
 };
 use ruff_python_ast::name::Name;
-use ty_python_core::{definition::Definition, place_table, use_def_map};
+use ty_python_core::{
+    definition::{Definition, DefinitionKind},
+    place_table, use_def_map,
+};
 
 use crate::{
     Db, FxIndexMap, ProgramEnvironment, TypeQualifiers,
     diagnostic::format_enumeration,
     place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
     types::{
-        ClassBase, ClassLiteral, ClassType, LintDiagnosticGuard, Parameters, Signature, Type,
-        binding_type,
+        ClassBase, ClassLiteral, ClassType, KnownClass, LintDiagnosticGuard, Parameters, Signature,
+        Type, binding_type,
         diagnostic::{AbstractMethodAnnotationPolicy, abstract_method_span},
-        function::AbstractMethodKind,
-        infer::infer_definition_types,
+        function::{AbstractMethodKind, FunctionDecorators},
+        infer::{function_known_decorators, infer_definition_types},
     },
 };
 
@@ -305,6 +308,8 @@ impl<'db> ClassType<'db> {
             let scope = class_literal.body_scope(db);
             let place_table = place_table(db, scope);
             let use_def_map = use_def_map(db, class_literal.body_scope(db));
+            let can_be_implicitly_abstract =
+                !class_literal.file(db).is_stub(db) && class.is_protocol(db);
 
             // Treat abstract methods from superclasses as having been overridden
             // if this class has a synthesized method by that name,
@@ -328,6 +333,18 @@ impl<'db> ClassType<'db> {
 
             for (symbol_id, bindings_iterator) in use_def_map.all_end_of_scope_symbol_bindings() {
                 let name = place_table.symbol(symbol_id).name();
+                // Avoid inferring signatures for methods that cannot introduce abstractness.
+                // Inspect all reachable definitions: an earlier overload can be abstract even
+                // when the final implementation is concrete.
+                if !can_be_implicitly_abstract
+                    && !abstract_methods.contains_key(name)
+                    && use_def_map
+                        .reachable_symbol_bindings(symbol_id)
+                        .filter_map(|binding| binding.binding.definition())
+                        .all(|definition| !might_be_explicitly_abstract(db, definition))
+                {
+                    continue;
+                }
                 let place_and_definition = place_from_bindings(db, env, bindings_iterator);
                 let Place::Defined(DefinedPlace { ty, .. }) = place_and_definition.place else {
                     continue;
@@ -353,6 +370,32 @@ impl<'db> ClassType<'db> {
 
         abstract_methods
     }
+}
+
+/// Whether a binding needs type inference to rule out an explicitly abstract method.
+///
+/// Keep the AST dependency in this query so unrelated edits to a superclass's module do not
+/// invalidate abstract-method discovery for all of its subclasses.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true)]
+fn might_be_explicitly_abstract<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    let DefinitionKind::Function(function) = definition.kind(db) else {
+        return true;
+    };
+    let module = parsed_module(db, definition.python_file(db)).load(db);
+    let function = function.node(&module);
+    if function.decorator_list.is_empty() {
+        return false;
+    }
+    let decorators = function_known_decorators(db, definition);
+    !function.decorator_list.iter().all(|decorator| {
+        let Some(ty) = decorators.expression_type(&decorator.expression) else {
+            return false;
+        };
+        let flags = FunctionDecorators::from_decorator_type(db, ty);
+        (!flags.is_empty() && !flags.contains(FunctionDecorators::ABSTRACT_METHOD))
+            || matches!(ty, Type::ClassLiteral(class)
+                if class.known(db) == Some(KnownClass::Property))
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
