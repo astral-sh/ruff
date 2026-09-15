@@ -21,7 +21,9 @@ use ty_python_core::ProgramFile;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
 use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, PythonVersionWithSource};
+use ty_python_semantic::{
+    AnalysisSettings, Db as SemanticDb, PlaceLoadRecordingMode, PythonVersionWithSource,
+};
 
 mod changes;
 
@@ -110,7 +112,12 @@ impl ProjectDatabase {
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
-        Self::new(project_metadata, system, &FallibleStrategy)
+        Self::new(
+            project_metadata,
+            system,
+            PlaceLoadRecordingMode::default(),
+            &FallibleStrategy,
+        )
     }
 
     /// Creates a new database, substituting default values for any misconfigured settings.
@@ -118,7 +125,12 @@ impl ProjectDatabase {
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
-        let Ok(db) = Self::new(project_metadata, system, &UseDefaultStrategy);
+        let Ok(db) = Self::new(
+            project_metadata,
+            system,
+            PlaceLoadRecordingMode::default(),
+            &UseDefaultStrategy,
+        );
         db
     }
 
@@ -144,6 +156,7 @@ impl ProjectDatabase {
     fn new<S, Strategy: MisconfigurationStrategy>(
         project_metadata: ProjectMetadata,
         system: S,
+        recording_mode: PlaceLoadRecordingMode,
         strategy: &Strategy,
     ) -> Result<Self, Strategy::Error<anyhow::Error>>
     where
@@ -181,6 +194,8 @@ impl ProjectDatabase {
 
         let (program_settings, program_settings_diagnostics) = strategy
             .to_anyhow(merged_options.to_program_settings(db.system(), db.vendored(), strategy))?;
+
+        ty_python_semantic::initialize_place_load_recording(&db, recording_mode);
 
         // This must be called before `from_metadata`, or the `SearchPath` root
         // will take precedence over the `Project` root, resulting in
@@ -725,7 +740,7 @@ pub(crate) mod testing {
     use ty_python_semantic::ProgramEnvironment;
     use ty_python_semantic::dependency::DependencyMetadata;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-    use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource};
+    use ty_python_semantic::{AnalysisSettings, PlaceLoadRecordingMode, PythonVersionWithSource};
 
     use crate::db::Db;
     use crate::metadata::settings::file_settings;
@@ -749,6 +764,14 @@ pub(crate) mod testing {
 
     impl TestDb {
         pub fn new(project: ProjectMetadata) -> Self {
+            Self::with_place_load_recording_mode(project, PlaceLoadRecordingMode::default())
+        }
+
+        /// Creates a test database with the given recording policy.
+        fn with_place_load_recording_mode(
+            project: ProjectMetadata,
+            recording_mode: PlaceLoadRecordingMode,
+        ) -> Self {
             let events = Events::default();
             let uv_environments = UvEnvironments::new(project.use_uv());
             let mut db = Self {
@@ -766,6 +789,8 @@ pub(crate) mod testing {
                 events,
                 project: None,
             };
+
+            ty_python_semantic::initialize_place_load_recording(&db, recording_mode);
 
             let (settings, settings_diagnostics) = project
                 .to_merged_options()
@@ -949,6 +974,27 @@ mod tests {
     use crate::db::testing::TestDb;
     use crate::watch::ChangeEvent;
     use crate::{Db, ProjectDatabase, ProjectMetadata, UseUv};
+
+    #[test]
+    fn place_load_recording_defaults_to_disabled() {
+        let system = TestSystem::default();
+        system
+            .memory_file_system()
+            .write_file_all(
+                "/project/test.py",
+                r#"
+value = 1
+result = value
+"#,
+            )
+            .expect("write recording fixture");
+        let metadata = ProjectMetadata::new("recording", SystemPathBuf::from("/project"));
+        let mut db = ProjectDatabase::fallible(metadata, system).expect("valid test project");
+        let file = system_path_to_file(&db, "/project/test.py").expect("fixture exists");
+        ty_python_semantic::enable_place_load_recording(&mut db, [file]);
+        assert!(!ty_python_semantic::should_record_place_loads(&db, file));
+        assert!(db.check_file(file).is_empty());
+    }
 
     #[test]
     fn checks_use_available_script_environment_without_running_uv() -> anyhow::Result<()> {
