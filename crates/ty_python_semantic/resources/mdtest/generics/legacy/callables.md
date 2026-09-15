@@ -322,6 +322,36 @@ def _(value: str | int) -> None:
     reveal_type(accepts_callable_and_value(overloaded_consumer, value))  # revealed: str | bytes | int
 ```
 
+When overloads exchange their input and output types, inference preserves each input-output pair.
+The constrained input type excludes `Never`, so each specialization selects one of the overloads. A
+covariant wrapper keeps the pairs visible in the return type instead of collapsing their
+intersection to `Never`:
+
+```py
+from typing import Generic
+
+ResultT = TypeVar("ResultT", covariant=True)
+PairT = TypeVar("PairT", int, str)
+U = TypeVar("U")
+
+class Result(Generic[ResultT]):
+    def use(self, callback: Callable[[ResultT], int]) -> int:
+        raise NotImplementedError
+
+def infer_pair(converter: Callable[[PairT], U]) -> Result[tuple[PairT, U]]:
+    raise NotImplementedError
+
+@overload
+def swap(value: int) -> str: ...
+@overload
+def swap(value: str) -> int: ...
+def swap(value: int | str) -> int | str:
+    raise NotImplementedError
+
+def _() -> None:
+    reveal_type(infer_pair(swap))  # revealed: Result[tuple[int, str]] & Result[tuple[str, int]]
+```
+
 ## Rejected overloaded callbacks preserve valid specializations
 
 An overloaded callback may contain one alternative whose return type violates a type variable's
@@ -456,6 +486,51 @@ def singleton(flag: bool = False) -> Callable[[Callable[[int], S]], Callable[[in
     return wrapper
 ```
 
+## Dependent return types from generic callbacks
+
+A generic identity callback returns the type it receives. Each overload of the consumer selects a
+different argument type for that callback, which also determines its result type. The enclosing
+call's return type should satisfy both specializations, giving `A & B`. We currently retain `A | B`
+because subtype revalidation does not recognize the generic callback as a subtype of either
+specialized callable type:
+
+```py
+from typing import Callable, TypeVar, overload
+
+T = TypeVar("T")
+R = TypeVar("R")
+
+class A: ...
+class B: ...
+
+def infer_result(callback: Callable[[T], R], consumer: Callable[[T], None]) -> R:
+    raise NotImplementedError
+
+def identity(value: T) -> T:
+    return value
+
+@overload
+def consume(value: A) -> None: ...
+@overload
+def consume(value: B) -> None: ...
+def consume(value: A | B) -> None: ...
+
+# TODO: revealed: A & B
+reveal_type(infer_result(identity, consume))  # revealed: A | B
+```
+
+Supplying a value selects the consumer overload that accepts it. The identity callback's result type
+follows that selected argument type:
+
+```py
+def infer_result_with_value(callback: Callable[[T], R], consumer: Callable[[T], None], value: T) -> R:
+    return callback(value)
+
+def _(a: A, b: B) -> None:
+    reveal_type(infer_result_with_value(identity, consume, a))  # revealed: A
+    reveal_type(infer_result_with_value(identity, consume, b))  # revealed: B
+```
+
 ## Return type inference from partially annotated overloads
 
 The catch-all overload returns `object`, which is preserved when inferring a return type from the
@@ -539,6 +614,41 @@ def callback(value):
 
 assert_type(infer_return((callback, callback, callback), 0), Unknown)
 assert_type(infer_return(default=0, callback=(callback, callback, callback)), Unknown)
+```
+
+## Contextual preference after solution budget exhaustion
+
+The return context prefers `object` for the list's element type. It also requires the repeated
+payload type to satisfy both `A | B` and `C | D | E`, whose intersection exceeds the solution
+budget. Argument inference supplies the payload type and two source element alternatives, but does
+not make the contextual inference complete. The result keeps the merged source element type rather
+than intersecting the alternative tuple returns.
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+Element = TypeVar("Element", covariant=True)
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+
+class Source(Generic[Element]):
+    def get(self) -> Element:
+        raise NotImplementedError
+
+def make(value: T, payload: U, source: Source[V]) -> tuple[list[T], U, U, V]:
+    raise NotImplementedError
+
+def _(payload: Intersection[A, C], source: Intersection[Source[D], Source[E]]) -> None:
+    # revealed: tuple[list[object], A & C, A & C, D | E]
+    result: tuple[list[object], A | B, C | D | E, object] = reveal_type(make(1, payload, source))
 ```
 
 ## Inferred type-guard return alternatives
