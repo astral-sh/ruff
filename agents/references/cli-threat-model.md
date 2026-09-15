@@ -14,7 +14,8 @@ Editors, playgrounds, and repository automation have [separate models](threat-mo
 
 ## Trust boundaries and assumptions
 
-- **Attacker-controlled:** source code, stubs, notebook contents, Markdown, and project configuration.
+- **Attacker-controlled:** project files used during analysis, including source code, project
+    configuration, and dependency source code.
 - **Trusted local input:** the operating system, installed programs, environment variables, `PATH`,
     caches, user configuration, explicit command-line choices, and user-managed filesystem state that
     the attacker cannot change.

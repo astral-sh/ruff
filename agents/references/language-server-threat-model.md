@@ -20,8 +20,9 @@ symlinks that point outside it.
 
 ## Security invariants
 
-- **Code Execution:** When `untrustedWorkspace` is true, ty must not execute code related to the
-    workspace or its dependencies, including code run during installation.
+- **Code Execution:** In untrusted workspaces, the editor extension and server may launch executables
+    bundled with the extension or trusted programs already installed on the host. They must not
+    execute workspace or dependency code, including code run during installation.
 - **Edits:** Only editing operations may change source files, and they must not change unrelated
     files.
 - **Output:** Attacker-controlled text in diagnostics, documentation, and logs must not inject code
