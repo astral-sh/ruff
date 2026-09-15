@@ -1,5 +1,12 @@
 {% extends "base.html" %}
 
+{% block content %}
+{{ super() }}
+{% if page.file.src_uri == "rules.md" %}
+{% include "partials/rule-filters.html" %}
+{% endif %}
+{% endblock %}
+
 {% block htmltitle %}
 {% if page.meta and page.meta.title %}
 <title>{{ page.meta.title }} | {{ config.site_name }}</title>
