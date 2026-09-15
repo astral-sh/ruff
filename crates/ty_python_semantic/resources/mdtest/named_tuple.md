@@ -890,6 +890,14 @@ reveal_type(Bad4)  # revealed: type[tuple[Unknown, ...]] & type[NamedTupleLike] 
 Bad4(42, 56, 79)  # no error
 ```
 
+An invalid name argument does not prevent us from reporting a missing `fields` argument:
+
+```py
+from typing import Union
+
+InvalidName = NamedTuple(Union[int, str])  # error: [missing-argument]
+```
+
 ### Starred and double-starred arguments
 
 For `collections.namedtuple`, starred (`*args`) or double-starred (`**kwargs`) arguments cause us to

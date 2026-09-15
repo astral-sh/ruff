@@ -2,6 +2,7 @@ use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::call::bind::CallableDescription;
+use crate::types::tuple::TupleType;
 use crate::types::type_alias::PEP695TypeAliasType;
 use crate::{Db, ProgramEnvironment};
 use ruff_db::files::system_path_to_file;
@@ -163,16 +164,22 @@ fn typing_vs_typeshed_no_default() {
     );
 }
 
-fn list_alias<'db>(
+fn generic_alias_with_one_argument<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
+    class: KnownClass,
     argument: Type<'db>,
 ) -> GenericAlias<'db> {
-    KnownClass::List
-        .to_specialized_class_type(db, env, &[argument])
-        .expect("`list` should accept one type argument")
+    let specialized = if class == KnownClass::Tuple {
+        TupleType::heterogeneous(db, env, [argument]).to_class_type(db)
+    } else {
+        class
+            .to_specialized_class_type(db, env, &[argument])
+            .expect("the class should accept one type argument")
+    };
+    specialized
         .into_generic_alias()
-        .expect("a specialized `list` should be a generic alias")
+        .expect("the specialized class should be a generic alias")
 }
 
 fn oscillating_generic_alias_cycle_recover<'db>(
@@ -181,6 +188,7 @@ fn oscillating_generic_alias_cycle_recover<'db>(
     previous: &Type<'db>,
     current: Type<'db>,
     program: Program<'db>,
+    _class: KnownClass,
 ) -> Type<'db> {
     let env = ProgramEnvironment::from_program(program);
     current.cycle_normalized(db, &env, *previous, cycle)
@@ -188,12 +196,16 @@ fn oscillating_generic_alias_cycle_recover<'db>(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_initial=|_, id, _, _| Type::divergent(id),
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
-fn oscillating_generic_alias<'db>(db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
+fn oscillating_generic_alias<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    class: KnownClass,
+) -> Type<'db> {
     let env = ProgramEnvironment::from_program(program);
-    let previous = oscillating_generic_alias(db, program);
+    let previous = oscillating_generic_alias(db, program, class);
     let argument = if let Type::GenericAlias(alias) = previous
         && alias.specialization(db).types(db) == [Type::unknown()]
     {
@@ -202,13 +214,14 @@ fn oscillating_generic_alias<'db>(db: &'db dyn Db, program: Program<'db>) -> Typ
         Type::unknown()
     };
 
-    list_alias(db, &env, argument).into()
+    generic_alias_with_one_argument(db, &env, class, argument).into()
 }
 
 #[test]
 fn generic_alias_cycle_recovery_normalizes_same_origin_unknown_oscillation() {
     let db = setup_db();
-    let Type::GenericAlias(alias) = oscillating_generic_alias(&db, db.program()) else {
+    let Type::GenericAlias(alias) = oscillating_generic_alias(&db, db.program(), KnownClass::List)
+    else {
         panic!("cycle recovery should preserve the generic alias");
     };
 
@@ -216,19 +229,41 @@ fn generic_alias_cycle_recovery_normalizes_same_origin_unknown_oscillation() {
 }
 
 #[test]
-fn generic_alias_cycle_recovery_rejects_unsafe_merges() {
+fn tuple_alias_cycle_recovery_converges_on_unknown_oscillation() {
+    let db = setup_db();
+    // Specialty tuples retain both approximations rather than replacing the previous iteration.
+    let Type::Union(recovered) = oscillating_generic_alias(&db, db.program(), KnownClass::Tuple)
+    else {
+        panic!("cycle recovery should retain both tuple aliases");
+    };
+    let env = db.program_environment();
+    assert_eq!(recovered.elements(&db).len(), 2);
+    for argument in [Type::unknown(), KnownClass::Int.to_instance(&db, &env)] {
+        let alias = generic_alias_with_one_argument(&db, &env, KnownClass::Tuple, argument);
+        assert!(recovered.elements(&db).contains(&Type::GenericAlias(alias)));
+    }
+}
+
+#[test_case(KnownClass::List; "list")]
+#[test_case(KnownClass::Tuple; "tuple")]
+fn generic_alias_cycle_recovery_rejects_unsafe_merges(class: KnownClass) {
     let db = setup_db();
     let db = &db;
     let env = db.program_environment();
-    let int = list_alias(db, &env, KnownClass::Int.to_instance(db, &env));
-    let str = list_alias(db, &env, KnownClass::Str.to_instance(db, &env));
+    let int =
+        generic_alias_with_one_argument(db, &env, class, KnownClass::Int.to_instance(db, &env));
+    let str =
+        generic_alias_with_one_argument(db, &env, class, KnownClass::Str.to_instance(db, &env));
     assert!(str.merge_cycle_recovery(db, int).is_none());
 
     let generic_context = int.specialization(db).generic_context(db);
     let unknown_generic = Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
     assert!(
-        int.merge_cycle_recovery(db, list_alias(db, &env, unknown_generic))
-            .is_none()
+        int.merge_cycle_recovery(
+            db,
+            generic_alias_with_one_argument(db, &env, class, unknown_generic)
+        )
+        .is_none()
     );
 }
 

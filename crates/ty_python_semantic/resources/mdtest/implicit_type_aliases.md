@@ -446,8 +446,7 @@ reveal_type(Pair)  # revealed: <class 'tuple[T@Pair, T@Pair]'>
 reveal_type(Sum)  # revealed: <class 'tuple[T@Sum, U@Sum]'>
 reveal_type(ObjectAndList)  # revealed: <class 'tuple[object, list[T@ObjectAndList]]'>
 reveal_type(ListOrTuple)  # revealed: <types.UnionType special-form 'list[T@ListOrTuple] | tuple[T@ListOrTuple, ...]'>
-# revealed: <types.UnionType special-form 'list[T@ListOrTupleLegacy] | tuple[T@ListOrTupleLegacy, ...]'>
-reveal_type(ListOrTupleLegacy)
+reveal_type(ListOrTupleLegacy)  # revealed: <types.UnionType special-form>
 reveal_type(MyCallable)  # revealed: <Callable special-form '(**P@MyCallable) -> T@MyCallable'>
 reveal_type(AnnotatedType)  # revealed: <special-form 'typing.Annotated[T@AnnotatedType, <metadata>]'>
 reveal_type(TransparentAlias)  # revealed: TypeVar
@@ -1208,10 +1207,26 @@ from typing import Optional
 
 MyOptionalInt = Optional[int]
 
-reveal_type(MyOptionalInt)  # revealed: <types.UnionType special-form 'int | None'>
+reveal_type(MyOptionalInt)  # revealed: <types.UnionType special-form>
 
 def _(optional_int: MyOptionalInt):
     reveal_type(optional_int)  # revealed: int | None
+```
+
+Generic optional aliases preserve their type parameter when specialized:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+GenericOptional = Optional[T]
+
+def consume(value: GenericOptional[int]):
+    reveal_type(value)  # revealed: int | None
+
+consume(1)
+consume(None)
+consume("")  # error: [invalid-argument-type]
 ```
 
 A special case is `Optional[None]`, which is equivalent to `None`:
@@ -1223,6 +1238,47 @@ reveal_type(JustNone)  # revealed: None
 
 def _(just_none: JustNone):
     reveal_type(just_none)  # revealed: None
+```
+
+`NoneType`, including aliases and stringified references to it, receives the same treatment:
+
+```py
+from types import NoneType
+
+Alias = NoneType
+ImportedNone = Optional[NoneType]
+AliasedNone = Optional[Alias]
+StringifiedNone = Optional["NoneType"]
+
+reveal_type(ImportedNone)  # revealed: None
+reveal_type(AliasedNone)  # revealed: None
+reveal_type(StringifiedNone)  # revealed: None
+```
+
+Adding `None` to a bottom type also denotes `None` in annotations, but retains a union value:
+
+```py
+from typing import NoReturn
+from typing_extensions import Never
+
+OptionalNever = Optional[Never]
+OptionalNoReturn = Optional[NoReturn]
+
+reveal_type(OptionalNever)  # revealed: <types.UnionType special-form>
+reveal_type(OptionalNoReturn)  # revealed: <types.UnionType special-form>
+
+def _(first: OptionalNever, second: OptionalNoReturn):
+    reveal_type(first)  # revealed: None
+    reveal_type(second)  # revealed: None
+```
+
+Errors in the argument are still reported when the optional value collapses to `None`:
+
+```py
+from typing import Annotated
+
+InvalidNone = Optional[Annotated[None]]  # error: [invalid-type-form]
+reveal_type(InvalidNone)  # revealed: None
 ```
 
 Invalid uses:
@@ -1288,7 +1344,8 @@ def _(invalid: Invalid):
 
 ## `Union`
 
-We support implicit type aliases using `typing.Union`:
+We support implicit type aliases using `typing.Union`. Revealing the union value shows the special
+form, while using it as an annotation produces the union of its member types:
 
 ```py
 from typing import Union
@@ -1296,8 +1353,8 @@ from typing import Union
 IntOrStr = Union[int, str]
 IntOrStrOrBytes = Union[int, Union[str, bytes]]
 
-reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
-reveal_type(IntOrStrOrBytes)  # revealed: <types.UnionType special-form 'int | str | bytes'>
+reveal_type(IntOrStr)  # revealed: <types.UnionType special-form>
+reveal_type(IntOrStrOrBytes)  # revealed: <types.UnionType special-form>
 
 def _(
     int_or_str: IntOrStr,
@@ -1325,7 +1382,7 @@ An empty `typing.Union` leads to a `TypeError` at runtime, so we emit an error. 
 # error: [invalid-type-form] "`typing.Union` requires at least one type argument"
 EmptyUnion = Union[()]
 
-reveal_type(EmptyUnion)  # revealed: <types.UnionType special-form 'Never'>
+reveal_type(EmptyUnion)  # revealed: <types.UnionType special-form>
 
 def _(empty: EmptyUnion):
     reveal_type(empty)  # revealed: Never
@@ -1341,6 +1398,106 @@ def _(
     invalid: Invalid,
 ):
     reveal_type(invalid)  # revealed: str | Unknown
+```
+
+Invalid union members are diagnosed even when the alias is never used, both at module scope and
+inside a function:
+
+```py
+Unused = Union[str, 1]  # error: [invalid-type-form]
+
+def unused():
+    Unused = Union[str, 1]  # error: [invalid-type-form]
+```
+
+The same checks apply to each union nested in an unused value expression:
+
+```py
+UnusedMembers = [
+    Union[str, 1],  # error: [invalid-type-form]
+    Union[int, 2],  # error: [invalid-type-form]
+]
+```
+
+## `Union` member lookup
+
+An imported union alias uses the bindings at its definition. Reassigning a member afterward, or
+binding the same name in the importing module, does not change the alias.
+
+`aliases.py`:
+
+```py
+from typing import Union
+
+Member = int
+Alias = Union[Member, str]
+Member = bytes
+```
+
+`main.py`:
+
+```py
+from aliases import Alias
+
+Member = complex
+
+def consume(value: Alias):
+    reveal_type(value)  # revealed: int | str
+
+consume(1)
+consume("")
+consume(b"")  # error: [invalid-argument-type]
+consume(1j)  # error: [invalid-argument-type]
+```
+
+## `Union` values passed to functions
+
+A union value can be passed to an ordinary function. The assignment then has the function's return
+type, rather than declaring a union alias, and other arguments are ordinary value expressions.
+
+```py
+from typing import Union
+
+def consume(value: object, other: object) -> int:
+    return 0
+
+result = consume(Union[int, str], 42)
+reveal_type(result)  # revealed: int
+```
+
+Passing a union through a generic identity function preserves its meaning as a type expression:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+ReturnedUnion = identity(Union[int, str])
+
+def consume_returned(value: ReturnedUnion):
+    reveal_type(value)  # revealed: int | str
+
+consume_returned(1.5)  # error: [invalid-argument-type]
+```
+
+## `Union` value identity
+
+Storing a union value in a container does not make it a different object. Separately declared
+aliases can also refer to the same union object, so we do not conclude that their values are
+distinct.
+
+```py
+from typing import Union
+
+A = Union[int, str]
+values = [A]
+reveal_type(values[0] is A)  # revealed: bool
+
+B = Union[int, str]
+reveal_type(A is B)  # revealed: bool
 ```
 
 ## `type[…]` and `Type[…]`
@@ -1374,7 +1531,7 @@ reveal_type(SubclassOfA)  # revealed: <special-form 'type[A]'>
 reveal_type(SubclassOfAny)  # revealed: <special-form 'type[Any]'>
 reveal_type(SubclassOfAOrB1)  # revealed: <special-form 'type[A | B]'>
 reveal_type(SubclassOfAOrB2)  # revealed: <types.UnionType special-form 'type[A | B]'>
-reveal_type(SubclassOfAOrB3)  # revealed: <types.UnionType special-form 'type[A | B]'>
+reveal_type(SubclassOfAOrB3)  # revealed: <types.UnionType special-form>
 reveal_type(SubclassOfG)  # revealed: <special-form 'type[G[Unknown]]'>
 reveal_type(SubclassOfGInt)  # revealed: <special-form 'type[G[int]]'>
 reveal_type(SubclassOfP)  # revealed: <special-form 'type[P]'>
@@ -1704,7 +1861,7 @@ reveal_type(SubclassOfA)  # revealed: <special-form 'type[A]'>
 reveal_type(SubclassOfAny)  # revealed: <special-form 'type[Any]'>
 reveal_type(SubclassOfAOrB1)  # revealed: <special-form 'type[A | B]'>
 reveal_type(SubclassOfAOrB2)  # revealed: <types.UnionType special-form 'type[A | B]'>
-reveal_type(SubclassOfAOrB3)  # revealed: <types.UnionType special-form 'type[A | B]'>
+reveal_type(SubclassOfAOrB3)  # revealed: <types.UnionType special-form>
 reveal_type(SubclassOfG)  # revealed: <special-form 'type[G[Unknown]]'>
 reveal_type(SubclassOfGInt)  # revealed: <special-form 'type[G[int]]'>
 reveal_type(SubclassOfP)  # revealed: <special-form 'type[P]'>
