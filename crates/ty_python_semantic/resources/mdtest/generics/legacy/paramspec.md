@@ -1071,10 +1071,8 @@ def without_first(callback: Callback[Concatenate[Base, Q]]) -> Callable[Q, None]
 def original(first: Middle, /, value: str) -> None: ...
 
 wrapped = Callback(original)
-# TODO: Should reveal `(value: str) -> None`. Needs ParamSpecs in the new constraint solver.
-reveal_type(without_first(wrapped))  # revealed: (...) -> None
-# TODO: Should reveal `(value: str) -> None`. Needs ParamSpecs in the new constraint solver.
-reveal_type(without_first(Callback(original)))  # revealed: (...) -> None
+reveal_type(without_first(wrapped))  # revealed: (value: str) -> None
+reveal_type(without_first(Callback(original)))  # revealed: (value: str) -> None
 ```
 
 ## Inferring through unions of structural `ParamSpec` protocols
@@ -1334,6 +1332,186 @@ async def check():
     await to_thread(C.make, 1, label=2)  # error: [invalid-argument-type] "Expected `str`"
 ```
 
+### Preserving parameter kinds and defaults
+
+Capturing a parameter list preserves names, parameter kinds, defaults, and variadic parameters.
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def preserve(callback: Callable[P, int]) -> Callable[P, str]:
+    raise NotImplementedError
+
+def shaped(value: int, /, label: str = "x", *, enabled: bool = False) -> int:
+    return value
+
+def variadic(*args: int, **kwargs: str) -> int:
+    return 1
+
+reveal_type(preserve(variadic))  # revealed: (*args: int, **kwargs: str) -> str
+```
+
+The resulting callable validates arguments against the captured parameter list.
+
+```py
+wrapped = preserve(shaped)
+# revealed: (value: int, /, label: str = "x", *, enabled: bool = False) -> str
+reveal_type(wrapped)
+wrapped(1)
+wrapped(1, label="label", enabled=True)
+wrapped(1, enabled="yes")  # error: [invalid-argument-type]
+wrapped()  # error: [missing-argument]
+```
+
+### Parameter lists inferred from consumers
+
+A consumer of a callback supplies an upper bound on the callback's parameter list.
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def from_consumer(consumer: Callable[[Callable[P, None]], None]) -> Callable[P, None]:
+    raise NotImplementedError
+
+def consume(callback: Callable[[int], None]) -> None: ...
+
+reveal_type(from_consumer(consume))  # revealed: (int, /) -> None
+```
+
+A callback and a consumer can bound the same parameter list from opposite directions.
+
+```py
+def between(callback: Callable[P, None], consumer: Callable[[Callable[P, None]], None]) -> Callable[P, None]:
+    return callback
+
+def accepts_object(value: object, /) -> None: ...
+def accepts_str(value: str, /) -> None: ...
+
+reveal_type(between(accepts_object, consume))  # revealed: (value: object, /) -> None
+between(accepts_str, consume)  # error: [invalid-argument-type]
+
+def consumer_first(consumer: Callable[[Callable[P, None]], None], callback: Callable[P, None]) -> Callable[P, None]:
+    return callback
+
+reveal_type(consumer_first(consume, accepts_object))  # revealed: (int, /) -> None
+```
+
+### Type variable variance alongside a parameter list
+
+A captured parameter list does not change how other type variables follow variance.
+
+```py
+from typing import Callable, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+V = TypeVar("V", contravariant=True)
+
+class Consumer(Generic[V]):
+    def consume(self, value: V) -> None: ...
+
+def use(shape: Callable[P, None], consumer: Consumer[Callable[[T], None]], value: T) -> T:
+    return value
+
+def empty() -> None: ...
+def _(consumer: Consumer[Callable[[object], None]]):
+    reveal_type(use(empty, consumer, 1))  # revealed: object
+```
+
+### Repeated parameter lists retain the first binding
+
+Later callbacks must accept the calls allowed by the first captured parameter list.
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def first(left: Callable[P, None], right: Callable[P, None]) -> Callable[P, None]:
+    return left
+
+def integer(value: int, /) -> None: ...
+def anything(value: object, /) -> None: ...
+def keyword(*, value: int) -> None: ...
+
+reveal_type(first(integer, anything))  # revealed: (value: int, /) -> None
+first(anything, integer)  # error: [invalid-argument-type]
+first(integer, keyword)  # error: [invalid-argument-type]
+```
+
+Later callbacks still supply return types while the first supplies the parameter list.
+
+```py
+from typing import TypeVar
+
+R = TypeVar("R")
+
+def returning(left: Callable[P, None], right: Callable[P, R]) -> Callable[P, R]:
+    return right
+
+def returns_str(value: object, /) -> str:
+    return ""
+
+reveal_type(returning(integer, returns_str))  # revealed: (value: int, /) -> str
+```
+
+### Repeated parameter lists from generic instances
+
+The first instance or callback supplies `P`, even when its parameter list is gradual.
+
+```py
+from typing import Callable, Generic, ParamSpec
+
+P = ParamSpec("P")
+
+class Callback(Generic[P]):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+def instances(left: Callback[P], right: Callback[P]) -> Callback[P]:
+    return left
+
+def instance_first(left: Callback[P], right: Callable[P, None]) -> Callback[P]:
+    return left
+
+def callable_first(left: Callable[P, None], right: Callback[P]) -> Callable[P, None]:
+    return left
+
+def integer(value: int, /) -> None: ...
+def anything(value: object, /) -> None: ...
+def _(concrete: Callback[[int]], gradual: Callback[...]) -> None:
+    reveal_type(instances(concrete, gradual))  # revealed: Callback[(int, /)]
+    reveal_type(instances(gradual, concrete))  # revealed: Callback[(...)]
+    reveal_type(instance_first(concrete, anything))  # revealed: Callback[(int, /)]
+    reveal_type(callable_first(integer, gradual))  # revealed: (value: int, /) -> None
+```
+
+### Empty parameter lists override defaults
+
+A missing callback uses the default parameter list. An explicit empty list remains empty.
+
+```py
+from typing import Callable, Generic
+from typing_extensions import ParamSpec
+
+P = ParamSpec("P", default=[int])
+
+class OptionalCallback(Generic[P]):
+    callback: Callable[P, None]
+
+    def __init__(self, callback: Callable[P, None] | None = None) -> None: ...
+
+def empty() -> None: ...
+
+reveal_type(OptionalCallback().callback)  # revealed: (int, /) -> None
+reveal_type(OptionalCallback(empty).callback)  # revealed: () -> None
+OptionalCallback(empty).callback()
+OptionalCallback(empty).callback(1)  # error: [too-many-positional-arguments]
+```
+
 ### Forwarded arguments with type-variable bounds
 
 When a type variable is bounded by `LiteralString`, string literals are not promoted to `str` when
@@ -1352,4 +1530,130 @@ def target(first: T, values: list[T]) -> None: ...
 
 target("a", ["a"])
 forward(target, "a", ["a"])
+```
+
+### Parameter lists after incomplete inference
+
+Inferring `T` can exceed the work limit without losing a known parameter list.
+
+`A | B` and `C | D` have four possible intersections; adding `E` exceeds the limit.
+
+```py
+from typing import Callable, TypeVar
+from typing_extensions import ParamSpec
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+
+def capture(
+    shape: Callable[P, None],
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> Callable[P, T]:
+    raise NotImplementedError
+
+def shape(*, value: str) -> None: ...
+def left(value: A | B) -> None: ...
+def right_small(value: C | D) -> None: ...
+def right_large(value: C | D | E) -> None: ...
+
+# revealed: (*, value: str) -> (A & C) | (B & C) | (A & D) | (B & D)
+reveal_type(capture(shape, left, right_small))
+
+result = capture(shape, left, right_large)
+reveal_type(result)  # revealed: (*, value: str) -> Unknown
+result(value="a")
+result(value=1)  # error: [invalid-argument-type]
+```
+
+When no argument supplies a parameter list, its default still applies even though `T` is unknown.
+
+```py
+from typing import Generic
+
+Q = ParamSpec("Q", default=[int])
+
+class Defaulted(Generic[T, Q]):
+    callback: Callable[Q, T]
+
+    def __init__(self, left: Callable[[T], None], right: Callable[[T], None]) -> None: ...
+
+defaulted = Defaulted(left, right_large).callback
+reveal_type(defaulted)  # revealed: (int, /) -> Unknown
+defaulted(1)
+defaulted("a")  # error: [invalid-argument-type]
+```
+
+### Tuple inference alongside parameter lists
+
+A captured parameter list does not change inference from alternatives in a tuple argument.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+def first(callback: Callable[P, None], value: tuple[T, ...]) -> T:
+    return value[0]
+
+def callback(*, label: str) -> None: ...
+def check(value: tuple[int] | tuple[str]):
+    reveal_type(first(callback, value))  # revealed: int | str
+```
+
+### Preserving method variables on callable receivers
+
+Binding a callable receiver preserves the method's other type variables for argument inference.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class Callback:
+    def __call__(self, text: str) -> int:
+        return len(text)
+
+    def call(self: Callable[P, int], value: T, /, *args: P.args, **kwargs: P.kwargs) -> T:
+        self(*args, **kwargs)
+        return value
+
+callback = Callback()
+reveal_type(callback.call(1, "text"))  # revealed: Literal[1]
+reveal_type(callback.call("value", "text"))  # revealed: Literal["value"]
+callback.call(1, 2)  # error: [invalid-argument-type]
+```
+
+### Capturing both constructor signatures
+
+Capturing a class should keep the required `__init__` argument even if `__new__` accepts anything.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+from typing_extensions import Self
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def capture(fn: Callable[P, R]) -> Callable[P, R]:
+    return fn
+
+class Example:
+    def __new__(cls, *args, **kwargs) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, value: int) -> None: ...
+
+constructor = capture(Example)
+reveal_type(constructor(1))  # revealed: Example
+# TODO: Combine both constructor parameter lists and report [missing-argument].
+constructor()
 ```
