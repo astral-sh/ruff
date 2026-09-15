@@ -63,6 +63,19 @@ def repeat(flag: bool) -> None:
     reveal_type(value)  # revealed: tuple[Literal[1], ...]
 ```
 
+## Alternating between fixed-length tuples
+
+A loop can alternate between a finite set of tuple shapes without growing the tuple. The inferred
+type preserves those shapes:
+
+```py
+def alternate(flag: bool):
+    value = (1,)
+    while flag:
+        value = ("a", "b") if len(value) == 1 else (1,)
+    reveal_type(value)  # revealed: tuple[Literal[1]] | tuple[Literal["a"], Literal["b"]]
+```
+
 ## Generic `NamedTuple` with recursive fields
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3872>. Computing the

@@ -1128,45 +1128,6 @@ impl<'db> UnionBuilder<'db> {
         self.try_build().unwrap_or(Type::Never)
     }
 
-    /// Widen changing tuple lengths so repeatedly appending elements can reach a fixed point.
-    fn widen_tuple_lengths(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        types: &mut Vec<Type<'db>>,
-    ) {
-        let mut lengths = types
-            .iter()
-            .filter_map(|ty| ty.exact_tuple_instance_spec(db).map(|tuple| tuple.len()));
-        let Some(first_length) = lengths.next() else {
-            return;
-        };
-        if !lengths.any(|length| length != first_length) {
-            return;
-        }
-
-        // Recovery cannot perform relation queries, including when combining tuple elements.
-        // Mark those elements recursive so growing literal unions also widen promptly.
-        let mut elements = UnionBuilder::new(db, env)
-            .cycle_recovery(true)
-            .or_recursively_defined(RecursivelyDefined::Yes);
-        types.retain(|ty| {
-            let Some(tuple) = ty.exact_tuple_instance_spec(db) else {
-                return true;
-            };
-            for element in tuple.iter_element_types(db) {
-                elements.add_in_place(element);
-            }
-            false
-        });
-        let element_type = match elements.build() {
-            // `tuple[Never, ...]` normalizes to the empty tuple, which does not contain
-            // fixed-length types like `tuple[Never]`. Preserve a static upper bound.
-            Type::Never => Type::object(),
-            element_type => element_type,
-        };
-        types.push(Type::homogeneous_tuple(db, env, element_type));
-    }
-
     pub(crate) fn try_build(self) -> Option<Type<'db>> {
         let db = self.db;
 
@@ -1212,10 +1173,6 @@ impl<'db> UnionBuilder<'db> {
                 }
                 UnionElement::Type(ty) => types.push(ty),
             }
-        }
-
-        if cycle_recovery {
-            Self::widen_tuple_lengths(db, &self.env, &mut types);
         }
 
         if normalize_enum_complement_unions(db, &self.env, &mut types) {
@@ -2319,6 +2276,10 @@ mod tests {
 
         let union = UnionType::from_elements_cycle_recovery(&db, &env, [first, second]);
         assert_eq!(union.expect_union().elements(&db), &[first, second]);
+        assert_eq!(
+            UnionType::widen_growing_tuples(&db, &env, first, second),
+            None
+        );
     }
 
     #[test]
@@ -2332,16 +2293,24 @@ mod tests {
 
         for (left, right) in [(first, second), (second, first)] {
             assert_eq!(
-                UnionType::from_elements_cycle_recovery(&db, &env, [left, right]),
-                widened,
+                UnionType::widen_growing_tuples(&db, &env, left, right),
+                Some(widened),
             );
         }
 
         // Appending to the widened result adds a fixed suffix, which recovery must absorb.
         let appended = Type::tuple(TupleType::mixed(&db, &env, [], int, [int]));
         let other = Type::bool_literal(true);
-        let union = UnionType::from_elements_cycle_recovery(&db, &env, [other, widened, appended]);
+        let previous = UnionType::from_elements_cycle_recovery(&db, &env, [other, widened]);
+        let current = UnionType::from_elements_cycle_recovery(&db, &env, [previous, appended]);
+        let union = UnionType::widen_growing_tuples(&db, &env, previous, current).unwrap();
         assert_eq!(union.expect_union().elements(&db), &[other, widened]);
+
+        // Initial cycle iterations can discard unrelated alternatives from the previous result.
+        assert_eq!(
+            UnionType::widen_growing_tuples(&db, &env, previous, appended),
+            Some(widened)
+        );
     }
 
     #[test]
@@ -2354,7 +2323,7 @@ mod tests {
         let second = Type::heterogeneous_tuple(&db, &env, [Type::from(literal), Type::object()]);
         events_db.clear_salsa_events();
 
-        let result = UnionType::from_elements_cycle_recovery(&db, &env, [first, second]);
+        let result = UnionType::widen_growing_tuples(&db, &env, first, second).unwrap();
         let tuple = result.exact_tuple_instance_spec(&db).unwrap();
         let elements = tuple.variable_element_type(&db).unwrap().expect_union();
         assert_eq!(
@@ -2381,7 +2350,7 @@ mod tests {
 
         for (last_element, widened_element) in [(Type::Never, Type::object()), (int, int)] {
             let second = Type::heterogeneous_tuple(&db, &env, [Type::Never, last_element]);
-            let result = UnionType::from_elements_cycle_recovery(&db, &env, [first, second]);
+            let result = UnionType::widen_growing_tuples(&db, &env, first, second).unwrap();
 
             assert_eq!(result, Type::homogeneous_tuple(&db, &env, widened_element));
             assert!(first.is_subtype_of(&db, &env, result));
