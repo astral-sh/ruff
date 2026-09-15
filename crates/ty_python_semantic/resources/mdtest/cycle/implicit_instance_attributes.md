@@ -530,3 +530,73 @@ class Cached:
 
 reveal_type(Cached().metadata)  # revealed: int
 ```
+
+## Inherited collection updates when the base is checked first
+
+Normalizing a recursive list preserves its non-recursive element types. The unresolved recursive
+assignment still causes an unsound-return warning, whose type is independent of which file is
+checked first. This reproduces <https://github.com/astral-sh/ty/issues/4221>.
+
+```toml
+[rules]
+unsound-return-statement = "warn"
+```
+
+`base.py`:
+
+```py
+class Base:
+    values = ["a"]
+
+class Parent(Base):
+    def __init__(self):
+        if self.values:
+            self.values = [*self.values]
+
+    def get_values(self) -> list[str]:
+        return self.values  # error: [unsound-return-statement] "`list[str] | list[str | Divergent]`"
+```
+
+`child.py`:
+
+```py
+from base import Parent
+
+class Child(Parent):
+    def __init__(self):
+        self.values = self.values + ["b"]
+```
+
+## Inherited collection updates when the subclass is checked first
+
+Checking the subclass first produces the same unsound-return warning.
+
+```toml
+[rules]
+unsound-return-statement = "warn"
+```
+
+`child.py`:
+
+```py
+from base import Parent
+
+class Child(Parent):
+    def __init__(self):
+        self.values = self.values + ["b"]
+```
+
+`base.py`:
+
+```py
+class Base:
+    values = ["a"]
+
+class Parent(Base):
+    def __init__(self):
+        if self.values:
+            self.values = [*self.values]
+
+    def get_values(self) -> list[str]:
+        return self.values  # error: [unsound-return-statement] "`list[str] | list[str | Divergent]`"
+```
