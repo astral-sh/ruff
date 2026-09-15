@@ -215,7 +215,10 @@ pub(crate) fn is_discarded_dict_key_assignment<'db>(
 /// `@staticmethod`).
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, _, _| FunctionDecoratorInference::default(),
+    cycle_initial=|_, _, _| FunctionDecoratorInference {
+        has_unknown_decorators: true,
+        ..FunctionDecoratorInference::default()
+    },
     heap_size=ruff_memory_usage::heap_size
 )]
 pub(crate) fn function_known_decorators<'db>(
@@ -259,6 +262,8 @@ pub(crate) struct FunctionDecoratorInference<'db> {
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
     known_decorators: FunctionDecorators,
+    /// Whether any decorator is unrecognized, or decorator inference is incomplete.
+    has_unknown_decorators: bool,
     diagnostics: TypeCheckDiagnostics,
 }
 
@@ -284,8 +289,12 @@ impl<'db> FunctionDecoratorInference<'db> {
         &self.called_functions
     }
 
-    fn known_decorators(&self) -> FunctionDecorators {
+    pub(super) fn known_decorators(&self) -> FunctionDecorators {
         self.known_decorators
+    }
+
+    pub(super) fn has_unknown_decorators(&self) -> bool {
+        self.has_unknown_decorators
     }
 
     fn diagnostics(&self) -> &TypeCheckDiagnostics {

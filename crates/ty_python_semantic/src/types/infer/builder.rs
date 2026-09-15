@@ -11822,24 +11822,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn finish_function_decorator_inference(mut self) -> FunctionDecoratorInference<'db> {
         self.infer_region();
 
-        let known_decorators = match self.region {
-            InferenceRegion::FunctionDecorators(definition) => match definition.kind(self.db()) {
-                DefinitionKind::Function(function) => {
-                    function.node(self.module()).decorator_list.iter().fold(
-                        FunctionDecorators::empty(),
-                        |known_decorators, decorator| {
-                            known_decorators
-                                | FunctionDecorators::from_decorator_type(
-                                    self.db(),
-                                    self.expression_type(&decorator.expression),
-                                )
-                        },
-                    )
+        let mut known_decorators = FunctionDecorators::empty();
+        let mut has_unknown_decorators = true;
+        if let InferenceRegion::FunctionDecorators(definition) = self.region
+            && let DefinitionKind::Function(function) = definition.kind(self.db())
+        {
+            has_unknown_decorators = false;
+            for decorator in &function.node(self.module()).decorator_list {
+                let ty = self.expression_type(&decorator.expression);
+                let flags = FunctionDecorators::from_decorator_type(self.db(), ty);
+                known_decorators |= flags;
+                if flags.is_empty()
+                    && !matches!(ty, Type::ClassLiteral(class)
+                        if class.known(self.db()) == Some(KnownClass::Property))
+                {
+                    has_unknown_decorators = true;
                 }
-                _ => FunctionDecorators::empty(),
-            },
-            _ => FunctionDecorators::empty(),
-        };
+            }
+        }
 
         let Self {
             context,
@@ -11878,6 +11878,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
             known_decorators,
+            has_unknown_decorators,
             diagnostics,
         }
     }

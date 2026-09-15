@@ -41,7 +41,6 @@ use crate::types::{
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::node_key::NodeKey;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeKind, ScopeId};
 use ty_python_core::{SemanticIndex, semantic_index};
 
@@ -319,11 +318,7 @@ pub(crate) fn typing_self<'db>(
             let DefinitionKind::Function(func_ref) = def.kind(db) else {
                 return None;
             };
-            Some(
-                index.node_scope_by_key(NodeWithScopeKey::Function(NodeKey::from_node_ref(
-                    func_ref,
-                ))),
-            )
+            Some(index.node_scope_by_key(NodeWithScopeKey::Function(func_ref.node_key())))
         })
         .unwrap_or_else(|| scope_id.file_scope_id(db));
 

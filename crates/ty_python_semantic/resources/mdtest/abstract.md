@@ -419,3 +419,43 @@ class Concrete(Interface):
 
 Concrete()  # no diagnostic
 ```
+
+## Abstract overloads
+
+An abstract overload keeps a method abstract even when its implementation is not decorated with
+`abstractmethod`. The implementation can provide a body for subclasses to call with `super()`.
+
+```py
+from abc import ABC, abstractmethod
+from typing import overload
+
+class Abstract(ABC):
+    @overload
+    @abstractmethod
+    def method(self, value: int) -> int: ...
+    @overload
+    @abstractmethod
+    def method(self, value: str) -> str: ...
+    def method(self, value: int | str) -> int | str:
+        return value
+
+Abstract()  # error: [call-non-callable]
+```
+
+## Aliased abstract methods
+
+Assigning an abstract method to another class preserves its abstractness, even when that class does
+not inherit from the class that defined the method.
+
+```py
+from abc import abstractmethod
+
+class Abstract:
+    @abstractmethod
+    def method(self) -> None: ...
+
+class Alias:
+    method = Abstract.method
+
+Alias()  # error: [call-non-callable]
+```
