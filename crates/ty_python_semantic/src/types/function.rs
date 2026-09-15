@@ -75,7 +75,8 @@ use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::diagnostic::{
     ASSERT_TYPE_UNSPELLABLE_SUBTYPE, DISJOINT_CAST, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST,
     STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE, report_bad_argument_to_get_protocol_members,
-    report_bad_argument_to_protocol_interface, report_invalid_total_ordering_call,
+    report_bad_argument_to_protocol_interface, report_invalid_runtime_checkable,
+    report_invalid_total_ordering_call,
     report_issubclass_check_against_protocol_with_non_method_members,
     report_runtime_check_against_non_runtime_checkable_protocol,
     report_runtime_check_against_typed_dict,
@@ -2885,6 +2886,14 @@ impl KnownFunction {
                     source_type
                         .disjointness_error_context(db, env, casted_type)
                         .attach_to(db, env, &mut diagnostic);
+                }
+            }
+
+            KnownFunction::RuntimeCheckable => {
+                if let [Some(Type::ClassLiteral(class))] = parameter_types
+                    && !class.is_protocol(db)
+                {
+                    report_invalid_runtime_checkable(context, call_expression, *class);
                 }
             }
 

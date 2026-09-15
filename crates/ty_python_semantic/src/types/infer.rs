@@ -1376,7 +1376,7 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
-    /// Input types for failed decorator applications that are checked after inference.
+    /// Input types for decorator applications that need validation after inference.
     deferred_decorator_calls: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// Whether synthesized dictionary-key assignments derived from the right-hand side should be
