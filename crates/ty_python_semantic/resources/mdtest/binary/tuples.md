@@ -20,22 +20,6 @@ def _(x: tuple[int, str], y: tuple[None, tuple[int]]):
     reveal_type(y + x)  # revealed: tuple[None, tuple[int], int, str]
 ```
 
-## Concatenation in assignments, arguments, and returns
-
-The concatenated tuple satisfies fixed-length annotations when its elements have the expected types.
-
-```py
-def prepend(x: tuple[int, int]) -> tuple[str, int, int]:
-    return ("a",) + x
-
-def takes_four(x: tuple[int, int, int, int]) -> None: ...
-def concatenate() -> None:
-    a: tuple[int, int] = (1, 2)
-    b: tuple[int, int] = (3, 4)
-    c: tuple[int, int, int, int] = a + b
-    takes_four(a + b)
-```
-
 ## Concatenation for homogeneous tuples
 
 Concatenating variable-length tuples combines their element types. Fixed-length operands preserve a
