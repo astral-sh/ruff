@@ -8,7 +8,8 @@ use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, DescriptorSetterDomain,
     ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
     InstanceAttributeWriteMember, ProtocolMemberWriteRequirement, attribute_write_requirement,
-    descriptor_setter_domain, property_setter_returns_never,
+    descriptor_setter_domain, instance_attribute_write_is_blocked, instance_setattr_dispatch,
+    property_setter_returns_never,
 };
 use crate::types::call::{Bindings, CallArguments, CallDiagnosticOverride, CallError};
 use crate::types::class::FrozenDataclassDispatch;
@@ -542,17 +543,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         let db = self.builder.db();
         let env = self.builder.program_environment();
 
-        let frozen_dataclass_dispatch = object_ty
-            .nominal_class(db, env)
-            .and_then(|class| class.static_class_literal(db))
-            .and_then(|(class, specialization)| {
-                class.inherited_frozen_dataclass_dispatch(
-                    db,
-                    specialization,
-                    "__setattr__",
-                    self.attribute,
-                )
-            });
+        let frozen_dataclass_dispatch =
+            instance_setattr_dispatch(db, env, object_ty, self.attribute);
         let setattr_receiver = frozen_dataclass_dispatch
             .map_or(object_ty, |dispatch| dispatch.receiver(db, env, object_ty));
 
@@ -584,28 +576,19 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             (setattr_result, value_ty)
         };
 
-        // A terminal `__setattr__` blocks even explicitly declared attributes.
-        let setattr_returns_never = matches!(
+        let assignment_blocked = instance_attribute_write_is_blocked(
+            db,
+            env,
+            object_ty,
+            member,
+            self.attribute,
+            &setattr_result,
             frozen_dataclass_dispatch,
-            Some(FrozenDataclassDispatch::FrozenField)
-        ) || match &setattr_result {
-            Ok(bindings) => bindings.return_type(db, env).is_never(),
-            Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
-        };
-
-        let pydantic_setattr = pydantic::setattr_behavior(db, env, object_ty);
-        let assignment_blocked = match pydantic_setattr {
-            Some(pydantic::SetAttrBehavior::Frozen) => {
-                // Pydantic permits writes to private attributes even on frozen models.
-                !(matches!(member, InstanceAttributeWriteMember::Explicit { .. })
-                    && pydantic::is_private_attribute(self.attribute))
-            }
-            Some(pydantic::SetAttrBehavior::NonFrozen) => false,
-            Some(pydantic::SetAttrBehavior::CustomSetAttr) | None => setattr_returns_never,
-        };
+        );
 
         if assignment_blocked {
             if emit_diagnostics {
+                let pydantic_setattr = pydantic::setattr_behavior(db, env, object_ty);
                 let is_read_only =
                     matches!(pydantic_setattr, Some(pydantic::SetAttrBehavior::Frozen))
                         || !matches!(

@@ -1357,6 +1357,40 @@ person._private_with_default = 2
 person._explicit_private = 2
 ```
 
+## Frozen models and protocols
+
+Frozen models cannot satisfy a protocol that requires a writable field, but can satisfy one that
+only requires reading it:
+
+```py
+from typing import Protocol
+from pydantic import BaseModel, ConfigDict
+
+class Frozen(BaseModel, frozen=True):
+    value: int
+
+class Mutable(Frozen):
+    model_config = ConfigDict(frozen=False)
+
+class Writable(Protocol):
+    value: int
+
+class Readable(Protocol):
+    @property
+    def value(self) -> int: ...
+
+def update(model: Writable) -> None:
+    model.value = 2
+
+def read(model: Readable) -> int:
+    return model.value
+
+update(Frozen(value=1))  # error: [invalid-argument-type]
+update(Mutable(value=1))
+read(Frozen(value=1))
+read(Mutable(value=1))
+```
+
 ## Validation of default values
 
 At runtime, default values are *not* validated against the field type annotation, unless

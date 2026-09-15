@@ -527,9 +527,8 @@ pub(in crate::types) fn setattr_behavior(
         if matches!(base, ClassBase::Generic | ClassBase::Protocol) {
             continue;
         }
-        let (base, _) = base
-            .into_class()
-            .and_then(|base| base.static_class_literal(db))?;
+        let base_class = base.into_class()?;
+        let (base, _) = base_class.static_class_literal(db)?;
         if base.is_known(db, KnownClass::PydanticBaseModel) {
             return Some(if metadata.is_frozen(db) {
                 SetAttrBehavior::Frozen
@@ -537,7 +536,10 @@ pub(in crate::types) fn setattr_behavior(
                 SetAttrBehavior::NonFrozen
             });
         }
-        if !class_member(db, base.body_scope(db), "__setattr__").is_undefined() {
+        if !base_class
+            .own_class_member(db, env, None, "__setattr__")
+            .is_undefined()
+        {
             return Some(SetAttrBehavior::CustomSetAttr);
         }
     }
