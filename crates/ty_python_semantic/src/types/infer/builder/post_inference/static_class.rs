@@ -1,33 +1,31 @@
 use crate::Db;
-use itertools::Itertools;
-use ruff_db::{
-    diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity},
-    source::source_text,
-};
+use itertools::{Either, Itertools};
+use ruff_db::{diagnostic::Annotation, source::source_text};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, PythonVersion, name::Name};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
+use crate::attribute_assignments;
 use crate::{
     TypeQualifiers,
-    diagnostic::format_enumeration,
     place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
     types::{
-        CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, KnownClass,
-        KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, Parameters, Signature,
-        SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, TypingModule, binding_type,
+        CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, DisplaySettings,
+        KnownClass, KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, SpecialFormType,
+        StaticClassLiteral, Type, TypeVarVariance, TypingModule,
+        abstract_methods::AbstractMethods,
+        binding_type,
         call::Argument,
         class::{
-            AbstractMethod, CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind,
-            expanded_class_base_entries,
+            CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind, expanded_class_base_entries,
         },
         context::InferContext,
         definition_expression_type,
         diagnostic::{
-            ABSTRACT_METHOD_IN_FINAL_CLASS, AbstractMethodAnnotationPolicy, CONFLICTING_METACLASS,
-            CYCLIC_CLASS_DEFINITION, DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE,
-            INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_BASE, INVALID_DATACLASS,
+            ABSTRACT_METHOD_IN_FINAL_CLASS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
+            DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO,
+            INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_BASE, INVALID_DATACLASS,
             INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
             INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
             SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
@@ -56,10 +54,76 @@ use crate::{
         visitor::find_over_type,
     },
 };
-use crate::{attribute_assignments, types::diagnostic::abstract_method_span};
 use ty_python_core::{
     SemanticIndex, attribute_scopes, definition::DefinitionKind, scope::ScopeId, semantic_index,
 };
+
+/// Rejects slot layouts that fail while Python constructs the runtime class.
+///
+/// ```python
+/// class Example:
+///     __slots__ = ("value",)
+///     value = 1  # This class binding conflicts with the generated slot descriptor.
+/// ```
+///
+/// Stub declarations do not execute and therefore cannot create runtime class-namespace conflicts.
+fn check_class_slots<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    index: &SemanticIndex<'db>,
+) {
+    let db = context.db();
+    let has_explicit_slots = class.has_explicit_slots(db);
+
+    if has_explicit_slots
+        && class
+            .dataclass_params(db)
+            .is_some_and(|parameters| parameters.flags(db).contains(DataclassFlags::SLOTS))
+    {
+        if let Some(builder) = context.report_lint(&INVALID_DATACLASS, class.header_range(db)) {
+            builder.into_diagnostic(format_args!(
+                "Dataclass `{}` cannot combine `slots=True` with manually assigned `__slots__`",
+                class.name(db),
+            ));
+        }
+        return;
+    }
+
+    if !has_explicit_slots || context.in_stub() {
+        return;
+    }
+
+    let Some(slot_names) = class.slot_names(db) else {
+        return;
+    };
+
+    let scope_id = class.body_scope(db).file_scope_id(db);
+    let table = index.place_table(scope_id);
+    let use_def = index.use_def_map(scope_id);
+
+    for name in slot_names {
+        let Some(symbol) = table.symbol_id(name) else {
+            continue;
+        };
+
+        for binding in use_def.end_of_scope_symbol_bindings(symbol) {
+            if let Some(definition) = binding.binding.definition()
+                && !index.is_in_type_checking_block(
+                    scope_id,
+                    definition.kind(db).full_range(context.module()),
+                )
+                && let Some(builder) = context.report_lint(
+                    &INVALID_ASSIGNMENT,
+                    definition.focus_range(db, context.module()),
+                )
+            {
+                builder.into_diagnostic(format_args!(
+                    "Class variable `{name}` conflicts with an instance slot"
+                ));
+            }
+        }
+    }
+}
 
 /// Iterate over all static class definitions (created using `class` statements) to check that
 /// the definition is semantically valid and will not cause an exception to be raised at runtime.
@@ -105,6 +169,8 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     let env = context.program_environment();
+
+    check_class_slots(context, class, index);
 
     // Check that the class is not an enum and generic
     if is_enum_class_by_inheritance(db, env, class) && class.generic_context(db).is_some() {
@@ -319,11 +385,11 @@ pub(crate) fn check_static_class_definitions<'db>(
                     );
                     if let ast::Expr::Subscript(node) = node {
                         let source = source_text(db, context.file());
-                        let type_params_range = TextRange::new(
-                            type_params.start().saturating_add(TextSize::new(1)),
-                            type_params.end().saturating_sub(TextSize::new(1)),
-                        );
-                        if source[node.slice.range()] == source[type_params_range] {
+                        // The parser can recover a type parameter list without a closing bracket.
+                        if let Some(type_params) = source[type_params.range()].strip_prefix('[')
+                            && let Some(type_params) = type_params.strip_suffix(']')
+                            && type_params == &source[node.slice.range()]
+                        {
                             diagnostic.help("Remove the type parameters from the `Protocol` base");
                             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(
                                 TextRange::new(node.value.end(), node.end()),
@@ -345,8 +411,9 @@ pub(crate) fn check_static_class_definitions<'db>(
                             if declared_variance == TypeVarVariance::Invariant {
                                 return None;
                             }
-                            let required_variance =
-                                base_alias.variance_of(db, env, typevar.identity(db));
+                            let required_variance = base_alias
+                                .variance_of(db, env, typevar.identity(db))
+                                .evaluate(db);
                             if declared_variance.join(required_variance) != declared_variance {
                                 Some((typevar, declared_variance, required_variance))
                             } else {
@@ -624,41 +691,51 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
             }
             MetaclassErrorKind::Conflict {
-                candidate1:
+                candidate:
                     MetaclassCandidate {
                         metaclass: metaclass1,
-                        explicit_metaclass_of: class1,
+                        base: base1,
                     },
-                candidate2:
-                    MetaclassCandidate {
-                        metaclass: metaclass2,
-                        explicit_metaclass_of: class2,
-                    },
-                candidate1_is_base_class,
+                base_metaclass: metaclass2,
+                base: base2,
+                ..
             } => {
-                if *candidate1_is_base_class {
+                if let Some(base1) = base1 {
                     report_conflicting_metaclass_from_bases(
                         context,
                         class_node.into(),
                         class.name(db),
                         *metaclass1,
-                        class1.name(db),
+                        base1.name(db),
                         *metaclass2,
-                        class2.name(db),
+                        base2.name(db),
                     );
                 } else if let Some(builder) =
                     context.report_lint(&CONFLICTING_METACLASS, class_node)
                 {
+                    let types = [
+                        Type::from(class),
+                        Type::from(*metaclass1),
+                        Type::from(*metaclass2),
+                        Type::from(*base2),
+                    ];
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, types);
+                    let base = if let ClassBase::Class(base) = base2 {
+                        Either::Left(base.class_literal(db).display_with(db, settings.clone()))
+                    } else {
+                        Either::Right(base2.display_with(db, env, settings.clone()))
+                    };
                     builder.into_diagnostic(format_args!(
                         "The metaclass of a derived class (`{class}`) \
                             must be a subclass of the metaclasses of all its bases, \
                             but `{metaclass_of_class}` (metaclass of `{class}`) \
                             and `{metaclass_of_base}` (metaclass of base class `{base}`) \
                             have no subclass relationship",
-                        class = class.name(db),
-                        metaclass_of_class = metaclass1.name(db),
-                        metaclass_of_base = metaclass2.name(db),
-                        base = class2.name(db),
+                        class = ClassLiteral::Static(class).display_with(db, settings.clone()),
+                        metaclass_of_class = metaclass1
+                            .class_literal(db)
+                            .display_with(db, settings.clone()),
+                        metaclass_of_base = metaclass2.class_literal(db).display_with(db, settings),
                     ));
                 }
             }
@@ -762,7 +839,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                 .ignore_possibly_undefined();
 
             if let Some(init_subclass) = init_subclass_type {
-                let call_args = call_args.with_self(Some(Type::from(class)));
+                let call_args =
+                    call_args.with_self(Some(Type::from(class.identity_specialization(db))));
                 if let Err(call_error) = init_subclass.try_call(db, env, &call_args) {
                     report_subclass_of_class_with_non_callable_init_subclass(
                         context, call_error, class, class_node,
@@ -1063,6 +1141,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     if let Some(protocol) = class.into_protocol_class(db) {
         protocol.validate_members(context);
+        protocol.validate_type_parameter_variance(context);
     }
 
     if class.is_typed_dict(db) {
@@ -1145,7 +1224,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
 ) {
     let db = context.db();
     let env = context.program_environment();
-    let metaclass = class.metaclass(db);
+    let metaclass = class.inferred_metaclass(db).for_inheritance(db, env);
     if metaclass == KnownClass::Type.to_class_literal(db, env) {
         return;
     }
@@ -1335,10 +1414,10 @@ fn check_final_class_abstract_methods<'db>(
     let env = context.program_environment();
 
     let class_type = class.identity_specialization(db);
-    let abstract_methods = class_type.abstract_methods(db);
+    let abstract_methods = AbstractMethods::of_class(db, class_type);
 
     // If there are no abstract methods, we're done.
-    let Some((first_method_name, abstract_method)) = abstract_methods.iter().next() else {
+    let Some(first_method_name) = abstract_methods.first_name() else {
         return;
     };
 
@@ -1370,106 +1449,23 @@ fn check_final_class_abstract_methods<'db>(
         diagnostic.annotate(context.secondary(decorator));
     }
 
+    abstract_methods.annotate_diagnostic(db, env, &mut diagnostic);
     let num_abstract_methods = abstract_methods.len();
-
     if num_abstract_methods == 1 {
         diagnostic.set_concise_message(format_args!(
-            "Final class `{class_name}` has unimplemented abstract method \
-                `{first_method_name}`",
+            "Final class `{class_name}` has unimplemented abstract method `{first_method_name}`",
         ));
-        diagnostic
-            .set_primary_annotation_message(format_args!("`{first_method_name}` is unimplemented"));
     } else {
-        let verbose = db.verbose();
-        let max_abstract_methods_to_print = if verbose { num_abstract_methods } else { 3 };
-        let formatted_methods =
-            format_enumeration(abstract_methods.keys().take(max_abstract_methods_to_print));
-
-        if num_abstract_methods > max_abstract_methods_to_print {
-            diagnostic.set_primary_annotation_message(format_args!(
-                "{num_abstract_methods} abstract methods are unimplemented, \
-                        including {formatted_methods}",
-            ));
+        let formatted_methods = abstract_methods.formatted_names(db);
+        if formatted_methods.truncation_occurred {
             diagnostic.set_concise_message(format_args!(
                 "Final class `{class_name}` has {num_abstract_methods} unimplemented \
                     abstract methods, including {formatted_methods}",
             ));
-            diagnostic.info(format_args!(
-                "Use `--verbose` to see all {num_abstract_methods} \
-                    unimplemented abstract methods",
-            ));
         } else {
             diagnostic.set_concise_message(format_args!(
-                "Final class `{class_name}` has unimplemented \
-                    abstract methods {formatted_methods}",
+                "Final class `{class_name}` has unimplemented abstract methods {formatted_methods}",
             ));
-            diagnostic.set_primary_annotation_message(format_args!(
-                "Abstract methods {formatted_methods} are unimplemented"
-            ));
-        }
-    }
-
-    let AbstractMethod {
-        defining_class,
-        definition,
-        kind,
-    } = abstract_method;
-
-    let defining_class_name = defining_class.name(db);
-
-    if let Type::FunctionLiteral(function) = binding_type(db, *definition) {
-        let policy = if kind.is_explicit() {
-            AbstractMethodAnnotationPolicy::ExcludeVerboseBody
-        } else {
-            AbstractMethodAnnotationPolicy::AlwaysIncludeBody
-        };
-        let secondary_span = abstract_method_span(db, function, policy);
-        let mut secondary_annotation = Annotation::secondary(secondary_span);
-        secondary_annotation = if defining_class.class_literal(db) == ClassLiteral::Static(class) {
-            secondary_annotation.message(format_args!("`{first_method_name}` declared as abstract"))
-        } else {
-            secondary_annotation.message(format_args!(
-                "`{first_method_name}` declared as abstract on superclass `{defining_class_name}`",
-            ))
-        };
-        diagnostic.annotate(secondary_annotation);
-    }
-
-    if !kind.is_explicit() {
-        let mut sub = SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            format_args!(
-                "`{defining_class_name}.{first_method_name}` is implicitly abstract \
-                    because `{defining_class_name}` is a `Protocol` class \
-                    and `{first_method_name}` lacks an implementation",
-            ),
-        );
-        sub.annotate(
-            Annotation::secondary(defining_class.definition_span(db))
-                .message(format_args!("`{defining_class_name}` declared here")),
-        );
-        diagnostic.sub(sub);
-
-        // If the implicitly abstract method is defined in first-party code
-        // and the return type is assignable to `None`, they may not have intended
-        // for it to be implicitly abstract; add a clarificatory note:
-        if kind.is_implicit_due_to_stub_body() && db.should_check_file(definition.file(db)) {
-            let function_type_as_callable = infer_definition_types(db, *definition)
-                .binding_type(*definition)
-                .try_upcast_to_callable(db, env);
-
-            if let Some(callables) = function_type_as_callable
-                && Type::function_like_callable(
-                    db,
-                    Signature::new(Parameters::gradual_form(), Type::none(db, env)),
-                )
-                .is_assignable_to(db, env, callables.into_type(db, env))
-            {
-                diagnostic.help(format_args!(
-                    "Change the body of `{first_method_name}` to `return` \
-                        or `return None` if it was not intended to be abstract"
-                ));
-            }
         }
     }
 }

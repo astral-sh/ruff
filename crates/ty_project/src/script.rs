@@ -1,18 +1,24 @@
 use pep440_rs::VersionSpecifiers;
 use ruff_db::Db as SourceDb;
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
+};
 use ruff_db::files::File;
 use ruff_db::source::source_text;
 use ruff_python_ast::script::ScriptTag;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use serde::Deserialize;
 use ty_combine::Combine;
-use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, UseDefaultStrategy};
 use ty_python_semantic::PythonVersionWithSource;
+use ty_python_semantic::dependency::DependencyMetadata;
 
-use crate::metadata::options::{Options, OptionsContext};
+use crate::metadata::options::{EnvironmentOptions, Options, OptionsContext};
 use crate::metadata::pyproject::Tool;
 use crate::metadata::settings::Settings;
+use crate::metadata::value::RelativePathBuf;
+use crate::uv::{DependencyMetadataError, UvMetadata, script_environment};
 use crate::{Db, ProjectMetadata};
 
 /// A standalone PEP 723 script and its resolved settings.
@@ -33,18 +39,51 @@ pub(crate) struct Script<'db> {
     #[returns(ref)]
     pub(crate) python_version_with_source: PythonVersionWithSource,
 
+    /// Whether the script's metadata, settings, and Python environment resolved without errors.
+    ///
+    /// For a script with invalid settings, `Program` is a best effort approximation
+    /// of the script's configuration. It's, therefore, important that ty doesn't run any destructive
+    /// operations or shows misleading diagnostics. That means, `--fix` should be a no-op and
+    /// `check_file` (and similar operations) should bail and only show the setting related diagnostics.
+    #[tracked]
+    #[returns(copy)]
+    pub(crate) has_valid_settings: bool,
+
+    /// Diagnostics generated while parsing the script metadata and resolving its settings.
     #[tracked]
     #[returns(deref)]
-    pub(crate) diagnostics: Box<[Diagnostic]>,
+    pub(crate) settings_diagnostics: Box<[Diagnostic]>,
 }
 
+#[salsa::tracked]
 impl<'db> Script<'db> {
     /// Returns the script for `file` without creating a second Salsa memo for ordinary files.
     pub(crate) fn for_file(db: &'db dyn Db, file: File) -> Option<Self> {
-        // Most files are not scripts. Check the existing metadata query first so ordinary files
+        // Most files are not scripts. Check the existing tag query first so ordinary files
         // do not also allocate a tracked `script` memo just to cache another `None`.
-        script_metadata(db, file)?;
+        script_tag(db, file)?;
         script(db, file)
+    }
+
+    /// Cache dependency declarations separately from settings, which can remain unchanged after
+    /// uv synchronizes an edit to the script's dependencies.
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn dependency_metadata(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<Option<Box<DependencyMetadata>>, DependencyMetadataError> {
+        if !self.has_valid_settings(db) {
+            return Ok(None);
+        }
+
+        let Some(metadata) = script_environment(db, self.file(db))
+            .and_then(|environment| environment.uv_metadata(db))
+        else {
+            return Ok(None);
+        };
+        metadata
+            .dependency_metadata()
+            .map(|metadata| Some(Box::new(metadata)))
     }
 }
 
@@ -54,11 +93,20 @@ impl get_size2::GetSize for Script<'_> {}
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     // Files without script metadata must not depend on the low-durability open-file set.
-    let metadata = script_metadata(db, file)?;
+    let tag = script_tag(db, file)?;
 
     // Never treat third-party files as scripts.
-    if !crate::should_check_file(db, file) {
+    if !crate::is_project_file(db, file) {
         return None;
+    }
+
+    let mut diagnostics = ScriptConfigurationDiagnostics::default();
+    let metadata = parse_script_metadata(file, tag, &mut diagnostics);
+    let environment = script_environment(db, file);
+    let uv_metadata = environment.and_then(|environment| environment.uv_metadata(db));
+
+    if let Some(error) = environment.and_then(|environment| environment.initialization_error(db)) {
+        diagnostics.report_invalid(uv_metadata_diagnostic(file, tag, error));
     }
 
     let configuration_root = file
@@ -70,18 +118,22 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
 
     let project_metadata = db.project().metadata(db);
 
-    let mut diagnostics = Vec::new();
-    // FIXME: Report configuration errors as diagnostics and skip checking the script entirely so
-    // that fixes cannot be applied using the enclosing project's configuration.
-    let options = resolve_script_options(project_metadata, metadata)?;
-    let settings = resolve_script_settings(db, &options, context, &mut diagnostics)?;
+    let options = resolve_script_options(
+        project_metadata,
+        &metadata,
+        uv_metadata,
+        file,
+        &mut diagnostics,
+    );
+    let settings = resolve_script_settings(db, &options, context, &mut diagnostics);
     let program_settings = resolve_script_program_settings(
         db,
         &options,
         context,
         project_metadata.name(),
+        file,
         &mut diagnostics,
-    )?;
+    );
 
     program_settings.search_paths.try_register_static_roots(db);
 
@@ -93,83 +145,16 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
         settings,
         program,
         program_settings.python_version,
-        diagnostics.into_boxed_slice(),
+        !diagnostics.has_invalid_settings,
+        diagnostics.diagnostics.into_boxed_slice(),
     ))
 }
 
-fn resolve_script_options(
-    project_metadata: &ProjectMetadata,
-    metadata: &ScriptMetadata,
-) -> Option<Options> {
-    // When using `--config-file <FILE>`, use the settings from `<FILE>`
-    let inline = if project_metadata.config_file_override().is_some() {
-        project_metadata.options().clone()
-    } else {
-        // Otherwise use the script's settings.
-        metadata.to_options()?
-    };
-
-    let mut options = Options::default();
-    // Merge the options with CLI, LSP, user configuration, and fallback options
-    for layer in project_metadata.script_options_in_precedence_order(&inline) {
-        options.combine_with(layer.clone());
-    }
-
-    // Unlike Project's, default to `[]` for scripts (unless explicitly specified).
-    options
-        .environment
-        .get_or_insert_default()
-        .root
-        .get_or_insert_default();
-
-    Some(options)
-}
-
-fn resolve_script_settings(
-    db: &dyn Db,
-    options: &Options,
-    context: OptionsContext<'_>,
-    diagnostics: &mut Vec<Diagnostic>,
-) -> Option<Settings> {
-    let (settings, settings_diagnostics) =
-        options.to_settings(db, context, &FallibleStrategy).ok()?;
-    diagnostics.extend(
-        settings_diagnostics
-            .into_iter()
-            .map(|diagnostic| diagnostic.to_diagnostic()),
-    );
-    Some(settings)
-}
-
-fn resolve_script_program_settings(
-    db: &dyn Db,
-    options: &Options,
-    context: OptionsContext<'_>,
-    project_name: &str,
-    diagnostics: &mut Vec<Diagnostic>,
-) -> Option<ProgramSettings> {
-    let (settings, settings_diagnostics) = options
-        .to_program_settings(
-            context,
-            project_name,
-            db.system(),
-            db.vendored(),
-            &FallibleStrategy,
-        )
-        .ok()?;
-    diagnostics.extend(
-        settings_diagnostics
-            .into_iter()
-            .map(|diagnostic| diagnostic.into_diagnostic(db).to_diagnostic()),
-    );
-    Some(settings)
-}
-
-/// Returns the PEP 723 metadata embedded in `file`.
+/// Returns the PEP 723 script tag embedded in `file`.
 ///
-/// Most files have no script metadata. Boxing keeps the cached result compact when it is `None`.
+/// Most files have no script tag. Boxing keeps the cached result compact when it is `None`.
 #[salsa::tracked(returns(as_deref))]
-pub(crate) fn script_metadata(db: &dyn SourceDb, file: File) -> Option<Box<ScriptMetadata>> {
+pub fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
     let path = file.path(db);
     if path.is_vendored_path() {
         return None;
@@ -180,38 +165,231 @@ pub(crate) fn script_metadata(db: &dyn SourceDb, file: File) -> Option<Box<Scrip
         return None;
     }
 
-    let (content, source_map) = ScriptTag::parse(source.as_bytes())?.into_metadata_and_source_map();
-    let _guard = ValueSourceGuard::with_source_map(ValueSource::ScriptMetadata(file), source_map);
-    // FIXME: Report invalid TOML in script metadata instead of silently ignoring it.
-    let mut metadata: ScriptMetadata = toml::from_str(&content).ok()?;
+    ScriptTag::parse(source.as_bytes()).map(Box::new)
+}
+
+fn parse_script_metadata(
+    file: File,
+    tag: &ScriptTag,
+    diagnostics: &mut ScriptConfigurationDiagnostics,
+) -> ScriptMetadata {
+    let result = {
+        let _guard = ValueSourceGuard::with_source_map(
+            ValueSource::ScriptMetadata(file),
+            tag.source_map().clone(),
+        );
+        toml::from_str::<ScriptMetadata>(tag.metadata())
+    };
+
+    let mut metadata = match result {
+        Ok(metadata) => metadata,
+        Err(error) => {
+            let range = error.span().and_then(|span| {
+                let start = TextSize::try_from(span.start).ok()?;
+                let end = TextSize::try_from(span.end).ok()?;
+                Some(tag.source_map().map_range(TextRange::new(start, end)))
+            });
+
+            diagnostics.report_invalid(invalid_script_metadata_diagnostic(
+                file,
+                error.message(),
+                range,
+            ));
+            return ScriptMetadata::default();
+        }
+    };
 
     if let Some(options) = metadata.tool.as_mut().and_then(|tool| tool.ty.as_mut()) {
         options.prioritize_all_selectors();
     }
 
-    Some(Box::new(metadata))
+    metadata
+}
+
+fn resolve_script_options(
+    project_metadata: &ProjectMetadata,
+    metadata: &ScriptMetadata,
+    uv_metadata: Option<&UvMetadata>,
+    file: File,
+    diagnostics: &mut ScriptConfigurationDiagnostics,
+) -> Options {
+    // When using `--config-file <FILE>`, use the settings from `<FILE>`
+    let inline = if project_metadata.config_file_override().is_some() {
+        project_metadata.options().clone()
+    } else {
+        // Otherwise use the script's settings.
+        metadata.to_options(file, diagnostics)
+    };
+
+    let uv_options = uv_metadata.map(|metadata| Options {
+        environment: Some(EnvironmentOptions {
+            python_version: metadata.python_version().cloned(),
+            python: metadata
+                .environment()
+                .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata)),
+            ..EnvironmentOptions::default()
+        }),
+        ..Options::default()
+    });
+
+    let mut options = Options::default();
+    // Merge the options with CLI, LSP, user configuration, and fallback options
+    for layer in project_metadata.options_in_precedence_order(&inline, uv_options.as_ref()) {
+        options.combine_with(layer.clone());
+    }
+
+    // An explicit Python environment selects uv's interpreter, not the script's site-packages.
+    if let Some(environment) = uv_metadata.and_then(UvMetadata::environment) {
+        options.environment.get_or_insert_default().python =
+            Some(RelativePathBuf::new(environment, ValueSource::UvMetadata));
+    }
+
+    // Unlike Project's, default to `[]` for scripts (unless explicitly specified).
+    options
+        .environment
+        .get_or_insert_default()
+        .root
+        .get_or_insert_default();
+
+    options
+}
+
+fn resolve_script_settings(
+    db: &dyn Db,
+    options: &Options,
+    context: OptionsContext<'_>,
+    diagnostics: &mut ScriptConfigurationDiagnostics,
+) -> Settings {
+    let (settings, settings_diagnostics) = match options.to_settings(db, context, &FallibleStrategy)
+    {
+        Ok(settings) => settings,
+        Err(error) => {
+            diagnostics.report_invalid(error.into_diagnostic().to_diagnostic());
+            let Ok(settings) = options.to_settings(db, context, &UseDefaultStrategy);
+            settings
+        }
+    };
+    diagnostics.extend(
+        settings_diagnostics
+            .into_iter()
+            .map(|diagnostic| diagnostic.to_diagnostic()),
+    );
+    settings
+}
+
+fn resolve_script_program_settings(
+    db: &dyn Db,
+    options: &Options,
+    context: OptionsContext<'_>,
+    project_name: &str,
+    file: File,
+    diagnostics: &mut ScriptConfigurationDiagnostics,
+) -> ProgramSettings {
+    let (settings, settings_diagnostics) = match options.to_program_settings(
+        context,
+        project_name,
+        db.system(),
+        db.vendored(),
+        &FallibleStrategy,
+    ) {
+        Ok(settings) => settings,
+        Err(error) => {
+            let (source_file, range) = error
+                .setting_source(options)
+                .and_then(|(source, range)| source.file(db).map(|file| (file, range)))
+                .unwrap_or((file, None));
+
+            let mut diagnostic =
+                invalid_script_metadata_diagnostic(source_file, error.message(), range);
+            if let Some(hint) = error.hint() {
+                diagnostic.sub(SubDiagnostic::new(SubDiagnosticSeverity::Info, hint));
+            }
+            diagnostics.report_invalid(diagnostic);
+
+            let Ok(settings) = options.to_program_settings(
+                context,
+                project_name,
+                db.system(),
+                db.vendored(),
+                &UseDefaultStrategy,
+            );
+            settings
+        }
+    };
+    diagnostics.extend(
+        settings_diagnostics
+            .into_iter()
+            .map(|diagnostic| diagnostic.into_diagnostic(db).to_diagnostic()),
+    );
+    settings
 }
 
 /// PEP 723 metadata, whose Python requirement belongs at the top level rather than in `project`.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) struct ScriptMetadata {
+struct ScriptMetadata {
     requires_python: Option<RangedValue<VersionSpecifiers>>,
     tool: Option<Tool>,
 }
 
 impl ScriptMetadata {
-    fn to_options(&self) -> Option<Options> {
+    fn to_options(&self, file: File, diagnostics: &mut ScriptConfigurationDiagnostics) -> Options {
         let mut options = self.ty().cloned().unwrap_or_default();
+        if let Err(error) = options.apply_requires_python(self.requires_python.as_ref()) {
+            let range = self.requires_python.as_ref().and_then(RangedValue::range);
+            let mut diagnostic = invalid_script_metadata_diagnostic(file, error.message(), range);
+            if let Some(hint) = error.hint() {
+                diagnostic.sub(SubDiagnostic::new(SubDiagnosticSeverity::Info, hint));
+            }
+            diagnostics.report_invalid(diagnostic);
+        }
         options
-            .apply_requires_python(self.requires_python.as_ref())
-            .ok()?;
-        Some(options)
     }
 
     fn ty(&self) -> Option<&Options> {
         self.tool.as_ref().and_then(|tool| tool.ty.as_ref())
     }
+}
+
+#[derive(Default)]
+struct ScriptConfigurationDiagnostics {
+    diagnostics: Vec<Diagnostic>,
+    has_invalid_settings: bool,
+}
+
+impl ScriptConfigurationDiagnostics {
+    fn report_invalid(&mut self, diagnostic: Diagnostic) {
+        self.has_invalid_settings = true;
+        self.diagnostics.push(diagnostic);
+    }
+
+    fn extend(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
+        self.diagnostics.extend(diagnostics);
+    }
+}
+
+fn uv_metadata_diagnostic(file: File, tag: &ScriptTag, message: &str) -> Diagnostic {
+    let mut diagnostic = Diagnostic::new(DiagnosticId::UvMetadata, Severity::Error, message);
+    let mut annotation = Annotation::primary(Span::from(file).with_range(tag.range()));
+    annotation.hide_snippet(true);
+    diagnostic.annotate(annotation);
+    diagnostic
+}
+
+fn invalid_script_metadata_diagnostic(
+    file: File,
+    message: impl std::fmt::Display,
+    range: Option<TextRange>,
+) -> Diagnostic {
+    let mut diagnostic = Diagnostic::new(
+        DiagnosticId::InvalidScriptMetadata,
+        Severity::Error,
+        message,
+    );
+    diagnostic.annotate(Annotation::primary(
+        Span::from(file).with_optional_range(range),
+    ));
+    diagnostic
 }
 
 #[cfg(test)]

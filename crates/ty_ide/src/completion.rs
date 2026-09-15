@@ -11,8 +11,7 @@ use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
-use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_python_codegen::Stylist;
+use ruff_python_ast::{self as ast, AnyNodeRef, StringFlags};
 use ruff_python_literal::escape::{Escape, UnicodeEscape};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
@@ -21,6 +20,7 @@ use ty_module_resolver::{
 };
 use ty_python_core::{ProgramFile, semantic_index};
 use ty_python_semantic::HasType;
+use ty_python_semantic::importer::{ImportRequest, Importer};
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
@@ -29,7 +29,6 @@ use ty_python_semantic::{
 
 use crate::docstring::Docstring;
 use crate::goto::Definitions;
-use crate::importer::{ImportRequest, Importer};
 use crate::symbols::QueryPattern;
 use crate::{Db, all_symbols, signature_help};
 
@@ -59,7 +58,7 @@ pub fn completion<'db>(
             db,
             program_file,
             CollectionContext::none(),
-            UserQuery::fuzzy(None),
+            UserQuery::fuzzy(context.cursor.typed_string_prefix()),
         );
 
         add_string_literal_completions(
@@ -1040,6 +1039,21 @@ impl<'m> ContextCursor<'m> {
         self.tokens_before
             .last()
             .map(|token| token.string_quote_style())
+    }
+
+    /// Returns the source text between the current string's opener and the cursor.
+    fn typed_string_prefix(&self) -> Option<&'m str> {
+        let token = self.tokens_before.last()?;
+        if token.kind() != TokenKind::String || token.end() < self.offset {
+            return None;
+        }
+
+        let content_start = token.start() + token.string_flags()?.opener_len();
+        if content_start >= self.offset {
+            return None;
+        }
+
+        Some(&self.source[TextRange::new(content_start, self.offset)])
     }
 
     fn suppress_callable_parentheses(&self) -> bool {
@@ -2350,6 +2364,9 @@ fn add_string_literal_completions<'db>(
         let Some(insert) = escape_for_quote(&candidate.value, quote_style) else {
             continue;
         };
+        if !completions.query.is_match(&insert) {
+            continue;
+        }
         completions.add_skip_query(
             Completion::builder(candidate.value.as_str())
                 .insert(insert)
@@ -2383,9 +2400,7 @@ fn add_unimported_completions<'db>(
     }
 
     let source_file = file.file(db);
-    let source = source_text(db, source_file);
-    let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
-    let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
+    let importer = Importer::new(db, file, parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
     let importing_file = ImportingFile::File(source_file, file.resolver_environment(db));
 
@@ -3303,6 +3318,7 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             // "struct" here as a more general "object." ---AG
             Type::NominalInstance(_)
             | Type::PropertyInstance(_)
+            | Type::SlotDescriptor(_)
             | Type::BoundSuper(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_)
@@ -5014,7 +5030,7 @@ C.<CURSOR>
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
         __subclasscheck__ :: bound method <class 'C'>.__subclasscheck__(subclass: type, /) -> bool
-        __subclasses__ :: bound method <class 'C'>.__subclasses__[Self]() -> list[Self]
+        __subclasses__ :: bound method <class 'C'>.__subclasses__[_T]() -> list[type[_T]]
         __subclasshook__ :: bound method <class 'C'>.__subclasshook__(subclass: type, /) -> bool
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -5083,7 +5099,7 @@ Meta.<CURSOR>
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: def __subclasscheck__(self, subclass: type, /) -> bool
-                __subclasses__ :: def __subclasses__[Self](self: Self) -> list[Self]
+                __subclasses__ :: def __subclasses__[_T](self: type[_T]) -> list[type[_T]]
                 __subclasshook__ :: bound method <class 'Meta'>.__subclasshook__(subclass: type, /) -> bool
                 __text_signature__ :: str | None
                 __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -5213,7 +5229,7 @@ Quux.<CURSOR>
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
         __subclasscheck__ :: bound method <class 'Quux'>.__subclasscheck__(subclass: type, /) -> bool
-        __subclasses__ :: bound method <class 'Quux'>.__subclasses__[Self]() -> list[Self]
+        __subclasses__ :: bound method <class 'Quux'>.__subclasses__[_T]() -> list[type[_T]]
         __subclasshook__ :: bound method <class 'Quux'>.__subclasshook__(subclass: type, /) -> bool
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -5292,7 +5308,7 @@ Answer.<CURSOR>
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: bound method <class 'Answer'>.__subclasscheck__(subclass: type, /) -> bool
-                __subclasses__ :: bound method <class 'Answer'>.__subclasses__[Self]() -> list[Self]
+                __subclasses__ :: bound method <class 'Answer'>.__subclasses__[_T]() -> list[type[_T]]
                 __subclasshook__ :: bound method <class 'Answer'>.__subclasshook__(subclass: type, /) -> bool
                 __text_signature__ :: str | None
                 __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -6671,6 +6687,49 @@ from sys import (
     }
 
     #[test]
+    fn from_import_with_bare_annotation() {
+        let builder = CursorTest::builder()
+            .source("module.py", "declared: int\nvalue = 1")
+            .source("main.py", "from module import val<CURSOR>")
+            .completion_test_builder();
+
+        builder.build().contains("value");
+    }
+
+    #[test]
+    fn from_import_with_separate_annotation_and_assignment() {
+        let builder = CursorTest::builder()
+            .source("module.py", "value: int\nvalue = 1")
+            .source("main.py", "from module import val<CURSOR>")
+            .completion_test_builder();
+
+        let test = builder.build();
+        assert!(
+            test.completions()
+                .iter()
+                .any(|completion| completion.name == "value" && !completion.is_type_check_only)
+        );
+    }
+
+    #[test]
+    fn from_import_with_type_checking_annotation() {
+        let builder = CursorTest::builder()
+            .source(
+                "module.py",
+                "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    value: int",
+            )
+            .source("main.py", "from module import val<CURSOR>")
+            .completion_test_builder();
+
+        let test = builder.build();
+        assert!(
+            test.completions()
+                .iter()
+                .any(|completion| completion.name == "value" && completion.is_type_check_only)
+        );
+    }
+
+    #[test]
     fn from_import_unknown_in_module() {
         let builder = completion_test_builder(
             "\
@@ -7865,16 +7924,13 @@ func(1, "<CURSOR>")
             r#"
 from typing import Literal
 
-value: Literal["x", "y"] = "<CURSOR>"
+value: Literal["apple", "banana"] = "app<CURSOR>"
 "#,
         );
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
-            @r#"
-        x :: Literal["x"]
-        y :: Literal["y"]
-        "#,
+            @r#"apple :: Literal["apple"]"#,
         );
     }
 

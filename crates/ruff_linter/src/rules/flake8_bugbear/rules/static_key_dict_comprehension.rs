@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
@@ -31,7 +32,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// {value: value.upper() for value in data}
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Correctness)]
 pub(crate) struct StaticKeyDictComprehension {
     key: SourceCodeSnippet,
 }

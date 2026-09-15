@@ -169,7 +169,7 @@ def use_existing_union(form: TypeForm[int] | TypeForm[str]) -> None:
 def use_existing_alias(form: FormUnion, value: int | str) -> None:
     assert_type(value, form)
 
-type RecursiveForm = RecursiveForm | TypeForm[int]
+type RecursiveForm = RecursiveForm | TypeForm[int]  # error: [cyclic-type-alias-definition]
 
 def use_recursive_alias(form: RecursiveForm) -> None:
     reveal_type(cast(form, object()))  # revealed: int

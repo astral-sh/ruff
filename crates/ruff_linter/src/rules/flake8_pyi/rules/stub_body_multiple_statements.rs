@@ -4,6 +4,7 @@ use ruff_python_ast::identifier::Identifier;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for functions in stub (`.pyi`) files that contain multiple
@@ -29,7 +30,7 @@ use crate::checkers::ast::Checker;
 /// def function(): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Correctness)]
 pub(crate) struct StubBodyMultipleStatements;
 
 impl Violation for StubBodyMultipleStatements {

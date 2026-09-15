@@ -29,13 +29,13 @@ ty_static = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["wrap_help"] }
+colored = { workspace = true }
 ignore = { workspace = true }
 imara-diff = { workspace = true }
 indicatif = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
 markdown = { version = "1.0.0" }
-pretty_assertions = { workspace = true }
 rayon = { workspace = true }
 regex = { workspace = true }
 schemars = { workspace = true }

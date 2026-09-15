@@ -464,6 +464,59 @@ def propagating_exception(value: int | str) -> None:
     reveal_type(value)  # revealed: str
 ```
 
+Narrowing established after an earlier operation that may raise is preserved too:
+
+```py
+def narrowing_after_possible_exception(value: int | str) -> None:
+    with Manager():
+        int("invalid")
+        if isinstance(value, int):
+            raise ValueError
+    reveal_type(value)  # revealed: str
+```
+
+Type guard narrowing on one exception path is preserved when another path introduces a new binding
+inside a non-suppressing context manager:
+
+```py
+from typing import TypeGuard
+
+class Base: ...
+
+def is_string(value: Base) -> TypeGuard[str]:
+    return isinstance(value, str)
+
+def make_integer() -> int:
+    return 1
+
+def type_guard_across_exception_handler() -> None:
+    value = Base()
+    try:
+        if not is_string(value):
+            return
+    except Exception:
+        with Manager():
+            value = make_integer()
+
+    reveal_type(value)  # revealed: str | int
+```
+
+Ordinary `isinstance` narrowing follows the same rule: an excluded `None` does not reappear when the
+exception-handler assignment is merged:
+
+```py
+def isinstance_across_exception_handler(source: str | None) -> None:
+    value = source
+    try:
+        if not isinstance(value, str):
+            return
+    except Exception:
+        with Manager():
+            value = make_integer()
+
+    reveal_type(value)  # revealed: str | int
+```
+
 ## Overloaded context manager exit methods
 
 Whether an overloaded exit method can suppress an exception depends on the overload used when an

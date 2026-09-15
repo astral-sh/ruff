@@ -684,6 +684,126 @@ static_assert(not is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[int]
 static_assert(not is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[int, int]))
 ```
 
+An unbounded homogeneous tuple whose element type is an alias of `Any` is also gradual. It is
+assignable to fixed-length tuples, including the empty tuple, even through a chain of aliases.
+
+```py
+type Dynamic = Any
+type DynamicAlias = Dynamic
+
+static_assert(is_assignable_to(tuple[Dynamic, ...], tuple[()]))
+static_assert(is_assignable_to(tuple[Dynamic, ...], tuple[int]))
+static_assert(is_assignable_to(tuple[DynamicAlias, ...], tuple[int, str]))
+```
+
+When unpacked into a mixed tuple, the gradual segment can supply additional elements, but the fixed
+prefix and suffix must still fit within the target and have compatible types.
+
+```py
+static_assert(is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[int, bool, str]))
+static_assert(not is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[int]))
+static_assert(not is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[str, bool, str]))
+static_assert(not is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[int, bool, int]))
+```
+
+## Constraint-producing assignability of gradual tuples
+
+A gradual segment can supply any fixed number of elements, including zero. These concrete tuple
+comparisons produce always-satisfied constraints, matching eager assignability.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, is_assignable_to, is_constraint_set_assignable_to
+
+static_assert(is_assignable_to(tuple[Any, ...], tuple[()]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[()]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[int]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int, str]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[int, str]))
+
+type Dynamic = Any
+
+static_assert(is_assignable_to(tuple[Dynamic, ...], tuple[int]))
+static_assert(is_constraint_set_assignable_to(tuple[Dynamic, ...], tuple[int]))
+```
+
+The gradual segment can also supply a variable-length target's required prefix or suffix.
+
+```py
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int, *tuple[str, ...]]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[int, *tuple[str, ...]]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[*tuple[str, ...], int]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[*tuple[str, ...], int]))
+```
+
+A mixed tuple's fixed elements must still fit within the target and have compatible types. The
+gradual segment cannot remove a required element or change its type.
+
+```py
+static_assert(is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[int, bool, str]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[int]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[str, bool, str]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[int, bool, int]))
+static_assert(not is_constraint_set_assignable_to(tuple[str, *tuple[Any, ...]], tuple[int, *tuple[bytes, ...]]))
+static_assert(not is_constraint_set_assignable_to(tuple[*tuple[Any, ...], str], tuple[*tuple[bytes, ...], int]))
+```
+
+A static homogeneous tuple can have any length, so it cannot guarantee a fixed length or a required
+element in a variable-length target.
+
+```py
+static_assert(not is_assignable_to(tuple[int, ...], tuple[int]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, ...], tuple[int]))
+static_assert(not is_assignable_to(tuple[int, ...], tuple[int, *tuple[int, ...]]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, ...], tuple[int, *tuple[int, ...]]))
+```
+
+Type variables in fixed source elements are compared normally. The gradual segment can be empty or
+supply additional target elements without discarding constraints on the fixed source elements.
+
+```py
+def source_type_variables[T]() -> None:
+    static_assert(is_constraint_set_assignable_to(tuple[list[T], *tuple[Any, ...]], tuple[object]))
+    static_assert(is_constraint_set_assignable_to(tuple[*tuple[Any, ...], list[T]], tuple[object]))
+    static_assert(is_constraint_set_assignable_to(tuple[T, *tuple[Any, ...]], tuple[int]) == ConstraintSet.upper_bound(T, int))
+    static_assert(is_constraint_set_assignable_to(tuple[*tuple[Any, ...], T], tuple[str]) == ConstraintSet.upper_bound(T, str))
+    static_assert(
+        is_constraint_set_assignable_to(tuple[T, *tuple[Any, ...]], tuple[int, str, *tuple[bytes, ...]])
+        == ConstraintSet.upper_bound(T, int)
+    )
+    static_assert(
+        is_constraint_set_assignable_to(tuple[*tuple[Any, ...], T], tuple[*tuple[bytes, ...], str, int])
+        == ConstraintSet.upper_bound(T, int)
+    )
+```
+
+TODO: Gradual-length comparisons do not yet generate evidence for type variables in target elements
+supplied by the gradual segment. These comparisons currently fail even when the variable is nested
+inside another type or hidden behind an alias.
+
+```py
+type Identity[T] = T
+
+def nested_type_variables[T]() -> None:
+    static_assert(is_assignable_to(tuple[Any, ...], tuple[list[T]]))
+    # TODO: This should be ConstraintSet.equality(T, Any).
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[list[T]]) == ConstraintSet.never())
+    static_assert(is_assignable_to(tuple[Any, ...], tuple[Identity[T]]))
+    # TODO: This should be ConstraintSet.lower_bound(Any, T).
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[Identity[T]]) == ConstraintSet.never())
+```
+
+A symbolic `TypeVarTuple` is not gradual: its specialization can have a different length from a
+fixed target tuple.
+
+```py
+def symbolic_pack[*Ts]() -> None:
+    static_assert(not is_assignable_to(tuple[*Ts], tuple[int]))
+    static_assert(is_constraint_set_assignable_to(tuple[*Ts], tuple[int]) == ConstraintSet.never())
+```
+
 ## Union types
 
 ```py
@@ -801,6 +921,11 @@ static_assert(is_assignable_to(LiteralString & ~Literal["", "a"], AlwaysTruthy))
 static_assert(is_assignable_to(LiteralString & ~Literal[""], ~AlwaysFalsy))
 # error: [static-assert-error]
 static_assert(is_assignable_to(LiteralString & ~Literal["", "a"], ~AlwaysFalsy))
+
+# Each member of a union must be assignable to the target intersection
+static_assert(is_assignable_to(Literal[1, 2], int & ~Literal[3]))
+static_assert(not is_assignable_to(Literal[1, 2], int & ~Literal[2]))
+static_assert(not is_assignable_to(Literal[1, "a"], int & ~Literal[3]))
 ```
 
 ## Callable types with Unknown/missing return type
@@ -1084,7 +1209,7 @@ parameter following that tuple.
 
 ```py
 from typing import Any, Callable, Never, Unpack, cast
-from ty_extensions import static_assert
+from ty_extensions import Top, static_assert
 from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
 
 def expects_suffix(callback: Callable[[Unpack[tuple[str, ...]], None], None]) -> None: ...
@@ -1194,6 +1319,17 @@ static_assert(is_assignable_to(OneOrMoreIntegers, GradualSuffix))
 static_assert(is_assignable_to(GradualSuffix, OneOrMoreIntegers))
 ```
 
+Gradual and top callable signatures accept a named positional prefix before an unpacked required
+suffix. Their synthetic keyword parameters do not represent concrete keyword arguments that can
+collide with the prefix.
+
+```py
+def named_prefix_and_suffix(name: int, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+
+static_assert(is_assignable_to(RegularCallableTypeOf[named_prefix_and_suffix], Callable[..., None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[named_prefix_and_suffix], Top[Callable[..., None]]))
+```
+
 A positional parameter cannot also be filled by a target keyword argument.
 
 ```py
@@ -1223,6 +1359,30 @@ A suffix cannot be extended with elements that the source variadic parameter rej
 ```py
 # error: [invalid-assignment]
 incompatible_suffix: Callable[[*tuple[int, ...], str, str], None] = requires_string_after_integers
+```
+
+### Gradual keyword collisions with unpacked positional parameters
+
+A gradual keyword type can materialize to `Never`, eliminating an otherwise possible collision.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
+
+def source(a: int, *args: *tuple[*tuple[int, ...], int], **kwargs: int) -> None: ...
+def target(x: int, /, *args: *tuple[*tuple[int, ...], int], **kwargs: Any) -> None: ...
+
+static_assert(is_assignable_to(RegularCallableTypeOf[source], RegularCallableTypeOf[target]))
+```
+
+A gradual source tail does not remove a real named prefix or permit a duplicate argument.
+
+```py
+def gradual_source(a: int, *args: Any, **kwargs: Any) -> None: ...
+def concrete_target(x: int, /, *args: *tuple[*tuple[int, ...], int], **kwargs: int) -> None: ...
+
+static_assert(not is_assignable_to(RegularCallableTypeOf[gradual_source], RegularCallableTypeOf[concrete_target]))
 ```
 
 ### Fixed-length unpacked positional parameters

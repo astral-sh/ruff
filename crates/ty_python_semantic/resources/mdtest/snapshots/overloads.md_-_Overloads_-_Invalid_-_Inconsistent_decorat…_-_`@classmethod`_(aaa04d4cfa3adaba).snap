@@ -69,26 +69,33 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 54 |         if isinstance(x, int):
 55 |             return cls(x)
 56 |         return None
-57 | 
-58 | class Base:
-59 |     @overload
-60 |     @classmethod
-61 |     def from_value(cls: type[Base], x: int) -> int: ...
-62 |     @overload
-63 |     @classmethod
-64 |     def from_value(cls: type[Child], x: str) -> str: ...
-65 |     @classmethod
-66 |     def from_value(cls, x: int | str) -> int | str:
-67 |         return x
-68 | 
-69 | class Child(Base): ...
-70 | 
-71 | reveal_type(Base.from_value)  # revealed: bound method <class 'Base'>.from_value(x: int) -> int
-72 | reveal_type(Child.from_value)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
-73 | 
-74 | good: Callable[[int], int] = Base.from_value
-75 | # error: [invalid-assignment]
-76 | bad: Callable[[str], str] = Base.from_value
+57 | instance = CheckClassMethod(1)
+58 | reveal_type(instance.try_from1("a"))  # revealed: None
+59 | reveal_type(instance.try_from2(1))  # revealed: CheckClassMethod
+60 | reveal_type(CheckClassMethod.try_from3(CheckClassMethod, 1))  # revealed: CheckClassMethod
+61 | reveal_type(CheckClassMethod.try_from1(instance, "a"))  # revealed: None
+62 | CheckClassMethod.try_from1(1)  # error: [no-matching-overload]
+63 | 
+64 | reveal_type(CheckClassMethod.try_from4(1))  # revealed: CheckClassMethod
+65 | class Base:
+66 |     @overload
+67 |     @classmethod
+68 |     def from_value(cls: type[Base], x: int) -> int: ...
+69 |     @overload
+70 |     @classmethod
+71 |     def from_value(cls: type[Child], x: str) -> str: ...
+72 |     @classmethod
+73 |     def from_value(cls, x: int | str) -> int | str:
+74 |         return x
+75 | 
+76 | class Child(Base): ...
+77 | 
+78 | reveal_type(Base.from_value)  # revealed: bound method <class 'Base'>.from_value(x: int) -> int
+79 | reveal_type(Child.from_value)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+80 | 
+81 | good: Callable[[int], int] = Base.from_value
+82 | # error: [invalid-assignment]
+83 | bad: Callable[[str], str] = Base.from_value
 ```
 
 # Diagnostics
@@ -145,10 +152,34 @@ error[call-non-callable]: Object of type `CheckClassMethod` is not callable
 ```
 
 ```
-error[invalid-assignment]: Object of type `bound method <class 'Base'>.from_value(x: int) -> int` is not assignable to `(str, /) -> str`
-  --> src/mdtest_snippet.py:76:29
+error[no-matching-overload]: No overload of function `CheckClassMethod.try_from1` matches arguments
+  --> src/mdtest_snippet.py:62:1
    |
-76 | bad: Callable[[str], str] = Base.from_value
+62 | CheckClassMethod.try_from1(1)  # error: [no-matching-overload]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+info: First overload defined here
+  --> src/mdtest_snippet.py:9:5
+   |
+ 9 | /     @overload
+10 | |     @classmethod
+11 | |     def try_from1(cls, x: int) -> CheckClassMethod: ...
+   | |_______________________________________________________^ First overload defined here
+info: Possible overloads for function `try_from1`:
+info:   (cls, x: int) -> CheckClassMethod
+info:   (cls, x: str) -> None
+info: Overload implementation defined here
+  --> src/mdtest_snippet.py:16:9
+   |
+16 |     def try_from1(cls, x: int | str) -> CheckClassMethod | None:
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+```
+
+```
+error[invalid-assignment]: Object of type `bound method <class 'Base'>.from_value(x: int) -> int` is not assignable to `(str, /) -> str`
+  --> src/mdtest_snippet.py:83:29
+   |
+83 | bad: Callable[[str], str] = Base.from_value
    |      --------------------   ^^^^^^^^^^^^^^^ Incompatible value of type `bound method <class 'Base'>.from_value(x: int) -> int`
    |      |
    |      Declared type

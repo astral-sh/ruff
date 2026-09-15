@@ -76,6 +76,17 @@ reveal_type(Foo())  # revealed: Foo
 reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
+When `__new__` is a lambda with an unknown return type, constructor calls still infer the class
+instance type:
+
+```py
+class LambdaNew:
+    __new__ = lambda cls: object.__new__(cls)
+
+reveal_type(LambdaNew())  # revealed: LambdaNew
+LambdaNew().missing_attribute  # error: [unresolved-attribute]
+```
+
 ## `__new__` with an invalid decorator and unresolved return annotation
 
 Regression test for <https://github.com/astral-sh/ty/issues/3470>.
@@ -264,6 +275,224 @@ class ReturnsFactory:
 
 # TODO should be - error: [invalid-argument-type] "Argument to `SelfFactory.__init__` is incorrect: Expected `int`, found `<class 'ReturnsFactory'>`"
 ReturnsFactory()
+```
+
+## Recursive constructor signatures
+
+When a constructor refers back to the same receiver type without reaching a callable signature, we
+fall back to an unknown signature with the nominal instance return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+### A decorator returning the enclosing class
+
+A decorator can replace `__new__` with the type of its implicit `cls` parameter, making the
+constructor refer back to itself. Regression test for <https://github.com/astral-sh/ty/issues/4347>.
+
+```py
+from collections.abc import Callable
+
+def decorate[T](callback: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+class C:
+    @decorate
+    def __new__(cls):
+        pass
+
+reveal_type(C.__new__)  # revealed: type[C]
+reveal_type(C())  # revealed: C
+```
+
+### Mutually recursive class objects
+
+The same fallback applies when two classes use each other as their `__new__` method:
+
+```py
+class A:
+    __new__: type["B"]
+
+class B:
+    __new__: type[A]
+
+reveal_type(A())  # revealed: A
+```
+
+### Recursive generic constructors
+
+A constructor can also return to the same generic class with the same specialization:
+
+```py
+class C[T]:
+    __new__: type["C[T]"]
+
+# TODO: Default unsolved class type variables in gradual constructor signatures to `Unknown`.
+reveal_type(C())  # revealed: C[T@C]
+reveal_type(C[int]())  # revealed: C[int]
+```
+
+### Shared constructors in union branches
+
+A constructor that occurs in separate union branches is not recursive. Both branches reach the same
+finite signature:
+
+```py
+class End:
+    def __new__(cls, *args: object) -> int:
+        return 1
+
+class Left:
+    __new__ = End
+
+class Right:
+    __new__ = End
+
+class C:
+    __new__: type[Left] | type[Right]
+
+reveal_type(C())  # revealed: int
+```
+
+### Finite generic constructor chains
+
+Returning to the same generic class is safe when subsequent constructors reach a callable signature.
+Here, each step consumes a nested specialization until it reaches `End.__new__`:
+
+```py
+class End[T]:
+    def __new__(cls, *args: object) -> int:
+        return 1
+
+class C[T]:
+    __new__: type[T]
+
+reveal_type(C[C[End[int]]]())  # revealed: int
+
+type Inner = C[End[int]]
+
+reveal_type(C[Inner]())  # revealed: int
+```
+
+A finite chain can even grow its arguments. `Factory` returns to `C` with a larger argument, but
+`End` does not expand the nested `Factory` type:
+
+```py
+class Factory[T]:
+    __new__: type[C[End["Factory[T]"]]]
+
+reveal_type(C[Factory[int]]())  # revealed: int
+```
+
+### Descriptor-sensitive constructor receivers
+
+An exact class object and a value of `type[C]` can select different descriptor overloads. This
+constructor returns to `C` with a different receiver type before reaching a finite signature:
+
+```py
+from collections.abc import Callable
+from typing import overload
+from ty_extensions._internal import TypeOf
+
+class Descriptor:
+    @overload
+    def __get__(self, obj: None, owner: "TypeOf[C]") -> "type[C]": ...
+    @overload
+    def __get__(self, obj: None, owner: "type[C]") -> Callable[..., int]: ...
+    def __get__(self, obj, owner):
+        raise NotImplementedError
+
+class C:
+    __new__: Descriptor
+
+reveal_type(C())  # revealed: int
+```
+
+### Argument checks after recursive `__new__`
+
+The recursive `__new__` fallback accepts arbitrary arguments, but an ordinary `__init__` still
+validates them against the class's specialization:
+
+```py
+class C[T]:
+    __new__: type["C[T]"]
+
+    def __init__(self, x: T):
+        pass
+
+reveal_type(C[int](1))  # revealed: C[int]
+# error: [invalid-argument-type]
+C[int]("wrong")
+```
+
+### A recursive class object in place of `__init__`
+
+Class-valued `__init__` methods can also lead back to the constructor being expanded:
+
+```py
+class C:
+    __init__: type["C"]
+
+reveal_type(C())  # revealed: C
+```
+
+The fallback does not override a known non-instance return from `__new__`, which bypasses
+`__init__`:
+
+```py
+class ReturnsInt:
+    def __new__(cls) -> int:
+        return 1
+
+    __init__: type["ReturnsInt"]
+
+reveal_type(ReturnsInt())  # revealed: int
+```
+
+### A recursive class object in place of metaclass `__call__`
+
+A metaclass's `__call__` can refer back to the class being constructed:
+
+```py
+class Meta(type):
+    __call__: type["C"]
+
+class C(metaclass=Meta): ...
+
+reveal_type(C())  # revealed: C
+```
+
+### A cycle through a callable instance
+
+Constructor expansion can pass through an instance's `__call__` before returning to the original
+class:
+
+```py
+class C:
+    __new__: "Factory"
+
+class Factory:
+    __call__: type[C]
+
+reveal_type(C())  # revealed: C
+```
+
+### A metaclass bypassing a recursive `__new__`
+
+A metaclass `__call__` that returns an unrelated type bypasses `__new__`. A recursive signature in
+the unused `__new__` does not prevent us from inferring the metaclass method's return type:
+
+```py
+class Meta(type):
+    def __call__(cls) -> int:
+        return 1
+
+class C(metaclass=Meta):
+    __new__: type["C"]
+
+reveal_type(C())  # revealed: int
 ```
 
 ## `__new__` is implicitly a static method, but explicitly marking it as one is harmless
@@ -1468,6 +1697,108 @@ class RequiredClassSelector(Generic[T]):
     def __init__(self: RequiredClassSelector[CT | None], *, class_: type[CT]) -> None: ...
 
 reveal_type(RequiredClassSelector(class_=MyClass))  # revealed: RequiredClassSelector[MyClass | None]
+```
+
+## Inferring type arguments from a union `self` annotation
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Never
+
+class Covariant[T]:
+    def __init__(self: Covariant[int | str]) -> None: ...
+
+    # Make it covariant in `T`:
+    def get(self) -> T:
+        raise NotImplementedError
+
+reveal_type(Covariant())  # revealed: Covariant[int | str]
+reveal_type(Covariant[int]())  # revealed: Covariant[int]
+reveal_type(Covariant[str]())  # revealed: Covariant[str]
+reveal_type(Covariant[Never]())  # revealed: Covariant[Never]
+
+Covariant[object]()  # error: [invalid-argument-type]
+
+class Contravariant[T]:
+    def __init__(self: Contravariant[int | str]) -> None: ...
+
+    # Make it contravariant in `T`:
+    def push(self, value: T) -> None: ...
+
+reveal_type(Contravariant())  # revealed: Contravariant[int | str]
+reveal_type(Contravariant[object]())  # revealed: Contravariant[object]
+
+Contravariant[int]()  # error: [invalid-argument-type]
+Contravariant[str]()  # error: [invalid-argument-type]
+
+class Invariant[T]:
+    def __init__(self: Invariant[int | str]) -> None: ...
+
+    # Make it invariant in `T`:
+    def get(self) -> T:
+        raise NotImplementedError
+    def push(self, value: T) -> None: ...
+
+reveal_type(Invariant())  # revealed: Invariant[int | str]
+reveal_type(Invariant[int | str]())  # revealed: Invariant[int | str]
+
+Invariant[int]()  # error: [invalid-argument-type]
+Invariant[Never]()  # error: [invalid-argument-type]
+Invariant[object]()  # error: [invalid-argument-type]
+```
+
+## Constrained type variables in a union `self` annotation
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class C[T: (str | None, int | None)]:
+    def __init__[U: (str, int)](self: C[U | None], value: U) -> None: ...
+    def get(self) -> T:
+        raise NotImplementedError
+
+reveal_type(C("a"))  # revealed: C[str | None]
+
+# TODO: Resolve `U` before selecting a constraint for `T`. This should infer
+# `C[int | None]` without an error.
+# error: [invalid-argument-type]
+reveal_type(C(1))  # revealed: C[str | None]
+```
+
+## Union `self` annotations with variadic constructor parameters
+
+The `object` argument selects the `Any` constraint, even when the constructor also infers a
+`ParamSpec` or `TypeVarTuple`.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+class WithParamSpec[T: (str | None, Any)]:
+    def __init__[**P](self: WithParamSpec[str | None], value: T, callback: Callable[P, None]) -> None: ...
+    def push(self, value: T) -> None: ...
+
+def callback() -> None: ...
+
+reveal_type(WithParamSpec(object(), callback))  # revealed: WithParamSpec[Any]
+
+class WithTypeVarTuple[T: (str | None, Any)]:
+    def __init__[*Ts](self: WithTypeVarTuple[str | None], value: T, rest: tuple[*Ts]) -> None: ...
+    def push(self, value: T) -> None: ...
+
+reveal_type(WithTypeVarTuple(object(), (1,)))  # revealed: WithTypeVarTuple[Any]
 ```
 
 ## `__init__` can remap constructor generic arguments via `self` annotation

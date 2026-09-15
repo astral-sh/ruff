@@ -42,57 +42,108 @@ static SERVER_WORK_DONE_TOKENS: AtomicUsize = AtomicUsize::new(0);
 ///
 /// [work-done-progress]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workDoneProgress
 #[derive(Clone)]
-pub(super) struct LazyWorkDoneProgress {
+pub(crate) struct LazyWorkDoneProgress {
     inner: Arc<Inner>,
 }
 
 impl LazyWorkDoneProgress {
-    pub(super) fn new(
+    pub(crate) fn new(
         client: &Client,
         request_token: Option<ProgressToken>,
         title: &str,
         capabilities: ResolvedClientCapabilities,
     ) -> Self {
-        if let Some(token) = &request_token {
-            Self::send_begin(client, token.clone(), title.to_string());
-        }
+        Self::new_inner(
+            client,
+            request_token,
+            WorkDoneProgressBegin {
+                title: title.to_string(),
+                cancellable: Some(false),
+                message: None,
+                percentage: Some(0),
+            },
+            capabilities,
+            ProgressCreation::Queue,
+        )
+    }
 
-        let is_server_initiated = request_token.is_none();
+    /// Returns a progress reporter that displays an indicator if the main-loop action queue has
+    /// capacity.
+    ///
+    /// Server-initiated progress requires sending a request to the client through the main loop.
+    /// If the queue is full, the progress indicator is not shown. Waiting for capacity would
+    /// deadlock because the main loop cannot drain its own queue until this call returns.
+    pub(crate) fn new_on_main_loop(
+        client: &Client,
+        begin: WorkDoneProgressBegin,
+        capabilities: ResolvedClientCapabilities,
+    ) -> Self {
+        Self::new_inner(
+            client,
+            None,
+            begin,
+            capabilities,
+            ProgressCreation::TryQueue,
+        )
+    }
 
-        let once_token = std::sync::OnceLock::new();
-        if let Some(token) = request_token {
-            // SAFETY: The token is guaranteed to be not set yet because we only created it above.
-            once_token.set(token).unwrap();
-        }
-
+    fn new_inner(
+        client: &Client,
+        request_token: Option<ProgressToken>,
+        begin: WorkDoneProgressBegin,
+        capabilities: ResolvedClientCapabilities,
+        creation: ProgressCreation,
+    ) -> Self {
         let work_done = Self {
             inner: Arc::new(Inner {
-                token: once_token,
+                token: std::sync::OnceLock::new(),
                 finish_message: std::sync::Mutex::default(),
                 client: client.clone(),
             }),
         };
 
-        if is_server_initiated && capabilities.supports_work_done_progress() {
+        if let Some(token) = request_token {
+            if Self::send_begin(client, token.clone(), begin) {
+                work_done
+                    .inner
+                    .token
+                    .set(token)
+                    .expect("progress token should only be set once");
+            }
+        } else if capabilities.supports_work_done_progress() {
             // Use a string token because Zed does not support numeric tokens
             let token = ProgressToken::String(format!(
                 "ty-{}",
                 SERVER_WORK_DONE_TOKENS.fetch_add(1, Ordering::Relaxed)
             ));
             let work_done = work_done.clone();
-            let title = title.to_string();
 
-            client.send_deferred_request::<WorkDoneProgressCreateRequest>(
-                WorkDoneProgressCreateParams {
-                    token: token.clone(),
-                },
-                move |client, ()| {
-                    Self::send_begin(client, token.clone(), title);
-                    // SAFETY: We only take this branch if `request_token` was `None`
-                    // and we only issue a single request (without retry).
-                    work_done.inner.token.set(token).unwrap();
-                },
-            );
+            let params = WorkDoneProgressCreateParams {
+                token: token.clone(),
+            };
+            let response_handler = move |client: &Client, ()| {
+                if Self::send_begin(client, token.clone(), begin) {
+                    work_done
+                        .inner
+                        .token
+                        .set(token)
+                        .expect("progress token should only be set once");
+                }
+            };
+
+            match creation {
+                ProgressCreation::Queue => client
+                    .send_deferred_request::<WorkDoneProgressCreateRequest>(
+                        params,
+                        response_handler,
+                    ),
+                ProgressCreation::TryQueue => {
+                    client.try_send_deferred_request::<WorkDoneProgressCreateRequest>(
+                        params,
+                        response_handler,
+                    );
+                }
+            }
         }
 
         work_done
@@ -104,20 +155,9 @@ impl LazyWorkDoneProgress {
         *finish_message = Some(message);
     }
 
-    fn send_begin(client: &Client, token: ProgressToken, title: String) {
-        client.send_notification::<lsp_types::ProgressNotification>(ProgressParams {
-            token,
-            value: serde_json::to_value(WorkDoneProgressBegin {
-                title,
-                cancellable: Some(false),
-                message: None,
-                percentage: Some(0),
-            })
-            .expect("Failed to serialize work done progress begin"),
-        });
-    }
-
     /// Sends a progress report with the given message and optional percentage.
+    ///
+    /// Reports sent before the client acknowledges progress creation are dropped.
     pub(super) fn report_progress(&self, message: impl Display, percentage: Option<u32>) {
         let Some(token) = self.inner.token.get() else {
             return;
@@ -125,7 +165,7 @@ impl LazyWorkDoneProgress {
 
         self.inner
             .client
-            .send_notification::<lsp_types::ProgressNotification>(ProgressParams {
+            .try_send_notification::<lsp_types::ProgressNotification>(ProgressParams {
                 token: token.clone(),
                 value: serde_json::to_value(WorkDoneProgressReport {
                     cancellable: Some(false),
@@ -135,7 +175,23 @@ impl LazyWorkDoneProgress {
                 .expect("Failed to serialize work done progress report"),
             });
     }
+
+    fn send_begin(client: &Client, token: ProgressToken, begin: WorkDoneProgressBegin) -> bool {
+        client.try_send_notification::<lsp_types::ProgressNotification>(ProgressParams {
+            token,
+            value: serde_json::to_value(begin)
+                .expect("Failed to serialize work done progress begin"),
+        })
+    }
 }
+
+#[derive(Clone, Copy)]
+enum ProgressCreation {
+    Queue,
+    TryQueue,
+}
+
+impl ty_project::UvSyncProgress for LazyWorkDoneProgress {}
 
 struct Inner {
     token: std::sync::OnceLock<ProgressToken>,

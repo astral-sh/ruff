@@ -22,7 +22,10 @@ mod watcher;
 /// event instead of emitting an event for each file or subdirectory in that path.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ChangeEvent {
-    /// The file corresponding to the given path was opened in an editor.
+    /// A new or existing file was opened in an editor.
+    ///
+    /// Refresh its metadata and add it to an existing project index if it is included.
+    /// The editor may open a file before its filesystem creation notification arrives.
     Opened(SystemPathBuf),
 
     /// A new path was created
@@ -88,7 +91,7 @@ impl ChangeEvent {
         matches!(self, ChangeEvent::Rescan)
     }
 
-    pub const fn is_created(&self) -> bool {
+    pub(crate) const fn is_created(&self) -> bool {
         matches!(self, ChangeEvent::Created { .. })
     }
 

@@ -351,7 +351,6 @@ fn is_update_inline_snapshots_enabled() -> bool {
 fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str> {
     static INLINE_SNAPSHOT_PATH_FILTER: std::sync::LazyLock<regex::Regex> =
         std::sync::LazyLock::new(|| regex::Regex::new(r#"\\(\w\w|\.|")"#).unwrap());
-
     INLINE_SNAPSHOT_PATH_FILTER.replace_all(rendered, "/$1")
 }
 
@@ -361,6 +360,7 @@ pub fn validate_inline_snapshot(
     test_file: &TestFile<'_>,
     inline_diagnostics: &[Diagnostic],
     markdown_edits: &mut Vec<MarkdownEdit>,
+    snapshot_filter: impl Fn(&str) -> String,
 ) -> Result<(), matcher::FailuresByLine> {
     let update_snapshots = is_update_inline_snapshots_enabled();
     let line_index = line_index(db, test_file.file);
@@ -419,8 +419,8 @@ pub fn validate_inline_snapshot(
             continue;
         };
 
-        let actual = apply_snapshot_filters(&render_diagnostics(db, tool_name, block_diagnostics))
-            .into_owned();
+        let rendered = render_diagnostics(db, tool_name, block_diagnostics);
+        let actual = snapshot_filter(&apply_snapshot_filters(&rendered));
 
         let Some(snapshot_code_block) = code_block.inline_snapshot_block() else {
             if update_snapshots {
@@ -742,6 +742,7 @@ pub fn snapshot_diagnostics<C>(
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use super::apply_snapshot_filters;
     use ruff_db::Db;
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
@@ -793,4 +794,11 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl salsa::Database for TestDb {}
+
+    #[test]
+    fn preserves_site_packages_paths_in_inline_snapshots() {
+        let rendered = " ::: .venv/lib/python3.10/site-packages/dependency.py:1:5";
+
+        assert_eq!(apply_snapshot_filters(rendered), rendered);
+    }
 }

@@ -15,13 +15,11 @@ impl super::BackgroundDocumentRequestHandler for DocumentDiagnostic {
     fn run_with_snapshot(
         snapshot: Self::Snapshot,
         _client: &Client,
-        _params: types::DocumentDiagnosticParams,
+        params: types::DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReport> {
         let diagnostics = match snapshot {
             Ok(snapshot) => generate_diagnostics(&snapshot)
-                .into_iter()
-                .next()
-                .map(|(_, diagnostics)| diagnostics)
+                .remove(&params.text_document.uri)
                 .unwrap_or_default(),
             Err(uri) => {
                 tracing::warn!("Returning no diagnostics because document `{uri}` isn't open.");
@@ -34,8 +32,6 @@ impl super::BackgroundDocumentRequestHandler for DocumentDiagnostic {
             full_document_diagnostic_report: FullDocumentDiagnosticReport {
                 // TODO(jane): eventually this will be important for caching diagnostic information.
                 result_id: None,
-                // Pull diagnostic requests are only called for text documents.
-                // Since diagnostic requests generate
                 items: diagnostics,
             },
         }

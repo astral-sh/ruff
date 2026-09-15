@@ -2,6 +2,10 @@ name: ty ecosystem-analyzer
 
 permissions: {}
 
+# Third-party builds must not write caches consumed by other jobs.
+# GitHub-hosted runners use GitHub's cache service, which enforces this mode.
+cache-mode: read
+
 on:
   pull_request:
     paths:
@@ -13,12 +17,15 @@ on:
       - "!crates/ty_wasm/**"
       - "crates/ruff_db/**"
       - "crates/ruff_python_ast/**"
+      - "crates/ruff_python_edits/**"
       - "crates/ruff_python_parser/**"
       - "crates/ruff_python_stdlib/**"
       - ".github/workflows/ty-ecosystem-analyzer.yaml"
       - ".github/ty-ecosystem.toml"
       - "crates/ty_python_semantic/resources/primer/**"
       - "Cargo.lock"
+      - "pyproject.toml"
+      - "uv.lock"
       - "!**.md"
       - "!**.snap"
       # It's tempting to skip all Python files in every directory,
@@ -35,6 +42,7 @@ defaults:
     shell: bash
 
 env:
+  UV_LOCKED: 1
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
@@ -42,9 +50,6 @@ env:
   RUST_BACKTRACE: 1
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
-  # TODO: Update the mypy-primer revision in scripts/setup_primer_project.py
-  # and regenerate its lockfile when updating ecosystem-analyzer.
-  ECOSYSTEM_ANALYZER_COMMIT: a602846d9c13d7c6d7268dff728442f68c47d923
 
 jobs:
   build-ty:
@@ -52,7 +57,7 @@ jobs:
     strategy:
       matrix:
         revision: [base, pr]
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-32' || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -63,6 +68,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           lookup-only: false
+          save-if: false
 
       - name: Install Rust toolchain
         run: rustup show
@@ -117,30 +123,41 @@ jobs:
             projects_flaky.txt
             ty-ecosystem.toml
 
+      - name: Upload ecosystem-analyzer dependency metadata
+        if: matrix.revision == 'pr'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-build-dependencies
+          path: |
+            pyproject.toml
+            uv.lock
+
   analyze-shards:
     needs: [build-ty]
     strategy:
       matrix:
         shard: [0, 1, 2, 3]
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-32' || 'ubuntu-latest' }}
     timeout-minutes: 10
     env:
       EXCLUDE_NEWER: ${{ github.event.pull_request.updated_at }}
+      # Enable experimental support for installing PEP 723 script dependencies.
+      TY_UV: scripts
     steps:
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.3"
+          version: "0.12.11"
           ignore-empty-workdir: true
           # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
-          # since its cache-invalidation keys (pyproject.toml, uv.lock, etc.) aren't available
-          # here. But the cache doesn't help us much here anyway, since the uv binary, the
-          # Python binary, and all pre-built wheels are all excluded from setup-uv's cache.
+          # since its cache-invalidation keys aren't available until the build artifacts
+          # are downloaded. But the cache doesn't help us much here anyway, since the
+          # uv binary, Python binary, and all pre-built wheels are excluded from setup-uv's cache.
           # The cache would only save us from building two Git dependencies which are both
           # small, pure-Python projects.
           enable-cache: false
 
-      - name: Download ty binaries, flaky project list, and config
+      - name: Download ty binaries, flaky project list, config, and dependency metadata
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: ty-build-*
@@ -157,8 +174,9 @@ jobs:
           MERGE_BASE="$(< merge-base.txt)"
           echo "MERGE_BASE: ${MERGE_BASE}"
 
-          uvx \
-            --from "git+https://github.com/astral-sh/ecosystem-analyzer@${ECOSYSTEM_ANALYZER_COMMIT}" \
+          uv run \
+            --locked \
+            --only-group=ty-ecosystem \
             ecosystem-analyzer \
             --flaky-runs 10 \
             diff \
@@ -184,21 +202,26 @@ jobs:
   generate-report:
     name: Generate diagnostic diff report
     needs: [analyze-shards]
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.3"
+          version: "0.12.11"
           ignore-empty-workdir: true
           # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
-          # since its cache-invalidation keys (pyproject.toml, uv.lock, etc.) aren't available
-          # here. But the cache doesn't help us much here anyway, since the uv binary, the
-          # Python binary, and all pre-built wheels are all excluded from setup-uv's cache.
+          # since its cache-invalidation keys aren't available until the build artifacts
+          # are downloaded. But the cache doesn't help us much here anyway, since the
+          # uv binary, Python binary, and all pre-built wheels are excluded from setup-uv's cache.
           # The cache would only save us from building two Git dependencies which are both
           # small, pure-Python projects.
           enable-cache: false
+
+      - name: Download ecosystem-analyzer dependency metadata
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ty-build-dependencies
 
       - name: Download shard diagnostics
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -216,13 +239,14 @@ jobs:
           jq -s '{ outputs: [.[].outputs[]] }' diagnostics-base-*.json > diagnostics-base.json
           jq -s '{ outputs: [.[].outputs[]] }' diagnostics-PR-*.json   > diagnostics-PR.json
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
-
           mkdir dist
 
           # Upload a structured JSON report alongside the HTML report to make
           # ecosystem changes easier for agents to analyze.
-          ecosystem-analyzer \
+          uv run \
+            --locked \
+            --only-group=ty-ecosystem \
+            ecosystem-analyzer \
             generate-diff \
             diagnostics-base.json \
             diagnostics-PR.json \
@@ -232,7 +256,10 @@ jobs:
             --output-json dist/diff.json
 
           set +e
-          ecosystem-analyzer \
+          uv run \
+            --locked \
+            --only-group=ty-ecosystem \
+            ecosystem-analyzer \
             generate-diff-statistics \
             diagnostics-base.json \
             diagnostics-PR.json \
@@ -243,7 +270,10 @@ jobs:
           DIFF_STATISTICS_EXIT_CODE=$?
           set -e
 
-          ecosystem-analyzer \
+          uv run \
+            --locked \
+            --only-group=ty-ecosystem \
+            ecosystem-analyzer \
             generate-timing-diff \
             diagnostics-base.json \
             diagnostics-PR.json \

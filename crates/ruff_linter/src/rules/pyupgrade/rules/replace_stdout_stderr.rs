@@ -6,6 +6,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -43,7 +44,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python 3.7 release notes](https://docs.python.org/3/whatsnew/3.7.html#subprocess)
 /// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.199")]
+#[violation_metadata(stable_since = "v0.0.199", category = Category::Complexity)]
 pub(crate) struct ReplaceStdoutStderr;
 
 impl Violation for ReplaceStdoutStderr {

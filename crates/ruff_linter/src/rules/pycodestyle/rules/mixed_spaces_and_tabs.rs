@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::Line;
 
+use crate::codes::Category;
 use crate::{Violation, checkers::ast::LintContext};
 
 /// ## What it does
@@ -27,7 +28,7 @@ use crate::{Violation, checkers::ast::LintContext};
 /// if a == 0:\n    a = 1\n    b = 1
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.229")]
+#[violation_metadata(stable_since = "v0.0.229", category = Category::Formatting)]
 pub(crate) struct MixedSpacesAndTabs;
 
 impl Violation for MixedSpacesAndTabs {

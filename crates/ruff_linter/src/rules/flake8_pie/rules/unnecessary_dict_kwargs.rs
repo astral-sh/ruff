@@ -8,6 +8,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
@@ -70,7 +71,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: Dictionary displays](https://docs.python.org/3/reference/expressions.html#dictionary-displays)
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.231")]
+#[violation_metadata(stable_since = "v0.0.231", category = Category::Style)]
 pub(crate) struct UnnecessaryDictKwargs;
 
 impl Violation for UnnecessaryDictKwargs {

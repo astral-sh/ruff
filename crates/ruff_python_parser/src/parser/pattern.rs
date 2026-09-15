@@ -6,10 +6,10 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextSize};
 
-use crate::ParseErrorType;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{Parser, RecoveryContextKind, SequenceMatchPatternParentheses, recovery};
 use crate::token_set::TokenSet;
+use crate::{ParseErrorType, UnsupportedSyntaxErrorKind};
 
 use super::expression::ExpressionContext;
 
@@ -23,6 +23,7 @@ const LITERAL_PATTERN_START_SET: TokenSet = TokenSet::new([
     TokenKind::Float,
     TokenKind::Complex,
     TokenKind::Minus, // Unary minus
+    TokenKind::Plus,  // Unary plus
 ]);
 
 /// The set of tokens that can start a pattern.
@@ -479,7 +480,6 @@ impl Parser<'_> {
                 })
             }
             kind => {
-                // The `+` is only for better error recovery.
                 if let Some(unary_arithmetic_op) = kind.as_unary_arithmetic_operator() {
                     if matches!(
                         self.peek(),
@@ -490,12 +490,42 @@ impl Parser<'_> {
                             ExpressionContext::default(),
                         );
 
-                        if unary_expr.op.is_u_add() {
+                        // test_err signed_pattern_non_literal_operand
+                        // # parse_options: {"target-version": "3.15"}
+                        // match value:
+                        //     case -1**2: ...
+                        //     case -1 .real: ...
+                        //     case -1[0]: ...
+                        //     case -1(): ...
+                        //     case {+1**2: _}: ...
+
+                        // Parse the full operand for error recovery, but only numeric literals
+                        // are valid after a sign in a literal pattern.
+                        if !unary_expr.operand.is_number_literal_expr() {
                             self.add_error(
                                 ParseErrorType::OtherError(
-                                    "Unary '+' is not allowed as a literal pattern".to_string(),
+                                    "Expected a numeric literal after unary operator".to_string(),
                                 ),
-                                &unary_expr,
+                                unary_expr.operand.range(),
+                            );
+                        }
+
+                        // test_ok unary_plus_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // match foo:
+                        //     case +1: ...
+                        //     # this is also now valid inside more complicated patterns
+                        //     case {+1: 2}: ...
+
+                        // test_err unary_plus_py314
+                        // # parse_options: {"target-version": "3.14"}
+                        // match foo:
+                        //     case +1: ...
+                        //     case {+1: 2}: ...
+                        if unary_expr.op.is_u_add() {
+                            self.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::UnaryPlusMatchPattern,
+                                unary_expr.range,
                             );
                         }
 

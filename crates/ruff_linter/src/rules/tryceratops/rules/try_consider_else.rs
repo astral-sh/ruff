@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `return` statements in `try` blocks.
@@ -51,7 +52,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Errors and Exceptions](https://docs.python.org/3/tutorial/errors.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.229")]
+#[violation_metadata(stable_since = "v0.0.229", category = Category::Pedantic)]
 pub(crate) struct TryConsiderElse;
 
 impl Violation for TryConsiderElse {

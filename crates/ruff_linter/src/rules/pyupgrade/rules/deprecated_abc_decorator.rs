@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -52,7 +53,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     def prop(self): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.21")]
+#[violation_metadata(preview_since = "0.15.21", category = Category::Suspicious)]
 pub(crate) struct DeprecatedAbcDecorator {
     from: &'static str,
     to: &'static str,

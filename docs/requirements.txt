@@ -1,9 +1,0 @@
-PyYAML==6.0.3
-ruff==0.16.2
-mkdocs==1.6.1
-mkdocs-material==9.7.7
-mkdocs-redirects==1.2.3
-mdformat==1.0.0
-mdformat-mkdocs==5.3.0
-mkdocs-github-admonitions-plugin @ git+https://github.com/PGijsbers/admonitions.git#7343d2f4a92e4d1491094530ef3d0d02d93afbb7
-mkdocs-llmstxt==0.2.0

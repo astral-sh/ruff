@@ -14,6 +14,7 @@ python-version = "3.14"
 class A: ...
 class B: ...
 class C: ...
+class Box[T]: ...
 
 def _(
     a_and_b: A & B,
@@ -21,12 +22,16 @@ def _(
     i2: A | B & C,
     not_a: ~A,
     nested: A & B & C,
+    boxed: Box[A & B],
+    quoted: "A & ~B",
 ) -> None:
     reveal_type(a_and_b)  # revealed: A & B
     reveal_type(i1)  # revealed: (A & B) | C
     reveal_type(i2)  # revealed: A | (B & C)
     reveal_type(not_a)  # revealed: ~A
     reveal_type(nested)  # revealed: A & B & C
+    reveal_type(boxed)  # revealed: Box[A & B]
+    reveal_type(quoted)  # revealed: A & ~B
 ```
 
 The `&` and `~` operators cannot be used in value positions, since that would lead to a runtime
@@ -37,6 +42,8 @@ error:
 Invalid1 = A & B
 # error: [unsupported-operator] "Unary operator `~` is not supported for object of type `<class 'A'>`"
 Invalid2 = ~A
+# error: [unsupported-operator] "Operator `&` is not supported between objects of type `<class 'A'>` and `<class 'B'>`"
+Box[A & B]
 ```
 
 ## Python 3.13
@@ -90,4 +97,37 @@ Stringified annotations also defer evaluation:
 def _(a_and_b: "A & B", not_a: "~A") -> None:
     reveal_type(a_and_b)  # revealed: A & B
     reveal_type(not_a)  # revealed: ~A
+```
+
+## PEP 695 aliases
+
+We allow experimental intersection and negation syntax in PEP 695 aliases. Defining an alias does
+not evaluate its value, so these `type` definitions can execute even before Python 3.14. Explicitly
+accessing e.g. `AAndB.__value__` would actually evaluate the `A & B` expression and raise a
+`TypeError` at runtime. However, we consider this to be an edge case. Also note that we still do
+emit `experimental-syntax` diagnostics for all of these definitions (that rule is just globally
+deactivated for mdtests).
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class A: ...
+class B: ...
+class Box[T]: ...
+
+type AAndB = A & B
+type NotA = ~A
+type Quoted = "A & ~B"
+type Nested = Box[A & B]
+type BoxGeneric[T] = Box[A & T]
+
+def _(a_and_b: AAndB, not_a: NotA, quoted: Quoted, nested: Nested, generic: BoxGeneric[B]):
+    reveal_type(a_and_b)  # revealed: A & B
+    reveal_type(not_a)  # revealed: ~A
+    reveal_type(quoted)  # revealed: A & ~B
+    reveal_type(nested)  # revealed: Box[A & B]
+    reveal_type(generic)  # revealed: Box[A & B]
 ```

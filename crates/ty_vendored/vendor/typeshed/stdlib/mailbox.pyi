@@ -583,12 +583,13 @@ class _ProxyFile:
     def flush(self) -> None: ...
     @property
     def closed(self) -> bool: ...
-    def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """Represent a PEP 585 generic type
+    if sys.version_info < (3, 15):
+        def __class_getitem__(cls, item: Any, /) -> GenericAlias:
+            """Represent a PEP 585 generic type
 
-        For example, for t = list[int], t.__origin__ is list and t.__args__
-        is (int,).
-        """
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
+            """
 
 class _PartialFile(_ProxyFile):
     """A read-only wrapper of part of a file."""

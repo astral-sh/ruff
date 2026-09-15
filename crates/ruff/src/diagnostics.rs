@@ -169,9 +169,9 @@ impl AddAssign for FixMap {
                 continue;
             }
             let fixed_in_file = self.0.entry(filename).or_default();
-            for (rule, name, count) in fixed.iter() {
+            for (id, code, count) in fixed.iter() {
                 if count > 0 {
-                    *fixed_in_file.entry(rule).or_default(name) += count;
+                    *fixed_in_file.entry(id).or_default(code) += count;
                 }
             }
         }

@@ -528,6 +528,7 @@ pub(crate) struct AssignmentDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<Unpack<'db>>,
     pub(crate) value: &'ast ast::Expr,
     pub(crate) target: &'ast ast::Expr,
+    pub(crate) owner: BindingsOwner,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -678,7 +679,10 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 })
             }
             DefinitionNodeRef::Function(function) => {
-                DefinitionKind::Function(AstNodeRef::new(parsed, function))
+                DefinitionKind::Function(FunctionDefinitionKind {
+                    node: AstNodeRef::new(parsed, function),
+                    has_decorators: !function.decorator_list.is_empty(),
+                })
             }
             DefinitionNodeRef::Class(class) => {
                 DefinitionKind::Class(AstNodeRef::new(parsed, class))
@@ -693,10 +697,12 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 unpack,
                 value,
                 target,
+                owner,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
                 unpack,
                 value: AstNodeRef::new(parsed, value),
                 target: AstNodeRef::new(parsed, target),
+                owner,
             }),
             DefinitionNodeRef::AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef {
                 node,
@@ -841,6 +847,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 value: _,
                 unpack: _,
                 target,
+                owner: _,
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
             Self::AnnotatedAssignment(ann_assign) => ann_assign.node.into(),
             Self::AugmentedAssignment(node) => node.into(),
@@ -926,7 +933,7 @@ pub enum DefinitionKind<'db> {
     ImportFrom(ImportFromDefinitionKind),
     ImportFromSubmodule(ImportFromSubmoduleDefinitionKind),
     StarImport(StarImportDefinitionKind),
-    Function(AstNodeRef<ast::StmtFunctionDef>),
+    Function(FunctionDefinitionKind),
     Class(AstNodeRef<ast::StmtClassDef>),
     TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
     NamedExpression(AstNodeRef<ast::ExprNamed>),
@@ -1178,6 +1185,27 @@ impl<'db> DefinitionKind<'db> {
     }
 }
 
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct FunctionDefinitionKind {
+    node: AstNodeRef<ast::StmtFunctionDef>,
+    has_decorators: bool,
+}
+
+impl FunctionDefinitionKind {
+    pub fn node<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtFunctionDef {
+        self.node.node(module)
+    }
+
+    pub fn node_key(&self) -> NodeKey {
+        NodeKey::from_node_ref(&self.node)
+    }
+
+    /// Whether the function has decorators, without loading its module's AST.
+    pub fn has_decorators(&self) -> bool {
+        self.has_decorators
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Hash, get_size2::GetSize)]
 pub enum TargetKind<'db> {
     Sequence(UnpackPosition, Unpack<'db>),
@@ -1328,6 +1356,20 @@ impl ParameterDefinitionNodeKind {
             }
         }
     }
+
+    pub fn annotation<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
+        match self {
+            Self::VariadicPositionalParameter(parameter)
+            | Self::VariadicKeywordParameter(parameter) => {
+                parameter.node(module).annotation.as_deref()
+            }
+            Self::Parameter(parameter_with_default) => parameter_with_default
+                .node(module)
+                .parameter
+                .annotation
+                .as_deref(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, get_size2::GetSize)]
@@ -1422,11 +1464,21 @@ impl ImportFromSubmoduleDefinitionKind {
     }
 }
 
+/// The inference region that owns bindings created while evaluating an assignment's value.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum BindingsOwner {
+    /// A simple-name assignment is represented by its definition.
+    Definition,
+    /// An assignment with multiple, unpacking, or non-name targets is represented by its statement.
+    Statement,
+}
+
 #[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct AssignmentDefinitionKind<'db> {
     unpack: Option<Unpack<'db>>,
     value: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::Expr>,
+    owner: BindingsOwner,
 }
 
 impl<'db> AssignmentDefinitionKind<'db> {
@@ -1440,6 +1492,10 @@ impl<'db> AssignmentDefinitionKind<'db> {
 
     pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
         self.target.node(module)
+    }
+
+    pub fn owner(&self) -> BindingsOwner {
+        self.owner
     }
 }
 

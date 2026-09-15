@@ -136,6 +136,33 @@ reveal_type(generic_context(into_regular_callable(C)))
 reveal_type(into_regular_callable(C)(1))
 ```
 
+## Generic `__iter__` methods with explicit receivers
+
+Binding `__iter__` to an `Unpacker[Iterable[int]]` infers `S` as `int` from the explicit
+`self: Unpacker[Iterable[S]]` annotation. Calls to `list()` and `iter()` preserve this element type,
+just as `tuple()` and `for` loops do.
+
+Regression test for <https://github.com/astral-sh/ty/issues/3598>.
+
+```py
+from collections.abc import Iterable, Iterator
+
+class Unpacker[T: Iterable[object]]:
+    def __init__(self, it: T, /) -> None:
+        self._it = it
+    def __iter__[S](self: "Unpacker[Iterable[S]]") -> Iterator[S]:
+        return iter(self._it)
+
+def integers() -> Unpacker[Iterable[int]]:
+    return Unpacker([1, 2, 3])
+
+reveal_type(tuple(integers()))  # revealed: tuple[int, ...]
+for x in integers():
+    reveal_type(x)  # revealed: int
+reveal_type(list(integers()))  # revealed: list[int]
+reveal_type(iter(integers()))  # revealed: Iterator[int]
+```
+
 ## Naming a generic `Callable`: type aliases
 
 The easiest way to refer to a generic `Callable` type directly is via a type alias:
@@ -563,6 +590,68 @@ def consume_int_or_str(value: int | str) -> None: ...
 reveal_type(infer_str(consume_int_or_str))  # revealed: str
 ```
 
+## Inferring gradual tuple returns with concrete bounds
+
+A callback returning `tuple[Any, ...]` satisfies a fixed-length tuple bound because both its
+elements and its length are gradual. Inference preserves the callback's return type.
+
+```py
+from typing import Any, Callable
+
+def get_tuple() -> tuple[Any, ...]:
+    return ()
+
+def infer_fixed[T: tuple[int]](callback: Callable[[], T]) -> T:
+    return callback()
+
+reveal_type(infer_fixed(get_tuple))  # revealed: tuple[Any, ...]
+```
+
+The gradual length can also supply required elements at either end of a variable-length bound.
+
+```py
+def infer_prefix[T: tuple[int, *tuple[int, ...]]](callback: Callable[[], T]) -> T:
+    return callback()
+
+def infer_suffix[T: tuple[*tuple[int, ...], int]](callback: Callable[[], T]) -> T:
+    return callback()
+
+reveal_type(infer_prefix(get_tuple))  # revealed: tuple[Any, ...]
+reveal_type(infer_suffix(get_tuple))  # revealed: tuple[Any, ...]
+```
+
+Fixed elements still have to satisfy the bound, and an ordinary homogeneous tuple does not have a
+gradual length.
+
+```py
+def wrong_element() -> tuple[str, *tuple[Any, ...]]:
+    return ("",)
+
+def get_ints() -> tuple[int, ...]:
+    return ()
+
+infer_fixed(wrong_element)  # error: [invalid-argument-type]
+infer_prefix(wrong_element)  # error: [invalid-argument-type]
+infer_fixed(get_ints)  # error: [invalid-argument-type]
+infer_prefix(get_ints)  # error: [invalid-argument-type]
+infer_suffix(get_ints)  # error: [invalid-argument-type]
+```
+
+## Source type variables in gradual tuple returns
+
+A callback's fixed tuple element can contain an outer type variable and still satisfy a concrete
+bound. The gradual segment can be empty, and inference preserves the outer type variable.
+
+```py
+from typing import Any, Callable
+
+def infer_tuple[R: tuple[object]](callback: Callable[[], R]) -> R:
+    return callback()
+
+def outer[T](callback: Callable[[], tuple[list[T], *tuple[Any, ...]]]) -> None:
+    reveal_type(infer_tuple(callback))  # revealed: tuple[list[T@outer], *tuple[Any, ...]]
+```
+
 ## Inferring `Never` from a callable parameter
 
 `Never` is a valid upper-bound inference result and should not be replaced with the fallback for an
@@ -664,6 +753,25 @@ def f(val: str | bytes) -> None:
     pass
 
 reveal_type(accepts_callable(f))  # revealed: str | bytes
+```
+
+When overloads exchange their input and output types, the inferred return tuple currently contains a
+union for each type variable.
+
+```py
+def infer_pair[T, U](converter: Callable[[T], U]) -> tuple[T, U]:
+    raise NotImplementedError
+
+@overload
+def swap(value: int) -> str: ...
+@overload
+def swap(value: str) -> int: ...
+def swap(value: int | str) -> int | str:
+    raise NotImplementedError
+
+# TODO: Infer the intersection of `tuple[int, str]` and `tuple[str, int]`.
+# Both specializations validate the same call, so its result satisfies both return types.
+reveal_type(infer_pair(swap))  # revealed: tuple[int | str, str | int]
 ```
 
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated

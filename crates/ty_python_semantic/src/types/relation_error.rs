@@ -1,7 +1,7 @@
 use crate::Db;
 use crate::types::relation::TypeRelation;
 /// This module defines a tree structure for collecting contextual information about type relation errors
-/// ("why is this complex type not assignable to that other complex type?").
+/// (for example, why two types are not assignable or cannot overlap).
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -13,6 +13,28 @@ use crate::types::infer::nearest_enclosing_class;
 use crate::types::tuple::TupleLength;
 use crate::types::{DisplaySettings, Type, TypedDictType};
 use crate::{FxOrderSet, ProgramEnvironment};
+
+/// The relation explained by a diagnostic node, independently of the checker that owns the tree.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum ErrorRelation {
+    TypeRelation(TypeRelation),
+    Disjointness,
+}
+
+impl From<TypeRelation> for ErrorRelation {
+    fn from(relation: TypeRelation) -> Self {
+        Self::TypeRelation(relation)
+    }
+}
+
+impl ErrorRelation {
+    fn description(self) -> &'static str {
+        match self {
+            Self::TypeRelation(relation) => relation.description(),
+            Self::Disjointness => "disjoint from",
+        }
+    }
+}
 
 /// Identifies a parameter, either by name or by position.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -47,6 +69,54 @@ impl std::fmt::Display for ParameterDescription {
 pub(crate) enum ErrorContext<'db> {
     /// No additional context is available.
     Empty,
+    DisjointTypes {
+        left: Type<'db>,
+        right: Type<'db>,
+    },
+    DisjointUnion {
+        union: Type<'db>,
+        other: Type<'db>,
+    },
+    InvariantTypeArgument {
+        left: Type<'db>,
+        right: Type<'db>,
+    },
+    FinalClassDisjoint {
+        final_type: Type<'db>,
+        other: Type<'db>,
+    },
+    FinalTypeMissingProtocolMembers {
+        final_type: Type<'db>,
+        protocol: Type<'db>,
+    },
+    IncompatibleClassLayouts {
+        left: Type<'db>,
+        right: Type<'db>,
+    },
+    DisjointTupleElement {
+        left: Type<'db>,
+        right: Type<'db>,
+        index: usize,
+        from_end: bool,
+    },
+    DisjointReturnTypes {
+        left: Type<'db>,
+        right: Type<'db>,
+    },
+    DisjointTupleLengths {
+        left: TupleLength,
+        right: TupleLength,
+    },
+    TypedDictFieldTypeConflict {
+        field_name: Name,
+        left: Type<'db>,
+        right: Type<'db>,
+    },
+    TypedDictRequirednessConflict {
+        field_name: Name,
+        required: TypedDictType<'db>,
+        not_required: TypedDictType<'db>,
+    },
     NotAllUnionElementsAssignable {
         element: Type<'db>,
         union: Type<'db>,
@@ -178,7 +248,7 @@ impl<'db> ErrorContext<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        relation: TypeRelation,
+        relation: ErrorRelation,
         help_messages: &mut FxOrderSet<HelpMessages<'db>>,
     ) -> Option<String> {
         let typed_dict_name = |typed_dict: &TypedDictType<'db>| match typed_dict {
@@ -191,6 +261,136 @@ impl<'db> ErrorContext<'db> {
         Some(match self {
             Self::Empty => {
                 return None;
+            }
+            Self::DisjointTypes { left, right } => {
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(db, env, [*left, *right]);
+                format!(
+                    "`{}` and `{}` are disjoint",
+                    left.display_with(db, env, settings.clone()),
+                    right.display_with(db, env, settings),
+                )
+            }
+            Self::DisjointUnion { union, other } => {
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(db, env, [*union, *other]);
+                format!(
+                    "every element of union `{}` is disjoint from `{}`",
+                    union.display_with(db, env, settings.clone().expand_numeric_tower_unions()),
+                    other.display_with(db, env, settings),
+                )
+            }
+            Self::InvariantTypeArgument { left, right } => {
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(db, env, [*left, *right]);
+                format!(
+                    "`{}` and `{}` are not mutual subtypes of each other, \
+                    but must be due to invariance",
+                    left.display_with(db, env, settings.clone()),
+                    right.display_with(db, env, settings),
+                )
+            }
+            Self::FinalClassDisjoint { final_type, other } => {
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(db, env, [*final_type, *other]);
+                format!(
+                    "`{}` is `@final` and not a subclass of `{}`",
+                    final_type.display_with(db, env, settings.clone()),
+                    other.display_with(db, env, settings),
+                )
+            }
+            Self::FinalTypeMissingProtocolMembers {
+                final_type,
+                protocol,
+            } => {
+                let settings = DisplaySettings::from_possibly_ambiguous_types(
+                    db,
+                    env,
+                    [*final_type, *protocol],
+                );
+                format!(
+                    "`@final` type `{}` does not provide all members of protocol `{}`",
+                    final_type.display_with(db, env, settings.clone()),
+                    protocol.display_with(db, env, settings),
+                )
+            }
+            Self::IncompatibleClassLayouts { left, right } => {
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(db, env, [*left, *right]);
+                format!(
+                    "`{}` and `{}` are disjoint due to incompatible instance layouts",
+                    left.display_with(db, env, settings.clone()),
+                    right.display_with(db, env, settings),
+                )
+            }
+            Self::DisjointTupleElement {
+                left,
+                right,
+                index,
+                from_end,
+            } => {
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(db, env, [*left, *right]);
+                format!(
+                    "tuple element {}{} has disjoint types `{}` and `{}`",
+                    index + 1,
+                    if *from_end { " from the end" } else { "" },
+                    left.display_with(db, env, settings.clone()),
+                    right.display_with(db, env, settings),
+                )
+            }
+            Self::DisjointReturnTypes { left, right } => {
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(db, env, [*left, *right]);
+                format!(
+                    "return types `{}` and `{}` are disjoint",
+                    left.display_with(db, env, settings.clone()),
+                    right.display_with(db, env, settings),
+                )
+            }
+            Self::DisjointTupleLengths { left, right } => {
+                let length = |length| match length {
+                    TupleLength::Fixed(n) => n.to_string(),
+                    TupleLength::Variable(prefix, suffix) => {
+                        format!("at least {}", prefix + suffix)
+                    }
+                };
+                format!(
+                    "the tuples have incompatible lengths: {} and {}",
+                    length(*left),
+                    length(*right)
+                )
+            }
+            Self::TypedDictFieldTypeConflict {
+                field_name,
+                left,
+                right,
+            } => {
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(db, env, [*left, *right]);
+                format!(
+                    "field `{field_name}` has incompatible types `{}` and `{}`",
+                    left.display_with(db, env, settings.clone()),
+                    right.display_with(db, env, settings),
+                )
+            }
+            Self::TypedDictRequirednessConflict {
+                field_name,
+                required,
+                not_required,
+            } => {
+                let required = Type::TypedDict(*required);
+                let not_required = Type::TypedDict(*not_required);
+                let settings = DisplaySettings::from_possibly_ambiguous_types(
+                    db,
+                    env,
+                    [required, not_required],
+                );
+                format!(
+                    "field `{field_name}` is required in `{}` but mutable and not-required in `{}`",
+                    required.display_with(db, env, settings.clone()),
+                    not_required.display_with(db, env, settings),
+                )
             }
             Self::NotAllUnionElementsAssignable {
                 element,
@@ -486,7 +686,7 @@ impl<'db> ErrorContext<'db> {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum HelpMessages<'db> {
     RequiredFieldCouldBeRemoved,
-    TypedDictNotAssignableToDict(TypeRelation),
+    TypedDictNotAssignableToDict(ErrorRelation),
     ConsiderUsingMappingInsteadOfDict,
     TopCallableExplanation,
     ConsiderAddingADefaultValue {
@@ -514,7 +714,7 @@ impl<'db> HelpMessages<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment,
-        relation: TypeRelation,
+        relation: ErrorRelation,
     ) -> impl std::fmt::Display {
         std::fmt::from_fn(move |f| match self {
             HelpMessages::RequiredFieldCouldBeRemoved => f.write_str(
@@ -600,6 +800,7 @@ impl<'db> HelpMessages<'db> {
 struct ErrorContextNode<'db> {
     context: ErrorContext<'db>,
     children: Vec<ErrorContextNode<'db>>,
+    relation: ErrorRelation,
 }
 
 impl Default for ErrorContextNode<'_> {
@@ -607,6 +808,7 @@ impl Default for ErrorContextNode<'_> {
         Self {
             context: ErrorContext::Empty,
             children: Vec::new(),
+            relation: TypeRelation::Assignability.into(),
         }
     }
 }
@@ -617,18 +819,20 @@ impl<'db> ErrorContextNode<'db> {
         matches!(self.context, ErrorContext::Empty) && self.children.is_empty()
     }
 
-    #[expect(clippy::too_many_arguments)]
     fn render_tree(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        relation: TypeRelation,
         output_lines: &mut Vec<String>,
-        help_messages: &mut FxOrderSet<HelpMessages<'db>>,
+        help_messages: &mut FxOrderSet<(ErrorRelation, HelpMessages<'db>)>,
         prefix: &str,
         continuation: &str,
     ) {
-        if let Some(line) = self.context.render(db, env, relation, help_messages) {
+        let mut node_help_messages = FxOrderSet::default();
+        if let Some(line) = self
+            .context
+            .render(db, env, self.relation, &mut node_help_messages)
+        {
             output_lines.push(format!("{prefix}{line}"));
         }
 
@@ -649,7 +853,7 @@ impl<'db> ErrorContextNode<'db> {
                 definition.scope(db),
             )
         {
-            help_messages.insert(HelpMessages::SuggestMakingParameterPositionalOnly {
+            node_help_messages.insert(HelpMessages::SuggestMakingParameterPositionalOnly {
                 ty: *ty,
                 protocol: *protocol,
                 declaring_protocol_name: declaring_protocol.name(db),
@@ -657,6 +861,12 @@ impl<'db> ErrorContextNode<'db> {
                 parameter_name: target_name.clone(),
             });
         }
+
+        help_messages.extend(
+            node_help_messages
+                .into_iter()
+                .map(|message| (self.relation, message)),
+        );
 
         let num_children = self.children.len();
         for (index, child) in self.children.iter().enumerate() {
@@ -669,7 +879,6 @@ impl<'db> ErrorContextNode<'db> {
             child.render_tree(
                 db,
                 env,
-                relation,
                 output_lines,
                 help_messages,
                 &child_prefix,
@@ -683,7 +892,7 @@ impl<'db> ErrorContextNode<'db> {
 pub(crate) struct ErrorContextTree<'db> {
     root: Rc<RefCell<ErrorContextNode<'db>>>,
     enabled: Cell<bool>,
-    relation: TypeRelation,
+    relation: ErrorRelation,
 }
 
 impl PartialEq for ErrorContextTree<'_> {
@@ -696,19 +905,24 @@ impl Eq for ErrorContextTree<'_> {}
 
 impl<'db> ErrorContextTree<'db> {
     /// Create a new, empty error context tree with collection enabled.
-    pub(crate) fn new(relation: TypeRelation) -> Self {
+    pub(crate) fn new(relation: impl Into<ErrorRelation>) -> Self {
         Self {
             root: Rc::default(),
             enabled: Cell::new(true),
-            relation,
+            relation: relation.into(),
         }
     }
 
-    pub(crate) fn from_context(context: ErrorContext<'db>, relation: TypeRelation) -> Self {
+    pub(crate) fn from_context(
+        context: ErrorContext<'db>,
+        relation: impl Into<ErrorRelation>,
+    ) -> Self {
+        let relation = relation.into();
         Self {
             root: Rc::new(RefCell::new(ErrorContextNode {
                 context,
                 children: Vec::new(),
+                relation,
             })),
             enabled: Cell::new(true),
             relation,
@@ -735,7 +949,11 @@ impl<'db> ErrorContextTree<'db> {
         }
         let root = self.root.take();
         let children = if root.is_empty() { vec![] } else { vec![root] };
-        *self.root.borrow_mut() = ErrorContextNode { context, children };
+        *self.root.borrow_mut() = ErrorContextNode {
+            context,
+            children,
+            relation: self.relation,
+        };
     }
 
     /// Overwrite the error context tree with a new root context and child nodes.
@@ -749,6 +967,7 @@ impl<'db> ErrorContextTree<'db> {
         }
         *self.root.borrow_mut() = ErrorContextNode {
             context,
+            relation: self.relation,
             children: children
                 .into_iter()
                 .map(|child_context| child_context.root.take())
@@ -766,6 +985,13 @@ impl<'db> ErrorContextTree<'db> {
         }
     }
 
+    /// Replace this tree with another tree, preserving each node's relation.
+    pub(crate) fn replace(&self, other: &Self) {
+        if self.is_enabled() {
+            *self.root.borrow_mut() = other.root.take();
+        }
+    }
+
     /// Render the error context tree as info sub-diagnostics on `diag`.
     pub(in crate::types) fn attach_to(
         &self,
@@ -775,20 +1001,14 @@ impl<'db> ErrorContextTree<'db> {
     ) {
         let mut output_lines = Vec::new();
         let mut help_messages = FxOrderSet::default();
-        self.root.borrow().render_tree(
-            db,
-            env,
-            self.relation,
-            &mut output_lines,
-            &mut help_messages,
-            "",
-            "",
-        );
+        self.root
+            .borrow()
+            .render_tree(db, env, &mut output_lines, &mut help_messages, "", "");
         for line in output_lines {
             diag.info(line);
         }
-        for help_message in help_messages {
-            diag.help(help_message.display(db, env, self.relation));
+        for (relation, help_message) in help_messages {
+            diag.help(help_message.display(db, env, relation));
         }
     }
 }

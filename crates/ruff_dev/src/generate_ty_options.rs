@@ -5,14 +5,13 @@ use std::{fmt::Write, path::PathBuf};
 
 use anyhow::bail;
 use itertools::Itertools;
-use pretty_assertions::StrComparison;
 use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
 use ruff_python_trivia::textwrap;
 use ty_project::metadata::Options;
 
 use crate::{
     ROOT_DIR,
-    generate_all::{Mode, REGENERATE_ALL_COMMAND},
+    generate_all::{Mode, REGENERATE_ALL_COMMAND, generated_file_diff},
 };
 
 #[derive(clap::Args)]
@@ -46,7 +45,7 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<()> {
             if output == current {
                 println!("Up-to-date: {file_name}");
             } else {
-                let comparison = StrComparison::new(&current, &output);
+                let comparison = generated_file_diff(&current, &output);
                 bail!("{file_name} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}");
             }
         }

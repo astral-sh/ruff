@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::{
@@ -9,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::linter::float::is_infinity_string_literal;
 
 /// ## What it does
@@ -101,7 +101,7 @@ use crate::linter::float::is_infinity_string_literal;
 /// - [NumPy documentation: `numpy.allclose`](https://numpy.org/doc/stable/reference/generated/numpy.allclose.html#numpy-allclose)
 /// - [PyTorch documentation: `torch.isclose`](https://docs.pytorch.org/docs/stable/generated/torch.isclose.html#torch-isclose)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.1")]
+#[violation_metadata(preview_since = "0.15.1", category = Category::Suspicious)]
 pub(crate) struct FloatEqualityComparison<'a> {
     left: &'a str,
     right: &'a str,
@@ -125,19 +125,16 @@ pub(crate) fn float_equality_comparison(checker: &Checker, compare: &ast::ExprCo
     let locator = checker.locator();
     let semantic = checker.semantic();
 
-    for (left, right, operator) in std::iter::once(&*compare.left)
-        .chain(&compare.comparators)
-        .tuple_windows()
-        .zip(&compare.ops)
-        .filter(|(_, op)| matches!(op, CmpOp::Eq | CmpOp::NotEq))
-        .filter(|((left, right), _)| {
+    for (left, operator, right) in compare
+        .iter()
+        .filter(|(_, op, _)| matches!(op, CmpOp::Eq | CmpOp::NotEq))
+        .filter(|(left, _, right)| {
             if should_skip_comparison(left, semantic) || should_skip_comparison(right, semantic) {
                 return false;
             }
 
             has_float(left, semantic) || has_float(right, semantic)
         })
-        .map(|((left, right), op)| (left, right, op))
     {
         checker.report_diagnostic(
             FloatEqualityComparison {

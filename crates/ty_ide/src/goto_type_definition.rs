@@ -59,6 +59,31 @@ mod tests {
     }
 
     #[test]
+    fn goto_type_of_slot_descriptor() {
+        let test = cursor_test(
+            r#"
+            class Slotted:
+                __slots__ = ("value",)
+
+            descriptor = Slotted.va<CURSOR>lue
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:22
+           |
+        LL | descriptor = Slotted.value
+           |                      ^^^^^ Clicking here
+        info: Found 1 type definition
+          --> stdlib/types.pyi:LL:7
+           |
+        LL | class MemberDescriptorType:
+           |       --------------------
+        ");
+    }
+
+    #[test]
     fn goto_type_of_typing_dot_literal() {
         let test = cursor_test(
             r#"

@@ -210,6 +210,59 @@ error[invalid-assignment]: Object of type `tuple[int, str]` is not assignable to
 info: a tuple of length 2 is not assignable to a tuple of length 3
 ```
 
+## Repeated successful comparisons before a mismatch
+
+Successful comparisons remain memoized while collecting context for a later mismatch. Fully
+expanding the first tuple element below would produce over a million leaves, but the diagnostic can
+identify the incompatible second element without visiting every repeated occurrence.
+
+```py
+type Pair[T] = tuple[T, T]
+type Quad[T] = Pair[Pair[T]]
+type Sixteen[T] = Quad[Quad[T]]
+type Nested[T] = Sixteen[Sixteen[Sixteen[Sixteen[Sixteen[T]]]]]
+
+def check(source: tuple[Nested[int], int]) -> tuple[Nested[object], str]:
+    return source  # snapshot: invalid-return-type
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+ --> src/mdtest_snippet.py:7:12
+  |
+6 | def check(source: tuple[Nested[int], int]) -> tuple[Nested[object], str]:
+  |                                               -------------------------- Expected `tuple[Nested[object], str]` because of return type
+7 |     return source  # snapshot: invalid-return-type
+  |            ^^^^^^ expected `tuple[Nested[object], str]`, found `tuple[Nested[int], int]`
+info: the second tuple element is not compatible: `int` is not assignable to `str`
+```
+
+An explicit receiver can leave successful comparisons conditional on a type variable. Comparing the
+first parameters below produces a satisfiable constraint on `S`. We reuse that result while
+reporting the incompatible `y` parameter.
+
+```py
+from typing import Callable
+
+class Receiver:
+    def method[S](self: S, x: Nested[S], y: int) -> int:
+        return 0
+
+def check_receiver(receiver: Receiver) -> Callable[[Nested[int], str], int]:
+    return receiver.method  # snapshot: invalid-return-type
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:15:12
+   |
+14 | def check_receiver(receiver: Receiver) -> Callable[[Nested[int], str], int]:
+   |                                           --------------------------------- Expected `(Nested[int], str, /) -> int` because of return type
+15 |     return receiver.method  # snapshot: invalid-return-type
+   |            ^^^^^^^^^^^^^^^ expected `(Nested[int], str, /) -> int`, found `bound method Receiver.method[S](x: Nested[S], y: int) -> int`
+info: the second parameter has an incompatible type: `str` is not assignable to `int`
+```
+
 ## `Callable`
 
 Assigning a function to a `Callable`
@@ -451,9 +504,8 @@ info: the first parameter is missing
 
 ## Missing parameters in nested generic calls involving `TypeVarTuple`s and `ParamSpec`s
 
-In the following example, the signature of the `callback` function does not satisfy the `fn`
-parameter of `wrapper` in the `accept()` call, because the arguments provided to `accept()`
-following `fn` indicate that it must accept the value `1` as a positional argument, and it does not.
+In the following example, the arguments provided to the `accept()` call are not accepted by the
+signature of the `callback` function, and so we report an error on the outer call.
 
 We don't currently add error context in this code path, but we could add it in the future:
 
@@ -466,20 +518,20 @@ def wrapper1[**P](fn: Callable[P, None]) -> Callable[P, None]:
 def accept1[**P](fn: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
 def callback1() -> None: ...
 
-accept1(wrapper1(callback1), 1)  # snapshot: invalid-argument-type
+accept1(wrapper1(callback1), 1)  # snapshot: too-many-positional-arguments
 ```
 
 ```snapshot
-error[invalid-argument-type]: Argument to function `wrapper1` is incorrect
- --> src/mdtest_snippet.py:9:18
+error[too-many-positional-arguments]: Too many positional arguments to function `accept1`: expected 0, got 1
+ --> src/mdtest_snippet.py:9:30
   |
-9 | accept1(wrapper1(callback1), 1)  # snapshot: invalid-argument-type
-  |                  ^^^^^^^^^ Expected `(**P@accept1) -> None`, found `def callback1() -> None`
-info: Function defined here
- --> src/mdtest_snippet.py:3:5
+9 | accept1(wrapper1(callback1), 1)  # snapshot: too-many-positional-arguments
+  |                              ^
+info: Function signature here
+ --> src/mdtest_snippet.py:6:5
   |
-3 | def wrapper1[**P](fn: Callable[P, None]) -> Callable[P, None]:
-  |     ^^^^^^^^      --------------------- Parameter declared here
+6 | def accept1[**P](fn: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
 The following case is similar, but exercises a different code path. Here, we could also add error
@@ -492,24 +544,26 @@ def wrapper2[**P](fn: Callable[P, None]) -> Callable[P, None]:
 def accept2[**P](fn: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
 def callback2(**kwargs: int) -> None: ...
 
-accept2(wrapper2(callback2), 1)  # snapshot: invalid-argument-type
+accept2(wrapper2(callback2), 1)  # snapshot: too-many-positional-arguments
 ```
 
 ```snapshot
-error[invalid-argument-type]: Argument to function `wrapper2` is incorrect
-  --> src/mdtest_snippet.py:16:18
+error[too-many-positional-arguments]: Too many positional arguments to function `accept2`: expected 0, got 1
+  --> src/mdtest_snippet.py:16:30
    |
-16 | accept2(wrapper2(callback2), 1)  # snapshot: invalid-argument-type
-   |                  ^^^^^^^^^ Expected `(**P@accept2) -> None`, found `def callback2(**kwargs: int) -> None`
-info: Function defined here
-  --> src/mdtest_snippet.py:10:5
+16 | accept2(wrapper2(callback2), 1)  # snapshot: too-many-positional-arguments
+   |                              ^
+info: Function signature here
+  --> src/mdtest_snippet.py:13:5
    |
-10 | def wrapper2[**P](fn: Callable[P, None]) -> Callable[P, None]:
-   |     ^^^^^^^^      --------------------- Parameter declared here
+13 | def accept2[**P](fn: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
-And the same applies to the following two examples too, which both use a `TypeVarTuple` instead of a
-`ParamSpec`:
+The following examples use a `TypeVarTuple` instead of a `ParamSpec`. In this case, we forward the
+specialization of the outer `TypeVarTuple` to the inner call, and so report `callback3` as being
+incompatible with the signature of `wrapper3`, instead of the provided arguments being incompatible
+with the signature of `accept3`.
 
 ```py
 def wrapper3[*Ts](fn: Callable[[*Ts], None]) -> Callable[[*Ts], None]:
@@ -1270,6 +1324,96 @@ error[invalid-assignment]: Object of type `SupportsCheckWithOtherSignature` is n
 info: protocol `SupportsCheckWithOtherSignature` is not assignable to protocol `SupportsCheck`
 info: └── protocol member `check` is incompatible
 info:     └── parameter `y` has an incompatible type: `str` is not assignable to `bytes`
+```
+
+## Recursive protocol diagnostic context
+
+A value-constrained type parameter makes the recursive `child` override valid for each permitted
+specialization. The explicit receiver on `Outer.expose` preserves unresolved type variables while
+diagnostic context is collected, including the incompatible recursive member and its return type.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def child(self) -> Chain[T]: ...
+    def value(self) -> T: ...
+
+class Outer[T](Protocol):
+    def expose(self: Outer[T]) -> Chain[T]: ...
+
+class Concrete[T: (str, object)](Chain[T], Outer[T]):
+    def child(self) -> Concrete[str]:
+        raise NotImplementedError
+
+    def expose(self: Outer[T]) -> Concrete[T]:
+        raise NotImplementedError
+
+def diagnose[T: (str, object)](value: Concrete[T]) -> None:
+    invalid: Outer[int] = value  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Concrete[T@diagnose]` is not assignable to `Outer[int]`
+  --> src/mdtest_snippet.py:20:27
+   |
+20 |     invalid: Outer[int] = value  # snapshot: invalid-assignment
+   |              ----------   ^^^^^ Incompatible value of type `Concrete[T@diagnose]`
+   |              |
+   |              Declared type
+info: type `Concrete[T@diagnose]` is not assignable to protocol `Chain[int]`
+info: └── protocol member `child` is incompatible
+info:     └── incompatible return types: `Concrete[str]` is not assignable to `Chain[int]`
+info:         └── type `Concrete[str]` is not assignable to protocol `Chain[int]`
+info:             └── protocol member `value` is incompatible
+info:                 └── incompatible return types: `str` is not assignable to `int`
+```
+
+## Recursive protocols in a union after overload comparison
+
+A recursive callable protocol can be incompatible with more than one member of a target union. The
+diagnostic includes the nested `payload` mismatch for `HasPacket[str]`, even if the same member
+types were already compared when checking the callable overloads.
+
+```py
+from __future__ import annotations
+
+from typing import Callable, Protocol, overload
+
+class Packet[T](Protocol):
+    payload: T
+
+class HasPacket[T](Protocol):
+    def packet(self) -> Packet[T]: ...
+
+class Source[T](HasPacket[T], Protocol):
+    @overload
+    def __call__(self, x: int) -> Source[T]: ...
+    @overload
+    def __call__(self, x: str) -> Source[tuple[T]]: ...
+
+def check(source: Source[bytes]) -> Callable[[int], Source[str]] | HasPacket[str]:
+    return source  # snapshot: invalid-return-type
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:18:12
+   |
+17 | def check(source: Source[bytes]) -> Callable[[int], Source[str]] | HasPacket[str]:
+   |                                     --------------------------------------------- Expected `((int, /) -> Source[str]) | HasPacket[str]` because of return type
+18 |     return source  # snapshot: invalid-return-type
+   |            ^^^^^^ expected `((int, /) -> Source[str]) | HasPacket[str]`, found `Source[bytes]`
+info: type `Source[bytes]` is not assignable to any element of the union `((int, /) -> Source[str]) | HasPacket[str]`
+info: ├── type `Source[bytes]` has inferred callable type `Overload[(x: int) -> Source[bytes], (x: str) -> Source[tuple[bytes]]]`
+info: └── protocol `Source[bytes]` is not assignable to protocol `HasPacket[str]`
+info:     └── protocol member `packet` is incompatible
+info:         └── incompatible return types: `Packet[bytes]` is not assignable to `Packet[str]`
+info:             └── protocol `Packet[bytes]` is not assignable to protocol `Packet[str]`
+info:                 └── protocol member `payload` is incompatible
+info:                     └── read type `bytes` is not assignable to `str`
 ```
 
 ## Protocol method parameter names

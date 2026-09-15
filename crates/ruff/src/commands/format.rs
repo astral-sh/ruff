@@ -1105,7 +1105,7 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
     if !incompatible_rules.is_empty() {
         let mut rule_names: Vec<_> = incompatible_rules
             .into_iter()
-            .map(|rule| format!("`{}`", rule.noqa_code()))
+            .map(|rule| format!("{:#}", rule.name_and_code()))
             .collect();
         rule_names.sort();
         if let [rule] = rule_names.as_slice() {

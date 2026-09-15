@@ -13,6 +13,7 @@ use glob::{GlobError, Paths, PatternError, glob};
 use itertools::Itertools;
 use log::debug;
 use regex::Regex;
+use ruff_linter::codes::Category;
 use ruff_linter::preview::is_warn_on_unknown_selectors_enabled;
 use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
@@ -906,8 +907,16 @@ impl LintConfiguration {
             require_explicit: self.explicit_preview_rules.unwrap_or_default(),
         };
 
+        let preview_selectors;
+        let selectors = if preview.mode.is_enabled() {
+            preview_selectors = Category::default_categories().map(RuleSelector::Category);
+            &preview_selectors
+        } else {
+            DEFAULT_SELECTORS
+        };
+
         // The select_set keeps track of which rules have been selected.
-        let mut select_set: RuleSet = DEFAULT_SELECTORS
+        let mut select_set: RuleSet = selectors
             .iter()
             .flat_map(|selector| selector.rules(&preview))
             .collect();

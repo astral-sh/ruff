@@ -24,8 +24,8 @@ def outer_generator():
 
 ## `yield from` with a custom iterable
 
-`yield from` can also be used with custom iterable types. In that case, the type of the `yield from`
-expression cannot be determined
+`yield from` can also be used with custom iterable types. If the iterator returned by `__iter__` is
+not a generator, the type of the `yield from` expression cannot be determined:
 
 ```py
 from typing import Generator, TypeVar, Generic
@@ -67,6 +67,181 @@ def generator() -> Generator[str]:
     # (the more common case), then the `.value` attribute of the `StopIteration` instance
     # would default to `None`.
     reveal_type(result)  # revealed: Unknown
+```
+
+## `yield from` with a custom iterable whose `__iter__` returns a generator
+
+`yield from x` delegates to `iter(x)`. The send and return types of the `yield from` expression are
+therefore determined by the iterator returned by `x.__iter__()`, even if `x` itself is not a
+generator:
+
+```py
+from typing import Generator
+
+class Box:
+    def __iter__(self) -> Generator[str, None, int]:
+        yield "hello"
+        return 42
+
+def main() -> Generator[str, None, int]:
+    x = yield from Box()
+    reveal_type(x)  # revealed: int
+
+    y: str = yield from Box()  # error: [invalid-assignment]
+    return x
+```
+
+The send type of the inner generator is also validated against the outer generator's send type:
+
+```py
+class SendBox:
+    def __iter__(self) -> Generator[int, int, None]:
+        x = yield 1
+
+def outer() -> Generator[int, str, None]:
+    # error: [invalid-yield] "Send type `int` does not match annotated send type `str`"
+    yield from SendBox()
+
+def outer_ok() -> Generator[int, int, None]:
+    yield from SendBox()
+```
+
+## `yield from` with a plain `Iterator`
+
+An `Iterator` annotation specifies the yielded type, but not the value of `StopIteration.value`. The
+result of delegating to such an iterator is therefore `Unknown`, even when it is returned by a
+custom iterable's `__iter__` method:
+
+```py
+from typing import Generator, Iterator
+
+class Finished:
+    def __iter__(self) -> "Finished":
+        return self
+
+    def __next__(self) -> str:
+        raise StopIteration(42)
+
+class Plain:
+    def __iter__(self) -> Iterator[str]:
+        return Finished()
+
+def plain() -> Generator[str, None, int]:
+    result = yield from Plain()
+    reveal_type(result)  # revealed: Unknown
+    return result
+```
+
+The same applies to an iterator used directly and to a built-in iterable whose `__iter__` method
+returns a plain `Iterator`:
+
+```py
+def direct(iterator: Iterator[str]) -> Generator[str, None, int]:
+    result = yield from iterator
+    reveal_type(result)  # revealed: Unknown
+    return result
+
+def builtin() -> Generator[str, None, None]:
+    result = yield from ["a", "b"]
+    reveal_type(result)  # revealed: Unknown
+```
+
+## `yield from` with alternative iteration protocols
+
+An iterable union can mix a generator-returning `__iter__` with the sequence protocol. The
+`__getitem__` alternative contributes to the result of `yield from`, so the return type of the
+generator alone does not describe every possible result:
+
+```py
+from typing import Generator
+
+class Wrapped:
+    def __iter__(self) -> Generator[int, int | None, str]:
+        yield 1
+        return "done"
+
+class Sequence:
+    def __getitem__(self, index: int) -> int:
+        raise IndexError
+
+def mixed(value: Wrapped | Sequence) -> Generator[int, None, object]:
+    result = yield from value
+    reveal_type(result)  # revealed: Unknown
+    return result
+```
+
+The sequence iterator does not support sending a non-`None` value, even though the generator does:
+
+```py
+def mixed_send(value: Wrapped | Sequence) -> Generator[int, int, None]:
+    # error: [invalid-yield] "Send type `None` does not match annotated send type `int`"
+    yield from value
+```
+
+## `yield from` with union send types
+
+The outer generator's send type must be accepted by every possible delegated generator. An `int`
+cannot be forwarded to an iterator that might require `str`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generator
+
+class IntBox:
+    def __iter__(self) -> Generator[int, int, None]:
+        yield 1
+
+class StrBox:
+    def __iter__(self) -> Generator[int, str, None]:
+        yield 1
+
+def incompatible_boxes(box: IntBox | StrBox) -> Generator[int, int, None]:
+    yield from box  # error: [invalid-yield]
+```
+
+The same check applies when `__iter__` itself returns a union, including through a type alias, or
+when the operand is already a union of generators:
+
+```py
+type EitherGenerator = Generator[int, int, None] | Generator[int, str, None]
+
+class UnionBox:
+    def __iter__(self) -> EitherGenerator:
+        yield 1
+
+def incompatible_iterators() -> Generator[int, int, None]:
+    yield from UnionBox()  # error: [invalid-yield]
+
+def incompatible_generators(inner: EitherGenerator) -> Generator[int, int, None]:
+    yield from inner  # error: [invalid-yield]
+```
+
+Delegation is valid when every alternative accepts the outer send type, even if the alternatives
+also accept different additional types:
+
+```py
+class OverlappingBox:
+    def __iter__(self) -> Generator[int, int | str, None] | Generator[int, int | bytes, None]:
+        yield 1
+
+def compatible_iterators() -> Generator[int, int, None]:
+    yield from OverlappingBox()
+```
+
+Gradual send types are checked against each alternative separately. `list[Any]` is assignable to
+both `list[int]` and `list[str]`, so this delegation is accepted:
+
+```py
+from typing import Any
+
+def gradual_send(
+    inner: Generator[int, list[int], None] | Generator[int, list[str], None],
+) -> Generator[int, list[Any], None]:
+    yield from inner
 ```
 
 ## `yield from` with a generator that return `types.GeneratorType`
@@ -169,8 +344,9 @@ def mixing_generator_async_generator() -> Generator[int, int, None] | AsyncGener
     return None
 ```
 
-`Iterator` has no send type or return type, It is equivalent to using `Generator` with send set to
-`None` and return type to `Unknown`.
+Within generator functions annotated as `Iterator` or `AsyncIterator`, we infer `None` for `yield`
+expressions. These annotations expose iteration with `next()` or `anext()`, not a `send` or `asend`
+method.
 
 ```py
 def iterator_send_none() -> Iterator[int]:
@@ -184,6 +360,52 @@ async def async_iterator_send_none() -> AsyncIterator[int]:
 def iterator_yield_from() -> Generator[int, None, int]:
     yield from iterator_send_none()
     return 1
+```
+
+## `yield from` with an `Iterator` return annotation
+
+An outer `Iterator` annotation does not expose a `send` method. Advancing the outer iterator with
+`next()` also advances the delegated generator with `next()`, so its send type does not restrict
+this delegation:
+
+```py
+from typing import Generator, Iterator
+
+class Wrapped:
+    def __iter__(self) -> Generator[int, str, None]:
+        yield 1
+
+def iterator() -> Iterator[int]:
+    yield from Wrapped()
+```
+
+The yielded values are still checked against the outer annotation:
+
+```py
+def invalid_yield() -> Iterator[str]:
+    # error: [invalid-yield] "Yield type `int` does not match annotated yield type `str`"
+    yield from Wrapped()
+```
+
+An explicit `Generator` annotation still constrains the values sent to the delegated generator:
+
+```py
+def invalid_send() -> Generator[int, int, None]:
+    # error: [invalid-yield] "Send type `str` does not match annotated send type `int`"
+    yield from Wrapped()
+```
+
+An `Iterator` member in a return-type union does not remove the other members' explicit send
+requirements. Here the yielded `int` values require the `Generator` alternative, whose send type
+must be compatible with the delegated generator:
+
+```py
+def mixed_annotation() -> Iterator[str] | Generator[int, int, None]:
+    # error: [invalid-yield] "Send type `str` does not match annotated send type `int`"
+    yield from Wrapped()
+
+def compatible_mixed_annotation() -> Iterator[str] | Generator[int, str, None]:
+    yield from Wrapped()
 ```
 
 ## Generator type aliases
@@ -217,6 +439,9 @@ type IteratorAlias[T] = Iterator[T]
 def invalid_iterator_return() -> IteratorAlias[int]:
     yield 42
     return "foo"  # error: [invalid-return-type]
+
+def aliased_iterator(inner: Generator[int, str, None]) -> IteratorAlias[int]:
+    yield from inner
 
 type AsyncGeneratorAlias[T] = AsyncGenerator[T]
 

@@ -10,6 +10,7 @@ use ruff_python_stdlib::typing::simple_magic_return_type;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::{Checker, DiagnosticGuard};
+use crate::codes::Category;
 use crate::registry::Rule;
 use crate::rules::flake8_annotations::helpers::{auto_return_type, type_expr};
 use crate::rules::ruff::typing::type_hint_resolves_to_any;
@@ -38,7 +39,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Options
 /// - `lint.flake8-annotations.suppress-dummy-args`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = Category::Pedantic)]
 pub(crate) struct MissingTypeFunctionArgument {
     name: String,
 }
@@ -74,7 +75,7 @@ impl Violation for MissingTypeFunctionArgument {
 /// ## Options
 /// - `lint.flake8-annotations.suppress-dummy-args`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = Category::Pedantic)]
 pub(crate) struct MissingTypeArgs {
     name: String,
 }
@@ -110,7 +111,7 @@ impl Violation for MissingTypeArgs {
 /// ## Options
 /// - `lint.flake8-annotations.suppress-dummy-args`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = Category::Pedantic)]
 pub(crate) struct MissingTypeKwargs {
     name: String,
 }
@@ -152,7 +153,7 @@ impl Violation for MissingTypeKwargs {
 /// ```
 #[derive(ViolationMetadata)]
 #[deprecated(note = "ANN101 has been removed")]
-#[violation_metadata(removed_since = "0.8.0")]
+#[violation_metadata(removed_since = "0.8.0", category = Category::Pedantic)]
 pub(crate) struct MissingTypeSelf;
 
 #[expect(deprecated)]
@@ -197,7 +198,7 @@ impl Violation for MissingTypeSelf {
 /// ```
 #[derive(ViolationMetadata)]
 #[deprecated(note = "ANN102 has been removed")]
-#[violation_metadata(removed_since = "0.8.0")]
+#[violation_metadata(removed_since = "0.8.0", category = Category::Pedantic)]
 pub(crate) struct MissingTypeCls;
 
 #[expect(deprecated)]
@@ -241,7 +242,7 @@ impl Violation for MissingTypeCls {
 ///
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = Category::Pedantic)]
 pub(crate) struct MissingReturnTypeUndocumentedPublicFunction {
     name: String,
     annotation: Option<String>,
@@ -295,7 +296,7 @@ impl Violation for MissingReturnTypeUndocumentedPublicFunction {
 ///
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = Category::Pedantic)]
 pub(crate) struct MissingReturnTypePrivateFunction {
     name: String,
     annotation: Option<String>,
@@ -356,7 +357,7 @@ impl Violation for MissingReturnTypePrivateFunction {
 ///
 /// - `lint.flake8-annotations.mypy-init-return`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = Category::Pedantic)]
 pub(crate) struct MissingReturnTypeSpecialMethod {
     name: String,
     annotation: Option<String>,
@@ -408,7 +409,7 @@ impl Violation for MissingReturnTypeSpecialMethod {
 ///
 /// - `lint.flake8-annotations.suppress-none-returning`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = Category::Pedantic)]
 pub(crate) struct MissingReturnTypeStaticMethod {
     name: String,
     annotation: Option<String>,
@@ -460,7 +461,7 @@ impl Violation for MissingReturnTypeStaticMethod {
 ///
 /// - `lint.flake8-annotations.suppress-none-returning`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = Category::Pedantic)]
 pub(crate) struct MissingReturnTypeClassMethod {
     name: String,
     annotation: Option<String>,
@@ -533,7 +534,7 @@ impl Violation for MissingReturnTypeClassMethod {
 /// - [Python documentation: `typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
 /// - [Mypy documentation: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.108")]
+#[violation_metadata(stable_since = "v0.0.108", category = Category::Pedantic)]
 pub(crate) struct AnyType {
     name: String,
 }

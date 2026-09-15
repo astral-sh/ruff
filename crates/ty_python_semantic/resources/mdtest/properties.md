@@ -49,6 +49,211 @@ c.my_property = 2
 c.my_property = "a"
 ```
 
+## Property subclasses
+
+A subclass that inherits the built-in property implementation retains both its nominal type and its
+accessors. Adding a setter does not discard the getter's return type.
+
+```py
+class CustomProperty(property):
+    def description(self) -> str:
+        return "custom"
+
+class C:
+    @CustomProperty
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, value: str) -> None:
+        pass
+
+reveal_type(C.value)  # revealed: CustomProperty
+reveal_type(C.value.description())  # revealed: str
+reveal_type(C().value)  # revealed: int
+C().value = "new"
+C().value = 1  # error: [invalid-assignment]
+```
+
+## Replacing subclass accessors
+
+Direct construction and each accessor decorator preserve the subclass. Replacing one accessor also
+preserves the other accessors.
+
+```py
+class CustomProperty(property): ...
+
+def get_value(obj: object) -> int:
+    return 1
+
+def set_value(obj: object, value: str) -> None:
+    pass
+
+def delete_value(obj: object) -> None:
+    pass
+
+def get_text(obj: object) -> str:
+    return "value"
+
+original = CustomProperty(get_value)
+updated = original.setter(set_value).deleter(delete_value).getter(get_text)
+reveal_type(original)  # revealed: CustomProperty
+reveal_type(updated)  # revealed: CustomProperty
+reveal_type(original.fget)  # revealed: def get_value(obj: object) -> int
+reveal_type(updated.fget)  # revealed: def get_text(obj: object) -> str
+reveal_type(updated.fset)  # revealed: def set_value(obj: object, value: str) -> None
+reveal_type(updated.fdel)  # revealed: def delete_value(obj: object) -> None
+
+class C:
+    before = original
+    after = updated
+
+reveal_type(C.before)  # revealed: CustomProperty
+reveal_type(C().before)  # revealed: int
+reveal_type(C().after)  # revealed: str
+reveal_type(updated.__get__(C(), C))  # revealed: str
+reveal_type(type(updated).__get__(updated, C(), C))  # revealed: str
+C().after = "new"
+C().after = 1  # error: [invalid-assignment]
+del C().after
+```
+
+## Generic property subclasses
+
+The nominal class specialization is retained when an accessor is replaced.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class CustomProperty(property, Generic[T]):
+    metadata: T
+
+def get_value(obj: object) -> int:
+    return 1
+
+def set_value(obj: object, value: str) -> None:
+    pass
+
+descriptor = CustomProperty[bytes](get_value).setter(set_value)
+reveal_type(descriptor)  # revealed: CustomProperty[bytes]
+reveal_type(descriptor.metadata)  # revealed: bytes
+```
+
+Specializing the class that owns the property also specializes the descriptor's nominal type.
+
+```py
+class Owner(Generic[T]):
+    value = CustomProperty[T](get_value)
+
+reveal_type(Owner[str].value)  # revealed: CustomProperty[str]
+reveal_type(Owner[str].value.metadata)  # revealed: str
+reveal_type(Owner[str]().value)  # revealed: int
+```
+
+## Overridden property accessor methods
+
+A subclass can replace an accessor-copy method. Its declared return type takes precedence over the
+built-in copy behavior.
+
+```py
+from typing import Any, Callable
+
+class ReplacementProperty(property): ...
+
+class CustomProperty(property):
+    def setter(self, fset: Callable[[Any, Any], None], /) -> ReplacementProperty:
+        return ReplacementProperty()
+
+def set_value(obj: object, value: str) -> None:
+    pass
+
+reveal_type(CustomProperty().setter(set_value))  # revealed: ReplacementProperty
+```
+
+## Overridden property descriptor methods
+
+Subclasses that change the descriptor protocol are checked as ordinary descriptors. Their `__get__`
+annotations must not be replaced with the stored getter's return type.
+
+```py
+from typing import overload
+from typing_extensions import Self
+
+def get_value(obj: object) -> int:
+    return 1
+
+class CustomGetter(property):
+    @overload
+    def __get__(self, instance: None, owner: type, /) -> Self: ...
+    @overload
+    def __get__(self, instance: object, owner: type | None = None, /) -> str: ...
+    def __get__(self, instance: object, owner: type | None = None, /) -> Self | str:
+        return self if instance is None else "custom"
+
+class C:
+    value = CustomGetter(get_value)
+
+reveal_type(C.value)  # revealed: CustomGetter
+reveal_type(C().value)  # revealed: str
+```
+
+## Overridden accessor attributes
+
+A subclass may hide an accessor attribute without changing the getter that the descriptor calls. The
+stored callable must not replace that explicitly defined attribute.
+
+```py
+class HiddenGetter(property):
+    fget: None = None
+
+def get_value(obj: object) -> int:
+    return 1
+
+descriptor = HiddenGetter(get_value)
+reveal_type(descriptor.fget)  # revealed: None
+```
+
+## Custom property constructors
+
+A custom initializer can give its arguments a different meaning. We must not interpret those
+arguments as the built-in getter, setter, and deleter parameters.
+
+```py
+from typing import Any, Callable
+
+class CustomProperty(property):
+    def __init__(self, description: str, getter: Callable[[Any], Any]) -> None:
+        super().__init__(getter)
+
+def get_value(obj: object) -> int:
+    return 1
+
+descriptor = CustomProperty("value", get_value)
+reveal_type(descriptor)  # revealed: CustomProperty
+
+class C:
+    value = descriptor
+
+reveal_type(C.value)  # revealed: CustomProperty
+reveal_type(C().value)  # revealed: Unknown
+```
+
+## Property subclass truthiness
+
+Tracking the accessors does not make a subclass with a custom `__bool__` unconditionally truthy.
+
+```py
+from typing import Literal
+
+class FalsyProperty(property):
+    def __bool__(self) -> Literal[False]:
+        return False
+
+reveal_type(bool(FalsyProperty()))  # revealed: Literal[False]
+```
+
 ## Properties returning `Self`
 
 A property that returns `Self` refers to an instance of the class:
