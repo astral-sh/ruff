@@ -3504,7 +3504,7 @@ impl<'db> CandidateSolutions<'db> {
             node_support.as_ref(),
             node,
         )?;
-        ControlFlow::Continue(walker.finish(db, env, storage))
+        ControlFlow::Continue(walker.finish())
     }
 
     /// Accumulates a conjunction of concrete bound constraints without constructing a
