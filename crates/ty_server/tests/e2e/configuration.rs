@@ -1,5 +1,6 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use insta::assert_json_snapshot;
+use lsp_types::RegistrationRequest;
 use ruff_db::system::SystemPath;
 use serde_json::{Map, json};
 use ty_server::{ClientOptions, WorkspaceOptions};
@@ -41,13 +42,37 @@ def foo() -> str:
 unresolved-reference="warn"
         "#,
         )?
+        .with_watched_file_support(true)
         .build()
         .wait_until_workspaces_are_initialized();
+
+    let (_, registrations) = server.await_request::<RegistrationRequest>();
+    let options = registrations
+        .registrations
+        .first()
+        .and_then(|registration| registration.register_options.as_ref())
+        .context("expected file watcher registration")?;
+    assert_json_snapshot!(options["watchers"], @r#"
+    [
+      {
+        "globPattern": {
+          "baseUri": "file://<temp_dir>/src",
+          "pattern": "**"
+        }
+      },
+      {
+        "globPattern": {
+          "baseUri": "file://<temp_dir>/",
+          "pattern": "ty2.toml"
+        }
+      }
+    ]
+    "#);
 
     server.open_text_document(foo, foo_content, 1);
     let diagnostics = server.document_diagnostic_request(foo, None);
 
-    assert_json_snapshot!(diagnostics);
+    assert_json_snapshot!("configuration_file", diagnostics);
 
     Ok(())
 }

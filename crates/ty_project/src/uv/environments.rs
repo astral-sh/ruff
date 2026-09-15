@@ -75,7 +75,7 @@ use parking_lot::Mutex;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_db::FxDashMap;
 use ruff_db::cancellation::CancellationTokenSource;
-use ruff_db::files::{File, Files};
+use ruff_db::files::File;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use salsa::Setter;
 
@@ -712,33 +712,10 @@ fn apply_sync_result(
     request: &ScriptSyncRequest,
     output: std::io::Result<std::process::Output>,
 ) {
-    let previous_root = environment
-        .uv_metadata(db)
-        .and_then(UvMetadata::environment)
-        .map(ToOwned::to_owned);
-    let recovering_from_error = environment.initialization_error(db).is_some();
     let (uv_metadata, initialization_error) = match Uv::parse_metadata_output(db.system(), output) {
         Ok(metadata) => (Some(metadata), None),
         Err(error) => (None, Some(error.to_string().into_boxed_str())),
     };
-    let current_root = uv_metadata.as_ref().and_then(UvMetadata::environment);
-
-    if let Some(root) = previous_root
-        .as_deref()
-        .or_else(|| current_root.filter(|_| recovering_from_error))
-    {
-        // uv can install, update, or remove packages without changing the virtual-environment path.
-        // Refresh files under that path so semantic queries see the updated package contents.
-        // After a failed synchronization, recover the path from the new metadata because the
-        // previous metadata was cleared along with its virtual-environment path.
-        //
-        // FIXME: This is overbroad. A file watcher can tell us precisely what changed.
-        // Remove this fallback once the language server also watches script environments.
-        // Changes inside virtual environments should instead be watched and processed through `ProjectDatabase::apply_changes`.
-        // Using a file watcher also ensures that virtual environment changes in
-        // scripts without using uv are detected.
-        Files::sync_all_recursive(db, [root]);
-    }
 
     if environment.uv_metadata(db) != uv_metadata.as_ref() {
         environment.set_uv_metadata(db).to(uv_metadata);
