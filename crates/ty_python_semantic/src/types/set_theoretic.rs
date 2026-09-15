@@ -1,5 +1,6 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
+use rustc_hash::FxHashSet;
 
 use std::convert::Infallible;
 
@@ -10,7 +11,7 @@ use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
 use crate::types::{InstanceProjection, Type, TypePair, TypeQualifiers};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Program};
 
 pub(crate) mod builder;
 mod generic_gradual_intersections;
@@ -123,7 +124,7 @@ impl<'db> UnionType<'db> {
     pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
         self.elements(db)
             .iter()
-            .any(|element| matches!(element, Type::TypeAlias(_)))
+            .any(|element| matches!(element, Type::TypeAlias(_) | Type::Recursive(_)))
     }
 
     /// Recursively expands aliases that expose top-level union elements.
@@ -134,8 +135,34 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        // Rebuild the union so that `UnionBuilder` simplifies any redundancies exposed.
-        Self::from_elements(db, env, self.elements(db).iter().copied())
+        // Relation checks expand the same target union for many different source types.
+        self.cached_expand_aliases(db, env.program(db))
+    }
+
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, program| {
+            result.cycle_normalized(db, &ProgramEnvironment::from_program(program), *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn cached_expand_aliases(self, db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
+        let env = &ProgramEnvironment::from_program(program);
+        // Expose both alias forms without expanding aliases inside containers during reduction.
+        let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
+        let mut pending = vec![Type::Union(self)];
+        let mut seen = FxHashSet::default();
+        while let Some(element) = pending.pop() {
+            if !seen.insert(element) {
+                continue;
+            }
+            match element.resolve_type_alias(db) {
+                Type::Union(union) => pending.extend(union.elements(db).iter().rev().copied()),
+                resolved => builder.add_in_place(resolved),
+            }
+        }
+        builder.build()
     }
 
     pub(crate) fn from_elements_cycle_recovery<I, T>(
@@ -245,6 +272,7 @@ impl<'db> UnionType<'db> {
         let mut iter = elements.iter().enumerate();
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty)?;
+            // The builder unpacks `TypeAlias` nodes but preserves structural recursive types.
             if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_)) {
                 let mut builder = UnionBuilder::new(db, env);
                 for prev in &elements[..i] {

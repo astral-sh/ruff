@@ -672,6 +672,11 @@ impl<'db> SemanticModel<'db> {
                 Type::TypeAlias(alias) => {
                     visitor.visit(db, ty, || collect(db, alias.value_type(db), visitor))
                 }
+                Type::Recursive(recursive) => visitor.visit(db, ty, || {
+                    recursive.map_or_else(db, &recursive.environment(db), Vec::new, |unfolded| {
+                        collect(db, unfolded, visitor)
+                    })
+                }),
                 _ => Vec::new(),
             }
         }

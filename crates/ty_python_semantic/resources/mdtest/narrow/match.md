@@ -3947,9 +3947,9 @@ type Changing[T] = T | Changing[bool]  # error: [cyclic-type-alias-definition]
 def match_changing_specialization(value: Changing[BrandedNumber]) -> None:
     match value:
         case Number.ONE:
-            reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.ONE]) | bool
+            reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.ONE]) | Literal[True]
         case _:
-            reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.TWO]) | bool
+            reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.TWO]) | Literal[False]
 ```
 
 ## Value patterns with guard
