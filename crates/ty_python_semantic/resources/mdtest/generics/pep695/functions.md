@@ -1786,6 +1786,58 @@ def union_bound[T: type[A] | type[B]](cls: T) -> None:
     reveal_type(cls.attr)  # revealed: str | int
 ```
 
+## Nested calls in bounded argument contexts
+
+A parameter's upper bound validates the result of a nested call without replacing its inferred
+gradual type. An explicit annotation still provides declared evidence:
+
+```py
+from typing import Any
+
+def f[T: str](value: T) -> T:
+    return value
+
+def g[T](value: tuple[T]) -> T:
+    raise NotImplementedError
+
+def _(any_value: Any, unknown_value):
+    reveal_type(f(f(any_value)))  # revealed: Any
+    reveal_type(f(f(unknown_value)))  # revealed: Unknown
+    reveal_type(f(g(unknown_value)))  # revealed: Unknown
+
+    result: str = reveal_type(f(any_value))  # revealed: str
+```
+
+## Upper-bound context for dictionary literals
+
+A `TypedDict` upper bound provides the field types needed to infer a dictionary literal:
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+def f[T: Payload](value: T) -> T:
+    return value
+
+reveal_type(f({"value": 1}))  # revealed: Payload
+```
+
+## Upper-bound context for lambdas
+
+A callable upper bound provides parameter types for an unannotated lambda:
+
+```py
+from typing import Callable
+
+def f[T: Callable[[int], int]](value: T) -> T:
+    return value
+
+callback = f(lambda value: reveal_type(value))  # revealed: int
+reveal_type(callback(1))  # revealed: int
+```
+
 ## Solving TypeVars with upper bounds in unions
 
 ```py

@@ -36,9 +36,9 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, DynamicType, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType,
     KnownClass, KnownInstanceType, MaterializationKind, PromotionKind, SubclassOfInner, Type,
-    TypeAliasType, TypeContext, TypeMapping, TypeRecursionContext, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type,
-    infer_definition_types, inferred_declaration,
+    TypeAliasType, TypeContext, TypeContextKind, TypeMapping, TypeRecursionContext,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
+    binding_type, infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -2806,12 +2806,23 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         self.infer_from_constraint_set(set)
     }
 
-    /// Conjoin declared-type constraints with the pending inference constraints.
-    pub(crate) fn intersect_declared_constraints(&mut self, constraints: ConstraintSet<'db, 'c>) {
+    /// Conjoin expected-type constraints with the pending inference constraints.
+    pub(crate) fn intersect_context_constraints(
+        &mut self,
+        constraints: ConstraintSet<'db, 'c>,
+        kind: TypeContextKind,
+    ) {
         if constraints.is_always_satisfied(self.db, self.env) {
             return;
         }
-        let constraints = constraints.with_declared_evidence(self.db, self.env, self.constraints);
+        let constraints = match kind {
+            TypeContextKind::Declared => {
+                constraints.with_declared_evidence(self.db, self.env, self.constraints)
+            }
+            TypeContextKind::Validity => {
+                constraints.with_validity_bounds(self.db, self.env, self.constraints)
+            }
+        };
         self.pending
             .intersect(self.db, self.constraints, constraints);
     }

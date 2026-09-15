@@ -775,6 +775,26 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
     ) -> Self {
+        self.map_provenance(db, env, builder, ConstraintProvenance::as_declared)
+    }
+
+    /// Retains the constraints as validity requirements without supplying inference evidence.
+    pub(crate) fn with_validity_bounds(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> Self {
+        self.map_provenance(db, env, builder, |_| ConstraintProvenance::Validity)
+    }
+
+    fn map_provenance(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+        map: impl Fn(ConstraintProvenance) -> ConstraintProvenance,
+    ) -> Self {
         self.verify_builder(builder);
         let mut storage = builder.storage.borrow_mut();
         let source_orders = storage.calculate_source_orders(self.source_order);
@@ -788,7 +808,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         for id in constraints {
             let constraint = storage.constraint_data(id);
             let (node, order) = constraint
-                .with_provenance(constraint.provenance().as_declared())
+                .with_provenance(map(constraint.provenance()))
                 .new_node(db, env, &mut storage);
             mapped_constraints.insert(id, node);
             source_order = storage.ordered_source_order(source_order, order);
