@@ -78,7 +78,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     return len(sized)
 /// ```
 ///
-/// On Python 3.15 and later, use instead:
+/// On Python 3.15 and later, using a lazy import is also an option:
 /// ```python
 /// lazy from . import local_module
 ///
@@ -187,7 +187,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 ///     return len(df)
 /// ```
 ///
-/// On Python 3.15 and later, use instead:
+/// On Python 3.15 and later, using a lazy import is also an option:
 /// ```python
 /// lazy import pandas as pd
 ///
@@ -296,7 +296,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 ///     return str(path)
 /// ```
 ///
-/// On Python 3.15 and later, use instead:
+/// On Python 3.15 and later, using a lazy import is also an option:
 /// ```python
 /// lazy from pathlib import Path
 ///
