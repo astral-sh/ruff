@@ -1024,6 +1024,103 @@ def f25(x: tuple[int] | tuple[int, str]) -> None:
     f24(*x, 1)  # error: [invalid-argument-type]
 ```
 
+### Forwarded tuple unions and unpacked variadic parameters
+
+Every alternative of a forwarded tuple union must satisfy an unpacked parameter's fixed elements.
+Merging alternatives of different lengths must not conceal an incompatible suffix or missing
+argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def fixed(*args: *tuple[int, str]) -> None: ...
+def with_suffix(*args: *tuple[*tuple[int, ...], str]) -> None: ...
+def forward(
+    valid: tuple[int, str] | tuple[int, int, str],
+    wrong_suffix: tuple[int, str] | tuple[int, int, int],
+    too_short: tuple[int, str] | tuple[int],
+) -> None:
+    with_suffix(*valid)
+    with_suffix(*wrong_suffix)  # error: [invalid-argument-type]
+    fixed(*too_short)  # error: [missing-argument]
+```
+
+Boolean and integer-literal elements satisfy the integer prefix in every tuple alternative.
+
+```py
+from typing import Literal
+
+def forward_element_unions(
+    booleans: tuple[bool, str] | tuple[bool, bool, str],
+    literals: tuple[Literal[1, 2], str] | tuple[Literal[1, 2], int, str],
+) -> None:
+    with_suffix(*booleans)
+    with_suffix(*literals)
+```
+
+When several independently forwarded tuple unions are combined, every combination must satisfy the
+complete unpacked parameter.
+
+```py
+def combine(
+    prefix: tuple[()] | tuple[int],
+    boolean_prefix: tuple[bool] | tuple[bool, bool],
+    valid_suffix: tuple[str] | tuple[int, str],
+    wrong_suffix: tuple[str] | tuple[int, int],
+) -> None:
+    with_suffix(*prefix, *valid_suffix)
+    with_suffix(*boolean_prefix, *valid_suffix)
+    with_suffix(*prefix, *wrong_suffix)  # error: [invalid-argument-type]
+```
+
+The shortest alternatives still determine the minimum argument count even when too many forwarded
+tuple unions prevent all combinations from being expanded.
+
+```py
+def requires_ten(*args: *tuple[int, int, int, int, int, int, int, int, int, int]) -> None: ...
+def forward_beyond_limit(values: tuple[()] | tuple[int]) -> None:
+    # error: [missing-argument]
+    requires_ten(*values, *values, *values, *values, *values, *values, *values, *values, *values, 1)
+```
+
+### Forwarded tuple aliases and unpacked variadic parameters
+
+Each alternative of a tuple union remains valid when part of the union is defined through an alias.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Values = tuple[int, str] | tuple[int, int, str]
+
+def with_suffix(*args: *tuple[*tuple[int, ...], str]) -> None: ...
+def forward(values: Values | tuple[int, int, int, str]) -> None:
+    with_suffix(*values)
+```
+
+Aliases can contain other aliases without changing which tuple alternatives are accepted.
+
+```py
+type MoreValues = Values | tuple[int, int, int, str]
+
+def forward_nested(values: MoreValues | tuple[int, int, int, int, str]) -> None:
+    with_suffix(*values)
+```
+
+An incompatible alternative inside an alias still makes the forwarded call invalid.
+
+```py
+type WrongSuffix = tuple[int, str] | tuple[int, int, int]
+
+def forward_invalid(values: WrongSuffix | tuple[int, int, int, str]) -> None:
+    with_suffix(*values)  # error: [invalid-argument-type]
+```
+
 ### Mixed argument and parameter containing variadic
 
 ```toml

@@ -1286,6 +1286,157 @@ def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
     reveal_type(m(*t))  # revealed: Literal[1, 2]
 ```
 
+### Forwarded tuple unions and unpacked overloads
+
+A forwarded tuple union is valid only when each alternative matches an overload. A successful
+shorter alternative must not conceal an incompatible fixed element in a longer alternative.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, overload
+
+@overload
+def select(*args: *tuple[object]) -> Literal[1]: ...
+@overload
+def select(*args: *tuple[object, int, object]) -> Literal[2]: ...
+def select(*args: object) -> int:
+    return 1
+
+def forward(
+    valid: tuple[str] | tuple[str, int, str],
+    invalid: tuple[str] | tuple[str, str, str],
+) -> None:
+    reveal_type(select(*valid))  # revealed: Literal[1, 2]
+    select(*invalid)  # error: [no-matching-overload]
+```
+
+Tuple alternatives with boolean elements also contribute their overload's return type.
+
+```py
+def forward_booleans(values: tuple[bool] | tuple[bool, int, str]) -> None:
+    reveal_type(select(*values))  # revealed: Literal[1, 2]
+```
+
+A fixed argument can occupy different positions when a preceding forwarded tuple has alternatives of
+different lengths. Each concrete alternative must be checked before rejecting that argument.
+
+```py
+@overload
+def accept(*args: *tuple[str]) -> None: ...
+@overload
+def accept(*args: *tuple[bytes, *tuple[object, ...]]) -> None: ...
+def accept(*args: object) -> None: ...
+def forward_fixed(values: tuple[bytes] | tuple[bytes, str]) -> None:
+    accept(*values, 1)
+```
+
+If independently forwarded tuple unions exceed the expansion limit, an incompatible suffix must not
+be accepted merely because some earlier alternatives were valid.
+
+```py
+@overload
+def bounded(*args: *tuple[*tuple[object, ...], str]) -> None: ...
+@overload
+def bounded(*args: *tuple[bytes]) -> None: ...
+def bounded(*args: object) -> None: ...
+def forward_beyond_limit(
+    prefix: tuple[()] | tuple[int],
+    suffix: tuple[str] | tuple[int],
+) -> None:
+    # error: [no-matching-overload]
+    bounded(*prefix, *prefix, *prefix, *prefix, *prefix, *prefix, *prefix, *prefix, *suffix)
+```
+
+### Unpacked arguments preserve whole-type overload matches
+
+The third overload accepts `int | str`, so it wins before argument type expansion.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import overload
+
+@overload
+def select(*args: *tuple[int]) -> int: ...
+@overload
+def select(*args: *tuple[str]) -> str: ...
+@overload
+def select(*args: *tuple[int | str]) -> object: ...
+def select(*args: object) -> object: ...
+def forward(values: tuple[int | str]) -> None:
+    reveal_type(select(*values))  # revealed: object
+```
+
+The broader overload also wins when the narrower overloads use ordinary positional parameters.
+
+```py
+@overload
+def mixed(value: int, /) -> int: ...
+@overload
+def mixed(value: str, /) -> str: ...
+@overload
+def mixed(*args: *tuple[int | str]) -> object: ...
+def mixed(*args: object) -> object: ...
+def forward_mixed(values: tuple[int | str]) -> None:
+    reveal_type(mixed(*values))  # revealed: object
+```
+
+A whole-type overload match also wins when the forwarded alternatives have different lengths.
+
+```py
+@overload
+def variadic(value: int, /, *args: object) -> int: ...
+@overload
+def variadic(value: str, /, *args: object) -> str: ...
+@overload
+def variadic(*args: *tuple[int | str, *tuple[object, ...]]) -> object: ...
+def variadic(*args: object) -> object: ...
+def forward_variable(values: tuple[int] | tuple[str, str]) -> None:
+    reveal_type(variadic(*values))  # revealed: object
+```
+
+The narrower overloads still win when each call's first argument has a single concrete type.
+
+```py
+reveal_type(variadic(1))  # revealed: int
+reveal_type(variadic("first", "second"))  # revealed: str
+```
+
+Multiple whole-type matches are resolved before expansion can reopen narrower overloads.
+
+```py
+@overload
+def multiple(value: int, /, *args: object) -> int: ...
+@overload
+def multiple(value: str, /, *args: object) -> str: ...
+@overload
+def multiple(*args: *tuple[int | str, *tuple[object, ...]]) -> object: ...
+@overload
+def multiple(*args: *tuple[object, *tuple[object, ...]]) -> object: ...
+def multiple(*args: object) -> object: ...
+def forward_multiple(values: tuple[int] | tuple[str, str]) -> None:
+    reveal_type(multiple(*values))  # revealed: object
+```
+
+When both overloads accept the whole tuple union, the variadic overload is preferred.
+
+```py
+@overload
+def prefer_variadic(first: object, second: object = ..., /) -> int: ...
+@overload
+def prefer_variadic(*args: *tuple[object, *tuple[object, ...]]) -> object: ...
+def prefer_variadic(*args: object) -> object: ...
+def forward_prefer_variadic(values: tuple[int] | tuple[int, int]) -> None:
+    reveal_type(prefer_variadic(*values))  # revealed: object
+```
+
 ### Retry from parameter matching with type context
 
 When retrying, arguments are inferred with the correct type context:
