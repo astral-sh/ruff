@@ -637,6 +637,34 @@ infer_prefix(get_ints)  # error: [invalid-argument-type]
 infer_suffix(get_ints)  # error: [invalid-argument-type]
 ```
 
+## Gradual tuple parameters in generic callbacks
+
+A callback accepting a fixed-length tuple can be passed where a gradual-length tuple is expected. An
+unrelated type parameter does not change the callback's assignability.
+
+```py
+from typing import Any, Callable
+
+def regular(value: int, callback: Callable[[tuple[Any, ...]], None]) -> None: ...
+def generic[T](value: T, callback: Callable[[tuple[Any, ...]], None]) -> None: ...
+def callback(value: tuple[int]) -> None: ...
+
+regular(0, callback)
+generic(0, callback)
+```
+
+Gradual tuple elements also provide inference evidence when they appear in a callback's return type.
+
+```py
+def infer_pair[K, V](callback: Callable[[], tuple[K, V]]) -> tuple[K, V]:
+    return callback()
+
+def get_tuple() -> tuple[Any, ...]:
+    return ()
+
+reveal_type(infer_pair(get_tuple))  # revealed: tuple[Any, Any]
+```
+
 ## Source type variables in gradual tuple returns
 
 A callback's fixed tuple element can contain an outer type variable and still satisfy a concrete

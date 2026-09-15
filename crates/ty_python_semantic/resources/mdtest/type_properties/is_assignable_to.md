@@ -779,20 +779,36 @@ def source_type_variables[T]() -> None:
     )
 ```
 
-TODO: Gradual-length comparisons do not yet generate evidence for type variables in target elements
-supplied by the gradual segment. These comparisons currently fail even when the variable is nested
-inside another type or hidden behind an alias.
+Each element supplied by the gradual segment contributes its own constraints. Fixed source elements
+retain their more precise constraints, and aliases do not change the resulting bounds.
 
 ```py
 type Identity[T] = T
 
+def target_type_variables[T, U, V]() -> None:
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[T]) == ConstraintSet.lower_bound(Any, T))
+    static_assert(is_assignable_to(tuple[Any, ...], tuple[Identity[T]]))
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[Identity[T]]) == ConstraintSet.lower_bound(Any, T))
+    static_assert(
+        is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[T, U, V])
+        == (ConstraintSet.lower_bound(int, T) & ConstraintSet.lower_bound(Any, U) & ConstraintSet.lower_bound(str, V))
+    )
+    static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[T]))
+    static_assert(
+        is_constraint_set_assignable_to(tuple[Dynamic, ...], tuple[T, *tuple[int, ...]]) == ConstraintSet.lower_bound(Any, T)
+    )
+    static_assert(
+        is_constraint_set_assignable_to(tuple[Dynamic, ...], tuple[*tuple[int, ...], T]) == ConstraintSet.lower_bound(Any, T)
+    )
+```
+
+TODO: Assigning `Any` to a structured type does not yet generate constraints for its nested type
+variables. Gradual tuple elements follow the same rule as other occurrences of `Any`.
+
+```py
 def nested_type_variables[T]() -> None:
     static_assert(is_assignable_to(tuple[Any, ...], tuple[list[T]]))
-    # TODO: This should be ConstraintSet.equality(T, Any).
-    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[list[T]]) == ConstraintSet.never())
-    static_assert(is_assignable_to(tuple[Any, ...], tuple[Identity[T]]))
-    # TODO: This should be ConstraintSet.lower_bound(Any, T).
-    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[Identity[T]]) == ConstraintSet.never())
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[list[T]]))
 ```
 
 A symbolic `TypeVarTuple` is not gradual: its specialization can have a different length from a

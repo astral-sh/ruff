@@ -881,6 +881,39 @@ reveal_type(D(1))  # revealed: D[str, Literal[1]]
 reveal_type(D(1, "string"))  # revealed: D[Literal[1], Literal["string"]]
 ```
 
+### Gradual tuple specializations from `__init__`
+
+A constructor's explicit `self` annotation determines the result's specialization. A gradual tuple
+satisfies a nonempty tuple bound without adding the bound as an intersection to the result.
+
+```py
+from typing import Any
+
+class Box[Shape: tuple[int, *tuple[int, ...]]]:
+    def __init__(self: "Box[tuple[Any, ...]]") -> None: ...
+
+reveal_type(Box())  # revealed: Box[tuple[Any, ...]]
+```
+
+### Gradual tuple arguments to overloaded constructors
+
+A gradual tuple can satisfy either constructor signature below. The first overload remains eligible:
+an unknown tuple length does not justify skipping it in favor of the one-element specialization.
+
+```py
+from typing import Any, overload
+
+class Box[Shape: tuple[int, *tuple[int, ...]]]:
+    @overload
+    def __init__(self: "Box[tuple[Any, ...]]", value: tuple[object, object]) -> None: ...
+    @overload
+    def __init__(self: "Box[tuple[int]]", value: tuple[int]) -> None: ...
+    def __init__(self, value) -> None: ...
+
+def check(value: tuple[Any, ...]) -> None:
+    reveal_type(Box(value))  # revealed: Box[tuple[Any, ...]]
+```
+
 ### Synthesized methods with dataclasses
 
 ```py
