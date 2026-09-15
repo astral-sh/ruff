@@ -3541,21 +3541,40 @@ impl<'db> PathBound<'db> {
     ) -> Option<PathBoundSolution<'db>> {
         // Other variables from this call can still be specialized to satisfy the lower bound.
         // Type variables from an enclosing scope must remain fixed.
-        if !self.bound_typevar.is_paramspec(db)
-            && self
-                .effective_lower(db, env)
-                .when_assignable_to(db, env, candidate, builder, inferable)
-                .is_never_satisfied(db, env)
-        {
+        let satisfies_lower = |candidate| {
+            self.bound_typevar.is_paramspec(db)
+                || !self
+                    .effective_lower(db, env)
+                    .when_assignable_to(db, env, candidate, builder, inferable)
+                    .is_never_satisfied(db, env)
+        };
+        if !satisfies_lower(candidate) {
             return None;
         }
 
+        // Classify the replacement evidence independently of the original lower bound. Otherwise
+        // a gradual candidate can select an arbitrary concrete TypeVar constraint merely because
+        // the argument supplied static evidence.
+        let mut evidence = EvidenceKinds::from_type(db, env, candidate);
+        for upper in self.upper.iter_evidence() {
+            evidence.include(EvidenceKinds::from_type(db, env, upper));
+        }
         let mut candidate_bound = self.clone();
-        candidate_bound.evidence.lower = Some(candidate);
-        candidate_bound.evidence.has_only_gradual &=
-            candidate.bottom_materialization(db, env) != candidate.top_materialization(db, env);
+        candidate_bound.evidence = PathEvidence {
+            lower: Some(candidate),
+            has_only_gradual: evidence.is_only_gradual(),
+        };
         match PathBounds::default_solve(db, env, builder, &candidate_bound) {
             PathBoundSolution::Unsolved | PathBoundSolution::Unsatisfiable => None,
+            // Solving can promote or restrict the candidate. The resulting type must still
+            // accept the original lower bound, not just the replacement used for validation.
+            outcome
+                if outcome.as_type().is_some_and(|solution| {
+                    solution != candidate && !satisfies_lower(solution)
+                }) =>
+            {
+                None
+            }
             outcome => Some(outcome),
         }
     }

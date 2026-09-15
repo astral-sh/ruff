@@ -1261,6 +1261,27 @@ def _(first: int, second: str):
     result: tuple[Sequence[Any], Sequence[object]] = reveal_type(pair(first, second))
 ```
 
+## Gradual return context preserves constrained arguments
+
+A gradual return context can supply a valid specialization of a constrained type variable. It does
+not allow us to select a concrete constraint that rejects the argument.
+
+```py
+from typing import Any
+
+def f[T: (object, str)](value: T) -> T:
+    return value
+
+def g[T: (str, bytes)](value: T) -> T:
+    return value
+
+def unannotated():
+    return f(object())
+
+x: Any = reveal_type(f(object()))  # revealed: Any
+y: Any = reveal_type(g(b""))  # revealed: Any
+```
+
 ## Return context preserves a wider callback parameter
 
 A callback accepting `object` also accepts `int`. The return context therefore does not require us
