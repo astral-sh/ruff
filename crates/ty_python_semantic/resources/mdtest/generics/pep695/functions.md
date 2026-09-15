@@ -426,8 +426,8 @@ def repeated_polarity[T](container: MixedVariance[Callable[[], T], Callable[[], 
 reveal_type(repeated_polarity(MixedVariance[Callable[[], Middle], Callable[[], Middle]](), Derived()))  # revealed: Middle
 ```
 
-An unrelated variadic type parameter currently sends the entire inference context through the legacy
-solver, so the ordinary callable loses the contravariant bound shown above.
+An unrelated ParamSpec preserves contravariance; TypeVarTuples still lose it through legacy
+inference.
 
 ```py
 def with_paramspec[T, **P](container: Contravariant[Callable[[], T]], value: T, unrelated: Callable[P, None]) -> T:
@@ -438,8 +438,7 @@ def with_typevartuple[T, *Ts](container: Contravariant[Callable[[], T]], value: 
 
 def unrelated(value: str) -> None: ...
 
-# TODO: Should reveal `Derived` when an unrelated ParamSpec no longer disables contravariance.
-reveal_type(with_paramspec(Contravariant[Callable[[], Middle]](), Derived(), unrelated))  # revealed: Middle
+reveal_type(with_paramspec(Contravariant[Callable[[], Middle]](), Derived(), unrelated))  # revealed: Derived
 # TODO: Should reveal `Derived` when an unrelated TypeVarTuple no longer disables contravariance.
 reveal_type(with_typevartuple(Contravariant[Callable[[], Middle]](), Derived(), ("value",)))  # revealed: Middle
 ```
@@ -2247,6 +2246,9 @@ reveal_type(into_regular_callable(ClassWithNewAndInit))
 # TODO: revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
 # revealed: (...) -> ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit))
+# revealed: ClassWithNewAndInit
+reveal_type(accepts_callable(ClassWithNewAndInit)(1))
+# TODO: Combine both constructor parameter lists and report [missing-argument].
 # revealed: ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit)())
 

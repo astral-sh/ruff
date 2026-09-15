@@ -618,6 +618,105 @@ class ParamSpecWithDefault5[**P1 = P2]:
 Most of these test cases are adopted from the
 [typing documentation on `ParamSpec` semantics](https://typing.python.org/en/latest/spec/generics.html#semantics).
 
+### Parameter lists inferred from consumers
+
+A consumer of a callback supplies an upper bound on the callback's parameter list.
+
+```py
+from typing import Callable
+
+def from_consumer[**P](consumer: Callable[[Callable[P, None]], None]) -> Callable[P, None]:
+    raise NotImplementedError
+
+def consume(callback: Callable[[int], None]) -> None: ...
+
+reveal_type(from_consumer(consume))  # revealed: (int, /) -> None
+```
+
+A callback and a consumer can bound the same parameter list from opposite directions.
+
+```py
+def between[**P](callback: Callable[P, None], consumer: Callable[[Callable[P, None]], None]) -> Callable[P, None]:
+    return callback
+
+def accepts_object(value: object, /) -> None: ...
+def accepts_str(value: str, /) -> None: ...
+
+reveal_type(between(accepts_object, consume))  # revealed: (value: object, /) -> None
+between(accepts_str, consume)  # error: [invalid-argument-type]
+
+def consumer_first[**P](consumer: Callable[[Callable[P, None]], None], callback: Callable[P, None]) -> Callable[P, None]:
+    return callback
+
+reveal_type(consumer_first(consume, accepts_object))  # revealed: (int, /) -> None
+```
+
+### Type variable variance alongside a parameter list
+
+A captured parameter list does not change how other type variables follow variance.
+
+```py
+from typing import Callable
+
+class Consumer[V]:
+    def consume(self, value: V) -> None: ...
+
+def use[**P, T](shape: Callable[P, None], consumer: Consumer[Callable[[T], None]], value: T) -> T:
+    return value
+
+def empty() -> None: ...
+def _(consumer: Consumer[Callable[[object], None]]):
+    reveal_type(use(empty, consumer, 1))  # revealed: object
+```
+
+### Repeated parameter lists from generic instances
+
+The first instance or callback supplies `P`, even when its parameter list is gradual.
+
+```py
+from typing import Callable
+
+class Callback[**P]:
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+def instances[**P](left: Callback[P], right: Callback[P]) -> Callback[P]:
+    return left
+
+def instance_first[**P](left: Callback[P], right: Callable[P, None]) -> Callback[P]:
+    return left
+
+def callable_first[**P](left: Callable[P, None], right: Callback[P]) -> Callable[P, None]:
+    return left
+
+def integer(value: int, /) -> None: ...
+def anything(value: object, /) -> None: ...
+def _(concrete: Callback[[int]], gradual: Callback[...]) -> None:
+    reveal_type(instances(concrete, gradual))  # revealed: Callback[(int, /)]
+    reveal_type(instances(gradual, concrete))  # revealed: Callback[(...)]
+    reveal_type(instance_first(concrete, anything))  # revealed: Callback[(int, /)]
+    reveal_type(callable_first(integer, gradual))  # revealed: (value: int, /) -> None
+```
+
+### Empty parameter lists override defaults
+
+A missing callback uses the default parameter list. An explicit empty list remains empty.
+
+```py
+from typing import Callable
+
+class OptionalCallback[**P = [int]]:
+    callback: Callable[P, None]
+
+    def __init__(self, callback: Callable[P, None] | None = None) -> None: ...
+
+def empty() -> None: ...
+
+reveal_type(OptionalCallback().callback)  # revealed: (int, /) -> None
+reveal_type(OptionalCallback(empty).callback)  # revealed: () -> None
+OptionalCallback(empty).callback()
+OptionalCallback(empty).callback(1)  # error: [too-many-positional-arguments]
+```
+
 ### Return type change using `ParamSpec` once
 
 ```py
@@ -669,6 +768,26 @@ reveal_type(f3(y="a", x=1))  # revealed: bool
 f3(1)
 # error: [invalid-argument-type] "Argument is incorrect: Expected `int`, found `Literal["a"]`"
 f3("a", "b")
+```
+
+Parameter kinds, defaults, and variadic annotations survive return-type changes.
+
+```py
+def shaped(value: int, /, label: str = "x", *, enabled: bool = False) -> int:
+    return value
+
+def variadic(*args: int, **kwargs: str) -> int:
+    return 1
+
+reveal_type(converter(variadic))  # revealed: (*args: int, **kwargs: str) -> bool
+
+wrapped = converter(shaped)
+# revealed: (value: int, /, label: str = "x", *, enabled: bool = False) -> bool
+reveal_type(wrapped)
+wrapped(1)
+wrapped(1, label="label", enabled=True)
+wrapped(1, enabled="yes")  # error: [invalid-argument-type]
+wrapped()  # error: [missing-argument]
 ```
 
 ### Prefer the declared parameter list
@@ -821,6 +940,35 @@ def keyword_only2(*, y: int) -> int:
 # common supertype, so it should result in an error.
 # error: [invalid-argument-type] "Argument to function `multiple` is incorrect: Expected `(*, x: int) -> int`, found `def keyword_only2(*, y: int) -> int`"
 reveal_type(multiple(keyword_only1, keyword_only2))  # revealed: (*, x: int) -> bool
+```
+
+Later callbacks must accept the calls allowed by the first captured parameter list.
+
+```py
+def integer(value: int, /) -> int:
+    return value
+
+def anything(value: object, /) -> int:
+    return 1
+
+def keyword(*, value: int) -> int:
+    return value
+
+reveal_type(multiple(integer, anything))  # revealed: (value: int, /) -> bool
+multiple(anything, integer)  # error: [invalid-argument-type]
+multiple(integer, keyword)  # error: [invalid-argument-type]
+```
+
+Later callbacks still supply return types while the first supplies the parameter list.
+
+```py
+def returning[**P, R](left: Callable[P, int], right: Callable[P, R]) -> Callable[P, R]:
+    return right
+
+def returns_str(value: object, /) -> str:
+    return ""
+
+reveal_type(returning(integer, returns_str))  # revealed: (value: int, /) -> str
 ```
 
 ### Constructors of user-defined generic class on `ParamSpec`
@@ -1252,19 +1400,22 @@ class Combined[**P, **Q, **R](Protocol):
     @overload
     def call(self, tag: Literal[3], /, *args: P.args, **kwargs: P.kwargs) -> None: ...
 
-def combine[**P, **Q, **R](p: Callback[P], q: Callback[Q], r: Callback[R]) -> Combined[P, Q, R]:
+class First[**P](Protocol):
+    def combine[**Q, **R](self, q: Callback[Q], r: Callback[R]) -> Combined[P, Q, R]: ...
+
+def first[**P](p: Callback[P]) -> First[P]:
     raise NotImplementedError
 
 type FourCallbacks = Callback[[int]] | Callback[[str]] | Callback[[bytes]] | Callback[[None]]
 
 def _(x: FourCallbacks) -> None:
     # The cartesian product produces a union of 64 elements.
-    f = combine(x, x, x).call
+    f = first(x).combine(x, x).call
     reveal_type(f())  # revealed: int
 
 def _(x: FourCallbacks, y: FourCallbacks | Callback[[list[int]]]) -> None:
     # The cartesian product would have produced a union of 80 elements.
-    f = combine(x, x, y).call
+    f = first(x).combine(x, y).call
     reveal_type(f)  # revealed: Unknown
 ```
 
@@ -1373,6 +1524,27 @@ reveal_type(callback.call(value=1))  # revealed: Literal[1]
 reveal_type(callback.call("value"))  # revealed: Literal["value"]
 callback.call()  # error: [missing-argument] "No argument provided for required parameter `value`"
 callback.call(1, 2)  # error: [too-many-positional-arguments]
+```
+
+### Preserving method variables on callable receivers
+
+Binding a callable receiver preserves the method's other type variables for argument inference.
+
+```py
+from typing import Callable
+
+class Callback:
+    def __call__(self, text: str) -> int:
+        return len(text)
+
+    def call[**P, T](self: Callable[P, int], value: T, /, *args: P.args, **kwargs: P.kwargs) -> T:
+        self(*args, **kwargs)
+        return value
+
+callback = Callback()
+reveal_type(callback.call(1, "text"))  # revealed: Literal[1]
+reveal_type(callback.call("value", "text"))  # revealed: Literal["value"]
+callback.call(1, 2)  # error: [invalid-argument-type]
 ```
 
 ### Overloaded methods with generic receivers
@@ -1940,6 +2112,71 @@ reveal_type(run(multi, x=1, y=2))  # revealed: int | str
 # No matching overload (int, str doesn't match either overload of `multi`)
 # error: [invalid-argument-type]
 reveal_type(run(multi, 1, "b"))  # revealed: int | str
+```
+
+### Parameter lists after incomplete inference
+
+Inferring `T` can exceed the work limit without losing a known parameter list.
+
+`A | B` and `C | D` have four possible intersections; adding `E` exceeds the limit.
+
+```py
+from typing import Callable
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+
+def capture[**P, T](
+    shape: Callable[P, None],
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> Callable[P, T]:
+    raise NotImplementedError
+
+def shape(*, value: str) -> None: ...
+def left(value: A | B) -> None: ...
+def right_small(value: C | D) -> None: ...
+def right_large(value: C | D | E) -> None: ...
+
+# revealed: (*, value: str) -> (A & C) | (B & C) | (A & D) | (B & D)
+reveal_type(capture(shape, left, right_small))
+
+result = capture(shape, left, right_large)
+reveal_type(result)  # revealed: (*, value: str) -> Unknown
+result(value="a")
+result(value=1)  # error: [invalid-argument-type]
+```
+
+When no argument supplies a parameter list, its default still applies even though `T` is unknown.
+
+```py
+class Defaulted[T, **P = [int]]:
+    callback: Callable[P, T]
+
+    def __init__(self, left: Callable[[T], None], right: Callable[[T], None]) -> None: ...
+
+defaulted = Defaulted(left, right_large).callback
+reveal_type(defaulted)  # revealed: (int, /) -> Unknown
+defaulted(1)
+defaulted("a")  # error: [invalid-argument-type]
+```
+
+### Tuple inference alongside parameter lists
+
+A captured parameter list does not change inference from alternatives in a tuple argument.
+
+```py
+from typing import Callable
+
+def first[**P, T](callback: Callable[P, None], value: tuple[T, ...]) -> T:
+    return value[0]
+
+def callback(*, label: str) -> None: ...
+def check(value: tuple[int] | tuple[str]):
+    reveal_type(first(callback, value))  # revealed: int | str
 ```
 
 ### Overloads with substitution of `P.args` and `P.kwargs`
