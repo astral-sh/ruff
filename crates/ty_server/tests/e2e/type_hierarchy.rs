@@ -23,9 +23,7 @@ class Derived(Base):
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document("foo.py", content, 1);
-
-    // Prepare on `Derived`
+    // Prepare on closed `Derived`, then follow the returned item to its base.
     let items = prepare(&mut server, "foo.py", Position::new(3, 8)).unwrap();
     assert_eq!(items[0].name, "Derived");
 

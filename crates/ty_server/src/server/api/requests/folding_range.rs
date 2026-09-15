@@ -48,7 +48,7 @@ impl BackgroundDocumentRequestHandler for FoldingRangeRequestHandler {
         // would produce invalid coordinates for every other cell.
         let mut cell_range: Option<TextRange> = None;
 
-        if snapshot.document().is_cell()
+        if snapshot.is_cell()
             && let Some(notebook_document) = db.notebook_document(file)
             && let Some(notebook) = source_text(db, file).as_notebook()
         {
