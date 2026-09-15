@@ -10795,6 +10795,50 @@ def consume(value: A | B) -> None: ...
     }
 
     #[test]
+    fn forwarded_overload_inference_uses_constraints() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+from typing import Callable, overload
+
+def invoke[**P, R](fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return fn(*args, **kwargs)
+
+@overload
+def identity() -> None: ...
+@overload
+def identity[T](value: T, /) -> T: ...
+def identity(value=None, /):
+    return value
+"#,
+        )?;
+        let db = &db;
+        let env = db.program_environment();
+        let file = ProgramFile::new(db, system_path_to_file(db, "/src/a.py")?, env.program(db));
+        let callable = global_symbol(db, file, "invoke").place.expect_type();
+        let callback = global_symbol(db, file, "identity").place.expect_type();
+        let int = KnownClass::Int.to_instance(db, &env);
+        let inference = call_inference(db, callable, [callback, int], TypeContext::default())?;
+        assert!(matches!(
+            inference.solutions(db),
+            TypeVarInferenceSolutions::Single
+        ));
+        let [Type::Callable(parameters), return_type] =
+            inference.merged_specialization(db).types(db)
+        else {
+            anyhow::bail!("expected the outer P and R bindings only");
+        };
+        assert_eq!(*return_type, int);
+        assert_eq!(parameters.kind(db), CallableTypeKind::ParamSpecValue);
+        let [signature] = parameters.signatures(db).overloads.as_slice() else {
+            anyhow::bail!("expected the selected overload only");
+        };
+        assert_eq!(signature.parameters()[0].annotated_type(), int);
+        Ok(())
+    }
+
+    #[test]
     fn contextual_preference_preserves_incomplete_inference() -> anyhow::Result<()> {
         let mut db = setup_db();
         db.write_dedented(
