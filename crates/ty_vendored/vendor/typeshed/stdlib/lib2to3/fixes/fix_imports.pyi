@@ -1,3 +1,4 @@
+"""Fix incompatible imports and module references."""
 from _typeshed import StrPath
 from collections.abc import Generator
 from typing import ClassVar, Final, Literal

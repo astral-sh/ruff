@@ -1,3 +1,4 @@
+"""A simple log mechanism styled after PEP 282."""
 from typing import Any, Final
 
 DEBUG: Final = 1

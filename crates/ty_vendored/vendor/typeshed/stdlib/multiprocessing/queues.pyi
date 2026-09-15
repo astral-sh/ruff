@@ -27,7 +27,12 @@ class Queue(Generic[_T]):
     def join_thread(self) -> None: ...
     def cancel_join_thread(self) -> None: ...
     if sys.version_info >= (3, 12):
-        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+        def __class_getitem__(cls, item: Any, /) -> GenericAlias:
+            """Represent a PEP 585 generic type
+
+For example, for t = list[int], t.__origin__ is list and t.__args__
+is (int,).
+"""
 
 class JoinableQueue(Queue[_T]):
     def __getstate__(self) -> _JoinableQueueState: ...  # type: ignore[override]
@@ -43,4 +48,9 @@ class SimpleQueue(Generic[_T]):
     def __setstate__(self, state: _SimpleQueueState) -> None: ...
     def get(self) -> _T: ...
     def put(self, obj: _T) -> None: ...
-    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias:
+        """Represent a PEP 585 generic type
+
+For example, for t = list[int], t.__origin__ is list and t.__args__
+is (int,).
+"""
