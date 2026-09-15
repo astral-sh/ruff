@@ -842,7 +842,7 @@ impl<'db> CallableType<'db> {
     }
 
     /// Binds the runtime receiver while using `typing_self_type` to replace `typing.Self`.
-    pub(crate) fn bind_self_with_receiver(
+    fn bind_self_with_receiver(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
