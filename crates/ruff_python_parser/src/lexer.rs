@@ -119,12 +119,14 @@ impl<'src> Lexer<'src> {
     }
 
     /// Returns the range of the current token.
-    pub(crate) const fn current_range(&self) -> TextRange {
+    #[doc(hidden)]
+    pub const fn current_range(&self) -> TextRange {
         self.current_range
     }
 
     /// Returns the flags for the current token.
-    pub(crate) const fn current_flags(&self) -> TokenFlags {
+    #[doc(hidden)]
+    pub const fn current_flags(&self) -> TokenFlags {
         self.current_flags
     }
 
@@ -1617,6 +1619,7 @@ fn is_identifier_continuation(c: char, identifier_is_ascii_only: &mut bool) -> b
 }
 
 /// Create a new [`Lexer`] for the given source code and [`Mode`].
+#[doc(hidden)]
 pub fn lex(source: &str, mode: Mode) -> Lexer<'_> {
     Lexer::new(source, mode, TextSize::default())
 }

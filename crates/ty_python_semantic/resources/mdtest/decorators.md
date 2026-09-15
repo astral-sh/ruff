@@ -937,7 +937,7 @@ def dynamic(function: object):
     return function
 
 f = lambda: f
-assert f
+assert f  # error: [redundant-condition] "always truthy"
 
 # snapshot: dynamic-function-decorator-return
 @dynamic

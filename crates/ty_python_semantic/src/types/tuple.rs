@@ -333,18 +333,34 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: TupleType<'db>,
         target: TupleType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.check_tuple_spec_pair(db, source.tuple(db), target.tuple(db))
-    }
-
-    fn check_tuple_spec_pair(
-        &self,
-        db: &'db dyn Db,
-        source: &TupleSpec<'db>,
-        target: &TupleSpec<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        match source {
-            Tuple::Fixed(source) => self.check_fixed_length_tuple_vs_tuple_spec(db, source, target),
-            Tuple::Variable(source) => self.check_variable_length_vs_tuple_spec(db, source, target),
+        match source.tuple(db) {
+            Tuple::Fixed(source) => {
+                self.check_fixed_length_tuple_vs_tuple_spec(db, source, target.tuple(db))
+            }
+            Tuple::Variable(source_spec) => {
+                // Lazy assignability can use gradual lengths when the target contains no type
+                // variables. Fixed source elements can still generate constraints on source
+                // type variables. Inferring target type variables from the gradual segment
+                // is not yet supported.
+                let allow_gradual_length = self.is_eager_assignability()
+                    || (self.relation.is_assignability()
+                        && source_spec
+                            .variable()
+                            .gradual_element_type(db, self.env)
+                            .is_some()
+                        && !any_over_type_expanding_aliases(
+                            db,
+                            self.env,
+                            Type::tuple(target),
+                            Type::is_type_var,
+                        ));
+                self.check_variable_length_vs_tuple_spec(
+                    db,
+                    source_spec,
+                    target.tuple(db),
+                    allow_gradual_length,
+                )
+            }
         }
     }
 
@@ -454,6 +470,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
         target: &TupleSpec<'db>,
+        allow_gradual_length: bool,
     ) -> ConstraintSet<'db, 'c> {
         match target {
             Tuple::Fixed(target) => {
@@ -471,7 +488,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // Unlike a dynamic homogeneous segment, a symbolic type variable tuple ranges
                 // over all specializations rather than making a gradual choice of length.
                 let env = self.env;
-                if !self.is_eager_assignability()
+                if !allow_gradual_length
                     || source.variable().gradual_element_type(db, env).is_none()
                 {
                     return self.never();
@@ -687,7 +704,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !self.is_eager_assignability() || !source_variable.is_dynamic() {
+                            if !allow_gradual_length || !source_variable.is_dynamic() {
                                 return self.never();
                             }
                             self.check_type_pair(db, source_variable, other_ty)
@@ -724,7 +741,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !self.is_eager_assignability() || !source_variable.is_dynamic() {
+                            if !allow_gradual_length || !source_variable.is_dynamic() {
                                 return self.never();
                             }
                             self.check_type_pair(db, source_variable, target_ty)
@@ -942,7 +959,7 @@ impl<'db> VariableSegment<'db> {
     ///
     /// Preserve the `TypeVarTuple` here so that variance inference and generic-context traversal
     /// can still observe it. Runtime element operations must use [`Self::element_type`] instead.
-    fn tuple_class_type(self) -> Type<'db> {
+    pub(super) fn tuple_class_type(self) -> Type<'db> {
         match self {
             Self::Homogeneous(element) => element,
             Self::TypeVarTuple(typevartuple) => Type::TypeVar(typevartuple),
@@ -1226,7 +1243,7 @@ impl<T, V> VariableLengthTuple<T, V> {
         self.suffix_elements().iter().copied()
     }
 
-    fn fixed_elements(&self) -> impl Iterator<Item = &T> + '_ {
+    fn fixed_elements(&self) -> impl ExactSizeIterator<Item = &T> + '_ {
         self.fixed_elements.iter()
     }
 
@@ -2515,7 +2532,7 @@ impl<T, V> Tuple<T, V> {
     }
 
     /// Returns an iterator of all of the fixed-length element types of this tuple.
-    pub(crate) fn fixed_elements(&self) -> impl Iterator<Item = &T> + '_ {
+    pub(crate) fn fixed_elements(&self) -> impl ExactSizeIterator<Item = &T> + '_ {
         match self {
             Tuple::Fixed(tuple) => Either::Left(tuple.all_elements().iter()),
             Tuple::Variable(tuple) => Either::Right(tuple.fixed_elements()),

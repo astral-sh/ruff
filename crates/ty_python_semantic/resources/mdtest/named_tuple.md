@@ -209,9 +209,9 @@ a = A(x=B(x=C(x=A(x=None))))
 reveal_type(a.x)  # revealed: B | None
 
 if a.x:
-    reveal_type(a.x and a.x.x)  # revealed: C
-    reveal_type(a.x and a.x.x.x)  # revealed: A
-    reveal_type(a.x and a.x.x.x.x)  # revealed: B | None
+    reveal_type(a.x.x)  # revealed: C
+    reveal_type(a.x.x.x)  # revealed: A
+    reveal_type(a.x.x.x.x)  # revealed: B | None
 
 A(x=42)  # error: [invalid-argument-type]
 

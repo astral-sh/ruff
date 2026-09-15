@@ -2,7 +2,7 @@ use crate::Db;
 use crate::FxOrderSet;
 use crate::ProgramEnvironment;
 use crate::place::PlaceAndQualifiers;
-use crate::types::class::DynamicClassLiteral;
+use crate::types::class::{DynamicClassLiteral, metaclass_instance_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::{VarianceInferable, VarianceTerm};
@@ -319,9 +319,7 @@ impl<'db> SubclassOfType<'db> {
         // And `to_meta_type` will transpose `type[T: C]` into `T: type[C]`, collapse to
         // the upper bound `type[C]`, and transform that to the meta-type `type[M]`, which
         // `to_instance` then resolves to `M`.
-        self.to_meta_type(db, env)
-            .to_instance_approximation(db, env)
-            .expect("the meta-type of a SubclassOf type should always be instantiable")
+        metaclass_instance_type(db, env, self.to_meta_type(db, env))
     }
 
     /// Compute the metatype of this `type[T]`.
@@ -539,16 +537,13 @@ impl<'db> SubclassOfInner<'db> {
             Self::Dynamic(_) | Self::Protocol(_) => None,
             Self::Class(class) => Some(class),
             Self::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db, env) {
-                    None => Some(ClassType::object(db, env)),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                match bound_typevar.require_bound_or_constraints(db, env) {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
                         Self::try_from_instance(db, env, bound)
                             .and_then(|subclass_of| subclass_of.into_class(db, env))
                     }
                     // TODO this is quite imprecise
-                    Some(TypeVarBoundOrConstraints::Constraints(_)) => {
-                        Some(ClassType::object(db, env))
-                    }
+                    TypeVarBoundOrConstraints::Constraints(_) => Some(ClassType::object(db, env)),
                 }
             }
         }
@@ -625,7 +620,7 @@ impl<'db> SubclassOfInner<'db> {
         let bound_typevar = bound_typevar.map_bound_or_constraints(db, |bound_or_constraints| {
             Some(match bound_or_constraints {
                 None => TypeVarBoundOrConstraints::UpperBound(
-                    SubclassOfType::try_from_instance(db, env, Type::object())
+                    SubclassOfType::try_from_instance(db, env, bound_typevar.domain(db).top(db))
                         .unwrap_or(SubclassOfType::subclass_of_unknown()),
                 ),
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {

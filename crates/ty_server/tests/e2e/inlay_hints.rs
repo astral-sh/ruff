@@ -1,10 +1,14 @@
+use std::fmt::Write;
+
 use anyhow::Result;
 use lsp_types::DidOpenTextDocumentNotification;
+use lsp_types::HoverRequest;
 use lsp_types::InlayHintRequest;
 use lsp_types::LanguageKind;
 use lsp_types::{
-    DidOpenTextDocumentParams, InlayHintParams, Position, Range, TextDocumentIdentifier,
-    TextDocumentItem, Uri, WorkDoneProgressParams,
+    DidOpenTextDocumentParams, HoverParams, InlayHintParams, Position, Range,
+    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri,
+    WorkDoneProgressParams,
 };
 use ruff_db::system::SystemPath;
 use ty_server::ClientOptions;
@@ -303,6 +307,74 @@ def get_a() -> A:
       }
     ]
     "#);
+
+    Ok(())
+}
+
+/// A burst of inlay-hint requests must not prevent completed requests or a later hover
+/// from receiving responses.
+#[test]
+fn inlay_hint_burst_does_not_block_responses() -> Result<()> {
+    const REQUEST_COUNT: u32 = 103;
+    const LINES_PER_REQUEST: u32 = 30;
+    const FIRST_ASSIGNMENT_LINE: u32 = 3;
+
+    let workspace_root = SystemPath::new("src");
+    let file = SystemPath::new("src/values.py");
+    let mut content = String::from("def identity(value: int) -> int:\n    return value\n\n");
+    for line in 0..REQUEST_COUNT * LINES_PER_REQUEST {
+        writeln!(content, "value_{line} = identity({line})")?;
+    }
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(file, &content)?
+        .enable_inlay_hints(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(file, &content, 1);
+    let first_range = Range::new(
+        Position::new(FIRST_ASSIGNMENT_LINE, 0),
+        Position::new(FIRST_ASSIGNMENT_LINE + LINES_PER_REQUEST, 0),
+    );
+    assert!(
+        server
+            .inlay_hints_request(file, first_range)
+            .is_some_and(|hints| !hints.is_empty())
+    );
+
+    // Queue the full burst before reading any responses so incoming messages and
+    // completed worker actions compete in the main loop.
+    let uri = server.file_uri(file);
+    let mut request_ids = Vec::with_capacity(REQUEST_COUNT as usize);
+    for index in 0..REQUEST_COUNT {
+        let start = FIRST_ASSIGNMENT_LINE + index * LINES_PER_REQUEST;
+        request_ids.push(server.send_request::<InlayHintRequest>(InlayHintParams {
+            text_document: TextDocumentIdentifier { uri: uri.clone() },
+            range: Range::new(
+                Position::new(start, 0),
+                Position::new(start + LINES_PER_REQUEST, 0),
+            ),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        }));
+    }
+    let hover_id = server.send_request::<HoverRequest>(HoverParams {
+        text_document_position_params: TextDocumentPositionParams {
+            text_document: TextDocumentIdentifier { uri },
+            position: Position::new(FIRST_ASSIGNMENT_LINE, 2),
+        },
+        work_done_progress_params: WorkDoneProgressParams::default(),
+    });
+
+    for id in request_ids {
+        assert!(
+            server
+                .await_response::<InlayHintRequest>(&id)
+                .is_some_and(|hints| !hints.is_empty())
+        );
+    }
+    assert!(server.await_response::<HoverRequest>(&hover_id).is_some());
 
     Ok(())
 }

@@ -11,8 +11,7 @@ use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
-use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_python_codegen::Stylist;
+use ruff_python_ast::{self as ast, AnyNodeRef, StringFlags};
 use ruff_python_literal::escape::{Escape, UnicodeEscape};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
@@ -21,6 +20,7 @@ use ty_module_resolver::{
 };
 use ty_python_core::{ProgramFile, semantic_index};
 use ty_python_semantic::HasType;
+use ty_python_semantic::importer::{ImportRequest, Importer};
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
@@ -29,7 +29,6 @@ use ty_python_semantic::{
 
 use crate::docstring::Docstring;
 use crate::goto::Definitions;
-use crate::importer::{ImportRequest, Importer};
 use crate::symbols::QueryPattern;
 use crate::{Db, all_symbols, signature_help};
 
@@ -59,7 +58,7 @@ pub fn completion<'db>(
             db,
             program_file,
             CollectionContext::none(),
-            UserQuery::fuzzy(None),
+            UserQuery::fuzzy(context.cursor.typed_string_prefix()),
         );
 
         add_string_literal_completions(
@@ -1040,6 +1039,21 @@ impl<'m> ContextCursor<'m> {
         self.tokens_before
             .last()
             .map(|token| token.string_quote_style())
+    }
+
+    /// Returns the source text between the current string's opener and the cursor.
+    fn typed_string_prefix(&self) -> Option<&'m str> {
+        let token = self.tokens_before.last()?;
+        if token.kind() != TokenKind::String || token.end() < self.offset {
+            return None;
+        }
+
+        let content_start = token.start() + token.string_flags()?.opener_len();
+        if content_start >= self.offset {
+            return None;
+        }
+
+        Some(&self.source[TextRange::new(content_start, self.offset)])
     }
 
     fn suppress_callable_parentheses(&self) -> bool {
@@ -2350,6 +2364,9 @@ fn add_string_literal_completions<'db>(
         let Some(insert) = escape_for_quote(&candidate.value, quote_style) else {
             continue;
         };
+        if !completions.query.is_match(&insert) {
+            continue;
+        }
         completions.add_skip_query(
             Completion::builder(candidate.value.as_str())
                 .insert(insert)
@@ -2383,9 +2400,7 @@ fn add_unimported_completions<'db>(
     }
 
     let source_file = file.file(db);
-    let source = source_text(db, source_file);
-    let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
-    let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
+    let importer = Importer::new(db, file, parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
     let importing_file = ImportingFile::File(source_file, file.resolver_environment(db));
 
@@ -7909,16 +7924,13 @@ func(1, "<CURSOR>")
             r#"
 from typing import Literal
 
-value: Literal["x", "y"] = "<CURSOR>"
+value: Literal["apple", "banana"] = "app<CURSOR>"
 "#,
         );
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
-            @r#"
-        x :: Literal["x"]
-        y :: Literal["y"]
-        "#,
+            @r#"apple :: Literal["apple"]"#,
         );
     }
 

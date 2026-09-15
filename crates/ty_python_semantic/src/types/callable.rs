@@ -15,7 +15,7 @@ use crate::{
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
-        visitor, walk_signature, walk_signature_without_return_type,
+        visitor, walk_signature,
     },
 };
 use ty_python_core::definition::Definition;
@@ -113,13 +113,13 @@ impl<'db> Type<'db> {
                 Some(CallableTypes::one(function_literal.into_callable_type(db)))
             }
             Type::BoundMethod(bound_method)
-                if context.is_recursive_reference(db, bound_method.function(db)) =>
+                if bound_method
+                    .function(db)
+                    .is_some_and(|function| context.is_recursive_reference(db, function)) =>
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
-            Type::BoundMethod(bound_method) => {
-                Some(CallableTypes::one(bound_method.into_callable_type(db)))
-            }
+            Type::BoundMethod(bound_method) => bound_method.callables(db, env),
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
@@ -175,7 +175,7 @@ impl<'db> Type<'db> {
                     }
                 }),
                 SubclassOfInner::TypeVar(tvar) => {
-                    match tvar.typevar(db).require_bound_or_constraints(db, env) {
+                    match tvar.require_bound_or_constraints(db, env) {
                         TypeVarBoundOrConstraints::UpperBound(bound) => {
                             let upcast_callables = bound
                                 .constructor_for_typevar_bound(db, env)
@@ -287,6 +287,10 @@ impl<'db> Type<'db> {
                 KnownInstanceType::FunctoolsPartial(partial)
                 | KnownInstanceType::FunctoolsPartialCall(partial),
             ) => Some(CallableTypes::one(partial.partial(db))),
+
+            Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
+                wrapper.callables(db, env)
+            }
 
             Type::Intersection(intersection) => intersection
                 .finite_alternative_union(db, env)
@@ -595,6 +599,14 @@ pub enum CallableTypeKind {
     /// materializations from ordinary callable types in type-relation checks. It does not
     /// carry the runtime `typing.ParamSpec` instance behavior of a `ParamSpec` declaration.
     ParamSpecValue,
+
+    /// Callable objects modeled as instances of Python's `types.MethodWrapperType`.
+    ///
+    /// Accessing `__call__` on a bound method or method descriptor produces a method wrapper.
+    /// It retains the original callable's precise signatures, is always truthy, and exposes
+    /// method-wrapper attributes such as `__name__`, `__qualname__`, and `__self__`. Unlike a
+    /// function-like callable, it does not bind another receiver when stored on a class.
+    MethodWrapper,
 }
 
 /// A "policy" enum that describes how `type[]` types should be upcast
@@ -664,16 +676,8 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     ty: CallableType<'db>,
     visitor: &V,
 ) {
-    if ty.is_paramspec_value(db) {
-        // We normalize the callables that represent the value assigned to a ParamSpec by removing
-        // their return values. A missing return value is usually treated as `Unknown`
-        for signature in &ty.signatures(db).overloads {
-            walk_signature_without_return_type(db, signature, visitor);
-        }
-    } else {
-        for signature in &ty.signatures(db).overloads {
-            walk_signature(db, signature, visitor);
-        }
+    for signature in &ty.signatures(db).overloads {
+        walk_signature(db, signature, visitor);
     }
 }
 
@@ -723,15 +727,46 @@ impl<'db> CallableType<'db> {
     }
 
     fn paramspec_value(db: &'db dyn Db, parameters: Parameters<'db>) -> CallableType<'db> {
-        CallableType::new(
+        Self::paramspec_value_from_signatures(
             db,
             CallableSignature::single(Signature::new(parameters, Type::unknown())),
+        )
+    }
+
+    pub(super) fn paramspec_value_from_signatures(
+        db: &'db dyn Db,
+        signatures: CallableSignature<'db>,
+    ) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            CallableSignature::from_overloads(
+                signatures
+                    .overloads
+                    .into_iter()
+                    .map(Signature::into_paramspec_value),
+            ),
             CallableTypeKind::ParamSpecValue,
         )
     }
 
-    fn is_paramspec_value(self, db: &'db dyn Db) -> bool {
-        self.kind(db) == CallableTypeKind::ParamSpecValue
+    pub(crate) fn is_bottom_paramspec_value(self, db: &'db dyn Db) -> bool {
+        if self.kind(db) != CallableTypeKind::ParamSpecValue {
+            return false;
+        }
+        let [signature] = self.signatures(db).overloads.as_slice() else {
+            return false;
+        };
+        signature.parameters().is_bottom()
+    }
+
+    pub(crate) fn is_top_paramspec_value(self, db: &'db dyn Db) -> bool {
+        if self.kind(db) != CallableTypeKind::ParamSpecValue {
+            return false;
+        }
+        let [signature] = self.signatures(db).overloads.as_slice() else {
+            return false;
+        };
+        signature.parameters().is_top()
     }
 
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
@@ -739,8 +774,17 @@ impl<'db> CallableType<'db> {
         Self::single(db, Signature::unknown())
     }
 
+    /// Create the fully static `Top[Callable[..., object]]` type.
+    pub(crate) fn top(db: &'db dyn Db) -> CallableType<'db> {
+        Self::single(db, Signature::new(Parameters::top(), Type::object()))
+    }
+
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::FunctionLike)
+    }
+
+    pub(crate) fn is_method_wrapper(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), CallableTypeKind::MethodWrapper)
     }
 
     fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
@@ -773,30 +817,24 @@ impl<'db> CallableType<'db> {
         self.with_kind(db, CallableTypeKind::Regular)
     }
 
+    pub(crate) fn into_method_wrapper(self, db: &'db dyn Db) -> CallableType<'db> {
+        self.with_kind(db, CallableTypeKind::MethodWrapper)
+    }
+
     /// Retain every parameter signature and its generic context, but erase return types
     /// that do not participate in a `ParamSpec` specialization.
     pub(crate) fn into_paramspec_value(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(
-            db,
-            CallableSignature::from_overloads(
-                self.signatures(db)
-                    .iter()
-                    .cloned()
-                    .map(|signature| signature.with_return_type(Type::unknown())),
-            ),
-            CallableTypeKind::ParamSpecValue,
-        )
+        Self::paramspec_value_from_signatures(db, self.signatures(db).clone())
     }
 
     /// Returns the reduced callable produced by partially applying selected overloads.
     pub(crate) fn partially_apply(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
         overloads: impl IntoIterator<Item = PartialSignatureApplication<'db>>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
-            CallableSignature::partially_apply(db, env, overloads)?,
+            CallableSignature::partially_apply(db, overloads)?,
             CallableTypeKind::Regular,
         ))
     }
@@ -828,11 +866,26 @@ impl<'db> CallableType<'db> {
         env: &ProgramEnvironment<'db>,
         self_type: Option<Type<'db>>,
     ) -> CallableType<'db> {
+        self.bind_self_with_receiver(db, env, self_type, self_type)
+    }
+
+    /// Binds the runtime receiver while using `typing_self_type` to replace `typing.Self`.
+    pub(crate) fn bind_self_with_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Option<Type<'db>>,
+        typing_self_type: Option<Type<'db>>,
+    ) -> CallableType<'db> {
         if self.is_dunder_paramspec(db) {
             return self.into_regular(db);
         }
 
-        self.with_signatures(db, self.signatures(db).bind_self(db, env, self_type))
+        self.with_signatures(
+            db,
+            self.signatures(db)
+                .bind_self_with_receiver(db, env, receiver_type, typing_self_type),
+        )
     }
 
     pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
@@ -1030,6 +1083,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if target.is_function_like(db) && !source.is_function_like(db) {
             return self.never();
         }
+        if target.is_method_wrapper(db) && !source.is_method_wrapper(db) {
+            return self.never();
+        }
+
         self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
     }
 
@@ -1042,5 +1099,29 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source.iter().when_all(db, self.constraints, |element| {
             self.check_callable_pair(db, *element, target)
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::db::tests::setup_db;
+    use crate::types::{Parameter, Type};
+
+    #[test]
+    fn paramspec_value_materializations_do_not_add_return_type() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let paramspec_value = Type::paramspec_value_callable(
+            &db,
+            Parameters::standard([
+                Parameter::positional_only(None).with_annotated_type(Type::object())
+            ]),
+        );
+        let bottom = paramspec_value.bottom_materialization(&db, &env);
+        assert_eq!(paramspec_value, bottom);
+        let top = paramspec_value.top_materialization(&db, &env);
+        assert_eq!(paramspec_value, top);
     }
 }

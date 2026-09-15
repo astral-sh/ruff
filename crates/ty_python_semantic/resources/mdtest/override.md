@@ -186,6 +186,457 @@ class Foo:
     def bar(self): ...  # error: [invalid-explicit-override]
 ```
 
+## Constructor signature compatibility
+
+Constructors can have different signatures from those on their superclasses. Decorating a
+constructor with `@override` opts into signature compatibility checks, so it must accept every
+argument combination accepted by the superclass constructor.
+
+```pyi
+from typing_extensions import override
+
+class Parent:
+    def __init__(self, value: int) -> None: ...
+    def __new__(cls, value: int) -> Parent: ...
+
+class Compatible(Parent):
+    @override
+    def __init__(self, value: int) -> None: ...
+    @override
+    def __new__(cls, value: int) -> Compatible: ...
+```
+
+Adding an optional parameter also preserves every call accepted by the parent:
+
+```pyi
+class Wider(Parent):
+    @override
+    def __init__(self, value: int, extra: int = 0) -> None: ...
+    @override
+    def __new__(cls, value: int, extra: int = 0) -> Wider: ...
+```
+
+Changing the parameter type from `int` to `str` is incompatible when the constructor is explicitly
+marked as an override:
+
+```pyi
+class Incompatible(Parent):
+    @override
+    def __init__(self, value: str) -> None: ...  # error: [invalid-method-override]
+    @override
+    def __new__(cls, value: str) -> Incompatible: ...  # error: [invalid-method-override]
+```
+
+The same signatures are allowed without `@override`:
+
+```pyi
+class Undecorated(Parent):
+    def __init__(self, value: str) -> None: ...
+    def __new__(cls, value: str) -> Undecorated: ...
+```
+
+## Constructor overrides with `Self` parameters
+
+`Self` is a type variable bounded by the class that defines the method. The parent's constructor
+accepts any subtype of `Parent`, while each subclass narrows `other` to its own subtypes. These
+overrides violate the Liskov substitution principle, with either an implicit or explicit `self`
+annotation.
+
+```pyi
+from typing_extensions import Self, override
+
+class Parent:
+    def __init__(self, other: Self) -> None: ...
+
+class ImplicitReceiver(Parent):
+    @override
+    # TODO: This should report `invalid-method-override`. We incorrectly bind inherited
+    # `Self` to the subclass. See https://github.com/astral-sh/ty/issues/2255 and
+    # https://github.com/astral-sh/ty/issues/4133 for the related generic method subtyping gap.
+    def __init__(self, other: Self) -> None: ...
+
+class ExplicitReceiver(Parent):
+    @override
+    # TODO: This should report `invalid-method-override`.
+    def __init__(self: Self, other: Self) -> None: ...
+```
+
+A constructor that instead accepts an unrelated type is incompatible:
+
+```pyi
+class Incompatible(Parent):
+    @override
+    def __init__(self, other: int) -> None: ...  # error: [invalid-method-override]
+```
+
+## Generic constructor overrides
+
+Constructor compatibility uses the superclass's specialized type parameters. Return types are
+covariant, so returning `Self` from the subclass is compatible with the parent's `Self` return type:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing_extensions import Self, override
+
+class Parent[T]:
+    def __new__(cls, value: T) -> Self: ...
+
+class Compatible(Parent[int]):
+    @override
+    def __new__(cls, value: int) -> Self: ...
+
+class Incompatible(Parent[int]):
+    @override
+    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
+```
+
+## Constructor overloads with specialized receivers
+
+Only `__new__` overloads whose `cls` annotation accepts the subclass constrain a constructor
+override. A subclass of `Parent[int]` does not need to accept arguments required only for
+`Parent[str]`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing_extensions import overload, override
+
+class Parent[T]:
+    @overload
+    def __new__(cls: type[Parent[int]], value: int) -> Parent[int]: ...
+    @overload
+    def __new__(cls: type[Parent[str]], value: str) -> Parent[str]: ...
+
+class IntChild(Parent[int]):
+    @override
+    def __new__(cls, value: int) -> IntChild: ...
+
+class StrChild(Parent[str]):
+    @override
+    def __new__(cls, value: str) -> StrChild: ...
+```
+
+The override must still accept the arguments of the applicable overload:
+
+```pyi
+class Incompatible(Parent[int]):
+    @override
+    def __new__(cls, value: str) -> Incompatible: ...  # error: [invalid-method-override]
+```
+
+## Decorated constructor overrides
+
+A decorator can expose `__new__` as a `Callable`. Construction still supplies its `cls` parameter,
+so override checking compares the remaining parameters:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing_extensions import Callable, Self, override
+
+def preserve_signature[**P, R](function: Callable[P, R]) -> Callable[P, R]: ...
+
+class Parent:
+    @preserve_signature
+    def __new__(cls, value: int) -> Self: ...
+
+class Compatible(Parent):
+    @override
+    def __new__(cls, value: int) -> Self: ...
+
+class Incompatible(Parent):
+    @override
+    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
+```
+
+## Constructor overrides with signature-changing decorators
+
+An override must accept the parameters exposed by a decorator, even when they differ from the
+original `__new__` signature. Here, the decorator changes `value` from `int` to `str` while
+preserving the implicit `cls` parameter:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing_extensions import Callable, Self, override
+
+def replace_parameter[C, R](function: Callable[[C, int], R]) -> Callable[[C, str], R]: ...
+
+class Parent:
+    @replace_parameter
+    def __new__(cls, value: int) -> Self: ...
+
+class Compatible(Parent):
+    @override
+    def __new__(cls, value: str) -> Self: ...
+
+class Incompatible(Parent):
+    @override
+    def __new__(cls, value: int) -> Self: ...  # error: [invalid-method-override]
+```
+
+## Overrides of callable-instance constructors
+
+When `__new__` is a callable instance, its `__call__` method receives both the callable instance and
+the class being constructed. Both receivers are supplied implicitly during construction, so
+compatibility depends on the remaining arguments:
+
+```pyi
+from typing_extensions import override
+
+class Factory:
+    def __call__(self, cls: type[Parent], value: int) -> Parent: ...
+
+class Parent:
+    __new__ = Factory()
+
+class Compatible(Parent):
+    @override
+    def __new__(cls, value: int) -> Compatible: ...
+
+class Incompatible(Parent):
+    @override
+    def __new__(cls, value: str) -> Incompatible: ...  # error: [invalid-method-override]
+```
+
+## Constructor overrides with callback-protocol decorators
+
+A decorator can expose `__new__` as a callback protocol. As with a callable instance, override
+checking binds the protocol's `__call__` receiver before binding the constructor's `cls` parameter:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing_extensions import Callable, Protocol, Self, override
+
+class Callback[**P, R](Protocol):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
+
+def preserve_signature[**P, R](function: Callable[P, R]) -> Callback[P, R]: ...
+
+class Parent:
+    @preserve_signature
+    def __new__(cls, value: int) -> Self: ...
+
+class Compatible(Parent):
+    @override
+    def __new__(cls, value: int) -> Self: ...
+
+class Incompatible(Parent):
+    @override
+    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
+```
+
+## Overrides of classmethod constructors
+
+Unlike the usual static `__new__`, a classmethod `__new__` receives the class twice: once from
+descriptor binding and once from construction. A plain `__new__` override has only one implicit
+receiver, but must accept the same explicit arguments:
+
+```pyi
+from typing_extensions import Self, override
+
+class Parent:
+    @classmethod
+    def __new__(cls, constructed_class: type[Self], value: int) -> Self: ...
+
+class Compatible(Parent):
+    @override
+    def __new__(cls, value: int) -> Self: ...
+
+class Incompatible(Parent):
+    @override
+    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
+```
+
+The overriding constructor can also be a classmethod, with both receivers supplied implicitly:
+
+```pyi
+class CompatibleClassMethod(Parent):
+    @classmethod
+    @override
+    def __new__(cls, constructed_class: type[Self], value: int) -> Self: ...
+
+class IncompatibleClassMethod(Parent):
+    @classmethod
+    @override
+    def __new__(cls, constructed_class: type[Self], value: str) -> Self: ...  # error: [invalid-method-override]
+```
+
+## Overrides of decorated classmethod constructors
+
+A signature-preserving decorator on a classmethod `__new__` does not change which overrides are
+compatible. Both implicit receivers are class objects; the descriptor's `cls` is not an instance of
+the subclass:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing_extensions import Callable, Self, override
+
+def preserve_signature[**P, R](function: Callable[P, R]) -> Callable[P, R]: ...
+
+class Parent:
+    @classmethod
+    @preserve_signature
+    def __new__(cls: type[Parent], constructed_class: type[Parent], value: int) -> Parent: ...
+
+class Compatible(Parent):
+    @override
+    def __new__(cls, value: int) -> Compatible: ...
+
+class Incompatible(Parent):
+    @override
+    def __new__(cls, value: str) -> Incompatible: ...  # error: [invalid-method-override]
+```
+
+`type[Self]` annotates each implicit class receiver, while the return `Self` denotes an instance.
+Returning a subclass instance is compatible with the parent's covariant return type:
+
+```pyi
+class SelfParent:
+    @classmethod
+    @preserve_signature
+    def __new__(cls: type[Self], constructed_class: type[Self], value: int) -> Self: ...
+
+class SelfCompatible(SelfParent):
+    @override
+    def __new__(cls, value: int) -> Self: ...
+```
+
+## Overrides of generated `NamedTuple` constructors
+
+A subclass can explicitly override a generated `NamedTuple` constructor with a compatible signature.
+The override must still accept the field types declared on the named tuple:
+
+```pyi
+from typing_extensions import NamedTuple, Self, override
+
+class Parent(NamedTuple):
+    value: int
+
+class Compatible(Parent):
+    @override
+    def __new__(cls, value: int) -> Self: ...
+
+class Incompatible(Parent):
+    @override
+    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
+```
+
+## Overrides of functional `NamedTuple` constructors
+
+The functional `NamedTuple` form also generates a constructor from its declared fields. A compatible
+override accepts those fields rather than the iterable accepted by `tuple.__new__`:
+
+```pyi
+from typing_extensions import NamedTuple, Self, override
+
+Parent = NamedTuple("Parent", [("value", int)])
+
+class Compatible(Parent):
+    @override
+    def __new__(cls, value: int) -> Self: ...
+
+class Incompatible(Parent):
+    @override
+    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override] "Parent.__new__"
+```
+
+## Constructor overrides with inherited incompatibilities
+
+An undecorated constructor can change the parameters accepted by its parent. An explicit override in
+a further subclass can preserve that new signature without also satisfying the older one:
+
+```pyi
+from typing_extensions import Self, override
+
+class Grandparent:
+    def __new__(cls, value: int) -> Self: ...
+
+class Parent(Grandparent):
+    def __new__(cls, value: str) -> Self: ...
+
+class Child(Parent):
+    @override
+    def __new__(cls, value: str) -> Self: ...
+```
+
+## Constructor overrides checked against a grandparent
+
+The immediate parent can accept every call while the grandparent still imposes a narrower
+constructor signature. The diagnostic for the child names `Grandparent`, whose `int` argument the
+override does not accept:
+
+```pyi
+from typing import Any
+from typing_extensions import override
+
+class Grandparent:
+    def __init__(self, x: int) -> None: ...
+
+class Parent(Grandparent):
+    def __init__(self, *args: Any, **kwargs: Any) -> None: ...
+
+class Child(Parent):
+    @override
+    def __init__(self, x: str) -> None: ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `__init__`
+  --> src/mdtest_snippet.pyi:12:9
+   |
+12 |     def __init__(self, x: str) -> None: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Grandparent.__init__`
+   |
+  ::: src/mdtest_snippet.pyi:5:9
+   |
+ 5 |     def __init__(self, x: int) -> None: ...
+   |         ------------------------------ `Grandparent.__init__` defined here
+info: parameter `x` has an incompatible type: `int` is not assignable to `str`
+info: This violates the Liskov Substitution Principle
+```
+
+## Constructor overrides with inherited `Self` returns
+
+Returning `Parent` satisfies the inherited `Self` return annotation when constructing `Parent`.
+Returning `Parent` from `Child` violates that annotation: it promises an instance of `Child`. The
+parent's valid override does not exempt the child from this check:
+
+```pyi
+from typing_extensions import Self, override
+
+class Grandparent:
+    def __new__(cls) -> Self: ...
+
+class Parent(Grandparent):
+    def __new__(cls) -> Parent: ...
+
+class Child(Parent):
+    @override
+    def __new__(cls) -> Parent: ...  # error: [invalid-method-override]
+```
+
 ## Missing `@override` decorator
 
 ```toml

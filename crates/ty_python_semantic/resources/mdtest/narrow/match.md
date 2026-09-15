@@ -2638,7 +2638,7 @@ class IntReader:
 def f(reader: IntReader | None):
     match reader:
         case Reader():
-            reveal_type(reader.read())  # revealed: int & Any
+            reveal_type(reader.read())  # revealed: int
         case _:
             reveal_type(reader)  # revealed: None
 ```
@@ -3962,8 +3962,10 @@ class C:
 
 def _(x: Literal["foo", b"bar"] | int):
     match x:
+        # error: [redundant-condition] "always truthy"
         case "foo" if reveal_type(x):  # revealed: Literal["foo"]
             pass
+        # error: [redundant-condition] "always truthy"
         case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"]
             pass
         case 42 if reveal_type(x):  # revealed: Literal[42]
@@ -4062,8 +4064,10 @@ from typing import Literal
 
 def _(x: Literal["foo", b"bar"] | int):
     match x:
+        # error: [redundant-condition] "always truthy"
         case "foo" | 42 if reveal_type(x):  # revealed: Literal["foo", 42]
             pass
+        # error: [redundant-condition] "always truthy"
         case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"]
             pass
         case _ if reveal_type(x):  # revealed: int & ~Literal[42]
@@ -4102,6 +4106,7 @@ match x:
         pass
     case False if x and reveal_type(x):  #  revealed: Never
         pass
+    # error: [redundant-condition] "always truthy"
     case "foo" if (x := "bar") and reveal_type(x):  #  revealed: Literal["bar"]
         pass
 
@@ -4294,20 +4299,39 @@ def multiple_tags(x: tuple[Literal["a"], int] | tuple[Literal["b", "c"], str]):
             reveal_type(x)  # revealed: tuple[Literal["b", "c"], str]
 ```
 
-Narrowing is restricted to `Literal` tag elements:
+Integer patterns also match `IntEnum` members with the same value:
 
 ```py
-def _(x: tuple[Literal["tag1"], A] | tuple[str, B]):
+from enum import IntEnum
+
+class IntTag(IntEnum):
+    A = 1
+    B = 2
+
+def enum_tag_equal_to_integer(
+    x: tuple[Literal[IntTag.A], int] | tuple[Literal[1], str] | tuple[Literal[2], bytes],
+):
     match x[0]:
-        case "tag1":
-            # Can't narrow because second tuple has `str` (not literal) at index 0
-            reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | tuple[str, B]
+        case 1:
+            reveal_type(x)  # revealed: tuple[Literal[IntTag.A], int] | tuple[Literal[1], str]
         case _:
-            # But we *can* narrow with inequality
-            reveal_type(x)  # revealed: tuple[str, B]
+            reveal_type(x)  # revealed: tuple[Literal[2], bytes]
 ```
 
-and it is also restricted to `match` patterns that solely consist of value patterns:
+A broad tag keeps its tuple possible in both branches, while other tuples can still be excluded
+based on their literal tags:
+
+```py
+def _(x: tuple[Literal["tag1"], A] | tuple[str, B] | tuple[Literal["tag2"], C]):
+    match x[0]:
+        case "tag1":
+            reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | tuple[str, B]
+        case _:
+            reveal_type(x)  # revealed: tuple[str, B] | tuple[Literal["tag2"], C]
+```
+
+A broad value pattern can match either tag, so another alternative in the same OR pattern does not
+rule out either tuple:
 
 ```py
 class Config:
@@ -4385,4 +4409,56 @@ def _(x: A | B | C):
             reveal_type(x)  # revealed: A | B
         case _:
             reveal_type(x)  # revealed: B | C
+```
+
+An `IntEnum` value pattern can match both an enum tag and an equal integer tag. Neither alternative
+remains in the default branch:
+
+```py
+from enum import Enum, IntEnum
+
+class IntTag(IntEnum):
+    A = 1
+    B = 2
+
+class IntegerTag:
+    tag: Literal[1]
+
+class EnumTag:
+    tag: Literal[IntTag.A]
+
+class OtherTag:
+    tag: Literal[2]
+
+def integer_tag_equal_to_enum(x: IntegerTag | EnumTag | OtherTag):
+    match x.tag:
+        case IntTag.A:
+            reveal_type(x)  # revealed: IntegerTag | EnumTag
+        case _:
+            reveal_type(x)  # revealed: OtherTag
+```
+
+A failed value pattern uses the negation of equality, not `__ne__`. An enum member whose custom
+`__ne__` always returns false can still fail to match the pattern:
+
+```py
+class NeverUnequal(Enum):
+    A = 1
+    B = 2
+
+    def __ne__(self, other: object) -> Literal[False]:
+        return False
+
+class UnequalTag:
+    tag: Literal[NeverUnequal.A]
+
+class StringTag:
+    tag: Literal["a"]
+
+def custom_inequality(x: UnequalTag | StringTag):
+    match x.tag:
+        case "a":
+            reveal_type(x)  # revealed: StringTag
+        case _:
+            reveal_type(x)  # revealed: UnequalTag
 ```

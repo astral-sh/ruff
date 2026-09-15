@@ -497,7 +497,7 @@ impl Options {
                 output_format: terminal.output_format,
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
             });
-        let src = strategy.fallback(src, |_| SrcSettings::default())?;
+        let src = strategy.fallback(src, |_| SrcSettings::default(context.configuration_root()))?;
 
         let mut analysis_diagnostics = Vec::new();
         let analysis = self
@@ -1338,9 +1338,11 @@ fn build_exclude_filter(
     let system = db.system();
     let mut excludes = ExcludeFilterBuilder::new();
 
+    // Like excludes in a `ty.toml`, default excludes only apply under the project root.
+    // An explicit `../sibling/dist` is not excluded by project defaults.
     for pattern in default_patterns {
         PortableGlobPattern::parse(pattern, PortableGlobKind::Exclude)
-            .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
+            .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(project_root))?))
             .unwrap_or_else(|err| {
                 panic!("Expected default exclude to be valid glob but adding it failed with: {err}")
             });
@@ -1541,7 +1543,7 @@ pub struct TerminalOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
     /// Whether ty should use strict narrowing for unspecialized generic classes in
-    /// `isinstance()` and `issubclass()` checks, as well as `match` class patterns.
+    /// `isinstance()` and `issubclass()` checks, `match` class patterns, and `TypeIs` checks.
     ///
     /// When enabled, ty narrows to the top materialization of the class. For example,
     /// `isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,

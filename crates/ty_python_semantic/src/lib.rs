@@ -19,8 +19,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
 use rustc_hash::FxHasher;
 pub use semantic_model::{
-    Completion, ExpectedStringLiteralCompletion, HasDefinition, HasType, MemberDefinition,
-    NameKind, SemanticModel,
+    Completion, ExpectedStringLiteralCompletion, HasDefinition, HasType, NameKind, SemanticModel,
 };
 use std::hash::BuildHasherDefault;
 pub use suppression::suppress_single;
@@ -49,14 +48,15 @@ pub use types::ide_support::{
 };
 pub use types::{
     DisplaySettings, FixtureBinding, FixtureExposure, FixtureNameSource, ProgramEnvironment,
-    TypeQualifiers, fixture_bindings_for_parameter, fixture_exposures_for_definition,
-    pytest_global_plugin_files,
+    PytestTest, TypeQualifiers, fixture_bindings_for_parameter, fixture_exposures_for_definition,
+    pytest_global_plugin_files, pytest_tests_in_file,
 };
 
 mod db;
 pub mod dependency;
 mod dunder_all;
 mod fixes;
+pub mod importer;
 mod lexical_name_path;
 pub mod lint;
 pub(crate) mod place;

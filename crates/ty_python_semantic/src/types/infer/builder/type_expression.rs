@@ -28,9 +28,9 @@ use ty_python_core::scope::ScopeKind;
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder,
     IntersectionType, InvalidTypeExpression, KnownClass, KnownInstanceType, LintDiagnosticGuard,
-    LiteralValueTypeKind, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
-    TypeContext, TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder,
-    UnionType, any_over_type, todo_type,
+    Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeContext, TypeFormType,
+    TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type,
+    todo_type,
 };
 use crate::{FxOrderSet, SemanticModel, add_inferred_python_version_hint_to_diagnostic};
 
@@ -150,6 +150,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 || builder
                     .inference_flags()
                     .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
+        };
+        let ignore_experimental_runtime_errors = |builder: &Self| {
+            ignore_runtime_errors(builder)
+                || matches!(builder.scope.scope(db).kind(), ScopeKind::TypeAlias)
         };
 
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
@@ -405,7 +409,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let left_ty = self.infer_type_expression(&binary.left);
                         let right_ty = self.infer_type_expression(&binary.right);
 
-                        if !ignore_runtime_errors(self) {
+                        if !ignore_experimental_runtime_errors(self) {
                             // Infer the operands as values to report the types used by the runtime
                             // operation rather than their interpretation as type expressions.
                             let mut speculative_builder = self.speculate_without_diagnostics();
@@ -473,6 +477,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         diagnostic.set_primary_annotation_message(format_args!(
                             "Did you mean `typing.Literal[b\"{valid_string}\"]`?"
                         ));
+                        diagnostic::autofix_with_literal(
+                            &self.context,
+                            &mut diagnostic,
+                            expression,
+                        );
                     }
                 }
                 Type::unknown()
@@ -493,6 +502,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         diagnostic.set_primary_annotation_message(format_args!(
                             "Did you mean `typing.Literal[{int}]`?"
                         ));
+                        diagnostic::autofix_with_literal(
+                            &self.context,
+                            &mut diagnostic,
+                            expression,
+                        );
                     }
                 }
 
@@ -539,6 +553,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         "Did you mean `typing.Literal[{}]`?",
                         if bool_value.value { "True" } else { "False" }
                     ));
+                    diagnostic::autofix_with_literal(&self.context, &mut diagnostic, expression);
                 }
                 Type::unknown()
             }
@@ -707,7 +722,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let operand_ty = self.infer_type_expression(operand);
 
-                if !ignore_runtime_errors(self) {
+                if !ignore_experimental_runtime_errors(self) {
                     let operand_value = self
                         .speculate_without_diagnostics()
                         .infer_expression(operand, TypeContext::default());
@@ -1903,6 +1918,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
+                KnownInstanceType::MethodWrapper(wrapper) => {
+                    if !self.in_string_annotation() {
+                        self.infer_expression(&subscript.slice, TypeContext::default());
+                    }
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`{}` instances cannot be specialized",
+                            wrapper.class(db).name(env.python_version(db)),
+                        ));
+                    }
+                    Type::unknown()
+                }
                 KnownInstanceType::Range { .. } => {
                     if !self.in_string_annotation() {
                         self.infer_expression(&subscript.slice, TypeContext::default());
@@ -1971,8 +1998,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             Type::Union(union) => {
                 let db = self.db();
-                let mut union_builder =
-                    UnionBuilder::new(db, env).recursively_defined(union.recursively_defined(db));
+                let mut union_builder = UnionBuilder::new(db, env)
+                    .or_recursively_defined(union.recursively_defined(db));
 
                 for (index, element) in union.elements(db).iter().enumerate() {
                     let mut speculative_builder = self.speculate();
@@ -2757,59 +2784,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
             SpecialFormType::LiteralString => {
-                let arguments = self.infer_expression(arguments_slice, TypeContext::default());
+                self.infer_expression(arguments_slice, TypeContext::default());
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     let mut diag =
                         builder.into_diagnostic("`LiteralString` expects no type parameter");
 
-                    let argument_elements = if self.in_string_annotation() {
-                        let argument_expressions = match arguments_slice {
-                            ast::Expr::Tuple(tuple) => tuple.elts.as_slice(),
-                            _ => std::slice::from_ref(arguments_slice),
-                        };
-                        let mut builder = self.speculate_without_diagnostics();
-                        argument_expressions
-                            .iter()
-                            .map(|argument| {
-                                builder
-                                    .infer_literal_parameter_type(argument)
-                                    .unwrap_or(Type::unknown())
-                            })
-                            .collect::<Vec<_>>()
-                    } else {
-                        let arguments_as_tuple = arguments.exact_tuple_instance_spec(db);
-                        arguments_as_tuple.as_ref().map_or_else(
-                            || vec![arguments],
-                            |tuple| tuple.iter_element_types(db).collect(),
-                        )
-                    };
-
-                    let probably_meant_literal = argument_elements.into_iter().all(|ty| {
-                        let elements = match ty {
-                            Type::Union(union) => union.elements(db),
-                            _ => std::slice::from_ref(&ty),
-                        };
-
-                        elements.iter().all(|ty| match ty {
-                            Type::LiteralValue(literal)
-                                if matches!(
-                                    literal.kind(),
-                                    LiteralValueTypeKind::String(_)
-                                        | LiteralValueTypeKind::Bytes(_)
-                                        | LiteralValueTypeKind::Enum(_)
-                                        | LiteralValueTypeKind::Bool(_)
-                                ) =>
-                            {
-                                true
-                            }
-                            Type::NominalInstance(instance) => {
-                                instance.has_known_class(db, KnownClass::NoneType)
-                            }
-                            _ => false,
-                        })
-                    });
-
-                    if probably_meant_literal {
+                    if self
+                        .speculate_without_diagnostics()
+                        .infer_literal_parameter_type(arguments_slice)
+                        .is_ok()
+                    {
                         diag.annotate(
                             self.context
                                 .secondary(&*subscript.value)
@@ -2818,6 +2802,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         diag.set_concise_message(
                             "`LiteralString` expects no type parameter - did you mean `Literal`?",
                         );
+                        if let Some(action) = diagnostic::import_literal_for_fix(
+                            &self.context,
+                            subscript.value.start(),
+                        ) {
+                            diag.help("Replace `LiteralString` with `Literal`");
+                            diag.set_fix(Fix::unsafe_edits(
+                                Edit::range_replacement(
+                                    action.symbol_text().to_string(),
+                                    subscript.value.range(),
+                                ),
+                                action.import().cloned(),
+                            ));
+                        }
                     }
                 }
                 Type::unknown()

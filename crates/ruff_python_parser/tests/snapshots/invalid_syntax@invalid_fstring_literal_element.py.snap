@@ -20,27 +20,25 @@ Module(
                             range: 0..26,
                             value: FStringValue {
                                 inner: Single(
-                                    FString(
-                                        FString {
-                                            range: 0..26,
-                                            node_index: NodeIndex(None),
-                                            elements: [
-                                                Literal(
-                                                    InterpolatedStringLiteralElement {
-                                                        range: 2..25,
-                                                        node_index: NodeIndex(None),
-                                                        value: "",
-                                                    },
-                                                ),
-                                            ],
-                                            flags: FStringFlags {
-                                                quote_style: Single,
-                                                prefix: Regular,
-                                                triple_quoted: false,
-                                                unclosed: false,
-                                            },
+                                    FString {
+                                        range: 0..26,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Literal(
+                                                InterpolatedStringLiteralElement {
+                                                    range: 2..25,
+                                                    node_index: NodeIndex(None),
+                                                    value: "",
+                                                },
+                                            ),
+                                        ],
+                                        flags: FStringFlags {
+                                            quote_style: Single,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                            unclosed: false,
                                         },
-                                    ),
+                                    },
                                 ),
                             },
                         },
@@ -57,27 +55,25 @@ Module(
                             range: 27..57,
                             value: FStringValue {
                                 inner: Single(
-                                    FString(
-                                        FString {
-                                            range: 27..57,
-                                            node_index: NodeIndex(None),
-                                            elements: [
-                                                Literal(
-                                                    InterpolatedStringLiteralElement {
-                                                        range: 31..54,
-                                                        node_index: NodeIndex(None),
-                                                        value: "",
-                                                    },
-                                                ),
-                                            ],
-                                            flags: FStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: true,
-                                                unclosed: false,
-                                            },
+                                    FString {
+                                        range: 27..57,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Literal(
+                                                InterpolatedStringLiteralElement {
+                                                    range: 31..54,
+                                                    node_index: NodeIndex(None),
+                                                    value: "",
+                                                },
+                                            ),
+                                        ],
+                                        flags: FStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: true,
+                                            unclosed: false,
                                         },
-                                    ),
+                                    },
                                 ),
                             },
                         },

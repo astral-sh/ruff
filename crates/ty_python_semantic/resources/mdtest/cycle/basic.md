@@ -7,7 +7,7 @@ inferring the lambda's return type, which depends on that same assignment.
 
 ```py
 (f := lambda: f)
-while lambda: f:
+while lambda: f:  # error: [redundant-condition] "always truthy"
     pass
 f = 0
 ```
@@ -18,7 +18,7 @@ The same cycle can arise when a conditional filters the bindings visible to a re
 
 ```py
 f = lambda: f
-if not (lambda: f):
+if not (lambda: f):  # error: [redundant-condition] "always truthy"
     f = 0
 ```
 
@@ -264,7 +264,7 @@ an earlier assertion and prevent inference from converging. This is a regression
 
 ```py
 f = lambda: f
-assert f
+assert f  # error: [redundant-condition] "always truthy"
 
 @property
 def f(x=lambda: f): ...
@@ -274,7 +274,7 @@ The same cycle must converge when the parameter and return type are annotated:
 
 ```py
 g = lambda: g
-assert g
+assert g  # error: [redundant-condition] "always truthy"
 
 @property
 def g(x: object = lambda: g) -> None: ...
@@ -293,7 +293,7 @@ def decorator(value: int) -> int:
     return value
 
 f = lambda: f
-assert f
+assert f  # error: [redundant-condition] "always truthy"
 
 # error: [invalid-argument-type] "Expected `int`, found `def f(x=...) -> Unknown`"
 @decorator
@@ -306,7 +306,7 @@ Constructing a property explicitly has the same behavior as decorator syntax:
 
 ```py
 f = lambda: f
-assert f
+assert f  # error: [redundant-condition] "always truthy"
 
 def getter(x=lambda: f): ...
 
@@ -326,7 +326,7 @@ def decorator(fn: Callable[[Any], Any]) -> Callable[[Any], Any]:
     return fn
 
 f = lambda: f
-assert f
+assert f  # error: [redundant-condition] "always truthy"
 
 @decorator
 def f(x=lambda: f): ...
@@ -349,7 +349,7 @@ def decorator[**P](fn: Callable[P, None]) -> Callable[[], None]:
     return lambda: None
 
 f = lambda: f
-assert f
+assert f  # error: [redundant-condition] "always truthy"
 
 @decorator
 def f(x=lambda: f) -> None: ...
@@ -369,7 +369,7 @@ python-version = "3.12"
 
 ```py
 f = lambda: f
-assert f
+assert f  # error: [redundant-condition] "always truthy"
 
 @property
 def f[T](value: T, callback=lambda: f) -> T:

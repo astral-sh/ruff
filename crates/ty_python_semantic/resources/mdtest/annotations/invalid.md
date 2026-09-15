@@ -1366,17 +1366,498 @@ def decorator(fn: callable) -> callable:
 
 ### AST nodes that are only valid inside `Literal`
 
-<!-- snapshot-diagnostics -->
+An annotation such as `x: 42` is invalid. To restrict `x` to the value `42`, a user must write
+`x: Literal[42]` instead. The same applies to bytes and boolean literals. We offer an unsafe fix
+that wraps these values in `Literal[...]`, importing `Literal` if needed. We also offer this fix for
+a string that cannot be parsed as a forward annotation.
+
+```toml
+[environment]
+python-version = "3.8"
+```
+
+#### Literal values
+
+`Literal` can be imported from `typing` starting with Python 3.8.
 
 ```py
 def bad(
-    # error: [invalid-type-form]
+    # snapshot: invalid-type-form
     a: 42,
-    # error: [invalid-type-form]
+    # snapshot: invalid-type-form
     b: b"42",
-    # error: [invalid-type-form]
+    # snapshot: invalid-type-form
     c: True,
-    # error: [invalid-syntax-in-forward-annotation]
+    # snapshot: invalid-syntax-in-forward-annotation
     d: "invalid syntax",
 ): ...
+```
+
+```snapshot
+error[invalid-type-form]: Int literals are not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:3:8
+  |
+3 |     a: 42,
+  |        ^^ Did you mean `typing.Literal[42]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Wrap in `Literal[...]`
+  |
+1 + from typing import Literal
+2 | def bad(
+3 |     # snapshot: invalid-type-form
+  -     a: 42,
+4 +     a: Literal[42],
+5 |     # snapshot: invalid-type-form
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+
+error[invalid-type-form]: Bytes literals are not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:5:8
+  |
+5 |     b: b"42",
+  |        ^^^^^ Did you mean `typing.Literal[b"42"]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Wrap in `Literal[...]`
+  |
+1 + from typing import Literal
+2 | def bad(
+3 |     # snapshot: invalid-type-form
+4 |     a: 42,
+5 |     # snapshot: invalid-type-form
+  -     b: b"42",
+6 +     b: Literal[b"42"],
+7 |     # snapshot: invalid-type-form
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+
+error[invalid-type-form]: Boolean literals are not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:7:8
+  |
+7 |     c: True,
+  |        ^^^^ Did you mean `typing.Literal[True]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Wrap in `Literal[...]`
+  |
+1 + from typing import Literal
+2 | def bad(
+--------------------------------------------------------------------------------
+7 |     # snapshot: invalid-type-form
+  -     c: True,
+8 +     c: Literal[True],
+9 |     # snapshot: invalid-syntax-in-forward-annotation
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+
+error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
+ --> src/mdtest_snippet.py:9:17
+  |
+9 |     d: "invalid syntax",
+  |         --------^^^^^^
+  |                 |
+  |                 Unexpected token at the end of an expression
+help: Did you mean `typing.Literal["invalid syntax"]`?
+help: Wrap in `Literal[...]`
+   |
+1  + from typing import Literal
+2  | def bad(
+--------------------------------------------------------------------------------
+9  |     # snapshot: invalid-syntax-in-forward-annotation
+   -     d: "invalid syntax",
+10 +     d: Literal["invalid syntax"],
+11 | ): ...
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+#### Preserving literal syntax
+
+The fix preserves numeric spelling, bytes escapes, and string delimiters. It also works inside
+forward annotations:
+
+```py
+def bad(
+    # snapshot: invalid-type-form
+    integer: (0x_FF),
+    # snapshot: invalid-type-form
+    data: b"\x41",
+    # snapshot: invalid-type-form
+    quoted: "False",
+    # snapshot: invalid-syntax-in-forward-annotation
+    string: """can't parse this""",
+): ...
+```
+
+```snapshot
+error[invalid-type-form]: Int literals are not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:3:15
+  |
+3 |     integer: (0x_FF),
+  |               ^^^^^ Did you mean `typing.Literal[255]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Wrap in `Literal[...]`
+  |
+1 + from typing import Literal
+2 | def bad(
+3 |     # snapshot: invalid-type-form
+  -     integer: (0x_FF),
+4 +     integer: (Literal[0x_FF]),
+5 |     # snapshot: invalid-type-form
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+
+error[invalid-type-form]: Bytes literals are not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:5:11
+  |
+5 |     data: b"/x41",
+  |           ^^^^^^^ Did you mean `typing.Literal[b"A"]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Wrap in `Literal[...]`
+  |
+1 + from typing import Literal
+2 | def bad(
+3 |     # snapshot: invalid-type-form
+4 |     integer: (0x_FF),
+5 |     # snapshot: invalid-type-form
+  -     data: b"/x41",
+6 +     data: Literal[b"/x41"],
+7 |     # snapshot: invalid-type-form
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+
+error[invalid-type-form]: Boolean literals are not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:7:14
+  |
+7 |     quoted: "False",
+  |              ^^^^^ Did you mean `typing.Literal[False]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Wrap in `Literal[...]`
+  |
+1 + from typing import Literal
+2 | def bad(
+--------------------------------------------------------------------------------
+7 |     # snapshot: invalid-type-form
+  -     quoted: "False",
+8 +     quoted: "Literal[False]",
+9 |     # snapshot: invalid-syntax-in-forward-annotation
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+
+error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
+ --> src/mdtest_snippet.py:9:19
+  |
+9 |     string: """can't parse this""",
+  |                ---^^^^^^^^^^^^^
+  |                   |
+  |                   missing closing quote in string literal
+help: Did you mean `typing.Literal["can't parse this"]`?
+help: Wrap in `Literal[...]`
+   |
+1  + from typing import Literal
+2  | def bad(
+--------------------------------------------------------------------------------
+9  |     # snapshot: invalid-syntax-in-forward-annotation
+   -     string: """can't parse this""",
+10 +     string: Literal["""can't parse this"""],
+11 | ): ...
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+#### Reusing imports
+
+Existing aliases for `Literal` or its module are reused in the replacement.
+
+`member.py`:
+
+```py
+from typing import Literal as L
+
+# snapshot: invalid-type-form
+value: True
+```
+
+```snapshot
+error[invalid-type-form]: Boolean literals are not allowed in this context in a type expression
+ --> src/member.py:4:8
+  |
+4 | value: True
+  |        ^^^^ Did you mean `typing.Literal[True]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Wrap in `Literal[...]`
+  |
+3 | # snapshot: invalid-type-form
+  - value: True
+4 + value: L[True]
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+`module.py`:
+
+```py
+import typing as t
+
+# snapshot: invalid-type-form
+value: 42
+```
+
+```snapshot
+error[invalid-type-form]: Int literals are not allowed in this context in a type expression
+ --> src/module.py:4:8
+  |
+4 | value: 42
+  |        ^^ Did you mean `typing.Literal[42]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Wrap in `Literal[...]`
+  |
+3 | # snapshot: invalid-type-form
+  - value: 42
+4 + value: t.Literal[42]
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+#### Shadowed import names
+
+When `Literal` is shadowed, the fix uses a qualified import:
+
+```py
+def qualified(Literal: int):
+    # snapshot: invalid-type-form
+    value: True
+```
+
+```snapshot
+error[invalid-type-form]: Boolean literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:3:12
+  |
+3 |     value: True
+  |            ^^^^ Did you mean `typing.Literal[True]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Wrap in `Literal[...]`
+  |
+1 + import typing
+2 | def qualified(Literal: int):
+3 |     # snapshot: invalid-type-form
+  -     value: True
+4 +     value: typing.Literal[True]
+5 | def unavailable(Literal: int, typing: int):
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+If both names are occupied, no fix is offered:
+
+```py
+def unavailable(Literal: int, typing: int):
+    # snapshot: invalid-type-form
+    value: False
+```
+
+```snapshot
+error[invalid-type-form]: Boolean literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:6:12
+  |
+6 |     value: False
+  |            ^^^^^ Did you mean `typing.Literal[False]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+#### Python 3.7 without dependency metadata
+
+`Literal` is unavailable in `typing` on Python 3.7. The presence of `typing_extensions` stubs in our
+vendored typeshed stubs for the stdlib do not, on their own, justify an autofix that would add an
+import from `typing_extensions` -- the package may not be available at runtime:
+
+```toml
+[environment]
+python-version = "3.7"
+```
+
+```py
+# snapshot: invalid-type-form
+value: True
+```
+
+```snapshot
+error[invalid-type-form]: Boolean literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:2:8
+  |
+2 | value: True
+  |        ^^^^ Did you mean `typing.Literal[True]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+#### Python 3.7 with a declared backport dependency
+
+If `typing_extensions` is declared as a direct dependency, present in `site-packages`, and the
+installed version exports a `Literal` symbol, the fix will import `Literal` from `typing_extensions`
+on Python 3.7.
+
+```toml
+[environment]
+python-version = "3.7"
+python = "/.venv"
+
+[dependency-metadata]
+projects = [{ path = "/src", dependencies = ["extensions"] }]
+
+[dependency-metadata.distributions]
+extensions = { name = "typing-extensions" }
+
+[dependency-metadata.module-owners]
+typing_extensions = ["extensions"]
+```
+
+##### Available runtime export
+
+The installed version of `typing_extensions` provides `Literal`, so the fix can import it:
+
+`/.venv/<path-to-site-packages>/typing_extensions.py`:
+
+```py
+Literal = object()
+```
+
+`main.py`:
+
+```py
+# snapshot: invalid-type-form
+value: True
+```
+
+```snapshot
+error[invalid-type-form]: Boolean literals are not allowed in this context in a type expression
+ --> src/main.py:2:8
+  |
+2 | value: True
+  |        ^^^^ Did you mean `typing.Literal[True]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Wrap in `Literal[...]`
+  |
+1 | # snapshot: invalid-type-form
+  - value: True
+2 + from typing_extensions import Literal
+3 + value: Literal[True]
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+##### Missing runtime export
+
+If the installed version of `typing_extensions` does not expose `Literal`, we don't offer the
+autofix even if `Literal` exists in typeshed's stdlib stub for `typing_extensions`:
+
+`/.venv/<path-to-site-packages>/typing_extensions.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+# snapshot: invalid-type-form
+value: True
+```
+
+```snapshot
+error[invalid-type-form]: Boolean literals are not allowed in this context in a type expression
+ --> src/main.py:2:8
+  |
+2 | value: True
+  |        ^^^^ Did you mean `typing.Literal[True]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+##### Missing runtime module
+
+`typing_extensions` must be present in `site-packages` as well as declared as a direct dependency
+for the autofix to be offered:
+
+`/.venv/<path-to-site-packages>/unrelated.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+# snapshot: invalid-type-form
+value: True
+```
+
+```snapshot
+error[invalid-type-form]: Boolean literals are not allowed in this context in a type expression
+ --> src/main.py:2:8
+  |
+2 | value: True
+  |        ^^^^ Did you mean `typing.Literal[True]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+#### Python 3.7 with an indirect backport dependency
+
+It's not sufficient for `typing_extensions` to be installed into `site-packages`. If the project
+does not declare a direct dependency on `typing_extensions`, no autofix will be offered. A parent
+project's declared dependencies do not apply to a nested project.
+
+```toml
+[environment]
+python-version = "3.7"
+python = "/.venv"
+
+[dependency-metadata]
+projects = [
+    { path = "/src", dependencies = ["extensions"] },
+    { path = "/src/member", dependencies = [] },
+]
+
+[dependency-metadata.distributions]
+extensions = { name = "typing-extensions" }
+
+[dependency-metadata.module-owners]
+typing_extensions = ["extensions"]
+```
+
+`/.venv/<path-to-site-packages>/typing_extensions.py`:
+
+```py
+Literal = object()
+```
+
+`member/main.py`:
+
+```py
+# snapshot: invalid-type-form
+value: True
+```
+
+```snapshot
+error[invalid-type-form]: Boolean literals are not allowed in this context in a type expression
+ --> src/member/main.py:2:8
+  |
+2 | value: True
+  |        ^^^^ Did you mean `typing.Literal[True]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```

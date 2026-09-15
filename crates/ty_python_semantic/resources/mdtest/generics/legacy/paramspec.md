@@ -1248,9 +1248,8 @@ class ParamSpecWithDefault6(Generic[PAnother]):
 
 ## Semantics
 
-The semantics of `ParamSpec` are described in
-[the PEP 695 `ParamSpec` document](./../pep695/paramspec.md) to avoid duplication unless there are
-any behavior specific to the legacy `ParamSpec` implementation.
+See [the PEP 695 `ParamSpec` document](./../pep695/paramspec.md) for corresponding examples using
+type parameter lists.
 
 ### Binding contexts
 
@@ -1273,4 +1272,24 @@ def outer(_: Callable[P, None]):
     def inner(_: Callable[P, None]): ...
 
     reveal_type(generic_context(inner))  # revealed: None
+```
+
+### Forwarded arguments with type-variable bounds
+
+When a type variable is bounded by `LiteralString`, string literals are not promoted to `str` when
+providing context for other arguments. This applies to ordinary calls and calls forwarded through a
+`ParamSpec`.
+
+```py
+from typing import Any, Callable, ParamSpec, TypeVar
+from typing_extensions import LiteralString
+
+P = ParamSpec("P")
+T = TypeVar("T", bound=LiteralString)
+
+def forward(function: Callable[P, Any], /, *args: P.args, **kwargs: P.kwargs): ...
+def target(first: T, values: list[T]) -> None: ...
+
+target("a", ["a"])
+forward(target, "a", ["a"])
 ```

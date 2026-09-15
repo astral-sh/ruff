@@ -85,7 +85,7 @@ fn setup_tomllib_case() -> FileCase {
 
     let src_root = SystemPath::new("/src");
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_override_options(Options {
+    metadata.set_override_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             ..EnvironmentOptions::default()
@@ -333,6 +333,31 @@ fn benchmark_tuple_implicit_instance_attributes(criterion: &mut Criterion) {
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4466>.
+///
+/// Uses of empty dictionaries in a nested conditional constrain their initializers. Without
+/// normalization, these constraints gain another layer of dictionary types on each cycle iteration.
+fn benchmark_recursive_collection_use_constraints(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[recursive_collection_use_constraints]", |b| {
+        b.iter_batched_ref(
+            || {
+                setup_micro_case(
+                    r#"
+                    def f(flag: bool):
+                        x = {}
+                        y = {}
+                        return {"a": x, "b": {"c": y} if flag else {"d": {"e": y}}}
+                    "#,
+                )
+            },
+            |case| assert_eq!(case.db.check().len(), 0),
             BatchSize::SmallInput,
         );
     });
@@ -880,14 +905,15 @@ from collections.abc import Callable, Iterable
 from typing import Protocol
 
 class Chain[T](Protocol):
-    def value(self) -> T: ...
+    def value(self) -> T:
+        raise RuntimeError
 "
     .to_string();
 
     for i in 0..NUM_METHODS {
         writeln!(
             &mut code,
-            "    def method_{i}[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]: ..."
+            "    def method_{i}[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]:\n        raise RuntimeError"
         )
         .ok();
     }
@@ -1710,7 +1736,7 @@ impl<'a> ProjectBenchmark<'a> {
         let src_root = SystemPath::new("/");
         let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
 
-        metadata.apply_override_options(Options {
+        metadata.set_override_options(Options {
             environment: Some(EnvironmentOptions {
                 python_version: Some(RangedValue::cli(self.project.config.python_version)),
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
@@ -1871,6 +1897,7 @@ criterion_group!(
     benchmark_many_string_assignments,
     benchmark_many_tuple_assignments,
     benchmark_tuple_implicit_instance_attributes,
+    benchmark_recursive_collection_use_constraints,
     benchmark_complex_constrained_attributes_1,
     benchmark_complex_constrained_attributes_2,
     benchmark_complex_constrained_attributes_3,

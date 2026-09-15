@@ -15,6 +15,7 @@ use salsa::plumbing::{AsId, FromId, Id};
 use super::{Type, TypeCheckDiagnostics, infer_definition_types};
 
 use crate::diagnostic::DiagnosticGuard;
+use crate::importer::Importer;
 use crate::lint::LintSource;
 use crate::reachability::is_range_reachable;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNBOUND_TYPE_VARIABLE};
@@ -203,6 +204,11 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.module
     }
 
+    /// Constructs an importer using the file's cached imports and source style.
+    pub(crate) fn importer(&self) -> Importer<'_> {
+        Importer::new(self.db, self.program_file, self.module)
+    }
+
     pub(crate) fn scope(&self) -> ScopeId<'db> {
         self.scope
     }
@@ -342,7 +348,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     ///
     /// This checks both whether the scope itself is reachable and whether the
     /// specific statement or expression containing this range is reachable.
-    fn is_range_reachable(&self, range: TextRange) -> bool {
+    pub(super) fn is_range_reachable(&self, range: TextRange) -> bool {
         let db = self.db;
         let index = semantic_index(self.db(), self.program_file);
         let scope_id = self.scope.file_scope_id(self.db());

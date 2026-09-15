@@ -19,7 +19,7 @@ env:
 
 jobs:
   publish-versions:
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     environment: release
     env:
       VERSION: ${{ fromJson(inputs.plan).announcement_tag }}

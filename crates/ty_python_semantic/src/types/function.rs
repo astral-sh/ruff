@@ -92,11 +92,11 @@ use crate::types::tuple::TupleSpec;
 use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
 use crate::types::visitor::non_any_dynamic_content;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableType, ClassBase, ClassLiteral, ClassType, FindLegacyTypeVarsVisitor,
-    IntersectionBuilder, KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner,
-    SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionBuilder, UnionType, binding_type, definition_expression_type, walk_signature,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType, ClassBase,
+    ClassLiteral, ClassType, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownClass,
+    KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
+    TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType, binding_type,
+    definition_expression_type, walk_signature,
 };
 use crate::{Db, FxIndexMap, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -1551,14 +1551,13 @@ impl<'db> FunctionType<'db> {
     ///
     /// This is the signature as seen by external callers, possibly modified by decorators and/or
     /// overloaded.
-    ///
-    /// ## Why is this a salsa query?
-    ///
-    /// This is a salsa query to short-circuit the invalidation
-    /// when the function's AST node changes.
-    ///
-    /// Were this not a salsa query, then the calling query
-    /// would depend on the function's AST and rerun for every change in that file.
+    pub(crate) fn signature(self, db: &'db dyn Db) -> &'db CallableSignature<'db> {
+        self.updated_signature(db)
+            .unwrap_or_else(|| self.literal_signature(db))
+    }
+
+    /// This query isolates the function's AST dependency, so callers only invalidate when the
+    /// computed signature changes. Updated signatures are already stored on the interned function.
     #[salsa::tracked(
         returns(ref),
         cycle_initial=|db, id, function: FunctionType<'db>| {
@@ -1575,10 +1574,8 @@ impl<'db> FunctionType<'db> {
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
-    pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
-        self.updated_signature(db)
-            .cloned()
-            .unwrap_or_else(|| self.literal(db).signature(db))
+    fn literal_signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
+        self.literal(db).signature(db)
     }
 
     /// Refer to this signature's equation, including recursive `TypeOf` references to itself.
@@ -1666,13 +1663,100 @@ impl<'db> FunctionType<'db> {
         CallableType::new(db, self.signature(db), self.callable_type_kind(db))
     }
 
-    /// Convert the `FunctionType` into a [`BoundMethodType`].
-    pub(crate) fn into_bound_method_type(
+    /// Bind this function's signatures to a receiver while preserving overload selection and `Self`.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|db, _, _, _, _| CallableType::bottom(db),
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(crate) fn into_bound_callable(
         self,
         db: &'db dyn Db,
-        self_instance: Type<'db>,
-    ) -> BoundMethodType<'db> {
-        BoundMethodType::new(db, self, self_instance, self_instance)
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> CallableType<'db> {
+        let env = ProgramEnvironment::from_scope(self.literal(db).last_definition.body_scope(db));
+
+        CallableType::new(
+            db,
+            self.bound_signatures_with_receiver(db, &env, receiver_type, typing_self_type),
+            CallableTypeKind::FunctionLike,
+        )
+    }
+
+    /// Bind this function using the caller's environment and separate receiver and `Self` types.
+    pub(crate) fn into_bound_callable_with_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            self.bound_signatures_with_receiver(db, env, receiver_type, typing_self_type),
+            CallableTypeKind::FunctionLike,
+        )
+    }
+
+    /// Shares the signatures retained in the function's interned bound callable.
+    pub(crate) fn bound_signatures(
+        self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> &'db CallableSignature<'db> {
+        self.into_bound_callable(db, receiver_type, typing_self_type)
+            .signatures(db)
+    }
+
+    fn bound_signatures_with_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> CallableSignature<'db> {
+        let function_signature = self.signature(db);
+
+        let [signature] = function_signature.overloads.as_slice() else {
+            if !function_signature
+                .overloads
+                .iter()
+                .any(Signature::has_explicit_positional_receiver_annotation)
+            {
+                return CallableSignature::from_overloads(function_signature.overloads.iter().map(
+                    |signature| {
+                        signature.bind_self_with_receiver(
+                            db,
+                            env,
+                            Some(receiver_type),
+                            Some(typing_self_type),
+                        )
+                    },
+                ));
+            }
+
+            return CallableSignature::from_overloads(
+                function_signature
+                    .overloads
+                    .iter()
+                    .filter_map(|signature| {
+                        signature.bind_self_if_compatible(db, env, receiver_type, typing_self_type)
+                    })
+                    .flat_map(|signature| signature.overloads),
+            );
+        };
+
+        let specialized = if signature.has_receiver_determined_method_typevar(db, env) {
+            signature.specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
+        } else {
+            None
+        };
+
+        specialized
+            .unwrap_or_else(|| CallableSignature::single(signature.clone()))
+            .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type))
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -1985,16 +2069,13 @@ fn is_instance_truthiness<'db>(
                 if is_instance_truthiness(db, env, positive, class).is_always_true() {
                     return Truthiness::AlwaysTrue;
                 } else if let Type::TypeVar(tvar) = positive {
-                    match tvar.typevar(db).bound_or_constraints(db, env) {
-                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    match tvar.require_bound_or_constraints(db, env) {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
                             effective.add_positive_in_place(bound);
                         }
-                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
                             effective.add_positive_in_place(constraints.as_type(db, env));
                         }
-                        // A typevar without bounds/constraints has `object` as its implicit upper bound,
-                        // and adding `object` to an intersection is a no-op
-                        None => {}
                     }
                     found_tvars_or_newtypes = true;
                 } else if let Type::NewTypeInstance(newtype) = positive {
@@ -2049,20 +2130,17 @@ fn is_instance_truthiness<'db>(
 
         Type::TypeAlias(alias) => is_instance_truthiness(db, env, alias.value_type(db), class),
 
-        Type::TypeVar(bound_typevar) => {
-            match bound_typevar.typevar(db).bound_or_constraints(db, env) {
-                None => is_instance_truthiness(db, env, Type::object(), class),
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    is_instance_truthiness(db, env, bound, class)
-                }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => always_true_if(
-                    constraints
-                        .elements(db)
-                        .iter()
-                        .all(|c| is_instance_truthiness(db, env, *c, class).is_always_true()),
-                ),
+        Type::TypeVar(bound_typevar) => match bound_typevar.require_bound_or_constraints(db, env) {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                is_instance_truthiness(db, env, bound, class)
             }
-        }
+            TypeVarBoundOrConstraints::Constraints(constraints) => always_true_if(
+                constraints
+                    .elements(db)
+                    .iter()
+                    .all(|c| is_instance_truthiness(db, env, *c, class).is_always_true()),
+            ),
+        },
 
         Type::BoundMethod(..)
         | Type::KnownBoundMethod(..)
@@ -2140,16 +2218,15 @@ fn is_instance_tuple_covers<'db>(
             .positive(db)
             .iter()
             .any(|element| is_instance_tuple_covers(db, env, tuple, *element, recursion_guard)),
-        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db, env) {
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+        Type::TypeVar(typevar) => match typevar.require_bound_or_constraints(db, env) {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
                 is_instance_tuple_covers(db, env, tuple, bound, recursion_guard)
             }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
                 constraints.elements(db).iter().all(|constraint| {
                     is_instance_tuple_covers(db, env, tuple, *constraint, recursion_guard)
                 })
             }
-            None => is_instance_tuple_covers(db, env, tuple, Type::object(), recursion_guard),
         },
         ty => tuple.fixed_elements().any(|element| {
             let Type::ClassLiteral(class) = element else {
@@ -2971,8 +3048,7 @@ impl KnownFunction {
                             SpecialFormType::TypingCallable
                             | SpecialFormType::CollectionsAbcCallable,
                         ) => {
-                            let callable_top = Type::Callable(CallableType::unknown(db))
-                                .top_materialization(db, env);
+                            let callable_top = Type::Callable(CallableType::top(db));
                             if first_arg.is_subtype_of(db, env, callable_top) {
                                 Truthiness::AlwaysTrue
                             } else {

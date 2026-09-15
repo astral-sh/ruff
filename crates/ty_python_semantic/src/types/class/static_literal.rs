@@ -448,6 +448,44 @@ impl<'db> StaticClassLiteral<'db> {
         inherited_legacy_generic_context_inner(db, self)
     }
 
+    /// Iterate through the decorators on this class, returning the span of the first one
+    /// that matches the given predicate.
+    fn find_decorator_span(
+        self,
+        db: &'db dyn Db,
+        predicate: impl Fn(Type<'db>) -> bool,
+    ) -> Option<Span> {
+        if !self.has_decorators(db) {
+            return None;
+        }
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        self.node(db, &parsed_module(db, definition.python_file(db)).load(db))
+            .decorator_list
+            .iter()
+            .find(|decorator| {
+                predicate(definition_expression_type(
+                    db,
+                    definition,
+                    &decorator.expression,
+                ))
+            })
+            .map(|decorator| Span::from(file).with_range(decorator.range))
+    }
+
+    /// Iterate through the decorators on this class, returning the span of the first one
+    /// that matches the given [`KnownFunction`].
+    pub(crate) fn find_known_decorator_span(
+        self,
+        db: &'db dyn Db,
+        needle: KnownFunction,
+    ) -> Option<Span> {
+        self.find_decorator_span(db, |ty| {
+            ty.as_function_literal()
+                .is_some_and(|f| f.is_known(db, needle))
+        })
+    }
+
     /// Returns all of the typevars that are referenced in this class's base class list.
     /// (This is used to ensure that classes do not reference typevars from enclosing
     /// generic contexts.)
@@ -790,44 +828,25 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> Result<&'db Mro<'db>, &'db StaticMroError<'db>> {
         match specialization {
             None => self.try_mro_unspecialized(db),
-            Some(specialization) => self.try_mro_specialized(db, specialization),
+            Some(specialization) => GenericAlias::new(db, self, specialization).try_mro(db),
         }
+        .map_err(Box::as_ref)
     }
 
     #[salsa::tracked(
         returns(as_ref),
         cycle_initial=|db, _, self_: StaticClassLiteral<'db>| {
             let env = ProgramEnvironment::from_scope(self_.body_scope(db));
-            Err(StaticMroError::cycle(
+            Err(Box::new(StaticMroError::cycle(
                 db, &env,
                 self_.apply_optional_specialization(db, None),
-            ))
+            )))
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn try_mro_unspecialized(self, db: &'db dyn Db) -> Result<Mro<'db>, StaticMroError<'db>> {
+    fn try_mro_unspecialized(self, db: &'db dyn Db) -> Result<Mro<'db>, Box<StaticMroError<'db>>> {
         tracing::trace!("StaticClassLiteral::try_mro: {}", self.name(db));
-        Mro::of_static_class(db, self, None)
-    }
-
-    #[salsa::tracked(
-        returns(as_ref),
-        cycle_initial=|db, _, self_: StaticClassLiteral<'db>, specialization| {
-            let env = ProgramEnvironment::from_scope(self_.body_scope(db));
-            Err(StaticMroError::cycle(
-                db, &env,
-                self_.apply_optional_specialization(db, Some(specialization)),
-            ))
-        },
-        heap_size=ruff_memory_usage::heap_size
-    )]
-    fn try_mro_specialized(
-        self,
-        db: &'db dyn Db,
-        specialization: Specialization<'db>,
-    ) -> Result<Mro<'db>, StaticMroError<'db>> {
-        tracing::trace!("StaticClassLiteral::try_mro: {}", self.name(db));
-        Mro::of_static_class(db, self, Some(specialization))
+        Mro::of_static_class(db, self, None).map_err(Box::new)
     }
 
     /// Iterate over the [method resolution order] ("MRO") of the class.
@@ -1082,13 +1101,6 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Return `true` if Pydantic's effective model configuration marks this model as frozen.
-    fn is_frozen_pydantic_model(db: &'db dyn Db, field_policy: CodeGeneratorKind<'db>) -> bool {
-        field_policy
-            .pydantic_metadata()
-            .is_some_and(|metadata| metadata.is_frozen(db))
-    }
-
     /// Checks if the given dataclass parameter flag is set for this class.
     /// This checks both the `dataclass_params` and `transformer_params`.
     pub(crate) fn has_dataclass_param(
@@ -1154,7 +1166,13 @@ impl<'db> StaticClassLiteral<'db> {
     pub(in crate::types) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
         self.try_metaclass(db)
             .map(|(metaclass, _)| metaclass)
-            .unwrap_or_else(|_| ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()))
+            .unwrap_or_else(|error| match error.kind {
+                MetaclassErrorKind::Conflict {
+                    explicit_metaclass: Some(metaclass),
+                    ..
+                } => ClassMetaclass::Selected(metaclass.into()),
+                _ => ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()),
+            })
     }
 
     /// Return the selected metaclass or protocol fallback, or an error if it cannot be inferred.
@@ -1277,13 +1295,22 @@ impl<'db> StaticClassLiteral<'db> {
             // - https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass
             // - https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
             for (base_class, metaclass) in base_metaclasses {
+                if metaclass == SubclassOfType::subclass_of_unknown() {
+                    return Ok((ClassMetaclass::Selected(metaclass), None));
+                }
                 let Some(metaclass) = metaclass.to_class_type(db) else {
                     continue;
                 };
-                if candidate.metaclass.is_subclass_of(db, &env, metaclass) {
-                    continue;
-                }
-                if metaclass.is_subclass_of(db, &env, candidate.metaclass) {
+                if let Some(selected) = candidate
+                    .metaclass
+                    .most_derived_metaclass(db, &env, metaclass)
+                {
+                    let Some(metaclass) = selected.to_class_type(db) else {
+                        return Ok((ClassMetaclass::Selected(selected), None));
+                    };
+                    if metaclass == candidate.metaclass {
+                        continue;
+                    }
                     candidate = MetaclassCandidate {
                         metaclass,
                         base: Some(base_class),
@@ -1295,6 +1322,8 @@ impl<'db> StaticClassLiteral<'db> {
                         candidate,
                         base_metaclass: metaclass,
                         base: base_class,
+                        explicit_metaclass: explicit_metaclass
+                            .and_then(|metaclass| metaclass.to_class_type(db)),
                     },
                 });
             }
@@ -1609,6 +1638,15 @@ impl<'db> StaticClassLiteral<'db> {
             return Member::unbound();
         }
 
+        // Enum members are read-only on the class, but instances can shadow them.
+        if enum_metadata(db, ClassLiteral::Static(self))
+            .is_some_and(|metadata| metadata.contains_member(name))
+        {
+            let mut member = member;
+            member.inner.qualifiers.insert(TypeQualifiers::READ_ONLY);
+            return member;
+        }
+
         // For enum classes, `nonmember(value)` creates a non-member attribute.
         // At runtime, the enum metaclass unwraps the value, so accessing the attribute
         // returns the inner value, not the `nonmember` wrapper.
@@ -1891,8 +1929,7 @@ impl<'db> StaticClassLiteral<'db> {
                     add_parameter_with_name(field_name.clone(), default_ty);
                 } else {
                     // Use the alias name if provided, otherwise use the field name.
-                    let parameter_name =
-                        Name::new(alias.map(|alias| &**alias).unwrap_or(&**field_name));
+                    let parameter_name = alias.map_or_else(|| field_name.clone(), Name::new);
                     add_parameter_with_name(parameter_name, default_ty);
                 }
             }
@@ -2088,14 +2125,8 @@ impl<'db> StaticClassLiteral<'db> {
 
                 signature_from_fields(vec![self_parameter], instance_ty)
             }
-            (
-                field_policy @ (CodeGeneratorKind::DataclassLike(_)
-                | CodeGeneratorKind::Pydantic(_)),
-                "__setattr__",
-            ) => {
-                if self.is_frozen_dataclass(db) == Some(true)
-                    || Self::is_frozen_pydantic_model(db, field_policy)
-                {
+            (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
+                if self.is_frozen_dataclass(db) == Some(true) {
                     let signature = Signature::new(
                         Parameters::standard([
                             Parameter::positional_or_keyword(Name::new_static("self"))

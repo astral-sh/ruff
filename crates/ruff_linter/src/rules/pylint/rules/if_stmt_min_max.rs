@@ -110,21 +110,12 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
         return;
     };
 
-    let Some(ast::ExprCompare {
-        ops,
-        left,
-        comparators,
-        ..
-    }) = test.as_compare_expr()
-    else {
+    let Some(compare) = test.as_compare_expr() else {
         return;
     };
 
     // Ignore, e.g., `foo < bar < baz`.
-    let [op] = &**ops else {
-        return;
-    };
-    let [right] = &**comparators else {
+    let Some((left, op, right)) = compare.as_single() else {
         return;
     };
 
@@ -159,9 +150,9 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
     };
 
     let (arg1, arg2) = if flip_args {
-        (right, &**left)
+        (right, left)
     } else {
-        (&**left, right)
+        (left, right)
     };
 
     let replacement = format!(

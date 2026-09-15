@@ -345,10 +345,10 @@ def isgenerator(object: object) -> TypeIs[GeneratorType[object, Never, object]]:
         throw()         used to raise an exception inside the generator
     """
 
-def iscoroutine(object: object) -> TypeIs[CoroutineType[object, Never, object]]:
+def iscoroutine(object: object) -> TypeIs[CoroutineType[Any, Any, Any]]:
     """Return true if the object is a coroutine."""
 
-def isawaitable(object: object) -> TypeIs[Awaitable[object]]:
+def isawaitable(object: object) -> TypeIs[Awaitable[Any]]:
     """Return true if object can be passed to an ``await`` expression."""
 
 @overload
