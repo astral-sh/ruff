@@ -2564,6 +2564,36 @@ impl<'db> TypeVarInference<'db> {
         self.generic_context(db).specialize_recursive(db, types)
     }
 
+    /// Substitute recovered bindings without filling missing or cyclic bindings with defaults.
+    ///
+    /// Argument checking must distinguish a recovered `Any` from an unsolved variable that would
+    /// default to `Unknown`: only the former can resolve otherwise incompatible static bounds.
+    pub(crate) fn recovery_specialization(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Specialization<'db> {
+        let generic_context = self.generic_context(db);
+        let bindings: Vec<_> = generic_context
+            .variables(db)
+            .zip(self.merged_types(db))
+            .map(|(bound_typevar, ty)| TypeVarSolution {
+                bound_typevar,
+                solution: ty.unwrap_or(Type::TypeVar(bound_typevar)),
+            })
+            .collect();
+        let resolved = resolve_solution(db, env, generic_context.inferable_typevars(db), &bindings);
+        let types: Vec<_> = generic_context
+            .variables(db)
+            .zip(resolved)
+            .map(|(typevar, solution)| match solution {
+                SolutionType::Resolved(ty) => ty,
+                SolutionType::Unresolved(_) => Type::TypeVar(typevar),
+            })
+            .collect();
+        generic_context.specialize(db, types)
+    }
+
     /// Select a complete alternative when merging the solutions would violate the return context.
     /// Returns `None` if no retained solution satisfies the context.
     pub(crate) fn select_return_context_solution(
