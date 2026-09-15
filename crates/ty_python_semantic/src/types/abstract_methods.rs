@@ -1,6 +1,9 @@
 //! Abstract-method discovery and diagnostics for class validation.
 
-use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_db::{
+    diagnostic::{Annotation, Span, SubDiagnostic, SubDiagnosticSeverity},
+    parsed::parsed_module,
+};
 use ruff_python_ast::name::Name;
 use ty_python_core::{definition::Definition, place_table, use_def_map};
 
@@ -71,26 +74,26 @@ impl<'db> AbstractMethods<'db> {
 
         let defining_class_name = defining_class.name(db);
 
-        if let Type::FunctionLiteral(function) = binding_type(db, *definition) {
+        let secondary_span = if let Type::FunctionLiteral(function) = binding_type(db, *definition)
+        {
             let policy = if kind.is_explicit() {
                 AbstractMethodAnnotationPolicy::ExcludeVerboseBody
             } else {
                 AbstractMethodAnnotationPolicy::AlwaysIncludeBody
             };
-            let secondary_span = abstract_method_span(db, function, policy);
-            let mut secondary_annotation = Annotation::secondary(secondary_span);
-            secondary_annotation = if defining_class.class_literal(db)
-                == self.class.class_literal(db)
-            {
-                secondary_annotation
-                    .message(format_args!("`{first_method_name}` declared as abstract"))
-            } else {
-                secondary_annotation.message(format_args!(
-                    "`{first_method_name}` declared as abstract on superclass `{defining_class_name}`",
-                ))
-            };
-            diagnostic.annotate(secondary_annotation);
-        }
+            abstract_method_span(db, function, policy)
+        } else {
+            let module = parsed_module(db, definition.python_file(db)).load(db);
+            Span::from(definition.focus_range(db, &module))
+        };
+        let secondary_annotation = Annotation::secondary(secondary_span);
+        diagnostic.annotate(if *defining_class == self.class {
+            secondary_annotation.message(format_args!("`{first_method_name}` declared as abstract"))
+        } else {
+            secondary_annotation.message(format_args!(
+                "`{first_method_name}` declared as abstract on superclass `{defining_class_name}`",
+            ))
+        });
 
         if !kind.is_explicit() {
             let mut sub = SubDiagnostic::new(
@@ -127,6 +130,77 @@ impl<'db> AbstractMethods<'db> {
                             or `return None` if it was not intended to be abstract"
                     ));
                 }
+            }
+        }
+
+        let mut annotation_override = None;
+
+        for superclass in self
+            .class
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .take_while(|superclass| superclass != defining_class)
+        {
+            let Some(literal) = superclass.class_literal(db).as_static() else {
+                continue;
+            };
+            let scope = literal.body_scope(db);
+            let Some(symbol_id) = place_table(db, scope).symbol_id(first_method_name) else {
+                continue;
+            };
+            let use_def_map = use_def_map(db, scope);
+            let bindings = use_def_map.end_of_scope_symbol_bindings(symbol_id);
+            if place_from_bindings(db, env, bindings)
+                .place
+                .ignore_possibly_undefined()
+                .is_some()
+            {
+                continue;
+            }
+            let declarations = place_from_declarations(
+                db,
+                env,
+                use_def_map.end_of_scope_symbol_declarations(symbol_id),
+            );
+            if let Some(first_declaration) = declarations.first_declaration
+                && !declarations
+                    .ignore_conflicting_declarations()
+                    .qualifiers
+                    .contains(TypeQualifiers::CLASS_VAR)
+            {
+                annotation_override = Some((superclass, first_declaration));
+            }
+        }
+
+        if let Some((overriding_class, declaration)) = annotation_override {
+            if overriding_class == self.class {
+                diagnostic.info(format_args!(
+                    "The instance-attribute annotation for `{first_method_name}` \
+                    does not override the abstract method",
+                ));
+            } else {
+                diagnostic.info(format_args!(
+                    "The instance-attribute annotation for `{first_method_name}` on superclass `{}` \
+                    does not override the abstract method",
+                    overriding_class.name(db)
+                ));
+            }
+
+            let file = declaration.file(db);
+
+            if db.should_check_file(file) {
+                let mut sub = SubDiagnostic::new(
+                    SubDiagnosticSeverity::Help,
+                    "Either assign a value or add `ClassVar` to this declaration",
+                );
+                let declaration_module = parsed_module(db, declaration.python_file(db)).load(db);
+                sub.annotate(
+                    Annotation::secondary(Span::from(
+                        declaration.focus_range(db, &declaration_module),
+                    ))
+                    .message("Instance-attribute declaration"),
+                );
+                diagnostic.sub(sub);
             }
         }
     }
