@@ -234,12 +234,12 @@ from typing import Self
 
 class E1:
     @classmethod
-    def f(cls) -> list[Self]:
+    def f(cls: type[Self]) -> list[Self]:
         return [cls()]
 
 class E2:
     @classmethod
-    def f(cls) -> list[Self]:
+    def f(cls: type[Self]) -> list[Self]:
         return [cls()]
 
 def _(
@@ -278,11 +278,11 @@ class G2[T]: ...
 
 class P1(Protocol):
     @classmethod
-    def f(cls) -> G1[Self]: ...
+    def f(cls: type[Self]) -> G1[Self]: ...
 
 class P2(Protocol):
     @classmethod
-    def f(cls) -> G2[Self]: ...
+    def f(cls: type[Self]) -> G2[Self]: ...
 
 def _(
     union_external: type[P1] | type[P2],
@@ -304,10 +304,11 @@ def _(
     # TODO: this should be `G1[P1 & P2] & G2[P1 & P2]`
     reveal_type(intersection_external.f())  # revealed: G1[Self@f] & G2[Self@f]
 
-    # TODO: these should work as well (same results as `intersection_external`)
-    # revealed: @Todo(unsupported type[X] special form)
+    # TODO: this should not leak the Self@f type variables
+    # revealed: (() -> G1[Self@f]) & (() -> G2[Self@f])
     reveal_type(intersection_internal.f)
-    reveal_type(intersection_internal.f())  # revealed: @Todo(unsupported type[X] special form)
+    # TODO: this should be `G1[P1 & P2] & G2[P1 & P2]`
+    reveal_type(intersection_internal.f())  # revealed: G1[Self@f] & G2[Self@f]
 ```
 
 ### Method defined on a single element
@@ -371,7 +372,7 @@ from typing import Self
 
 class E1:
     @classmethod
-    def f(cls) -> list[Self]:
+    def f(cls: type[Self]) -> list[Self]:
         return [cls()]
 
 class E2: ...
@@ -397,10 +398,10 @@ def _(
     # TODO: This should be list[E1 & E2]
     reveal_type(intersection_external.f())  # revealed: list[E1]
 
-    # TODO: these should work as well (same results as `intersection_external`)
-    # revealed: @Todo(unsupported type[X] special form)
+    # revealed: bound method (type[E1] & type[E2]).f() -> list[E1 & E2]
     reveal_type(intersection_internal.f)
-    reveal_type(intersection_internal.f())  # revealed: @Todo(unsupported type[X] special form)
+    # TODO: This should be list[E1 & E2]
+    reveal_type(intersection_internal.f())  # revealed: list[E1]
 ```
 
 This also works with protocols:
@@ -410,7 +411,7 @@ from typing import Protocol
 
 class P1(Protocol):
     @classmethod
-    def f(cls) -> list[Self]: ...
+    def f(cls: type[Self]) -> list[Self]: ...
 
 class Other: ...
 
@@ -438,10 +439,11 @@ def _(
     # TODO: this should be list[P1 & Other]
     reveal_type(intersection_external.f())  # revealed: list[Self@f]
 
-    # TODO: these should work as well (same results as `intersection_external`)
-    # revealed: @Todo(unsupported type[X] special form)
+    # TODO: this should not leak the Self@f type variable
+    # revealed: () -> list[Self@f]
     reveal_type(intersection_internal.f)
-    reveal_type(intersection_internal.f())  # revealed: @Todo(unsupported type[X] special form)
+    # TODO: this should be list[P1 & Other]
+    reveal_type(intersection_internal.f())  # revealed: list[Self@f]
 ```
 
 ### Method defined on a single element and a dynamic type
