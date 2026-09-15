@@ -117,6 +117,7 @@ use crate::types::{
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
+mod monotone;
 pub(crate) mod paths;
 pub(crate) mod projection;
 pub(crate) mod resolution;
@@ -3330,7 +3331,7 @@ pub(crate) enum PathBounds<'db> {
 }
 
 /// Limits shared by the preprocessing and collection walks used to extract solutions.
-trait SolutionLimits {
+trait SolutionLimits: Clone {
     type Break;
 
     fn visit_node(&mut self) -> ControlFlow<Self::Break> {
@@ -3342,12 +3343,14 @@ trait SolutionLimits {
     }
 }
 
+#[derive(Clone)]
 struct UnboundedSolutionLimits;
 
 impl SolutionLimits for UnboundedSolutionLimits {
     type Break = Infallible;
 }
 
+#[derive(Clone)]
 struct BoundedSolutionLimits {
     remaining_paths: usize,
     remaining_visits: usize,
@@ -3450,6 +3453,22 @@ impl<'db> PathBounds<'db> {
             limits,
         )? {
             return ControlFlow::Continue(path_bounds);
+        }
+
+        // Failed recognition must leave the ordinary traversal's budget available.
+        let mut monotone_limits = limits.clone();
+        if let ControlFlow::Continue(Some(bounds)) = PathBound::collect_monotone_conjunction(
+            db,
+            env,
+            storage,
+            &source_orders,
+            node,
+            inferable,
+            &mut monotone_limits,
+        ) {
+            monotone_limits.satisfied_path()?;
+            *limits = monotone_limits;
+            return ControlFlow::Continue(PathBounds::Constrained(Box::new([bounds])));
         }
 
         let (node, derived_source_order) =
@@ -4926,7 +4945,7 @@ mod tests {
         )
     }
 
-    #[derive(Default)]
+    #[derive(Clone, Default)]
     struct CountSolutionLimits {
         visits: usize,
         paths: usize,
