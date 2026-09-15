@@ -26,8 +26,8 @@ use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
 use ty_project::{
-    ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ProjectReloadResult,
-    ScriptEnvironmentAvailability, UseUv, UvSyncChanges,
+    ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata, ProjectReloadResult,
+    ScriptEnvironmentAvailability, SemanticDb as _, UseUv, UvSyncChanges,
 };
 
 use index::DocumentError;
@@ -126,6 +126,9 @@ pub(crate) struct Session {
 
 /// LSP State for a Project
 pub(crate) struct ProjectState {
+    /// Whether this project handles standalone files without a client-provided workspace.
+    is_fallback: bool,
+
     /// Files that we have outstanding otherwise-untracked pushed diagnostics for.
     ///
     /// In `CheckMode::OpenFiles` we still read some files that the client hasn't
@@ -162,11 +165,25 @@ impl Session {
     ) -> crate::Result<Self> {
         let index = Arc::new(Index::new());
 
+        let is_fallback = workspace_uris.is_empty();
+        let workspace_uris = if is_fallback {
+            let current_dir = native_system.current_directory();
+            tracing::info!(
+                "No workspaces were provided during initialization. \
+                Using {current_dir} for standalone files without indexing its contents."
+            );
+            let uri = Uri::from_file_path(current_dir.as_std_path())
+                .map_err(|()| anyhow!("Failed to create a workspace URI for {current_dir}"))?;
+            vec![uri]
+        } else {
+            workspace_uris
+        };
+
         let mut workspaces = Workspaces::default();
         // Register workspaces with default settings - they'll be initialized with real settings
         // when workspace/configuration response is received
         for uri in workspace_uris {
-            workspaces.register(uri)?;
+            workspaces.register(uri, is_fallback)?;
         }
 
         let use_uv = initialization_options.use_uv(&*native_system);
@@ -683,7 +700,11 @@ impl Session {
         }
         if let Some(check_mode) = self.global_settings.diagnostic_mode().to_check_mode() {
             for project in self.projects.values_mut() {
-                project.db.set_check_mode(check_mode);
+                project.db.set_check_mode(if project.is_fallback {
+                    CheckMode::OpenFiles
+                } else {
+                    check_mode
+                });
             }
         }
 
@@ -819,8 +840,26 @@ impl Session {
             }
         };
 
-        // Carry forward diagnostic state if any exists
+        let is_fallback = workspace.is_fallback;
+        if is_fallback {
+            // The working directory may be the user's home or filesystem root. It supplies
+            // configuration for standalone files, but is not a workspace to index.
+            db.project().set_included_paths(&mut db, Vec::new());
+        }
+
+        // Preserve open documents when a real workspace replaces the fallback at the same path.
         let previous = self.projects.remove(&root);
+        let open_documents: Vec<_> = previous
+            .as_ref()
+            .into_iter()
+            .flat_map(|previous| {
+                self.file_document_handles().filter(|document| {
+                    document
+                        .notebook_or_file(&previous.db)
+                        .is_some_and(|file| previous.db.is_open_file(file))
+                })
+            })
+            .collect();
         let untracked = previous
             .map(|state| state.untracked_files_with_pushed_diagnostics)
             .unwrap_or_default();
@@ -835,10 +874,15 @@ impl Session {
         self.projects.insert(
             root.clone(),
             ProjectState {
+                is_fallback,
                 db,
                 untracked_files_with_pushed_diagnostics: untracked,
             },
         );
+
+        for document in open_documents {
+            self.open_document_in_db(client, &document, None);
+        }
 
         publish_settings_diagnostics(self, client, root);
     }
@@ -846,7 +890,7 @@ impl Session {
     /// Adds an uninitialized workspace to this session.
     ///
     /// This returns `true` when this workspace is added and `false`
-    /// when it has already been added.
+    /// when it has already been added. A real workspace replaces a fallback at the same path.
     ///
     /// If there was a problem adding the workspace folder (e.g., the
     /// path derived from the given URI is not valid UTF-8), then an
@@ -856,7 +900,7 @@ impl Session {
     /// a request for workspace folder configuration via
     /// `Session::request_uninitialized_workspace_folder_configuration`.
     pub(crate) fn register_workspace_folder(&mut self, uri: Uri) -> anyhow::Result<bool> {
-        self.workspaces.register(uri)
+        self.workspaces.register(uri, false)
     }
 
     /// Requests configuration for each registered but uninitialized
@@ -1456,14 +1500,17 @@ impl Session {
                     return;
                 }
 
-                let db = self.project_db_mut(path);
+                let project_state = self.project_state_mut(path);
+                let db = &mut project_state.db;
                 match system_path_to_file(db, system_path) {
                     Ok(file) => {
                         let project = db.project();
 
-                        // Only mark this file as open if it's part of the project.
-                        // This ensures that we don't show diagnostics for files outside the project.
-                        if project.is_file_included(db, system_path).is_included() {
+                        // Standalone files can be anywhere on disk. Explicit workspaces only
+                        // show diagnostics for files included in the project.
+                        if project_state.is_fallback
+                            || project.is_file_included(db, system_path).is_included()
+                        {
                             project.open_file(db, file);
                         }
                     }
@@ -1744,7 +1791,7 @@ impl Workspaces {
     /// to the server during the `initialize` request, but the resolved
     /// settings are only available after the client has responded to the
     /// `workspace/configuration` request.
-    fn register(&mut self, uri: Uri) -> anyhow::Result<bool> {
+    fn register(&mut self, uri: Uri, is_fallback: bool) -> anyhow::Result<bool> {
         let path = uri
             .to_file_path()
             .map_err(|()| anyhow!("Workspace URI is not a file or directory: {uri:?}"))?;
@@ -1753,7 +1800,9 @@ impl Workspaces {
         let system_path = SystemPathBuf::from_path_buf(path)
             .map_err(|_| anyhow!("Workspace URI is not valid UTF8"))?;
 
-        if self.workspaces.contains_key(&system_path) {
+        if let Some(workspace) = self.workspaces.get(&system_path)
+            && (!workspace.is_fallback || is_fallback)
+        {
             return Ok(false);
         }
 
@@ -1763,6 +1812,7 @@ impl Workspaces {
                 uri,
                 settings: Arc::new(WorkspaceSettings::default()),
                 initialized: false,
+                is_fallback,
             },
         );
         Ok(true)
@@ -1816,6 +1866,8 @@ impl<'a> IntoIterator for &'a Workspaces {
 pub(crate) struct Workspace {
     /// The workspace root URI as sent by the client during initialization.
     uri: Uri,
+    /// Whether this workspace was synthesized to handle files opened without a workspace.
+    is_fallback: bool,
     /// The settings for this workspace.
     ///
     /// The settings here have already been "combined" with the initialization

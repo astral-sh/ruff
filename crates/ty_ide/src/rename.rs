@@ -38,8 +38,9 @@ pub fn can_rename(
     for target in &declaration_targets {
         let target_file = target.file();
 
-        // If definition is outside the project, refuse rename
-        if !is_file_in_project(db, target_file) {
+        // A standalone file can rename its own definitions, but not definitions in other
+        // files outside the project (for example, imported library symbols).
+        if target_file != source_file && !is_file_in_project(db, target_file) {
             return None;
         }
 

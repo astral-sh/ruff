@@ -78,7 +78,7 @@ impl ProjectWatcher {
         let included_paths = ruff_db::system::deduplicate_nested_paths(
             std::iter::once(project_path).chain(
                 db.project()
-                    .included_paths_list(db)
+                    .included_paths_or_root(db)
                     .iter()
                     .map(SystemPathBuf::as_path),
             ),

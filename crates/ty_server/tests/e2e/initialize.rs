@@ -1,6 +1,7 @@
 use anyhow::Result;
 use lsp_types::{
-    Code, Position, PublishDiagnosticsNotification, RegistrationRequest, ShowMessageNotification,
+    Code, DocumentDiagnosticReport, Position, PublishDiagnosticsNotification, RegistrationRequest,
+    ShowMessageNotification, WorkspaceSymbolParams, WorkspaceSymbolRequest,
 };
 use ruff_db::system::SystemPath;
 use serde_json::{Value, json};
@@ -63,6 +64,57 @@ fn empty_workspace_folders() -> Result<()> {
     let initialization_result = server.initialization_result().unwrap();
 
     insta::assert_json_snapshot!("initialization", initialization_result);
+
+    Ok(())
+}
+
+/// A fallback workspace must not index closed files in either diagnostic mode.
+/// Adding that directory as a real workspace should enable indexing normally.
+#[test]
+fn standalone_files_do_not_index_working_directory() -> Result<()> {
+    for diagnostic_mode in [DiagnosticMode::OpenFilesOnly, DiagnosticMode::Workspace] {
+        let mut server = TestServerBuilder::new()?
+            .with_file("closed.py", "class ClosedSymbol: pass\n")?
+            .with_file("open.py", "")?
+            .with_initialization_options(
+                &ClientOptions::default().with_diagnostic_mode(diagnostic_mode),
+            )
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document("open.py", "missing\n", 1);
+        assert!(matches!(
+            server.document_diagnostic_request("open.py", None),
+            DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report)
+                if report.full_document_diagnostic_report.items.len() == 1
+        ));
+
+        if diagnostic_mode == DiagnosticMode::Workspace {
+            let diagnostics = server.workspace_diagnostic_request(None, None);
+            assert_eq!(diagnostics.items.len(), 1);
+        }
+
+        let symbols = server.send_request_await::<WorkspaceSymbolRequest>(WorkspaceSymbolParams {
+            query: "ClosedSymbol".to_string(),
+            ..Default::default()
+        });
+        assert!(symbols.is_none());
+
+        server.change_workspace_folders([SystemPath::new("")], []);
+        let mut server = server.wait_until_workspaces_are_initialized();
+
+        let symbols = server.send_request_await::<WorkspaceSymbolRequest>(WorkspaceSymbolParams {
+            query: "ClosedSymbol".to_string(),
+            ..Default::default()
+        });
+        assert!(symbols.is_some());
+
+        assert!(matches!(
+            server.document_diagnostic_request("open.py", None),
+            DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report)
+                if report.full_document_diagnostic_report.items.len() == 1
+        ));
+    }
 
     Ok(())
 }

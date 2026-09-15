@@ -95,10 +95,11 @@ pub struct Project {
 
     /// The paths that should be included when checking this project.
     ///
-    /// The default (when this list is empty) is to include all files in the project root
+    /// The default (when this is `None`) is to include all files in the project root
     /// (that satisfy the configured include and exclude patterns).
     /// However, it's sometimes desired to only check a subset of the project, e.g. to see
     /// the diagnostics for a single file or a folder.
+    /// An explicitly empty list leaves the project with no indexed files.
     ///
     /// This list gets initialized by the paths passed to `ty check <paths>`
     ///
@@ -114,8 +115,8 @@ pub struct Project {
     /// in an IDE when the user only wants to check the open tabs. This could be modeled
     /// with `included_paths` too but it would require an explicit walk dir step that's simply unnecessary.
     #[default]
-    #[returns(deref)]
-    included_paths_list: Vec<SystemPathBuf>,
+    #[returns(ref)]
+    included_paths_list: Option<Box<[SystemPathBuf]>>,
 
     /// Diagnostics that were generated when resolving the project settings.
     #[returns(deref)]
@@ -242,7 +243,7 @@ impl Project {
         let program_settings = self.program_settings(db).clone();
         let metadata = Box::new(self.metadata(db).clone());
         let settings = Box::new(self.settings(db).clone());
-        let included_paths = self.included_paths_list(db).to_vec();
+        let included_paths = self.included_paths_list(db).clone();
         let check_mode = self.check_mode(db);
         let verbose = self.verbose_flag(db);
         let force_exclude = self.force_exclude_flag(db);
@@ -577,10 +578,12 @@ impl Project {
         removed
     }
 
+    /// Limits indexing to these paths. An empty list disables directory indexing.
     pub fn set_included_paths(self, db: &mut dyn Db, paths: Vec<SystemPathBuf>) {
         tracing::debug!("Setting included paths: {paths}", paths = paths.len());
 
-        self.set_included_paths_list(db).to(paths);
+        self.set_included_paths_list(db)
+            .to(Some(paths.into_boxed_slice()));
         self.reload_files(db);
     }
 
@@ -615,9 +618,9 @@ impl Project {
     /// This can be useful to check arbitrary files, but it isn't something we recommend.
     /// We should try to support this use case but it's okay if there are some limitations around it.
     fn included_paths_or_root(self, db: &dyn Db) -> &[SystemPathBuf] {
-        match self.included_paths_list(db) {
-            [] => std::slice::from_ref(&self.metadata(db).root),
-            paths => paths,
+        match self.included_paths_list(db).as_deref() {
+            None => std::slice::from_ref(&self.metadata(db).root),
+            Some(paths) => paths,
         }
     }
 

@@ -8,6 +8,7 @@ use lsp_types::{
     CallHierarchyIncomingCallsRequest, CallHierarchyOutgoingCallsRequest,
     CallHierarchyPrepareRequest,
 };
+use ruff_db::system::SystemPath;
 
 use crate::TestServerBuilder;
 
@@ -157,6 +158,7 @@ def use_b():
 
     let mut server = TestServerBuilder::new()?
         .with_file("lib.py", lib)?
+        .with_workspace(SystemPath::new(""), None)?
         .with_file("caller_a.py", caller_a)?
         .with_file("caller_b.py", caller_b)?
         .build()
