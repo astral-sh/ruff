@@ -1155,6 +1155,94 @@ def _(callback: Intersection[Callable[[object], list[A]], Callable[[object], lis
     b: list[B] = invoke(callback, object())
 ```
 
+A fixed mutable component does not prevent other components of the result from being refined. Both
+callback signatures below return the same `list[int]` type in the second tuple position, so their
+return types can be intersected. Either tuple type can also serve as the expected return type:
+
+```py
+def _(
+    callback: Intersection[
+        Callable[[object], tuple[A, list[int]]],
+        Callable[[object], tuple[B, list[int]]],
+    ],
+) -> None:
+    reveal_type(invoke(callback, object()))  # revealed: tuple[A, list[int]] & tuple[B, list[int]]
+    a: tuple[A, list[int]] = invoke(callback, object())
+    b: tuple[B, list[int]] = invoke(callback, object())
+```
+
+An alias around the tuple does not change which component is invariant or prevent the refinement:
+
+```py
+type Alias[T] = tuple[T, list[int]]
+
+def _(callback: Intersection[Callable[[object], Alias[A]], Callable[[object], Alias[B]]]) -> None:
+    reveal_type(invoke(callback, object()))  # revealed: tuple[A, list[int]] & tuple[B, list[int]]
+```
+
+The invariant components must agree at each position. Swapping `list[A]` and `list[B]` does not make
+the two tuple types compatible, so inference retains their union:
+
+```py
+def _(
+    callback: Intersection[
+        Callable[[object], tuple[list[A], list[B]]],
+        Callable[[object], tuple[list[B], list[A]]],
+    ],
+) -> None:
+    reveal_type(invoke(callback, object()))  # revealed: tuple[list[A], list[B]] | tuple[list[B], list[A]]
+```
+
+Union alternatives can associate each mutable component with a different type in another position.
+These associations differ between the signatures, so inference keeps the full union:
+
+```py
+def _(
+    callback: Intersection[
+        Callable[[object], tuple[list[int], int] | tuple[list[str], str]],
+        Callable[[object], tuple[list[int], str] | tuple[list[str], int]],
+    ],
+) -> None:
+    # revealed: tuple[list[int], int] | tuple[list[str], str] | tuple[list[int], str] | tuple[list[str], int]
+    reveal_type(invoke(callback, object()))
+```
+
+The same distinction applies to generic classes with both covariant and invariant parameters.
+`Wrapper` only produces `T`, while its writable `value` attribute makes `U` invariant:
+
+```py
+class Wrapper[T, U]:
+    value: U
+
+    def get(self) -> T:
+        raise NotImplementedError
+```
+
+When the signatures agree on `U = int`, their return types can be intersected. If `U` varies between
+`int` and `str`, inference retains the union:
+
+```py
+def _(
+    fixed: Intersection[Callable[[object], Wrapper[A, int]], Callable[[object], Wrapper[B, int]]],
+    varying: Intersection[Callable[[object], Wrapper[A, int]], Callable[[object], Wrapper[B, str]]],
+) -> None:
+    reveal_type(invoke(fixed, object()))  # revealed: Wrapper[A, int] & Wrapper[B, int]
+    reveal_type(invoke(varying, object()))  # revealed: Wrapper[A, int] | Wrapper[B, str]
+```
+
+A tuple subclass can have invariant attributes beyond its tuple elements. Identical inherited tuple
+elements do not make different specializations of its writable `value` attribute compatible:
+
+```py
+class TupleWrapper[T](tuple[int, list[int]]):
+    value: T
+
+def _(
+    callback: Intersection[Callable[[object], TupleWrapper[A]], Callable[[object], TupleWrapper[B]]],
+) -> None:
+    reveal_type(invoke(callback, object()))  # revealed: TupleWrapper[A] | TupleWrapper[B]
+```
+
 ## Multiple occurrences of a higher-order generic callable
 
 If a generic callable is used more than once in a higher-order call, each occurrence should get its

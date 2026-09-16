@@ -40,6 +40,7 @@ use crate::types::constraints::{
     SolutionPaths, Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
+use crate::types::cyclic::PairVisitor;
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_DATACLASS,
@@ -6047,6 +6048,86 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .map(|inference| inference.merged_specialization(db))
     }
 
+    /// Conservatively checks whether two inferred returns differ in an invariant component.
+    /// Matching tuple positions and generic arguments can vary independently of fixed mutable
+    /// components, as in `tuple[A, list[int]]` versus `tuple[B, list[int]]`.
+    fn has_invariant_return_difference(
+        &self,
+        left: Type<'db>,
+        right: Type<'db>,
+        visitor: &PairVisitor<'db, (), bool>,
+    ) -> bool {
+        let db = self.db;
+        let env = self.env;
+        let left = left.resolve_type_alias(db);
+        let right = right.resolve_type_alias(db);
+        if left == right {
+            return false;
+        }
+        visitor.visit(db, (left, right), || {
+            let class_specialization = |ty| match ty {
+                Type::GenericAlias(alias) => Some((alias.origin(db), alias.specialization(db))),
+                Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::TypedDict(_) => {
+                    ty.class_specialization(db, env)
+                }
+                _ => None,
+            };
+            let has_invariant_specialization = |ty| {
+                any_over_type_expanding_aliases(db, env, ty, |nested| {
+                    class_specialization(nested).is_some_and(|(_, specialization)| {
+                        specialization
+                            .generic_context(db)
+                            .variables(db)
+                            .any(|variable| variable.variance(db) == TypeVarVariance::Invariant)
+                    })
+                })
+            };
+            if !has_invariant_specialization(left) && !has_invariant_specialization(right) {
+                return false;
+            }
+
+            if let (Some(left), Some(right)) = (
+                left.exact_tuple_instance_spec(db),
+                right.exact_tuple_instance_spec(db),
+            ) && let (TupleSpec::Fixed(left), TupleSpec::Fixed(right)) = (&*left, &*right)
+                && left.len() == right.len()
+            {
+                return left.iter_all_elements().zip(right.iter_all_elements()).any(
+                    |(left, right)| self.has_invariant_return_difference(left, right, visitor),
+                );
+            }
+
+            if matches!(
+                (left, right),
+                (Type::NominalInstance(_), Type::NominalInstance(_))
+                    | (Type::GenericAlias(_), Type::GenericAlias(_))
+            ) && let (Some((left_class, left)), Some((right_class, right))) =
+                (class_specialization(left), class_specialization(right))
+                && left_class == right_class
+                && left.generic_context(db) == right.generic_context(db)
+                && left.materialization_kind(db) == right.materialization_kind(db)
+                && left.tuple(db).is_none()
+                && right.tuple(db).is_none()
+            {
+                return left
+                    .generic_context(db)
+                    .variables(db)
+                    .zip(left.types(db).iter().zip(right.types(db)))
+                    .any(|(variable, (&left, &right))| {
+                        if variable.variance(db) == TypeVarVariance::Invariant {
+                            left != right
+                        } else {
+                            self.has_invariant_return_difference(left, right, visitor)
+                        }
+                    });
+            }
+
+            // Do not match invariant descendants by membership alone. In particular, union
+            // alternatives can correlate the same mutable types with different sibling types.
+            true
+        })
+    }
+
     /// Intersects returns from resolved inference alternatives that each validate all arguments.
     ///
     /// Returns `None` when correlated inference is unavailable or cannot safely replace the
@@ -6152,39 +6233,24 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // hidden inside an inferred type, such as `R = list[A]` versus `R = list[B]`. This is
         // conservative: choosing either valid specialization could be less restrictive, but
         // without a return context there is no clear preference between them.
-        let has_invariant_specialization = |ty| {
-            any_over_type_expanding_aliases(db, env, ty, |nested| {
-                let specialization = match nested {
-                    Type::GenericAlias(alias) => Some(alias.specialization(db)),
-                    Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::TypedDict(_) => {
-                        nested
-                            .class_specialization(db, env)
-                            .map(|(_, specialization)| specialization)
-                    }
-                    _ => None,
-                };
-                specialization.is_some_and(|specialization| {
-                    specialization
-                        .generic_context(db)
-                        .variables(db)
-                        .any(|variable| variable.variance(db) == TypeVarVariance::Invariant)
-                })
-            })
-        };
+        // Recursive aliases that cannot be fully compared retain the merged fallback.
+        let invariant_visitor = PairVisitor::new(true);
         if return_variables.iter().any(|(index, variable)| {
-            !specializations
+            let mut types = specializations
                 .iter()
-                .map(|specialization| specialization.types(db)[*index])
-                .all_equal()
+                .map(|specialization| specialization.types(db)[*index]);
+            let Some(first) = types.next() else {
+                return false;
+            };
+            !types.clone().all(|ty| ty == first)
                 && (self
                     .return_ty
                     .variance_of(db, env, variable.identity(db))
                     .evaluate(db)
                     == TypeVarVariance::Invariant
-                    || specializations
-                        .iter()
-                        .map(|specialization| specialization.types(db)[*index])
-                        .any(has_invariant_specialization))
+                    || types.any(|ty| {
+                        self.has_invariant_return_difference(first, ty, &invariant_visitor)
+                    }))
         }) {
             return None;
         }
