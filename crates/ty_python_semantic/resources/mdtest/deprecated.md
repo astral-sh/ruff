@@ -528,6 +528,37 @@ alias_func()  # error: [deprecated] "Use other_func instead"
 AliasClass()  # error: [deprecated] "Use OtherType instead"
 ```
 
+## Names in annotations
+
+Each reference to a deprecated class produces one warning, including references through aliases and
+generic specialization.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing_extensions import deprecated
+
+@deprecated("Use Replacement")
+class Old[T = int]: ...
+
+Alias = Old  # error: [deprecated] "Use Replacement"
+
+def direct(value: Old) -> None:  # error: [deprecated] "Use Replacement"
+    pass
+
+def alias(value: Alias) -> None:  # error: [deprecated] "Use Replacement"
+    pass
+
+def specialized(value: Old[int]) -> None:  # error: [deprecated] "Use Replacement"
+    pass
+
+def specialized_alias(value: Alias[int]) -> None:  # error: [deprecated] "Use Replacement"
+    pass
+```
+
 ## Dunders
 
 ### Binary operators

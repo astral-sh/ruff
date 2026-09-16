@@ -6,6 +6,7 @@
 //! listing all members in the class's body scope.
 
 use std::cmp::Ordering;
+use std::convert::identity;
 
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
@@ -174,6 +175,9 @@ impl<'db> AllMembers<'db> {
 
     fn extend_with_type(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
         match ty {
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             Type::Union(union) => {
                 fn is_dynamic(db: &dyn Db, ty: Type<'_>) -> bool {
                     // We don't need to use recursion here because
@@ -332,6 +336,11 @@ impl<'db> AllMembers<'db> {
 
             Type::TypeAlias(alias) => {
                 self.extend_with_type(db, env, alias.value_type(db));
+            }
+
+            Type::Recursive(recursive) => {
+                let unfolded = recursive.map_or(db, env, Type::object(), identity);
+                self.extend_with_type(db, env, unfolded);
             }
 
             Type::TypeVar(bound_typevar) => {
