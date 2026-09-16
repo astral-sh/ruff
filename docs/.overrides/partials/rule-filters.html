@@ -1,36 +1,61 @@
-<template id="rule-filters-template">
-  <form class="rule-filters" role="search" aria-label="Filter rules">
-    <div class="rule-filters__controls">
-      <label class="rule-filters__search">
-        Search rules
-        <input type="search" name="rule-search" placeholder="Code, name, or message"
-               autocomplete="off" spellcheck="false">
-      </label>
-      {% for name in ["category", "linter", "status"] %}
-      <fieldset class="rule-filters__{{ name }}">
-        <legend>{{ name | capitalize }}</legend>
-        <details data-filter="{{ name }}">
-          <summary><span>All</span><span aria-hidden="true">▾</span></summary>
-          <div class="rule-filters__options">
-            <div class="rule-filters__actions">
-              <button type="button" data-preset="all">All</button>
-              {% if name == "category" %}
-              <button type="button" data-preset="default">Default</button>
-              {% endif %}
-              <button type="button" data-preset="none">None</button>
-            </div>
-            {% if name == "status" %}
-            {% for status in ["stable", "preview", "deprecated", "removed", "fixable", "default"] %}
-            <label><input type="checkbox" name="status" value="{{ status }}"> {{ status | capitalize }}</label>
-            {% endfor %}
-            {% endif %}
+<form id="rule-filters" class="rule-filters" role="search" aria-label="Filter rules" hidden>
+  <div class="rule-filters__controls">
+    <label class="rule-filters__search">
+      Search rules
+      <input type="search" name="rule-search" placeholder="Code, name, or message"
+             autocomplete="off" spellcheck="false">
+    </label>
+
+    <fieldset class="rule-filters__category">
+      <legend>Category</legend>
+      <details data-filter="category">
+        <summary><span>All</span><span aria-hidden="true">▾</span></summary>
+        <div class="rule-filters__options">
+          <div class="rule-filters__actions">
+            <button type="button" data-preset="all">All</button>
+            <button type="button" data-preset="default">Default</button>
+            <button type="button" data-preset="none">None</button>
           </div>
-        </details>
-      </fieldset>
-      {% endfor %}
-      <button type="reset">Clear filters</button>
-    </div>
-    <p class="rule-filters__count" role="status" aria-live="polite" aria-atomic="true"></p>
-    <p class="rule-filters__empty" hidden>No matching rules. Try another search or clear the filters.</p>
-  </form>
-</template>
+          {category_options}
+        </div>
+      </details>
+    </fieldset>
+
+    <fieldset class="rule-filters__linter">
+      <legend>Linter</legend>
+      <details data-filter="linter">
+        <summary><span>All</span><span aria-hidden="true">▾</span></summary>
+        <div class="rule-filters__options">
+          <div class="rule-filters__actions">
+            <button type="button" data-preset="all">All</button>
+            <button type="button" data-preset="none">None</button>
+          </div>
+          {linter_options}
+        </div>
+      </details>
+    </fieldset>
+
+    <fieldset class="rule-filters__status">
+      <legend>Status</legend>
+      <details data-filter="status">
+        <summary><span>All</span><span aria-hidden="true">▾</span></summary>
+        <div class="rule-filters__options">
+          <div class="rule-filters__actions">
+            <button type="button" data-preset="all">All</button>
+            <button type="button" data-preset="none">None</button>
+          </div>
+          <label><input type="checkbox" name="status" value="stable" checked> Stable</label>
+          <label><input type="checkbox" name="status" value="preview" checked> Preview</label>
+          <label><input type="checkbox" name="status" value="deprecated" checked> Deprecated</label>
+          <label><input type="checkbox" name="status" value="removed" checked> Removed</label>
+          <label><input type="checkbox" name="status" value="fixable" checked> Fixable</label>
+          <label><input type="checkbox" name="status" value="default" checked> Default</label>
+        </div>
+      </details>
+    </fieldset>
+
+    <button type="reset">Clear filters</button>
+  </div>
+  <p class="rule-filters__count" role="status" aria-live="polite" aria-atomic="true"></p>
+  <p class="rule-filters__empty" hidden>No matching rules. Try another search or clear the filters.</p>
+</form>

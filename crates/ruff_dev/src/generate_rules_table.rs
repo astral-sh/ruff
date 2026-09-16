@@ -2,7 +2,7 @@
 //!
 //! Used for <https://docs.astral.sh/ruff/rules/>.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt::Write;
 
 use itertools::Itertools;
@@ -31,19 +31,22 @@ fn generate_table(
     rules: impl IntoIterator<Item = Rule>,
     default_rules: &RuleTable,
 ) {
+    let table_start = table_out.len();
+    table_out.push('\n');
     let categories = Category::iter().join(" ");
     let default_categories = Category::default_categories().iter().join(" ");
     let _ = writeln!(
         table_out,
-        "| Code {{ scope='col' .rule-code }} \
-         | Rule {{ scope='col' .rule-identity }} \
-         | Category {{ scope='col' .rule-category data-categories='{categories}' data-default-categories='{default_categories}' }} \
-         | Linter {{ scope='col' .rule-linter }} \
+        "| <button type='button' title='Sort by code' disabled>Code</button> {{ scope='col' .rule-code }} \
+         | <button type='button' title='Sort by rule' disabled>Rule</button> {{ scope='col' .rule-identity }} \
+         | <button type='button' title='Sort by category' disabled>Category</button> {{ scope='col' .rule-category data-categories='{categories}' data-default-categories='{default_categories}' }} \
+         | <button type='button' title='Sort by linter' disabled>Linter</button> {{ scope='col' .rule-linter }} \
          | Status {{ scope='col' .rule-status aria-label='Status, fix availability, and default selection' }} |"
     );
     table_out.push_str("| ---- | ---- | -------- | ------ | -: |");
     table_out.push('\n');
     let mut seen_anchors = HashSet::new();
+    let mut linters = BTreeMap::new();
     for rule in rules {
         let status = rule.status();
         let status_token = match status {
@@ -136,6 +139,10 @@ fn generate_table(
         };
         // Preserve links to the old linter headings on their first table row.
         let linter_anchor = if seen_anchors.insert(linter_slug.clone()) {
+            linters.insert(
+                linter_label.to_lowercase(),
+                (linter_slug.clone(), linter_label.clone()),
+            );
             format!("#{linter_slug}")
         } else {
             String::new()
@@ -181,6 +188,27 @@ fn generate_table(
         table_out.push('\n');
     }
     table_out.push('\n');
+
+    // Reuse the table's linter labels and slugs for the filter options.
+    let category_options = Category::iter()
+        .map(|category| {
+            format!("<label><input type='checkbox' name='category' value='{category}' checked> {category}</label>")
+        })
+        .join("\n");
+    let linter_options = linters
+        .values()
+        .map(|(value, label)| {
+            format!("<label><input type='checkbox' name='linter' value='{value}' checked> {label}</label>")
+        })
+        .join("\n");
+    table_out.insert_str(
+        table_start,
+        &format!(
+            include_str!("../../../docs/.overrides/partials/rule-filters.html"),
+            category_options = category_options,
+            linter_options = linter_options,
+        ),
+    );
 }
 
 pub(crate) fn generate() -> String {
