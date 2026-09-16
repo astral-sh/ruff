@@ -1433,7 +1433,12 @@ impl<'db> BoundTypeVarInstance<'db> {
                 generic_context,
                 delta,
             } => {
-                if generic_context.contains(db, self.identity(db)) && !self.is_paramspec(db) {
+                let identity = if self.is_paramspec(db) {
+                    self.identity(db).without_paramspec_attr(db)
+                } else {
+                    self.identity(db)
+                };
+                if generic_context.contains(db, identity) {
                     Type::TypeVar(self.freshen_with_mapping(
                         db,
                         self.freshness(db).add(*delta),
