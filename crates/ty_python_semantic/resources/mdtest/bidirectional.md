@@ -2908,6 +2908,79 @@ x24[1] = "b"
 reveal_type(x24)  # revealed: dict[int | str, str | int]
 ```
 
+## Unconstrained collection use-sites
+
+Calling a method that does not constrain a collection's element type does not affect its inferred
+type.
+
+```py
+def _():
+    x1 = [1]
+    x1.reverse()
+    reveal_type(x1)  # revealed: list[int]
+
+    x2 = {1}
+    x2.clear()
+    reveal_type(x2)  # revealed: set[int]
+
+    x3 = {"a": 1}
+    x3.clear()
+    reveal_type(x3)  # revealed: dict[str, int]
+```
+
+Calls that partially constrain the collection do not affect the type inferred for unrelated type
+variables.
+
+```py
+def _():
+    values = {"a": 1}
+    values.pop("a")
+    reveal_type(values)  # revealed: dict[str, int]
+```
+
+An empty collection remains unknown until another use supplies an element type:
+
+```py
+def _():
+    x1 = []
+    x1.reverse()
+    reveal_type(x1)  # revealed: list[Unknown]
+
+    x2 = []
+    x2.reverse()
+    x2.append(1)
+    reveal_type(x2)  # revealed: list[int]
+```
+
+Gradual types that explicitly constrain a collection are preserved in the inferred type.
+
+```py
+from ty_extensions._internal import Unknown
+
+def _(unknown: Unknown):
+    x1 = [1]
+    x1.reverse()
+    x1.append(unknown)
+    reveal_type(x1)  # revealed: list[Unknown | int]
+```
+
+An unannotated lambda expression does not influence the inferred type for a collection literal,
+while an explicitly annotated callback does introduce constraints.
+
+```py
+def key(value: Unknown) -> int:
+    return 0
+
+def _():
+    x1 = [(0, "a")]
+    x1.sort(key=lambda x: x[0])
+    reveal_type(x1)  # revealed: list[tuple[int, str]]
+
+    x2 = [(0, "a")]
+    x2.sort(key=key)
+    reveal_type(x2)  # revealed: list[Unknown | tuple[int, str]]
+```
+
 ## Multi-inference diagnostics
 
 Diagnostics unrelated to the type-context are only reported once:

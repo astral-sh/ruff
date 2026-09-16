@@ -9647,7 +9647,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .iter_flat()
                         .flat_map(CallableBinding::matching_overloads)
                         .filter_map(|(_, identity_overload)| {
-                            identity_overload.merged_specialization(db)
+                            identity_overload.partial_specialization(db, env)
                         })
                     {
                         // Record the constraints on the receiver's generic context formed by
