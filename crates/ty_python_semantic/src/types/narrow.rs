@@ -1050,7 +1050,7 @@ fn specialize_generic_class_from_solutions<'db>(
             solution
                 .iter()
                 .find(|binding| binding.bound_typevar == typevar)
-                .map(|binding| binding.solution)
+                .map(|binding| binding.solution.ty())
                 .or_else(|| unknown_specialization.get(db, typevar))
         })
         .collect::<Option<Vec<_>>>()?;
@@ -5411,6 +5411,16 @@ fn visit_matching_typeddict_field_types<'db>(
         Type::RecursiveVar(_) => {
             unreachable!("semantic operation on an unbound recursive variable")
         }
+        Type::Recursive(recursive) => {
+            return recursive.map_or_else(
+                db,
+                env,
+                || (),
+                |unfolded| {
+                    visit_matching_typeddict_field_types(db, env, unfolded, field_name, visit);
+                },
+            );
+        }
         Type::TypedDict(td) => {
             if let Some(field) = td.items(db).get(field_name) {
                 visit(field.declared_ty);
@@ -5424,16 +5434,6 @@ fn visit_matching_typeddict_field_types<'db>(
                 alias.value_type(db),
                 field_name,
                 visit,
-            );
-        }
-        Type::Recursive(recursive) => {
-            return recursive.map_or_else(
-                db,
-                env,
-                || (),
-                |unfolded| {
-                    visit_matching_typeddict_field_types(db, env, unfolded, field_name, visit);
-                },
             );
         }
         Type::Union(union) => Either::Left(union.elements(db).iter()),

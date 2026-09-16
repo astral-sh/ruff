@@ -470,19 +470,6 @@ impl PathAssignments {
         result
     }
 
-    pub(super) fn positive_constraints(
-        &self,
-    ) -> impl Iterator<Item = (ConstraintId, ConstraintId)> + '_ {
-        self.assignments.iter().filter_map(
-            |(assignment, (source_constraint, _))| match assignment {
-                ConstraintAssignment::Positive(constraint) => {
-                    Some((*constraint, *source_constraint))
-                }
-                ConstraintAssignment::Negative(_) | ConstraintAssignment::Unconstrained(_) => None,
-            },
-        )
-    }
-
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
         self.assignments.contains_key(&assignment)
     }
@@ -1371,7 +1358,10 @@ mod tests {
             let mut walker = SolutionWalker::new(source_orders.clone());
             let ControlFlow::Continue(()) =
                 walker.visit_node(db, &env, &mut storage, &mut path, set.node, &mut limits);
-            assert_eq!(walker.finish(db, &env, &mut storage), expected);
+            assert_eq!(
+                walker.finish(db, &env, &mut storage, TypeVarSet::from_typevars(db, [t])),
+                expected
+            );
         }
     }
 }

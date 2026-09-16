@@ -633,6 +633,28 @@ def outer(callback: Callable[[], tuple[list[T], *tuple[Any, ...]]]) -> None:
     reveal_type(infer_tuple(callback))  # revealed: tuple[list[T@outer], *tuple[Any, ...]]
 ```
 
+## Generic identity callbacks with dynamic arguments
+
+An identity callback contributes the known type of its input to the return type. A separate
+dynamically typed argument does not erase that known alternative.
+
+```py
+from typing import Any, Callable, TypeVar
+
+K = TypeVar("K")
+V = TypeVar("V")
+U = TypeVar("U")
+
+def select(key: K, value: V, callback: Callable[[K], V]) -> V:
+    raise NotImplementedError
+
+def identity(value: U) -> U:
+    return value
+
+def check(key: str, value: Any):
+    reveal_type(select(key, value, identity))  # revealed: str | Any
+```
+
 ## SymPy one-import MRE scaffold (multi-file)
 
 Reduced regression lock for a SymPy overload/protocol shape that can panic in the

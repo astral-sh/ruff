@@ -1059,6 +1059,622 @@ def f[S, T, U]():
     ...
 ```
 
+## Equivalent variables share a solution
+
+Equality can determine several variables from one known type without introducing recursion.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def equal[X, Y]():
+    constraints = ConstraintSet.equality(X, Y) & ConstraintSet.equality(Y, int)
+    reveal_type(constraints.solutions(inferable=tuple[X, Y]))  # revealed: tuple[Solution[Y=int, X=int]]
+```
+
+A cycle of subtype relations also makes the variables equal. Fixing one variable determines all
+three variables.
+
+```py
+def transitive[X, Y, Z]():
+    constraints = (
+        ConstraintSet.equality(X, int | str)
+        & ConstraintSet.upper_bound(X, Y)
+        & ConstraintSet.upper_bound(Y, Z)
+        & ConstraintSet.upper_bound(Z, X)
+    )
+    # revealed: tuple[Solution[X=int | str, Y=int | str, Z=int | str]]
+    reveal_type(constraints.solutions(inferable=tuple[X, Y, Z]))
+```
+
+## Equivalent bounds in a gradual solution
+
+When `A` is `int`, the two tuple lower bounds describe the same type. After combining them, the
+`Any` part of the solution is still restricted by the upper bound `tuple[int | str]`.
+
+```py
+from typing import Any
+from ty_extensions._internal import ConstraintSet
+
+def gradual[A, X]():
+    constraints = (
+        ConstraintSet.equality(A, int)
+        & ConstraintSet.lower_bound(tuple[int], X)
+        & ConstraintSet.lower_bound(tuple[A], X)
+        & ConstraintSet.range(Any, X, tuple[int | str])
+    )
+    # revealed: tuple[Solution[A=int, X=tuple[int] | (tuple[int | str] & Any)]]
+    reveal_type(constraints.solutions(inferable=tuple[A, X]))
+```
+
+## Recursive solutions
+
+### Direct and mutual recursion
+
+A type variable can have a structural recursive solution. In the display below, `μ$0. ...` binds
+`$0` to the whole recursive type; it is not an unresolved inference variable or a dynamic type.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def direct[T]():
+    constraints = ConstraintSet.equality(T, int | tuple[T])
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=μ$0. tuple[$0] | int]]
+```
+
+Equating `T` with `tuple[U]` and `U` with `tuple[T]` produces a recursive tuple type for both
+variables. The tuple's element has the same recursive type as the tuple itself.
+
+```py
+def mutual[T, U]():
+    constraints = ConstraintSet.equality(T, tuple[U]) & ConstraintSet.equality(U, tuple[T])
+    # revealed: tuple[Solution[T=μ$0. tuple[$0], U=μ$0. tuple[$0]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+### Recursive bounds with an incompatible upper bound
+
+Requiring `T` to contain `int` and every `tuple[T]` also requires it to contain `tuple[tuple[int]]`.
+An upper bound that permits only `int` and `tuple[int]` therefore leaves no solution. The same
+restrictions can occur on one alternative of a larger constraint set; rejecting that alternative
+preserves the other solutions.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def incompatible_upper[T]():
+    recursive = ConstraintSet.lower_bound(int, T) & ConstraintSet.lower_bound(tuple[T], T)
+    invalid = recursive & ConstraintSet.upper_bound(T, int | tuple[int])
+    reveal_type(invalid.solutions(inferable=tuple[T]))  # revealed: None
+    alternatives = invalid | ConstraintSet.equality(T, str)
+    reveal_type(alternatives.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=str]]
+```
+
+### Recursive bounds respect type parameter declarations
+
+The declaration limits `T` to a single tuple layer. A lower bound that can add arbitrarily many
+tuple layers cannot satisfy it.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def declared_upper[T: int | tuple[int]]():
+    constraints = ConstraintSet.lower_bound(int, T) & ConstraintSet.lower_bound(tuple[T], T)
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: None
+```
+
+The same upper bound can be imposed through a type parameter whose value is not being inferred.
+Leaving that parameter symbolic does not relax its declaration.
+
+```py
+def declared_dependency[T, U: int | tuple[int]]():
+    constraints = ConstraintSet.lower_bound(int, T) & ConstraintSet.lower_bound(tuple[T], T) & ConstraintSet.upper_bound(T, U)
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: None
+```
+
+### Recursive bounds respect legacy type variable declarations
+
+A legacy `TypeVar` bound imposes the same restriction on nested tuples.
+
+```py
+from typing import TypeVar
+from ty_extensions._internal import ConstraintSet
+
+T = TypeVar("T", bound=int | tuple[int])
+
+def declared_upper(value: T):
+    constraints = ConstraintSet.lower_bound(int, T) & ConstraintSet.lower_bound(tuple[T], T)
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: None
+```
+
+### Recursive solutions respect finite type parameter choices
+
+`V` contains both nested integers and strings. A parameter constrained to either `Nested` or `str`
+cannot contain both, even when its value is left symbolic in the result.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Nested = int | tuple[Nested]
+
+def choices[T, V, U: (Nested, str)]():
+    constraints = ConstraintSet.equality(T, int | tuple[T]) & ConstraintSet.equality(V, T | str) & ConstraintSet.upper_bound(V, U)
+    reveal_type(constraints.solutions(inferable=tuple[T, V]))  # revealed: None
+    reveal_type(constraints.solutions(inferable=tuple[T, V, U]))  # revealed: None
+```
+
+### Recursive solutions respect legacy finite type variable choices
+
+The same restriction applies to a legacy `TypeVar` with a finite set of constraints.
+
+```py
+from typing import TypeVar
+from ty_extensions._internal import ConstraintSet
+
+type Nested = int | tuple[Nested]
+
+T = TypeVar("T")
+V = TypeVar("V")
+U = TypeVar("U", Nested, str)
+
+def choices(t: T, v: V, u: U):
+    constraints = ConstraintSet.equality(T, int | tuple[T]) & ConstraintSet.equality(V, T | str) & ConstraintSet.upper_bound(V, U)
+    reveal_type(constraints.solutions(inferable=tuple[T, V]))  # revealed: None
+    reveal_type(constraints.solutions(inferable=tuple[T, V, U]))  # revealed: None
+```
+
+### Excluded recursive candidates
+
+The smallest type containing `int` and every `tuple[T]` is `Nested`. Excluding subtypes of `Nested`
+rules out that candidate. We leave `T` and the dependent `U = Box[T]` unresolved while retaining the
+independent solution `V = str`. Keeping `U = Box[Nested]` would force `T` back to the excluded type
+because `list` is invariant.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Nested = int | tuple[Nested]
+type Box[Element] = list[Element]
+
+def excluded[T, U, V]():
+    constraints = (
+        ConstraintSet.lower_bound(int, T)
+        & ConstraintSet.lower_bound(tuple[T], T)
+        & ~ConstraintSet.upper_bound(T, Nested)
+        & ConstraintSet.equality(U, Box[T])
+        & ConstraintSet.equality(V, str)
+    )
+    # TODO: Select a larger type satisfying the exclusion, such as `object`.
+    # revealed: tuple[Solution[T=T@excluded, U=U@excluded, V=str]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
+```
+
+Excluding types with at most one tuple layer permits the recursive candidate.
+
+```py
+def permitted[T, V]():
+    constraints = (
+        ConstraintSet.lower_bound(int, T)
+        & ConstraintSet.lower_bound(tuple[T], T)
+        & ~ConstraintSet.upper_bound(T, int | tuple[int])
+        & ConstraintSet.equality(V, str)
+    )
+    # revealed: tuple[Solution[T=μ$0. tuple[$0] | int, V=str]]
+    reveal_type(constraints.solutions(inferable=tuple[T, V]))
+```
+
+### Shared recursive structure
+
+Both equations can contain direct and mutual references. In `μ{$0; $1 = …}. body`, `$0` denotes the
+whole recursive type defined by `body`, and `$1` names a shared part. Both names are bound
+throughout the definitions and the body. Each shared part is defined once. Without auxiliary
+definitions, the notation is `μ$0. body`.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def nested[T, U]():
+    constraints = ConstraintSet.equality(T, tuple[T, U]) & ConstraintSet.equality(U, list[tuple[T, U]])
+    # revealed: tuple[Solution[T=μ$0. tuple[$0, list[$0]], U=μ{$0; $1 = tuple[$1, $0]}. list[$1]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+A type parameter outside the inferable set remains a parameter of the solution.
+
+```py
+def with_free_parameter[T, E]():
+    constraints = ConstraintSet.equality(T, int | tuple[T, E])
+    # revealed: tuple[Solution[T=μ$0. tuple[$0, E@with_free_parameter] | int]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+### Sharing between recursive components
+
+A recursive type can contain two references to an independently recursive type. Each definition
+appears once, including when that sharing continues through several recursive components.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def components[A, B, C]():
+    constraints = (
+        ConstraintSet.equality(A, tuple[A, B, B]) & ConstraintSet.equality(B, tuple[B, C, C]) & ConstraintSet.equality(C, list[C])
+    )
+    # revealed: tuple[Solution[A=μ{$0; $1 = tuple[$1, $2, $2]; $2 = list[$2]}. tuple[$0, $1, $1]]]
+    reveal_type(constraints.solutions_for(A, inferable=tuple[A, B, C]))
+```
+
+### Equal recursive definitions
+
+Two variables with the same defining expression have the same recursive solution. Their equality
+does not add another layer of recursion to the tuple structure.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def same_definition[X, Y, Z]():
+    constraints = ConstraintSet.equality(X, tuple[Z]) & ConstraintSet.equality(Y, tuple[Z]) & ConstraintSet.equality(Z, int | Y)
+    # revealed: tuple[Solution[X=tuple[μ$0. tuple[$0] | int], Y=μ$0. tuple[$0 | int], Z=μ$0. tuple[$0] | int]]
+    reveal_type(constraints.solutions(inferable=tuple[X, Y, Z]))
+```
+
+### Recursive alias arguments
+
+Recursive solutions can occur as arguments of a recursive alias. The alias retains its name, and its
+argument refers to the enclosing recursive solution.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Explicit[V] = V | tuple[Explicit[V]]
+
+def explicit[T]():
+    constraints = ConstraintSet.equality(T, list[Explicit[T]])
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=μ$0. list[Explicit[$0]]]]
+```
+
+### Dependencies through implicit recursive aliases
+
+Solving a type variable also specializes its occurrences inside an implicit recursive alias.
+
+```py
+from typing import TypeAlias, TypeVar
+from ty_extensions._internal import ConstraintSet
+
+V = TypeVar("V")
+Repeated: TypeAlias = V | tuple["Repeated[V]"]
+
+def acyclic[T, U]():
+    constraints = ConstraintSet.equality(T, Repeated[U]) & ConstraintSet.equality(U, int)
+    # revealed: tuple[Solution[T=Repeated[int], U=int]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+A tuple can guard the recursive reference either inside the alias definition or in its supplied
+argument. Both equations have recursive solutions.
+
+```py
+Guarded: TypeAlias = tuple[V, "Guarded[V]"]
+
+def guarded[T]():
+    constraints = ConstraintSet.equality(T, Guarded[T])
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=μ$0. Guarded[$0]]]
+
+def argument_guard[T]():
+    constraints = ConstraintSet.equality(T, Repeated[tuple[T]])
+    # revealed: tuple[Solution[T=μ$0. Repeated[tuple[$0]]]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+### Correlation and dependent solutions
+
+Each alternative retains its own recursive solution. Variables depending on that solution are
+specialized through the entire dependency chain.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def alternatives[T, U, V]():
+    constraints = (
+        (ConstraintSet.equality(T, int | tuple[T]) | ConstraintSet.equality(T, str | tuple[T]))
+        & ConstraintSet.equality(U, dict[str, T])
+        & ConstraintSet.equality(V, list[U])
+    )
+    # revealed: tuple[Solution[T=μ$0. tuple[$0] | int, U=dict[str, μ$0. tuple[$0] | int], V=list[dict[str, μ$0. tuple[$0] | int]]], Solution[T=μ$0. tuple[$0] | str, U=dict[str, μ$0. tuple[$0] | str], V=list[dict[str, μ$0. tuple[$0] | str]]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
+```
+
+### Equivalent equations
+
+Reversing the constraints gives the same recursive solution. Inlining an intermediate variable can
+leave a finite prefix outside the recursive binder, describing the same recursive structure.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def equivalent[A, B]():
+    left = ConstraintSet.equality(A, list[B])
+    right = ConstraintSet.equality(B, str | set[B] | tuple[A])
+    inlined = ConstraintSet.equality(B, str | set[B] | tuple[list[B]])
+    # revealed: tuple[Solution[A=μ{$0; $1 = tuple[$0] | set[$1] | str}. list[$1]]]
+    reveal_type((left & right).solutions_for(A, inferable=tuple[A, B]))
+    # revealed: tuple[Solution[A=μ{$0; $1 = tuple[$0] | set[$1] | str}. list[$1]]]
+    reveal_type((right & left).solutions_for(A, inferable=tuple[A, B]))
+    # revealed: tuple[Solution[A=list[μ$0. tuple[list[$0]] | set[$0] | str]]]
+    reveal_type((left & inlined).solutions_for(A, inferable=tuple[A, B]))
+    # revealed: tuple[Solution[B=μ$0. tuple[list[$0]] | set[$0] | str]]
+    reveal_type((left & right).solutions_for(B, inferable=tuple[A, B]))
+    # revealed: tuple[Solution[B=μ$0. tuple[list[$0]] | set[$0] | str]]
+    reveal_type(inlined.solutions_for(B, inferable=tuple[B]))
+```
+
+### Branching mutual recursion
+
+Each tuple contains two different recursive types. The solution retains every tuple's literal tag
+and its two references without duplicating shared definitions.
+
+```py
+from typing import Literal
+from ty_extensions._internal import ConstraintSet
+
+def branching[T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11]():
+    constraints = (
+        ConstraintSet.equality(T0, tuple[Literal[0], T1, T2])
+        & ConstraintSet.equality(T1, tuple[Literal[1], T2, T3])
+        & ConstraintSet.equality(T2, tuple[Literal[2], T3, T4])
+        & ConstraintSet.equality(T3, tuple[Literal[3], T4, T5])
+        & ConstraintSet.equality(T4, tuple[Literal[4], T5, T6])
+        & ConstraintSet.equality(T5, tuple[Literal[5], T6, T7])
+        & ConstraintSet.equality(T6, tuple[Literal[6], T7, T8])
+        & ConstraintSet.equality(T7, tuple[Literal[7], T8, T9])
+        & ConstraintSet.equality(T8, tuple[Literal[8], T9, T10])
+        & ConstraintSet.equality(T9, tuple[Literal[9], T10, T11])
+        & ConstraintSet.equality(T10, tuple[Literal[10], T11, T0])
+        & ConstraintSet.equality(T11, tuple[Literal[11], T0, T1])
+    )
+    # revealed: tuple[Solution[T0=μ{$0; $1 = tuple[Literal[1], $2, $3]; $2 = tuple[Literal[2], $3, $4]; $3 = tuple[Literal[3], $4, $5]; $4 = tuple[Literal[4], $5, $6]; $5 = tuple[Literal[5], $6, $7]; $6 = tuple[Literal[6], $7, $8]; $7 = tuple[Literal[7], $8, $9]; $8 = tuple[Literal[8], $9, $10]; $9 = tuple[Literal[9], $10, $11]; $10 = tuple[Literal[10], $11, $0]; $11 = tuple[Literal[11], $0, $1]}. tuple[Literal[0], $1, $2]]]
+    reveal_type(constraints.solutions_for(T0, inferable=tuple[T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11]))
+```
+
+### Ambiguous names in recursive solutions
+
+Distinct classes with the same name remain distinguishable inside a recursive solution.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+class First:
+    class Item: ...
+
+class Second:
+    class Item: ...
+
+def ambiguous[T]():
+    constraints = ConstraintSet.equality(T, First.Item | Second.Item | tuple[T])
+    # revealed: tuple[Solution[T=μ$0. tuple[$0] | mdtest_snippet.First.Item | mdtest_snippet.Second.Item]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+### Recursive callables and intersections
+
+Callable parameters can refer to the callable itself. Intersections inside a recursive tuple retain
+both the recursive reference and restrictions involving outer type parameters.
+
+```py
+from typing import Callable
+from ty_extensions import Intersection, Not
+from ty_extensions._internal import ConstraintSet
+
+def callable_cycle[T]():
+    constraints = ConstraintSet.equality(T, Callable[[T], int])
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=μ$0. ($0, /) -> int]]
+
+def positive_and_negative[T, E]():
+    constraints = ConstraintSet.equality(T, tuple[Intersection[T, Not[E]]])
+    # revealed: tuple[Solution[T=μ$0. tuple[$0 & ~E@positive_and_negative]]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+### Unresolved dependencies alongside recursive solutions
+
+A missing dependency leaves its dependent solution symbolic. Independent recursive solutions are
+still available. A reference through `type[T]` currently also remains symbolic, including bindings
+that depend on it.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def missing[T, U, V]():
+    constraints = ConstraintSet.equality(T, tuple[T, U]) & ConstraintSet.equality(V, int | tuple[V])
+    # revealed: tuple[Solution[T=tuple[T@missing, U@missing], V=μ$0. tuple[$0] | int]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
+
+def partial[T, U, V]():
+    constraints = (
+        ConstraintSet.equality(T, tuple[T, type[T]])
+        & ConstraintSet.equality(U, int | tuple[U])
+        & ConstraintSet.equality(V, list[T])
+    )
+    # TODO: Close the reference through type[T] as well as the tuple element.
+    # revealed: tuple[Solution[T=tuple[T@partial, type[T@partial]], U=μ$0. tuple[$0] | int, V=list[T@partial]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
+```
+
+### Aliases with exposed type arguments
+
+An alias can expose more than one argument outside a container. Every exposed argument must be
+checked: the tuple around the first argument does not guard the reference in the second argument.
+These equations remain symbolic rather than introducing a recursive type without a constructor.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Either[V, W] = V | W
+
+def exposed[T]():
+    constraints = ConstraintSet.equality(T, Either[tuple[T], T])
+    # revealed: tuple[Solution[T=Either[tuple[T@exposed], T@exposed]]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+An alias that is itself recursive can also expose its type argument outside a container.
+
+```py
+type Repeated[V] = V | tuple[Repeated[V]]
+
+def named[T]():
+    constraints = ConstraintSet.equality(T, Repeated[T])
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=Repeated[T@named]]]
+```
+
+### Implicit recursive aliases with exposed arguments
+
+`Repeated[T]` exposes `T` outside a tuple. Equating them leaves `T` unsolved, as well as any binding
+that depends on `T`. Wrapping the implicit alias in a `type` statement preserves this behavior.
+
+```py
+from typing import TypeAlias, TypeVar
+from ty_extensions._internal import ConstraintSet
+
+V = TypeVar("V")
+Repeated: TypeAlias = V | tuple["Repeated[V]"]
+type Wrapped[X] = Repeated[X]
+
+def direct[T, U]():
+    constraints = ConstraintSet.equality(T, Repeated[T]) & ConstraintSet.equality(U, list[T])
+    # revealed: tuple[Solution[T=Repeated[T@direct], U=list[T@direct]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+
+def wrapped[T, U]():
+    constraints = ConstraintSet.equality(T, Wrapped[T]) & ConstraintSet.equality(U, list[T])
+    # revealed: tuple[Solution[T=Wrapped[T@wrapped], U=list[T@wrapped]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+Nesting the alias or changing its arguments on recursive occurrences does not guard an exposed
+argument.
+
+```py
+type Nested[X] = Repeated[Repeated[X]]
+Growing: TypeAlias = V | tuple["Growing[list[V]]"]
+type WrappedGrowing[X] = Growing[X]
+
+def nested[T]():
+    constraints = ConstraintSet.equality(T, Nested[T])
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=Nested[T@nested]]]
+
+def growing[T]():
+    constraints = ConstraintSet.equality(T, WrappedGrowing[T])
+    # revealed: tuple[Solution[T=WrappedGrowing[T@growing]]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+### Captured variables in implicit recursive aliases
+
+A local alias can refer to an enclosing function's type variable without taking a type argument.
+That variable remains a dependency. If it cannot be substituted in the alias, dependent bindings
+remain unsolved too.
+
+```py
+from typing import TypeAlias
+from ty_extensions._internal import ConstraintSet
+
+def captured_self[T, U]():
+    Local: TypeAlias = T | tuple["Local"]
+    constraints = ConstraintSet.equality(T, Local) & ConstraintSet.equality(U, list[T])
+    # revealed: tuple[Solution[T=Local, U=list[T@captured_self]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+
+def captured_dependency[T, U, V]():
+    Local: TypeAlias = tuple[U, "Local"]
+    constraints = ConstraintSet.equality(T, Local) & ConstraintSet.equality(U, int) & ConstraintSet.equality(V, list[T])
+    # revealed: tuple[Solution[V=list[Local]]]
+    reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))
+```
+
+### Inferred recursive types exposed through aliases
+
+An inferred recursive type can expose a type parameter outside a tuple, just as a named recursive
+alias can. Using that type through another alias does not guard the parameter's self-reference.
+
+```py
+from typing import Callable, cast
+from ty_extensions._internal import ConstraintSet, TypeOf
+
+def fixed[T, U, E](first: Callable[[T], U | int], second: Callable[[U], tuple[T] | E], leaf: E) -> T:
+    raise NotImplementedError
+
+def identity[U](value: U) -> U:
+    return value
+
+class Tree[E]:
+    node = fixed(identity, identity, cast(E, None))
+
+type Exposed[X] = TypeOf[Tree[X].node]
+
+def inferred[T]():
+    constraints = ConstraintSet.equality(T, Exposed[T])
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=Exposed[T@inferred]]]
+```
+
+### Intersections exposed through aliases
+
+An intersection does not guard recursion, including when it occurs through another alias or contains
+a negated reference. These bounds retain their unsolved type variables.
+
+```py
+from ty_extensions import Intersection, Not
+from ty_extensions._internal import ConstraintSet
+
+type Restrict[V] = Intersection[V, tuple[V]]
+type Lower[V] = int | Restrict[V]
+type Exclude[V] = Intersection[int, Not[V]]
+
+def positive[T]():
+    constraints = ConstraintSet.lower_bound(Lower[T], T)
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=Lower[T@positive]]]
+
+def negative[T]():
+    constraints = ConstraintSet.lower_bound(Exclude[T], T)
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=Exclude[T@negative]]]
+```
+
+The same applies to intersections supplied as exposed arguments of an implicit recursive alias.
+
+```py
+from typing import TypeAlias, TypeVar
+
+V = TypeVar("V")
+Repeated: TypeAlias = V | tuple["Repeated[V]"]
+type Retained[X] = Repeated[Intersection[X, tuple[X]]]
+type Excluded[X] = Repeated[Intersection[int, Not[X]]]
+
+def implicit_positive[T]():
+    constraints = ConstraintSet.lower_bound(Retained[T], T)
+    # revealed: tuple[Solution[T=Retained[T@implicit_positive]]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+
+def implicit_negative[T]():
+    constraints = ConstraintSet.lower_bound(Excluded[T], T)
+    # revealed: tuple[Solution[T=Excluded[T@implicit_negative]]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+### Mutual dependencies through exposed alias arguments
+
+Following the first argument of each `Step` returns to the original variable without entering a
+tuple. The tuples in the second argument do not make that cycle a valid recursive type.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Step[V, W] = V | tuple[W]
+
+def mutual[T, U]():
+    constraints = ConstraintSet.equality(T, Step[U, T]) & ConstraintSet.equality(U, Step[T, U])
+    # revealed: tuple[Solution[T=Step[U@mutual, T@mutual], U=Step[T@mutual, U@mutual]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
 ## Other simplifications
 
 ### Ordering of intersection and union elements
@@ -1157,6 +1773,48 @@ def same_paramspec[**P]() -> None:
     constraints = ConstraintSet.equality(P, P)
     expected = ConstraintSet.range(Bottom[Callable[..., Never]], P, Top[Callable[..., object]])
     static_assert(constraints == expected)
+```
+
+## Recursive lower bounds
+
+### Mutual dependencies
+
+Integers and tuples of `U` are lower bounds for `T`. `V` includes `T`, and `U` includes `V`, so the
+solution retains these mutually recursive dependencies.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def ring[T, U, V]():
+    constraints = (
+        ConstraintSet.lower_bound(int, T)
+        & ConstraintSet.lower_bound(tuple[U], T)
+        & ConstraintSet.lower_bound(T, V)
+        & ConstraintSet.lower_bound(V, U)
+    )
+    # revealed: tuple[Solution[T=μ$0. tuple[$0] | int]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T, U, V]))
+    reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))  # revealed: tuple[Solution[V=μ$0. tuple[$0] | int]]
+    reveal_type(constraints.solutions_for(U, inferable=tuple[T, U, V]))  # revealed: tuple[Solution[U=μ$0. tuple[$0] | int]]
+```
+
+### Equal variables
+
+When all three variables are equal, each binding has the same recursive type expression. It includes
+integers wrapped in arbitrarily many one-element tuples. An explicit `object` bound does not
+restrict this solution.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def shared[T: object, U, V]():
+    constraints = ConstraintSet.equality(T, int | tuple[U]) & ConstraintSet.equality(U, V) & ConstraintSet.equality(V, T)
+    # revealed: tuple[Solution[T=μ$0. tuple[$0] | int]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T, U, V]))
+    # revealed: tuple[Solution[V=int | tuple[μ$0. tuple[$0] | int]]]
+    reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))
+    # revealed: tuple[Solution[U=int | tuple[μ$0. tuple[$0] | int]]]
+    reveal_type(constraints.solutions_for(U, inferable=tuple[T, U, V]))
 ```
 
 ## Existential quantification

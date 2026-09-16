@@ -4398,8 +4398,9 @@ reveal_type(IntBound(value=1))  # revealed: IntBound[int]
 
 ### Constructor inference with callable parameters
 
-Like other generic constructors, a callback must accept the promoted type inferred from another
-field.
+A callback can constrain the type inferred from another field. Although the value alone would infer
+`int`, this callback requires `Literal[1]`. The resulting dictionary preserves that restriction when
+the field is updated.
 
 ```toml
 [environment]
@@ -4415,7 +4416,9 @@ class Box[T](TypedDict):
 
 def accepts_one(value: Literal[1]) -> None: ...
 
-Box(value=1, callback=accepts_one)  # error: [invalid-argument-type]
+box = Box(value=1, callback=accepts_one)
+reveal_type(box)  # revealed: Box[Literal[1]]
+box["value"] = 2  # error: [invalid-assignment]
 ```
 
 ### Constructor inference with an expected type

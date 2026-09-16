@@ -6076,7 +6076,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 // lower/upper bounds on each BDD path.
                 let mut variance_map: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                     FxHashMap::default();
-                let solutions = path_bounds.solve_with(|variance, path_bound| {
+                let solutions = path_bounds.solve_with(db, self.env, |variance, path_bound| {
                     let identity = path_bound.bound_typevar.identity(db);
                     variance_map
                         .entry(identity)
@@ -6112,7 +6112,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         let inferred_ty = builder
                             .remove_inferable_typevar_artifacts_from_solution(
                                 binding.bound_typevar,
-                                binding.solution,
+                                binding.solution.ty(),
                             )
                             .filter_union(db, self.env, |ty| {
                                 if ty.has_provisional_marker(db, self.env) {
@@ -7940,7 +7940,7 @@ impl<'db> Binding<'db> {
                 generic_context.inferable_typevars(db),
             );
 
-            let solutions = path_bounds.solve_with(|_variance, path_bound| {
+            let solutions = path_bounds.solve_with(db, env, |_variance, path_bound| {
                 PathBounds::preliminary_solve(db, env, constraints, path_bound)
             });
             if let Solutions::Constrained(solutions) = solutions {
@@ -7954,10 +7954,10 @@ impl<'db> Binding<'db> {
                                     db,
                                     env,
                                     *existing,
-                                    binding.solution,
+                                    binding.solution.ty(),
                                 );
                             })
-                            .or_insert(binding.solution);
+                            .or_insert(binding.solution.ty());
                     }
                 }
             }
@@ -10232,8 +10232,28 @@ def swap(value: int | str) -> int | str:
         assert_eq!(
             paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
             FxHashSet::from_iter([
-                [Some(Resolved(int)), Some(Resolved(str))].as_slice(),
-                [Some(Resolved(str)), Some(Resolved(int))].as_slice(),
+                [
+                    Some(Resolved {
+                        ty: int,
+                        selected: int
+                    }),
+                    Some(Resolved {
+                        ty: str,
+                        selected: str
+                    })
+                ]
+                .as_slice(),
+                [
+                    Some(Resolved {
+                        ty: str,
+                        selected: str
+                    }),
+                    Some(Resolved {
+                        ty: int,
+                        selected: int
+                    })
+                ]
+                .as_slice(),
             ])
         );
         Ok(())
@@ -10281,11 +10301,32 @@ def consume(value: A | B) -> None: ...
 
         // The callback relates R to T. Each consumer overload selects a different T, and
         // resolving R within that alternative preserves the relationship between them.
+        let selected_r = Type::TypeVar(
+            inference
+                .generic_context(db)
+                .variables(db)
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("expected T"))?,
+        );
         assert_eq!(
             paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
             FxHashSet::from_iter([
-                [Some(Resolved(a)); 2].as_slice(),
-                [Some(Resolved(b)); 2].as_slice(),
+                [
+                    Some(Resolved { ty: a, selected: a }),
+                    Some(Resolved {
+                        ty: a,
+                        selected: selected_r
+                    })
+                ]
+                .as_slice(),
+                [
+                    Some(Resolved { ty: b, selected: b }),
+                    Some(Resolved {
+                        ty: b,
+                        selected: selected_r
+                    })
+                ]
+                .as_slice(),
             ])
         );
         let union = UnionType::from_two_elements(db, &env, a, b);
@@ -10338,7 +10379,14 @@ expected: tuple[list[object], A | B, C | D | E]
         };
         assert_eq!(
             paths.iter().map(AsRef::as_ref).collect::<Vec<_>>(),
-            [[Some(Resolved(Type::object())), None].as_slice()]
+            [[
+                Some(Resolved {
+                    ty: Type::object(),
+                    selected: Type::object()
+                }),
+                None
+            ]
+            .as_slice()]
         );
         Ok(())
     }

@@ -844,6 +844,24 @@ reveal_type(partial(partial, drop)(1)("x"))  # revealed: Unknown
 reveal_type(partial(partial, drop)("x")(1))  # revealed: Unknown
 ```
 
+## Generic identity callbacks with dynamic arguments
+
+An identity callback contributes the known type of its input to the return type. A separate
+dynamically typed argument does not erase that known alternative.
+
+```py
+from typing import Any, Callable
+
+def select[K, V](key: K, value: V, callback: Callable[[K], V]) -> V:
+    raise NotImplementedError
+
+def identity[U](value: U) -> U:
+    return value
+
+def check(key: str, value: Any):
+    reveal_type(select(key, value, identity))  # revealed: str | Any
+```
+
 ## SymPy one-import MRE scaffold (multi-file)
 
 Reduced regression lock for a SymPy overload/protocol shape that can panic in the

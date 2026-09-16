@@ -6811,6 +6811,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for binding in solution {
                 let inferred_ty = binding
                     .solution
+                    .ty()
                     .filter_union(db, env, |ty| !ty.has_provisional_marker(db, env));
                 if inferred_ty.has_provisional_marker(db, env) {
                     continue;
@@ -7600,7 +7601,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let path_bounds =
                     identity_instance.assignable_solutions_with_inferable(db, env, tcx, inferable);
-                let solutions = path_bounds.solve_with(|variance, path_bound| {
+                let solutions = path_bounds.solve_with(db, env, |variance, path_bound| {
                     let identity = path_bound.bound_typevar.identity(db);
                     elt_tcx_variance
                         .entry(identity)
@@ -7628,7 +7629,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 let inferred_ty = builder
                                     .remove_inferable_typevar_artifacts_from_solution(
                                         binding.bound_typevar,
-                                        binding.solution,
+                                        binding.solution.ty(),
                                     );
 
                                 // Avoid inferring a preferred type based on partially specialized
@@ -7799,7 +7800,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let statement_use_types = infer_statement_types(self.db(), statement);
 
-                if let Some(divergent) = statement_use_types
+                let use_constraints = if let Some(divergent) = statement_use_types
                     .expression_type(use_expression)
                     .as_divergent()
                 {
@@ -7810,22 +7811,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             generic_context
                                 .repeat_specialization(self.db(), Type::Divergent(divergent))
                         });
-
-                    builder
-                        .infer(
-                            identity_instance,
-                            Type::instance(db, env, divergent_instance),
-                        )
-                        .ok()?;
+                    vec![Type::instance(db, env, divergent_instance)]
                 } else if let Some(constraints) =
                     statement_use_types.collection_use_constraints(collection_def)
                 {
-                    for constraint in constraints {
-                        if constraint.has_unspecialized_type_var(db, env) {
-                            continue;
+                    constraints.iter().copied().collect()
+                } else {
+                    continue;
+                };
+                for constraint in use_constraints {
+                    if constraint.has_unspecialized_type_var(db, env) {
+                        continue;
+                    }
+                    let solutions = constraint
+                        .when_constraint_set_assignable_to(db, env, identity_instance, &constraints)
+                        .solutions(db, env, inferable)
+                        .ok()?;
+                    match solutions {
+                        Solutions::Unconstrained => {}
+                        Solutions::Constrained(solutions) => {
+                            for solution in solutions.as_slice() {
+                                for binding in solution {
+                                    // A later use contributes elements the collection must accept;
+                                    // it does not fix an invariant container's exact specialization.
+                                    builder.add_type_mapping(
+                                        binding.bound_typevar,
+                                        binding.solution.ty().promote(db, env),
+                                        TypeVarVariance::Covariant,
+                                    );
+                                }
+                            }
                         }
-
-                        builder.infer(identity_instance, *constraint).ok()?;
+                        Solutions::Unsatisfiable => return None,
                     }
                 }
             }
@@ -8036,9 +8053,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 match &mut yield_tcx {
                     Some(accumulator) => {
-                        accumulator.add(db, env, binding.solution);
+                        accumulator.add(db, env, binding.solution.ty());
                     }
-                    None => yield_tcx = Some(UnionAccumulator::new(binding.solution)),
+                    None => yield_tcx = Some(UnionAccumulator::new(binding.solution.ty())),
                 }
             }
         }

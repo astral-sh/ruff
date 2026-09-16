@@ -2739,7 +2739,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     },
                     |mut inference, solution, budget| {
                         for binding in solution {
-                            budget.charge_type(db, binding.solution)?;
+                            budget.charge_type(db, binding.solution.ty())?;
                         }
                         builder.merge_solution(&mut inference.merged_types, solution);
                         Ok(inference)
@@ -2913,17 +2913,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     fn merge_solution(
         &self,
         types: &mut FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
-        solution: &[TypeVarSolution<'db>],
+        solution: &[TypeVarSolution<'db, SolutionType<'db>>],
     ) {
         let db = self.db;
         for binding in solution {
             types
                 .entry(binding.bound_typevar.identity(db))
                 .and_modify(|existing| {
-                    *existing =
-                        UnionType::from_two_elements(db, self.env, *existing, binding.solution);
+                    *existing = UnionType::from_two_elements(
+                        db,
+                        self.env,
+                        *existing,
+                        binding.solution.ty(),
+                    );
                 })
-                .or_insert(binding.solution);
+                .or_insert(binding.solution.ty());
         }
     }
 
@@ -3006,7 +3010,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // repeatedly. For `T = list[U], U = T`, each pass adds another `list` layer.
         // Use the legacy type map (or `Unknown` if unavailable) for `merged_types` to avoid
         // that infinite loop. Keep the individual alternatives in `solutions`: their
-        // dependency resolver marks `T` and `U` unresolved while preserving independent bindings.
+        // dependency resolver retains any cycles it cannot close, alongside independent bindings.
         if types
             .iter()
             .any(|(identity, ty)| self.has_expanding_cycle(generic_context, types, *identity, *ty))
@@ -3044,17 +3048,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // The compatibility projection must be cleaned after merging, independently of these
         // alternatives: a bare `U` survives on one path, but is removed from a merged `U | int`.
         let mut paths = Vec::with_capacity(solutions.as_slice().len());
-        for mut path in solutions.into_vec() {
-            path.retain_mut(|binding| {
-                if !generic_context.contains(db, binding.bound_typevar.identity(db)) {
-                    return false;
-                }
-                binding.solution = self.remove_inferable_typevar_artifacts_from_solution(
-                    binding.bound_typevar,
-                    binding.solution,
-                );
-                true
-            });
+        for path in solutions.into_vec() {
+            let path: Vec<_> = path
+                .into_iter()
+                .filter(|binding| generic_context.contains(db, binding.bound_typevar.identity(db)))
+                .map(|binding| TypeVarSolution {
+                    bound_typevar: binding.bound_typevar,
+                    solution: self.remove_inferable_typevar_artifacts_from_solution(
+                        binding.bound_typevar,
+                        binding.solution.ty(),
+                    ),
+                })
+                .collect();
             let resolved = resolve_solution(db, self.env, self.inferable, &path);
             let path_types: FxHashMap<_, _> = path
                 .iter()
@@ -3065,7 +3070,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 && generic_context.variables_inner(db).keys().all(|identity| {
                     match (path_types.get(identity), types.get(identity)) {
                         (None, None) => true,
-                        (Some(SolutionType::Resolved(resolved)), Some(merged)) => {
+                        (Some(SolutionType::Resolved { ty: resolved, .. }), Some(merged)) => {
                             resolved == merged
                         }
                         _ => false,
@@ -3471,7 +3476,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             for binding in solution {
                 let solution = self.remove_inferable_typevar_artifacts_from_solution(
                     binding.bound_typevar,
-                    binding.solution,
+                    binding.solution.ty(),
                 );
                 self.insert_hash_map_type_mapping(binding.bound_typevar, solution);
             }
@@ -4760,8 +4765,28 @@ mod tests {
             assert_eq!(
                 paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
                 FxHashSet::from_iter([
-                    [Some(Resolved(int)), Some(Resolved(str))].as_slice(),
-                    [Some(Resolved(str)), Some(Resolved(int))].as_slice(),
+                    [
+                        Some(Resolved {
+                            ty: int,
+                            selected: int
+                        }),
+                        Some(Resolved {
+                            ty: str,
+                            selected: str
+                        })
+                    ]
+                    .as_slice(),
+                    [
+                        Some(Resolved {
+                            ty: str,
+                            selected: str
+                        }),
+                        Some(Resolved {
+                            ty: int,
+                            selected: int
+                        })
+                    ]
+                    .as_slice(),
                 ])
             );
 
@@ -4811,8 +4836,25 @@ mod tests {
                 assert_eq!(
                     paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
                     FxHashSet::from_iter([
-                        [Some(Resolved(int)), Some(Resolved(str))].as_slice(),
-                        [fallback.map(Resolved), Some(Resolved(int))].as_slice(),
+                        [
+                            Some(Resolved {
+                                ty: int,
+                                selected: int
+                            }),
+                            Some(Resolved {
+                                ty: str,
+                                selected: str
+                            })
+                        ]
+                        .as_slice(),
+                        [
+                            fallback.map(|ty| Resolved { ty, selected: ty }),
+                            Some(Resolved {
+                                ty: int,
+                                selected: int
+                            })
+                        ]
+                        .as_slice(),
                     ])
                 );
 
@@ -5027,8 +5069,22 @@ mod tests {
                 assert_eq!(
                     paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
                     FxHashSet::from_iter([
-                        [None, Some(Resolved(int))].as_slice(),
-                        [None, Some(Resolved(str))].as_slice(),
+                        [
+                            None,
+                            Some(Resolved {
+                                ty: int,
+                                selected: int
+                            })
+                        ]
+                        .as_slice(),
+                        [
+                            None,
+                            Some(Resolved {
+                                ty: str,
+                                selected: str
+                            })
+                        ]
+                        .as_slice(),
                     ])
                 );
             }
@@ -5080,7 +5136,14 @@ mod tests {
             paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
             FxHashSet::from_iter([
                 [Some(Unresolved(Type::TypeVar(u))), None].as_slice(),
-                [Some(Resolved(int)), None].as_slice(),
+                [
+                    Some(Resolved {
+                        ty: int,
+                        selected: int
+                    }),
+                    None
+                ]
+                .as_slice(),
             ])
         );
         assert_eq!(inference.merged_types(db), [Some(int), None]);
@@ -5088,7 +5151,7 @@ mod tests {
     }
 
     #[test]
-    fn inference_preserves_expanding_cycles_hidden_by_merging() -> anyhow::Result<()> {
+    fn inference_preserves_recursive_alternatives_hidden_by_merging() -> anyhow::Result<()> {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -5096,46 +5159,44 @@ mod tests {
         let context = GenericContext::from_typevar_instances(db, &env, typevars);
         let constraints = ConstraintSetBuilder::new();
         let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
-        let int = KnownClass::Int.to_instance(db, &env);
-        let str = KnownClass::Str.to_instance(db, &env);
         let list_of_u = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
         builder.record_constraint_set(exact_alternatives(
             db,
             &constraints,
             typevars,
-            [[int, str], [str, int]],
+            [[list_of_u, Type::TypeVar(t)], [Type::object(); 2]],
         ));
 
-        // Select T = list[U], U = T on one path and T = U = object on the other. Only the
-        // individual path still contains the cycle after merging with object.
+        // A broad proposal must not discard the recursive alternative when it violates that
+        // path's bounds. The cycle remains visible even though merging erases it with object.
         let inference = builder
-            .build_inference_with(|typevar, bounds| {
-                let ty = match (typevar, bounds?.evidence_lower()) {
-                    (typevar, Some(lower)) if typevar == t && lower == int => list_of_u,
-                    (typevar, Some(lower)) if typevar == u && lower == str => Type::TypeVar(t),
-                    _ => Type::object(),
-                };
-                Some(PathBoundSolution::Solved(ty))
-            })
+            .build_inference_with(|_, _| Some(PathBoundSolution::Solved(Type::object())))
             .map_err(|()| anyhow::anyhow!("an expanding cycle should recover"))?;
         let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
-            anyhow::bail!("expected complete alternatives with an unresolved cycle");
+            anyhow::bail!("expected complete alternatives with a recursive solution");
         };
-        assert_eq!(
-            paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
-            FxHashSet::from_iter([
+        assert_eq!(paths.len(), 2);
+        for path in paths {
+            match &**path {
                 [
-                    Some(Unresolved(list_of_u)),
-                    Some(Unresolved(Type::TypeVar(t)))
-                ]
-                .as_slice(),
-                [
-                    Some(Resolved(Type::object())),
-                    Some(Resolved(Type::object()))
-                ]
-                .as_slice(),
-            ])
-        );
+                    Some(Resolved { ty: t, .. }),
+                    Some(Resolved {
+                        ty: Type::Recursive(u),
+                        ..
+                    }),
+                ] => {
+                    assert_eq!(*t, u.unfold(db, &env));
+                    assert_eq!(
+                        u.unfold(db, &env),
+                        KnownClass::List.to_specialized_instance(db, &env, &[Type::Recursive(*u)])
+                    );
+                }
+                [Some(Resolved { ty: t, .. }), Some(Resolved { ty: u, .. })] => {
+                    assert_eq!((*t, *u), (Type::object(), Type::object()));
+                }
+                _ => anyhow::bail!("expected closed alternatives"),
+            }
+        }
         assert_eq!(
             inference.merged_types(db),
             [Some(Type::object()), Some(Type::object())]
@@ -5172,15 +5233,8 @@ mod tests {
                 (typevar == t).then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
             .map_err(|()| anyhow::anyhow!("expected a satisfiable dependency chain"))?;
-        let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
-            anyhow::bail!("resolved bindings differ from the merged projection");
-        };
-        assert_eq!(paths.len(), 1);
-        assert_eq!(&*paths[0], [Some(Resolved(int)); 2]);
-        assert_eq!(
-            inference.merged_types(db),
-            [Some(Type::TypeVar(u)), Some(int)]
-        );
+        assert_eq!(inference.solutions(db), &TypeVarInferenceSolutions::Single);
+        assert_eq!(inference.merged_types(db), [Some(int); 2]);
         assert_eq!(inference.merged_specialization(db).types(db), [int, int]);
         Ok(())
     }
@@ -5263,7 +5317,7 @@ mod tests {
     }
 
     #[test]
-    fn merged_cycle_recovery_preserves_unresolved_alternative() -> anyhow::Result<()> {
+    fn recursive_solution_preserves_independent_binding() -> anyhow::Result<()> {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -5273,32 +5327,26 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         let list_of_u = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
         let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
-        builder.record_constraint_set(exact_alternatives(db, &constraints, typevars, [[int; 3]]));
+        builder.record_constraint_set(exact_alternatives(
+            db,
+            &constraints,
+            typevars,
+            [[list_of_u, Type::TypeVar(t), int]],
+        ));
 
-        // The merged specialization needs recovery for T = list[U], U = T. That does not
-        // discard the original alternative or the independent, resolved binding V = int.
+        // T = list[U], U = T closes as one recursive list type, alongside V = int.
         let inference = builder
-            .build_inference_with(|variable, _| {
-                if variable == t {
-                    Some(PathBoundSolution::Solved(list_of_u))
-                } else if variable == u {
-                    Some(PathBoundSolution::Solved(Type::TypeVar(t)))
-                } else {
-                    None
-                }
-            })
+            .build_inference_with(|_, _| None)
             .map_err(|()| anyhow::anyhow!("a cyclic alternative remains satisfiable"))?;
-        let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
-            anyhow::bail!("expected a retained cyclic alternative");
+        assert_eq!(inference.solutions(db), &TypeVarInferenceSolutions::Single);
+        let [Some(t), Some(Type::Recursive(u)), Some(v)] = inference.merged_types(db) else {
+            anyhow::bail!("expected closed recursive bindings and an independent binding");
         };
-        assert_eq!(paths.len(), 1);
+        assert_eq!(*t, u.unfold(db, &env));
+        assert_eq!(*v, int);
         assert_eq!(
-            &*paths[0],
-            [
-                Some(Unresolved(list_of_u)),
-                Some(Unresolved(Type::TypeVar(t))),
-                Some(Resolved(int))
-            ]
+            u.unfold(db, &env),
+            KnownClass::List.to_specialized_instance(db, &env, &[Type::Recursive(*u)])
         );
         Ok(())
     }
@@ -5348,8 +5396,28 @@ mod tests {
         assert_eq!(
             paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
             FxHashSet::from_iter([
-                [Some(Resolved(Type::TypeVar(outer))), Some(Resolved(int)),].as_slice(),
-                [Some(Resolved(Type::TypeVar(outer))), Some(Resolved(str)),].as_slice(),
+                [
+                    Some(Resolved {
+                        ty: Type::TypeVar(outer),
+                        selected: Type::TypeVar(outer)
+                    }),
+                    Some(Resolved {
+                        ty: int,
+                        selected: int
+                    }),
+                ]
+                .as_slice(),
+                [
+                    Some(Resolved {
+                        ty: Type::TypeVar(outer),
+                        selected: Type::TypeVar(outer)
+                    }),
+                    Some(Resolved {
+                        ty: str,
+                        selected: str
+                    }),
+                ]
+                .as_slice(),
             ])
         );
         Ok(())

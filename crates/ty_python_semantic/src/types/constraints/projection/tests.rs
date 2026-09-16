@@ -8,6 +8,7 @@ use ty_python_core::ProgramFile;
 use super::{ProjectionError, ProjectionTypeBudget, SolutionBudget, SolutionProjection};
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::global_symbol;
+use crate::types::constraints::resolution::SolutionType;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
     PathBoundSolution, PathBounds, Solution, SolutionPaths, Solutions, TypeVarSolution,
@@ -61,10 +62,13 @@ fn binary_choice<'db, 'c>(
 fn binding<'db>(
     bound_typevar: BoundTypeVarInstance<'db>,
     solution: Type<'db>,
-) -> TypeVarSolution<'db> {
+) -> TypeVarSolution<'db, SolutionType<'db>> {
     TypeVarSolution {
         bound_typevar,
-        solution,
+        solution: SolutionType::Resolved {
+            ty: solution,
+            selected: solution,
+        },
     }
 }
 
@@ -85,7 +89,7 @@ fn collect_paths<'db, 'c>(
         Paths::default(),
         |mut paths, path, budget| {
             for binding in path {
-                budget.charge_type(db, binding.solution)?;
+                budget.charge_type(db, binding.solution.ty())?;
             }
             let mut path = path.to_vec();
             path.sort_by_key(|binding| {
@@ -400,7 +404,7 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                         Vec::new(),
                         |mut paths, path, budget| {
                             for binding in path {
-                                budget.charge_type(db, binding.solution)?;
+                                budget.charge_type(db, binding.solution.ty())?;
                             }
                             paths.push(path.to_vec());
                             Ok(paths)
@@ -504,7 +508,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
             Type::Never,
             |accumulated, path, budget| {
                 assert_eq!(path.len(), 1);
-                let ty = path[0].solution;
+                let ty = path[0].solution.ty();
                 budget.charge_type(db, ty)?;
                 constructed += 1;
                 Ok(UnionType::from_two_elements(db, &env, accumulated, ty))
@@ -617,16 +621,19 @@ class E: ...
             alternatives
                 .map(|ty| Box::new([PathBound::exact(t, ty)]) as Box<[_]>)
                 .into(),
+            TypeVarSet::from_typevars(db, [t]),
         );
 
         assert_eq!(
             paths.try_fold_with(
+                db,
+                &env,
                 |_, bound| PathBounds::default_solve(db, &env, &builder, bound),
                 Type::object(),
                 &mut ProjectionTypeBudget::new(7),
                 |accumulated, path, budget| {
                     assert_eq!(path.len(), 1);
-                    let ty = path[0].solution;
+                    let ty = path[0].solution.ty();
                     budget.charge_type(db, ty)?;
                     IntersectionType::bounded_from_elements(db, &env, [accumulated, ty])
                         .ok_or(ProjectionError::TypeBudgetExceeded)

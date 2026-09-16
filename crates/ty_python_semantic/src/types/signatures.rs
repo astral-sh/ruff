@@ -11,6 +11,7 @@
 //! arguments must match _at least one_ overload.
 
 use crate::ProgramEnvironment;
+use std::cell::RefCell;
 use std::fmt;
 use std::num::NonZeroU32;
 use std::slice::Iter;
@@ -1008,6 +1009,45 @@ impl<'db> Signature<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         let env = visitor.env;
+        let freshening;
+        let fresh_visitor;
+        let (type_mapping, visitor) = if let TypeMapping::FreshenBoundTypeVars {
+            generic_context,
+            delta,
+        } = type_mapping
+        {
+            // Implicit receivers and bound receivers can retain formal variables outside the
+            // generic context. Their declarations must use the same fresh variables as the call.
+            let binding_context = self.definition.map(BindingContext::Definition);
+            let variables = RefCell::new(generic_context.variables(db).collect::<Vec<_>>());
+            for ty in self
+                .receiver_constraint_types()
+                .chain(self.parameters.iter().map(Parameter::annotated_type))
+                .chain(std::iter::once(self.return_ty))
+            {
+                any_over_type(db, env, ty, false, |ty| {
+                    if let Type::TypeVar(variable) = ty
+                        && Some(variable.binding_context(db)) == binding_context
+                    {
+                        variables.borrow_mut().push(variable);
+                    }
+                    false
+                });
+            }
+            let context = GenericContext::from_typevar_instances(db, env, variables.into_inner());
+            if context == *generic_context {
+                (type_mapping, visitor)
+            } else {
+                freshening = TypeMapping::FreshenBoundTypeVars {
+                    generic_context: context,
+                    delta: *delta,
+                };
+                fresh_visitor = visitor.fresh();
+                (&freshening, &fresh_visitor)
+            }
+        } else {
+            (type_mapping, visitor)
+        };
         Self {
             generic_context: self
                 .generic_context

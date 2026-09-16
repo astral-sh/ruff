@@ -82,6 +82,17 @@ pub(crate) enum Constraint<'db> {
 }
 
 impl<'db> Constraint<'db> {
+    /// Returns whether the bound comes from inference evidence or a validity restriction.
+    pub(super) const fn provenance(self) -> ConstraintProvenance {
+        match self {
+            Self::ConcreteLower(bound) => bound.provenance,
+            Self::ConcreteUpper(bound) => bound.provenance,
+            Self::ConcreteEquivalence(bound) => bound.provenance,
+            Self::TypeVarRange(bound) => bound.provenance,
+            Self::TypeVarEquivalence(bound) => bound.provenance,
+        }
+    }
+
     pub(super) fn new_node(
         self,
         db: &'db dyn Db,

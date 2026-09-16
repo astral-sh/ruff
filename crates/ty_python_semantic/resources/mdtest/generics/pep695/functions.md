@@ -2633,5 +2633,106 @@ def f(l: list[tuple[Any | str, Any | str]]) -> None:
     reveal_type(dict(l))
 ```
 
+## Inferring recursive callback solutions
+
+Passing the identity function relates the argument and return types of the callback. The inferred
+result is an integer or a tuple containing another such value. Subscribing the tuple recovers that
+same recursive type, and the result cannot be assigned to `str`.
+
+```py
+from typing import Callable, TypeVar
+
+def fixed[T](callback: Callable[[T], tuple[T] | int]) -> T:
+    raise NotImplementedError
+
+def identity[U](value: U) -> U:
+    return value
+
+root = fixed(identity)
+reveal_type(root)  # revealed: μ$0. tuple[$0] | int
+if isinstance(root, tuple):
+    reveal_type(root)  # revealed: tuple[μ$0. tuple[$0] | int]
+    reveal_type(root[0])  # revealed: μ$0. tuple[$0] | int
+wrong: str = root  # error: [invalid-assignment]
+```
+
+## Recursive callback solutions through implicit aliases
+
+The callback's return type contains an implicit recursive alias. Its argument can refer to the
+inferred result: the outer tuple guards that reference. Subscribing the result retains the recursive
+relationship, and the result cannot be assigned to `str`.
+
+```py
+from typing import Callable, TypeAlias, TypeVar
+
+V = TypeVar("V")
+Repeated: TypeAlias = V | tuple["Repeated[V]"]
+
+def fixed[T](callback: Callable[[T], tuple[Repeated[T]] | int]) -> T:
+    raise NotImplementedError
+
+def identity[U](value: U) -> U:
+    return value
+
+root = fixed(identity)
+reveal_type(root)  # revealed: μ$0. tuple[Repeated[$0]] | int
+if isinstance(root, tuple):
+    reveal_type(root[0])  # revealed: μ$0. Repeated[tuple[$0] | int]
+wrong: str = root  # error: [invalid-assignment]
+```
+
+## Aliased lower bounds in recursive callbacks
+
+Passing the identity function requires `Retained[T]` to be a subtype of `T`. The intersection is
+already a subtype of `T`, so `int` is the smallest solution. We currently retain an unsolved type
+variable; introducing a recursive type here would leave a cycle outside any container.
+
+```py
+from typing import Callable
+from ty_extensions import Intersection
+
+type Retained[V] = int | Intersection[V, tuple[V]]
+
+def fixed[T](callback: Callable[[Retained[T]], T]) -> T:
+    raise NotImplementedError
+
+def identity[U](value: U) -> U:
+    return value
+
+root = fixed(identity)
+# TODO: Infer int by simplifying the lower bound.
+reveal_type(root)  # revealed: int | (T@fixed & tuple[T@fixed])
+wrong: str = root  # error: [invalid-assignment]
+```
+
+## Specializing inferred recursive values
+
+The inferred recursive attribute retains the class's type parameter. Access through a specialized
+instance substitutes that parameter throughout the recursive type, including after subscripting. The
+two specializations remain independent.
+
+```py
+from typing import Callable, cast
+
+def fixed[T, E](callback: Callable[[T], tuple[T, E] | E], leaf: E) -> T:
+    raise NotImplementedError
+
+def identity[U](value: U) -> U:
+    return value
+
+class Tree[E]:
+    node = fixed(identity, cast(E, None))
+    reveal_type(node)  # revealed: μ$0. tuple[$0, E@Tree] | E@Tree
+
+first = Tree[int]().node
+second = Tree[str]().node
+reveal_type(first)  # revealed: μ$0. tuple[$0, int] | int
+reveal_type(second)  # revealed: μ$0. tuple[$0, str] | str
+if isinstance(first, tuple):
+    reveal_type(first[0])  # revealed: μ$0. tuple[$0, int] | int
+    reveal_type(first[1])  # revealed: int
+wrong: str = first  # error: [invalid-assignment]
+```
+
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371

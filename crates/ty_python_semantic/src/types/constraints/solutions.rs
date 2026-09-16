@@ -2,17 +2,19 @@ use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
 use crate::types::constraints::paths::PathAssignments;
+use crate::types::constraints::relations::PathRelations;
 use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintId, ConstraintSetStorage, NodeId, PathBoundBuilder,
-    PathBounds, SolutionLimits,
+    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintAssignment, ConstraintId, ConstraintSetStorage, NodeId,
+    PathBoundBuilder, PathBounds, SolutionLimits,
 };
+use crate::types::typevar::TypeVarSet;
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,
-    sorted_paths: Vec<Vec<(ConstraintId, usize)>>,
+    sorted_paths: Vec<Vec<(ConstraintAssignment, usize)>>,
     _phantom: PhantomData<&'db ()>,
 }
 
@@ -72,13 +74,15 @@ impl<'db> SolutionWalker<'db> {
 
     fn found_satisfied_path(&mut self, path: &PathAssignments) {
         let mut path: Vec<_> = path
-            .positive_constraints()
-            .map(|(constraint, source_constraint)| {
+            .assignments
+            .iter()
+            .filter(|(assignment, _)| !matches!(assignment, ConstraintAssignment::Unconstrained(_)))
+            .map(|(assignment, (source_constraint, _))| {
                 let source_order = self
                     .source_orders
-                    .get_index_of(&source_constraint)
+                    .get_index_of(source_constraint)
                     .expect("every TDD constraint should have a source order");
-                (constraint, source_order)
+                (*assignment, source_order)
             })
             .collect();
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
@@ -95,6 +99,7 @@ impl<'db> SolutionWalker<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> PathBounds<'db> {
         if self.sorted_paths.is_empty() {
             return PathBounds::Unsatisfiable;
@@ -112,8 +117,23 @@ impl<'db> SolutionWalker<'db> {
 
         for path in self.sorted_paths {
             mappings.clear();
-            for (constraint, _) in path {
-                let constraint = storage.constraint_data(constraint);
+            for (assignment, _) in path {
+                let constraint = storage.constraint_data(assignment.constraint());
+                if matches!(assignment, ConstraintAssignment::Negative(_)) {
+                    let variable = match constraint {
+                        Constraint::ConcreteLower(bound) => bound.typevar,
+                        Constraint::ConcreteUpper(bound) => bound.typevar,
+                        Constraint::ConcreteEquivalence(bound) => bound.typevar,
+                        Constraint::TypeVarRange(bound) => bound.left,
+                        Constraint::TypeVarEquivalence(bound) => bound.left,
+                    };
+                    mappings
+                        .entry(variable)
+                        .or_default()
+                        .excluded
+                        .push(constraint);
+                    continue;
+                }
                 match constraint {
                     Constraint::ConcreteLower(lower) => {
                         let bounds = mappings.entry(lower.typevar).or_default();
@@ -146,13 +166,11 @@ impl<'db> SolutionWalker<'db> {
                 }
             }
 
-            let path_bounds = mappings
-                .drain(..)
-                .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
-                .collect();
+            let relations = PathRelations::new(db, env, &mappings, inferable);
+            let path_bounds = relations.collect_bounds(db, env, std::mem::take(&mut mappings));
             result.push(path_bounds);
         }
 
-        PathBounds::Constrained(result.into_boxed_slice())
+        PathBounds::Constrained(result.into_boxed_slice(), inferable)
     }
 }
