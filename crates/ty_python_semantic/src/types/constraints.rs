@@ -1391,12 +1391,11 @@ impl<'db> ConstraintSetStorage<'db> {
         env: &ProgramEnvironment<'db>,
         data: Constraint<'db>,
     ) -> ConstraintId {
-        let support = self.intern_constraint_typevars(db, env, data);
-
         self.ensure_overlay_identity_caches();
         if let Some(id) = self.constraint_cache.get(&data) {
             return *id;
         }
+        let support = self.intern_constraint_typevars(db, env, data);
         let support_id = self.intern_support(support);
         let id = self.constraints.push(data);
         self.constraint_supports.push(support_id);
