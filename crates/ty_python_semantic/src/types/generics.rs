@@ -3485,7 +3485,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             |_variance, path_bound| {
                 let solution = match validate(
                     path_bound.bound_typevar,
-                    CandidateSolutions::preliminary_solve(db, self.env, self.constraints, self.inferable, path_bound),
+                    CandidateSolutions::preliminary_solve(
+                        db,
+                        self.env,
+                        self.constraints,
+                        self.inferable,
+                        path_bound,
+                    ),
                 ) {
                     Ok(solution) => solution,
                     Err(error) => {
@@ -5769,7 +5775,13 @@ mod tests {
         let bounds = PathBound::exact(typevar, int).with_upper_evidence(str);
 
         assert!(matches!(
-            PathBounds::preliminary_solve(db, &env, &constraints, &bounds),
+            PathBounds::preliminary_solve(
+                db,
+                &env,
+                &constraints,
+                context.inferable_typevars(db),
+                &bounds,
+            ),
             PathBoundSolution::Unsatisfiable
         ));
         assert!(
