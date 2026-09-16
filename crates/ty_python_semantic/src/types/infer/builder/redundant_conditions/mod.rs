@@ -460,10 +460,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 self.report_redundant_condition(&condition)
                                 && condition.expression.range() == test.range()
                             {
-                                self.annotate_redundant_if_or_elif(
+                                // An operand's truthiness can differ from the complete condition's,
+                                // so only annotate branch reachability for the complete test.
+                                self.add_secondary_annotations_for_redundant_if_or_elif(
                                     &condition,
                                     &mut diagnostic,
                                     if_stmt,
+                                    branch_index,
+                                    &suite[i + 1..],
                                 );
                             }
                         }
@@ -977,6 +981,8 @@ fn suite_ends_with_exit(
 
 /// Return `true` if `stmt` is a "trivial statement"
 /// that has no effect nor side effect at runtime.
+///
+/// Statements considered trivial are `pass`, `...`, and string-literal statements.
 fn is_trivial_statement(stmt: &ast::Stmt) -> bool {
     match stmt {
         ast::Stmt::Pass(_) => true,
