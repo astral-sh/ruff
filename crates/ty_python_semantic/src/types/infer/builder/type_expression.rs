@@ -1421,9 +1421,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => slice_ty,
             };
-            SubclassOfType::try_from_instance(db, env, slice_ty).unwrap_or_else(|| match slice_ty {
-                Type::Callable(_) => invalid_type_argument(builder, slice),
-                _ => todo_type!("unsupported type[X] special form"),
+            SubclassOfType::try_from_instance(db, env, slice_ty).unwrap_or_else(|unsupported| {
+                match unsupported {
+                    Type::Callable(_) => invalid_type_argument(builder, slice),
+                    _ => todo_type!("unsupported type[X] special form"),
+                }
             })
         };
 

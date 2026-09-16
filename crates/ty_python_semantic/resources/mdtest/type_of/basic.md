@@ -146,8 +146,8 @@ static_assert(is_equivalent_to(type[A & B], type[A] & type[B]))
 static_assert(is_equivalent_to(type[A] & type[Any], type[A & Any]))
 ```
 
-This equivalence is also true for intersections of disjoint classes. In this case,
-both sides evaluate to `Never`.
+This equivalence is also true for intersections of disjoint classes. In this case, both sides
+evaluate to `Never`.
 
 ```pyi
 from typing_extensions import Never
@@ -283,6 +283,11 @@ _: type[A, B]
 
 ## Callable types are not valid parameters
 
+```toml
+[environment]
+python-version = "3.14"
+```
+
 ```py
 from collections.abc import Callable
 
@@ -297,6 +302,36 @@ def f(
     reveal_type(x)  # revealed: type[Unknown]
     reveal_type(y)  # revealed: type[Unknown]
     reveal_type(z)  # revealed: type[Unknown]
+```
+
+A callable signature is also invalid when it appears inside a union, an intersection or an alias used as the
+argument to `type[...]`:
+
+```py
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+type MyCallable = Callable[[int], str]
+
+def _(
+    union: type[A | Callable[[int], str]],  # error: [invalid-type-form]
+    intersection: type[A & Callable[[int], str]],  # error: [invalid-type-form]
+    intersection_explicit: type[Intersection[A, Callable[[int], str]]],  # error: [invalid-type-form]
+    alias: type[MyCallable],  # error: [invalid-type-form]
+):
+    reveal_type(union)  # revealed: type[Unknown]
+    reveal_type(intersection)  # revealed: type[Unknown]
+    reveal_type(intersection_explicit)  # revealed: type[Unknown]
+    reveal_type(alias)  # revealed: type[Unknown]
+```
+
+`Callable` is still valid when nested in other types, e.g.:
+
+```py
+def _(valid: type[list[Callable[[int], str]]]):
+    reveal_type(valid)  # revealed: type[list[(int, /) -> str]]
 ```
 
 ## As a base class

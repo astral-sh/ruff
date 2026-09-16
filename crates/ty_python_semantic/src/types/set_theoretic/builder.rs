@@ -1635,7 +1635,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         // A runtime class value of `TypeForm[T]` has type `type[T]`.
         match new_positive {
             Type::TypeForm(typeform) => {
-                if let Some(narrowed) = SubclassOfType::try_from_instance(
+                if let Ok(narrowed) = SubclassOfType::try_from_instance(
                     db,
                     env,
                     typeform.type_argument(db).resolve_type_alias(db),
@@ -1657,6 +1657,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                                 env,
                                 typeform.type_argument(db).resolve_type_alias(db),
                             )
+                            .ok()
                             .map(|narrowed| (index, narrowed)),
                             _ => None,
                         })

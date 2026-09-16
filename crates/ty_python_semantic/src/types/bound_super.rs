@@ -65,7 +65,7 @@ impl<'db> TypeVarOwnerContext<'db> {
                     .require_bound_or_constraints(db, env)
                     .as_type(db, env),
             )
-            .unwrap_or_else(SubclassOfType::subclass_of_unknown),
+            .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown()),
         }
     }
 }
@@ -694,7 +694,7 @@ impl<'db> BoundSuperType<'db> {
                                 )?)
                             } else {
                                 let subclass_of = SubclassOfType::try_from_instance(db, env, bound)
-                                    .unwrap_or_else(SubclassOfType::subclass_of_unknown);
+                                    .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown());
                                 return delegate_with_error_mapped(
                                     subclass_of,
                                     Some(TypeVarOwnerContext::SubclassOf(bound_typevar)),
