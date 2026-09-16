@@ -146,6 +146,23 @@ static_assert(is_equivalent_to(type[A & B], type[A] & type[B]))
 static_assert(is_equivalent_to(type[A] & type[Any], type[A & Any]))
 ```
 
+This equivalence is also true for intersections of disjoint classes. In this case,
+both sides evaluate to `Never`.
+
+```pyi
+from typing_extensions import Never
+
+static_assert(is_equivalent_to(type[bool & str], Never))
+static_assert(is_equivalent_to(type[bool] & type[str], Never))
+static_assert(is_equivalent_to(type[bool & str], type[bool] & type[str]))
+```
+
+This also implies that `type[Never]` is equivalent to `Never`:
+
+```pyi
+static_assert(is_equivalent_to(type[Never], Never))
+```
+
 ## Special case for `None`
 
 The typing conformance suite contains this test case. It's debatable whether it's correct to do so,
