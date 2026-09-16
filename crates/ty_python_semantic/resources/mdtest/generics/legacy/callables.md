@@ -553,6 +553,39 @@ reveal_type(callback)  # revealed: (*args: Any, **kwargs: Any) -> None
 static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
 ```
 
+## Gradual class parameters
+
+A callback that accepts `type[Any]` or `type[Unknown]` can accept any class object.
+
+```py
+from typing import Any, Callable, TypeVar
+from ty_extensions._internal import Unknown
+
+T = TypeVar("T")
+
+def invoke(callback: Callable[[type], T]) -> T:
+    return callback(int)
+
+def _(f: Callable[[type[Any]], int], g: Callable[[type[Unknown]], str]):
+    reveal_type(invoke(f))  # revealed: int
+    reveal_type(invoke(g))  # revealed: str
+```
+
+A gradual class argument can also satisfy a callback's metaclass parameter:
+
+```py
+class Meta(type): ...
+
+def f(cls: Meta) -> int:
+    return 1
+
+def invoke_any(callback: Callable[[type[Any]], T], cls: type[Any]) -> T:
+    return callback(cls)
+
+def _(cls: type[Any]):
+    reveal_type(invoke_any(f, cls))  # revealed: int
+```
+
 ## Inferring gradual tuple returns with concrete bounds
 
 ```toml
