@@ -706,6 +706,104 @@ static_assert(not is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[
 static_assert(not is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[int, bool, int]))
 ```
 
+## Constraint-producing assignability of gradual tuples
+
+A gradual segment can supply any fixed number of elements, including zero. These concrete tuple
+comparisons produce always-satisfied constraints, matching eager assignability.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, is_assignable_to, is_constraint_set_assignable_to
+
+static_assert(is_assignable_to(tuple[Any, ...], tuple[()]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[()]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[int]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int, str]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[int, str]))
+
+type Dynamic = Any
+
+static_assert(is_assignable_to(tuple[Dynamic, ...], tuple[int]))
+static_assert(is_constraint_set_assignable_to(tuple[Dynamic, ...], tuple[int]))
+```
+
+The gradual segment can also supply a variable-length target's required prefix or suffix.
+
+```py
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int, *tuple[str, ...]]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[int, *tuple[str, ...]]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[*tuple[str, ...], int]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[*tuple[str, ...], int]))
+```
+
+A mixed tuple's fixed elements must still fit within the target and have compatible types. The
+gradual segment cannot remove a required element or change its type.
+
+```py
+static_assert(is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[int, bool, str]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[int]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[str, bool, str]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[int, bool, int]))
+static_assert(not is_constraint_set_assignable_to(tuple[str, *tuple[Any, ...]], tuple[int, *tuple[bytes, ...]]))
+static_assert(not is_constraint_set_assignable_to(tuple[*tuple[Any, ...], str], tuple[*tuple[bytes, ...], int]))
+```
+
+A static homogeneous tuple can have any length, so it cannot guarantee a fixed length or a required
+element in a variable-length target.
+
+```py
+static_assert(not is_assignable_to(tuple[int, ...], tuple[int]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, ...], tuple[int]))
+static_assert(not is_assignable_to(tuple[int, ...], tuple[int, *tuple[int, ...]]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, ...], tuple[int, *tuple[int, ...]]))
+```
+
+Type variables in fixed source elements are compared normally. The gradual segment can be empty or
+supply additional target elements without discarding constraints on the fixed source elements.
+
+```py
+def source_type_variables[T]() -> None:
+    static_assert(is_constraint_set_assignable_to(tuple[list[T], *tuple[Any, ...]], tuple[object]))
+    static_assert(is_constraint_set_assignable_to(tuple[*tuple[Any, ...], list[T]], tuple[object]))
+    static_assert(is_constraint_set_assignable_to(tuple[T, *tuple[Any, ...]], tuple[int]) == ConstraintSet.upper_bound(T, int))
+    static_assert(is_constraint_set_assignable_to(tuple[*tuple[Any, ...], T], tuple[str]) == ConstraintSet.upper_bound(T, str))
+    static_assert(
+        is_constraint_set_assignable_to(tuple[T, *tuple[Any, ...]], tuple[int, str, *tuple[bytes, ...]])
+        == ConstraintSet.upper_bound(T, int)
+    )
+    static_assert(
+        is_constraint_set_assignable_to(tuple[*tuple[Any, ...], T], tuple[*tuple[bytes, ...], str, int])
+        == ConstraintSet.upper_bound(T, int)
+    )
+```
+
+TODO: Gradual-length comparisons do not yet generate evidence for type variables in target elements
+supplied by the gradual segment. These comparisons currently fail even when the variable is nested
+inside another type or hidden behind an alias.
+
+```py
+type Identity[T] = T
+
+def nested_type_variables[T]() -> None:
+    static_assert(is_assignable_to(tuple[Any, ...], tuple[list[T]]))
+    # TODO: This should be ConstraintSet.equality(T, Any).
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[list[T]]) == ConstraintSet.never())
+    static_assert(is_assignable_to(tuple[Any, ...], tuple[Identity[T]]))
+    # TODO: This should be ConstraintSet.lower_bound(Any, T).
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[Identity[T]]) == ConstraintSet.never())
+```
+
+A symbolic `TypeVarTuple` is not gradual: its specialization can have a different length from a
+fixed target tuple.
+
+```py
+def symbolic_pack[*Ts]() -> None:
+    static_assert(not is_assignable_to(tuple[*Ts], tuple[int]))
+    static_assert(is_constraint_set_assignable_to(tuple[*Ts], tuple[int]) == ConstraintSet.never())
+```
+
 ## Union types
 
 ```py

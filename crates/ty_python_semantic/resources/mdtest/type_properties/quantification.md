@@ -145,7 +145,7 @@ def witness_sensitive[X, A, B]() -> None:
 
     # Each solution for A and B depends on the compatible choice of X.
     # TODO: revealed: tuple[Solution[X=object, A=object, B=Invariant[object]]]
-    # revealed: tuple[Solution[A=X@witness_sensitive, X=A@witness_sensitive, B=Invariant[X@witness_sensitive]]]
+    # revealed: tuple[Solution[X=A@witness_sensitive, A=X@witness_sensitive, B=Invariant[X@witness_sensitive]]]
     reveal_type(body.solutions(inferable=tuple[X, A, B]))
     # TODO: revealed: tuple[Solution[A=object, B=Invariant[object]]]
     # revealed: tuple[()]
@@ -237,7 +237,7 @@ def finite_domain[X: (int, str), Y, Z]() -> None:
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[X=int, Y=int, Z=Invariant[int]], Solution[X=str, Y=str, Z=Invariant[str]]]
-    # revealed: tuple[Solution[X=Y@finite_domain, Y=X@finite_domain, Z=Invariant[X@finite_domain]]]
+    # revealed: tuple[Solution[Y=X@finite_domain, X=Y@finite_domain, Z=Invariant[X@finite_domain]]]
     reveal_type(body.solutions(inferable=tuple[X, Y, Z]))
     # TODO: revealed: tuple[Solution[Y=int, Z=Invariant[int]], Solution[Y=str, Z=Invariant[str]]]
     # revealed: tuple[Solution[Z=Invariant[Y@finite_domain]]]

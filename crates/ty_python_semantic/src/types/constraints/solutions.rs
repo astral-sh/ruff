@@ -2,12 +2,14 @@ use std::ops::ControlFlow;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::types::constraints::relations::PathRelations;
+use crate::types::constraints::relations::{ConstraintRelation, PathRelations};
+use crate::types::constraints::variables::ConstraintProvenance;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, Constraint, ConstraintAssignment, ConstraintBound,
-    ConstraintBoundsBuilder, ConstraintId, ConstraintSetBuilder, ConstraintSetStorage, NodeId,
-    PathBound, PathBounds, SolutionLimits,
+    ALWAYS_FALSE, ALWAYS_TRUE, Constraint, ConstraintAssignment, ConstraintId,
+    ConstraintSetBuilder, ConstraintSetStorage, NodeId, PathBound, PathBoundBuilder, PathBounds,
+    SolutionLimits,
 };
+use crate::types::signatures::Parameters;
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
@@ -73,16 +75,13 @@ impl<'db> SolutionWalker<'db> {
                     let (node, _) = storage.load(
                         db,
                         env,
-                        &provenance
-                            .lower_bound(db)
-                            .ty()
-                            .when_constraint_set_assignable_to_owned(
-                                db,
-                                env,
-                                provenance.upper_bound(db).ty(),
-                            ),
+                        &provenance.lower.when_constraint_set_assignable_to_owned(
+                            db,
+                            env,
+                            provenance.upper,
+                        ),
                     );
-                    pending.push((node, Some((source, provenance)), path));
+                    pending.push((node, Some((source, provenance.provenance)), path));
                     continue;
                 }
                 let constraints: Vec<_> = path.facts.keys().copied().collect();
@@ -100,9 +99,7 @@ impl<'db> SolutionWalker<'db> {
                     .enumerate()
                     .find_map(|(source, id)| {
                         (!path.assignments.contains(&id.when_true())
-                            && path
-                                .by_variable
-                                .contains_key(&storage.constraint_data(*id).typevar().identity(db))
+                            && path.constrains(db, storage.constraint_data(*id))
                             && path.implies(db, env, &relations, storage.constraint_data(*id)))
                         .then_some((source, *id))
                     });
@@ -112,7 +109,7 @@ impl<'db> SolutionWalker<'db> {
                         storage,
                         self.inferable,
                         id.when_true(),
-                        (source, storage.constraint_data(id)),
+                        (source, ConstraintProvenance::Evidence),
                     ) {
                         pending.push((ALWAYS_TRUE, None, path));
                     }
@@ -129,7 +126,7 @@ impl<'db> SolutionWalker<'db> {
                     self.source_orders
                         .get_index_of(&interior.constraint)
                         .unwrap_or(self.source_orders.len()),
-                    storage.constraint_data(interior.constraint),
+                    ConstraintProvenance::Evidence,
                 )
             });
             for (assignment, child) in [
@@ -161,33 +158,23 @@ impl<'db> SolutionWalker<'db> {
     ) -> ControlFlow<L::Break> {
         let mut facts: Vec<_> = path.facts.into_iter().collect();
         facts.sort_by_key(|(_, source)| *source);
-        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
+        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, PathBoundBuilder<'db>> =
             FxIndexMap::default();
-        for (constraint, _) in &facts {
-            let typevar = constraint.typevar();
-            let bounds = mappings.entry(typevar).or_default();
-            if let Some(lower) = constraint.stored_lower_bound() {
-                bounds.add_lower(db, env, lower);
-            }
-            if let Some(upper) = constraint.stored_upper_bound() {
-                bounds.add_upper(db, env, upper);
-            }
-            if let Some(lower) = constraint.stored_lower_bound()
-                && let Type::TypeVar(other) = lower.ty().resolve_type_alias(db)
-            {
-                mappings.entry(other).or_default().add_upper(
+        for (relation, _) in &facts {
+            if let Type::TypeVar(variable) = relation.upper.resolve_type_alias(db) {
+                mappings.entry(variable).or_default().add_lower(
                     db,
                     env,
-                    lower.with_type(Type::TypeVar(typevar)),
+                    relation.provenance,
+                    relation.lower,
                 );
             }
-            if let Some(upper) = constraint.stored_upper_bound()
-                && let Type::TypeVar(other) = upper.ty().resolve_type_alias(db)
-            {
-                mappings.entry(other).or_default().add_lower(
+            if let Type::TypeVar(variable) = relation.lower.resolve_type_alias(db) {
+                mappings.entry(variable).or_default().add_upper(
                     db,
                     env,
-                    upper.with_type(Type::TypeVar(typevar)),
+                    relation.provenance,
+                    relation.upper,
                 );
             }
         }
@@ -231,14 +218,22 @@ impl<'db> SolutionWalker<'db> {
 #[derive(Clone, Default)]
 struct SolutionBounds<'db> {
     assignments: FxHashSet<ConstraintAssignment>,
-    facts: FxIndexMap<Constraint<'db>, usize>,
-    by_variable: FxHashMap<BoundTypeVarIdentity<'db>, Vec<Constraint<'db>>>,
+    facts: FxIndexMap<ConstraintRelation<'db>, usize>,
+    by_variable: FxHashMap<BoundTypeVarIdentity<'db>, Vec<ConstraintRelation<'db>>>,
     negative: Vec<Constraint<'db>>,
-    compared: FxHashSet<(ConstraintBound<'db>, ConstraintBound<'db>)>,
-    comparisons: Vec<(Constraint<'db>, usize)>,
+    compared: FxHashSet<ConstraintRelation<'db>>,
+    comparisons: Vec<(ConstraintRelation<'db>, usize)>,
 }
 
 impl<'db> SolutionBounds<'db> {
+    fn constrains(&self, db: &'db dyn Db, constraint: Constraint<'db>) -> bool {
+        constraint.types().any(|ty| {
+            ty.resolve_type_alias(db)
+                .as_typevar()
+                .is_some_and(|variable| self.by_variable.contains_key(&variable.identity(db)))
+        })
+    }
+
     fn implies(
         &self,
         db: &'db dyn Db,
@@ -247,37 +242,78 @@ impl<'db> SolutionBounds<'db> {
         constraint: Constraint<'db>,
     ) -> bool {
         let builder = ConstraintSetBuilder::new();
-        let subject = Type::TypeVar(constraint.typevar());
-        let lower = constraint.lower_bound(db).ty();
-        let upper = constraint.upper_bound(db).ty();
-        // Missing endpoints still participate in implication: e.g. `int <= T` implies `T <= Any`
-        // through its implicit upper bound, without adding that bound as inference evidence.
-        let lower_holds = lower.is_never()
-            || relations.is_subtype(db, env, lower, subject, &builder)
-            || self
-                .by_variable
-                .get(&constraint.typevar().identity(db))
-                .into_iter()
-                .flatten()
-                .any(|fact| {
-                    lower
-                        .when_constraint_set_assignable_to_owned(db, env, fact.lower_bound(db).ty())
-                        .query(|_, when| when.is_trivially_always_satisfied())
-                });
-        let upper_holds = upper.is_object()
-            || relations.is_subtype(db, env, subject, upper, &builder)
-            || self
-                .by_variable
-                .get(&constraint.typevar().identity(db))
-                .into_iter()
-                .flatten()
-                .any(|fact| {
-                    fact.upper_bound(db)
-                        .ty()
-                        .when_constraint_set_assignable_to_owned(db, env, upper)
-                        .query(|_, when| when.is_trivially_always_satisfied())
-                });
-        lower_holds && upper_holds
+        constraint.relations().all(|relation| {
+            if relation.lower.is_never()
+                || relation.upper.is_object()
+                || relations.is_subtype(db, env, relation.lower, relation.upper, &builder)
+            {
+                return true;
+            }
+            // Missing endpoints participate in implication without becoming inference evidence.
+            // In particular, `int <= T` implies `T <= Any` through its implicit upper bound.
+            if let Type::TypeVar(variable) = relation.upper.resolve_type_alias(db) {
+                let bottom = if variable.is_paramspec(db) && variable.paramspec_attr(db).is_none() {
+                    Type::paramspec_value_callable(db, Parameters::bottom())
+                } else {
+                    Type::Never
+                };
+                if self
+                    .by_variable
+                    .get(&variable.identity(db))
+                    .into_iter()
+                    .flatten()
+                    .any(|fact| {
+                        let lower = if fact
+                            .upper
+                            .resolve_type_alias(db)
+                            .as_typevar()
+                            .is_some_and(|other| variable.is_same_typevar_as(db, other))
+                        {
+                            fact.lower
+                        } else {
+                            bottom
+                        };
+                        relation
+                            .lower
+                            .when_constraint_set_assignable_to_owned(db, env, lower)
+                            .query(|_, when| when.is_trivially_always_satisfied())
+                    })
+                {
+                    return true;
+                }
+            }
+            if let Type::TypeVar(variable) = relation.lower.resolve_type_alias(db) {
+                let top = if variable.is_paramspec(db) && variable.paramspec_attr(db).is_none() {
+                    Type::paramspec_value_callable(db, Parameters::top())
+                } else {
+                    Type::object()
+                };
+                if self
+                    .by_variable
+                    .get(&variable.identity(db))
+                    .into_iter()
+                    .flatten()
+                    .any(|fact| {
+                        let upper = if fact
+                            .lower
+                            .resolve_type_alias(db)
+                            .as_typevar()
+                            .is_some_and(|other| variable.is_same_typevar_as(db, other))
+                        {
+                            fact.upper
+                        } else {
+                            top
+                        };
+                        upper
+                            .when_constraint_set_assignable_to_owned(db, env, relation.upper)
+                            .query(|_, when| when.is_trivially_always_satisfied())
+                    })
+                {
+                    return true;
+                }
+            }
+            false
+        })
     }
 
     fn assign(
@@ -286,7 +322,7 @@ impl<'db> SolutionBounds<'db> {
         storage: &ConstraintSetStorage<'db>,
         inferable: TypeVarSet<'db>,
         assignment: ConstraintAssignment,
-        (source, provenance): (usize, Constraint<'db>),
+        (source, provenance): (usize, ConstraintProvenance),
     ) -> bool {
         if matches!(assignment, ConstraintAssignment::Unconstrained(_)) {
             return true;
@@ -302,113 +338,91 @@ impl<'db> SolutionBounds<'db> {
             self.negative.push(constraint);
             return true;
         }
-        let mut pending = Vec::new();
-        if let Some(lower) = constraint.stored_lower_bound() {
-            pending.push((
-                Constraint::new(
-                    constraint.typevar(),
-                    Some(lower.with_source_provenance(provenance)),
-                    None,
-                ),
-                source,
-            ));
-        }
-        if let Some(upper) = constraint.stored_upper_bound() {
-            pending.push((
-                Constraint::new(
-                    constraint.typevar(),
-                    None,
-                    Some(upper.with_source_provenance(provenance)),
-                ),
-                source,
-            ));
-        }
+        let mut pending: Vec<_> = constraint
+            .relations()
+            .map(|mut relation| {
+                if provenance == ConstraintProvenance::Validity {
+                    relation.provenance = ConstraintProvenance::Validity;
+                }
+                (relation, source)
+            })
+            .collect();
         while let Some((fact, source)) = pending.pop() {
             // Reflexive variable edges are tautologies, not inference evidence.
-            if fact.iter_stored_bounds().any(|bound| matches!(bound.ty(), Type::TypeVar(other) if fact.typevar().is_same_typevar_as(db, other))) || self.facts.contains_key(&fact) {
+            if matches!((fact.lower.resolve_type_alias(db), fact.upper.resolve_type_alias(db)), (Type::TypeVar(left), Type::TypeVar(right)) if left.is_same_typevar_as(db, right))
+                || self.facts.contains_key(&fact)
+            {
                 continue;
             }
             self.facts.insert(fact, source);
-            let variable = fact.typevar();
-            self.by_variable
-                .entry(variable.identity(db))
-                .or_default()
-                .push(fact);
-            if let Some(lower) = fact.stored_lower_bound()
-                && let Type::TypeVar(other) = lower.ty().resolve_type_alias(db)
+            // A transparent alias of a typevar is a variable edge, not a constructor bound.
+            for variable in [fact.lower, fact.upper]
+                .into_iter()
+                .filter_map(|ty| ty.resolve_type_alias(db).as_typevar())
             {
-                pending.push((
-                    Constraint::new(other, None, Some(lower.with_type(Type::TypeVar(variable)))),
-                    source,
-                ));
-            }
-            if let Some(upper) = fact.stored_upper_bound()
-                && let Type::TypeVar(other) = upper.ty().resolve_type_alias(db)
-            {
-                pending.push((
-                    Constraint::new(other, Some(upper.with_type(Type::TypeVar(variable))), None),
-                    source,
-                ));
-            }
-            for &other in &self.by_variable[&variable.identity(db)] {
-                let other_source = self.facts[&other];
-                for (lower, upper) in [
-                    (fact.stored_lower_bound(), other.stored_upper_bound()),
-                    (other.stored_lower_bound(), fact.stored_upper_bound()),
-                ] {
-                    let (Some(lower), Some(upper)) = (lower, upper) else {
-                        continue;
-                    };
-                    let lower_type = lower.ty().resolve_type_alias(db);
-                    let upper_type = upper.ty().resolve_type_alias(db);
-                    // Fixed variables are not substitution targets. Structural comparisons still
-                    // constrain their nested variables, as in `list[T] <= N <= list[str]`.
-                    if !variable.is_inferable(db, inferable)
-                        && (lower_type.is_type_var() || upper_type.is_type_var())
-                    {
-                        continue;
-                    }
-                    let source = source.max(other_source);
-                    match (lower_type, upper_type) {
-                        (Type::TypeVar(lower_variable), _) => {
-                            pending.push((
-                                Constraint::new(
-                                    lower_variable,
-                                    None,
-                                    Some(ConstraintBound::from_transitive_derivation(
-                                        upper.ty(),
-                                        lower,
-                                        upper,
-                                    )),
-                                ),
-                                source,
-                            ));
-                        }
-                        (_, Type::TypeVar(upper_variable)) => {
-                            pending.push((
-                                Constraint::new(
-                                    upper_variable,
-                                    Some(ConstraintBound::from_transitive_derivation(
-                                        lower.ty(),
-                                        lower,
-                                        upper,
-                                    )),
-                                    None,
-                                ),
-                                source,
-                            ));
-                        }
-                        _ if lower.ty() != upper.ty()
-                            && !lower.ty().is_never()
-                            && !upper.ty().is_object()
-                            && self.compared.insert((lower, upper)) =>
+                let adjacent = self.by_variable.entry(variable.identity(db)).or_default();
+                adjacent.push(fact);
+                for &other in adjacent.iter() {
+                    let source = source.max(self.facts[&other]);
+                    for (lower, upper) in [(fact, other), (other, fact)] {
+                        if !lower
+                            .upper
+                            .resolve_type_alias(db)
+                            .as_typevar()
+                            .is_some_and(|ty| ty.is_same_typevar_as(db, variable))
+                            || !upper
+                                .lower
+                                .resolve_type_alias(db)
+                                .as_typevar()
+                                .is_some_and(|ty| ty.is_same_typevar_as(db, variable))
                         {
-                            self.comparisons.push((
-                                Constraint::new(variable, Some(lower), Some(upper)),
-                                source,
-                            ));
+                            continue;
                         }
-                        _ => {}
+                        let lower_type = lower.lower.resolve_type_alias(db);
+                        let upper_type = upper.upper.resolve_type_alias(db);
+                        // Fixed variables are not substitution targets. Structural comparisons
+                        // still constrain nested variables, as in `list[T] <= N <= list[str]`.
+                        if !variable.is_inferable(db, inferable)
+                            && (lower_type.is_type_var() || upper_type.is_type_var())
+                        {
+                            continue;
+                        }
+                        let relation = ConstraintRelation {
+                            lower: lower.lower,
+                            upper: upper.upper,
+                            provenance: ConstraintProvenance::derived(
+                                lower.provenance,
+                                upper.provenance,
+                            ),
+                        };
+                        match (lower_type, upper_type) {
+                            (Type::TypeVar(variable), _) => {
+                                pending.push((
+                                    ConstraintRelation {
+                                        lower: Type::TypeVar(variable),
+                                        ..relation
+                                    },
+                                    source,
+                                ));
+                            }
+                            (_, Type::TypeVar(variable)) => {
+                                pending.push((
+                                    ConstraintRelation {
+                                        upper: Type::TypeVar(variable),
+                                        ..relation
+                                    },
+                                    source,
+                                ));
+                            }
+                            _ if relation.lower != relation.upper
+                                && !relation.lower.is_never()
+                                && !relation.upper.is_object()
+                                && self.compared.insert(relation) =>
+                            {
+                                self.comparisons.push((relation, source));
+                            }
+                            _ => {}
+                        }
                     }
                 }
             }

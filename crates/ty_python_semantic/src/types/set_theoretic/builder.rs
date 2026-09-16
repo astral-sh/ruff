@@ -2140,6 +2140,7 @@ mod tests {
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::{global_symbol, known_module_symbol};
     use crate::types::enums::enum_member_literals;
+    use crate::types::tuple::TupleType;
     use crate::types::type_alias::TypeAliasType;
     use crate::types::{
         BytesLiteralType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
@@ -2263,6 +2264,97 @@ mod tests {
                 assert!(union.elements(db).contains(&left));
                 assert!(union.elements(db).contains(&right));
             }
+        }
+    }
+
+    #[test]
+    fn cycle_recovery_preserves_same_length_tuples() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let first = Type::heterogeneous_tuple(&db, &env, [Type::int_literal(1)]);
+        let second = Type::heterogeneous_tuple(&db, &env, [Type::int_literal(2)]);
+
+        let union = UnionType::from_elements_cycle_recovery(&db, &env, [first, second]);
+        assert_eq!(union.expect_union().elements(&db), &[first, second]);
+        assert_eq!(
+            UnionType::widen_growing_tuples(&db, &env, first, second),
+            None
+        );
+    }
+
+    #[test]
+    fn cycle_recovery_widens_growing_tuple_lengths() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(&db, &env);
+        let first = Type::heterogeneous_tuple(&db, &env, [int]);
+        let second = Type::heterogeneous_tuple(&db, &env, [int, int]);
+        let widened = Type::homogeneous_tuple(&db, &env, int);
+
+        for (left, right) in [(first, second), (second, first)] {
+            assert_eq!(
+                UnionType::widen_growing_tuples(&db, &env, left, right),
+                Some(widened),
+            );
+        }
+
+        // Appending to the widened result adds a fixed suffix, which recovery must absorb.
+        let appended = Type::tuple(TupleType::mixed(&db, &env, [], int, [int]));
+        let other = Type::bool_literal(true);
+        let previous = UnionType::from_elements_cycle_recovery(&db, &env, [other, widened]);
+        let current = UnionType::from_elements_cycle_recovery(&db, &env, [previous, appended]);
+        let union = UnionType::widen_growing_tuples(&db, &env, previous, current).unwrap();
+        assert_eq!(union.expect_union().elements(&db), &[other, widened]);
+
+        // Initial cycle iterations can discard unrelated alternatives from the previous result.
+        assert_eq!(
+            UnionType::widen_growing_tuples(&db, &env, previous, appended),
+            Some(widened)
+        );
+    }
+
+    #[test]
+    fn cycle_recovery_widens_tuples_without_relation_queries() {
+        let db = setup_db();
+        let mut events_db = db.clone();
+        let env = db.program_environment();
+        let literal = LiteralValueType::promotable(1_i64);
+        let first = Type::heterogeneous_tuple(&db, &env, [Type::from(literal)]);
+        let second = Type::heterogeneous_tuple(&db, &env, [Type::from(literal), Type::object()]);
+        events_db.clear_salsa_events();
+
+        let result = UnionType::widen_growing_tuples(&db, &env, first, second).unwrap();
+        let tuple = result.exact_tuple_instance_spec(&db).unwrap();
+        let elements = tuple.variable_element_type(&db).unwrap().expect_union();
+        assert_eq!(
+            elements.elements(&db),
+            &[
+                Type::from(literal.with_recursively_defined(RecursivelyDefined::Yes)),
+                Type::object(),
+            ]
+        );
+        assert!(
+            events_db
+                .take_salsa_events()
+                .iter()
+                .all(|event| !matches!(event.kind, salsa::EventKind::WillExecute { .. }))
+        );
+    }
+
+    #[test]
+    fn cycle_recovery_widens_never_tuples_to_an_upper_bound() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(&db, &env);
+        let first = Type::heterogeneous_tuple(&db, &env, [Type::Never]);
+
+        for (last_element, widened_element) in [(Type::Never, Type::object()), (int, int)] {
+            let second = Type::heterogeneous_tuple(&db, &env, [Type::Never, last_element]);
+            let result = UnionType::widen_growing_tuples(&db, &env, first, second).unwrap();
+
+            assert_eq!(result, Type::homogeneous_tuple(&db, &env, widened_element));
+            assert!(first.is_subtype_of(&db, &env, result));
+            assert!(second.is_subtype_of(&db, &env, result));
         }
     }
 

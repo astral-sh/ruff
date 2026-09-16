@@ -1674,6 +1674,18 @@ reveal_type(generic(A(), Array[B, D]()))  # revealed: Array[A, B, D]
 reveal_type(generic(A(), Array[()]()))  # revealed: Array[A]
 ```
 
+## Tuple concatenation with type variables
+
+Concatenation preserves type variables in fixed positions and an unpacked type variable tuple
+between them. The inferred result satisfies the corresponding generic return annotation.
+
+```py
+def enclose[T, *Ts](edge: tuple[T], middle: tuple[*Ts]) -> tuple[T, *Ts, T]:
+    result = edge + middle + edge
+    reveal_type(result)  # revealed: tuple[T@enclose, *Ts@enclose, T@enclose]
+    return result
+```
+
 ## Unpacking Unbounded Tuple Types
 
 An unpacked unbounded tuple can describe an unknown middle section while retaining fixed endpoints,

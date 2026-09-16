@@ -18,6 +18,7 @@ use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
+use crate::types::typevar::TypeVarDomain;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -482,18 +483,6 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db, env)
     }
 
-    /// Return true if this type is a subtype of `target` using constraint-set typevar rules.
-    pub(super) fn is_constraint_set_subtype_of(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        target: Type<'db>,
-    ) -> bool {
-        let constraints = ConstraintSetBuilder::new();
-        self.when_constraint_set_subtype_of(db, env, target, &constraints)
-            .is_always_satisfied(db, env)
-    }
-
     pub(super) fn when_assignable_to<'c>(
         self,
         db: &'db dyn Db,
@@ -604,24 +593,6 @@ impl<'db> Type<'db> {
             constraints,
             TypeVarSet::None,
             TypeRelation::Assignability,
-            TypeVarEvaluation::Lazy,
-        )
-    }
-
-    fn when_constraint_set_subtype_of<'c>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        target: Type<'db>,
-        constraints: &'c ConstraintSetBuilder<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        self.has_relation_to_with_typevar_evaluation(
-            db,
-            env,
-            target,
-            constraints,
-            TypeVarSet::None,
-            TypeRelation::Subtyping,
             TypeVarEvaluation::Lazy,
         )
     }
@@ -794,41 +765,59 @@ impl<'db> Type<'db> {
         )
     }
 
-    /// Returns whether `self` and `other` can be equivalent under some typevar specialization.
-    pub(super) fn can_be_constraint_set_equivalent_to(
+    pub(super) fn when_constraint_set_equivalent_to_owned(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+    ) -> Cow<'db, OwnedConstraintSet<'db>> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial=|_, _, _| OwnedConstraintSet::always(),
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn when_constraint_set_equivalent_to_impl<'db>(
+            db: &'db dyn Db,
+            types: TypePair<'db>,
+        ) -> OwnedConstraintSet<'db> {
+            let env = ProgramEnvironment::from_program(types.program(db));
+            let constraints = ConstraintSetBuilder::new();
+            let materialization_visitor = ApplyTypeMappingVisitor::new(&env);
+            constraints.into_owned(|constraints| {
+                types
+                    .first(db)
+                    .when_equivalent_to_with_materialization_visitor(
+                        db,
+                        types.second(db),
+                        constraints,
+                        &materialization_visitor,
+                        TypeVarEvaluation::Lazy,
+                    )
+            })
+        }
+
+        if self == other {
+            return Cow::Owned(OwnedConstraintSet::always());
+        }
+
+        Cow::Borrowed(when_constraint_set_equivalent_to_impl(
+            db,
+            TypePair::new(db, env.program(db), self, other),
+        ))
+    }
+
+    pub(super) fn is_constraint_set_equivalent_to(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         other: Type<'db>,
     ) -> bool {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
-        fn can_be_constraint_set_equivalent_to_impl<'db>(
-            db: &'db dyn Db,
-            types: TypePair<'db>,
-        ) -> bool {
-            let env = ProgramEnvironment::from_program(types.program(db));
-            let constraints = ConstraintSetBuilder::new();
-            let materialization_visitor = ApplyTypeMappingVisitor::new(&env);
-            !types
-                .first(db)
-                .when_equivalent_to_with_materialization_visitor(
-                    db,
-                    types.second(db),
-                    &constraints,
-                    &materialization_visitor,
-                    TypeVarEvaluation::Lazy,
-                )
-                .is_never_satisfied(db, &env)
-        }
-
         if self == other {
             return true;
         }
 
-        can_be_constraint_set_equivalent_to_impl(
-            db,
-            TypePair::new(db, env.program(db), self, other),
-        )
+        self.when_constraint_set_equivalent_to_owned(db, env, other)
+            .query(|_constraints, when| when.is_always_satisfied(db, env))
     }
 
     fn when_equivalent_to_with_materialization_visitor<'c>(
@@ -2200,7 +2189,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             | (Type::Callable(other), Type::TypeVar(bound_typevar))
                 if self.is_eager_assignability()
                     && !bound_typevar.is_inferable(db, self.inferable)
-                    && bound_typevar.is_paramspec(db)
+                    && bound_typevar.domain(db) == TypeVarDomain::ParameterSignature
                     && Self::is_gradual_paramspec_value(db, other) =>
             {
                 self.always()
@@ -2209,16 +2198,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Compare fixed `ParamSpec`s with the endpoints of the materialization range of `...`:
             // its bottom is below every `ParamSpec`, and its top is above every `ParamSpec`.
             (Type::TypeVar(bound_typevar), Type::Callable(other))
-            | (Type::Callable(other), Type::TypeVar(bound_typevar))
                 if !bound_typevar.is_inferable(db, self.inferable)
-                    && bound_typevar.is_paramspec(db)
-                    && other.kind(db) == CallableTypeKind::ParamSpecValue
-                    && other.signatures(db).iter().all(|signature| {
-                        signature.parameters().is_top() || signature.parameters().is_bottom()
-                    }) =>
+                    && bound_typevar.domain(db) == TypeVarDomain::ParameterSignature
+                    && other.is_top_paramspec_value(db) =>
             {
-                let other_is_top = Self::is_top_paramspec_value(db, other);
-                ConstraintSet::from_bool(self.constraints, source.is_type_var() == other_is_top)
+                self.always()
+            }
+
+            (Type::Callable(other), Type::TypeVar(bound_typevar))
+                if !bound_typevar.is_inferable(db, self.inferable)
+                    && bound_typevar.domain(db) == TypeVarDomain::ParameterSignature
+                    && other.is_bottom_paramspec_value(db) =>
+            {
+                self.always()
             }
 
             // If the typevar is constrained, there must be multiple constraints, and the typevar
@@ -2285,6 +2277,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_target_intersection(db, source, intersection)
             }
 
+            // Check an inferable target's bound before splitting a source intersection.
+            // For `T: A & B`, neither `A` nor `B` alone need satisfy the bound, but `A & B` does.
+            (_, Type::TypeVar(typevar))
+                if self.is_eager_assignability() && typevar.is_inferable(db, self.inferable) =>
+            {
+                // TODO: record the unification constraints
+                typevar.typevar(db).upper_bound(db, env).when_none_or(
+                    db,
+                    self.constraints,
+                    |bound| self.check_type_pair(db, source, bound),
+                )
+            }
+
             (Type::Intersection(intersection), _) => {
                 self.check_source_intersection(db, intersection, target)
             }
@@ -2315,18 +2320,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             // TODO: Infer specializations here
-            (_, Type::TypeVar(typevar)) if typevar.is_inferable(db, self.inferable) => {
-                if self.is_eager_assignability() {
-                    // TODO: record the unification constraints
-                    typevar.typevar(db).upper_bound(db, env).when_none_or(
-                        db,
-                        self.constraints,
-                        |bound| self.check_type_pair(db, source, bound),
-                    )
-                } else {
-                    self.never()
-                }
-            }
+            (_, Type::TypeVar(typevar)) if typevar.is_inferable(db, self.inferable) => self.never(),
             (Type::TypeVar(bound_typevar), _) => {
                 // All inferable cases should have been handled above
                 assert!(!bound_typevar.is_inferable(db, self.inferable));
@@ -3005,15 +2999,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .signatures(db)
                 .iter()
                 .all(|signature| signature.parameters().kind() == ParametersKind::Gradual)
-    }
-
-    /// Returns `true` if `callable` is the top materialization of a `ParamSpec` value.
-    fn is_top_paramspec_value(db: &'db dyn Db, callable: CallableType<'db>) -> bool {
-        callable.kind(db) == CallableTypeKind::ParamSpecValue
-            && callable
-                .signatures(db)
-                .iter()
-                .all(|signature| signature.parameters().kind() == ParametersKind::Top)
     }
 }
 

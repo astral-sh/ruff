@@ -355,9 +355,6 @@ def listify[T](value: T) -> list[T]:
 
 def invariant_callable[U, V]() -> None:
     constraints = ConstraintSet.range(bool, U, int) & ConstraintSet.equality(V, int)
-    # TODO: no error. Existential reduction of the callable's fresh typevar is currently lossy.
-    # TODO: sometimes: no error
-    # error: [static-assert-error]
     static_assert(constraints.implies_subtype_of(TypeOf[listify], Callable[[U], list[V]]))
 
 ConstrainedValue = TypeVar("ConstrainedValue", int, object, covariant=True)

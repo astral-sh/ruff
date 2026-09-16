@@ -5,6 +5,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssign, StmtRef};
+use ruff_python_edits::unwrapped_call_argument;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -136,9 +137,11 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
 
     let StmtAssign { targets, value, .. } = stmt;
 
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
+    let Expr::Call(
+        call @ ExprCall {
+            func, arguments, ..
+        },
+    ) = value.as_ref()
     else {
         return;
     };
@@ -195,9 +198,15 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
         checker,
         stmt.into(),
         &target_name.id,
-        value,
         &vars,
         TypeAliasKind::TypeAliasType,
+        &unwrapped_call_argument(
+            call,
+            value,
+            Some(stmt.into()),
+            checker.tokens(),
+            checker.source(),
+        ),
     );
 }
 
@@ -245,13 +254,16 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
         .unique_by(|tvar| tvar.name)
         .collect::<Vec<_>>();
 
+    let range_with_parentheses =
+        parenthesized_range(value.into(), stmt.into(), checker.tokens()).unwrap_or(value.range());
+
     create_diagnostic(
         checker,
         stmt.into(),
         name,
-        value,
         &vars,
         TypeAliasKind::TypeAlias,
+        &checker.source()[range_with_parentheses],
     );
 }
 
@@ -260,9 +272,9 @@ fn create_diagnostic(
     checker: &Checker,
     stmt: StmtRef,
     name: &Name,
-    value: &Expr,
     type_vars: &[TypeVar],
     type_alias_kind: TypeAliasKind,
+    value_source: &str,
 ) {
     if type_vars.iter().any(TypeVar::has_unsupported_restriction) {
         return;
@@ -282,15 +294,10 @@ fn create_diagnostic(
     }
 
     let source = checker.source();
-    let tokens = checker.tokens();
-
-    let range_with_parentheses =
-        parenthesized_range(value.into(), stmt.into(), tokens).unwrap_or(value.range());
 
     let content = format!(
-        "type {name}{type_params} = {value}",
+        "type {name}{type_params} = {value_source}",
         type_params = DisplayTypeVars { type_vars, source },
-        value = &source[range_with_parentheses]
     );
     let edit = Edit::range_replacement(content, stmt.range());
 

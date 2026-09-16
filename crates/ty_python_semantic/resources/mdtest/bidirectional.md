@@ -2750,6 +2750,15 @@ def _() -> int:
     return invalid_x6  # error: [invalid-return-type]
 ```
 
+A return annotation can provide a union of fixed-length tuple element types. Inferring an empty list
+from this context doesn't wrongly widen the type of `result` to a list of variable-length tuples:
+
+```py
+def tuples() -> list[tuple[()] | tuple[int]]:
+    result = []
+    return result
+```
+
 ```py
 x7 = []
 x7[:] = [1, "2", 3.0]

@@ -6,10 +6,71 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::{Constraint, ConstraintSetBuilder};
 use crate::types::Type;
+use crate::types::constraints::variables::ConstraintProvenance;
 use crate::types::cyclic::PairVisitor;
 use crate::types::graph::DependencyGraph;
 use crate::types::typevar::TypeVarSet;
 use crate::{Db, FxIndexSet, ProgramEnvironment};
+
+/// One directed bound, including the evidence that supports it.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(super) struct ConstraintRelation<'db> {
+    pub(super) lower: Type<'db>,
+    pub(super) upper: Type<'db>,
+    pub(super) provenance: ConstraintProvenance,
+}
+
+impl<'db> Constraint<'db> {
+    /// Expands equivalences into both directions without substituting inside either type.
+    pub(super) fn relations(self) -> impl Iterator<Item = ConstraintRelation<'db>> {
+        let (lower, upper, provenance, equivalent) = match self {
+            Self::ConcreteLower(bound) => (
+                bound.bound,
+                Type::TypeVar(bound.typevar),
+                bound.provenance,
+                false,
+            ),
+            Self::ConcreteUpper(bound) => (
+                Type::TypeVar(bound.typevar),
+                bound.bound,
+                bound.provenance,
+                false,
+            ),
+            Self::ConcreteEquivalence(bound) => (
+                bound.bound,
+                Type::TypeVar(bound.typevar),
+                bound.provenance,
+                true,
+            ),
+            Self::TypeVarRange(bound) => (
+                Type::TypeVar(bound.left),
+                Type::TypeVar(bound.right),
+                bound.provenance,
+                false,
+            ),
+            Self::TypeVarEquivalence(bound) => (
+                Type::TypeVar(bound.left),
+                Type::TypeVar(bound.right),
+                bound.provenance,
+                true,
+            ),
+        };
+        [
+            Some(ConstraintRelation {
+                lower,
+                upper,
+                provenance,
+            }),
+            equivalent.then_some(ConstraintRelation {
+                lower: upper,
+                upper: lower,
+                provenance,
+            }),
+        ]
+        .into_iter()
+        .flatten()
+    }
+}
 
 /// Quotients the path's subtype relations by mutual reachability. Occurrences inside a type
 /// constructor are deliberately not edges: equality does not imply structural recursion.
@@ -26,23 +87,17 @@ impl<'db> PathRelations<'db> {
     pub(super) fn new(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        constraints: &[Constraint<'db>],
+        constraints: &[ConstraintRelation<'db>],
     ) -> Self {
         let mut types = FxIndexSet::default();
         let mut edges = Vec::new();
         for constraint in constraints {
-            let subject = types.insert_full(Type::TypeVar(constraint.typevar())).0;
-            if let Some(lower) = constraint.stored_lower_bound()
-                && lower.ty().is_fully_static(db, env)
+            if constraint.lower.is_fully_static(db, env)
+                && constraint.upper.is_fully_static(db, env)
             {
-                let lower = types.insert_full(lower.ty().resolve_type_alias(db)).0;
-                edges.push((lower, subject));
-            }
-            if let Some(upper) = constraint.stored_upper_bound()
-                && upper.ty().is_fully_static(db, env)
-            {
-                let upper = types.insert_full(upper.ty().resolve_type_alias(db)).0;
-                edges.push((subject, upper));
+                let lower = types.insert_full(constraint.lower.resolve_type_alias(db)).0;
+                let upper = types.insert_full(constraint.upper.resolve_type_alias(db)).0;
+                edges.push((lower, upper));
             }
         }
         let mut successors = vec![Vec::new(); types.len()];

@@ -14,7 +14,7 @@ use crate::types::class_base::ClassBase;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget, SolutionProjection};
 use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::{
-    Constraint, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
     PathBoundSolution, PathBounds, SolutionPaths, Solutions, TypeVarSolution,
 };
 use crate::types::infer::original_class_type;
@@ -41,7 +41,6 @@ use crate::types::{
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::node_key::NodeKey;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeKind, ScopeId};
 use ty_python_core::{SemanticIndex, semantic_index};
 
@@ -319,11 +318,7 @@ pub(crate) fn typing_self<'db>(
             let DefinitionKind::Function(func_ref) = def.kind(db) else {
                 return None;
             };
-            Some(
-                index.node_scope_by_key(NodeWithScopeKey::Function(NodeKey::from_node_ref(
-                    func_ref,
-                ))),
-            )
+            Some(index.node_scope_by_key(NodeWithScopeKey::Function(func_ref.node_key())))
         })
         .unwrap_or_else(|| scope_id.file_scope_id(db));
 
@@ -1963,22 +1958,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 {
                     let ty = ty.materialized_divergent_fallback().unwrap_or(ty);
                     let env = self.env;
-                    let (lower, upper) = if self.relation.is_subtyping() {
-                        (
+                    if self.relation.is_subtyping() {
+                        ConstraintSet::constrain_typevar(
+                            db,
+                            env,
+                            self.constraints,
+                            typevar,
                             ty.top_materialization(db, env),
                             ty.bottom_materialization(db, env),
                         )
                     } else {
-                        (ty, ty)
-                    };
-                    ConstraintSet::constrain_typevar(
-                        db,
-                        env,
-                        self.constraints,
-                        typevar,
-                        lower,
-                        upper,
-                    )
+                        ConstraintSet::constrain_typevar_equivalence_bound(
+                            db,
+                            env,
+                            self.constraints,
+                            typevar,
+                            ty,
+                        )
+                    }
                 } else {
                     self.check_type_pair(db, target_type, source_type).and(
                         db,
@@ -3353,15 +3350,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    fn intersect_pending_typevar_constraint(&mut self, constraint: Constraint<'db>) {
+    fn intersect_pending_typevar_constraint(
+        &mut self,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        constraint: ConstraintSet<'db, 'c>,
+    ) {
         let db = self.db;
-        let bound_typevar = constraint.typevar();
         let identity = bound_typevar.identity(db);
         if bound_typevar.is_paramspec(db) && !self.paramspec_seen.insert(identity) {
             return;
         }
-
-        let constraint = ConstraintSet::from_constraint(db, self.env, self.constraints, constraint);
         self.pending.intersect(db, self.constraints, constraint);
     }
 
@@ -3402,14 +3400,30 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         variance: TypeVarVariance,
     ) {
         let constraint = match variance {
-            TypeVarVariance::Covariant => Constraint::from_evidence(bound_typevar, Some(ty), None),
-            TypeVarVariance::Contravariant => {
-                Constraint::from_evidence(bound_typevar, None, Some(ty))
-            }
-            TypeVarVariance::Invariant => Constraint::exact(bound_typevar, ty),
+            TypeVarVariance::Covariant => ConstraintSet::constrain_typevar_lower_bound(
+                self.db,
+                self.env,
+                self.constraints,
+                bound_typevar,
+                ty,
+            ),
+            TypeVarVariance::Contravariant => ConstraintSet::constrain_typevar_upper_bound(
+                self.db,
+                self.env,
+                self.constraints,
+                bound_typevar,
+                ty,
+            ),
+            TypeVarVariance::Invariant => ConstraintSet::constrain_typevar_equivalence_bound(
+                self.db,
+                self.env,
+                self.constraints,
+                bound_typevar,
+                ty,
+            ),
             TypeVarVariance::Bivariant => return,
         };
-        self.intersect_pending_typevar_constraint(constraint);
+        self.intersect_pending_typevar_constraint(bound_typevar, constraint);
     }
 
     /// Solves one relation without recording it or changing the legacy type mappings.
@@ -4710,7 +4724,13 @@ mod tests {
                 .into_iter()
                 .zip(types)
                 .when_all(db, constraints, |(typevar, ty)| {
-                    ConstraintSet::constrain_typevar(db, &env, constraints, typevar, ty, ty)
+                    ConstraintSet::constrain_typevar_equivalence_bound(
+                        db,
+                        &env,
+                        constraints,
+                        typevar,
+                        ty,
+                    )
                 })
         })
     }
@@ -4829,12 +4849,11 @@ mod tests {
         let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
         let int = KnownClass::Int.to_instance(db, &env);
         let str = KnownClass::Str.to_instance(db, &env);
-        builder.record_constraint_set(ConstraintSet::constrain_typevar(
+        builder.record_constraint_set(ConstraintSet::constrain_typevar_equivalence_bound(
             db,
             &env,
             &constraints,
             t,
-            int,
             int,
         ));
 
@@ -4885,12 +4904,11 @@ mod tests {
         assert_eq!(unconstrained.merged_types(db), [None]);
 
         for ty in [int, str] {
-            builder.record_constraint_set(ConstraintSet::constrain_typevar(
+            builder.record_constraint_set(ConstraintSet::constrain_typevar_equivalence_bound(
                 db,
                 &env,
                 &constraints,
                 t,
-                ty,
                 ty,
             ));
         }
@@ -4922,7 +4940,7 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         let str = KnownClass::Str.to_instance(db, &env);
         let relation = [int, str].into_iter().when_any(db, &constraints, |ty| {
-            ConstraintSet::constrain_typevar(db, &env, &constraints, t, ty, ty)
+            ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &constraints, t, ty)
         });
 
         for (budget, expected_choices) in [
@@ -4981,7 +4999,7 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         let str = KnownClass::Str.to_instance(db, &env);
         let relation = [int, str].into_iter().when_any(db, &constraints, |ty| {
-            ConstraintSet::constrain_typevar(db, &env, &constraints, t, ty, ty)
+            ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &constraints, t, ty)
         });
 
         // Both budgets allow solving the two present bindings, but storing the complete
@@ -5049,7 +5067,7 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         let str = KnownClass::Str.to_instance(db, &env);
         builder.record_constraint_set([str, int].into_iter().when_any(db, &constraints, |ty| {
-            ConstraintSet::constrain_typevar(db, &env, &constraints, t, ty, ty)
+            ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &constraints, t, ty)
         }));
 
         let inference = builder
@@ -5360,7 +5378,13 @@ mod tests {
         let constraints = ConstraintSetBuilder::new();
         let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
         let int = KnownClass::Int.to_instance(db, &env);
-        let set = ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, int, int);
+        let set = ConstraintSet::constrain_typevar_equivalence_bound(
+            db,
+            &env,
+            &constraints,
+            typevar,
+            int,
+        );
 
         let analysis = builder.analyze_constraint_set(set);
         assert!(matches!(&builder.types, LegacyTypeMappings::Available(types) if types.is_empty()));
@@ -5392,7 +5416,8 @@ mod tests {
 
         builder.add_type_mapping(typevar, str, TypeVarVariance::Covariant);
         let ty = UnionType::from_two_elements(db, &env, str, Type::int_literal(0));
-        let relation = ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, ty, ty);
+        let relation =
+            ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &constraints, typevar, ty);
         builder.record_constraint_set(relation);
         builder.project_for_legacy_fallback(&ConstraintSetAnalysis::BudgetExceeded);
         builder.add_type_mapping(typevar, str, TypeVarVariance::Covariant);
@@ -5430,8 +5455,20 @@ mod tests {
         let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
         let lower_only =
             ConstraintSet::constrain_typevar_lower_bound(db, &env, &constraints, typevar, str);
-        let rejected = ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, str, str);
-        let accepted = ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, int, int);
+        let rejected = ConstraintSet::constrain_typevar_equivalence_bound(
+            db,
+            &env,
+            &constraints,
+            typevar,
+            str,
+        );
+        let accepted = ConstraintSet::constrain_typevar_equivalence_bound(
+            db,
+            &env,
+            &constraints,
+            typevar,
+            int,
+        );
 
         for (set, variance) in [
             (lower_only, ConstraintFailureVariance::Contravariant),

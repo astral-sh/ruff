@@ -11,9 +11,11 @@ use crate::Db;
 use ty_module_resolver::KnownModule;
 use ty_python_core::{definition::Definition, use_def_map};
 
-use super::call::{CallArguments, CallDunderError};
+use super::call::{Bindings, CallArguments, CallDunderError};
 use super::callable::CallableTypeKind;
+use super::class::FrozenDataclassDispatch;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension};
+use super::dedicated::pydantic;
 use super::relation::TypeRelationChecker;
 use super::{
     BindingContext, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter,
@@ -107,6 +109,49 @@ pub(super) enum InstanceAttributeWriteMember<'db> {
     Instance(FallbackAttributeWriteRequirement<'db>),
     /// No declared member was found, so the write is governed by `__setattr__`.
     SetAttr,
+}
+
+/// Resolve attribute-specific dispatch through inherited frozen-dataclass setters.
+pub(super) fn instance_setattr_dispatch<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    object_ty: Type<'db>,
+    attribute: &str,
+) -> Option<FrozenDataclassDispatch<'db>> {
+    object_ty
+        .nominal_class(db, env)
+        .and_then(|class| class.static_class_literal(db))
+        .and_then(|(class, specialization)| {
+            class.inherited_frozen_dataclass_dispatch(db, specialization, "__setattr__", attribute)
+        })
+}
+
+/// Whether or not an attribute write is blocked by the receiver's `__setattr__` method.
+pub(super) fn instance_attribute_write_is_blocked<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    object_ty: Type<'db>,
+    member: &InstanceAttributeWriteMember<'_>,
+    attribute: &str,
+    setattr_result: &Result<Bindings<'db>, CallDunderError<'db>>,
+    frozen_dataclass_dispatch: Option<FrozenDataclassDispatch<'db>>,
+) -> bool {
+    match pydantic::setattr_behavior(db, env, object_ty) {
+        Some(pydantic::SetAttrBehavior::Frozen) => {
+            !(matches!(member, InstanceAttributeWriteMember::Explicit { .. })
+                && pydantic::is_private_attribute(attribute))
+        }
+        Some(pydantic::SetAttrBehavior::NonFrozen) => false,
+        Some(pydantic::SetAttrBehavior::CustomSetAttr) | None => {
+            matches!(
+                frozen_dataclass_dispatch,
+                Some(FrozenDataclassDispatch::FrozenField)
+            ) || match setattr_result {
+                Ok(bindings) => bindings.return_type(db, env).is_never(),
+                Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
+            }
+        }
+    }
 }
 
 /// The member that governs a write through a class object.
@@ -1220,18 +1265,43 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
-        let setattr_result = object_ty.try_call_dunder_with_policy(
+        let frozen_dataclass_dispatch = instance_setattr_dispatch(db, env, object_ty, member_name);
+        let setattr_receiver = frozen_dataclass_dispatch
+            .map_or(object_ty, |dispatch| dispatch.receiver(db, env, object_ty));
+        let mut arguments =
+            CallArguments::positional([Type::string_literal(db, member_name), value_ty]);
+        let setattr_result = if matches!(
+            frozen_dataclass_dispatch,
+            Some(FrozenDataclassDispatch::Delegate(_))
+        ) {
+            // The generated setter explicitly calls `super(...).__setattr__`, so lookup must
+            // follow the bound super's MRO rather than treating it as an implicit dunder call.
+            setattr_receiver.try_call_dunder_on_class(
+                db,
+                env,
+                "__setattr__",
+                &arguments,
+                TypeContext::default(),
+            )
+        } else {
+            setattr_receiver.try_call_dunder_with_policy(
+                db,
+                env,
+                "__setattr__",
+                &mut arguments,
+                TypeContext::default(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+            )
+        };
+        if instance_attribute_write_is_blocked(
             db,
             env,
-            "__setattr__",
-            &mut CallArguments::positional([Type::string_literal(db, member_name), value_ty]),
-            TypeContext::default(),
-            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-        );
-        if match &setattr_result {
-            Ok(bindings) => bindings.return_type(db, env).is_never(),
-            Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
-        } {
+            object_ty,
+            member,
+            member_name,
+            &setattr_result,
+            frozen_dataclass_dispatch,
+        ) {
             return self.never();
         }
 

@@ -1,5 +1,6 @@
 use std::cell::{OnceCell, RefCell};
 use std::collections::hash_map;
+use std::convert::Infallible;
 use std::rc::Rc;
 
 use compact_str::CompactString;
@@ -49,6 +50,7 @@ use crate::place_load::{
 use crate::reachability::{
     ReachabilityEvaluationCache, analyze_condition_expression, evaluate_reachability_with_cache,
 };
+use crate::types::abstract_methods::AbstractMethods;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
@@ -74,8 +76,8 @@ use crate::types::diagnostic::{
     UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
     UNSOUND_YIELD, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, YieldKind,
     autofix_with_notimplementederror, hint_if_stdlib_attribute_exists_on_other_versions,
-    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
-    report_bad_dunder_delete_call, report_call_to_abstract_method,
+    report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
+    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_dynamic_function_decorator_return,
     report_invalid_assignment, report_invalid_class_match_pattern, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
@@ -4959,8 +4961,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 infer_value_ty.infer_loud(self, TypeContext::default());
 
                 let mut operation_failed = false;
-                let result_ty = union.map(db, env, |&elem_type| {
-                    match self.infer_augmented_op(
+                let Ok(result_ty) = state.try_map_union(db, env, union, |elem_type, state| {
+                    let result_ty = match self.infer_augmented_op(
                         assignment,
                         elem_type,
                         value_expr,
@@ -4972,7 +4974,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             operation_failed = true;
                             recovery_ty
                         }
-                    }
+                    };
+                    Ok::<_, Infallible>(result_ty)
                 });
 
                 if operation_failed {
@@ -9406,10 +9409,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // that protocol -- and indeed, according to the spec, type checkers must disallow abstract
             // subclasses of the protocol to be passed to parameters that accept `type[SomeProtocol]`.
             // <https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols>.
-            if !callable_type.is_subclass_of()
-                && let Some(protocol) = class.into_protocol_class(self.db())
-            {
-                report_attempted_protocol_instantiation(&self.context, call_expression, protocol);
+            if !callable_type.is_subclass_of() {
+                if let Some(protocol) = class.into_protocol_class(db) {
+                    report_attempted_protocol_instantiation(
+                        &self.context,
+                        call_expression,
+                        protocol,
+                    );
+                } else if self.context.is_lint_enabled(&CALL_NON_CALLABLE) {
+                    let abstract_methods = AbstractMethods::of_class(db, class);
+                    if !abstract_methods.is_empty() {
+                        report_attempted_instantiation_of_abstract_class(
+                            &self.context,
+                            call_expression,
+                            class,
+                            &abstract_methods,
+                        );
+                    }
+                }
             }
 
             // Inference of correctly-placed `TypeVar`, `ParamSpec`, `NewType`, and
@@ -11807,24 +11824,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn finish_function_decorator_inference(mut self) -> FunctionDecoratorInference<'db> {
         self.infer_region();
 
-        let known_decorators = match self.region {
-            InferenceRegion::FunctionDecorators(definition) => match definition.kind(self.db()) {
-                DefinitionKind::Function(function) => {
-                    function.node(self.module()).decorator_list.iter().fold(
-                        FunctionDecorators::empty(),
-                        |known_decorators, decorator| {
-                            known_decorators
-                                | FunctionDecorators::from_decorator_type(
-                                    self.db(),
-                                    self.expression_type(&decorator.expression),
-                                )
-                        },
-                    )
+        let mut known_decorators = FunctionDecorators::empty();
+        let mut has_unknown_decorators = true;
+        if let InferenceRegion::FunctionDecorators(definition) = self.region
+            && let DefinitionKind::Function(function) = definition.kind(self.db())
+        {
+            has_unknown_decorators = false;
+            for decorator in &function.node(self.module()).decorator_list {
+                let ty = self.expression_type(&decorator.expression);
+                let flags = FunctionDecorators::from_decorator_type(self.db(), ty);
+                known_decorators |= flags;
+                if flags.is_empty()
+                    && !matches!(ty, Type::ClassLiteral(class)
+                        if class.known(self.db()) == Some(KnownClass::Property))
+                {
+                    has_unknown_decorators = true;
                 }
-                _ => FunctionDecorators::empty(),
-            },
-            _ => FunctionDecorators::empty(),
-        };
+            }
+        }
 
         let Self {
             context,
@@ -11863,6 +11880,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
             known_decorators,
+            has_unknown_decorators,
             diagnostics,
         }
     }
