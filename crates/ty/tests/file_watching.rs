@@ -189,7 +189,16 @@ impl TestCase {
     }
 
     fn apply_changes(&mut self, changes: &[ChangeEvent]) -> ChangeResult {
-        self.db.apply_changes(changes)
+        let result = self.db.apply_changes(changes);
+
+        if !changes.is_empty()
+            && let Some(watcher) = &mut self.watcher
+        {
+            watcher.update(&mut self.db);
+            assert!(!watcher.has_errored_paths());
+        }
+
+        result
     }
 
     fn update_options(&mut self, options: Options) -> anyhow::Result<()> {
@@ -205,11 +214,6 @@ impl TestCase {
 
         let changes = self.take_watch_changes(event_for_file("pyproject.toml"));
         self.apply_changes(&changes);
-
-        if let Some(watcher) = &mut self.watcher {
-            watcher.update(&self.db);
-            assert!(!watcher.has_errored_paths());
-        }
 
         Ok(())
     }
@@ -506,7 +510,7 @@ where
     let watcher = directory_watcher(move |events| sender.send(events).unwrap())
         .with_context(|| "Failed to create directory watcher")?;
 
-    let watcher = ProjectWatcher::new(watcher, &db);
+    let watcher = ProjectWatcher::new(watcher, &mut db);
     assert!(!watcher.has_errored_paths());
 
     let test_case = TestCase {
@@ -1501,6 +1505,246 @@ fn remove_search_path() -> anyhow::Result<()> {
 
     assert_eq!(changes, Err(vec![]));
 
+    Ok(())
+}
+
+#[test]
+fn script_dependency_changes() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_file("dependencies/dependency.py", "value = 1")?;
+        context.write_project_file(
+            "script.py",
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # [tool.ty.environment]
+            # extra-paths = ["../dependencies"]
+            # ///
+            from dependency import value
+            result: int = value
+            "#,
+        )
+    })?;
+    let dependency = case.root_path().join("dependencies/dependency.py");
+    assert!(case.db().check().is_empty());
+
+    update_file(&dependency, "value = 'wrong'")?;
+    let changes = case.stop_watch(event_for_file("dependency.py"));
+    case.apply_changes(&changes);
+
+    let diagnostics = case.db().check();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].id().as_str(), "invalid-assignment");
+    Ok(())
+}
+
+#[test]
+fn shared_script_search_paths_remain_watched_until_unused() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_file("dependencies/dependency.py", "value = 1")?;
+        let script = r#"
+        # /// script
+        # requires-python = ">=3.12"
+        # [tool.ty.environment]
+        # extra-paths = ["../dependencies"]
+        # ///
+        "#;
+        context.write_project_file("first.py", script)?;
+        context.write_project_file("second.py", script)
+    })?;
+    let dependency = case.root_path().join("dependencies/dependency.py");
+
+    update_file(case.project_path("first.py"), "")?;
+    let changes = case.take_watch_changes(event_for_file("first.py"));
+    case.apply_changes(&changes);
+
+    update_file(&dependency, "value = 2")?;
+    let changes = case.take_watch_changes(event_for_file("dependency.py"));
+    assert!(
+        changes
+            .iter()
+            .any(|event| matches!(event, ChangeEvent::Changed { path, .. } if path == &dependency)),
+        "expected an edit while the search path is shared: {changes:?}"
+    );
+
+    update_file(case.project_path("second.py"), "")?;
+    let changes = case.take_watch_changes(event_for_file("second.py"));
+    case.apply_changes(&changes);
+
+    update_file(&dependency, "value = 3")?;
+
+    // Neither script uses this path now, so edits to it should no longer produce watch events.
+    let changes = case.try_stop_watch(event_for_file("dependency.py"), Duration::from_millis(100));
+
+    assert_eq!(changes, Err(vec![]));
+    Ok(())
+}
+
+#[test]
+fn restoring_script_metadata_rewatches_search_path() -> anyhow::Result<()> {
+    let script = r#"
+    # /// script
+    # requires-python = ">=3.12"
+    # [tool.ty.environment]
+    # extra-paths = ["../dependencies"]
+    # ///
+    "#;
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_file("dependencies/dependency.py", "value = 1")?;
+        context.write_project_file("script.py", script)
+    })?;
+    let dependency = case.root_path().join("dependencies/dependency.py");
+
+    // Removing the script block removes its extra search path from the project.
+    update_file(case.project_path("script.py"), "")?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+
+    // Restoring the script re-registers its search path.
+    update_file(case.project_path("script.py"), script)?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+
+    update_file(&dependency, "value = 2")?;
+    let changes = case.stop_watch(event_for_file("dependency.py"));
+    assert!(
+        changes
+            .iter()
+            .any(|event| matches!(event, ChangeEvent::Changed { path, .. } if path == &dependency)),
+        "expected an edit after restoring the script's search path: {changes:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn nested_search_path_picks_up_missed_dependency_edit() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_file("dependencies/pkg/dependency.py", "value = 1")?;
+        context.write_project_file(
+            "main.py",
+            r"
+            from pkg.dependency import value
+            result: int = value
+            ",
+        )?;
+        context.write_project_file(
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            extra-paths = ["../dependencies"]
+            "#,
+        )
+    })?;
+    let dependency = case.root_path().join("dependencies/pkg/dependency.py");
+
+    // The first check caches the dependency through the parent search path.
+    assert!(case.db().check().is_empty());
+
+    // Stop watching the parent before editing the dependency, so ty misses that file event.
+    update_file(case.project_path("pyproject.toml"), "[tool.ty]\n")?;
+    let changes = case.take_watch_changes(event_for_file("pyproject.toml"));
+    case.apply_changes(&changes);
+
+    update_file(&dependency, "value = 'wrong'")?;
+
+    // The new search path is nested inside the former watch. Registering it must refresh
+    // known files beneath it, even though that exact directory was never watched before.
+    update_file(
+        case.project_path("pyproject.toml"),
+        r#"
+        [tool.ty.environment]
+        extra-paths = ["../dependencies/pkg"]
+        "#,
+    )?;
+    let changes = case.take_watch_changes(event_for_file("pyproject.toml"));
+    case.apply_changes(&changes);
+
+    // Import relative to the new search path and check that ty sees the missed edit.
+    update_file(
+        case.project_path("main.py"),
+        r"
+        from dependency import value
+        result: int = value
+        ",
+    )?;
+    let changes = case.take_watch_changes(event_for_file("main.py"));
+    case.apply_changes(&changes);
+
+    let diagnostics = case.db().check();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].id().as_str(), "invalid-assignment");
+    Ok(())
+}
+
+#[test]
+fn pth_edit_while_unwatched_watches_new_search_path() -> anyhow::Result<()> {
+    let site_packages = if cfg!(windows) {
+        "venv/Lib/site-packages"
+    } else {
+        "venv/lib/python3.12/site-packages"
+    };
+    let project_config = r#"
+    [tool.ty.environment]
+    python = "../venv"
+    "#;
+    let mut case = setup(|context: &mut SetupContext| {
+        let python_home = context.join_root_path("base/bin");
+        context.write_file("base/bin/python", "")?;
+        context.write_file(
+            "venv/pyvenv.cfg",
+            &format!(
+                r"home = {python_home}
+version = 3.12
+"
+            ),
+        )?;
+        context.write_file(
+            format!("{site_packages}/dependency.pth"),
+            context.join_root_path("old").as_str(),
+        )?;
+        context.write_file("old/dependency.py", "value = 1")?;
+        context.write_file("new/dependency.py", "value = 1")?;
+        context.write_project_file(
+            "main.py",
+            r"
+            from dependency import value
+            result: int = value
+            ",
+        )?;
+        context.write_project_file("pyproject.toml", project_config)
+    })?;
+
+    // The initial import resolves through `old`, as named by `dependency.pth`.
+    assert!(case.db().check().is_empty());
+
+    // Stop watching the virtual environment before changing its `.pth` file.
+    update_file(case.project_path("pyproject.toml"), "[tool.ty]\n")?;
+    let changes = case.take_watch_changes(event_for_file("pyproject.toml"));
+    case.apply_changes(&changes);
+
+    // This edit has no watcher event, so the cached `.pth` contents still name `old`.
+    let new = case.root_path().join("new");
+    update_file(
+        case.root_path().join(site_packages).join("dependency.pth"),
+        new.as_str(),
+    )?;
+
+    // Restoring the environment initially sees the cached `old` path. Rewatching
+    // `site-packages` must refresh `.pth` and register `new` in the same update.
+    update_file(case.project_path("pyproject.toml"), project_config)?;
+    let changes = case.take_watch_changes(event_for_file("pyproject.toml"));
+    case.apply_changes(&changes);
+
+    // Receiving this edit proves that `new` is now watched.
+    let dependency = new.join("dependency.py");
+    update_file(&dependency, "value = 2")?;
+    let changes = case.stop_watch(event_for_file("dependency.py"));
+    assert!(
+        changes
+            .iter()
+            .any(|event| matches!(event, ChangeEvent::Changed { path, .. } if path == &dependency)),
+        "expected an edit at the new search path: {changes:?}"
+    );
     Ok(())
 }
 
@@ -2621,10 +2865,14 @@ mod uv_metadata {
     use ruff_db::diagnostic::DiagnosticId;
     use ruff_db::files::File;
     use ruff_db::system::{OsSystem, System as _};
+    use ty_module_resolver::system_module_search_paths;
     use ty_project::{Db, ScriptEnvironmentAvailability, UseUv, UvSyncChanges, uv_test_env_vars};
+    use ty_python_semantic::Db as _;
     use ty_static::EnvVars;
 
-    use super::{SetupContext, TestCase, event_for_file, setup_with_system, update_file};
+    use super::{
+        ChangeEvent, SetupContext, TestCase, event_for_file, setup_with_system, update_file,
+    };
 
     const MANIFEST: &str = r#"
     [project]
@@ -2871,6 +3119,56 @@ mod uv_metadata {
         Ok(())
     }
 
+    #[test]
+    fn script_pth_adds_watched_search_path() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::Scripts,
+            &[
+                (
+                    "script.py",
+                    r#"
+                    # /// script
+                    # dependencies = []
+                    # requires-python = ">=3.12"
+                    # ///
+                    from dependency import value
+                    result: int = value
+                    "#,
+                ),
+                ("../dependencies/dependency.py", "value = 1"),
+            ],
+        )?;
+        let db = case.db();
+        let script = case.system_file(case.project_path("script.py"))?;
+        let environment = db.program_file(script).program(db).resolver_environment(db);
+        let site_packages = system_module_search_paths(db, environment)
+            .find(|path| path.file_name() == Some("site-packages"))
+            .context("script environment has no site-packages")?
+            .to_path_buf();
+        let pth = site_packages.join("dependency.pth");
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+
+        let dependencies = case.root_path().join("dependencies");
+        std::fs::write(pth.as_std_path(), dependencies.as_str())?;
+        let changes = case.take_watch_changes(event_for_file("dependency.pth"));
+        case.apply_changes(&changes);
+
+        assert!(case.db().check().is_empty());
+
+        let dependency = dependencies.join("dependency.py");
+        update_file(&dependency, "value = 2")?;
+        let changes = case.stop_watch(event_for_file("dependency.py"));
+        assert!(
+            changes.iter().any(
+                |event| matches!(event, ChangeEvent::Changed { path, .. } if path == &dependency)
+            ),
+            "expected an edit at the new search path: {changes:?}"
+        );
+        Ok(())
+    }
+
     fn setup_uv(use_uv: UseUv, files: &[(&str, &str)]) -> anyhow::Result<TestCase> {
         let uv = OsSystem::default().which("uv")?;
         let mut case = setup_with_system(
@@ -2962,10 +3260,10 @@ mod uv_metadata {
             changes.project = completed.project.or(changes.project);
         }
 
-        if changes.project.is_some()
+        if !changes.is_empty()
             && let Some(watcher) = &mut case.watcher
         {
-            watcher.update(&case.db);
+            watcher.update(&mut case.db);
             assert!(!watcher.has_errored_paths());
         }
 
