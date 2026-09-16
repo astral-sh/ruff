@@ -632,7 +632,11 @@ select = ["TID251"]
 
 #[test]
 fn extend_banned_api_inherited() -> Result<()> {
-    let fixture = CliTest::new()?;
+    let fixture = CliTest::with_settings(|_, mut settings| {
+        // The default path filter preserves `\n` escapes, including `\nested` on Windows.
+        settings.add_filter(r"child\\nested", "child/nested");
+        settings
+    })?;
     fixture.write_file(
         "ruff.toml",
         r#"
