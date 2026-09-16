@@ -90,14 +90,16 @@ use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::convert::Infallible;
 use std::fmt::{Debug, Display};
+use std::hash::BuildHasher;
 use std::iter;
 use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 use std::sync::{Arc, LazyLock};
 
+use hashbrown::HashTable;
 use itertools::Itertools;
 use ruff_index::{Idx, IndexVec, newtype_index};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::Program;
 use ty_python_core::rank::RankBitBox;
@@ -315,7 +317,10 @@ impl<'db> OwnedConstraintSet<'db> {
         F: for<'c> FnOnce(&'c ConstraintSetBuilder<'db>, ConstraintSet<'db, 'c>) -> R,
     {
         let storage = ConstraintSetStorage {
-            compacted: self.inner.clone(),
+            data: ConstraintSetData {
+                compacted: self.inner.clone(),
+                ..ConstraintSetData::default()
+            },
             ..ConstraintSetStorage::default()
         };
         let builder = ConstraintSetBuilder {
@@ -957,8 +962,11 @@ pub(crate) struct ConstraintSetBuilder<'db> {
 
 type ExistsCacheKey<'db> = (NodeId, TypeVarSet<'db>, Option<SourceOrderId>);
 
+/// Canonical values shared by ID lookups and the builder's interning tables.
+/// Keeping these apart from the tables lets rehashing read local and compacted values
+/// without copying them into the tables.
 #[derive(Debug, Default)]
-struct ConstraintSetStorage<'db> {
+struct ConstraintSetData<'db> {
     /// Compacted owned storage overlaid onto this builder. This is used by
     /// [`OwnedConstraintSet::query`] to create a [`ConstraintSetBuilder`] that is initially a
     /// read-only view of the owned constraint set's storage.
@@ -997,15 +1005,60 @@ struct ConstraintSetStorage<'db> {
     /// This is encoded as an interned binary DAG over [`ConstraintId`]s. The first occurrence of
     /// each constraint in a left-first traversal defines the ordering.
     source_orders: IndexVec<SourceOrderId, SourceOrder>,
+}
+
+impl<'db> ConstraintSetData<'db> {
+    fn constraint_data(&self, constraint: ConstraintId) -> Constraint<'db> {
+        if let Some(compacted) = &self.compacted {
+            let index = constraint.index();
+            let split = compacted.constraint_indices.len();
+            if index < split {
+                let compacted_index = compacted.retained_constraint_index(constraint);
+                return compacted.constraints[compacted_index];
+            }
+            return self.constraints[ConstraintId::from_usize(index - split)];
+        }
+        self.constraints[constraint]
+    }
+
+    fn interior_node_data(&self, node: NodeId) -> InteriorNodeData {
+        if let Some(compacted) = &self.compacted {
+            let index = node.index();
+            let split = compacted.node_indices.len();
+            if index < split {
+                let compacted_index = compacted.retained_node_index(node);
+                return compacted.nodes[compacted_index];
+            }
+            return self.nodes[NodeId::from_usize(index - split)];
+        }
+        self.nodes[node]
+    }
+
+    fn source_order_data(&self, source_order: SourceOrderId) -> SourceOrder {
+        if let Some(compacted) = &self.compacted {
+            let index = source_order.index();
+            let split = compacted.source_orders.len();
+            if index < split {
+                return compacted.source_orders[index];
+            }
+            return self.source_orders[SourceOrderId::from_usize(index - split)];
+        }
+        self.source_orders[source_order]
+    }
+}
+
+#[derive(Debug, Default)]
+struct ConstraintSetStorage<'db> {
+    data: ConstraintSetData<'db>,
 
     // Everything below are the memoization tables for the arenas and for our BDD operations.
-    constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
+    constraint_cache: HashTable<ConstraintId>,
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
-    node_cache: FxHashMap<InteriorNodeData, NodeId>,
+    node_cache: HashTable<NodeId>,
     /// Avoid repeatedly walking deep constraint bounds without imposing Salsa-query overhead on
     /// the many shallow bounds that are cheap to walk once.
     constraint_bound_depth_cache: FxHashMap<ConstraintId, (u16, u16)>,
-    source_order_cache: FxHashMap<SourceOrder, SourceOrderId>,
+    source_order_cache: HashTable<SourceOrderId>,
     /// Only caches completed top-level results. Recursive results depend on active path
     /// assignments and must not use this cache. A BDD's satisfiability does not depend on the
     /// source order used to traverse it.
@@ -1021,40 +1074,59 @@ struct ConstraintSetStorage<'db> {
 
 impl<'db> ConstraintSetStorage<'db> {
     fn ensure_overlay_identity_caches(&mut self) {
-        let Some(compacted) = &self.compacted else {
+        let Some(compacted) = &self.data.compacted else {
             return;
         };
         if !self.node_cache.is_empty() {
             return;
         }
 
-        self.constraint_cache.extend(
-            compacted
-                .constraint_indices
-                .iter_ones()
-                .zip(compacted.constraints.iter().copied())
-                .map(|(old_index, constraint)| (constraint, ConstraintId::from_usize(old_index))),
-        );
-        self.node_cache.extend(
-            compacted
-                .node_indices
-                .iter_ones()
-                .zip(compacted.nodes.iter().copied())
-                .map(|(old_index, node)| (node, NodeId::from_usize(old_index))),
-        );
-        self.source_order_cache.extend(
-            compacted
-                .source_orders
-                .iter()
-                .copied()
-                .enumerate()
-                .map(|(index, source_order)| (source_order, SourceOrderId::from_usize(index))),
-        );
+        let values = &self.data;
+        self.constraint_cache
+            .reserve(compacted.constraints.len(), |id| {
+                FxBuildHasher.hash_one(values.constraint_data(*id))
+            });
+        for (index, constraint) in compacted
+            .constraint_indices
+            .iter_ones()
+            .zip(compacted.constraints.iter())
+        {
+            let id = ConstraintId::from_usize(index);
+            self.constraint_cache
+                .insert_unique(FxBuildHasher.hash_one(constraint), id, |id| {
+                    FxBuildHasher.hash_one(values.constraint_data(*id))
+                });
+        }
+        self.node_cache.reserve(compacted.nodes.len(), |id| {
+            FxBuildHasher.hash_one(values.interior_node_data(*id))
+        });
+        for (index, node) in compacted
+            .node_indices
+            .iter_ones()
+            .zip(compacted.nodes.iter())
+        {
+            let id = NodeId::from_usize(index);
+            self.node_cache
+                .insert_unique(FxBuildHasher.hash_one(node), id, |id| {
+                    FxBuildHasher.hash_one(values.interior_node_data(*id))
+                });
+        }
+        self.source_order_cache
+            .reserve(compacted.source_orders.len(), |id| {
+                FxBuildHasher.hash_one(values.source_order_data(*id))
+            });
+        for (index, source_order) in compacted.source_orders.iter().enumerate() {
+            let id = SourceOrderId::from_usize(index);
+            self.source_order_cache
+                .insert_unique(FxBuildHasher.hash_one(source_order), id, |id| {
+                    FxBuildHasher.hash_one(values.source_order_data(*id))
+                });
+        }
     }
 
     // This is a separate method from `ensure_overlay_identity_caches` because it requires a `db`.
     fn ensure_overlay_typevar_identity_cache(&mut self, db: &'db dyn Db) {
-        let Some(compacted) = &self.compacted else {
+        let Some(compacted) = &self.data.compacted else {
             return;
         };
         if !self.typevar_cache.is_empty() {
@@ -1070,35 +1142,35 @@ impl<'db> ConstraintSetStorage<'db> {
     }
 
     fn adjusted_node_id(&self, id: NodeId) -> NodeId {
-        if let Some(compacted) = &self.compacted {
+        if let Some(compacted) = &self.data.compacted {
             return id + compacted.node_indices.len();
         }
         id
     }
 
     fn adjusted_constraint_id(&self, id: ConstraintId) -> ConstraintId {
-        if let Some(compacted) = &self.compacted {
+        if let Some(compacted) = &self.data.compacted {
             return id + compacted.constraint_indices.len();
         }
         id
     }
 
     fn adjusted_support_id(&self, id: SupportId) -> SupportId {
-        if let Some(compacted) = &self.compacted {
+        if let Some(compacted) = &self.data.compacted {
             return id + compacted.support_indices.len();
         }
         id
     }
 
     fn adjusted_source_order_id(&self, id: SourceOrderId) -> SourceOrderId {
-        if let Some(compacted) = &self.compacted {
+        if let Some(compacted) = &self.data.compacted {
             return id + compacted.source_orders.len();
         }
         id
     }
 
     fn adjusted_typevar_id(&self, id: TypeVarId) -> TypeVarId {
-        if let Some(compacted) = &self.compacted {
+        if let Some(compacted) = &self.data.compacted {
             return id + compacted.typevars.len();
         }
         id
@@ -1141,9 +1213,9 @@ impl<'db> ConstraintSetBuilder<'db> {
         let mut storage = self.storage.into_inner();
         let source_constraints = storage.calculate_source_orders(Some(source_order));
 
-        let mut used_nodes = RankBitBox::bits_with_capacity(storage.nodes.len());
-        let mut used_constraints = RankBitBox::bits_with_capacity(storage.constraints.len());
-        let mut used_supports = RankBitBox::bits_with_capacity(storage.supports.len());
+        let mut used_nodes = RankBitBox::bits_with_capacity(storage.data.nodes.len());
+        let mut used_constraints = RankBitBox::bits_with_capacity(storage.data.constraints.len());
+        let mut used_supports = RankBitBox::bits_with_capacity(storage.data.supports.len());
 
         let mut stack = vec![node];
         while let Some(node) = stack.pop() {
@@ -1201,12 +1273,14 @@ impl<'db> ConstraintSetBuilder<'db> {
         used_supports.truncate(used_supports.last_one().map_or(0, |last| last + 1));
 
         let nodes = storage
+            .data
             .nodes
             .into_iter()
             .zip(&used_nodes)
             .filter_map(|(node, used)| used.then_some(node))
             .collect();
         let node_supports = storage
+            .data
             .node_supports
             .into_iter()
             .zip(&used_nodes)
@@ -1215,12 +1289,14 @@ impl<'db> ConstraintSetBuilder<'db> {
         let node_indices = RankBitBox::from_bits(used_nodes);
 
         let constraints = storage
+            .data
             .constraints
             .into_iter()
             .zip(&used_constraints)
             .filter_map(|(constraint, used)| used.then_some(constraint))
             .collect();
         let constraint_supports = storage
+            .data
             .constraint_supports
             .into_iter()
             .zip(&used_constraints)
@@ -1229,6 +1305,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         let constraint_indices = RankBitBox::from_bits(used_constraints);
 
         let supports = storage
+            .data
             .supports
             .into_iter()
             .zip(&used_supports)
@@ -1236,7 +1313,7 @@ impl<'db> ConstraintSetBuilder<'db> {
             .collect();
         let support_indices = RankBitBox::from_bits(used_supports);
 
-        storage.typevars.shrink_to_fit();
+        storage.data.typevars.shrink_to_fit();
 
         OwnedConstraintSet {
             node,
@@ -1245,7 +1322,7 @@ impl<'db> ConstraintSetBuilder<'db> {
                 constraints,
                 constraint_supports,
                 constraint_indices,
-                typevars: storage.typevars,
+                typevars: storage.data.typevars,
                 nodes,
                 node_supports,
                 node_indices,
@@ -1287,7 +1364,7 @@ impl<'db> ConstraintSetStorage<'db> {
         if let Some(id) = self.typevar_cache.get(&identity) {
             return *id;
         }
-        let id = self.typevars.push(typevar);
+        let id = self.data.typevars.push(typevar);
         let id = self.adjusted_typevar_id(id);
         self.typevar_cache.insert(identity, id);
         id
@@ -1394,20 +1471,31 @@ impl<'db> ConstraintSetStorage<'db> {
         let support = self.intern_constraint_typevars(db, env, data);
 
         self.ensure_overlay_identity_caches();
-        if let Some(id) = self.constraint_cache.get(&data) {
+        let hash = FxBuildHasher.hash_one(data);
+        if let Some(id) = self
+            .constraint_cache
+            .find(hash, |id| self.constraint_data(*id) == data)
+        {
             return *id;
         }
         let support_id = self.intern_support(support);
-        let id = self.constraints.push(data);
-        self.constraint_supports.push(support_id);
+        let id = self.data.constraints.push(data);
+        self.data.constraint_supports.push(support_id);
         let id = self.adjusted_constraint_id(id);
-        self.constraint_cache.insert(data, id);
+        let values = &self.data;
+        self.constraint_cache.insert_unique(hash, id, |id| {
+            FxBuildHasher.hash_one(values.constraint_data(*id))
+        });
         id
     }
 
     fn intern_interior_node(&mut self, data: InteriorNodeData) -> NodeId {
         self.ensure_overlay_identity_caches();
-        if let Some(id) = self.node_cache.get(&data) {
+        let hash = FxBuildHasher.hash_one(data);
+        if let Some(id) = self
+            .node_cache
+            .find(hash, |id| self.interior_node_data(*id) == data)
+        {
             return *id;
         }
 
@@ -1418,10 +1506,13 @@ impl<'db> ConstraintSetStorage<'db> {
         support |= self.node_support(data.if_false);
         let support = self.intern_support(support);
 
-        let id = self.nodes.push(data);
-        self.node_supports.push(support);
+        let id = self.data.nodes.push(data);
+        self.data.node_supports.push(support);
         let id = self.adjusted_node_id(id);
-        self.node_cache.insert(data, id);
+        let values = &self.data;
+        self.node_cache.insert_unique(hash, id, |id| {
+            FxBuildHasher.hash_one(values.interior_node_data(*id))
+        });
         id
     }
 
@@ -1436,16 +1527,7 @@ impl<'db> ConstraintSetStorage<'db> {
     }
 
     fn constraint_data(&self, constraint: ConstraintId) -> Constraint<'db> {
-        if let Some(compacted) = &self.compacted {
-            let index = constraint.index();
-            let split = compacted.constraint_indices.len();
-            if index < split {
-                let compacted_index = compacted.retained_constraint_index(constraint);
-                return compacted.constraints[compacted_index];
-            }
-            return self.constraints[ConstraintId::from_usize(index - split)];
-        }
-        self.constraints[constraint]
+        self.data.constraint_data(constraint)
     }
 
     fn cached_constraint_bound_depth(
@@ -1464,26 +1546,24 @@ impl<'db> ConstraintSetStorage<'db> {
     }
 
     fn interior_node_data(&self, node: NodeId) -> InteriorNodeData {
-        if let Some(compacted) = &self.compacted {
-            let index = node.index();
-            let split = compacted.node_indices.len();
-            if index < split {
-                let compacted_index = compacted.retained_node_index(node);
-                return compacted.nodes[compacted_index];
-            }
-            return self.nodes[NodeId::from_usize(index - split)];
-        }
-        self.nodes[node]
+        self.data.interior_node_data(node)
     }
 
     fn intern_source_order(&mut self, data: SourceOrder) -> SourceOrderId {
         self.ensure_overlay_identity_caches();
-        if let Some(id) = self.source_order_cache.get(&data) {
+        let hash = FxBuildHasher.hash_one(data);
+        if let Some(id) = self
+            .source_order_cache
+            .find(hash, |id| self.source_order_data(*id) == data)
+        {
             return *id;
         }
-        let id = self.source_orders.push(data);
+        let id = self.data.source_orders.push(data);
         let id = self.adjusted_source_order_id(id);
-        self.source_order_cache.insert(data, id);
+        let values = &self.data;
+        self.source_order_cache.insert_unique(hash, id, |id| {
+            FxBuildHasher.hash_one(values.source_order_data(*id))
+        });
         id
     }
 
@@ -1509,15 +1589,7 @@ impl<'db> ConstraintSetStorage<'db> {
     }
 
     fn source_order_data(&self, source_order: SourceOrderId) -> SourceOrder {
-        if let Some(compacted) = &self.compacted {
-            let index = source_order.index();
-            let split = compacted.source_orders.len();
-            if index < split {
-                return compacted.source_orders[index];
-            }
-            return self.source_orders[SourceOrderId::from_usize(index - split)];
-        }
-        self.source_orders[source_order]
+        self.data.source_order_data(source_order)
     }
 
     fn calculate_source_orders(
@@ -1546,46 +1618,46 @@ impl<'db> ConstraintSetStorage<'db> {
     }
 
     fn intern_support(&mut self, data: Support) -> SupportId {
-        let id = self.supports.push(data);
+        let id = self.data.supports.push(data);
         self.adjusted_support_id(id)
     }
 
     fn typevar_data(&self, typevar: TypeVarId) -> BoundTypeVarInstance<'db> {
-        if let Some(compacted) = &self.compacted {
+        if let Some(compacted) = &self.data.compacted {
             let index = typevar.index();
             let split = compacted.typevars.len();
             if index < split {
                 return compacted.typevars[typevar];
             }
-            return self.typevars[TypeVarId::from_usize(index - split)];
+            return self.data.typevars[TypeVarId::from_usize(index - split)];
         }
-        self.typevars[typevar]
+        self.data.typevars[typevar]
     }
 
     fn support_data(&self, support: SupportId) -> &Support {
-        if let Some(compacted) = &self.compacted {
+        if let Some(compacted) = &self.data.compacted {
             let index = support.index();
             let split = compacted.support_indices.len();
             if index < split {
                 let compacted_index = compacted.retained_support_index(support);
                 return &compacted.supports[compacted_index];
             }
-            return &self.supports[SupportId::from_usize(index - split)];
+            return &self.data.supports[SupportId::from_usize(index - split)];
         }
-        &self.supports[support]
+        &self.data.supports[support]
     }
 
     fn constraint_support_id(&self, constraint: ConstraintId) -> SupportId {
-        if let Some(compacted) = &self.compacted {
+        if let Some(compacted) = &self.data.compacted {
             let index = constraint.index();
             let split = compacted.constraint_indices.len();
             if index < split {
                 let compacted_index = compacted.retained_constraint_index(constraint);
                 return compacted.constraint_supports[compacted_index];
             }
-            return self.constraint_supports[ConstraintId::from_usize(index - split)];
+            return self.data.constraint_supports[ConstraintId::from_usize(index - split)];
         }
-        self.constraint_supports[constraint]
+        self.data.constraint_supports[constraint]
     }
 
     fn constraint_support(&self, constraint: ConstraintId) -> &Support {
@@ -1607,16 +1679,16 @@ impl<'db> ConstraintSetStorage<'db> {
         if node.is_terminal() {
             return None;
         }
-        if let Some(compacted) = &self.compacted {
+        if let Some(compacted) = &self.data.compacted {
             let index = node.index();
             let split = compacted.node_indices.len();
             if index < split {
                 let compacted_index = compacted.retained_node_index(node);
                 return Some(compacted.node_supports[compacted_index]);
             }
-            return Some(self.node_supports[NodeId::from_usize(index - split)]);
+            return Some(self.data.node_supports[NodeId::from_usize(index - split)]);
         }
-        Some(self.node_supports[node])
+        Some(self.data.node_supports[node])
     }
 
     fn node_support(&self, node: NodeId) -> Option<&Support> {
@@ -6378,7 +6450,7 @@ class E: ...
                 })
                 .collect();
         }
-        let nodes = builder.storage.borrow().nodes.len();
+        let nodes = builder.storage.borrow().data.nodes.len();
         assert!(nodes < 4 * count * count, "allocated {nodes} nodes");
     }
 
@@ -6496,7 +6568,7 @@ class E: ...
 
         for original in [t_int, combined, alternatives] {
             let storage = builder.storage.borrow();
-            let original_source_order_count = storage.source_orders.len();
+            let original_source_order_count = storage.data.source_orders.len();
             drop(storage);
             let intersection = original.and(db, &builder, || original);
             let union = original.or(db, &builder, || original);
@@ -6506,7 +6578,10 @@ class E: ...
             assert_eq!(union.node, original.node);
             assert_eq!(union.source_order, original.source_order);
             let storage = builder.storage.borrow();
-            assert_eq!(storage.source_orders.len(), original_source_order_count);
+            assert_eq!(
+                storage.data.source_orders.len(),
+                original_source_order_count
+            );
         }
     }
 
@@ -6930,10 +7005,10 @@ class E: ...
             );
 
             let storage = builder.storage.borrow();
-            assert!(storage.compacted.is_some());
-            assert!(storage.nodes.is_empty());
-            assert!(storage.constraints.is_empty());
-            assert!(storage.typevars.is_empty());
+            assert!(storage.data.compacted.is_some());
+            assert!(storage.data.nodes.is_empty());
+            assert!(storage.data.constraints.is_empty());
+            assert!(storage.data.typevars.is_empty());
         });
     }
 
@@ -6948,6 +7023,7 @@ class E: ...
             let (node_split, constraint_split, typevar_split, source_order_split) = {
                 let storage = builder.storage.borrow();
                 let compacted = storage
+                    .data
                     .compacted
                     .as_ref()
                     .expect("query builder should have compacted storage");
@@ -6989,9 +7065,67 @@ class E: ...
             assert!(!combined.is_never_satisfied(db, &env));
 
             let storage = builder.storage.borrow();
-            assert!(!storage.nodes.is_empty());
-            assert!(!storage.constraints.is_empty());
-            assert!(!storage.typevars.is_empty());
+            assert!(!storage.data.nodes.is_empty());
+            assert!(!storage.data.constraints.is_empty());
+            assert!(!storage.data.typevars.is_empty());
+        });
+    }
+
+    #[test]
+    fn owned_constraint_set_interning_survives_table_growth() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let owned = create_compacted_owned_set(db);
+
+        owned.query(|builder, set| {
+            let w = create_typevar(db, "W");
+            let intern_literal = |value| {
+                ConstraintSet::constrain_typevar_equivalence_bound(
+                    db,
+                    &env,
+                    builder,
+                    w,
+                    Type::int_literal(value),
+                )
+            };
+            let added: Vec<_> = (0..256).map(intern_literal).collect();
+            let mut storage = builder.storage.borrow_mut();
+            let node = storage.interior_node_data(set.node);
+            let constraint = storage.constraint_data(node.constraint);
+
+            // The frozen graph retains sparse IDs. Growing the tables with local entries must
+            // still find the original constraint, node, and source-order entry by those IDs.
+            assert_eq!(
+                storage.intern_constraint(db, &env, constraint),
+                node.constraint
+            );
+            assert_eq!(storage.intern_interior_node(node), set.node);
+            assert_eq!(
+                Some(storage.constraint_source_order(node.constraint)),
+                set.source_order
+            );
+            let counts = (
+                storage.data.constraints.len(),
+                storage.data.nodes.len(),
+                storage.data.source_orders.len(),
+            );
+            drop(storage);
+
+            for (value, original) in (0..256).zip(added) {
+                let repeated = intern_literal(value);
+                assert_eq!(repeated.node, original.node);
+                assert_eq!(repeated.source_order, original.source_order);
+            }
+            let storage = builder.storage.borrow();
+            assert_eq!(
+                (
+                    storage.data.constraints.len(),
+                    storage.data.nodes.len(),
+                    storage.data.source_orders.len(),
+                ),
+                counts
+            );
         });
     }
 
@@ -7033,10 +7167,10 @@ class E: ...
         owned.query(|builder, set| {
             assert!(set.is_always_satisfied(db, &env));
             let storage = builder.storage.borrow();
-            assert!(storage.compacted.is_none());
-            assert!(storage.nodes.is_empty());
-            assert!(storage.constraints.is_empty());
-            assert!(storage.typevars.is_empty());
+            assert!(storage.data.compacted.is_none());
+            assert!(storage.data.nodes.is_empty());
+            assert!(storage.data.constraints.is_empty());
+            assert!(storage.data.typevars.is_empty());
         });
 
         let builder = ConstraintSetBuilder::new();

@@ -4897,6 +4897,7 @@ dependencies = [
  "drop_bomb",
  "get-size2",
  "glob",
+ "hashbrown 0.17.1",
  "indexmap",
  "indoc",
  "insta",

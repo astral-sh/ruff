@@ -195,6 +195,9 @@
 
 use crate::ProgramEnvironment;
 use std::cell::RefCell;
+use std::hash::BuildHasher;
+
+use hashbrown::{HashTable, hash_table::Entry};
 
 use crate::{
     Db,
@@ -214,7 +217,7 @@ use ruff_index::{Idx, IndexSlice};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, EvaluationMode,
@@ -940,7 +943,7 @@ struct ProjectedNarrowingNode {
 }
 
 /// A projected predicate or a suffix whose projection can be deferred until it is needed.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum ProjectedNarrowingEntry<'db> {
     Predicate(ProjectedNarrowingNode),
     /// A nonterminal suffix. Constant suffixes use the graph's existing terminal IDs instead.
@@ -956,7 +959,9 @@ struct ProjectedNarrowingGraph<'db> {
     nodes: Vec<ProjectedNarrowingEntry<'db>>,
     referenced: Vec<bool>,
     joins: Vec<bool>,
-    node_cache: FxHashMap<ProjectedNarrowingNode, ProjectedNarrowingNodeId>,
+    /// Only predicate entries are interned here; checkpoints are cached by `NarrowingProjector`.
+    /// Hashing and equality read the entry from `nodes`, avoiding a second copy in this table.
+    node_cache: HashTable<ProjectedNarrowingNodeId>,
     or_cache:
         FxHashMap<(ProjectedNarrowingNodeId, ProjectedNarrowingNodeId), ProjectedNarrowingNodeId>,
     predicate_constraints_cache: FxHashMap<
@@ -969,6 +974,31 @@ struct ProjectedNarrowingGraph<'db> {
 }
 
 impl<'db> ProjectedNarrowingGraph<'db> {
+    fn intern_node(&mut self, node: ProjectedNarrowingNode) -> ProjectedNarrowingNodeId {
+        let data = ProjectedNarrowingEntry::Predicate(node);
+        let nodes = &mut self.nodes;
+        match self.node_cache.entry(
+            FxBuildHasher.hash_one(data),
+            |id| nodes[id.0] == data,
+            |id| FxBuildHasher.hash_one(nodes[id.0]),
+        ) {
+            Entry::Occupied(entry) => *entry.get(),
+            Entry::Vacant(entry) => {
+                let id = ProjectedNarrowingNodeId(nodes.len());
+                nodes.push(data);
+                entry.insert(id);
+                self.referenced.push(false);
+                self.joins.push(false);
+
+                for next in [node.if_true, node.if_uncertain, node.if_false] {
+                    self.record_reference(next);
+                }
+
+                id
+            }
+        }
+    }
+
     /// Returns an interior projected node by ID.
     fn node(&self, id: ProjectedNarrowingNodeId) -> ProjectedNarrowingEntry<'db> {
         self.nodes[id.0]
@@ -1214,23 +1244,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             });
         }
 
-        if let Some(cached) = self.graph.node_cache.get(&node) {
-            return *cached;
-        }
-
-        let id = ProjectedNarrowingNodeId(self.graph.nodes.len());
-        self.graph
-            .nodes
-            .push(ProjectedNarrowingEntry::Predicate(node));
-        self.graph.referenced.push(false);
-        self.graph.joins.push(false);
-        self.graph.node_cache.insert(node, id);
-
-        for next in [node.if_true, node.if_uncertain, node.if_false] {
-            self.graph.record_reference(next);
-        }
-
-        id
+        self.graph.intern_node(node)
     }
 
     /// Combines two paths without copying one path into both outcomes of the other's predicate.
@@ -2243,6 +2257,51 @@ mod tests {
     use ty_python_core::narrowing_constraints::InteriorNode;
     use ty_python_core::predicate::Predicates;
     use ty_python_core::semantic_index;
+
+    #[test]
+    fn projected_node_interning_preserves_ids_and_references() {
+        let checkpoint = ProjectedNarrowingEntry::Checkpoint {
+            constraint: ScopedNarrowingConstraint::new(0),
+            ty: Type::unknown(),
+        };
+        let mut graph = ProjectedNarrowingGraph {
+            nodes: vec![checkpoint],
+            referenced: vec![false],
+            joins: vec![false],
+            ..ProjectedNarrowingGraph::default()
+        };
+        let node = ProjectedNarrowingNode {
+            atom: ScopedPredicateId::new(0),
+            if_true: ProjectedNarrowingNodeId(0),
+            if_uncertain: ProjectedNarrowingNodeId::ALWAYS_FALSE,
+            if_false: ProjectedNarrowingNodeId::ALWAYS_FALSE,
+        };
+        let first = graph.intern_node(node);
+        assert_eq!(graph.intern_node(node), first);
+        assert!(graph.referenced[0]);
+        assert!(!graph.joins[0]);
+
+        // Grow both collections with a checkpoint outside the interning table. Reusing a
+        // predicate must preserve its ID without recording its outgoing references again.
+        for index in 1..256 {
+            graph.intern_node(ProjectedNarrowingNode {
+                atom: ScopedPredicateId::new(index),
+                ..node
+            });
+        }
+        for index in 0..256 {
+            let id = graph.intern_node(ProjectedNarrowingNode {
+                atom: ScopedPredicateId::new(index),
+                ..node
+            });
+            assert_eq!(id, ProjectedNarrowingNodeId(index + 1));
+        }
+        assert_eq!(graph.nodes.len(), 257);
+        assert_eq!(graph.referenced.len(), 257);
+        assert_eq!(graph.joins.len(), 257);
+        assert_eq!(graph.node(ProjectedNarrowingNodeId(0)), checkpoint);
+        assert!(graph.joins[0]);
+    }
 
     #[test]
     fn non_terminal_call_range_recovers_cross_file_cycle() -> anyhow::Result<()> {

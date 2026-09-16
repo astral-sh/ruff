@@ -36,6 +36,7 @@ char_str = { workspace = true, features = ["get-size"] }
 compact_str = { workspace = true }
 drop_bomb = { workspace = true }
 get-size2 = { workspace = true, features = ["indexmap", "ordermap"] }
+hashbrown = { workspace = true }
 indexmap = { workspace = true }
 itertools = { workspace = true }
 memchr = { workspace = true }
