@@ -136,6 +136,7 @@ fn bounded_intersection_limits_negated_alias_expansion() -> anyhow::Result<()> {
     db.write_dedented(
         "/src/aliases.py",
         r#"
+        from typing import Literal
         from ty_extensions import Intersection, Not
 
         class A: ...
@@ -149,6 +150,7 @@ fn bounded_intersection_limits_negated_alias_expansion() -> anyhow::Result<()> {
         type Second = Intersection[C, D]
         type Third = Intersection[E, F]
         type Excluded = Not[int]
+        type ExcludedLiteral = Not[Literal[5]]
         "#,
     )?;
     let db = &db;
@@ -166,7 +168,32 @@ fn bounded_intersection_limits_negated_alias_expansion() -> anyhow::Result<()> {
 
     // De Morgan's law expands these negated intersections into a product of unions.
     assert!(IntersectionType::bounded_from_elements(db, &env, &exclusions[..2]).is_some());
-    assert!(IntersectionType::bounded_from_elements(db, &env, exclusions).is_none());
+    assert!(IntersectionType::bounded_from_elements(db, &env, &exclusions).is_none());
+
+    // A narrowing factor prunes these alternatives before they can exhaust the budget,
+    // regardless of where it appears among the negated aliases.
+    let literal = Type::int_literal(5);
+    for position in 0..=exclusions.len() {
+        let mut elements = exclusions.clone();
+        elements.insert(position, literal);
+        assert_eq!(
+            IntersectionType::bounded_from_elements(db, &env, elements),
+            Some(literal)
+        );
+    }
+
+    // Double negation of a literal is also a narrowing factor, not a disjunction.
+    let excluded_literal = global_symbol(db, file, "ExcludedLiteral")
+        .place
+        .expect_type();
+    let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) = excluded_literal else {
+        anyhow::bail!("expected `ExcludedLiteral` to be a type alias");
+    };
+    exclusions.push(Type::TypeAlias(alias).negate(db, &env));
+    assert_eq!(
+        IntersectionType::bounded_from_elements(db, &env, exclusions),
+        Some(Type::LiteralValue(LiteralValueType::unpromotable(5)))
+    );
 
     // A double negation introduces no alternatives and must not consume the first-union exemption.
     let excluded = global_symbol(db, file, "Excluded").place.expect_type();

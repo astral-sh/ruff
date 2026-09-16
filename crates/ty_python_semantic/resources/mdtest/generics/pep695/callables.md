@@ -541,6 +541,44 @@ def consume_explicit(value: E | F) -> None: ...
 reveal_type(infer_from_consumers(consume_first, consume_second, consume_explicit))  # revealed: Unknown
 ```
 
+## Narrowing negated intersection aliases
+
+The negation of an aliased intersection acts as a union of negations. Intersecting three such upper
+bounds can exceed the solution budget, but an additional literal upper bound leaves just one
+solution. We infer the literal regardless of the consumer order.
+
+```py
+from typing import Callable, Literal
+from ty_extensions import Intersection, Not
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+
+type AB = Intersection[A, B]
+type CD = Intersection[C, D]
+type EF = Intersection[E, F]
+
+def infer_from_consumers[T](
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+    third: Callable[[T], None],
+    fourth: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+def exclude_ab(value: Not[AB]) -> None: ...
+def exclude_cd(value: Not[CD]) -> None: ...
+def exclude_ef(value: Not[EF]) -> None: ...
+def consume_literal(value: Literal[5]) -> None: ...
+
+reveal_type(infer_from_consumers(exclude_ab, exclude_cd, exclude_ef, consume_literal))  # revealed: Literal[5]
+reveal_type(infer_from_consumers(consume_literal, exclude_ab, exclude_cd, exclude_ef))  # revealed: Literal[5]
+```
+
 ## Intersecting recursive inferred union upper bounds
 
 A recursive alias can contribute an upper bound without expanding its nested occurrences. Here, only

@@ -1330,23 +1330,58 @@ impl<'db> IntersectionBuilder<'db> {
             return Some(first);
         }
 
-        // Before distributing multiple unions, apply narrowing factors regardless of their
-        // input order. With at most one union, retain the original intersection element order.
-        // Resolving a top-level alias only classifies the factor; the builder expands its value
-        // under the same budget and recursion guard as an explicit union.
-        let is_union = |ty: &Type<'db>| ty.resolve_type_alias(db).is_union();
-        let multiple_unions = elements.clone().filter(is_union).nth(1).is_some();
+        // Before distributing multiple disjunctions, apply narrowing factors regardless of their
+        // input order. With at most one disjunction, retain the original intersection element order.
+        // Classification follows aliases and negations without expanding into DNF; the builder
+        // performs that expansion under its budget and recursion guard.
+        let is_disjunctive = |ty: &Type<'db>| Self::is_disjunctive(db, env, *ty);
+        let multiple_disjunctions = elements.clone().filter(is_disjunctive).nth(1).is_some();
         let mut builder = Self::new(db, env);
         for element in elements
             .clone()
-            .filter(|ty| !multiple_unions || !is_union(ty))
-            .chain(elements.filter(|ty| multiple_unions && is_union(ty)))
+            .filter(|ty| !multiple_disjunctions || !is_disjunctive(ty))
+            .chain(elements.filter(|ty| multiple_disjunctions && is_disjunctive(ty)))
         {
             builder
                 .add_positive_impl::<BoundedIntersection>(element, &mut vec![])
                 .continue_value()?;
         }
         Some(builder.build())
+    }
+
+    /// Whether expanding a factor can introduce alternatives, including through De Morgan's law.
+    fn is_disjunctive(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> bool {
+        let mut pending = SmallVec::<[_; 4]>::from_slice(&[(ty, false)]);
+        let mut seen_aliases = FxHashSet::default();
+        while let Some((ty, negated)) = pending.pop() {
+            match ty {
+                Type::TypeAlias(alias) => {
+                    if seen_aliases.insert((alias, negated)) {
+                        pending.push((alias.value_type(db), negated));
+                    }
+                }
+                Type::Union(union) => {
+                    if !negated {
+                        return true;
+                    }
+                    pending.extend(union.elements(db).iter().map(|ty| (*ty, true)));
+                }
+                Type::Intersection(intersection) => {
+                    if negated
+                        && intersection.positive(db).len() + intersection.negative(db).len() > 1
+                    {
+                        return true;
+                    }
+                    pending.extend(intersection.positive(db).iter().map(|ty| (*ty, negated)));
+                    pending.extend(intersection.negative(db).iter().map(|ty| (*ty, !negated)));
+                }
+                Type::EnumComplement(complement) => {
+                    pending.push((complement.to_intersection(db, env), negated));
+                }
+                _ => {}
+            }
+        }
+        false
     }
 
     pub(crate) fn add_positive(mut self, ty: Type<'db>) -> Self {
