@@ -16,6 +16,7 @@ use super::callable::CallableTypeKind;
 use super::class::FrozenDataclassDispatch;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension};
 use super::dedicated::pydantic;
+use super::member::MemberBinding;
 use super::relation::TypeRelationChecker;
 use super::{
     BindingContext, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter,
@@ -903,8 +904,13 @@ pub(super) fn assignment_attribute_members<'db>(
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => object_ty.instance_member(db, env, attribute),
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => object_ty
-                .class_object_member(db, env, attribute, MemberLookupPolicy::default())
-                .into_place(db, env),
+                .class_object_member(
+                    db,
+                    env,
+                    attribute,
+                    MemberLookupPolicy::default(),
+                    MemberBinding::Raw,
+                ),
             Type::Union(..)
             | Type::Intersection(..)
             | Type::TypeAlias(..)

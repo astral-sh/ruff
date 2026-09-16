@@ -1,6 +1,7 @@
 //! Instance types: both nominal and structural.
 
 use crate::ProgramEnvironment;
+use crate::place::PlaceAndQualifiers;
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::debug_assert_matches;
@@ -17,7 +18,7 @@ use crate::types::constraints::{
 use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::walk_specialization;
-use crate::types::member::LookupMember;
+use crate::types::member::MemberBinding;
 use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_instance_member,
     walk_protocol_interface,
@@ -1577,17 +1578,18 @@ impl<'db> ProtocolInstanceType<'db> {
     }
 
     /// Returns an effective materialized member without applying the nominal class fallback.
-    fn materialized_interface_member(
+    pub(super) fn materialized_interface_member(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
-    ) -> Option<LookupMember<'db>> {
+        binding: MemberBinding<'db>,
+    ) -> Option<PlaceAndQualifiers<'db>> {
         self.materialization_kind(db)?;
         let interface = self.interface(db);
         interface
             .includes_member(db, name)
-            .then(|| interface.instance_member(db, env, name))
+            .then(|| interface.instance_member(db, env, name, binding))
     }
 
     pub(super) fn instance_member(
@@ -1595,20 +1597,19 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
-    ) -> LookupMember<'db> {
+        binding: MemberBinding<'db>,
+    ) -> PlaceAndQualifiers<'db> {
         match self.inner {
             Protocol::FromClass(class) => {
                 let member = class.instance_member(db, env, name);
-                LookupMember::from_attribute(db, env, member)
+                binding.bind_attribute(db, env, member)
             }
-            Protocol::Synthesized(synthesized) => {
-                synthesized.interface().instance_member(db, env, name)
-            }
+            Protocol::Synthesized(synthesized) => synthesized
+                .interface()
+                .instance_member(db, env, name, binding),
             Protocol::Materialized(materialized) => self
-                .materialized_interface_member(db, env, name)
-                .unwrap_or_else(|| {
-                    LookupMember::new(materialized.origin(db).instance_member(db, env, name))
-                }),
+                .materialized_interface_member(db, env, name, binding)
+                .unwrap_or_else(|| materialized.origin(db).instance_member(db, env, name)),
         }
     }
 
