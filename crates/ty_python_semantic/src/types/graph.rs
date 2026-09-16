@@ -2,7 +2,7 @@
 /// Each node is an index into `dependencies`; reverse edges retain their insertion order.
 pub(super) struct DependencyGraph {
     pub(super) dependencies: Vec<Vec<usize>>,
-    dependents: Vec<Vec<usize>>,
+    pub(super) dependents: Vec<Vec<usize>>,
 }
 
 impl DependencyGraph {

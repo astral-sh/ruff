@@ -1093,10 +1093,13 @@ impl<'db> PlaceAndQualifiers<'db> {
                 },
                 ..current
             }),
-            // If a `Place` that was `Defined(Divergent)` in the previous cycle is actually found to be unreachable in the current cycle,
-            // it is set to `Undefined` (because the cycle initial value does not include meaningful reachability information).
+            // A cycle seed carries no reachability information. Discard it when
+            // the current iteration finds that the attribute is unreachable.
             (Place::Defined(prev), Place::Undefined) => {
-                if cycle.head_ids().any(|id| prev.ty == Type::divergent(id)) {
+                if cycle
+                    .head_ids()
+                    .any(|id| prev.ty.resolve_type_alias(db) == Type::divergent(id))
+                {
                     Place::Undefined
                 } else {
                     Place::Defined(DefinedPlace {

@@ -630,7 +630,7 @@ fn definition_contains_special_cased_condition<'db>(
                     .get_or_insert_with(|| {
                         infer_expression_types(db, standalone, TypeContext::default())
                     })
-                    .expression_type(expr)
+                    .expression_type(db, expr)
             } else {
                 definition_inference
                     .get_or_insert_with(|| infer_definition_types(db, definition))
@@ -715,7 +715,7 @@ fn predicate_contains_special_cased_condition<'db>(
                 .get_or_insert_with(|| {
                     infer_expression_types(db, expression, TypeContext::default())
                 })
-                .expression_type(expr)
+                .expression_type(db, expr)
         })
     })
 }
