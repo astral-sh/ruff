@@ -1219,25 +1219,6 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
-    fn empty(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
-        Self {
-            db,
-            env: env.clone(),
-            intersections: vec![],
-        }
-    }
-
-    /// Add DNF branches, dropping those that have already collapsed to `Never` so that later
-    /// union distribution does not multiply dead branches.
-    fn extend(&mut self, other: Self) {
-        self.intersections.extend(
-            other
-                .intersections
-                .into_iter()
-                .filter(|intersection| !intersection.contains_never()),
-        );
-    }
-
     pub(crate) fn add_positive(mut self, ty: Type<'db>) -> Self {
         self.add_positive_in_place(ty);
         self
@@ -1271,13 +1252,20 @@ impl<'db> IntersectionBuilder<'db> {
                 // (T2 & T4)`. If `self` is already a union-of-intersections `(T1 & T2) | (T3 & T4)`
                 // and we add `T5 | T6` to it, that flattens all the way out to `(T1 & T2 & T5) | (T1 &
                 // T2 & T6) | (T3 & T4 & T5) ...` -- you get the idea.
-                let mut distributed = IntersectionBuilder::empty(db, &self.env);
+                // Drop branches that have collapsed to `Never` and deduplicate the rest so later
+                // distribution does not multiply dead or repeated branches.
+                let mut distributed = FxOrderSet::default();
                 for elem in union.elements(db) {
                     let mut branch = self.clone();
                     branch.add_positive_impl(*elem, seen_aliases);
-                    distributed.extend(branch);
+                    distributed.extend(
+                        branch
+                            .intersections
+                            .into_iter()
+                            .filter(|intersection| !intersection.contains_never()),
+                    );
                 }
-                self.intersections = distributed.intersections;
+                self.intersections = distributed.into_iter().collect();
             }
             // `(A & B & ~C) & (D & E & ~F)` -> `A & B & D & E & ~C & ~F`
             Type::Intersection(other) => {
@@ -1340,20 +1328,30 @@ impl<'db> IntersectionBuilder<'db> {
                 // and negative constraints D, then our new intersection
                 // is (existing & ~C) | (existing & D)
 
-                let mut distributed = IntersectionBuilder::empty(db, &self.env);
+                let mut distributed = FxOrderSet::default();
                 // We negate all the positive constraints while distributing.
                 for elem in intersection.positive(db) {
                     let mut branch = self.clone();
                     branch.add_negative_impl(*elem, &mut seen_aliases.clone());
-                    distributed.extend(branch);
+                    distributed.extend(
+                        branch
+                            .intersections
+                            .into_iter()
+                            .filter(|intersection| !intersection.contains_never()),
+                    );
                 }
                 // All negative constraints end up becoming positive constraints.
                 for elem in intersection.negative(db) {
                     let mut branch = self.clone();
                     branch.add_positive_impl(*elem, &mut seen_aliases.clone());
-                    distributed.extend(branch);
+                    distributed.extend(
+                        branch
+                            .intersections
+                            .into_iter()
+                            .filter(|intersection| !intersection.contains_never()),
+                    );
                 }
-                self.intersections = distributed.intersections;
+                self.intersections = distributed.into_iter().collect();
             }
             Type::EnumComplement(complement) => {
                 let intersection = complement.to_intersection(db, &self.env);
@@ -1527,7 +1525,7 @@ fn simplify_intersection_pair_impl<'db>(
     IntersectionSimplification::Unchanged
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 struct InnerIntersectionBuilder<'db> {
     positive: FxOrderSet<Type<'db>>,
     negative: NegativeIntersectionElements<'db>,
@@ -2145,7 +2143,7 @@ mod tests {
     use crate::types::type_alias::TypeAliasType;
     use crate::types::{
         BytesLiteralType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
-        StringLiteralType, Truthiness, TypePair,
+        Signature, StringLiteralType, Truthiness, TypePair,
     };
 
     use ruff_db::system::DbWithWritableSystem as _;
@@ -2539,6 +2537,34 @@ mod tests {
 
         assert_eq!(intersection.intersections.len(), 1);
         assert_eq!(intersection.build(), int);
+    }
+
+    #[test]
+    fn build_intersection_deduplicates_dnf_branches() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let callable = Type::single_callable(db, Signature::dynamic(Type::object()));
+        let intersection = IntersectionBuilder::new(db, &env)
+            .add_positive(callable)
+            .add_negative(callable)
+            .build();
+        let negated = intersection.negate(db, &env);
+
+        let mut negative_builder = IntersectionBuilder::new(db, &env);
+        let mut positive_builder = IntersectionBuilder::new(db, &env);
+        for _ in 0..8 {
+            negative_builder.add_negative_in_place(intersection);
+            positive_builder.add_positive_in_place(negated);
+
+            // A gradual callable C can overlap its negation, so distribution retains C & ~C
+            // alongside C and ~C. Repeating the same clause must not multiply these alternatives.
+            assert!(negative_builder.intersections.len() <= 3);
+            assert!(positive_builder.intersections.len() <= 3);
+        }
+
+        assert!(negative_builder.build().is_equivalent_to(db, &env, negated));
+        assert!(positive_builder.build().is_equivalent_to(db, &env, negated));
     }
 
     #[test]
