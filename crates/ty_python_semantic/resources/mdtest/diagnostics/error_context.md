@@ -716,6 +716,33 @@ info: the parameter named `y` does not match `x` (and can be used as a keyword p
 info: This violates the Liskov Substitution Principle
 ```
 
+## Bound methods with incompatible specializations
+
+When both the captured receiver and the method signature are incompatible, the diagnostic explains
+the incompatible return types:
+
+```py
+from ty_extensions._internal import TypeOf
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def check(integer: Box[int], text: Box[str]):
+    method: TypeOf[text.get] = integer.get  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `bound method Box[int].get() -> int` is not assignable to `bound method Box[str].get() -> str`
+ --> src/mdtest_snippet.py:8:32
+  |
+8 |     method: TypeOf[text.get] = integer.get  # snapshot: invalid-assignment
+  |             ----------------   ^^^^^^^^^^^ Incompatible value of type `bound method Box[int].get() -> int`
+  |             |
+  |             Declared type
+info: incompatible return types: `int` is not assignable to `str`
+```
+
 ## Uncallable top signatures
 
 A top callable represents every possible callable signature, so no specific call is guaranteed to be
