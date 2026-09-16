@@ -183,6 +183,16 @@ impl UnresolvedReference {
         self.flags
             .contains(UnresolvedReferenceFlags::WILDCARD_IMPORT)
     }
+
+    /// Returns `true` if the unresolved reference occurred in a `@no_type_check` context.
+    ///
+    /// Per PEP 484, functions decorated with `@typing.no_type_check` should be treated as
+    /// having no annotations, so references that only occur within such an annotation
+    /// (including inside a stringified/forward-reference annotation) should not be reported
+    /// as undefined.
+    pub const fn in_no_type_check(&self) -> bool {
+        self.flags.contains(UnresolvedReferenceFlags::NO_TYPE_CHECK)
+    }
 }
 
 bitflags! {
@@ -198,6 +208,14 @@ bitflags! {
         /// print(x)
         /// ```
         const WILDCARD_IMPORT = 1 << 0;
+
+        /// The unresolved reference occurred within a `@typing.no_type_check` context.
+        ///
+        /// This is captured at the time the reference is recorded, rather than checked
+        /// against the semantic model's live state later on, since that state may have
+        /// changed (e.g. after visiting deferred string annotations) by the time
+        /// unresolved references are analyzed.
+        const NO_TYPE_CHECK = 1 << 1;
     }
 }
 
