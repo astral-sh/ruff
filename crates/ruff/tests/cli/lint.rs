@@ -607,6 +607,89 @@ extend = "ruff3.toml"
 }
 
 #[test]
+fn extend_banned_api() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+select = ["TID251"]
+
+[lint.flake8-tidy-imports.extend-banned-api]
+"typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+"cgi".msg = "Use a supported library instead."
+"typing.Any".msg = "Use a precise type instead."
+"#,
+    )?;
+    fixture.write_file(
+        "test.py",
+        "import cgi\nfrom typing import TypedDict\nimport typing\nx: typing.Any\n",
+    )?;
+
+    assert_cmd_snapshot!(fixture.check_command());
+    Ok(())
+}
+
+#[test]
+fn extend_banned_api_inherited() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+select = ["TID251"]
+
+[lint.flake8-tidy-imports.banned-api]
+"cgi".msg = "The cgi module is deprecated."
+"pipes".msg = "Use shlex instead."
+
+[lint.flake8-tidy-imports.extend-banned-api]
+"typing.Any".msg = "Use a precise type instead."
+"#,
+    )?;
+    fixture.write_file(
+        "child/ruff.toml",
+        r#"
+extend = "../ruff.toml"
+
+[lint.flake8-tidy-imports.extend-banned-api]
+"cgi".msg = "Use a supported library instead."
+"typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+"#,
+    )?;
+    fixture.write_file("child/nested/ruff.toml", "extend = \"../ruff.toml\"\n")?;
+    fixture.write_file(
+        "child/nested/test.py",
+        "import cgi\nimport pipes\nfrom typing import Any, TypedDict\n",
+    )?;
+
+    assert_cmd_snapshot!(fixture.check_command());
+
+    // Clear inherited extensions while preserving the inherited base bans.
+    fixture.write_file(
+        "child/nested/ruff.toml",
+        r#"
+extend = "../ruff.toml"
+[lint.flake8-tidy-imports]
+extend-banned-api = {}
+"#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command());
+
+    // Clear inherited base bans while preserving the inherited extensions.
+    fixture.write_file(
+        "child/nested/ruff.toml",
+        r#"
+extend = "../ruff.toml"
+[lint.flake8-tidy-imports]
+banned-api = {}
+"#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command());
+    Ok(())
+}
+
+#[test]
 fn circular_extend() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file(

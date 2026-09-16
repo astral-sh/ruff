@@ -1,0 +1,18 @@
+---
+source: crates/ruff/tests/cli/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - concise
+---
+success: false
+exit_code: 1
+----- stdout -----
+child/nested/test.py:1:8: TID251 `cgi` is banned: The cgi module is deprecated.
+child/nested/test.py:2:8: TID251 `pipes` is banned: Use shlex instead.
+Found 2 errors.
+
+----- stderr -----
