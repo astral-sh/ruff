@@ -760,7 +760,7 @@ requires-python = ">=3.8"
 members = ["packages/*"]
 "#,
     )?;
-    case.write_file(".python-version", "3.12")?;
+    case.write_file(".python-version", ">=3.12")?;
     case.write_file("packages/member/member.py", "from typing import override")?;
 
     let mut command = uv_sync_command(&case, None)?;
