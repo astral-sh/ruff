@@ -5,12 +5,13 @@ multiple-versions = "allow"
 
 # cargo-deny cannot distinguish defaults requested by workspace manifests from
 # defaults enabled transitively. Check our declarations separately instead.
-# See scripts/check-cargo-default-features.py.
+# See scripts/check-cargo-bans.py.
 external-default-features = "allow"
 
 [bans.build]
 # Keep this list alphabetically sorted. New external build scripts require
 # explicit review, including dependencies used only on other targets.
+# scripts/check-cargo-bans.py rejects stale entries.
 allow-build-scripts = [
     "alloca",
     "anyhow",
