@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
 use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 
 use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::support::Support;
@@ -27,10 +28,6 @@ pub(super) struct SolutionWalker<'db> {
     /// [`Invalid`][SolutionValidity::Invalid].
     pending: Vec<PendingCandidateSolution<'db>>,
 
-    /// An accumulator that stores the declared upper bounds that we have checked for a candidate
-    /// solution.
-    upper_bounds: Vec<(BoundTypeVarInstance<'db>, NodeId)>,
-
     _phantom: PhantomData<&'db ()>,
 }
 
@@ -48,7 +45,6 @@ impl<'db> SolutionWalker<'db> {
         Self {
             source_orders,
             pending: Vec::default(),
-            upper_bounds: Vec::default(),
             _phantom: PhantomData,
         }
     }
@@ -66,6 +62,7 @@ impl<'db> SolutionWalker<'db> {
         all_typevars: Option<&Support>,
         node: NodeId,
     ) -> ControlFlow<L::Break> {
+        let mut validations = None;
         self.visit_node_and_then(
             db,
             env,
@@ -75,7 +72,11 @@ impl<'db> SolutionWalker<'db> {
             node,
             &mut |this, storage, limits, path| match all_typevars {
                 Some(all_typevars) => {
-                    this.validate_satisfied_path(db, env, storage, limits, path, all_typevars)
+                    let validations = validations.get_or_insert_with(|| {
+                        Validations::from_support(db, env, storage, all_typevars)
+                    });
+                    let upper_bounds = validations.iter_upper_bounds();
+                    this.validate_satisfied_path(db, env, storage, limits, path, upper_bounds)
                 }
                 None => this.found_satisfied_path(db, env, storage, limits, path),
             },
@@ -183,33 +184,68 @@ impl<'db> SolutionWalker<'db> {
         )
     }
 
-    /// Having found a satisfiable path in the BDD, validates that path against the declared upper
-    /// bound (TODO and constraints) of all relevant typevars.
-    fn validate_satisfied_path<L: SolutionLimits>(
+    #[expect(clippy::too_many_arguments)]
+    #[expect(clippy::type_complexity)]
+    fn visit_constraints_and_then<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
-        all_typevars: &Support,
+        constraints: &[ConstraintId],
+        process_satisfied: &mut dyn FnMut(
+            &mut Self,
+            &mut ConstraintSetStorage<'db>,
+            &mut L,
+            &mut PathAssignments,
+        ) -> ControlFlow<L::Break>,
     ) -> ControlFlow<L::Break> {
-        // We have a path that represents a valid solution to the constraint set. Check if the
-        // solution satisfies all of the typevars' declared upper bounds (TODO and constraints).
-        let mut all_typevars = all_typevars.clone();
-        let mut seen_typevars = Support::default();
-        let previous_count = self.pending.len();
-        self.upper_bounds.clear();
-        self.validate_upper_bound_typevar(
+        let Some((constraint, constraints)) = constraints.split_first() else {
+            return process_satisfied(self, storage, limits, path);
+        };
+        // XXX let _ = storage.constraint_source_order(*constraint);
+        self.source_orders.insert(*constraint);
+        path.walk_edge(
             db,
             env,
             storage,
-            limits,
-            path,
-            &mut all_typevars,
-            &mut seen_typevars,
-        )?;
+            constraint.when_true(),
+            |storage, path, _new_range, found_conflict| {
+                if !found_conflict {
+                    self.visit_constraints_and_then(
+                        db,
+                        env,
+                        storage,
+                        limits,
+                        path,
+                        constraints,
+                        process_satisfied,
+                    )?;
+                }
+                ControlFlow::Continue(())
+            },
+        )
+    }
+
+    /// Having found a satisfiable path in the BDD, validates that path against the declared upper
+    /// bound (TODO and constraints) of all relevant typevars.
+    fn validate_satisfied_path<'a, L: SolutionLimits>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        path: &mut PathAssignments,
+        upper_bounds: impl Iterator<Item = (BoundTypeVarInstance<'db>, &'a UpperBound)> + Clone,
+    ) -> ControlFlow<L::Break> {
+        // We have a path that represents a valid solution to the constraint set. Check if the
+        // solution satisfies all of the typevars' declared upper bounds (TODO and constraints).
+        let previous_count = self.pending.len();
+        self.validate_upper_bound(db, env, storage, limits, path, &mut upper_bounds.clone())?;
         if self.pending.len() > previous_count {
+            // We will only add pending candidate solutions during the validation process if _all_
+            // validations
             // If we added any pending candidate solutions during the validation process, then the
             // solution is valid!
             return ControlFlow::Continue(());
@@ -219,19 +255,17 @@ impl<'db> SolutionWalker<'db> {
         // (TODO and constraints). If we can, we want to identify which particular upper bounds or
         // constraints were violated. To do that, we have to re-check this path against each one
         // individually.
-        self.attribute_typevar_failures(db, env, storage, limits, path)
+        self.attribute_typevar_failures(db, env, storage, limits, path, upper_bounds)
     }
 
-    #[expect(clippy::too_many_arguments)]
-    fn validate_upper_bound_typevar<L: SolutionLimits>(
+    fn validate_upper_bound<'a, L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
-        all_typevars: &mut Support,
-        seen_typevars: &mut Support,
+        upper_bounds: &mut dyn Iterator<Item = (BoundTypeVarInstance<'db>, &'a UpperBound)>,
     ) -> ControlFlow<L::Break> {
         // High level plan: We find the next typevar with a declared upper bound, create a
         // throwaway BDD that represents that upper bound, and then walk that upper bound BDD's
@@ -239,70 +273,33 @@ impl<'db> SolutionWalker<'db> {
         // in force, any satisfiable paths we find in the upper bound BDD will be compatible with
         // the current candidate solution.
 
-        while let Some(typevar) = all_typevars.pop() {
-            // Find the next typevar with a declared upper bound
-            seen_typevars.insert(typevar);
-            let bound_typevar = storage.typevar_data(typevar);
-            let bound_or_constraints = bound_typevar.typevar(db).bound_or_constraints(db, env);
-            let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints else {
-                continue;
-            };
+        let Some((_, upper_bound)) = upper_bounds.next() else {
+            // We've checked all typevars that have an upper bound, and we now know that the
+            // candidate solution is valid.
+            // TODO: Check the declared constraints here instead of `preliminary_solve` before
+            // declaring the candidate solution valid.
+            return self.found_satisfied_path(db, env, storage, limits, path);
+        };
 
-            // Create the throwaway BDD that represents that upper bound. (This will _usually_ be a
-            // single BDD node with a single constraint representing the upper bound. But certain
-            // patterns might produce a more complex BDD — for instance, an intersection upper
-            // bound, which we break apart into separate constraints.)
-            let constraints = Constraint::new_upper_bound(
-                db,
-                env,
-                ConstraintProvenance::Validity,
-                bound_typevar,
-                bound,
-            );
-            let (constraint, source_order) = Constraint::new_nodes(db, env, storage, constraints);
-            self.source_orders
-                .extend(storage.calculate_source_orders(source_order));
-            self.upper_bounds.push((bound_typevar, constraint));
+        let Some(constraints) = upper_bound.constraints.as_deref() else {
+            // This upper bound is entirely unsatisfiable.
+            return ControlFlow::Continue(());
+        };
 
-            // If any typevars are mentioned in the upper bound, we have to validate them too.
-            // TODO: Consider calculating this at construction time, so that here we have a fixed
-            // set of typevars to check.
-            if let Some(upper_bound_support) = storage.node_support(constraint) {
-                let new_typevars = upper_bound_support - &*seen_typevars;
-                *all_typevars |= &new_typevars;
-            }
-
-            // Search for any satisfiable paths in the upper bound BDD. If we find any, we still
-            // need to validate any _remaining_ typevar upper bounds, and we want to do that while
-            // `path` contains both the candidate solution and any upper bounds we have already
-            // checked. That means we have to use a recursive call inside the `walk_edge` callback
-            // to find and check the next typevar upper bound.
-            return self.visit_node_and_then(
-                db,
-                env,
-                storage,
-                limits,
-                path,
-                constraint,
-                &mut |this, storage, limits, path| {
-                    this.validate_upper_bound_typevar(
-                        db,
-                        env,
-                        storage,
-                        limits,
-                        path,
-                        all_typevars,
-                        seen_typevars,
-                    )
-                },
-            );
-        }
-
-        // If we fall through, then we have checked all typevars that have an upper bound, and we
-        // now know that the candidate solution is valid.
-        // TODO: Check the declared constraints here instead of `preliminary_solve` before
-        // declaring the candidate solution valid.
-        self.found_satisfied_path(db, env, storage, limits, path)
+        // Verify that we can add all of the upper bound's constraints to the current path without
+        // making it unsatisfiable. If we can, make a recursive call to check the next typevar with
+        // an upper bound.
+        self.visit_constraints_and_then(
+            db,
+            env,
+            storage,
+            limits,
+            path,
+            constraints,
+            &mut |this, storage, limits, path| {
+                this.validate_upper_bound(db, env, storage, limits, path, upper_bounds)
+            },
+        )
     }
 
     /// Create a pending candidate solution for the current path.
@@ -448,33 +445,35 @@ impl<'db> SolutionWalker<'db> {
     /// constraints were violated. Adds an [`Invalid`][SolutionValidity::Invalid] candidate
     /// solution for the path recording those violations, so that a later stage can transform them
     /// into useful diagnostics.
-    fn attribute_typevar_failures<L: SolutionLimits>(
+    fn attribute_typevar_failures<'a, L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
+        upper_bounds: impl Iterator<Item = (BoundTypeVarInstance<'db>, &'a UpperBound)> + Clone,
     ) -> ControlFlow<L::Break> {
         let mut upper_bound_violations = FxHashSet::default();
-        let upper_bounds = std::mem::take(&mut self.upper_bounds);
-        for (bound_typevar, constraint) in upper_bounds {
+        for (bound_typevar, upper_bound) in upper_bounds {
             let mut satisfied = false;
-            self.visit_node_and_then(
-                db,
-                env,
-                storage,
-                limits,
-                path,
-                constraint,
-                &mut |this, storage, _limits, path| {
-                    let pending = this.pending_candidate_solution(db, env, storage, path, None);
-                    if pending.is_some() {
-                        satisfied = true;
-                    }
-                    ControlFlow::Continue(())
-                },
-            )?;
+            if let Some(constraints) = upper_bound.constraints.as_deref() {
+                self.visit_constraints_and_then(
+                    db,
+                    env,
+                    storage,
+                    limits,
+                    path,
+                    constraints,
+                    &mut |this, storage, _limits, path| {
+                        let pending = this.pending_candidate_solution(db, env, storage, path, None);
+                        if pending.is_some() {
+                            satisfied = true;
+                        }
+                        ControlFlow::Continue(())
+                    },
+                )?;
+            }
             if !satisfied {
                 upper_bound_violations.insert(bound_typevar);
             }
@@ -516,5 +515,115 @@ impl<'db> SolutionWalker<'db> {
             .map(|pending| pending.candidate)
             .collect();
         CandidateSolutions::Constrained(result)
+    }
+}
+
+/// Validations that must be verified for each candidate solution.
+#[derive(Default)]
+struct Validations<'db> {
+    upper_bounds: FxIndexMap<BoundTypeVarInstance<'db>, UpperBound>,
+}
+
+struct UpperBound {
+    constraints: Option<SmallVec<[ConstraintId; 4]>>,
+}
+
+impl<'db> Validations<'db> {
+    fn from_support(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        all_typevars: &Support,
+    ) -> Self {
+        let mut result = Self::default();
+        let mut typevar_queue = all_typevars.clone();
+        let mut seen_typevars = Support::default();
+        while let Some(typevar) = typevar_queue.pop() {
+            let bound_typevar = storage.typevar_data(typevar);
+            result.add_typevar(
+                db,
+                env,
+                storage,
+                &mut typevar_queue,
+                &mut seen_typevars,
+                bound_typevar,
+            );
+        }
+        result
+    }
+
+    fn iter_upper_bounds(
+        &self,
+    ) -> impl Iterator<Item = (BoundTypeVarInstance<'db>, &UpperBound)> + Clone {
+        self.upper_bounds
+            .iter()
+            .map(|(bound_typevar, upper_bound)| (*bound_typevar, upper_bound))
+    }
+
+    fn add_typevar(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        typevar_queue: &mut Support,
+        seen_typevars: &mut Support,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) {
+        let bound_or_constraints = bound_typevar.typevar(db).bound_or_constraints(db, env);
+        match bound_or_constraints {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => self.add_upper_bound(
+                db,
+                env,
+                storage,
+                typevar_queue,
+                seen_typevars,
+                bound_typevar,
+                bound,
+            ),
+            Some(TypeVarBoundOrConstraints::Constraints(_)) => {
+                // TODO
+            }
+            None => {}
+        }
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn add_upper_bound(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        typevar_queue: &mut Support,
+        seen_typevars: &mut Support,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        bound: Type<'db>,
+    ) {
+        self.upper_bounds.entry(bound_typevar).or_insert_with(|| {
+            let constraints = Constraint::new_upper_bound(
+                db,
+                env,
+                ConstraintProvenance::Validity,
+                bound_typevar,
+                bound,
+            );
+            let constraints = constraints
+                .map(Result::ok)
+                .map(|constraint| {
+                    constraint.map(|constraint| storage.intern_constraint(db, env, constraint))
+                })
+                .collect();
+            let upper_bound = UpperBound { constraints };
+
+            // If any typevars are mentioned in the upper bound, we have to validate them too.
+            // TODO: Consider calculating this at construction time, so that here we have a fixed
+            // set of typevars to check.
+            for constraint in upper_bound.constraints.iter().flatten() {
+                let constraint_support = storage.constraint_support(*constraint);
+                let new_typevars = constraint_support - &*seen_typevars;
+                *typevar_queue |= &new_typevars;
+            }
+
+            upper_bound
+        });
     }
 }
