@@ -1567,7 +1567,6 @@ impl TestServerBuilder {
     }
 
     /// Write multiple files to the test directory
-    #[expect(dead_code)]
     pub(crate) fn with_files<P, C, I>(mut self, files: I) -> Result<Self>
     where
         I: IntoIterator<Item = (P, C)>,
