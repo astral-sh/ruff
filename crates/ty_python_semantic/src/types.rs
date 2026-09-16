@@ -113,7 +113,7 @@ use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::visitor::{
-    any_over_type, any_over_type_including_alias_arguments, dynamic_content,
+    TypeKind, any_over_type, any_over_type_including_alias_arguments, dynamic_content,
 };
 use crate::{Db, FxOrderSet, HasType, NameKind, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
@@ -2172,8 +2172,30 @@ impl<'db> Type<'db> {
         })
     }
 
+    #[expect(clippy::unnecessary_wraps, reason = "Query cycles return None")]
     fn is_fully_static(self, db: &'db dyn Db, env: &ProgramEnvironment) -> bool {
-        dynamic_content(db, env, self).is_absent()
+        #[salsa::tracked(
+            returns(copy),
+            cycle_result=|_, _, _, _| None,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn is_fully_static_impl<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            ty: Type<'db>,
+        ) -> Option<bool> {
+            let env = ProgramEnvironment::from_program(program);
+            Some(dynamic_content(db, &env, ty).is_absent())
+        }
+
+        if matches!(TypeKind::from(self), TypeKind::Atomic) {
+            return !self.is_dynamic();
+        }
+
+        // Share complete walks across constraint paths. Query cycles still use the ordinary
+        // walker rather than treating a provisional result as a proof of static content.
+        is_fully_static_impl(db, env.program(db), self)
+            .unwrap_or_else(|| dynamic_content(db, env, self).is_absent())
     }
 
     const fn as_intersection(self) -> Option<IntersectionType<'db>> {
