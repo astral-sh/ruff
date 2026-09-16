@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::{self as ast, Arguments, Expr, PythonVersion};
 
 use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::{Result, anyhow};
 
-use crate::rules::perflint::helpers::comment_strings_in_range;
+use crate::rules::perflint::helpers::{comment_strings_in_range, references_zero_arg_super};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_semantic::{Binding, analyze::typing::is_list};
@@ -335,6 +335,19 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     } else {
         ComprehensionType::Extend
     };
+
+    if references_zero_arg_super(arg, checker.semantic())
+        || if_test.is_some_and(|test| references_zero_arg_super(test, checker.semantic()))
+    {
+        match comprehension_type {
+            ComprehensionType::Extend => return,
+            ComprehensionType::ListComprehension => {
+                if checker.target_version() < PythonVersion::PY312 {
+                    return;
+                }
+            }
+        }
+    }
 
     let mut diagnostic = checker.report_diagnostic(
         ManualListComprehension {
