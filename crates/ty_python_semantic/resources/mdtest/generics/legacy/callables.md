@@ -610,6 +610,38 @@ infer_prefix(get_ints)  # error: [invalid-argument-type]
 infer_suffix(get_ints)  # error: [invalid-argument-type]
 ```
 
+## Inferring type variables from gradual tuple elements
+
+A callback returning a gradual-length tuple can constrain the type variables of a fixed-length
+tuple.
+
+```py
+from typing import Any, Callable, TypeVar
+from typing_extensions import Unpack
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+def infer_pair(callback: Callable[[], tuple[K, V]]) -> tuple[K, V]:
+    return callback()
+
+def _(
+    callback: Callable[[], tuple[Any, ...]],
+    prefix: Callable[[], tuple[int, Unpack[tuple[Any, ...]]]],
+    suffix: Callable[[], tuple[Unpack[tuple[Any, ...]], str]],
+):
+    reveal_type(infer_pair(callback))  # revealed: tuple[Any, Any]
+    reveal_type(infer_pair(prefix))  # revealed: tuple[int, Any]
+    reveal_type(infer_pair(suffix))  # revealed: tuple[Any, str]
+```
+
+A concrete homogeneous tuple does not guarantee the required length:
+
+```py
+def _(callback: Callable[[], tuple[int, ...]]):
+    infer_pair(callback)  # error: [invalid-argument-type]
+```
+
 ## Source type variables in gradual tuple returns
 
 ```toml
