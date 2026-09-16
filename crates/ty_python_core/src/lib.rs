@@ -45,6 +45,7 @@ mod db;
 pub mod definition;
 pub mod expression;
 pub mod frozen;
+mod interned_nodes;
 pub(crate) mod member;
 pub mod narrowing_constraints;
 pub mod node_key;
