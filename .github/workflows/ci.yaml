@@ -869,6 +869,28 @@ jobs:
             0-1000
           )
 
+  cargo-deny:
+    name: "cargo deny"
+    timeout-minutes: 10
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.11"
+      - name: "Check licenses"
+        run: uv run --only-dev cargo deny --locked --all-features check licenses
+      - name: "Check sources"
+        run: uv run --only-dev cargo deny --locked --all-features check sources
+      - name: "Check workspace dependency features"
+        run: uv run --no-project --locked scripts/check-cargo-default-features.py
+      - name: "Check bans"
+        run: uv run --only-dev cargo deny --locked --all-features check bans
+
   cargo-shear:
     name: "cargo shear"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
@@ -1450,6 +1472,7 @@ jobs:
     needs:
       - cargo-fmt
       - cargo-clippy
+      - cargo-deny
       - hawk
       - cargo-test-linux
       - cargo-test-wasm
