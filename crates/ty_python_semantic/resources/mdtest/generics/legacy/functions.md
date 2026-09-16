@@ -1643,9 +1643,7 @@ reveal_type(narrow("hello"))  # revealed: str
 
 ## Selecting constraints for narrowed caller type variables
 
-After narrowing a caller's type variable to `str`, its value satisfies the `str` constraint. We
-cannot select `int` by choosing a meaning for the caller's variable that would make its intersection
-with `str` empty. Selecting the compatible constraint does not depend on declaration order:
+Caller type variables are not inferable when selecting a constraint for a callee's type variable:
 
 ```py
 from typing import TypeVar
