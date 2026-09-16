@@ -175,7 +175,9 @@ jobs:
       - name: "Install uv"
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
           enable-cache: false
       - name: Install cached dist
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
