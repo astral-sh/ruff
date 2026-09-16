@@ -54,6 +54,7 @@ use salsa::plumbing::AsId;
 use std::borrow::Cow;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
+use crate::place::TypeOrigin;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
@@ -809,8 +810,20 @@ impl<'db> InferScope<'db> {
     }
 }
 
-/// The type context for a given expression, namely the type annotation
-/// in an annotated assignment.
+/// Whether generic inference should prefer an expected type or only use it to restrict solutions.
+#[derive(
+    Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
+)]
+enum TypeContextKind {
+    /// An annotation can supply a preferred specialization for a generic call.
+    #[default]
+    Declared,
+    /// An inferred attribute type or a type variable's upper bound restricts solutions without
+    /// supplying inference evidence.
+    Validity,
+}
+
+/// The expected type for an expression and how it contributes to generic inference.
 ///
 /// Knowing the outer type context when inferring an expression can enable
 /// more precise inference results, aka "bidirectional type inference".
@@ -819,11 +832,39 @@ impl<'db> InferScope<'db> {
 )]
 pub(crate) struct TypeContext<'db> {
     pub(crate) annotation: Option<Type<'db>>,
+    kind: TypeContextKind,
 }
 
 impl<'db> TypeContext<'db> {
     pub(crate) fn new(annotation: Option<Type<'db>>) -> Self {
-        Self { annotation }
+        Self {
+            annotation,
+            kind: TypeContextKind::Declared,
+        }
+    }
+
+    pub(crate) fn validity(annotation: Type<'db>) -> Self {
+        Self {
+            annotation: Some(annotation),
+            kind: TypeContextKind::Validity,
+        }
+    }
+
+    /// Declared attributes supply a preferred type; inferred attributes only restrict assignments.
+    pub(crate) fn from_origin(ty: Type<'db>, origin: TypeOrigin) -> Self {
+        match origin {
+            TypeOrigin::Declared => Self::new(Some(ty)),
+            TypeOrigin::Inferred => Self::validity(ty),
+        }
+    }
+
+    /// Replace the expected type without changing whether it supplies declared preference.
+    pub(crate) fn with_annotation(self, annotation: Option<Type<'db>>) -> Self {
+        Self { annotation, ..self }
+    }
+
+    pub(crate) fn is_declared(self) -> bool {
+        matches!(self.kind, TypeContextKind::Declared)
     }
 
     /// If the type annotation is a specialized instance of the given `KnownClass`, returns the
@@ -839,9 +880,7 @@ impl<'db> TypeContext<'db> {
     }
 
     fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
-        Self {
-            annotation: self.annotation.map(f),
-        }
+        self.with_annotation(self.annotation.map(f))
     }
 
     fn is_typealias(&self) -> bool {

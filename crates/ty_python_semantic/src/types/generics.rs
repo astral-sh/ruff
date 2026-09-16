@@ -2777,6 +2777,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         self.infer_from_constraint_set(set)
     }
 
+    /// Restricts valid specializations without adding contextual inference evidence.
+    pub(crate) fn intersect_validity_constraints(&mut self, set: ConstraintSet<'db, 'c>) {
+        let set = set.with_validity_bounds(self.db, self.env);
+        self.record_constraint_set(set);
+    }
+
     /// Build a merged specialization, using a caller-provided hook to select the solution for
     /// each typevar. This compatibility API discards correlations and solving completeness.
     ///

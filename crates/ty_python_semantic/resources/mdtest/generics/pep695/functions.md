@@ -1978,6 +1978,216 @@ def test[T: int](items: list[T]) -> list[T]:
     return items
 ```
 
+## Upper bounds do not provide declared type preference
+
+A type variable's upper bound supplies validity constraints for a nested generic call, not declared
+type preference. These constraints are combined with the evidence inferred from the arguments:
+
+```py
+from typing import Any
+
+def singleton[T](value: T) -> list[T]:
+    return [value]
+
+def bounded[T: list[int]](value: T) -> T:
+    return value
+
+def _(value: Any, unknown):
+    reveal_type(singleton(value))  # revealed: list[Any]
+    reveal_type(bounded(singleton(value)))  # revealed: list[Any | int]
+    reveal_type(bounded(singleton(unknown)))  # revealed: list[Unknown | int]
+```
+
+The same rule applies when the context passes through another generic call or a tuple element:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+def nested[T: tuple[list[int]]](value: T) -> T:
+    return value
+
+def nested_union[T: tuple[list[int]] | int](value: T) -> T:
+    return value
+
+def _(value: Any):
+    reveal_type(bounded(identity(singleton(value))))  # revealed: list[Any | int]
+    reveal_type(nested((singleton(value),)))  # revealed: tuple[list[Any | int]]
+    reveal_type(nested_union((singleton(value),)))  # revealed: tuple[list[Any | int]]
+```
+
+The context can still select a specialization needed to satisfy the bound. Here, `list[bool]` is not
+assignable to `list[int]`, but `singleton(True)` can specialize to `list[int]`:
+
+```py
+reveal_type(bounded(singleton(True)))  # revealed: list[int]
+reveal_type(bounded(identity(singleton(True))))  # revealed: list[int]
+bounded(singleton("invalid"))  # error: [invalid-argument-type]
+```
+
+An explicit parameter annotation still supplies a preferred type:
+
+```py
+def declared(value: list[int]) -> list[int]:
+    return value
+
+def _(value: Any):
+    reveal_type(declared(singleton(value)))  # revealed: list[int]
+    reveal_type(declared(identity(singleton(value))))  # revealed: list[int]
+```
+
+Callback parameters supply upper-bound evidence, which is intersected with the validity bounds:
+
+```py
+from collections.abc import Callable
+
+def from_callback[T](f: Callable[[T], None]) -> list[T]:
+    return []
+
+def _(f: Callable[[Any], None]):
+    reveal_type(bounded(from_callback(f)))  # revealed: list[Any & int]
+```
+
+If the callback accepts any `object`, we can choose `int` to satisfy the context. A callback that
+only accepts `bool` cannot be used to produce a `list[int]`:
+
+```py
+def _(f: Callable[[object], None], g: Callable[[bool], None]):
+    reveal_type(bounded(from_callback(f)))  # revealed: list[int]
+    bounded(from_callback(g))  # error: [invalid-argument-type]
+```
+
+Upper bounds also continue to provide structural context for dictionary literals and lambda
+parameters:
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+def payload[T: Payload](value: T) -> T:
+    return value
+
+def callback[T: Callable[[int], list[int]]](value: T) -> T:
+    return value
+
+reveal_type(payload({"value": 1}))  # revealed: Payload
+reveal_type(callback(lambda value: [value]))  # revealed: (value: int) -> list[int]
+```
+
+A generic call inside the lambda also receives validity-only return context:
+
+```py
+def _(value: Any):
+    f = callback(lambda _: singleton(value))
+    reveal_type(f(1))  # revealed: list[Any | int]
+```
+
+A union of callables can infer the same argument against an upper bound and an explicit annotation.
+Each callable retains its own specialization, regardless of the union's order:
+
+```py
+def discard(value: list[int]) -> None:
+    pass
+
+def _(flag: bool, value: Any):
+    f = bounded if flag else discard
+    reveal_type(f(singleton(value)))  # revealed: list[Any | int] | None
+    g = discard if flag else bounded
+    reveal_type(g(singleton(value)))  # revealed: None | list[Any | int]
+```
+
+Alternatives in the upper bound constrain the type variables together. The second argument rules out
+the alternative with `list[int]` in the second position:
+
+```py
+def pair[T, U](x: T, y: U) -> tuple[list[T], list[U]]:
+    return [x], [y]
+
+def either[T: tuple[list[int], list[str]] | tuple[list[str], list[int]]](value: T) -> T:
+    return value
+
+reveal_type(either(pair(True, "")))  # revealed: tuple[list[int], list[str]]
+either(pair(True, b""))  # error: [invalid-argument-type]
+```
+
+## Upper-bound context without inference evidence
+
+Validity-only context does not supply a specialization without argument evidence. Unsolved type
+variables use `Unknown`, even when the context supplies both lower and upper validity bounds:
+
+```py
+def empty[T]() -> list[T]:
+    return []
+
+def bounded[T: list[int]](value: T) -> T:
+    return value
+
+reveal_type(bounded(empty()))  # revealed: list[Unknown]
+
+def make[T]() -> T:
+    raise NotImplementedError
+
+def number[T: int](value: T) -> T:
+    return value
+
+reveal_type(number(make()))  # revealed: Unknown
+```
+
+An explicit default is used instead of `Unknown` or the contextual bound:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+def make_with_default[T = bool]() -> T:
+    raise NotImplementedError
+
+reveal_type(number(make_with_default()))  # revealed: bool
+```
+
+TODO: An `Unknown` argument does not supply inference evidence for a type variable nested inside
+`tuple[T]`. Validity-only context does not fill this gap; the type variable remains unsolved:
+
+```py
+def first[T](values: tuple[T]) -> T:
+    return values[0]
+
+def first_with_default[T = bool](values: tuple[T]) -> T:
+    return values[0]
+
+def _(unknown):
+    reveal_type(number(first(unknown)))  # revealed: Unknown
+    reveal_type(number(first_with_default(unknown)))  # revealed: bool
+```
+
+## Upper-bound context with variadic type parameters
+
+Calls involving a `ParamSpec` or `TypeVarTuple` still use legacy inference, which treats an upper
+bound as a preferred type. TODO: Conjoin validity constraints in these calls when variadic inference
+migrates to the constraint solver.
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+def bounded[T: list[int]](value: T) -> T:
+    return value
+
+def from_callback[**P, T](f: Callable[P, T]) -> list[T]:
+    return []
+
+def with_args[T, *Ts](value: T, *args: *Ts) -> list[T]:
+    return [value]
+
+def _(f: Callable[[], Any], value: Any):
+    reveal_type(bounded(from_callback(f)))  # revealed: list[int]
+    reveal_type(bounded(with_args(value)))  # revealed: list[int]
+```
+
 ## Nested functions see typevars bound in outer function
 
 ```py

@@ -1628,15 +1628,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Place::Undefined => None,
         };
 
-        let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
-            self.fallback_member_declared_type(node)
+        let tcx = if resolved_place.is_undefined() && !place.is_symbol() {
+            self.fallback_member_type_context(node)
         } else {
-            None
-        }
-        .or_else(|| resolved_place.ignore_possibly_undefined());
+            TypeContext::new(resolved_place.ignore_possibly_undefined())
+        };
 
         AddBinding {
-            declared_ty,
+            tcx,
             declaration,
             binding,
             node,
@@ -1646,9 +1645,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// For a member binding without a live place declaration, obtain its declared type from
-    /// normal attribute or subscript lookup on its receiver.
-    fn fallback_member_declared_type(&mut self, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
+    /// Look up type context on the receiver when a member has no live place declaration.
+    /// Inferred attributes supply validity-only context, not a preferred type.
+    fn fallback_member_type_context(&mut self, node: AnyNodeRef<'_>) -> TypeContext<'db> {
         let db = self.db();
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
             let value_type = self.try_expression_type(value).unwrap_or_else(|| {
@@ -1656,6 +1655,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
             if let Place::Defined(DefinedPlace {
                 ty,
+                origin,
                 definedness: Definedness::AlwaysDefined,
                 ..
             }) = value_type
@@ -1663,9 +1663,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .place
             {
                 // TODO: also consider qualifiers on the attribute
-                Some(ty)
+                TypeContext::from_origin(ty, origin)
             } else {
-                None
+                TypeContext::default()
             }
         } else if let AnyNodeRef::ExprSubscript(
             subscript @ ast::ExprSubscript {
@@ -1675,12 +1675,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             let value_ty = self.get_or_infer_expression(value, TypeContext::default());
             let slice_ty = self.get_or_infer_expression(slice, TypeContext::default());
-            Some(
+            TypeContext::new(Some(
                 self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx)
                     .unwrap_or_else(|recovery_ty| recovery_ty),
-            )
+            ))
         } else {
-            None
+            TypeContext::default()
         }
     }
 
@@ -4517,7 +4517,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let node = target.into();
             let add = AddBinding {
-                declared_ty: self.fallback_member_declared_type(node),
+                tcx: self.fallback_member_type_context(node),
                 declaration: None,
                 binding: definition,
                 node,
@@ -4533,7 +4533,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .unwrap_or(value_ty)
             } else {
                 // Annotation-only definitions are bindings in stubs.
-                add.declared_ty.unwrap_or(Type::unknown())
+                add.tcx.annotation.unwrap_or(Type::unknown())
             };
             self.store_expression_type(target, target_ty);
             add.insert(self, target_ty);
@@ -5822,7 +5822,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return None;
             }
 
-            let narrowed_tcx = TypeContext::new(Some(narrowed_ty));
+            let narrowed_tcx = call_expression_tcx.with_annotation(Some(narrowed_ty));
 
             let mut speculative_bindings = bindings.clone();
             let mut speculative_builder = self.speculate();
@@ -7164,7 +7164,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut speculative_builder = self.speculate();
 
             let inferred_ty = speculative_builder
-                .infer_tuple_expression_impl(tuple, TypeContext::new(Some(*narrowed_ty)));
+                .infer_tuple_expression_impl(tuple, tcx.with_annotation(Some(*narrowed_ty)));
             if inferred_ty.is_assignable_to(db, env, *narrowed_ty) {
                 self.extend(speculative_builder);
                 if teardown_expression_cache {
@@ -7257,7 +7257,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     annotated_elt_ty
                 };
-                TypeContext::new(expected)
+                tcx.with_annotation(expected)
             } else {
                 TypeContext::default()
             };
@@ -7398,7 +7398,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return TypeContext::default();
         }
 
-        TypeContext::new(
+        tcx.with_annotation(
             tcx.annotation
                 .and_then(|annotation| self.typed_dict_key_expected_type(annotation)),
         )
@@ -7447,7 +7447,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // the non-`TypedDict` arm of the union.
                         let mut speculative_builder = self.speculate_without_diagnostics();
                         has_dict_compatible_fallback = speculative_builder
-                            .infer_dict_expression(dict, TypeContext::new(Some(element)))
+                            .infer_dict_expression(dict, tcx.with_annotation(Some(element)))
                             .is_assignable_to(db, env, element);
                     }
                 }
@@ -7551,7 +7551,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 collection_expr,
                 elts,
                 infer_elt_expression,
-                TypeContext::new(Some(narrowed_ty)),
+                tcx.with_annotation(Some(narrowed_ty)),
             )?;
 
             // Ensure the inferred return type is assignable to the narrowed declared type.
@@ -7823,7 +7823,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         elt_tcx
                     };
                     let inferred_elt_ty =
-                        infer_elt_expression(self, (i, elt, TypeContext::new(Some(elt_tcx))));
+                        infer_elt_expression(self, (i, elt, tcx.with_annotation(Some(elt_tcx))));
                     inferred_elt_tys[i] = Some(inferred_elt_ty);
 
                     if !inferred_elt_ty.is_assignable_to(db, env, elt_tcx) {
@@ -8010,7 +8010,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .as_ref()
                     .and_then(|inferred_elts| inferred_elts[elts_index][i])
                     .unwrap_or_else(|| {
-                        infer_elt_expression(self, (i, elt, TypeContext::new(elt_tcx)))
+                        infer_elt_expression(self, (i, elt, tcx.with_annotation(elt_tcx)))
                     });
 
                 // Simplify the inference based on a non-covariant declared type.
@@ -8145,7 +8145,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        TypeContext::new(yield_tcx.map(|accumulator| accumulator.into_type(db, env)))
+        tcx.with_annotation(yield_tcx.map(|accumulator| accumulator.into_type(db, env)))
     }
 
     fn infer_generator_expression(
@@ -8823,7 +8823,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let return_tcx = if let Some(signature) = callable_tcx {
             match signature.return_ty {
                 Type::Dynamic(DynamicType::Unknown) => TypeContext::new(None),
-                _ => TypeContext::new(Some(signature.return_ty)),
+                _ => tcx.with_annotation(Some(signature.return_ty)),
             }
         } else {
             // TODO: Useful inference of a lambda's return type will require a different approach,
@@ -13072,7 +13072,7 @@ impl<V> IntoIterator for VecSet<V> {
 
 #[must_use]
 struct AddBinding<'db, 'ast> {
-    declared_ty: Option<Type<'db>>,
+    tcx: TypeContext<'db>,
     declaration: Option<Definition<'db>>,
     binding: Definition<'db>,
     node: AnyNodeRef<'ast>,
@@ -13084,7 +13084,7 @@ struct AddBinding<'db, 'ast> {
 
 impl<'db, 'ast> AddBinding<'db, 'ast> {
     fn type_context(&self) -> TypeContext<'db> {
-        TypeContext::new(self.declared_ty)
+        self.tcx
     }
 
     fn insert(
@@ -13093,7 +13093,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         inferred_ty: Type<'db>,
     ) -> Type<'db> {
         let env = builder.program_environment();
-        let declared_ty = self.declared_ty.unwrap_or(Type::unknown());
+        let declared_ty = self.tcx.annotation.unwrap_or(Type::unknown());
 
         let db = builder.db();
         let file_scope_id = self.binding.file_scope(db);

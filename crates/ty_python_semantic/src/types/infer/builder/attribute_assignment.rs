@@ -810,8 +810,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     )
                     .is_some()
                 }),
-            ExplicitAttributeWriteRequirement::AssignableTo { ty, .. } => {
-                let value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
+            ExplicitAttributeWriteRequirement::AssignableTo { ty, origin, .. } => {
+                let value_ty = self.infer_value(TypeContext::from_origin(*ty, *origin), false);
                 self.check_type_pair(value_ty, *ty, emit_diagnostics)
             }
         }
@@ -913,12 +913,13 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             FallbackAttributeWriteRequirement::AssignableTo {
                 ty,
                 qualifiers,
+                origin,
                 possibly_missing,
             } => {
                 if !self.final_assignment_is_valid(object_ty, *qualifiers, emit_diagnostics) {
                     return false;
                 }
-                let value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
+                let value_ty = self.infer_value(TypeContext::from_origin(*ty, *origin), false);
                 let valid = self.check_type_pair(value_ty, *ty, emit_diagnostics);
                 if *possibly_missing {
                     self.report(AssignmentAttributeWriteDiagnostic::PossiblyMissing);
@@ -943,10 +944,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             FallbackAttributeWriteRequirement::AssignableTo {
                 ty,
                 qualifiers,
+                origin,
                 possibly_missing,
             } => {
                 let value_ty = self.infer_value(
-                    TypeContext::new(Some(*ty)),
+                    TypeContext::from_origin(*ty, *origin),
                     matches!(inference, ContextualInference::Commit) && emit_diagnostics,
                 );
                 if !self.builder.validate_generic_class_attribute_access(

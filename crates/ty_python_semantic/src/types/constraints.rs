@@ -768,6 +768,19 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, node, source_order)
     }
 
+    /// Retains the constraints as validity requirements without supplying inference evidence.
+    pub(crate) fn with_validity_bounds(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Self {
+        self.map_constraints(|constraint| {
+            constraint
+                .with_provenance(ConstraintProvenance::Validity)
+                .new_node(db, env, &mut self.builder.storage.borrow_mut())
+        })
+    }
+
     /// Applies a type mapping to every constraint in this constraint set.
     pub(crate) fn apply_type_mapping_impl(
         self,
@@ -775,6 +788,16 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         type_mapping: &TypeMapping<'_, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        self.map_constraints(|constraint| {
+            constraint.apply_type_mapping_impl(db, self.builder, type_mapping, tcx, visitor)
+        })
+    }
+
+    /// Replace atomic constraints while preserving the diagram's alternatives and source order.
+    fn map_constraints(
+        self,
+        mut map: impl FnMut(Constraint<'db>) -> (NodeId, Option<SourceOrderId>),
     ) -> Self {
         fn rebuild_node(
             storage: &mut ConstraintSetStorage<'_>,
@@ -814,9 +837,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             mapped
         }
 
-        // We have to collect this into a temporary vec since we can't hold an open borrow on the
-        // storage during the apply_type_mapping calls below, since they also need to borrow the
-        // storage.
+        // Mapping may borrow the storage, so collect the constraints before invoking the callback.
         let storage = self.builder.storage.borrow();
         let mut constraints = SmallVec::<[_; 8]>::new();
         self.node
@@ -832,12 +853,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
         let mut mapped_constraints = FxHashMap::default();
         for (constraint_id, constraint) in constraints {
-            if mapped_constraints.contains_key(&constraint_id) {
-                continue;
-            }
-            let mapped =
-                constraint.apply_type_mapping_impl(db, self.builder, type_mapping, tcx, visitor);
-            mapped_constraints.insert(constraint_id, mapped);
+            mapped_constraints.insert(constraint_id, map(constraint));
         }
 
         let mut storage = self.builder.storage.borrow_mut();
