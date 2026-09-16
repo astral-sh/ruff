@@ -37,6 +37,7 @@ ROOT = Path(__file__).resolve().parent.parent
 def inspect(
     metadata: dict[str, Any], workspace_dependencies: dict[str, Any]
 ) -> list[str]:
+    """Return errors for workspace requests for external default features."""
     root = Path(metadata["workspace_root"]).resolve()
     member_ids = set(metadata["workspace_members"])
     members = [
@@ -100,6 +101,7 @@ def inspect(
 def inspect_build_scripts(
     metadata: dict[str, Any], allow_build_scripts: list[str]
 ) -> list[str]:
+    """Return errors for stale entries in the external build-script allowlist."""
     member_ids = set(metadata["workspace_members"])
     build_script_crates = {
         package["name"]
@@ -115,24 +117,20 @@ def inspect_build_scripts(
 
 
 def main() -> int:
+    command = [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--offline",
+        "--all-features",
+        "--format-version",
+        "1",
+    ]
     try:
-        metadata = json.loads(
-            subprocess.check_output(
-                [
-                    "cargo",
-                    "metadata",
-                    "--locked",
-                    "--offline",
-                    "--all-features",
-                    "--format-version",
-                    "1",
-                ],
-                cwd=ROOT,
-                text=True,
-            )
-        )
+        raw_metadata = subprocess.check_output(command, cwd=ROOT, text=True)
     except subprocess.CalledProcessError as error:
         return error.returncode
+    metadata = json.loads(raw_metadata)
 
     root = Path(metadata["workspace_root"])
     with (root / "Cargo.toml").open("rb") as manifest:
