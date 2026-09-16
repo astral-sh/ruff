@@ -23,10 +23,11 @@ mod tests {
 
     use crate::linter::check_path;
     use crate::registry::{Linter, Rule};
+    use crate::rules::flake8_type_checking::settings::RuntimeSemantics;
     use crate::rules::isort;
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
-    use crate::settings::{LinterSettings, flags, types};
+    use crate::settings::{LinterSettings, flags};
     use crate::source_kind::SourceKind;
     use crate::suppression::Suppressions;
     use crate::test::{test_contents, test_path, test_snippet};
@@ -205,14 +206,14 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings {
-                runtime_evaluated_annotations: types::RuntimeEvaluatedAnnotationLocations {
-                    base_classes: types::RuntimeEvaluatedAnnotationLocation {
-                        required: vec![
-                            "pydantic.BaseModel".to_string(),
+                flake8_type_checking: crate::rules::flake8_type_checking::settings::Settings {
+                    runtime_evaluated_base_classes: FxHashMap::from_iter([
+                        ("pydantic.BaseModel".to_string(), RuntimeSemantics::Required),
+                        (
                             "sqlalchemy.orm.DeclarativeBase".to_string(),
-                        ],
-                        ..Default::default()
-                    },
+                            RuntimeSemantics::Required,
+                        ),
+                    ]),
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(rule_code)

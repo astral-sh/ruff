@@ -11,9 +11,11 @@ mod tests {
     use anyhow::Result;
     use itertools::Itertools;
     use ruff_python_ast::PythonVersion;
+    use rustc_hash::FxHashMap;
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
+    use crate::rules::flake8_type_checking::settings::RuntimeSemantics;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_diagnostics, settings};
 
@@ -285,14 +287,16 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
-                runtime_evaluated_annotations:
-                    settings::types::RuntimeEvaluatedAnnotationLocations {
-                        base_classes: settings::types::RuntimeEvaluatedAnnotationLocation {
-                            required: vec!["pydantic.BaseModel".to_string()],
-                            ambiguous: vec!["sqlalchemy.orm.DeclarativeBase".to_string()],
-                        },
-                        ..Default::default()
-                    },
+                flake8_type_checking: super::settings::Settings {
+                    runtime_evaluated_base_classes: FxHashMap::from_iter([
+                        ("pydantic.BaseModel".to_string(), RuntimeSemantics::Required),
+                        (
+                            "sqlalchemy.orm.DeclarativeBase".to_string(),
+                            RuntimeSemantics::Ambiguous,
+                        ),
+                    ]),
+                    ..Default::default()
+                },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -325,18 +329,21 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
-                runtime_evaluated_annotations:
-                    settings::types::RuntimeEvaluatedAnnotationLocations {
-                        decorators: settings::types::RuntimeEvaluatedAnnotationLocation {
-                            required: vec![
-                                "attrs.define".to_string(),
-                                "attrs.frozen".to_string(),
-                                "pydantic.validate_call".to_string(),
-                            ],
-                            ambiguous: vec!["sqlalchemy.orm.declared_attr".to_string()],
-                        },
-                        ..Default::default()
-                    },
+                flake8_type_checking: super::settings::Settings {
+                    runtime_evaluated_decorators: FxHashMap::from_iter([
+                        ("attrs.define".to_string(), RuntimeSemantics::Required),
+                        ("attrs.frozen".to_string(), RuntimeSemantics::Required),
+                        (
+                            "pydantic.validate_call".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                        (
+                            "sqlalchemy.orm.declared_attr".to_string(),
+                            RuntimeSemantics::Ambiguous,
+                        ),
+                    ]),
+                    ..Default::default()
+                },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -355,14 +362,13 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
-                runtime_evaluated_annotations:
-                    settings::types::RuntimeEvaluatedAnnotationLocations {
-                        base_classes: settings::types::RuntimeEvaluatedAnnotationLocation {
-                            required: vec!["module.direct.MyBaseClass".to_string()],
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    },
+                flake8_type_checking: super::settings::Settings {
+                    runtime_evaluated_base_classes: FxHashMap::from_iter([(
+                        "module.direct.MyBaseClass".to_string(),
+                        RuntimeSemantics::Required,
+                    )]),
+                    ..Default::default()
+                },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -377,23 +383,37 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
-                runtime_evaluated_annotations:
-                    settings::types::RuntimeEvaluatedAnnotationLocations {
-                        decorators: settings::types::RuntimeEvaluatedAnnotationLocation {
-                            required: vec![
-                                "fastapi.FastAPI.get".to_string(),
-                                "fastapi.FastAPI.put".to_string(),
-                                "module.app.AppContainer.app.get".to_string(),
-                                "module.app.AppContainer.app.put".to_string(),
-                                "module.app.app.get".to_string(),
-                                "module.app.app.put".to_string(),
-                                "module.app.app_container.app.get".to_string(),
-                                "module.app.app_container.app.put".to_string(),
-                            ],
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    },
+                flake8_type_checking: super::settings::Settings {
+                    runtime_evaluated_decorators: FxHashMap::from_iter([
+                        (
+                            "fastapi.FastAPI.get".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                        (
+                            "fastapi.FastAPI.put".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                        (
+                            "module.app.AppContainer.app.get".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                        (
+                            "module.app.AppContainer.app.put".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                        ("module.app.app.get".to_string(), RuntimeSemantics::Required),
+                        ("module.app.app.put".to_string(), RuntimeSemantics::Required),
+                        (
+                            "module.app.app_container.app.get".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                        (
+                            "module.app.app_container.app.put".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                    ]),
+                    ..Default::default()
+                },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

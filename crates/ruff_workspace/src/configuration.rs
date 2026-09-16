@@ -31,7 +31,7 @@ use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
     CompiledPerFileIgnoreList, CompiledPerFileTargetVersionList, ExtensionMapping, FilePattern,
     FilePatternSet, GlobPath, OutputFormat, PerFileIgnore, PerFileTargetVersion, PreviewMode,
-    RequiredVersion, RuntimeEvaluatedAnnotationLocations, UnsafeFixes,
+    RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{
     DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, TASK_TAGS, TargetVersion,
@@ -316,30 +316,6 @@ impl Configuration {
         conflicting_required_import_pyi025(&isort, &rules)?;
 
         let future_annotations = lint.future_annotations.unwrap_or_default();
-        let mut runtime_evaluated_annotations =
-            lint.runtime_evaluated_annotations.unwrap_or_default();
-        #[expect(deprecated)]
-        if let Some(ref flake8_type_checking) = lint.flake8_type_checking {
-            if runtime_evaluated_annotations
-                .base_classes
-                .required
-                .is_empty()
-                && let Some(ref base_classes) = flake8_type_checking.runtime_evaluated_base_classes
-            {
-                runtime_evaluated_annotations
-                    .base_classes
-                    .required
-                    .clone_from(base_classes);
-            }
-            if runtime_evaluated_annotations.decorators.required.is_empty()
-                && let Some(ref decorators) = flake8_type_checking.runtime_evaluated_decorators
-            {
-                runtime_evaluated_annotations
-                    .decorators
-                    .required
-                    .clone_from(decorators);
-            }
-        }
 
         Ok(Settings {
             cache_dir: self
@@ -538,7 +514,6 @@ impl Configuration {
                     .unwrap_or_default(),
                 typing_extensions: lint.typing_extensions.unwrap_or(true),
                 future_annotations,
-                runtime_evaluated_annotations,
             },
 
             formatter,
@@ -772,7 +747,6 @@ pub struct LintConfiguration {
     pub typing_modules: Option<Vec<String>>,
     pub typing_extensions: Option<bool>,
     pub future_annotations: Option<bool>,
-    pub runtime_evaluated_annotations: Option<RuntimeEvaluatedAnnotationLocations>,
 
     // Plugins
     pub flake8_annotations: Option<Flake8AnnotationsOptions>,
@@ -894,7 +868,6 @@ impl LintConfiguration {
             typing_modules: options.common.typing_modules,
             typing_extensions: options.typing_extensions,
             future_annotations: options.future_annotations,
-            runtime_evaluated_annotations: options.runtime_evaluated_annotations,
 
             // Plugins
             flake8_annotations: options.common.flake8_annotations,
@@ -1341,9 +1314,6 @@ impl LintConfiguration {
             ruff: self.ruff.combine(config.ruff),
             typing_extensions: self.typing_extensions.or(config.typing_extensions),
             future_annotations: self.future_annotations.or(config.future_annotations),
-            runtime_evaluated_annotations: self
-                .runtime_evaluated_annotations
-                .or(config.runtime_evaluated_annotations),
         }
     }
 }
