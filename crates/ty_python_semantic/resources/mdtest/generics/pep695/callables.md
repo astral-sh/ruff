@@ -965,10 +965,8 @@ def _(value: str | int) -> None:
     reveal_type(accepts_callable_and_value(overloaded_consumer, value))  # revealed: str | bytes | int
 ```
 
-When overloads exchange their input and output types, inference preserves each input-output pair.
-The constrained input type excludes `Never`, so each specialization selects one of the overloads. A
-covariant wrapper keeps the pairs visible in the return type instead of collapsing their
-intersection to `Never`:
+When overloads exchange their input and output types, each specialization selects one overload and
+preserves its input-output pair:
 
 ```py
 class Result[T]:
@@ -1033,11 +1031,15 @@ def singleton[S](flag: bool = False) -> Callable[[Callable[[int], S]], Callable[
 
 ## Dependent return types from generic callbacks
 
-A generic identity callback returns the type it receives. Each overload of the consumer selects a
-different argument type for that callback, which also determines its result type. The enclosing
-call's return type should satisfy both specializations, giving `A & B`. We currently retain `A | B`
-because subtype revalidation does not recognize the generic callback as a subtype of either
-specialized callable type:
+A generic identity callback can be used as either `Callable[[A], A]` or `Callable[[B], B]`: it
+returns its argument unchanged:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+```
+
+This overloaded "consumer" can accept either an `A` or a `B`:
 
 ```py
 from typing import Callable, overload
@@ -1045,24 +1047,31 @@ from typing import Callable, overload
 class A: ...
 class B: ...
 
-def infer_result[T, R](callback: Callable[[T], R], consumer: Callable[[T], None]) -> R:
-    raise NotImplementedError
-
-def identity[T](value: T) -> T:
-    return value
-
 @overload
 def consume(value: A) -> None: ...
 @overload
 def consume(value: B) -> None: ...
 def consume(value: A | B) -> None: ...
+```
+
+If we pass both the callback and the consumer to a generic function, we can solve `T` (and thus also
+`R`) to either `A` or `B`. This should allow us to infer `A & B` as the return type.
+
+```py
+def infer_result[T, R](callback: Callable[[T], R], consumer: Callable[[T], None]) -> R:
+    raise NotImplementedError
 
 # TODO: revealed: A & B
 reveal_type(infer_result(identity, consume))  # revealed: A | B
 ```
 
-Supplying a value selects the consumer overload that accepts it. The identity callback's result type
-follows that selected argument type:
+Before intersecting the results, we check that each specialization accepts the original callbacks.
+This subtype check does not yet infer `identity`'s own type variable when comparing it with
+`Callable[[A], A]` or `Callable[[B], B]`. Neither specialization currently passes this check, so we
+infer `A | B` here until this limitation is fixed.
+
+If we additionally supply a value, that selects the specific consumer overload that accepts it. The
+identity callback's result type follows that selected argument type:
 
 ```py
 def infer_result_with_value[T, R](callback: Callable[[T], R], consumer: Callable[[T], None], value: T) -> R:
@@ -1071,74 +1080,6 @@ def infer_result_with_value[T, R](callback: Callable[[T], R], consumer: Callable
 def _(a: A, b: B) -> None:
     reveal_type(infer_result_with_value(identity, consume, a))  # revealed: A
     reveal_type(infer_result_with_value(identity, consume, b))  # revealed: B
-```
-
-## Intersected returns exceeding the output budget
-
-Each overload below independently accepts the call, giving return types `A | B` and `C | D | E`.
-Their intersection contains six pairwise intersections, exceeding the return-type simplification
-budget. Inference retains the merged union of every alternative instead of narrowing from only a
-prefix:
-
-```py
-from typing import Callable, overload
-
-class A: ...
-class B: ...
-class C: ...
-class D: ...
-class E: ...
-
-def accepts_callable[T](consumer: Callable[[T], None]) -> T:
-    raise NotImplementedError
-
-@overload
-def consumer(value: A | B) -> None: ...
-@overload
-def consumer(value: C | D | E) -> None: ...
-def consumer(value: A | B | C | D | E) -> None: ...
-
-reveal_type(accepts_callable(consumer))  # revealed: A | B | C | D | E
-```
-
-An alias in the return annotation must not hide the union from that expansion limit:
-
-```py
-type Return[T] = T
-
-def accepts_callable_aliased[T](consumer: Callable[[T], None]) -> Return[T]:
-    raise NotImplementedError
-
-reveal_type(accepts_callable_aliased(consumer))  # revealed: A | B | C | D | E
-```
-
-## Contextual preference after solution budget exhaustion
-
-The return context prefers `object` for the list's element type. It also requires the repeated
-payload type to satisfy both `A | B` and `C | D | E`, whose intersection exceeds the solution
-budget. Argument inference supplies the payload type and two source element alternatives, but does
-not make the contextual inference complete. The result keeps the merged source element type rather
-than intersecting the alternative tuple returns.
-
-```py
-from ty_extensions import Intersection
-
-class A: ...
-class B: ...
-class C: ...
-class D: ...
-class E: ...
-
-class Source[T]:
-    def get(self) -> T:
-        raise NotImplementedError
-
-def make[T, U, V](value: T, payload: U, source: Source[V]) -> tuple[list[T], U, U, V]:
-    raise NotImplementedError
-
-def _(payload: Intersection[A, C], source: Intersection[Source[D], Source[E]]) -> None:
-    # revealed: tuple[list[object], A & C, A & C, D | E]
-    result: tuple[list[object], A | B, C | D | E, object] = reveal_type(make(1, payload, source))
 ```
 
 ## Inferred type-guard return alternatives

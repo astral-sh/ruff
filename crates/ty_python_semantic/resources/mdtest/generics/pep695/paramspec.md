@@ -812,20 +812,32 @@ reveal_type(c.f)  # revealed: (x: int, y: str) -> int
 
 ### Generic constructors with bounded return types
 
-A generic constructor can specialize its class parameter to satisfy the required return type.
-Capturing its parameters with a `ParamSpec` does not make the constructor's type variable a fixed
-choice belonging to an outer caller:
+A class object can be passed as a callable that constructs instances. `Factory` takes no constructor
+arguments, but its instances have a generic, writable `value` attribute:
+
+```py
+class Factory[T]:
+    value: T
+```
+
+The `construct` helper captures a callable's parameters in `P`, forwards its arguments, and returns
+the resulting instance. The bound on `R` requires that instance to be assignable to
+`Factory[object]`:
 
 ```py
 from typing import Callable
 
-class Factory[T]:
-    value: T
+def construct[**P, R: Factory[object]](factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+```
 
-def factory_result[**P, R: Factory[object]](factory: Callable[P, R]) -> R:
-    raise NotImplementedError
+`P` captures an empty parameter list, so the forwarded call supplies no information for `T`. The
+result should therefore be `Factory[Unknown]`, which is assignable to `Factory[object]` and
+satisfies `R`'s bound. We accept the call, but currently infer `Factory[object]` instead:
 
-reveal_type(factory_result(Factory))  # revealed: Factory[object]
+```py
+# TODO: revealed: Factory[Unknown]
+reveal_type(construct(Factory))  # revealed: Factory[object]
 ```
 
 ### `ParamSpec` in prepended positional parameters

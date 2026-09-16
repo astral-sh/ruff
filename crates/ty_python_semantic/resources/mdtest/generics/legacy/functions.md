@@ -1877,20 +1877,18 @@ def narrowed_via_truthiness(y: list[str]):
         reveal_type(first(y))  # revealed: str
 ```
 
-## Inferring typevars in intersections (actual type position, multiple positive types)
+## Bounded type variables inferred from intersections
 
 When an actual intersection provides multiple valid specializations of a generic call, inference
 keeps those paths separate and intersects the instantiated return types:
 
 ```py
-from typing import Generic, Sequence, TypeVar
+from typing import Sequence, TypeVar
 from ty_extensions import Intersection
 
 class Base: ...
 class Sub1(Base): ...
-class SuperclassOfSub2(Base): ...
-class Sub2(SuperclassOfSub2): ...
-class SubclassOfSub2(Sub2): ...
+class Sub2(Base): ...
 class Unrelated1: ...
 class Unrelated2: ...
 
@@ -1926,12 +1924,23 @@ def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     reveal_type(first(x))  # revealed: Unknown
 ```
 
+## Constrained type variables inferred from covariant intersections
+
 A constrained type variable must be solved to one of its declared constraints. Here, the call is
 solved separately with `Constrained = Sub1` and `Constrained = Sub2`, and the return types are
 intersected. `Constrained` itself is not solved to `Sub1 & Sub2`, which would not be a valid
 declared constraint:
 
 ```py
+from typing import Sequence, TypeVar
+from ty_extensions import Intersection
+
+class Sub1: ...
+class Sub2: ...
+class SubclassOfSub2(Sub2): ...
+class Unrelated1: ...
+class Unrelated2: ...
+
 Constrained = TypeVar("Constrained", Sub1, Sub2)
 
 def first_constrained(x: Sequence[Constrained]) -> Constrained:
@@ -1964,10 +1973,20 @@ def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     reveal_type(first_constrained(x))  # revealed: Unknown
 ```
 
+## Constrained type variables inferred from invariant intersections
+
 Incompatible invariant specializations are disjoint, so two valid positive elements must agree on
 the constrained type:
 
 ```py
+from typing import Generic, TypeVar
+from ty_extensions import Intersection
+
+class Sub1: ...
+class Sub2: ...
+class Unrelated1: ...
+
+Constrained = TypeVar("Constrained", Sub1, Sub2)
 InvariantT = TypeVar("InvariantT")
 
 class Box(Generic[InvariantT]):
@@ -2014,10 +2033,24 @@ def _(x: Intersection[Box[Sub1], Marker], y: Intersection[Box[Sub2], Marker]) ->
     reveal_type(unbox_pair(x, y))  # revealed: Sub1 | Sub2
 ```
 
+## Constrained type variables inferred from contravariant intersections
+
 For a contravariant sink, the selected constraint must be a subtype of the sink's element type. Each
 valid specialization contributes its return type:
 
 ```py
+from typing import Generic, TypeVar
+from ty_extensions import Intersection
+
+class Sub1: ...
+class SuperclassOfSub2: ...
+class Sub2(SuperclassOfSub2): ...
+class SubclassOfSub2(Sub2): ...
+class Unrelated1: ...
+class Unrelated2: ...
+class Marker: ...
+
+Constrained = TypeVar("Constrained", Sub1, Sub2)
 ContravariantT = TypeVar("ContravariantT", contravariant=True)
 
 class ConstrainedSink(Generic[ContravariantT]):
@@ -2064,10 +2097,14 @@ def _(x: Intersection[ConstrainedSink[Unrelated1], ConstrainedSink[Unrelated2]])
     reveal_type(sink_constrained(x))  # revealed: Unknown
 ```
 
-Generic inference should also combine specializations found through the MRO of intersected concrete
-subclasses, rather than only direct generic instances such as `Sequence[Sub1]` above:
+## Inherited specializations in intersection arguments
+
+Inference finds and combines generic specializations through the MRO of intersected concrete
+subclasses:
 
 ```py
+from typing import Generic, TypeVar
+
 SourceT = TypeVar("SourceT", covariant=True)
 ElementT = TypeVar("ElementT")
 
@@ -2096,11 +2133,138 @@ def f(x: IntSource) -> None:
         reveal_type(element(x))  # revealed: Never
 ```
 
-A constructor's synthetic `cls` argument can contain an inferable class type variable even when its
-declared `cls` parameter is specialized to a concrete type:
+## Uninferred return type variables with intersection arguments
+
+A type variable used only in the return annotation can remain uninferred without preventing
+refinement of an independent type variable. Here, `U` becomes `Unknown` in both specializations,
+while `T` is inferred separately as `A` and `B`:
 
 ```py
+from typing import Generic
+from typing_extensions import TypeVar
+from ty_extensions import Intersection
+
+SourceT = TypeVar("SourceT", covariant=True)
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Source(Generic[SourceT]):
+    def get(self) -> SourceT:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+
+def pair(value: Source[T]) -> tuple[T, U]:
+    raise NotImplementedError
+
+def _(value: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(pair(value))  # revealed: tuple[A, Unknown] & tuple[B, Unknown]
+```
+
+An alias in the return annotation preserves the same independence between `T` and `U`:
+
+```py
+from typing_extensions import TypeAliasType
+
+Pair = TypeAliasType("Pair", tuple[T, U], type_params=(T, U))
+
+def aliased_pair(value: Source[T]) -> Pair[T, U]:
+    raise NotImplementedError
+
+def _(value: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(aliased_pair(value))  # revealed: tuple[A, Unknown] & tuple[B, Unknown]
+```
+
+We currently restrict this refinement to uninferred variables that do not participate in argument
+inference. Passing `None` below does not determine `U`, but its parameter annotation contains `U`,
+so the call conservatively keeps the merged fallback:
+
+```py
+def pair_with_other(value: Source[T], other: U | None) -> tuple[T, U]:
+    raise NotImplementedError
+
+def _(value: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(pair_with_other(value, None))  # revealed: tuple[A | B, Unknown]
+```
+
+A fixed default gives the same type in every specialization. Even an invariant `list[int]` default
+therefore allows the independently inferred `T` to be refined:
+
+```py
+FixedU = TypeVar("FixedU", default=list[int])
+
+def fixed_default(value: Source[T]) -> tuple[T, FixedU]:
+    raise NotImplementedError
+
+def _(value: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(fixed_default(value))  # revealed: tuple[A, list[int]] & tuple[B, list[int]]
+```
+
+A default can also depend on an inferred variable. Defaulting `DependentU` to `T` in each
+specialization produces `A` and `B`, which can be intersected:
+
+```py
+DependentU = TypeVar("DependentU", default=T)
+
+def dependent_default(value: Source[T]) -> DependentU:
+    raise NotImplementedError
+
+def _(value: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(dependent_default(value))  # revealed: A & B
+```
+
+Using that defaulted variable inside an invariant return type instead produces incompatible
+`list[A]` and `list[B]` specializations. We retain the merged result so the call does not appear
+non-returning:
+
+```py
+def dependent_list(value: Source[T]) -> list[DependentU]:
+    raise NotImplementedError
+
+def _(value: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(dependent_list(value))  # revealed: list[A | B]
+```
+
+The invariant container can also come from the default itself. Applying `DefaultU = list[T]`
+separately would produce the incompatible invariant types `list[A]` and `list[B]`. We retain the
+merged `list[A | B]` result rather than intersecting them to `Never`:
+
+```py
+DefaultU = TypeVar("DefaultU", default=list[T])
+
+def defaulted(value: Source[T]) -> DefaultU:
+    raise NotImplementedError
+
+def _(value: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(defaulted(value))  # revealed: list[A | B]
+```
+
+## Constructor inference from intersection arguments
+
+A constructor can use an explicit `cls` annotation to restrict its inferred specialization, even
+when another argument admits several element types. We use a covariant source to supply those
+element types:
+
+```py
+from typing import Generic, TypeVar
+
+SourceT = TypeVar("SourceT", covariant=True)
+
+class Source(Generic[SourceT]):
+    def get(self) -> SourceT:
+        raise NotImplementedError
+
+class A: ...
 class ConcreteElement: ...
+```
+
+`FixedReceiverConstructor` has a writable `item` attribute and is invariant in `ElementT`. Its
+`value` parameter and return annotation use `ElementT`, but the explicit `cls` annotation requires
+the class to be specialized with `ConcreteElement`:
+
+```py
+ElementT = TypeVar("ElementT")
 
 class FixedReceiverConstructor(Generic[ElementT]):
     item: ElementT
@@ -2110,15 +2274,31 @@ class FixedReceiverConstructor(Generic[ElementT]):
         value: Source[ElementT],
     ) -> "FixedReceiverConstructor[ElementT]":
         raise NotImplementedError
+```
+
+The argument below is both a `Source[A]` and a `Source[ConcreteElement]`. Either element type could
+satisfy the `value` parameter on its own, but only `ConcreteElement` also satisfies the `cls`
+annotation. The call therefore returns `FixedReceiverConstructor[ConcreteElement]`:
+
+```py
+from ty_extensions import Intersection
 
 def _(value: Intersection[Source[A], Source[ConcreteElement]]) -> None:
     reveal_type(FixedReceiverConstructor(value))  # revealed: FixedReceiverConstructor[ConcreteElement]
 ```
 
-Generic constructors still reconstruct their return type from merged type-variable assignments, so
-an iterable intersection does not yet refine the constructed list's element type:
+The caller does not pass `cls` explicitly: the class object is supplied implicitly to `__new__`.
+During inference, that argument contains the class's still-unsolved `ElementT`, even though the
+written `cls` annotation contains no type variables. Comparing the two fixes `ElementT` to
+`ConcreteElement`; skipping inference based only on the parameter annotation would lose this
+constraint.
+
+Generic constructors still use legacy union-merged solutions for now, without intersection
+refinement:
 
 ```py
+from typing import Sequence
+
 def explicit(x: Intersection[Sequence[int], str]) -> None:
     # TODO: revealed: list[Never]
     reveal_type(list(x))  # revealed: list[int | str]
@@ -2130,6 +2310,8 @@ def narrowed(x: Sequence[int]) -> None:
         reveal_type(list(x))  # revealed: list[int | str]
 ```
 
+## Covariant return types need not preserve intersections
+
 Intersecting covariant return types does not generally allow intersecting their type arguments. A
 meet-preserving generic would satisfy `F[A & B] == F[A] & F[B]`; covariance only guarantees
 `F[A & B] <: F[A] & F[B]`, not the reverse. Here, an object usable as both `F[A]` and `F[B]` can
@@ -2138,7 +2320,11 @@ handles values that are both `A` and `B`, as `F[A & B]` would allow. Thus `F` is
 meet-preserving, and inferring `F[A & B]` from `F[A] & F[B]` would be unsound:
 
 ```py
-from typing import Callable
+from typing import Callable, Generic, TypeVar
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
 
 FSourceT = TypeVar("FSourceT", covariant=True)
 FElementT = TypeVar("FElementT")
@@ -2159,46 +2345,62 @@ def _(x: Intersection[F[A], F[B]]) -> None:
     reveal_type(return_f(x))  # revealed: F[A] & F[B]
 ```
 
-A gradual return component unrelated to inference does not invalidate either static path:
+## Correlated inference from multiple intersection arguments
+
+Constraints from every argument are solved together. Both sources in this function must supply
+values compatible with the same `ElementT`:
 
 ```py
-from typing import Any
+from typing import Generic, TypeVar
+from ty_extensions import Intersection
 
-def element_with_any(x: Source[ElementT]) -> tuple[ElementT, Any]:
-    return x.get(), None
+SourceT = TypeVar("SourceT", covariant=True)
+ElementT = TypeVar("ElementT")
 
-def _(x: Intersection[Source[A], Source[B]]) -> None:
-    reveal_type(element_with_any(x))  # revealed: tuple[A, Any] & tuple[B, Any]
-```
+class Source(Generic[SourceT]):
+    def get(self) -> SourceT:
+        raise NotImplementedError
 
-Constraints from every argument are solved together before each valid call specialization is
-instantiated:
-
-```py
-from typing import ParamSpec
-from typing_extensions import TypeVarTuple, Unpack
-
+class A: ...
+class B: ...
 class D: ...
 
 def correlated(x: Source[ElementT], y: Source[ElementT]) -> ElementT:
     raise NotImplementedError
+```
 
+Since `Source` is covariant, `ElementT` can be a union containing the element types selected from
+both arguments. Selecting `A` or `B` from `x` and `B` or `D` from `y` gives four valid
+specializations: `A | B`, `A | D`, `B`, and `B | D`. Intersecting these return types gives
+`(B & A) | (B & D)`.
+
+This also describes a result obtained from either source: a value from `x` satisfies `A & B`, while
+a value from `y` satisfies `B & D`. Either result satisfies `B`, but need not satisfy both `A` and
+`D`:
+
+```py
 def _(
     x: Intersection[Source[A], Source[B]],
     y: Intersection[Source[B], Source[D]],
 ) -> None:
     reveal_type(correlated(x, y))  # revealed: (B & A) | (B & D)
+```
+
+In contrast, `Box` is invariant: the first argument requires `ElementT = A`, while the second
+requires `ElementT = B`. The unrelated `Marker` and `D` intersection elements do not resolve that
+conflict, so no specialization accepts both arguments. For error recovery, inference merges `A` and
+`B`; neither argument matches the resulting `Box[A | B]` parameter type. The revealed `A | B` is
+therefore not the return type of a valid call:
+
+```py
+InvariantT = TypeVar("InvariantT")
+
+class Box(Generic[InvariantT]):
+    value: InvariantT
+
+class Marker: ...
 
 def invariant_correlated(x: Box[ElementT], y: Box[ElementT]) -> ElementT:
-    raise NotImplementedError
-
-P = ParamSpec("P")
-Ts = TypeVarTuple("Ts")
-
-def invariant_paramspec(x: Box[ElementT], y: Box[ElementT], callback: Callable[P, None]) -> ElementT:
-    raise NotImplementedError
-
-def invariant_typevartuple(x: Box[ElementT], y: Box[ElementT], values: tuple[Unpack[Ts]]) -> ElementT:
     raise NotImplementedError
 
 def _(
@@ -2208,19 +2410,67 @@ def _(
     # error: [invalid-argument-type] "Argument to function `invariant_correlated` is incorrect: Expected `Box[A | B]`, found `Box[A] & Marker`"
     # error: [invalid-argument-type] "Argument to function `invariant_correlated` is incorrect: Expected `Box[A | B]`, found `Box[B] & D`"
     reveal_type(invariant_correlated(x, y))  # revealed: A | B
+```
+
+Capturing a callback's parameters with a `ParamSpec` does not change the incompatible requirements
+on `ElementT`. The call reports the same two box argument errors and retains `A | B` only for error
+recovery:
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def invariant_paramspec(x: Box[ElementT], y: Box[ElementT], callback: Callable[P, None]) -> ElementT:
+    raise NotImplementedError
+
+def _(
+    x: Intersection[Box[A], Marker],
+    y: Intersection[Box[B], D],
+) -> None:
     # error: [invalid-argument-type] "Argument to function `invariant_paramspec` is incorrect: Expected `Box[A | B]`, found `Box[A] & Marker`"
     # error: [invalid-argument-type] "Argument to function `invariant_paramspec` is incorrect: Expected `Box[A | B]`, found `Box[B] & D`"
     reveal_type(invariant_paramspec(x, y, lambda value: None))  # revealed: A | B
+```
+
+Likewise, capturing a tuple's element types with a `TypeVarTuple` does not relax either `Box`
+parameter. Both box arguments are still rejected, with the same error-recovery return type:
+
+```py
+from typing_extensions import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+def invariant_typevartuple(x: Box[ElementT], y: Box[ElementT], values: tuple[Unpack[Ts]]) -> ElementT:
+    raise NotImplementedError
+
+def _(
+    x: Intersection[Box[A], Marker],
+    y: Intersection[Box[B], D],
+) -> None:
     # error: [invalid-argument-type] "Argument to function `invariant_typevartuple` is incorrect: Expected `Box[A | B]`, found `Box[A] & Marker`"
     # error: [invalid-argument-type] "Argument to function `invariant_typevartuple` is incorrect: Expected `Box[A | B]`, found `Box[B] & D`"
     reveal_type(invariant_typevartuple(x, y, (1, "x")))  # revealed: A | B
 ```
 
+## Intersection arguments with overloaded callbacks
+
 Callable constraints can add their own alternatives to the call-wide constraint set. Each complete
 static specialization still validates the whole call and contributes its instantiated return:
 
 ```py
-from typing import overload
+from typing import Callable, Generic, TypeVar, overload
+from ty_extensions import Intersection
+
+SourceT = TypeVar("SourceT", covariant=True)
+ElementT = TypeVar("ElementT")
+
+class Source(Generic[SourceT]):
+    def get(self) -> SourceT:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
 
 def with_callback(x: Source[ElementT], callback: Callable[[ElementT], None]) -> ElementT:
     raise NotImplementedError
@@ -2234,11 +2484,28 @@ def _(x: Intersection[Source[A], Source[B]]) -> None:
     reveal_type(with_callback(x, accepts))  # revealed: A & B
 ```
 
+## Intersection arguments with variadic parameters
+
 Homogeneous unpacked tuple annotations on starred parameters can be validated for each
 specialization, just like `*args: ElementT`. Both direct and unpacked arguments contribute to the
 inferred return type:
 
 ```py
+from typing import Generic, TypeVar
+from typing_extensions import Unpack
+from ty_extensions import Intersection
+
+SourceT = TypeVar("SourceT", covariant=True)
+ElementT = TypeVar("ElementT")
+
+class Source(Generic[SourceT]):
+    def get(self) -> SourceT:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+class D: ...
+
 def with_starred(x: Source[ElementT], *args: Unpack[tuple[ElementT, ...]]) -> ElementT:
     raise NotImplementedError
 
@@ -2247,14 +2514,22 @@ def _(x: Intersection[Source[A], Source[B]], value: D, values: tuple[D, ...]) ->
     reveal_type(with_starred(x, *values))  # revealed: (A & B) | D
 ```
 
+## Variance and nested intersection inference
+
 Intersection inference respects both generic variance and the polarity of nested comparisons:
 
 ```py
+from typing import Generic, TypeVar
+from ty_extensions import Intersection
+
+ElementT = TypeVar("ElementT")
 SinkT = TypeVar("SinkT", contravariant=True)
 
 class Sink(Generic[SinkT]):
     def put(self, value: SinkT) -> None: ...
 
+class A: ...
+class B: ...
 class ASink(Sink[A]): ...
 class BSink(Sink[B]): ...
 
@@ -2264,6 +2539,17 @@ def sink_type(x: Sink[ElementT]) -> ElementT:
 def _(x: ASink) -> None:
     if isinstance(x, BSink):
         reveal_type(sink_type(x))  # revealed: A & B
+```
+
+A covariant source nested inside a contravariant sink reverses the direction of the constraint. `C`
+is a subtype of both `A` and `B`, so it satisfies both the value argument and the sink:
+
+```py
+SourceT = TypeVar("SourceT", covariant=True)
+
+class Source(Generic[SourceT]):
+    def get(self) -> SourceT:
+        raise NotImplementedError
 
 class C(A, B): ...
 
@@ -2277,11 +2563,32 @@ def _(
     reveal_type(choose(x, sink))  # revealed: C
 ```
 
-Generic inference keeps the known types contributed by gradual intersections, but does not yet
-preserve their gradual components or intersect the independently inferred return types. Direct
-member access shows the more precise types:
+## Gradual intersection arguments
+
+Gradual types in arguments that contribute to type-variable inference currently prevent us from
+intersecting the independently inferred return types. Inference keeps the known types contributed by
+gradual intersections, but does not yet preserve their gradual components. Direct member access
+shows the more precise types:
 
 ```py
+from typing import Any, Generic, TypeVar
+from ty_extensions import Intersection
+
+SourceT = TypeVar("SourceT", covariant=True)
+ElementT = TypeVar("ElementT")
+
+class Source(Generic[SourceT]):
+    def get(self) -> SourceT:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+class ASource(Source[A]): ...
+class BSource(Source[B]): ...
+
+def element(x: Source[ElementT]) -> ElementT:
+    return x.get()
+
 def _(x) -> None:
     assert isinstance(x, ASource)
     reveal_type(x.get())  # revealed: Unknown & A
@@ -2304,10 +2611,14 @@ def _(x: Any) -> None:
 ```
 
 A narrowed gradual argument still contributes its known element type when another argument also
-constrains `ElementT`. Ignoring the source's element type would infer an integer-only result and
-hide an invalid attribute access:
+constrains `ElementT`. The result includes both the first argument's `Literal[1]` and the source's
+`str` contribution, rather than only the integer type. Inference should also preserve the gradual
+component of the source's element type, giving `Literal[1] | (Unknown & str)` or
+`Literal[1] | (Any & str)`:
 
 ```py
+class StrSource(Source[str]): ...
+
 def element_with_value(value: ElementT, source: Source[ElementT]) -> ElementT:
     return source.get()
 
@@ -2316,16 +2627,36 @@ def _(unknown, any_: Any) -> None:
     assert isinstance(any_, StrSource)
     unknown_result = element_with_value(1, unknown)
     any_result = element_with_value(1, any_)
+    # TODO: revealed: Literal[1] | (Unknown & str)
     reveal_type(unknown_result)  # revealed: Literal[1] | str
+    # TODO: revealed: Literal[1] | (Any & str)
     reveal_type(any_result)  # revealed: Literal[1] | str
-    # error: [unresolved-attribute]
-    unknown_result.bit_length()
-    # error: [unresolved-attribute]
-    any_result.bit_length()
 ```
 
-Unrelated gradual arguments do not affect `ElementT` and should not prevent static paths from
-refining the return type:
+A gradual argument's known element type also contributes when another argument is an intersection.
+The result includes `D`, but still unions the first argument's `A` and `B` contributions instead of
+intersecting them:
+
+```py
+class D: ...
+class DSource(Source[D]): ...
+
+def correlated(x: Source[ElementT], y: Source[ElementT]) -> ElementT:
+    raise NotImplementedError
+
+def _(x: Intersection[Source[A], Source[B]], unknown, any_: Any) -> None:
+    assert isinstance(unknown, DSource)
+    assert isinstance(any_, DSource)
+    reveal_type(unknown.get())  # revealed: Unknown & D
+    reveal_type(any_.get())  # revealed: Any & D
+    # TODO: revealed: (A & B) | (Unknown & D)
+    reveal_type(correlated(x, unknown))  # revealed: A | D | B
+    # TODO: revealed: (A & B) | (Any & D)
+    reveal_type(correlated(x, any_))  # revealed: A | D | B
+```
+
+Unrelated gradual arguments do not affect `ElementT` and do not prevent intersecting the inferred
+return types:
 
 ```py
 def element_with_other(x: Source[ElementT], other: object) -> ElementT:
@@ -2339,30 +2670,36 @@ def _(x: Intersection[Source[A], Source[B]], other) -> None:
     reveal_type(element_with_dynamic_formal(x, A()))  # revealed: A & B
 ```
 
-A gradual argument's known element type also contributes when another argument is an intersection.
-The result includes `D`, but still unions the first argument's `A` and `B` contributions instead of
-intersecting them:
+Similarly, a gradual component that appears only in the return annotation does not affect how
+`ElementT` is inferred from the arguments. The `Any` component is preserved in both specialized
+return types, which can still be intersected:
 
 ```py
-class DSource(Source[D]): ...
+def element_with_any(x: Source[ElementT]) -> tuple[ElementT, Any]:
+    return x.get(), None
 
-def _(x: Intersection[Source[A], Source[B]], unknown, any_: Any) -> None:
-    assert isinstance(unknown, DSource)
-    assert isinstance(any_, DSource)
-    reveal_type(unknown.get())  # revealed: Unknown & D
-    reveal_type(any_.get())  # revealed: Any & D
-    # TODO: revealed: (A & B) | (Unknown & D)
-    reveal_type(correlated(x, unknown))  # revealed: A | D | B
-    # TODO: revealed: (A & B) | (Any & D)
-    reveal_type(correlated(x, any_))  # revealed: A | D | B
+def _(x: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(element_with_any(x))  # revealed: tuple[A, Any] & tuple[B, Any]
 ```
+
+## Bounds and constraints on gradual intersection arguments
 
 A gradual intersection member can satisfy a declared bound or constraint even when its static
 sibling cannot:
 
 ```py
+from typing import Any, Generic, TypeVar
+from ty_extensions import Intersection
+
+SourceT = TypeVar("SourceT", covariant=True)
 BoundedT = TypeVar("BoundedT", bound=int)
 ConstrainedT = TypeVar("ConstrainedT", int, bytes)
+
+class Source(Generic[SourceT]):
+    def get(self) -> SourceT:
+        raise NotImplementedError
+
+class StrSource(Source[str]): ...
 
 def bounded_element(source: Source[BoundedT]) -> BoundedT:
     return source.get()
@@ -2407,6 +2744,8 @@ def _(
     reveal_type(bounded_element(unknown))  # revealed: Unknown
     reveal_type(constrained_element(unknown))  # revealed: Unknown
 ```
+
+## Iterating a gradually narrowed list
 
 An untyped value narrowed to `list` remains gradual. `enumerate` should accept it and preserve the
 unknown element type:
