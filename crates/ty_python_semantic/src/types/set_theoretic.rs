@@ -120,11 +120,14 @@ impl<'db> UnionType<'db> {
         builder.build()
     }
 
-    /// Returns `true` if any direct element of this union is a type alias.
+    /// Returns whether a direct alias or recursive binder can be expanded without solving
+    /// a query-owned inference reference.
     pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
-        self.elements(db)
-            .iter()
-            .any(|element| matches!(element, Type::TypeAlias(_) | Type::Recursive(_)))
+        self.elements(db).iter().any(|element| match element {
+            Type::TypeAlias(_) => true,
+            Type::Recursive(recursive) => recursive.inference_key(db).is_none(),
+            _ => false,
+        })
     }
 
     /// Recursively expands aliases that expose top-level union elements.
@@ -157,7 +160,13 @@ impl<'db> UnionType<'db> {
             if !seen.insert(element) {
                 continue;
             }
-            match element.resolve_type_alias(db) {
+            // Expanding query references would solve them before deferred projections
+            // have been recorded. Aliases and closed recursive solutions can be expanded.
+            let resolved = match element {
+                Type::Recursive(recursive) if recursive.inference_key(db).is_some() => element,
+                _ => element.resolve_type_alias(db),
+            };
+            match resolved {
                 Type::Union(union) => pending.extend(union.elements(db).iter().rev().copied()),
                 resolved => builder.add_in_place(resolved),
             }

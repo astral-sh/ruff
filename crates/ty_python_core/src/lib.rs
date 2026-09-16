@@ -1101,7 +1101,7 @@ impl From<bool> for Truthiness {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub enum EvaluationMode {
     Sync,
     Async,

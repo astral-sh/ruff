@@ -156,6 +156,57 @@ class ClassDefault:
 reveal_type(len(ClassDefault().value))  # revealed: Literal[2]
 ```
 
+## Recursive indices in tuple attributes
+
+The index and tuple depend on each other's assignments. Every tuple element and index is an integer,
+so assigning the index or the result of its `bit_length` method to `str` is an error.
+
+```py
+class Indexed:
+    def __init__(self):
+        self.index = 0
+        self.value = (0, 1)
+
+    def update(self, other: "Indexed"):
+        self.index = other.value[0]
+        self.value = (other.value[other.index], other.index)
+
+reveal_type(Indexed().index)  # revealed: int
+wrong_index: str = Indexed().index  # error: [invalid-assignment]
+reveal_type(Indexed().index.bit_length())  # revealed: int
+wrong_result: str = Indexed().index.bit_length()  # error: [invalid-assignment]
+```
+
+The inferred index cannot take the non-integer branch of an `isinstance` check.
+
+```py
+index = Indexed().index
+if isinstance(index, int):
+    reveal_type(index)  # revealed: int
+else:
+    reveal_type(index)  # revealed: Never
+```
+
+## Recursive indices stored in tuples
+
+An index can also be stored alongside a label in another tuple. The circular dependency retains both
+the index's integer type and the label's string type.
+
+```py
+class Indexed:
+    def __init__(self):
+        self.cursor = (0, "start")
+        self.value = (0, 1)
+
+    def update(self, other: "Indexed"):
+        self.cursor = (other.value[0], "updated")
+        self.value = (other.value[other.cursor[0]], other.cursor[0])
+
+reveal_type(Indexed().cursor[0])  # revealed: int
+reveal_type(Indexed().cursor[1])  # revealed: str
+wrong_index: str = Indexed().cursor[0]  # error: [invalid-assignment]
+```
+
 ## Tuple expansion through a property
 
 A property's getter determines the tuple read from it. The tuple passed to its setter does not

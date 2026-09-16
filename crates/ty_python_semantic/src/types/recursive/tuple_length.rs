@@ -11,7 +11,8 @@ use ty_python_core::place::PlaceExpr;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::semantic_index;
 
-use super::{InferenceQuery, InferenceSource};
+use super::operations::RecursiveOperation;
+use super::{InferenceKey, InferenceQuery, InferenceSource};
 use crate::place::Place;
 use crate::place::loop_header_reachability;
 use crate::place_load::{
@@ -293,8 +294,16 @@ impl<'db> TupleLengthAnalysis<'db> {
         match ty {
             Type::Recursive(recursive) => {
                 if let Some(key) = recursive.inference_key(db) {
-                    // Promotion preserves the outer tuple length.
-                    self.input(key.source)
+                    match key {
+                        InferenceKey::Source(source) => self.input(source),
+                        InferenceKey::Operation(node) => match node.operation(db) {
+                            RecursiveOperation::Promote { operand, .. } => {
+                                self.type_length(db, operand)
+                            }
+                            RecursiveOperation::Subscript { .. }
+                            | RecursiveOperation::Iterate { .. } => self.push(LengthNode::Unknown),
+                        },
+                    }
                 } else {
                     // Reading stored syntax does not solve the recursive type. Its
                     // nested elements are irrelevant to the length of the outer tuple.

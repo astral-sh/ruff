@@ -4921,7 +4921,7 @@ class C:
 
 # revealed: tuple[μ$0. tuple[$0, int], int]
 reveal_type(C().x)
-reveal_type(C().x[0])  # revealed: μ$0. tuple[$0, int]
+reveal_type(C().x[0])  # revealed: tuple[μ$0. tuple[$0, int], int]
 reveal_type(C().x[0][1])  # revealed: int
 wrong: str = C().x[0][1]  # error: [invalid-assignment]
 ```

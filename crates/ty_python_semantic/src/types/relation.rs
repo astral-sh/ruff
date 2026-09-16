@@ -480,9 +480,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
     ) -> bool {
-        let constraints = ConstraintSetBuilder::new();
-        self.when_constraint_set_assignable_to(db, env, target, &constraints)
-            .is_always_satisfied(db, env)
+        self.is_constraint_set_related_to(db, env, target, TypeRelation::Assignability)
     }
 
     /// Return true if this type is a subtype of `target` using constraint-set typevar rules.
@@ -492,17 +490,49 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
     ) -> bool {
-        let constraints = ConstraintSetBuilder::new();
-        self.has_relation_to_with_typevar_evaluation(
+        self.is_constraint_set_related_to(db, env, target, TypeRelation::Subtyping)
+    }
+
+    fn is_constraint_set_related_to(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+        relation: TypeRelation,
+    ) -> bool {
+        // Implication checks can build another constraint set that asks the same question.
+        // A circular implication alone does not establish a universal relation.
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _, _| false,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn is_constraint_set_related_to_impl<'db>(
+            db: &'db dyn Db,
+            types: TypePair<'db>,
+            relation: TypeRelation,
+        ) -> bool {
+            let env = ProgramEnvironment::from_program(types.program(db));
+            let constraints = ConstraintSetBuilder::new();
+            types
+                .first(db)
+                .has_relation_to_with_typevar_evaluation(
+                    db,
+                    &env,
+                    types.second(db),
+                    &constraints,
+                    TypeVarSet::None,
+                    relation,
+                    TypeVarEvaluation::Lazy,
+                )
+                .is_always_satisfied(db, &env)
+        }
+
+        is_constraint_set_related_to_impl(
             db,
-            env,
-            target,
-            &constraints,
-            TypeVarSet::None,
-            TypeRelation::Subtyping,
-            TypeVarEvaluation::Lazy,
+            TypePair::new(db, env.program(db), self, target),
+            relation,
         )
-        .is_always_satisfied(db, env)
     }
 
     pub(super) fn when_assignable_to<'c>(
@@ -628,7 +658,15 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         other: Type<'db>,
     ) -> bool {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+        // Recursive inference can make provisional redundancy proofs oscillate.
+        // Retaining an element is conservative, so keep a failed proof instead of
+        // repeatedly adding and removing the element.
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| true,
+            cycle_fn=|_, _, previous: &bool, current, _| *previous && current,
+            heap_size=ruff_memory_usage::heap_size
+        )]
         fn is_redundant_with_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
             let program = types.program(db);
             let env = ProgramEnvironment::from_program(program);

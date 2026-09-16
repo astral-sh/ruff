@@ -4,17 +4,17 @@
 //! # Approximation boundaries
 //!
 //! Equation collection follows query references and their deferred operations. It stops at
-//! 32 distinct query/operation pairs. Equations containing `Dynamic` or `Divergent` are
+//! 32 distinct query or operation nodes. Equations containing `Dynamic` or `Divergent` are
 //! approximated rather than solved. This traversal does not force lazy alias or member definitions.
 //! These are termination limits, not tests for whether a recursive type has a solution.
 //!
 //! A solver result is used only when its root is resolved within the type budget and
 //! contains no inference references. Otherwise,
 //! unresolved backedges are replaced with `Divergent`, retaining outer constructors where
-//! possible. A solving query that still cycles after `TAINTED_CYCLES` iterations falls back
-//! to a single `Divergent` marker.
+//! possible. Solving queries use ordinary type cycle recovery for both the closed solution
+//! and its unfolding, retaining known structure when unresolved references are approximated.
 //!
-//! Promotion can retain references as deferred operations.
+//! Promotion, subscripting, and iteration can retain references as deferred operations.
 //! Other semantic type mappings, including specialization and materialization, currently
 //! apply to a finite approximation that retains constructors and cuts backedges with `Divergent`.
 //! Structural substitutions handle references directly according to the requested substitution,
@@ -27,7 +27,7 @@ use ruff_python_ast::name::Name;
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
 
-use super::operations::RecursiveOperations;
+use super::operations::RecursiveOperationNode;
 use super::{RecursiveMapping, RecursiveOrigin, RecursiveSubstitution, RecursiveType};
 use crate::types::class::ImplicitAttributeName;
 use crate::types::constraints::resolution::SolutionType;
@@ -36,20 +36,20 @@ use crate::types::generics::walk_specialization_types;
 use crate::types::infer::{InferExpression, infer_definition_types, infer_expression_types_impl};
 use crate::types::visitor::{TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, DivergentType, DynamicType, MemberInference,
-    Type, TypeContext, TypeMapping, TypeVarVariance, any_over_type,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, DivergentType, DynamicType, MaterializationKind,
+    MemberInference, Type, TypeContext, TypeMapping, TypeVarVariance, any_over_type,
 };
-use crate::{Db, FxIndexMap, Program, ProgramEnvironment, TAINTED_CYCLES};
+use crate::{Db, FxIndexMap, Program, ProgramEnvironment};
 
 /// Identifies the inference result that supplies an equation's body.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
 pub struct InferenceSource<'db>(pub(in crate::types) InferenceQuery<'db>);
 
-/// A query equation after applying a sequence of deferred operations.
+/// An inference equation or an expression whose operands refer to other equations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
-pub struct InferenceKey<'db> {
-    pub(super) source: InferenceSource<'db>,
-    pub(super) operations: Option<RecursiveOperations<'db>>,
+pub enum InferenceKey<'db> {
+    Source(InferenceSource<'db>),
+    Operation(RecursiveOperationNode<'db>),
 }
 
 /// Inference results that can supply the body of a constructor equation.
@@ -67,11 +67,7 @@ impl get_size2::GetSize for InferenceSource<'_> {}
 impl<'db> InferenceQuery<'db> {
     /// Return an acyclic value directly or a closed reference to its defining query.
     pub(in crate::types) fn value(self, db: &'db dyn Db, body: Type<'db>) -> Type<'db> {
-        InferenceKey {
-            source: InferenceSource(self),
-            operations: None,
-        }
-        .value(db, body)
+        InferenceKey::Source(InferenceSource(self)).value(db, body)
     }
 }
 
@@ -89,10 +85,54 @@ impl<'db> InferenceSolution<'db> {
     fn approximate(ty: Type<'db>) -> Self {
         Self { ty, unfolded: ty }
     }
+
+    /// Normalize the stored results without collecting equations or re-entering the solver.
+    fn cycle_normalized(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        // A solver's provisional result may escape into another equation. Keep its
+        // unresolved leaves adoptable by that equation's recovery after normalizing growth.
+        let replacements = [
+            None,
+            Some(MaterializationKind::Top),
+            Some(MaterializationKind::Bottom),
+        ]
+        .map(|materialization| {
+            (
+                Type::Divergent(DivergentType {
+                    materialization,
+                    ..DivergentType::new(cycle.id())
+                }),
+                Type::Divergent(DivergentType {
+                    materialization,
+                    ..DivergentType::from_inference(cycle.id())
+                }),
+            )
+        });
+        let [ty, unfolded] = [(self.ty, previous.ty), (self.unfolded, previous.unfolded)].map(
+            |(current, previous)| {
+                current
+                    .cycle_normalized(db, env, previous, cycle)
+                    .apply_type_mapping(
+                        db,
+                        env,
+                        &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Replace(
+                            &replacements,
+                        ))),
+                        TypeContext::default(),
+                    )
+            },
+        );
+        Self { ty, unfolded }
+    }
 }
 
 impl<'db> InferenceSource<'db> {
-    pub(super) fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
+    fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
         match self.0 {
             InferenceQuery::Binding(definition) => ProgramEnvironment::from_definition(definition),
             InferenceQuery::Expression(input) => {
@@ -117,11 +157,14 @@ impl<'db> InferenceSource<'db> {
 }
 
 impl<'db> InferenceKey<'db> {
-    fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
-        self.source.environment(db)
+    pub(super) fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
+        match self {
+            Self::Source(source) => source.environment(db),
+            Self::Operation(operation) => operation.environment(db),
+        }
     }
 
-    fn reference(self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn reference(self, db: &'db dyn Db) -> Type<'db> {
         Type::Recursive(RecursiveType::inference(db, self))
     }
 
@@ -137,19 +180,17 @@ impl<'db> InferenceKey<'db> {
         }
     }
 
-    fn equation(self, db: &'db dyn Db) -> Type<'db> {
-        let body = self.source.equation(db);
-        self.operations.map_or(body, |operations| {
-            operations.apply(db, &self.environment(db), body)
-        })
-    }
-
     fn cycle_marker(self) -> Type<'db> {
-        let id = match self.source.0 {
-            InferenceQuery::Binding(definition) => definition.as_id(),
-            InferenceQuery::Expression(input) => input.as_id(),
-            InferenceQuery::Attribute(attribute) => attribute.as_id(),
-            InferenceQuery::Member(member) => member.as_id(),
+        let id = match self {
+            Self::Source(InferenceSource(InferenceQuery::Binding(definition))) => {
+                definition.as_id()
+            }
+            Self::Source(InferenceSource(InferenceQuery::Expression(input))) => input.as_id(),
+            Self::Source(InferenceSource(InferenceQuery::Attribute(attribute))) => {
+                attribute.as_id()
+            }
+            Self::Source(InferenceSource(InferenceQuery::Member(member))) => member.as_id(),
+            Self::Operation(operation) => operation.as_id(),
         };
         Type::Divergent(DivergentType::from_inference(id))
     }
@@ -162,7 +203,8 @@ impl<'db> InferenceKey<'db> {
     pub(super) fn approximate(self, db: &'db dyn Db) -> Type<'db> {
         // The unfolding retains query identities; a closed solution no longer distinguishes
         // these backedges from independently recursive components.
-        let (equations, _) = self.equations(db, self.solution(db).unfolded);
+        let (equations, _) =
+            EquationEvaluator::default().collect(db, self, self.solution(db).unfolded);
         RecursiveMapping::approximate_inference(
             db,
             &self.environment(db),
@@ -172,7 +214,7 @@ impl<'db> InferenceKey<'db> {
         )
     }
 
-    /// Retain the equation's outer constructors while approximating unresolved backedges.
+    /// Retain outer constructors while approximating unresolved equation references.
     fn approximate_equation(
         self,
         db: &'db dyn Db,
@@ -192,37 +234,11 @@ impl<'db> InferenceKey<'db> {
         InferenceSolution::approximate(ty)
     }
 
-    /// Collect dependencies of the supplied root body and report whether all were found.
-    fn equations(
-        self,
-        db: &'db dyn Db,
-        root: Type<'db>,
-    ) -> (FxIndexMap<InferenceKey<'db>, Type<'db>>, bool) {
-        let env = self.environment(db);
-        let mut equations = FxIndexMap::from_iter([(self, root)]);
-        let mut cursor = 0;
-        while let Some((_, body)) = equations.get_index(cursor) {
-            let inputs = RecursiveInputs::collect(db, &env, [*body]);
-            cursor += 1;
-            for key in inputs {
-                if !equations.contains_key(&key) {
-                    // Query inputs and deferred operation sequences can grow. Distinct
-                    // sequences are distinct equations, so this also bounds repeated
-                    // projections that adjacent idempotence cannot simplify.
-                    if equations.len() >= 32 {
-                        return (equations, false);
-                    }
-                    equations.insert(key, key.equation(db));
-                }
-            }
-        }
-        (equations, true)
-    }
-
     fn solve(self, db: &'db dyn Db) -> InferenceSolution<'db> {
         let env = self.environment(db);
-        let root = self.equation(db);
-        let (equations, complete) = self.equations(db, root);
+        let mut evaluator = EquationEvaluator::default();
+        let body = evaluator.evaluate(db, self);
+        let (equations, complete) = evaluator.collect(db, self, body);
         // Gradual equations still need a bound on materialization, but approximation
         // follows their dependencies to retain the known constructors.
         if !complete
@@ -299,11 +315,78 @@ impl<'db> InferenceKey<'db> {
     }
 }
 
+/// Evaluate expression inputs from one shared set of query equations, without solving them.
+#[derive(Default)]
+struct EquationEvaluator<'db> {
+    bodies: FxIndexMap<InferenceKey<'db>, Type<'db>>,
+    incomplete: bool,
+}
+
+impl<'db> EquationEvaluator<'db> {
+    fn evaluate(&mut self, db: &'db dyn Db, key: InferenceKey<'db>) -> Type<'db> {
+        if let Some(body) = self.bodies.get(&key) {
+            return *body;
+        }
+        // Count source and operation nodes, including inputs eliminated by an operation.
+        // Interning shares equal expressions but does not bound growing expressions.
+        if self.bodies.len() >= 32 {
+            self.incomplete = true;
+            return key.reference(db);
+        }
+        self.bodies.insert(key, key.reference(db));
+        let body = match key {
+            InferenceKey::Source(source) => source.equation(db),
+            InferenceKey::Operation(node) => node
+                .operation(db)
+                .map_operands(|ty| {
+                    if let Type::Recursive(recursive) = ty
+                        && let Some(input) = recursive.inference_key(db)
+                    {
+                        self.evaluate(db, input)
+                    } else {
+                        ty
+                    }
+                })
+                .apply(db, &node.environment(db)),
+        };
+        self.bodies.insert(key, body);
+        body
+    }
+
+    /// Collect equations for the remaining references after reducing operations.
+    fn collect(
+        &mut self,
+        db: &'db dyn Db,
+        root: InferenceKey<'db>,
+        body: Type<'db>,
+    ) -> (FxIndexMap<InferenceKey<'db>, Type<'db>>, bool) {
+        let env = root.environment(db);
+        let mut equations = FxIndexMap::from_iter([(root, body)]);
+        let mut cursor = 0;
+        'collect: while let Some((_, body)) = equations.get_index(cursor) {
+            let inputs = RecursiveInputs::collect(db, &env, [*body]);
+            cursor += 1;
+            for key in inputs {
+                if !equations.contains_key(&key) {
+                    let body = self.evaluate(db, key);
+                    equations.insert(key, body);
+                    if self.incomplete {
+                        break 'collect;
+                    }
+                }
+            }
+        }
+        (equations, !self.incomplete)
+    }
+}
+
 /// Solving may infer signatures and members, so it runs in an ordinary query.
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|_, id, _, _| InferenceSolution::approximate(Type::divergent(id)),
-    cycle_fn=|_, cycle: &salsa::Cycle, _, current, _, _| if cycle.iteration() <= TAINTED_CYCLES { current } else { InferenceSolution::approximate(Type::divergent(cycle.id())) },
+    cycle_fn=|db, cycle, previous: &InferenceSolution<'db>, current: InferenceSolution<'db>, _, key: InferenceKey<'db>| {
+        current.cycle_normalized(db, &key.environment(db), *previous, cycle)
+    },
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn inference_solution<'db>(
@@ -375,6 +458,26 @@ impl<'db> RecursiveInputs<'db> {
         Type::Dynamic(DynamicType::AmbiguousOverload(
             (!keys.is_empty()).then(|| Self::new(db, keys.into_boxed_slice())),
         ))
+    }
+
+    /// Resolve query references without inserting their solutions into equations.
+    pub(in crate::types) fn resolve(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        let replacements: Vec<_> = Self::collect(db, env, [ty])
+            .into_iter()
+            .map(|key| (key.reference(db), key.solution(db).ty))
+            .collect();
+        ty.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Replace(
+                &replacements,
+            ))),
+            TypeContext::default(),
+        )
     }
 
     /// Collect query references without traversing their defining equations.

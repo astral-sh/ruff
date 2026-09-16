@@ -960,7 +960,7 @@ union_list_result: list[int | str] = to_thread_like(
 to_thread_like(
     generic_pair,
     reveal_type([1]),  # revealed: list[str | int]
-    reveal_type([""]),  # revealed: list[int | str]
+    reveal_type([""]),  # revealed: list[str | int]
 )
 
 to_thread_like(

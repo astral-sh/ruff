@@ -1775,6 +1775,26 @@ def same_paramspec[**P]() -> None:
     static_assert(constraints == expected)
 ```
 
+### Nested tuple bounds
+
+A union containing an unconstrained type variable is not necessarily assignable to a tuple, even
+when its other members are tuples. These nested bounds admit some specializations and reject others.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_constraint_set_assignable_to
+
+type Tail[T] = tuple[*tuple[str, ...], tuple[int] | T]
+
+def compare[X, Y, Z]():
+    relation = is_constraint_set_assignable_to(
+        Tail[Y] | Y,
+        Tail[X | Tail[Tail[Y] | Z] | Tail[Y] | Z],
+    )
+    static_assert(not relation)
+    static_assert(not ~relation)
+```
+
 ## Recursive lower bounds
 
 ### Mutual dependencies

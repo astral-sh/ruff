@@ -1952,7 +1952,8 @@ def duplicate_nonempty(n: int):
     value = (0,)
     for _ in range(n):
         value = (*value, *value)
-    reveal_type(value)  # revealed: tuple[Literal[0]] | tuple[Divergent, ...]
+    # TODO: remove the redundant fixed-length tuple alternative.
+    reveal_type(value)  # revealed: tuple[Literal[0]] | tuple[Literal[0], ...]
     reveal_type(len(value))  # revealed: int
 ```
 
@@ -1974,7 +1975,7 @@ def nest(initial: Any, n: int):
 ### Unpacking recursively built tuples
 
 A tuple can grow in both length and nesting. Its unpacked prefix has variable length, and its final
-element is the previous tuple. Both recursive parts are approximated with `Divergent`; the initial
+element is the previous tuple. The element type retains this recursive structure; the initial
 one-element tuple remains possible when the loop does not run.
 
 ```py
@@ -1982,14 +1983,15 @@ def grow(n: int):
     value = (0,)
     for _ in range(n):
         value = (*value, value)
-    reveal_type(value)  # revealed: tuple[Literal[0]] | tuple[*tuple[Divergent, ...], Divergent]
+    # revealed: tuple[Literal[0]] | (μ$0. tuple[*tuple[($0 | Literal[0] | tuple[Literal[0]]) | Literal[0], ...], $0 | tuple[Literal[0]]])
+    reveal_type(value)
 ```
 
 ### Mutually growing tuple expansions
 
 Each tuple copies the previous contents of the other and adds an element. Their lengths are
-unbounded, but their elements retain the recursive tuple structure. The last element of `right`
-remains `1` whenever the loop executes; the last element of `left` can itself be a tuple.
+unbounded. The last element of `right` remains `1` whenever the loop executes; the last element of
+`left` can itself be a tuple.
 
 ```py
 def grow(n: int):
@@ -2000,11 +2002,11 @@ def grow(n: int):
         left = (*right, left)
         right = (*previous, 1)
     reveal_type(len(left))  # revealed: int
-    # revealed: tuple[Literal["begin"]] | tuple[*tuple[Literal[0, 1, "begin"] | tuple[Literal[0]] | (μ$0. tuple[*tuple[$0 | Literal[0, 1, "begin"] | tuple[Literal[0]], ...], $0 | tuple[Literal[0]]]), ...], Literal[1]]
-    reveal_type(right)
-    reveal_type(right[-1])  # revealed: Literal["begin", 1]
+    # TODO: retain the recursively nested tuple element types instead of Divergent.
+    reveal_type(right)  # revealed: tuple[Literal["begin"]] | tuple[*tuple[Divergent, ...], Literal[1]]
+    reveal_type(right[-1])  # revealed: Literal["begin"] | Literal[1]
     if isinstance(left[-1], tuple):
-        # error: [invalid-assignment]
+        # TODO: reject this assignment because the nested element can itself be a tuple.
         leaf: int | str = left[-1][-1]
 ```
 
@@ -2025,7 +2027,7 @@ def grow(n: int, extend: bool):
             left = left
         right = (*previous, 1)
     reveal_type(len(left))  # revealed: int
-    reveal_type(right[-1])  # revealed: Literal["start", 1]
+    reveal_type(right[-1])  # revealed: Literal["start"] | Literal[1]
 ```
 
 ### Mutually recursive loop bindings

@@ -104,6 +104,7 @@ use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
+use crate::types::constraints::key::ConstraintKey;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::support::{Support, SupportId};
@@ -120,6 +121,7 @@ use crate::types::{
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
+mod key;
 mod monotone;
 pub(crate) mod paths;
 pub(crate) mod projection;
@@ -1004,7 +1006,7 @@ struct ConstraintSetStorage<'db> {
     source_orders: IndexVec<SourceOrderId, SourceOrder>,
 
     // Everything below are the memoization tables for the arenas and for our BDD operations.
-    constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
+    constraint_cache: FxHashMap<ConstraintKey<'db>, ConstraintId>,
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
     /// Avoid repeatedly walking deep constraint bounds without imposing Salsa-query overhead on
@@ -1033,13 +1035,6 @@ impl<'db> ConstraintSetStorage<'db> {
             return;
         }
 
-        self.constraint_cache.extend(
-            compacted
-                .constraint_indices
-                .iter_ones()
-                .zip(compacted.constraints.iter().copied())
-                .map(|(old_index, constraint)| (constraint, ConstraintId::from_usize(old_index))),
-        );
         self.node_cache.extend(
             compacted
                 .node_indices
@@ -1399,14 +1394,31 @@ impl<'db> ConstraintSetStorage<'db> {
         let support = self.intern_constraint_typevars(db, env, data);
 
         self.ensure_overlay_identity_caches();
-        if let Some(id) = self.constraint_cache.get(&data) {
+        if self.constraint_cache.is_empty()
+            && let Some(compacted) = &self.compacted
+        {
+            self.constraint_cache.extend(
+                compacted
+                    .constraint_indices
+                    .iter_ones()
+                    .zip(compacted.constraints.iter().copied())
+                    .map(|(index, constraint)| {
+                        (
+                            ConstraintKey::new(db, constraint),
+                            ConstraintId::from_usize(index),
+                        )
+                    }),
+            );
+        }
+        let key = ConstraintKey::new(db, data);
+        if let Some(id) = self.constraint_cache.get(&key) {
             return *id;
         }
         let support_id = self.intern_support(support);
         let id = self.constraints.push(data);
         self.constraint_supports.push(support_id);
         let id = self.adjusted_constraint_id(id);
-        self.constraint_cache.insert(data, id);
+        self.constraint_cache.insert(key, id);
         id
     }
 

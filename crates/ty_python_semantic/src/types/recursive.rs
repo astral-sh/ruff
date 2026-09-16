@@ -6,7 +6,7 @@
 
 mod graph;
 mod inference;
-mod operations;
+pub(super) mod operations;
 mod tuple_length;
 
 pub(super) use inference::{InferenceKey, InferenceQuery, InferenceSource, RecursiveInputs};
@@ -19,7 +19,7 @@ use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
 use self::graph::RecursiveGraphBuilder;
-use self::operations::{RecursiveOperation, RecursiveOperations};
+use self::operations::{RecursiveOperation, RecursiveOperationNode};
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use super::generics::{ApplySpecialization, Specialization, walk_specialization_types};
 use super::relation::{TypeRelation, TypeRelationChecker};
@@ -27,8 +27,8 @@ use super::variance::{VarianceInferable, VarianceOrigin};
 use super::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, DivergentType,
-    GenericContext, MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping,
-    VarianceTerm,
+    GenericContext, MaterializationKind, RecursivelyDefined, Type, TypeAliasType, TypeContext,
+    TypeMapping, UnionBuilder, VarianceTerm,
 };
 use crate::{Db, FxIndexMap, FxOrderSet, Program, ProgramEnvironment};
 
@@ -167,7 +167,6 @@ impl<'db> RecursiveBinding<'db> {
                 recursive.origin(db) == target.origin(db)
                     && recursive.graph(db) == target.graph(db)
                     && recursive.materialization_kind(db) == target.materialization_kind(db)
-                    && recursive.operations(db) == target.operations(db)
             }
         };
         matches.then_some(cycle)
@@ -200,10 +199,41 @@ impl<'db> RecursiveApproximation<'_, 'db> {
         // projections. Enumerating every path through shared cycles grows factorially.
         self.cache.borrow_mut().insert(key, self.divergent);
         let ty = self.equations.get(&key).map_or(self.divergent, |body| {
-            body.apply_type_mapping_impl(db, mapping, tcx, &visitor.fresh())
+            let ty = body.apply_type_mapping_impl(db, mapping, tcx, &visitor.fresh());
+            self.normalize(db, visitor.env, ty)
         });
         self.cache.borrow_mut().insert(key, ty);
         ty
+    }
+
+    /// Remove forwarding backedges before embedding a finite equation in a constructor.
+    fn normalize(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        let Type::Union(union) = ty else {
+            return ty;
+        };
+        let mut builder = UnionBuilder::new(db, env)
+            .unpack_aliases(false)
+            .cycle_recovery(true)
+            .or_recursively_defined(union.recursively_defined(db));
+        let mut pending: Vec<_> = union.elements(db).iter().rev().copied().collect();
+        while let Some(element) = pending.pop() {
+            if let Type::Union(nested) = element {
+                if nested.recursively_defined(db) == RecursivelyDefined::Yes {
+                    builder = builder.or_recursively_defined(RecursivelyDefined::Yes);
+                }
+                pending.extend(nested.elements(db).iter().rev().copied());
+            } else if element.is_divergent_in_cycle(self.divergent) {
+                builder = builder.or_recursively_defined(RecursivelyDefined::Yes);
+            } else {
+                builder.add_in_place(element);
+            }
+        }
+        builder.try_build().unwrap_or(self.divergent)
     }
 }
 
@@ -310,8 +340,8 @@ pub enum RecursiveOrigin<'db> {
     },
     /// A closed solution of recursive type constraints, independent of any query cycle.
     ConstraintSolution(Program<'db>),
-    /// A closed reference to a query equation; its identity excludes provisional solutions.
-    Inference(InferenceSource<'db>),
+    /// A closed reference to an inference equation or deferred expression, excluding provisional solutions.
+    Inference(InferenceKey<'db>),
     /// A query's unresolved initial binder. It is replaced by a query reference at read boundaries.
     InferenceCycle {
         program: Program<'db>,
@@ -380,9 +410,6 @@ pub struct RecursiveType<'db> {
     /// The lazy materialization applied to this recursive alias, if any.
     #[returns(copy)]
     pub(super) materialization_kind: Option<MaterializationKind>,
-    /// Deferred operations on the closed query reference, outside its recursive binder.
-    #[returns(copy)]
-    operations: Option<RecursiveOperations<'db>>,
 }
 
 impl get_size2::GetSize for RecursiveType<'_> {}
@@ -410,7 +437,6 @@ impl<'db> RecursiveType<'db> {
             ),
             0,
             arguments,
-            None,
             None,
         )
     }
@@ -440,7 +466,6 @@ impl<'db> RecursiveType<'db> {
             0,
             None,
             None,
-            None,
         ))
     }
 
@@ -448,7 +473,7 @@ impl<'db> RecursiveType<'db> {
     fn inference(db: &'db dyn Db, key: InferenceKey<'db>) -> Self {
         Self::new_internal(
             db,
-            RecursiveOrigin::Inference(key.source),
+            RecursiveOrigin::Inference(key),
             RecursiveGraph::new_internal(
                 db,
                 vec![Type::RecursiveVar(RecursiveVar::new_internal(
@@ -461,16 +486,12 @@ impl<'db> RecursiveType<'db> {
             0,
             None,
             None,
-            key.operations,
         )
     }
 
     pub(super) fn inference_key(self, db: &'db dyn Db) -> Option<InferenceKey<'db>> {
         match self.origin(db) {
-            RecursiveOrigin::Inference(source) => Some(InferenceKey {
-                source,
-                operations: self.operations(db),
-            }),
+            RecursiveOrigin::Inference(key) => Some(key),
             _ => None,
         }
     }
@@ -542,7 +563,6 @@ impl<'db> RecursiveType<'db> {
             entry,
             arguments,
             self.materialization_kind(db),
-            self.operations(db),
         ))
     }
 
@@ -576,7 +596,6 @@ impl<'db> RecursiveType<'db> {
             && self.graph(db) == other.graph(db)
             && self.arguments(db) == other.arguments(db)
             && self.materialization_kind(db) == other.materialization_kind(db)
-            && self.operations(db) == other.operations(db)
     }
 
     /// Close recursive occurrences after inferring an alias's constructor expression.
@@ -628,7 +647,6 @@ impl<'db> RecursiveType<'db> {
             0,
             self.arguments(db),
             None,
-            None,
         ))
     }
 
@@ -640,7 +658,6 @@ impl<'db> RecursiveType<'db> {
             self.entry(db),
             arguments,
             self.materialization_kind(db),
-            self.operations(db),
         )
     }
 
@@ -656,7 +673,6 @@ impl<'db> RecursiveType<'db> {
             self.entry(db),
             self.arguments(db),
             materialization,
-            self.operations(db),
         )
     }
 
@@ -775,6 +791,19 @@ impl<'db> RecursiveType<'db> {
                     arguments,
                 ))
             }
+            TypeMapping::Recursive(_)
+                if let Some(InferenceKey::Operation(node)) = self.inference_key(db) =>
+            {
+                let operation = node.operation(db).map_operands(|operand| {
+                    operand.apply_type_mapping_impl(db, mapping, tcx, visitor)
+                });
+                InferenceKey::Operation(RecursiveOperationNode::new(
+                    db,
+                    node.environment(db).program(db),
+                    operation,
+                ))
+                .reference(db)
+            }
             TypeMapping::Recursive(RecursiveMapping(substitution)) => {
                 let graph = if matches!(self.origin(db), RecursiveOrigin::Alias { cycle, .. }
                     if Some(cycle) == substitution.alias_cycle(db))
@@ -800,11 +829,17 @@ impl<'db> RecursiveType<'db> {
                     self.entry(db),
                     arguments,
                     self.materialization_kind(db),
-                    self.operations(db),
                 ))
             }
-            TypeMapping::Promote(mode, kind) if self.inference_key(db).is_some() => {
-                Type::Recursive(self.with_operation(db, RecursiveOperation::Promote(*mode, *kind)))
+            TypeMapping::Promote(mode, kind)
+                if let Some(ty) = (RecursiveOperation::Promote {
+                    operand: Type::Recursive(self),
+                    mode: *mode,
+                    kind: *kind,
+                })
+                .deferred(db, visitor.env) =>
+            {
+                ty
             }
             // Map the finite approximation so specialization and materialization retain
             // known constructors without embedding a provisional recursive solution.
@@ -878,7 +913,6 @@ impl<'db> RecursiveType<'db> {
                 self.graph(db) == root.graph(db)
                     && self.origin(db) == root.origin(db)
                     && self.materialization_kind(db) == root.materialization_kind(db)
-                    && self.operations(db) == root.operations(db)
             }) =>
             {
                 Type::Recursive(self)
@@ -895,7 +929,6 @@ impl<'db> RecursiveType<'db> {
                             entry,
                             self.arguments(db),
                             self.materialization_kind(db),
-                            self.operations(db),
                         );
                         let mapped = root.map_type(db, visitor.env, |unfolded| {
                             unfolded.apply_type_mapping_impl(db, mapping, tcx, &nested)
@@ -1179,6 +1212,13 @@ impl<'db> TypeVisitor<'db> for RecursiveReferences<'_, 'db> {
     /// Count this binder only inside its body. Application arguments remain in the
     /// surrounding scope, and the original depth is restored before visiting siblings.
     fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+        if let Some(InferenceKey::Operation(node)) = recursive.inference_key(db) {
+            // Expression inputs belong to the surrounding graph, not the query's dummy binder.
+            for operand in node.operation(db).operands() {
+                self.visit_type(db, operand);
+            }
+            return;
+        }
         if let Some(arguments) = recursive.arguments(db) {
             walk_specialization_types(db, arguments, self);
         }
