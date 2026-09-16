@@ -1421,9 +1421,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => slice_ty,
             };
-            SubclassOfType::try_from_instance(db, env, slice_ty).unwrap_or_else(|| match slice_ty {
-                Type::Callable(_) => invalid_type_argument(builder, slice),
-                _ => todo_type!("unsupported type[X] special form"),
+            SubclassOfType::try_from_instance(db, env, slice_ty).unwrap_or_else(|unsupported| {
+                match unsupported {
+                    Type::Callable(_) => invalid_type_argument(builder, slice),
+                    _ => todo_type!("unsupported type[X] special form"),
+                }
             })
         };
 
@@ -1436,7 +1438,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::StringLiteral(_) => {
                 infer_type_argument(self, slice)
             }
-            ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
+            ast::Expr::BinOp(binary)
+                if matches!(binary.op, ast::Operator::BitOr | ast::Operator::BitAnd) =>
+            {
                 infer_type_argument(self, slice)
             }
             ast::Expr::Tuple(_) => {
@@ -1536,7 +1540,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         invalid_type_argument(self, slice)
                     }
                     value_ty @ (Type::SpecialForm(
-                        SpecialFormType::Top | SpecialFormType::Bottom | SpecialFormType::Annotated,
+                        SpecialFormType::Top
+                        | SpecialFormType::Bottom
+                        | SpecialFormType::Annotated
+                        | SpecialFormType::Intersection,
                     )
                     | Type::KnownInstance(_)
                     | Type::GenericAlias(_)
