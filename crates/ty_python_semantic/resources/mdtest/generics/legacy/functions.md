@@ -2484,6 +2484,17 @@ def _(x: Intersection[Source[A], Source[B]]) -> None:
     reveal_type(with_callback(x, accepts))  # revealed: A & B
 ```
 
+The overloaded callback also accepts the merged `A | B` parameter, since its overloads cover both
+union members. An invariant result therefore retains the valid merged specialization:
+
+```py
+def list_with_callback(x: Source[ElementT], callback: Callable[[ElementT], None]) -> list[ElementT]:
+    return []
+
+def _(x: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(list_with_callback(x, accepts))  # revealed: list[A | B]
+```
+
 ## Intersection arguments with variadic parameters
 
 Homogeneous unpacked tuple annotations on starred parameters can be validated for each
@@ -2862,6 +2873,97 @@ def with_fixed_list(source: Source[T], value: U) -> tuple[T, list[U]]:
 
 def _(source: Intersection[Source[A], Source[B]], value: str) -> None:
     reveal_type(with_fixed_list(source, value))  # revealed: tuple[A, list[str]] & tuple[B, list[str]]
+```
+
+## Mutable returns from alternative specializations
+
+Each sink accepts one of the two possible element types. Both complete specializations can return a
+mutable list, but merging their element types does not produce a specialization accepted by either
+sink. The call retains the union of the separately specialized list types:
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import Intersection
+
+SinkT = TypeVar("SinkT", contravariant=True)
+T = TypeVar("T")
+
+class Sink(Generic[SinkT]):
+    def put(self, value: SinkT) -> None: ...
+
+class A: ...
+class B: ...
+class ASink(Sink[A]): ...
+class BSink(Sink[B]): ...
+
+def make_list(sink: Sink[T]) -> list[T]:
+    return []
+
+def _(sink: Intersection[ASink, BSink]) -> None:
+    reveal_type(make_list(sink))  # revealed: list[A] | list[B]
+```
+
+Reversing the intersection members preserves the same two possible results:
+
+```py
+from typing_extensions import assert_type
+
+def _(sink: Intersection[BSink, ASink]) -> None:
+    assert_type(make_list(sink), list[A] | list[B])
+```
+
+A context that accepts both list types also accepts the result. A narrower context does not yet
+select one of the valid specializations:
+
+```py
+def _(sink: Intersection[ASink, BSink]) -> None:
+    lists: list[A] | list[B] = make_list(sink)
+    # TODO: Use the context to select the valid `A` specialization.
+    # error: [invalid-assignment]
+    a: list[A] = make_list(sink)
+    # TODO: Use the context to select the valid `B` specialization.
+    # error: [invalid-assignment]
+    b: list[B] = make_list(sink)
+```
+
+Evidence from another argument can also leave only one valid specialization. Both argument orders
+select `A` when the supplied value has type `A`:
+
+```py
+def with_value(sink: Sink[T], value: T) -> list[T]:
+    return [value]
+
+def with_value_first(value: T, sink: Sink[T]) -> list[T]:
+    return [value]
+
+def _(sink: Intersection[ASink, BSink], value: A) -> None:
+    reveal_type(with_value(sink, value))  # revealed: list[A]
+    reveal_type(with_value_first(value, sink))  # revealed: list[A]
+```
+
+An unrelated value is incompatible with both sinks, so neither argument order is valid:
+
+```py
+class C: ...
+
+def _(sink: Intersection[ASink, BSink], value: C) -> None:
+    # error: [invalid-argument-type]
+    with_value(sink, value)
+    # error: [invalid-argument-type]
+    with_value_first(value, sink)
+```
+
+Neither specialization can accept an invalid fixed argument. The call remains invalid, with the
+merged element type used only for error recovery:
+
+```py
+def with_fixed(sink: Sink[T], other: int) -> list[T]:
+    return []
+
+def _(sink: Intersection[ASink, BSink]) -> None:
+    # error: [invalid-argument-type] "Expected `Sink[A | B]`"
+    # error: [invalid-argument-type] "Expected `int`"
+    reveal_type(with_fixed(sink, "bad"))  # revealed: list[A | B]
 ```
 
 ## Type guards inferred from intersection arguments

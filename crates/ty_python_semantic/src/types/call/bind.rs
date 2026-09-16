@@ -5673,9 +5673,9 @@ struct ArgumentTypeChecker<'a, 'db> {
     inferable_typevars: TypeVarSet<'db>,
     inference: Option<TypeVarInference<'db>>,
 
-    /// Whether `intersected_return_type` has validated every matched argument relation against
-    /// each retained specialization. The later `check_argument_type` pass uses the union-merged
-    /// specialization, which can reject a call that is valid under the separate alternatives.
+    /// Whether validated specializations provided the call's return type. The later
+    /// `check_argument_type` pass uses the union-merged specialization, which can reject a call
+    /// that is valid under the separate alternatives.
     ///
     /// For example, suppose `Sink[T]` is contravariant, and `ASink` and `BSink` inherit from
     /// `Sink[A]` and `Sink[B]`, respectively. Passing an `ASink & BSink` to a `Sink[T]` parameter
@@ -6128,11 +6128,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         })
     }
 
-    /// Intersects returns from resolved inference alternatives that each validate all arguments.
+    /// Retains resolved inference alternatives that each validate every original argument.
     ///
-    /// Returns `None` when correlated inference is unavailable or cannot safely replace the
-    /// merged projection. `Single` already has the same return under either projection.
-    fn intersected_return_type(&self, inference: TypeVarInference<'db>) -> Option<Type<'db>> {
+    /// Returns `None` when correlated inference is unavailable or incomplete. `Single` already
+    /// has the same specialization under either projection.
+    fn validated_specializations(
+        &self,
+        inference: TypeVarInference<'db>,
+    ) -> Option<Vec<Specialization<'db>>> {
         let db = self.db;
         let env = self.env;
         // TODO: Project correlated alternatives through constructor stages and partial signatures.
@@ -6156,7 +6159,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 |nested| matches!(nested, Type::TypeVar(variable) if variable.is_inferable(db, self.inferable_typevars)),
             )
         };
-        let return_variables: Vec<_> = generic_context
+        let return_variables = generic_context
             .variables(db)
             .enumerate()
             .filter_map(|(index, variable)| {
@@ -6164,8 +6167,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     matches!(ty, Type::TypeVar(return_variable) if return_variable.identity(db) == variable.identity(db))
                 })
                 .then_some((index, variable))
-            })
-            .collect();
+            });
         // An unresolved dependency does not make an alternative invalid. Keep the merged fallback
         // for the whole call rather than silently dropping that sibling.
         // Unresolved bindings can contain cycles, so none may reach recursive specialization.
@@ -6180,7 +6182,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // A return variable missing from every alternative can use its default (or `Unknown`)
         // while other variables refine the return, provided it does not participate in argument
         // inference. Partial bindings still require the merged fallback.
-        for &(index, variable) in &return_variables {
+        for (index, variable) in return_variables {
             if alternatives.iter().all(|types| types[index].is_some()) {
                 continue;
             }
@@ -6202,9 +6204,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        // Apply defaults before checking for invariant differences: `U = list[T]` has no
-        // inferred binding but can introduce different invariant types in each alternative.
-        let specializations = alternatives
+        // Apply defaults separately in each alternative, preserving dependencies such as
+        // `U = list[T]` before validating arguments or projecting the return type.
+        let mut specializations = alternatives
             .iter()
             .map(|types| {
                 // Only inferred bindings require static evidence. A gradual return-only default
@@ -6223,37 +6225,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             })
             .collect::<Option<Vec<_>>>()?;
 
-        // A fresh invariant container can receive its specialization from context: the same
-        // expression `[]` is valid as either `list[A]` or `list[B]`. These typings make different,
-        // mutually exclusive choices for the allocated list's static element type, rather than
-        // establish simultaneous properties of one returned value. Their intersection is `Never`,
-        // which would incorrectly imply that the function cannot return.
-        //
-        // Keep the merged specialization for varying invariant returns, including containers
-        // hidden inside an inferred type, such as `R = list[A]` versus `R = list[B]`. This is
-        // conservative: choosing either valid specialization could be less restrictive, but
-        // without a return context there is no clear preference between them.
-        // Recursive aliases that cannot be fully compared retain the merged fallback.
-        let invariant_visitor = PairVisitor::new(true);
-        if return_variables.iter().any(|(index, variable)| {
-            let mut types = specializations
-                .iter()
-                .map(|specialization| specialization.types(db)[*index]);
-            let Some(first) = types.next() else {
-                return false;
-            };
-            !types.clone().all(|ty| ty == first)
-                && (self
-                    .return_ty
-                    .variance_of(db, env, variable.identity(db))
-                    .evaluate(db)
-                    == TypeVarVariance::Invariant
-                    || types.any(|ty| {
-                        self.has_invariant_return_difference(first, ty, &invariant_visitor)
-                    }))
-        }) {
-            return None;
-        }
         // Intersecting returns requires the same call to satisfy every retained specialization,
         // without choosing a different materialization of a gradual type for each one. For
         // example, `Any` is assignable to both `int` and `str`, but this does not prove that a
@@ -6287,16 +6258,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             })
             .collect::<Option<_>>()?;
 
-        let mut returns = Vec::with_capacity(alternatives.len());
-        let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
-        for specialization in specializations {
+        specializations.retain(|&specialization| {
             // TODO: Remove revalidation once constraint generation and solution selection
             // guarantee the original argument relations. Inference currently drops `None`
             // from `list[int] | None` against `list[T]`, and can infer `T = str` from
             // `tuple[str, str]` against `tuple[T, int]` without recording the second element's
             // incompatibility. Recursive protocol inference can also omit some requirements.
             // A solution of those partial constraints is not necessarily a valid call.
-            if !relations
+            relations
                 .iter()
                 .all(|(relation, contributes_to_inference)| {
                     let actual = relation
@@ -6311,12 +6280,58 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         actual.is_assignable_to(db, env, formal)
                     }
                 })
-            {
-                continue;
-            }
+        });
 
-            // Every retained specialization validates the same whole call, so the return value
-            // satisfies every instantiated return type, regardless of what caused the alternatives.
+        (!specializations.is_empty()).then_some(specializations)
+    }
+
+    /// Projects the return type from specializations that each validate the whole call.
+    fn specialized_return_type(
+        &self,
+        inference: TypeVarInference<'db>,
+        specializations: &[Specialization<'db>],
+    ) -> Option<Type<'db>> {
+        let db = self.db;
+        let env = self.env;
+
+        // A fresh invariant container can receive its specialization from context: the same
+        // expression `[]` is valid as either `list[A]` or `list[B]`. These typings make different,
+        // mutually exclusive choices for the allocated list's static element type, rather than
+        // establish simultaneous properties of one returned value. Their intersection is `Never`,
+        // which would incorrectly imply that the function cannot return.
+        // Apply this check only to valid specializations: a rejected sibling cannot prevent a
+        // single remaining specialization from providing its own return type.
+        let invariant_visitor = PairVisitor::new(true);
+        let has_invariant_difference = inference
+            .generic_context(db)
+            .variables(db)
+            .enumerate()
+            .filter(|(_, variable)| {
+                any_over_type_expanding_aliases(db, env, self.return_ty, |ty| {
+                    matches!(ty, Type::TypeVar(return_variable) if return_variable.identity(db) == variable.identity(db))
+                })
+            })
+            .any(|(index, variable)| {
+                let mut types = specializations
+                    .iter()
+                    .map(|specialization| specialization.types(db)[index]);
+                let Some(first) = types.next() else {
+                    return false;
+                };
+                !types.clone().all(|ty| ty == first)
+                    && (self
+                        .return_ty
+                        .variance_of(db, env, variable.identity(db))
+                        .evaluate(db)
+                        == TypeVarVariance::Invariant
+                        || types.any(|ty| {
+                            self.has_invariant_return_difference(first, ty, &invariant_visitor)
+                        }))
+            });
+
+        let mut returns = Vec::with_capacity(specializations.len());
+        let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
+        for &specialization in specializations {
             let return_ty = self.return_ty.apply_specialization(db, specialization);
             // TODO: Preserve alternatives through type-guard narrowing. Guard wrappers are not
             // ordinary result types: their intersection can simplify to `Never` even though both
@@ -6334,10 +6349,27 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             });
         }
 
-        if returns.is_empty() {
-            return None;
+        if has_invariant_difference {
+            let merged = inference.merged_specialization(db);
+            // Preserve the existing merged return when that specialization accepts the call.
+            // Otherwise, use the separate valid returns rather than an invalid merged mapping.
+            if self.argument_relations().all(|relation| {
+                relation
+                    .argument_type
+                    .apply_specialization(db, merged)
+                    .is_assignable_to(
+                        db,
+                        env,
+                        relation.declared_type.apply_specialization(db, merged),
+                    )
+            }) {
+                Some(self.return_ty.apply_specialization(db, merged))
+            } else {
+                Some(UnionType::from_elements(db, env, returns))
+            }
+        } else {
+            IntersectionType::bounded_from_elements(db, env, returns)
         }
-        IntersectionType::bounded_from_elements(db, env, returns.iter().copied())
     }
 
     fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
@@ -6629,7 +6661,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 choose,
             ),
         };
-        if let Some(return_ty) = self.intersected_return_type(inference) {
+        if let Some(specializations) = self.validated_specializations(inference)
+            && let Some(return_ty) = self.specialized_return_type(inference, &specializations)
+        {
             self.return_ty = return_ty;
             self.arguments_validated = true;
         } else {
