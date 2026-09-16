@@ -1538,7 +1538,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         invalid_type_argument(self, slice)
                     }
                     value_ty @ (Type::SpecialForm(
-                        SpecialFormType::Top | SpecialFormType::Bottom | SpecialFormType::Annotated,
+                        SpecialFormType::Top
+                        | SpecialFormType::Bottom
+                        | SpecialFormType::Annotated
+                        | SpecialFormType::Intersection,
                     )
                     | Type::KnownInstance(_)
                     | Type::GenericAlias(_)
