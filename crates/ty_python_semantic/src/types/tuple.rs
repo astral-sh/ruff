@@ -338,28 +338,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 self.check_fixed_length_tuple_vs_tuple_spec(db, source, target.tuple(db))
             }
             Tuple::Variable(source_spec) => {
-                // Lazy assignability can use gradual lengths when the target contains no type
-                // variables. Fixed source elements can still generate constraints on source
-                // type variables. Inferring target type variables from the gradual segment
-                // is not yet supported.
-                let allow_gradual_length = self.is_eager_assignability()
-                    || (self.relation.is_assignability()
-                        && source_spec
-                            .variable()
-                            .gradual_element_type(db, self.env)
-                            .is_some()
-                        && !any_over_type_expanding_aliases(
-                            db,
-                            self.env,
-                            Type::tuple(target),
-                            Type::is_type_var,
-                        ));
-                self.check_variable_length_vs_tuple_spec(
-                    db,
-                    source_spec,
-                    target.tuple(db),
-                    allow_gradual_length,
-                )
+                self.check_variable_length_vs_tuple_spec(db, source_spec, target.tuple(db))
             }
         }
     }
@@ -470,7 +449,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
         target: &TupleSpec<'db>,
-        allow_gradual_length: bool,
     ) -> ConstraintSet<'db, 'c> {
         match target {
             Tuple::Fixed(target) => {
@@ -488,11 +466,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // Unlike a dynamic homogeneous segment, a symbolic type variable tuple ranges
                 // over all specializations rather than making a gradual choice of length.
                 let env = self.env;
-                if !allow_gradual_length
-                    || source.variable().gradual_element_type(db, env).is_none()
-                {
+                if !self.relation.is_assignability() {
                     return self.never();
                 }
+                let Some(source_element) = source.variable().gradual_element_type(db, env) else {
+                    return self.never();
+                };
 
                 // In addition, the other tuple must have enough elements to match up with this
                 // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
@@ -527,7 +506,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
                 }
 
-                result
+                // The gradual segment supplies the remaining elements.
+                result.and(db, self.constraints, || {
+                    target_iter.when_all(db, self.constraints, |target_ty| {
+                        self.check_type_pair(db, source_element, target_ty)
+                    })
+                })
             }
 
             Tuple::Variable(target) => {
@@ -704,7 +688,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !allow_gradual_length || !source_variable.is_dynamic() {
+                            if !self.relation.is_assignability()
+                                || source.variable().gradual_element_type(db, env).is_none()
+                            {
                                 return self.never();
                             }
                             self.check_type_pair(db, source_variable, other_ty)
@@ -741,7 +727,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !allow_gradual_length || !source_variable.is_dynamic() {
+                            if !self.relation.is_assignability()
+                                || source.variable().gradual_element_type(db, env).is_none()
+                            {
                                 return self.never();
                             }
                             self.check_type_pair(db, source_variable, target_ty)
