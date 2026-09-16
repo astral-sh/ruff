@@ -47,31 +47,27 @@ impl<'db> SolutionType<'db> {
 
 /// Resolves selected dependencies, closing contractive cycles as simultaneous recursive types.
 /// Results follow `solution` order; variables outside `inferable` retain their bound identity.
+/// Resolved inputs must already be closed with respect to `inferable`.
 pub(crate) fn resolve_solution<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     inferable: TypeVarSet<'db>,
-    solution: &[TypeVarSolution<'db>],
+    solution: &[TypeVarSolution<'db, SolutionType<'db>>],
 ) -> Box<[SolutionType<'db>]> {
     let resolver = Resolver {
         env,
         inferable,
         solution,
-        indices: solution
-            .iter()
-            .enumerate()
-            .map(|(index, binding)| (binding.bound_typevar.identity(db), index))
-            .collect(),
     };
     let resolved = resolver.resolve(db);
     solution
         .iter()
         .enumerate()
         .map(|(index, binding)| {
-            resolved[index].map_or(SolutionType::Unresolved(binding.solution), |ty| {
+            resolved[index].map_or(SolutionType::Unresolved(binding.solution.ty()), |ty| {
                 SolutionType::Resolved {
                     ty,
-                    selected: binding.solution,
+                    selected: binding.solution.ty(),
                 }
             })
         })
@@ -81,57 +77,65 @@ pub(crate) fn resolve_solution<'db>(
 struct Resolver<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
     inferable: TypeVarSet<'db>,
-    solution: &'a [TypeVarSolution<'db>],
-    indices: FxHashMap<BoundTypeVarIdentity<'db>, usize>,
+    solution: &'a [TypeVarSolution<'db, SolutionType<'db>>],
 }
 
 impl<'db> Resolver<'_, 'db> {
     fn resolve(&self, db: &'db dyn Db) -> Vec<Option<Type<'db>>> {
+        let dependencies: Vec<_> = self
+            .solution
+            .iter()
+            .map(|binding| match binding.solution {
+                SolutionType::Resolved { .. } => Vec::new(),
+                SolutionType::Unresolved(ty) => {
+                    Dependencies::collect(db, self.env, self.inferable, ty)
+                }
+            })
+            .collect();
+        // A dependency-free candidate is already closed; retain that fact through resolution.
+        let mut resolved: Vec<_> = self
+            .solution
+            .iter()
+            .zip(&dependencies)
+            .map(|(binding, dependencies)| dependencies.is_empty().then_some(binding.solution.ty()))
+            .collect();
+        if resolved.iter().all(Option::is_some) {
+            return resolved;
+        }
+        let indices: FxHashMap<BoundTypeVarIdentity<'db>, usize> = self
+            .solution
+            .iter()
+            .enumerate()
+            .map(|(index, binding)| (binding.bound_typevar.identity(db), index))
+            .collect();
         let graph = DependencyGraph::new(
-            self.solution
+            dependencies
                 .iter()
-                .map(|binding| {
-                    let indices = RefCell::new(Vec::new());
-                    Dependencies::check(
-                        db,
-                        self.env,
-                        self.inferable,
-                        binding.solution,
-                        |dependency| {
-                            if let Some(index) = self.indices.get(&dependency.identity(db)) {
-                                indices.borrow_mut().push(*index);
-                            }
-                            true
-                        },
-                    );
-                    indices.into_inner()
+                .map(|dependencies| {
+                    dependencies
+                        .iter()
+                        .filter_map(|dependency| indices.get(&dependency.identity(db)).copied())
+                        .collect()
                 })
                 .collect(),
         );
-        let mut resolved = vec![None; self.solution.len()];
         for component in graph.components(0..self.solution.len()) {
+            if resolved[component[0]].is_some() {
+                continue;
+            }
             let Some(equations) = component
                 .iter()
                 .map(|index| {
                     let binding = &self.solution[*index];
-                    let original = binding.solution;
-                    let replacements = RefCell::new(FxOrderMap::default());
-                    if !Dependencies::check(db, self.env, self.inferable, original, |dependency| {
-                        let Some(&index) = self.indices.get(&dependency.identity(db)) else {
-                            return false;
-                        };
+                    let original = binding.solution.ty();
+                    let mut replacements = FxOrderMap::default();
+                    for dependency in &dependencies[*index] {
+                        let &index = indices.get(&dependency.identity(db))?;
                         if component.contains(&index) {
-                            return true;
+                            continue;
                         }
-                        let Some(ty) = resolved[index] else {
-                            return false;
-                        };
-                        replacements.borrow_mut().insert(index, ty);
-                        true
-                    }) {
-                        return None;
+                        replacements.insert(index, resolved[index]?);
                     }
-                    let replacements = replacements.into_inner();
                     if replacements.is_empty() {
                         return Some((binding.bound_typevar, original));
                     }
@@ -197,6 +201,21 @@ struct Dependencies<'a, 'db> {
 }
 
 impl<'db> Dependencies<'_, 'db> {
+    /// Collect dependencies in traversal order for graph construction and substitution.
+    fn collect(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+        ty: Type<'db>,
+    ) -> Vec<BoundTypeVarInstance<'db>> {
+        let dependencies = RefCell::new(Vec::new());
+        Self::check(db, env, inferable, ty, |dependency| {
+            dependencies.borrow_mut().push(dependency);
+            true
+        });
+        dependencies.into_inner()
+    }
+
     fn check(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -336,10 +355,10 @@ mod tests {
     fn binding<'db>(
         bound_typevar: BoundTypeVarInstance<'db>,
         solution: Type<'db>,
-    ) -> TypeVarSolution<'db> {
+    ) -> TypeVarSolution<'db, SolutionType<'db>> {
         TypeVarSolution {
             bound_typevar,
-            solution,
+            solution: SolutionType::Unresolved(solution),
         }
     }
 

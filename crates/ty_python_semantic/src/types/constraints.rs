@@ -4012,7 +4012,7 @@ impl<'db> PathBounds<'db> {
             if let Some(ty) = ty {
                 solution.push(TypeVarSolution {
                     bound_typevar: path_bound.bound_typevar,
-                    solution: ty,
+                    solution: SolutionType::Unresolved(ty),
                 });
             }
         }

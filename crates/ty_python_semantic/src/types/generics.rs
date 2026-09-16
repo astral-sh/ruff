@@ -3052,12 +3052,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             let path: Vec<_> = path
                 .into_iter()
                 .filter(|binding| generic_context.contains(db, binding.bound_typevar.identity(db)))
-                .map(|binding| TypeVarSolution {
-                    bound_typevar: binding.bound_typevar,
-                    solution: self.remove_inferable_typevar_artifacts_from_solution(
+                .map(|mut binding| {
+                    let ty = self.remove_inferable_typevar_artifacts_from_solution(
                         binding.bound_typevar,
                         binding.solution.ty(),
-                    ),
+                    );
+                    // Unchanged candidates remain closed under this inference's typevars.
+                    if ty != binding.solution.ty() {
+                        binding.solution = SolutionType::Unresolved(ty);
+                    }
+                    binding
                 })
                 .collect();
             let resolved = resolve_solution(db, self.env, self.inferable, &path);
