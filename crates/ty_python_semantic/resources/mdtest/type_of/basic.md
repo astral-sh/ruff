@@ -132,6 +132,47 @@ def f(a: type[BasicUser | Union[ProUser, A.B.C]], b: type[Union[BasicUser | Unio
     reveal_type(b)  # revealed: type[BasicUser | ProUser | C | str]
 ```
 
+## Intersection of classes
+
+The type of an intersection type represents a subclass of all elements of the intersection:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+class C(A, B): ...
+
+type Both = Intersection[A, B]
+
+def _(cls: type[Both]):
+    reveal_type(cls)  # revealed: type[A] & type[B]
+
+    cls = C  # ok
+    cls = A  # error: [invalid-assignment]
+    cls = B  # error: [invalid-assignment]
+```
+
+Intersections with negative components or callable signatures are currently unsupported:
+
+```py
+from collections.abc import Callable
+from ty_extensions import Not
+
+type WithoutB = Intersection[A, Not[B]]
+type CallableA = Intersection[A, Callable[[], None]]
+
+def _(x1: type[WithoutB], x2: type[CallableA]):
+    # TODO: Support negative and callable components in `type[]` arguments.
+    reveal_type(x1)  # revealed: @Todo(unsupported type[X] special form)
+    reveal_type(x2)  # revealed: @Todo(unsupported type[X] special form)
+```
+
 ## Special case for `None`
 
 The typing conformance suite contains this test case. It's debatable whether it's correct to do so,
