@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/composition.py
 ---
 ## Input
 
@@ -193,7 +192,56 @@ class C:
 ```diff
 --- Black
 +++ Ruff
-@@ -161,9 +161,7 @@
+@@ -2,7 +2,8 @@
+     def test(self) -> None:
+         with patch("black.out", print):
+             self.assertEqual(
+-                unstyle(str(report)), "1 file reformatted, 1 file failed to reformat."
++                unstyle(str(report)),
++                "1 file reformatted, 1 file failed to reformat.",
+             )
+             self.assertEqual(
+                 unstyle(str(report)),
+@@ -46,10 +47,14 @@
+ 
+     def omitting_trailers(self) -> None:
+         get_collection(
+-            hey_this_is_a_very_long_call, it_has_funny_attributes, really=True
++            hey_this_is_a_very_long_call,
++            it_has_funny_attributes,
++            really=True,
+         )[OneLevelIndex]
+         get_collection(
+-            hey_this_is_a_very_long_call, it_has_funny_attributes, really=True
++            hey_this_is_a_very_long_call,
++            it_has_funny_attributes,
++            really=True,
+         )[OneLevelIndex][TwoLevelIndex][ThreeLevelIndex][FourLevelIndex]
+         d[0][1][2][3][4][5][6][7][8][9][10][11][12][13][14][15][16][17][18][19][20][21][
+             22
+@@ -107,7 +112,9 @@
+             key8: value8,
+             key9: value9,
+         } == expected(
+-            value, is_going_to_be="too long to fit in a single line", srsly=True
++            value,
++            is_going_to_be="too long to fit in a single line",
++            srsly=True,
+         ), "Not what we expected"
+ 
+         assert {
+@@ -125,7 +132,9 @@
+         )
+ 
+         assert expected(
+-            value, is_going_to_be="too long to fit in a single line", srsly=True
++            value,
++            is_going_to_be="too long to fit in a single line",
++            srsly=True,
+         ) == {
+             key1: value1,
+             key2: value2,
+@@ -161,9 +170,7 @@
                        8 STORE_ATTR               0 (x)
                       10 LOAD_CONST               0 (None)
                       12 RETURN_VALUE
@@ -213,7 +261,8 @@ class C:
     def test(self) -> None:
         with patch("black.out", print):
             self.assertEqual(
-                unstyle(str(report)), "1 file reformatted, 1 file failed to reformat."
+                unstyle(str(report)),
+                "1 file reformatted, 1 file failed to reformat.",
             )
             self.assertEqual(
                 unstyle(str(report)),
@@ -257,10 +306,14 @@ class C:
 
     def omitting_trailers(self) -> None:
         get_collection(
-            hey_this_is_a_very_long_call, it_has_funny_attributes, really=True
+            hey_this_is_a_very_long_call,
+            it_has_funny_attributes,
+            really=True,
         )[OneLevelIndex]
         get_collection(
-            hey_this_is_a_very_long_call, it_has_funny_attributes, really=True
+            hey_this_is_a_very_long_call,
+            it_has_funny_attributes,
+            really=True,
         )[OneLevelIndex][TwoLevelIndex][ThreeLevelIndex][FourLevelIndex]
         d[0][1][2][3][4][5][6][7][8][9][10][11][12][13][14][15][16][17][18][19][20][21][
             22
@@ -318,7 +371,9 @@ class C:
             key8: value8,
             key9: value9,
         } == expected(
-            value, is_going_to_be="too long to fit in a single line", srsly=True
+            value,
+            is_going_to_be="too long to fit in a single line",
+            srsly=True,
         ), "Not what we expected"
 
         assert {
@@ -336,7 +391,9 @@ class C:
         )
 
         assert expected(
-            value, is_going_to_be="too long to fit in a single line", srsly=True
+            value,
+            is_going_to_be="too long to fit in a single line",
+            srsly=True,
         ) == {
             key1: value1,
             key2: value2,

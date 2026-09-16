@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/long_strings_flag_disabled.py
 ---
 ## Input
 
@@ -308,7 +307,22 @@ long_unmergable_string_with_pragma = (
 ```diff
 --- Black
 +++ Ruff
-@@ -167,14 +167,14 @@
+@@ -35,9 +35,12 @@
+         string_key
+     ): "This is a really really really long string that has to go i,side of a dictionary. It is soooo bad.",
+     some_func(
+-        "calling", "some", "stuff"
++        "calling",
++        "some",
++        "stuff",
+     ): "This is a really really really long string that has to go inside of a dictionary. It is {soooo} bad (#{x}).".format(
+-        sooo="soooo", x=2
++        sooo="soooo",
++        x=2,
+     ),
+     "A %s %s"
+     % (
+@@ -167,14 +170,14 @@
  
  triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
  
@@ -330,19 +344,48 @@ long_unmergable_string_with_pragma = (
  )
  
  assert some_type_of_boolean_expression, (
-@@ -255,10 +255,8 @@
-     + " that has been "
+@@ -202,7 +205,8 @@
+ )
+ 
+ return "A really really really really really really really really really really really really really long {} {}".format(
+-    "return", "value"
++    "return",
++    "value",
+ )
+ 
+ func_with_bad_comma(
+@@ -228,11 +232,17 @@
+ )
+ 
+ func_with_bad_parens_that_wont_fit_in_one_line(
+-    ("short string that should have parens stripped"), x, y, z
++    ("short string that should have parens stripped"),
++    x,
++    y,
++    z,
+ )
+ 
+ func_with_bad_parens_that_wont_fit_in_one_line(
+-    x, y, ("short string that should have parens stripped"), z
++    x,
++    y,
++    ("short string that should have parens stripped"),
++    z,
+ )
+ 
+ func_with_bad_parens(
+@@ -256,9 +266,7 @@
      + CONCATENATED
      + "using the '+' operator."
--)
+ )
 -annotated_variable: Final = (
 -    "This is a large string that has a type annotation attached to it. A type annotation should NOT stop a long string from being wrapped."
- )
+-)
 +annotated_variable: Final = "This is a large string that has a type annotation attached to it. A type annotation should NOT stop a long string from being wrapped."
  annotated_variable: Literal["fakse_literal"] = (
      "This is a large string that has a type annotation attached to it. A type annotation should NOT stop a long string from being wrapped."
  )
-@@ -267,9 +265,9 @@
+@@ -267,9 +275,9 @@
  backslashes = "This is a really long string with \"embedded\" double quotes and 'single' quotes that also handles checking for an even number of backslashes \\\\"
  backslashes = "This is a really 'long' string with \"embedded double quotes\" and 'single' quotes that also handles checking for an odd number of backslashes \\\", like this...\\\\\\"
  
@@ -396,9 +439,12 @@ D4 = {
         string_key
     ): "This is a really really really long string that has to go i,side of a dictionary. It is soooo bad.",
     some_func(
-        "calling", "some", "stuff"
+        "calling",
+        "some",
+        "stuff",
     ): "This is a really really really long string that has to go inside of a dictionary. It is {soooo} bad (#{x}).".format(
-        sooo="soooo", x=2
+        sooo="soooo",
+        x=2,
     ),
     "A %s %s"
     % (
@@ -563,7 +609,8 @@ some_function_call(
 )
 
 return "A really really really really really really really really really really really really really long {} {}".format(
-    "return", "value"
+    "return",
+    "value",
 )
 
 func_with_bad_comma(
@@ -589,11 +636,17 @@ func_with_bad_comma(
 )
 
 func_with_bad_parens_that_wont_fit_in_one_line(
-    ("short string that should have parens stripped"), x, y, z
+    ("short string that should have parens stripped"),
+    x,
+    y,
+    z,
 )
 
 func_with_bad_parens_that_wont_fit_in_one_line(
-    x, y, ("short string that should have parens stripped"), z
+    x,
+    y,
+    ("short string that should have parens stripped"),
+    z,
 )
 
 func_with_bad_parens(

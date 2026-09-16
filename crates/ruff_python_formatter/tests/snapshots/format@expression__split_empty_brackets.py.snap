@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/split_empty_brackets.py
 ---
 ## Input
 ```python
@@ -110,11 +109,13 @@ ct_match = (
 )
 
 ct_match = unicodedata.normalize("NFKC", s1).casefold(0) == unicodedata.normalize(
-    "NFKCNFKCNFKCNFKCNFKC", s2
+    "NFKCNFKCNFKCNFKCNFKC",
+    s2,
 ).casefold(1)
 
 ct_match = unicodedata.normalize("NFKC", s1).casefold(1) == unicodedata.normalize(
-    "NFKCNFKCNFKCNFKCNFKC", s2
+    "NFKCNFKCNFKCNFKCNFKC",
+    s2,
 ).casefold(1)
 
 ct_match = (
@@ -137,7 +138,8 @@ ct_match = (
 )
 
 ct_match = [1].unicodedata.normalize("NFKC", s1).casefold() == [].unicodedata.normalize(
-    "NFKCNFKCNFKCNFKCNFKC", s2
+    "NFKCNFKCNFKCNFKCNFKC",
+    s2,
 ).casefold()
 
 ct_match = [1].unicodedata.normalize("NFKC", s1).casefold() == [
@@ -155,7 +157,8 @@ ct_match = (
 )
 
 ct_match = {1}.unicodedata.normalize("NFKC", s1).casefold() == {}.unicodedata.normalize(
-    "NFKCNFKCNFKCNFKCNFKC", s2
+    "NFKCNFKCNFKCNFKCNFKC",
+    s2,
 ).casefold()
 
 ct_match = {1}.unicodedata.normalize("NFKC", s1).casefold() == {
@@ -189,7 +192,8 @@ return (
 )
 
 response = await sync_to_async(
-    lambda: self.django_handler.get_response(request), thread_sensitive=True
+    lambda: self.django_handler.get_response(request),
+    thread_sensitive=True,
 )()
 ```
 
@@ -198,7 +202,7 @@ response = await sync_to_async(
 ```diff
 --- Stable
 +++ Preview
-@@ -62,9 +62,9 @@
+@@ -66,9 +66,10 @@
      1
  }.unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
  
@@ -206,7 +210,8 @@ response = await sync_to_async(
 -    []
 -).unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
 +ct_match = ([]).unicodedata.normalize(
-+    "NFKC", s1
++    "NFKC",
++    s1,
 +).casefold() == ([]).unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
  
  return await self.http_client.fetch(
