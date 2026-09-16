@@ -295,7 +295,7 @@
       container.hidden = visible === 0;
     }
 
-    const fragmentLinks = [...article.querySelectorAll("a[href]")].filter(
+    const fragmentLinks = [...document.querySelectorAll("a[href]")].filter(
       (link) =>
         link.hash &&
         link.origin === location.origin &&
