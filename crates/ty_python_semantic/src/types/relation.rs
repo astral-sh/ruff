@@ -1,5 +1,6 @@
 use crate::ProgramEnvironment;
 use std::borrow::Cow;
+use std::cell::Cell;
 
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
@@ -375,6 +376,40 @@ impl<'db> Type<'db> {
     where
         'db: 'a,
     {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_result=|_, _, _| None,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn independent_subtyping<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Option<bool> {
+            let env = ProgramEnvironment::from_program(types.program(db));
+            let constraints = ConstraintSetBuilder::new();
+            let requested = Cell::new(false);
+            let when = types.first(db).when_subtype_of_assuming(
+                db,
+                &env,
+                types.second(db),
+                TypeRelationAssumptions::Unspecified {
+                    requested: &requested,
+                },
+                &constraints,
+                TypeVarSet::None,
+            );
+            let holds = when.is_always_satisfied(db, &env);
+            (!requested.get()).then_some(holds)
+        }
+
+        let given = assuming.into();
+        // Share structural comparisons across paths only when they did not consult any
+        // typevar assumptions. A query cycle also leaves the comparison to the path below.
+        if matches!(given, TypeRelationAssumptions::Path(_))
+            && inferable == TypeVarSet::None
+            && let Some(holds) =
+                independent_subtyping(db, TypePair::new(db, env.program(db), self, target))
+        {
+            return ConstraintSet::from_bool(constraints, holds);
+        }
+
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
@@ -386,7 +421,7 @@ impl<'db> Type<'db> {
             relation: TypeRelation::SubtypingAssuming,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
-            given: assuming.into(),
+            given,
             perform_expensive_checks: true,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
@@ -1028,11 +1063,15 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
     }
 }
 
-/// Known subtype relations supplied either as a formula or as one constraint path's quotient.
+/// Assumptions available when checking subtype relations.
 #[derive(Clone, Copy)]
 pub(super) enum TypeRelationAssumptions<'a, 'c, 'db> {
     Constraints(ConstraintSet<'db, 'c>),
     Path(&'a PathRelations<'db>),
+    /// Record whether the comparison needs assumptions before sharing it across paths.
+    Unspecified {
+        requested: &'a Cell<bool>,
+    },
 }
 
 impl<'c, 'db> From<ConstraintSet<'db, 'c>> for TypeRelationAssumptions<'_, 'c, 'db> {
@@ -1744,6 +1783,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             && (source.is_type_var() || target.is_type_var())
         {
             return match self.given {
+                TypeRelationAssumptions::Unspecified { requested } => {
+                    requested.set(true);
+                    self.never()
+                }
                 TypeRelationAssumptions::Constraints(given) => {
                     given.implies_subtype_of(db, env, self.constraints, source, target)
                 }
