@@ -679,7 +679,10 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 })
             }
             DefinitionNodeRef::Function(function) => {
-                DefinitionKind::Function(AstNodeRef::new(parsed, function))
+                DefinitionKind::Function(FunctionDefinitionKind {
+                    node: AstNodeRef::new(parsed, function),
+                    has_decorators: !function.decorator_list.is_empty(),
+                })
             }
             DefinitionNodeRef::Class(class) => {
                 DefinitionKind::Class(AstNodeRef::new(parsed, class))
@@ -930,7 +933,7 @@ pub enum DefinitionKind<'db> {
     ImportFrom(ImportFromDefinitionKind),
     ImportFromSubmodule(ImportFromSubmoduleDefinitionKind),
     StarImport(StarImportDefinitionKind),
-    Function(AstNodeRef<ast::StmtFunctionDef>),
+    Function(FunctionDefinitionKind),
     Class(AstNodeRef<ast::StmtClassDef>),
     TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
     NamedExpression(AstNodeRef<ast::ExprNamed>),
@@ -1179,6 +1182,27 @@ impl<'db> DefinitionKind<'db> {
             DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(module),
             _ => None,
         }
+    }
+}
+
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct FunctionDefinitionKind {
+    node: AstNodeRef<ast::StmtFunctionDef>,
+    has_decorators: bool,
+}
+
+impl FunctionDefinitionKind {
+    pub fn node<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtFunctionDef {
+        self.node.node(module)
+    }
+
+    pub fn node_key(&self) -> NodeKey {
+        NodeKey::from_node_ref(&self.node)
+    }
+
+    /// Whether the function has decorators, without loading its module's AST.
+    pub fn has_decorators(&self) -> bool {
+        self.has_decorators
     }
 }
 

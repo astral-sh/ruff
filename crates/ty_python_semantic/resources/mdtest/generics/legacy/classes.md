@@ -757,6 +757,90 @@ class C(Generic[T]):
         invalid: C[int] = C(value)
 ```
 
+### Constructing with an intersection-bounded type variable
+
+A constructor call preserves an enclosing type variable even when its upper bound is an
+intersection, including when passing `self` to a parameter annotated with `Self`. Constructor
+arguments must still satisfy their bounds.
+
+```py
+from typing_extensions import Generic, Self, TypeVar
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+T = TypeVar("T", bound=Intersection[A, B])
+
+class Box(Generic[T]):
+    def __init__(self, value: T, other: Self | None = None) -> None:
+        reveal_type(Box(value))  # revealed: Box[T@Box]
+        reveal_type(Box(value, self))  # revealed: Box[T@Box]
+        Box(A())  # error: [invalid-argument-type]
+        Box(value, A())  # error: [invalid-argument-type]
+```
+
+### Constructing from callbacks with a NamedTuple bound
+
+Regression test for [ty#4526](https://github.com/astral-sh/ty/issues/4526): combining callbacks with
+a `NamedTuple` bound preserves `Box[T]`.
+
+```py
+from collections.abc import Callable
+from typing_extensions import Generic, NamedTuple, TypeVar
+
+T = TypeVar("T", bound=NamedTuple)
+
+class Box(Generic[T]):
+    def __init__(self, *callbacks: Callable[[T], int]) -> None:
+        self.callbacks = callbacks
+
+    def combine(self, other: "Box[T]") -> "Box[T]":
+        result = Box(*self.callbacks, *other.callbacks)
+        reveal_type(result)  # revealed: Box[T@Box]
+        return result
+```
+
+### Passing Self to a NamedTuple-bounded constructor
+
+A `NamedTuple` bound also allows passing `self` to a constructor parameter annotated with `Self`.
+
+```py
+from typing_extensions import Generic, NamedTuple, Self, TypeVar
+
+T = TypeVar("T", bound=NamedTuple)
+
+class Box(Generic[T]):
+    def __init__(self, value: T, other: Self | None = None) -> None:
+        if other is None:
+            reveal_type(Box(value, self))  # revealed: Box[T@Box]
+```
+
+### Constructing with an enclosing Self type
+
+The recursive call in `__init__` shares a source-level `Self` binding with the constructor it calls,
+while `wrap` has a different `Self` binding. In both cases, freshening the constructor's type
+variables preserves the caller's `Self` argument. The result cannot be returned as `Box[T, T]`.
+
+```py
+from typing_extensions import Generic, Self, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T, U]):
+    def __init__(self, value: T, receiver: U) -> None:
+        reveal_type(Box[T, Self](value, self))  # revealed: Box[T@Box, Self@__init__]
+
+    def wrap(self, value: T) -> "Box[T, Self]":
+        result = Box[T, Self](value, self)
+        reveal_type(result)  # revealed: Box[T@Box, Self@wrap]
+        return result
+
+    def wrong_wrap(self, value: T) -> "Box[T, T]":
+        return Box[T, Self](value, self)  # error: [invalid-return-type]
+```
+
 ### Constructing through a classmethod receiver
 
 A constructor call through a classmethod receiver keeps an enclosing `TypeVarTuple` when checking

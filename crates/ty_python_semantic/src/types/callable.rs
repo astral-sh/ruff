@@ -762,9 +762,34 @@ impl<'db> CallableType<'db> {
         )
     }
 
+    pub(crate) fn is_bottom_paramspec_value(self, db: &'db dyn Db) -> bool {
+        if self.kind(db) != CallableTypeKind::ParamSpecValue {
+            return false;
+        }
+        let [signature] = self.signatures(db).overloads.as_slice() else {
+            return false;
+        };
+        signature.parameters().is_bottom()
+    }
+
+    pub(crate) fn is_top_paramspec_value(self, db: &'db dyn Db) -> bool {
+        if self.kind(db) != CallableTypeKind::ParamSpecValue {
+            return false;
+        }
+        let [signature] = self.signatures(db).overloads.as_slice() else {
+            return false;
+        };
+        signature.parameters().is_top()
+    }
+
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
     pub(crate) fn unknown(db: &'db dyn Db) -> CallableType<'db> {
         Self::single(db, Signature::unknown())
+    }
+
+    /// Create the fully static `Top[Callable[..., object]]` type.
+    pub(crate) fn top(db: &'db dyn Db) -> CallableType<'db> {
+        Self::single(db, Signature::new(Parameters::top(), Type::object()))
     }
 
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
@@ -818,12 +843,11 @@ impl<'db> CallableType<'db> {
     /// Returns the reduced callable produced by partially applying selected overloads.
     pub(crate) fn partially_apply(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
         overloads: impl IntoIterator<Item = PartialSignatureApplication<'db>>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
-            CallableSignature::partially_apply(db, env, overloads)?,
+            CallableSignature::partially_apply(db, overloads)?,
             CallableTypeKind::Regular,
         ))
     }
@@ -855,11 +879,26 @@ impl<'db> CallableType<'db> {
         env: &ProgramEnvironment<'db>,
         self_type: Option<Type<'db>>,
     ) -> CallableType<'db> {
+        self.bind_self_with_receiver(db, env, self_type, self_type)
+    }
+
+    /// Binds the runtime receiver while using `typing_self_type` to replace `typing.Self`.
+    pub(crate) fn bind_self_with_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Option<Type<'db>>,
+        typing_self_type: Option<Type<'db>>,
+    ) -> CallableType<'db> {
         if self.is_dunder_paramspec(db) {
             return self.into_regular(db);
         }
 
-        self.with_signatures(db, self.signatures(db).bind_self(db, env, self_type))
+        self.with_signatures(
+            db,
+            self.signatures(db)
+                .bind_self_with_receiver(db, env, receiver_type, typing_self_type),
+        )
     }
 
     pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {

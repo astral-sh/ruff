@@ -132,3 +132,20 @@ T: TypeAlias = ( # comment0
 # Test case for TypeVar with default - should be converted when preview mode is enabled
 T_default = TypeVar("T_default", default=int)
 DefaultList: TypeAlias = list[T_default]
+
+# Preserve parentheses around a multiline union in a TypeAliasType call.
+LongAlias = TypeAliasType(
+    "LongAlias",
+    int
+    | str
+    | float
+)
+
+# An already parenthesized value keeps its own parentheses.
+ParenAlias = TypeAliasType(
+    "ParenAlias",
+    (
+        int
+        | str
+    ),
+)

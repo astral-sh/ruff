@@ -2,6 +2,10 @@ name: ty ecosystem-analyzer
 
 permissions: {}
 
+# Third-party builds must not write caches consumed by other jobs.
+# GitHub-hosted runners use GitHub's cache service, which enforces this mode.
+cache-mode: read
+
 on:
   pull_request:
     paths:
@@ -53,7 +57,7 @@ jobs:
     strategy:
       matrix:
         revision: [base, pr]
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-32' || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -64,6 +68,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           lookup-only: false
+          save-if: false
 
       - name: Install Rust toolchain
         run: rustup show
@@ -132,7 +137,7 @@ jobs:
     strategy:
       matrix:
         shard: [0, 1, 2, 3]
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-32' || 'ubuntu-latest' }}
     timeout-minutes: 10
     env:
       EXCLUDE_NEWER: ${{ github.event.pull_request.updated_at }}
@@ -140,7 +145,7 @@ jobs:
       TY_UV: scripts
     steps:
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           version: "0.12.11"
           ignore-empty-workdir: true
@@ -201,7 +206,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           version: "0.12.11"
           ignore-empty-workdir: true

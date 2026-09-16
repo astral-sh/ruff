@@ -666,6 +666,74 @@ class WithBackportedDefault(Generic[Unpack[Ts]]):
 reveal_type(WithBackportedDefault().attr)  # revealed: tuple[int, str]
 ```
 
+## Functions
+
+### Partials with bound variadic arguments
+
+Binding positional arguments infers a fixed-length type variable tuple. The resulting partial
+accepts a call with no additional arguments because the bound values already fill those positions.
+
+```py
+from functools import partial
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def accept(*args: *Ts) -> None: ...
+
+one = partial(accept, 1)
+reveal_type(one)  # revealed: partial[() -> None]
+one()
+
+two = partial(accept, 1, "x")
+reveal_type(two)  # revealed: partial[() -> None]
+two()
+```
+
+### Partials with inferred variadic arguments
+
+A bound tuple determines the number and types of remaining positional parameters. A bound keyword
+after the variadic parameter retains its name and default, including when the tuple is empty.
+
+```py
+from functools import partial
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def repeat(values: tuple[*Ts], *args: *Ts, kw: int) -> tuple[*Ts]:
+    return values
+
+def check(i: int, s: str) -> None:
+    empty = partial(repeat, (), kw=1)
+    reveal_type(empty())  # revealed: tuple[()]
+
+    one = partial(repeat, (i,), kw=1)
+    reveal_type(one(i, kw=2))  # revealed: tuple[int]
+    one()  # error: [missing-argument]
+
+    two = partial(repeat, (i, s), kw=1)
+    reveal_type(two(i, s))  # revealed: tuple[int, str]
+    two(i, i)  # error: [invalid-argument-type]
+```
+
+## Tuple concatenation with type variables
+
+Concatenation preserves type variables in fixed positions and an unpacked type variable tuple
+between them. The inferred result satisfies the corresponding generic return annotation.
+
+```py
+from typing import TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+def enclose(edge: tuple[T], middle: tuple[*Ts]) -> tuple[T, *Ts, T]:
+    result = edge + middle + edge
+    reveal_type(result)  # revealed: tuple[T@enclose, *Ts@enclose, T@enclose]
+    return result
+```
+
 ## Type Aliases
 
 ### Legacy generic aliases

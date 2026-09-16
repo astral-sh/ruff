@@ -590,6 +590,68 @@ def consume_int_or_str(value: int | str) -> None: ...
 reveal_type(infer_str(consume_int_or_str))  # revealed: str
 ```
 
+## Inferring gradual tuple returns with concrete bounds
+
+A callback returning `tuple[Any, ...]` satisfies a fixed-length tuple bound because both its
+elements and its length are gradual. Inference preserves the callback's return type.
+
+```py
+from typing import Any, Callable
+
+def get_tuple() -> tuple[Any, ...]:
+    return ()
+
+def infer_fixed[T: tuple[int]](callback: Callable[[], T]) -> T:
+    return callback()
+
+reveal_type(infer_fixed(get_tuple))  # revealed: tuple[Any, ...]
+```
+
+The gradual length can also supply required elements at either end of a variable-length bound.
+
+```py
+def infer_prefix[T: tuple[int, *tuple[int, ...]]](callback: Callable[[], T]) -> T:
+    return callback()
+
+def infer_suffix[T: tuple[*tuple[int, ...], int]](callback: Callable[[], T]) -> T:
+    return callback()
+
+reveal_type(infer_prefix(get_tuple))  # revealed: tuple[Any, ...]
+reveal_type(infer_suffix(get_tuple))  # revealed: tuple[Any, ...]
+```
+
+Fixed elements still have to satisfy the bound, and an ordinary homogeneous tuple does not have a
+gradual length.
+
+```py
+def wrong_element() -> tuple[str, *tuple[Any, ...]]:
+    return ("",)
+
+def get_ints() -> tuple[int, ...]:
+    return ()
+
+infer_fixed(wrong_element)  # error: [invalid-argument-type]
+infer_prefix(wrong_element)  # error: [invalid-argument-type]
+infer_fixed(get_ints)  # error: [invalid-argument-type]
+infer_prefix(get_ints)  # error: [invalid-argument-type]
+infer_suffix(get_ints)  # error: [invalid-argument-type]
+```
+
+## Source type variables in gradual tuple returns
+
+A callback's fixed tuple element can contain an outer type variable and still satisfy a concrete
+bound. The gradual segment can be empty, and inference preserves the outer type variable.
+
+```py
+from typing import Any, Callable
+
+def infer_tuple[R: tuple[object]](callback: Callable[[], R]) -> R:
+    return callback()
+
+def outer[T](callback: Callable[[], tuple[list[T], *tuple[Any, ...]]]) -> None:
+    reveal_type(infer_tuple(callback))  # revealed: tuple[list[T@outer], *tuple[Any, ...]]
+```
+
 ## Inferring `Never` from a callable parameter
 
 `Never` is a valid upper-bound inference result and should not be replaced with the fallback for an

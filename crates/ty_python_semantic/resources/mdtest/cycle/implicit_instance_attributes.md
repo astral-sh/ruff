@@ -33,6 +33,25 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Concatenating recursively growing tuples
+
+Repeatedly appending or prepending elements to an inferred attribute can produce tuples of arbitrary
+length. Inference converges to a variable-length tuple while preserving its element type.
+
+```py
+class Tuples:
+    def __init__(self) -> None:
+        self.appended = ()
+        self.prepended = ()
+
+    def update(self, value: int) -> None:
+        self.appended += (value,)
+        self.prepended = (value,) + self.prepended
+
+reveal_type(Tuples().appended)  # revealed: tuple[int, ...]
+reveal_type(Tuples().prepended)  # revealed: tuple[int, ...]
+```
+
 ## Cycle normalization preserves non-gradual variadic parameters
 
 Normalizing a recursive implicit-attribute type does not reinterpret specialized variadic parameters

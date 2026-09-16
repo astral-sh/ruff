@@ -18,9 +18,11 @@ use crate::{
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
-        CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass, Parameter,
-        Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass,
+        MemberLookupPolicy, Parameter, Parameters, Signature, StaticClassLiteral, Type,
+        TypeContext, TypeQualifiers,
         call::CallArguments,
+        callable::CallableTypeKind,
         class::{CodeGeneratorKind, FieldKind, MethodDecorator},
         constraints::ConstraintSetBuilder,
         context::InferContext,
@@ -37,6 +39,7 @@ use crate::{
         list_members::{
             Member, MemberWithDefinition, all_end_of_scope_members, extract_underlying_functions,
         },
+        signatures::CallableSignature,
         tuple::Tuple,
     },
 };
@@ -477,7 +480,7 @@ fn check_class_declaration<'db>(
 
     let instance_of_class = Type::instance(db, env, class);
 
-    let subclass_instance_member = instance_of_class.member(db, env, &member.name);
+    let subclass_instance_member = lookup_override_member(db, env, class, &member.name);
     let Place::Defined(DefinedPlace {
         ty: type_on_subclass_instance,
         ..
@@ -674,37 +677,54 @@ fn check_class_declaration<'db>(
                 ClassBase::Class(class) => class,
             };
 
-            let Some((superclass_literal, superclass_specialization)) =
-                superclass.static_class_literal(db)
-            else {
-                continue;
-            };
-            let superclass_scope = superclass_literal.body_scope(db);
-            let superclass_symbol_table = place_table(db, superclass_scope);
-            let superclass_symbol_id = superclass_symbol_table.symbol_id(&member.name);
-
-            let mut method_kind = MethodKind::default();
-
-            // If the member is not defined on the class itself, skip it
-            if let Some(id) = superclass_symbol_id {
-                let superclass_symbol = superclass_symbol_table.symbol(id);
-                if !(superclass_symbol.is_bound() || superclass_symbol.is_declared()) {
-                    continue;
-                }
-            } else {
-                if superclass_literal
-                    .own_synthesized_member(db, env, superclass_specialization, None, &member.name)
-                    .is_none()
+            // If the member is not defined on the class itself, skip it. Functional named tuples
+            // have synthesized members but no class body in which to look up their definitions.
+            let (superclass_symbol, method_kind) =
+                if let Some((superclass_literal, superclass_specialization)) =
+                    superclass.static_class_literal(db)
                 {
+                    let superclass_scope = superclass_literal.body_scope(db);
+                    let superclass_symbol_table = place_table(db, superclass_scope);
+                    if let Some(id) = superclass_symbol_table.symbol_id(&member.name) {
+                        let superclass_symbol = superclass_symbol_table.symbol(id);
+                        if !(superclass_symbol.is_bound() || superclass_symbol.is_declared()) {
+                            continue;
+                        }
+                        (Some((superclass_scope, id)), MethodKind::default())
+                    } else {
+                        if superclass_literal
+                            .own_synthesized_member(
+                                db,
+                                env,
+                                superclass_specialization,
+                                None,
+                                &member.name,
+                            )
+                            .is_none()
+                        {
+                            continue;
+                        }
+                        (
+                            None,
+                            CodeGeneratorKind::from_class(db, superclass_literal.into())
+                                .map(MethodKind::Synthesized)
+                                .unwrap_or_default(),
+                        )
+                    }
+                } else if matches!(
+                    superclass.class_literal(db),
+                    ClassLiteral::DynamicNamedTuple(_)
+                ) && !superclass
+                    .own_class_member(db, env, None, &member.name)
+                    .is_undefined()
+                {
+                    (None, MethodKind::Synthesized(CodeGeneratorKind::NamedTuple))
+                } else {
                     continue;
-                }
-                method_kind = CodeGeneratorKind::from_class(db, superclass_literal.into())
-                    .map(MethodKind::Synthesized)
-                    .unwrap_or_default();
-            }
+                };
 
             let superclass_instance_member =
-                Type::instance(db, env, superclass).member(db, env, &member.name);
+                lookup_override_member(db, env, superclass, &member.name);
             let Place::Defined(DefinedPlace {
                 ty: superclass_type,
                 ..
@@ -726,8 +746,7 @@ fn check_class_declaration<'db>(
                 missing_override_target = Some(MissingOverrideTarget::for_superclass(
                     db,
                     superclass,
-                    superclass_scope,
-                    superclass_symbol_id,
+                    superclass_symbol,
                 ));
             }
 
@@ -741,7 +760,7 @@ fn check_class_declaration<'db>(
 
                 if configuration.check_final_method_overridden() {
                     overridden_final_method = overridden_final_method.or_else(|| {
-                        let superclass_symbol_id = superclass_symbol_id?;
+                        let (superclass_scope, superclass_symbol_id) = superclass_symbol?;
 
                         // TODO: `@final` should be more like a type qualifier:
                         // we should also recognise `@final`-decorated methods that don't end up
@@ -774,8 +793,8 @@ fn check_class_declaration<'db>(
 
                         // Find the declaration definition in the superclass for the secondary
                         // annotation.
-                        let superclass_definition = superclass_symbol_id.and_then(|id| {
-                            use_def_map(db, superclass_scope)
+                        let superclass_definition = superclass_symbol.and_then(|(scope, id)| {
+                            use_def_map(db, scope)
                                 .end_of_scope_symbol_declarations(id)
                                 .find_map(|decl| decl.declaration.definition())
                         });
@@ -845,8 +864,8 @@ fn check_class_declaration<'db>(
                             continue;
                         }
 
-                        let superclass_definition = superclass_symbol_id
-                            .and_then(|id| symbol_definition(db, superclass_scope, id));
+                        let superclass_definition = superclass_symbol
+                            .and_then(|(scope, id)| symbol_definition(db, scope, id));
                         report_invalid_attribute_override(
                             context,
                             &member.name,
@@ -870,8 +889,10 @@ fn check_class_declaration<'db>(
                 continue;
             };
 
-            // Constructor methods are not checked for Liskov compliance
-            if is_constructor_like_method(&member.name) {
+            // Constructor signatures may differ unless `@override` requests compatibility.
+            if is_constructor_like_method(&member.name)
+                && !subclass_function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
+            {
                 continue;
             }
 
@@ -882,9 +903,12 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let Some((subclass_override_type, superclass_override_type)) =
-                method_override_types(db, env, type_on_subclass_instance, superclass_type)
-            else {
+            let Some((subclass_override_type, superclass_override_type)) = method_override_types(
+                db,
+                env,
+                bind_new_for_override(db, env, class, &member.name, type_on_subclass_instance),
+                bind_new_for_override(db, env, class, &member.name, superclass_type),
+            ) else {
                 continue;
             };
 
@@ -994,6 +1018,75 @@ fn check_class_declaration<'db>(
     }
 }
 
+/// Look up `__new__` on the class so generated and decorated callables retain `cls`
+/// until they are bound for the override comparison.
+fn lookup_override_member<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassType<'db>,
+    name: &Name,
+) -> PlaceAndQualifiers<'db> {
+    if name == "__new__" {
+        class.class_member(db, env, name, MemberLookupPolicy::default())
+    } else {
+        Type::instance(db, env, class).member(db, env, name)
+    }
+}
+
+/// Resolve `__new__` descriptors and normalize callable objects before binding the
+/// constructor's implicit `cls`. This consumes a classmethod's bound `cls` or a
+/// callable instance's `__call__` receiver first, as for constructor calls.
+fn bind_new_for_override<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassType<'db>,
+    name: &Name,
+    ty: Type<'db>,
+) -> Type<'db> {
+    if name != "__new__" {
+        return ty;
+    }
+    let receiver = Type::from(class);
+    let instance_of_class = Type::instance(db, env, class);
+    let Some(callables) = Place::bound(ty)
+        .try_call_dunder_get(db, env, receiver)
+        .ignore_possibly_undefined()
+        .and_then(|ty| ty.try_upcast_to_callable(db, env))
+    else {
+        return ty;
+    };
+    callables
+        .map(|callable| {
+            let signature = callable.signatures(db);
+            let bound_signature = if signature.overloads.len() > 1
+                && signature
+                    .overloads
+                    .iter()
+                    .any(Signature::has_explicit_positional_receiver_annotation)
+            {
+                // Overloads specialized for other subclasses do not constrain this override.
+                CallableSignature::from_overloads(
+                    signature
+                        .overloads
+                        .iter()
+                        .filter_map(|signature| {
+                            signature.bind_self_if_compatible(db, env, receiver, instance_of_class)
+                        })
+                        .flat_map(|signature| signature.overloads),
+                )
+            } else {
+                signature.bind_self_with_receiver(db, env, Some(receiver), Some(instance_of_class))
+            };
+            CallableType::new(
+                db,
+                bound_signature,
+                // Compare call signatures independently of descriptor behavior.
+                CallableTypeKind::Regular,
+            )
+        })
+        .into_type(db, env)
+}
+
 /// Returns whether the selected inherited method already violates this ancestor's contract.
 ///
 /// The parent can inherit the method without defining an override. Its hierarchy may already
@@ -1020,10 +1113,13 @@ fn is_inherited_method_violation<'db>(
         .any(|parent| {
             let Place::Defined(DefinedPlace {
                 ty: parent_type, ..
-            }) = Type::instance(db, env, parent).member(db, env, name).place
+            }) = lookup_override_member(db, env, parent, name).place
             else {
                 return false;
             };
+            // An inherited violation belongs to the parent's own receiver domain.
+            let parent_type = bind_new_for_override(db, env, parent, name, parent_type);
+            let superclass_type = bind_new_for_override(db, env, parent, name, superclass_type);
             if is_assignable_method_override(db, env, parent_type, superclass_type) {
                 return false;
             }
@@ -1040,13 +1136,16 @@ fn is_inherited_method_violation<'db>(
                 .any(|ancestor| {
                     let Place::Defined(DefinedPlace {
                         ty: ancestor_type, ..
-                    }) = Type::instance(db, env, ancestor)
-                        .member(db, env, name)
-                        .place
+                    }) = lookup_override_member(db, env, ancestor, name).place
                     else {
                         return false;
                     };
-                    !is_assignable_method_override(db, env, parent_type, ancestor_type)
+                    !is_assignable_method_override(
+                        db,
+                        env,
+                        parent_type,
+                        bind_new_for_override(db, env, parent, name, ancestor_type),
+                    )
                 })
         })
 }
@@ -1157,34 +1256,6 @@ impl VariableKind {
     }
 }
 
-/// Returns the variable kind for a superclass member.
-fn superclass_variable_kind<'db>(
-    db: &'db dyn Db,
-    superclass_scope: ScopeId<'db>,
-    superclass_symbol_id: Option<ScopedSymbolId>,
-    class_member: PlaceAndQualifiers<'db>,
-    instance_member: PlaceAndQualifiers<'db>,
-) -> Option<VariableKind> {
-    // Method definitions and properties are not instance-variable declarations. Check the symbol
-    // definition before class/instance member lookup can erase that distinction. For example,
-    // resolving an abstract `@property def f(self) -> int` through instance-member lookup would
-    // make it look like an instance variable of type `int`, causing this rule to report
-    // `f: ClassVar[int]` as an invalid attribute override even though the superclass member is not
-    // an instance-attribute declaration.
-    if superclass_symbol_id.is_some_and(|id| is_function_definition(db, superclass_scope, id)) {
-        return None;
-    }
-
-    // Final attributes have their own override rule and diagnostic. Treating them as class
-    // variables here would report both diagnostics for the same override.
-    if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
-        return None;
-    }
-
-    let env = ProgramEnvironment::from_scope(superclass_scope);
-    variable_kind(db, &env, class_member, instance_member)
-}
-
 /// Returns the variable kind for a superclass member, preserving inherited `ClassVar` declarations
 /// through unannotated class-body assignments.
 ///
@@ -1234,11 +1305,28 @@ pub(super) fn effective_superclass_variable_kind<'db>(
     };
 
     if has_own_member {
-        let superclass_variable_kind = superclass_variable_kind(
+        // Method definitions and properties are not instance-variable declarations. Check the symbol
+        // definition before class/instance member lookup can erase that distinction. For example,
+        // resolving an abstract `@property def f(self) -> int` through instance-member lookup would
+        // make it look like an instance variable of type `int`, causing this rule to report
+        // `f: ClassVar[int]` as an invalid attribute override even though the superclass member is not
+        // an instance-attribute declaration.
+        if superclass_symbol_id.is_some_and(|id| is_function_definition(db, superclass_scope, id)) {
+            return inherited_variable_kind();
+        }
+
+        let class_member = superclass.own_class_member(db, env, None, &name).inner;
+
+        // Final attributes have their own override rule and diagnostic. Treating them as class
+        // variables here would report both diagnostics for the same override.
+        if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
+            return inherited_variable_kind();
+        }
+
+        let superclass_variable_kind = variable_kind(
             db,
-            superclass_scope,
-            superclass_symbol_id,
-            superclass.own_class_member(db, env, None, &name).inner,
+            env,
+            class_member,
             superclass.own_instance_member(db, env, &name).inner,
         );
 
@@ -1628,11 +1716,9 @@ impl<'db> MissingOverrideTarget<'db> {
     fn for_superclass(
         db: &'db dyn Db,
         superclass: ClassType<'db>,
-        superclass_scope: ScopeId<'db>,
-        superclass_symbol_id: Option<ScopedSymbolId>,
+        superclass_symbol: Option<(ScopeId<'db>, ScopedSymbolId)>,
     ) -> Self {
-        let definition =
-            superclass_symbol_id.and_then(|id| symbol_definition(db, superclass_scope, id));
+        let definition = superclass_symbol.and_then(|(scope, id)| symbol_definition(db, scope, id));
 
         Self {
             superclass,

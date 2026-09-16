@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use compact_str::CompactString;
+use char_str::CharStr;
 use pep440_rs::Version;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_ranged_value::{RangedValue, ValueSource};
@@ -11,6 +11,7 @@ use thiserror::Error;
 use crate::metadata::python_version::SupportedPythonVersion;
 
 mod dependencies;
+mod string_interner;
 
 pub(crate) use dependencies::DependencyMetadataError;
 
@@ -23,8 +24,8 @@ pub(crate) struct UvMetadata {
     schema: Schema,
     workspace: Option<NodeReference>,
     script: Option<PathNodeReference>,
-    resolution: BTreeMap<CompactString, ResolutionNode>,
-    module_owners: BTreeMap<CompactString, Box<[ModuleOwner]>>,
+    resolution: BTreeMap<CharStr, ResolutionNode>,
+    module_owners: BTreeMap<CharStr, Box<[ModuleOwner]>>,
 }
 
 impl UvMetadata {
@@ -50,8 +51,10 @@ impl UvMetadata {
         metadata: &[u8],
         system: &dyn System,
     ) -> Result<Self, UvMetadataError> {
-        let metadata = serde_json::from_slice::<WorkspaceMetadata>(metadata)
-            .map_err(UvMetadataError::InvalidMetadata)?;
+        let metadata: WorkspaceMetadata = {
+            let _interner = string_interner::InternerGuard::new();
+            serde_json::from_slice(metadata).map_err(UvMetadataError::InvalidMetadata)?
+        };
 
         let workspace_root = existing_directory(metadata.workspace_root, "workspace root", system)?;
 
@@ -86,7 +89,8 @@ pub(crate) struct WorkspaceMember {
     pub(crate) name: Box<str>,
     /// Directory containing the member's `pyproject.toml`.
     pub(crate) path: SystemPathBuf,
-    id: CompactString,
+    #[serde(deserialize_with = "string_interner::deserialize")]
+    id: CharStr,
 }
 
 #[derive(Debug, Error)]
@@ -163,10 +167,10 @@ struct WorkspaceMetadata {
     schema: Schema,
     workspace: Option<NodeReference>,
     script: Option<PathNodeReference>,
-    #[serde(default)]
-    resolution: BTreeMap<CompactString, ResolutionNode>,
-    #[serde(default)]
-    module_owners: BTreeMap<CompactString, Box<[ModuleOwner]>>,
+    #[serde(default, deserialize_with = "string_interner::deserialize_map")]
+    resolution: BTreeMap<CharStr, ResolutionNode>,
+    #[serde(default, deserialize_with = "string_interner::deserialize_map")]
+    module_owners: BTreeMap<CharStr, Box<[ModuleOwner]>>,
 }
 
 #[derive(Deserialize)]
@@ -194,18 +198,21 @@ enum SchemaVersion {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
 struct PathNodeReference {
     path: SystemPathBuf,
-    id: CompactString,
+    #[serde(deserialize_with = "string_interner::deserialize")]
+    id: CharStr,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
 struct ModuleOwner {
-    package_id: CompactString,
+    #[serde(deserialize_with = "string_interner::deserialize")]
+    package_id: CharStr,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
 struct ResolutionNode {
     kind: NodeKind,
-    name: Option<CompactString>,
+    #[serde(default, deserialize_with = "string_interner::deserialize_optional")]
+    name: Option<CharStr>,
     source: Option<Source>,
     // uv always emits this field, even for leaves. Missing edges are incomplete metadata, not
     // evidence that a project has no direct dependencies.
@@ -220,8 +227,8 @@ struct ResolutionNode {
 #[serde(rename_all = "snake_case")]
 enum NodeKind {
     Package,
-    Extra(CompactString),
-    Group(CompactString),
+    Extra(#[serde(deserialize_with = "string_interner::deserialize")] CharStr),
+    Group(#[serde(deserialize_with = "string_interner::deserialize")] CharStr),
     Workspace,
     Script,
     Build,
@@ -234,13 +241,16 @@ struct Source {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
 struct NodeReference {
-    id: CompactString,
+    #[serde(deserialize_with = "string_interner::deserialize")]
+    id: CharStr,
 }
 
 #[cfg(test)]
 mod tests {
     use std::assert_matches;
 
+    use anyhow::Context;
+    use char_str::CharStr;
     use ruff_db::system::{SystemPath, TestSystem};
     use serde_json::json;
 
@@ -300,6 +310,66 @@ mod tests {
             workspace.python_version().map(ToString::to_string),
             Some("3.13".to_string())
         );
+
+        Ok(())
+    }
+
+    fn assert_shared(expected: &CharStr, actual: &CharStr) {
+        assert_eq!(actual, expected);
+        assert!(expected.is_heap_allocated());
+        assert!(std::ptr::eq(actual.as_str(), expected.as_str()));
+    }
+
+    #[test]
+    fn shares_dependency_strings() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = if cfg!(windows) { "C:/app" } else { "/app" };
+        system.memory_file_system().create_directory_all(root)?;
+
+        let member_id = "app";
+        let dependency_id = "shareddistributionname==1.0.0 (registry:first)";
+        let name = "shareddistributionname";
+        let input = serde_json::to_vec(&json!({
+            "schema": {"version": "preview"},
+            "workspace_root": root,
+            "members": [{"id": member_id, "name": "app", "path": root}],
+            "resolution": {
+                (member_id): {
+                    "kind": "package", "name": "app",
+                    "dependencies": [{"id": dependency_id}]
+                },
+                (dependency_id): {"kind": "package", "name": name, "dependencies": []}
+            },
+            "module_owners": {
+                (name): [{"package_id": dependency_id}]
+            }
+        }))?;
+
+        let metadata = UvMetadata::from_metadata(&input, &system)?;
+        let (dependency_key, _) = metadata
+            .resolution
+            .get_key_value(dependency_id)
+            .context("expected the direct dependency")?;
+        let (module_name, owners) = metadata
+            .module_owners
+            .get_key_value(name)
+            .context("expected module ownership")?;
+
+        assert_shared(
+            dependency_key,
+            &metadata.resolution[member_id].dependencies[0].id,
+        );
+        assert_shared(dependency_key, &owners[0].package_id);
+
+        let dependencies = metadata.dependency_metadata()?;
+        assert_shared(
+            dependency_key,
+            dependencies.projects[0]
+                .dependencies
+                .get(dependency_id)
+                .context("expected a direct dependency")?,
+        );
+        assert_shared(module_name, &dependencies.distributions[dependency_id].name);
 
         Ok(())
     }
