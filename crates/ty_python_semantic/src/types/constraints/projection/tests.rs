@@ -622,6 +622,7 @@ class E: ...
     let right =
         UnionType::from_elements(db, &env, [instance("C")?, instance("D")?, instance("E")?]);
     let t = create_typevar(db, "T");
+    let inferable = TypeVarSet::from_typevars(db, [t]);
     let builder = ConstraintSetBuilder::new();
 
     // These classes can overlap, so distributing the intersection requires six DNF terms.
@@ -638,13 +639,7 @@ class E: ...
 
         assert_eq!(
             paths.try_fold_with(
-                |_, bound| CandidateSolutions::default_solve(
-                    db,
-                    &env,
-                    &builder,
-                    TypeVarSet::from_typevars(db, [t]),
-                    bound
-                ),
+                |_, bound| CandidateSolutions::default_solve(db, &env, &builder, inferable, bound),
                 Type::object(),
                 &mut ProjectionTypeBudget::new(7),
                 |accumulated, path, budget| {

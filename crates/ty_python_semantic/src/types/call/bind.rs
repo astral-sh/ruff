@@ -7958,6 +7958,7 @@ impl<'db> Binding<'db> {
         let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
             FxHashMap::default();
         if let Some(declared_return_ty) = call_expression_tcx.annotation {
+            let inferable = generic_context.inferable_typevars(db);
             let normalized_return_ty = self
                 .normalized_constructor_return(db)
                 .unwrap_or(self.signature.return_ty);
@@ -7965,17 +7966,11 @@ impl<'db> Binding<'db> {
                 db,
                 env,
                 declared_return_ty,
-                generic_context.inferable_typevars(db),
+                inferable,
             );
 
             let solutions = path_bounds.solve_with(|_variance, path_bound| {
-                CandidateSolutions::preliminary_solve(
-                    db,
-                    env,
-                    constraints,
-                    generic_context.inferable_typevars(db),
-                    path_bound,
-                )
+                CandidateSolutions::preliminary_solve(db, env, constraints, inferable, path_bound)
             });
             if let Solutions::Constrained(solutions) = solutions {
                 for solution in solutions.into_vec() {

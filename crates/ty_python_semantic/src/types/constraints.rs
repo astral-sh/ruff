@@ -5650,11 +5650,23 @@ mod tests {
                     (TypeVarSet::from_typevars(db, [t, e]), constraints[0]),
                 ] {
                     assert_eq!(
-                        CandidateSolutions::preliminary_solve(db, &env, &builder, inferable, &path_bound),
+                        CandidateSolutions::preliminary_solve(
+                            db,
+                            &env,
+                            &builder,
+                            inferable,
+                            &path_bound
+                        ),
                         PathBoundSolution::Solved(expected)
                     );
                     assert_eq!(
-                        CandidateSolutions::default_solve(db, &env, &builder, inferable, &path_bound),
+                        CandidateSolutions::default_solve(
+                            db,
+                            &env,
+                            &builder,
+                            inferable,
+                            &path_bound
+                        ),
                         PathBoundSolution::Solved(expected)
                     );
                 }
@@ -5687,7 +5699,13 @@ mod tests {
         let mut bounds = PathBoundBuilder::default();
         bounds.add_lower(db, &env, ConstraintProvenance::Evidence, lower);
         assert_eq!(
-            CandidateSolutions::default_solve(db, &env, &builder, inferable, &bounds.finish(db, &env, t)),
+            CandidateSolutions::default_solve(
+                db,
+                &env,
+                &builder,
+                inferable,
+                &bounds.finish(db, &env, t)
+            ),
             PathBoundSolution::ViolatesDeclaredConstraints
         );
     }
