@@ -208,17 +208,13 @@ def _(union: E1 | E2, intersection: E1 & E2):
 ```
 
 Analogous tests for method calls on objects of a generic type which is bounded by a union or
-intersection:
+intersection. Each union alternative narrows the receiver while preserving the type variable:
 
 ```py
 def generic_bounds[U: E1 | E2, I: E1 & E2](union: U, intersection: I):
-    # revealed: (bound method U@generic_bounds.f() -> list[U@generic_bounds]) | (bound method U@generic_bounds.f() -> list[U@generic_bounds])
+    # revealed: (bound method (U@generic_bounds & E1).f() -> list[U@generic_bounds & E1]) | (bound method (U@generic_bounds & E2).f() -> list[U@generic_bounds & E2])
     reveal_type(union.f)
-    # TODO: This call should be accepted without errors. Pyright and mypy reveal `list[E1] | list[E2]` here, but
-    # `list[U@generic_bounds]` seems more accurate.
-    # error: [invalid-argument-type] "`U@generic_bounds` does not satisfy upper bound `E2` of type variable `Self`"
-    # error: [invalid-argument-type] "`U@generic_bounds` does not satisfy upper bound `E1` of type variable `Self`"
-    reveal_type(union.f())  # revealed: list[Unknown]
+    reveal_type(union.f())  # revealed: list[U@generic_bounds & E1] | list[U@generic_bounds & E2]
 
     # revealed: (bound method I@generic_bounds.f() -> list[I@generic_bounds]) & (bound method I@generic_bounds.f() -> list[I@generic_bounds])
     reveal_type(intersection.f)
@@ -346,13 +342,11 @@ intersection:
 
 ```py
 def generic_bounds[U: E1 | E2, I: E1 & E2](union: U, intersection: I):
-    # revealed: bound method U@generic_bounds.f() -> list[U@generic_bounds]
+    # revealed: bound method (U@generic_bounds & E1).f() -> list[U@generic_bounds & E1]
     # error: [unresolved-attribute]
     reveal_type(union.f)
-    # TODO: Ideally, this would not emit the `invalid-argument-type` error and reveal `list[U@generic_bounds]`
-    # error: [invalid-argument-type] "`U@generic_bounds` does not satisfy upper bound `E1` of type variable `Self`"
     # error: [unresolved-attribute]
-    reveal_type(union.f())  # revealed: list[Unknown]
+    reveal_type(union.f())  # revealed: list[U@generic_bounds & E1]
 
     # revealed: bound method I@generic_bounds.f() -> list[I@generic_bounds]
     reveal_type(intersection.f)

@@ -1639,8 +1639,6 @@ def use_union(value: A | B):
     reveal_type(value.value)
 
 def use_typevar(value: U):
-    # TODO: This should not error once member lookup supports union upper bounds.
-    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value`"
     # revealed: int | str
     reveal_type(value.value)
 ```

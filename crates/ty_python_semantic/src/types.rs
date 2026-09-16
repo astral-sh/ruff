@@ -5541,6 +5541,12 @@ impl<'db> Type<'db> {
                     let mut error = None;
                     let mut properties = None;
                     let member = union.map_with_boundness_and_qualifiers(db, env, |elem| {
+                        // A receiver with a union bound is narrowed to the selected alternative.
+                        // For `T: A | B`, retain `T` in `T & A` and `T & B` so `Self` results
+                        // preserve the type variable without accepting cross-alternative arguments.
+                        let receiver = receiver.map(|receiver| {
+                            IntersectionType::from_two_elements(db, env, receiver, *elem)
+                        });
                         let result = elem.member_lookup_with_policy_and_receiver(
                             db, env, name_str, policy, receiver,
                         );
@@ -5917,6 +5923,22 @@ impl<'db> Type<'db> {
                     .value_type(db)
                     .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
 
+                // Distribute before special-method lookup bypasses instance attributes, so a
+                // union-bound receiver is narrowed for implicit calls such as `value / 1` too.
+                Type::TypeVar(typevar)
+                    if let Some(bound_or_constraints) =
+                        typevar.typevar(db).bound_or_constraints(db, env) =>
+                {
+                    distribute_member_lookup_over_bound_or_constraints(
+                        db,
+                        env,
+                        bound_or_constraints,
+                        receiver.unwrap_or(this),
+                        name_str,
+                        policy,
+                    )
+                }
+
                 _ if policy.no_instance_fallback() => {
                     let receiver = receiver.unwrap_or(this);
                     let result = Type::invoke_descriptor_protocol(
@@ -5967,22 +5989,9 @@ impl<'db> Type<'db> {
                 {
                     Place::declared(Type::TypeVar(typevar.with_paramspec_attr(db, attr))).into()
                 }
-                Type::TypeVar(typevar) => {
+                Type::TypeVar(_) => {
                     let receiver = receiver.unwrap_or(this);
-                    if let Some(bound_or_constraints) =
-                        typevar.typevar(db).bound_or_constraints(db, env)
-                    {
-                        distribute_member_lookup_over_bound_or_constraints(
-                            db,
-                            env,
-                            bound_or_constraints,
-                            receiver,
-                            name_str,
-                            policy,
-                        )
-                    } else {
-                        instance_like_member_lookup(db, env, key, receiver)
-                    }
+                    instance_like_member_lookup(db, env, key, receiver)
                 }
 
                 Type::NominalInstance(instance)
