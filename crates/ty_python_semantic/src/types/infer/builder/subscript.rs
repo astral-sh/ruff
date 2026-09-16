@@ -1832,7 +1832,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && let Some(expected_ty) = typed_dict.arbitrary_key_mutation_type(db, env)
                     {
                         let rhs_value_ty =
-                            infer_rhs_value(self, TypeContext::new(Some(expected_ty)));
+                            infer_rhs_value(self, TypeContext::declared(Some(expected_ty)));
                         if rhs_value_ty.is_assignable_to(db, env, expected_ty) {
                             return true;
                         }
@@ -1902,7 +1902,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let item = typed_dict.item(db, key);
                     let value_ty = infer_rhs_value.infer_silent(
                         self,
-                        TypeContext::new(item.as_ref().map(|item| item.declared_ty)),
+                        TypeContext::declared(item.as_ref().map(|item| item.declared_ty)),
                     );
 
                     if item.is_some() {

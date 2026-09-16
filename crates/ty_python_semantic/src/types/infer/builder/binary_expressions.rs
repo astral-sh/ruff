@@ -319,7 +319,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let update_ty = self.speculate_without_diagnostics().infer_expression(
             update,
-            TypeContext::new(Some(Type::TypedDict(update_context_typed_dict))),
+            TypeContext::declared(Some(Type::TypedDict(update_context_typed_dict))),
         );
         let env = self.program_environment();
 
@@ -366,7 +366,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .try_typed_dict_pep_584_dunder(value_expr, typed_dict, typed_dict, "__ior__")
             .is_some()
         {
-            infer_value_ty(self, TypeContext::new(Some(typed_dict_ty)));
+            infer_value_ty(self, TypeContext::declared(Some(typed_dict_ty)));
             return Some(typed_dict_ty);
         }
 
@@ -376,7 +376,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .try_typed_dict_pep_584_dunder(value_expr, update_patch, typed_dict, "__ior__")
             .is_some()
         {
-            infer_value_ty(self, TypeContext::new(Some(Type::TypedDict(update_patch))));
+            infer_value_ty(
+                self,
+                TypeContext::declared(Some(Type::TypedDict(update_patch))),
+            );
             return Some(typed_dict_ty);
         }
 

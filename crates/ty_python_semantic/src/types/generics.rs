@@ -1420,7 +1420,7 @@ impl<'db> Specialization<'db> {
 
         let mut new_materialization_kind = self.materialization_kind(db);
         let types = self.map_types(db, |i, typevar, ty| {
-            let tcx = TypeContext::new(tcx.get(i).copied());
+            let tcx = TypeContext::declared(tcx.get(i).copied());
             if type_mapping.is_structural() {
                 return ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
             }
@@ -2767,6 +2767,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         set: ConstraintSet<'db, 'c>,
     ) -> Result<(), SpecializationError<'db>> {
         self.infer_from_constraint_set(set)
+    }
+
+    /// Adds the provided constraint set as a validity constraint to the generic call.
+    pub(crate) fn intersect_validity_constraints(&mut self, set: ConstraintSet<'db, 'c>) {
+        let set = set.with_validity_bounds(self.db, self.env);
+        self.record_constraint_set(set);
     }
 
     /// Build a merged specialization, using a caller-provided hook to select the solution for
