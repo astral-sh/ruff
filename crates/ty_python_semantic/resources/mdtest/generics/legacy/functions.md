@@ -1117,6 +1117,67 @@ def specialized(box: Box[Callable[..., Any]]) -> None:
     box.cls.whatever
 ```
 
+## Methods on type variables with union upper bounds
+
+A common method can be called on a type variable bounded by a union. Each alternative retains the
+type variable in its receiver, so a `Self` result remains assignable to the original type variable.
+This also allows a generic wrapper to update its value using a fluent method.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+class A:
+    def value(self) -> int:
+        return 1
+
+    def chain(self) -> Self:
+        return self
+
+    def merge(self, other: Self) -> None: ...
+
+class B:
+    def value(self) -> str:
+        return ""
+
+    def chain(self) -> Self:
+        return self
+
+    def merge(self, other: Self) -> None: ...
+
+T = TypeVar("T", bound=A | B)
+
+def use(value: T) -> T:
+    reveal_type(value.value())  # revealed: int | str
+    return value.chain()
+
+class Wrapper(Generic[T]):
+    value: T
+
+    def update(self):
+        self.value = self.value.chain()
+```
+
+Two values of the same union-bounded type variable need not belong to the same alternative. A method
+taking `Self` must therefore reject the second value when it could belong to another alternative.
+
+```py
+def merge(left: T, right: T):
+    # error: [invalid-argument-type] "Argument to bound method `A.merge` is incorrect"
+    # error: [invalid-argument-type] "Argument to bound method `B.merge` is incorrect"
+    left.merge(right)
+```
+
+The `float` bound also includes `int`. Implicit method calls for arithmetic narrow the receiver to
+each alternative just like explicit calls.
+
+```py
+F = TypeVar("F", bound=float)
+
+def divide(value: F):
+    reveal_type(value / 1)  # revealed: float
+```
+
 ## Attribute access on TypeVars bounded by `type[...]`
 
 Regression test for <https://github.com/astral-sh/ty/issues/3782>.

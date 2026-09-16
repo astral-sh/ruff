@@ -1273,6 +1273,29 @@ class Concrete(Box[int], value=1): ...
 reveal_type(Concrete.get())  # revealed: int
 ```
 
+## Members of type variables with union upper bounds
+
+Unlike constraints, a union upper bound does not enumerate the possible assignments of a type
+variable. Member lookup can still use the upper bound to prove that a common member is available.
+
+```py
+class Base[T]:
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+class A(Base[int]): ...
+class B(Base[str]): ...
+
+def use_union(value: A | B):
+    # revealed: int | str
+    reveal_type(value.value)
+
+def use_typevar[U: A | B](value: U):
+    # revealed: int | str
+    reveal_type(value.value)
+```
+
 ## Generic attributes using type aliases
 
 An alias can hide a dependency on a class type parameter, including inside a recursive alias. An
