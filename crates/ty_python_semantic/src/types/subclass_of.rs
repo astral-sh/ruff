@@ -111,7 +111,7 @@ impl<'db> SubclassOfType<'db> {
                     .iter()
                     .map(|element| Self::try_from_instance(db, env, *element)),
             ),
-            Type::Intersection(intersection) if intersection.iter_negative(db).next().is_none() => {
+            Type::Intersection(intersection) if intersection.negative(db).is_empty() => {
                 intersection
                     .iter_positive(db)
                     .try_fold(IntersectionBuilder::new(db, env), |builder, element| {
