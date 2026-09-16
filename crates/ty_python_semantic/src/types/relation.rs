@@ -500,6 +500,27 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db, env)
     }
 
+    /// Return true if this type is a subtype of `target` for every specialization of the type
+    /// variables in either type.
+    pub(super) fn is_constraint_set_subtype_of(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+    ) -> bool {
+        let constraints = ConstraintSetBuilder::new();
+        self.has_relation_to_with_typevar_evaluation(
+            db,
+            env,
+            target,
+            &constraints,
+            TypeVarSet::None,
+            TypeRelation::Subtyping,
+            TypeVarEvaluation::Lazy,
+        )
+        .is_always_satisfied(db, env)
+    }
+
     pub(super) fn when_assignable_to<'c>(
         self,
         db: &'db dyn Db,

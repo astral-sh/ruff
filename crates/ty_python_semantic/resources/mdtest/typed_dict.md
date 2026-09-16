@@ -3491,7 +3491,22 @@ def set_and_get(value: SetAndGet[Key, Value], key: Key, item: Value) -> Value:
 
 def takes_int(value: int) -> None: ...
 def _(value: CorrelatedA | CorrelatedB) -> None:
+    # TODO: This should not error.
+    # snapshot: invalid-argument-type
     takes_int(set_and_get(value, "a", 1))
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `takes_int` is incorrect
+   --> src/mdtest_snippet.py:347:15
+    |
+347 |     takes_int(set_and_get(value, "a", 1))
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^ Expected `int`, found `object`
+info: Function defined here
+   --> src/mdtest_snippet.py:343:5
+    |
+343 | def takes_int(value: int) -> None: ...
+    |     ^^^^^^^^^ ---------- Parameter declared here
 ```
 
 Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a

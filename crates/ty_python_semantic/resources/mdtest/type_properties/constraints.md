@@ -1116,6 +1116,73 @@ def f[T]():
     static_assert(c1 == c2)
 ```
 
+### Implication with gradual bounds
+
+A constraint implies another when every specialization allowed by the first also satisfies the
+second. The gradual range `T <: Any` does not imply a static range `T <: str`, despite `Any` and
+`str` being mutually assignable.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+def _[T]():
+    upper_any = is_constraint_set_assignable_to(T, Any)
+    upper_str = ConstraintSet.upper_bound(T, str)
+    static_assert(upper_str.satisfies(upper_any))
+    static_assert(not upper_any.satisfies(upper_str))
+
+    lower_any = is_constraint_set_assignable_to(Any, T)
+    lower_str = ConstraintSet.lower_bound(str, T)
+    static_assert(lower_str.satisfies(lower_any))
+    static_assert(not lower_any.satisfies(lower_str))
+
+    static_assert(upper_any != upper_str)
+    static_assert(lower_any != lower_str)
+```
+
+The same applies to bounds containing nested gradual types.
+
+```py
+def _[T]():
+    upper_any = is_constraint_set_assignable_to(T, tuple[Any])
+    upper_str = ConstraintSet.upper_bound(T, tuple[str])
+    static_assert(upper_str.satisfies(upper_any))
+    static_assert(not upper_any.satisfies(upper_str))
+
+    lower_any = is_constraint_set_assignable_to(tuple[Any], T)
+    lower_str = ConstraintSet.lower_bound(tuple[str], T)
+    static_assert(lower_str.satisfies(lower_any))
+    static_assert(not lower_any.satisfies(lower_str))
+```
+
+As well as gradual types in contravariant position.
+
+```py
+from collections.abc import Callable
+
+def _[T]():
+    upper_any = is_constraint_set_assignable_to(T, Callable[[Any], int])
+    upper_str = ConstraintSet.upper_bound(T, Callable[[str], int])
+    static_assert(upper_str.satisfies(upper_any))
+    static_assert(not upper_any.satisfies(upper_str))
+
+    lower_any = is_constraint_set_assignable_to(Callable[[Any], int], T)
+    lower_str = ConstraintSet.lower_bound(Callable[[str], int], T)
+    static_assert(lower_str.satisfies(lower_any))
+    static_assert(not lower_any.satisfies(lower_str))
+```
+
+A gradual range remains valid when an upper bound eliminates incompatible alternatives.
+
+```py
+def _[T]():
+    alternatives = is_constraint_set_assignable_to(Any, T) | ConstraintSet.lower_bound(object, T)
+    constraints = alternatives & ConstraintSet.upper_bound(T, int)
+    static_assert(constraints.solutions_for(T, inferable=tuple[T]) is not None)
+```
+
 ### Constraints on the same typevar
 
 Any particular specialization maps each typevar to one type. That means it's not useful to constrain
