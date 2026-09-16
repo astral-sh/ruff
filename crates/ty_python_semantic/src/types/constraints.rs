@@ -3424,6 +3424,68 @@ fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'
         .query(|_storage, when| !when.is_never_satisfied(db, env))
 }
 
+/// A complete constraint path and simultaneous substitution, checked together to preserve
+/// correlations between unresolved variables, including those in negative constraints.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct SolutionValidation<'db> {
+    #[returns(copy)]
+    program: Program<'db>,
+    #[returns(ref)]
+    path: Box<[PathBound<'db>]>,
+    #[returns(ref)]
+    solution: Box<[TypeVarSolution<'db, SolutionType<'db>>]>,
+}
+
+impl<'db> SolutionValidation<'db> {
+    #[expect(clippy::unnecessary_wraps, reason = "Query cycles return None")]
+    fn is_valid(self, db: &'db dyn Db) -> bool {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_result=|_, _, _| None,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn validate<'db>(db: &'db dyn Db, input: SolutionValidation<'db>) -> Option<bool> {
+            Some(input.compute(db))
+        }
+
+        // Query cycles must use the ordinary check, not a provisional cached verdict.
+        validate(db, self).unwrap_or_else(|| self.compute(db))
+    }
+
+    fn compute(self, db: &'db dyn Db) -> bool {
+        let env = &ProgramEnvironment::from_program(self.program(db));
+        let bindings: Vec<_> = self
+            .solution(db)
+            .iter()
+            .filter_map(|binding| {
+                let SolutionType::Resolved { ty, .. } = binding.solution else {
+                    return None;
+                };
+                Some((binding.bound_typevar, ty))
+            })
+            .collect();
+        let context = GenericContext::from_typevar_instances(
+            db,
+            env,
+            bindings.iter().map(|(variable, _)| *variable),
+        );
+        let types: Vec<_> = bindings.iter().map(|(_, ty)| *ty).collect();
+        let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
+            generic_context: context,
+            types: &types,
+            skip: None,
+        });
+        let builder = ConstraintSetBuilder::new();
+        let visitor = ApplyTypeMappingVisitor::new(env);
+        let when = self.path(db).iter().when_all(db, &builder, |bound| {
+            bound.constraints(db, env, &builder, |ty| {
+                ty.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor)
+            })
+        });
+        !when.is_never_satisfied(db, env)
+    }
+}
+
 /// Per-path bounds for all typevars. Each element is the set of typevar bounds for one BDD path.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum PathBounds<'db> {
@@ -4038,34 +4100,7 @@ impl<'db> PathBounds<'db> {
         path: &[PathBound<'db>],
         solution: &Solution<'db>,
     ) -> bool {
-        let bindings: Vec<_> = solution
-            .iter()
-            .filter_map(|binding| {
-                let SolutionType::Resolved { ty, .. } = binding.solution else {
-                    return None;
-                };
-                Some((binding.bound_typevar, ty))
-            })
-            .collect();
-        let context = GenericContext::from_typevar_instances(
-            db,
-            env,
-            bindings.iter().map(|(variable, _)| *variable),
-        );
-        let types: Vec<_> = bindings.iter().map(|(_, ty)| *ty).collect();
-        let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
-            generic_context: context,
-            types: &types,
-            skip: None,
-        });
-        let builder = ConstraintSetBuilder::new();
-        let visitor = ApplyTypeMappingVisitor::new(env);
-        let when = path.iter().when_all(db, &builder, |bound| {
-            bound.constraints(db, env, &builder, |ty| {
-                ty.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor)
-            })
-        });
-        !when.is_never_satisfied(db, env)
+        SolutionValidation::new(db, env.program(db), path, solution.as_slice()).is_valid(db)
     }
 
     /// The default solution selection logic for a single typevar on a single BDD path.
