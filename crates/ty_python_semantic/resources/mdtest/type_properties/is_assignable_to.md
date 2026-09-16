@@ -285,6 +285,20 @@ static_assert(not is_assignable_to(TypeOf[Bar[int]], type[Foo[bool]]))
 static_assert(not is_assignable_to(TypeOf[Foo[bool]], type[Bar[int]]))
 ```
 
+## Gradual class types in constraint-producing assignability
+
+`type[Any]` is assignable to class-object types, including specialized generic classes.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_constraint_set_assignable_to
+
+static_assert(is_constraint_set_assignable_to(type, type[Any]))
+static_assert(is_constraint_set_assignable_to(type[Any], TypeOf[list[int]]))
+static_assert(not is_constraint_set_assignable_to(object, type[Any]))
+```
+
 ## `type[]` is not assignable to types disjoint from `builtins.type`
 
 ```py

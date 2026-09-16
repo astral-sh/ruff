@@ -2795,16 +2795,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::SubclassOf(subclass_of_ty), _) if subclass_of_ty.is_dynamic() => self
                 .check_type_pair(db, KnownClass::Type.to_instance(db, env), target)
                 .or(db, self.constraints, || {
-                    ConstraintSet::from_bool(self.constraints, self.is_eager_assignability()).and(
-                        db,
-                        self.constraints,
-                        || self.check_type_pair(db, target, KnownClass::Type.to_instance(db, env)),
-                    )
+                    ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+                        .and(db, self.constraints, || {
+                            self.check_type_pair(db, target, KnownClass::Type.to_instance(db, env))
+                        })
                 }),
 
             // Any `type[...]` type is assignable to `type[Any]`
             (_, Type::SubclassOf(subclass_of_ty))
-                if subclass_of_ty.is_dynamic() && self.is_eager_assignability() =>
+                if subclass_of_ty.is_dynamic() && self.relation.is_assignability() =>
             {
                 self.check_type_pair(db, source, KnownClass::Type.to_instance(db, env))
             }
