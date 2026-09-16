@@ -17,13 +17,29 @@ use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,
+
+    /// Candidate solutions for each satisfiable path in the BDD.
+    ///
+    /// We will check these solutions against the declared upper bounds (TODO and constraints) of
+    /// all relevant typevars (both inferable and non-inferable). Note that we will still create a
+    /// candidate solution for satisfiable paths that do _not_ satisfy the upper bounds and
+    /// constraints. Those paths will have a [`validity`][CandidateSolution::validity] of
+    /// [`Invalid`][SolutionValidity::Invalid].
     pending: Vec<PendingCandidateSolution<'db>>,
+
+    /// An accumulator that stores the declared upper bounds that we have checked for a candidate
+    /// solution.
     upper_bounds: Vec<(BoundTypeVarInstance<'db>, NodeId)>,
+
     _phantom: PhantomData<&'db ()>,
 }
 
 struct PendingCandidateSolution<'db> {
+    /// The candidate solution for a satisfiable path in the BDD
     candidate: CandidateSolution<'db>,
+
+    /// The `source_orders` of the constraints in the path that this candidate solution was created
+    /// from. We retain this so that our final result is sorted in a stable order.
     source_orders: Vec<usize>,
 }
 
@@ -37,6 +53,8 @@ impl<'db> SolutionWalker<'db> {
         }
     }
 
+    /// Visit a BDD node and all of its descendants. We will add pending candidate solutions for
+    /// any satisfiable path we discover from the node.
     #[expect(clippy::too_many_arguments)]
     pub(super) fn visit_node<L: SolutionLimits>(
         &mut self,
@@ -64,6 +82,8 @@ impl<'db> SolutionWalker<'db> {
         )
     }
 
+    /// Visit a BDD node and all of its descendants, invoking the `process_satisfied` callback for
+    /// any satisfiable path that is discovered.
     #[expect(clippy::too_many_arguments)]
     #[expect(clippy::type_complexity)]
     fn visit_node_and_then<L: SolutionLimits>(
@@ -113,6 +133,10 @@ impl<'db> SolutionWalker<'db> {
         ControlFlow::Continue(())
     }
 
+    /// Visits one of the outgoing edges from a BDD node.
+    ///
+    /// (This is a helper method used by [`visit_node_and_then`][Self::visit_node_and_then]. You
+    /// will probably not need to call this directly.)
     #[expect(clippy::too_many_arguments)]
     #[expect(clippy::type_complexity)]
     fn visit_edge<L: SolutionLimits>(
@@ -159,6 +183,8 @@ impl<'db> SolutionWalker<'db> {
         )
     }
 
+    /// Having found a satisfiable path in the BDD, validates that path against the declared upper
+    /// bound (TODO and constraints) of all relevant typevars.
     fn validate_satisfied_path<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
@@ -168,7 +194,7 @@ impl<'db> SolutionWalker<'db> {
         path: &mut PathAssignments,
         all_typevars: &Support,
     ) -> ControlFlow<L::Break> {
-        // We have a path that represents a valid solution to the constraint set. First verify that
+        // We have a path that represents a valid solution to the constraint set. Check if the
         // solution satisfies all of the typevars' declared upper bounds (TODO and constraints).
         let mut all_typevars = all_typevars.clone();
         let mut seen_typevars = Support::default();
@@ -184,15 +210,15 @@ impl<'db> SolutionWalker<'db> {
             &mut seen_typevars,
         )?;
         if self.pending.len() > previous_count {
-            // There is at least one extension of the valid solution that satisfies all declared
-            // upper bounds (TODO and constraints), and we've already recorded pending solutions
-            // for them. Nothing more to do.
+            // If we added any pending candidate solutions during the validation process, then the
+            // solution is valid!
             return ControlFlow::Continue(());
         }
 
-        // To see if the solution is actually valid, we checked against _all_ declared upper bounds
-        // (TODO and constraints). Now we have to re-check them _individually_ to create better
-        // diagnostics.
+        // If we fall through, then the solution did not satisfy all of the declared upper bounds
+        // (TODO and constraints). If we can, we want to identify which particular upper bounds or
+        // constraints were violated. To do that, we have to re-check this path against each one
+        // individually.
         self.attribute_typevar_failures(db, env, storage, limits, path)
     }
 
@@ -207,7 +233,14 @@ impl<'db> SolutionWalker<'db> {
         all_typevars: &mut Support,
         seen_typevars: &mut Support,
     ) -> ControlFlow<L::Break> {
+        // High level plan: We find the next typevar with a declared upper bound, create a
+        // throwaway BDD that represents that upper bound, and then walk that upper bound BDD's
+        // paths. Because we perform that walk with the current `path` from the original BDD still
+        // in force, any satisfiable paths we find in the upper bound BDD will be compatible with
+        // the current candidate solution.
+
         while let Some(typevar) = all_typevars.pop() {
+            // Find the next typevar with a declared upper bound
             seen_typevars.insert(typevar);
             let bound_typevar = storage.typevar_data(typevar);
             let bound_or_constraints = bound_typevar.typevar(db).bound_or_constraints(db, env);
@@ -215,6 +248,10 @@ impl<'db> SolutionWalker<'db> {
                 continue;
             };
 
+            // Create the throwaway BDD that represents that upper bound. (This will _usually_ be a
+            // single BDD node with a single constraint representing the upper bound. But certain
+            // patterns might produce a more complex BDD — for instance, an intersection upper
+            // bound, which we break apart into separate constraints.)
             let constraints = Constraint::new_upper_bound(
                 db,
                 env,
@@ -228,11 +265,18 @@ impl<'db> SolutionWalker<'db> {
             self.upper_bounds.push((bound_typevar, constraint));
 
             // If any typevars are mentioned in the upper bound, we have to validate them too.
+            // TODO: Consider calculating this at construction time, so that here we have a fixed
+            // set of typevars to check.
             if let Some(upper_bound_support) = storage.node_support(constraint) {
                 let new_typevars = upper_bound_support - &*seen_typevars;
                 *all_typevars |= &new_typevars;
             }
 
+            // Search for any satisfiable paths in the upper bound BDD. If we find any, we still
+            // need to validate any _remaining_ typevar upper bounds, and we want to do that while
+            // `path` contains both the candidate solution and any upper bounds we have already
+            // checked. That means we have to use a recursive call inside the `walk_edge` callback
+            // to find and check the next typevar upper bound.
             return self.visit_node_and_then(
                 db,
                 env,
@@ -254,6 +298,10 @@ impl<'db> SolutionWalker<'db> {
             );
         }
 
+        // If we fall through, then we have checked all typevars that have an upper bound, and we
+        // now know that the candidate solution is valid.
+        // TODO: Check the declared constraints here instead of `preliminary_solve` before
+        // declaring the candidate solution valid.
         self.found_satisfied_path(db, env, storage, limits, path)
     }
 
@@ -395,6 +443,11 @@ impl<'db> SolutionWalker<'db> {
         ControlFlow::Continue(())
     }
 
+    /// Having already determined that a satisfiable path violates the declared upper bounds (TODO
+    /// and constraints) of the relevant typevars, determines _which particular_ upper bounds or
+    /// constraints were violated. Adds an [`Invalid`][SolutionValidity::Invalid] candidate
+    /// solution for the path recording those violations, so that a later stage can transform them
+    /// into useful diagnostics.
     fn attribute_typevar_failures<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
