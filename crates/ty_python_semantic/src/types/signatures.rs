@@ -1358,7 +1358,8 @@ impl<'db> Signature<'db> {
                 && let Some(upper) = bounds.as_single_upper_bound(db, env)
                 && lower.is_equivalent_to(db, env, upper)
                 && let Some(solution) =
-                    CandidateSolutions::default_solve(db, env, &constraints, bounds).as_type()
+                    CandidateSolutions::default_solve(db, env, &constraints, inferable, bounds)
+                        .as_type()
             {
                 return Some(solution);
             }
@@ -1373,7 +1374,8 @@ impl<'db> Signature<'db> {
                     .evidence_lower()
                     .is_some_and(|lower| !lower.is_never())
                 && let Some(solution) =
-                    CandidateSolutions::default_solve(db, env, &constraints, bounds).as_type()
+                    CandidateSolutions::default_solve(db, env, &constraints, inferable, bounds)
+                        .as_type()
             {
                 return Some(solution);
             }

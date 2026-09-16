@@ -1641,6 +1641,42 @@ reveal_type(narrow(1))  # revealed: int
 reveal_type(narrow("hello"))  # revealed: str
 ```
 
+## Selecting constraints for narrowed caller type variables
+
+After narrowing a caller's type variable to `str`, its value satisfies the `str` constraint. We
+cannot select `int` by choosing a meaning for the caller's variable that would make its intersection
+with `str` empty. Selecting the compatible constraint does not depend on declaration order:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+ReversedT = TypeVar("ReversedT", str, int)
+S = TypeVar("S")
+
+def constrained(value: T) -> T:
+    return value
+
+def reversed_constraints(value: ReversedT) -> ReversedT:
+    return value
+
+def narrowed(value: S) -> None:
+    if isinstance(value, str):
+        reveal_type(constrained(value))  # revealed: str
+        reveal_type(reversed_constraints(value))  # revealed: str
+```
+
+The caller's variable also remains fixed when the narrowed value is nested in a tuple:
+
+```py
+def constrained_tuple(value: tuple[T]) -> T:
+    return value[0]
+
+def narrowed_tuple(value: S) -> None:
+    if isinstance(value, str):
+        reveal_type(constrained_tuple((value,)))  # revealed: str
+```
+
 ## Redundant callback bounds preserve constrained type-variable relationships
 
 A contravariant callback can contribute both another constrained type variable and a redundant

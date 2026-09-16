@@ -1030,7 +1030,12 @@ fn specialize_generic_class_for_subject<'db>(
             Type::instance(db, env, target),
             generic_context.inferable_typevars(db),
         )
-        .solve(db, env, &constraints);
+        .solve(
+            db,
+            env,
+            &constraints,
+            generic_context.inferable_typevars(db),
+        );
 
     specialize_generic_class_from_solutions(db, env, target_class, solutions)
 }

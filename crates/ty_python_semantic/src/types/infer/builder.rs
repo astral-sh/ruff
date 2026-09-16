@@ -6808,7 +6808,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Callable(target_callable),
                 inferable,
             );
-        let Solutions::Constrained(solutions) = path_bounds.solve(db, env, &constraints) else {
+        let Solutions::Constrained(solutions) = path_bounds.solve(db, env, &constraints, inferable)
+        else {
             return ty;
         };
 
@@ -7652,7 +7653,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .entry(identity)
                         .and_modify(|current| *current = current.join(variance))
                         .or_insert(variance);
-                    CandidateSolutions::preliminary_solve(db, env, &constraints, path_bound)
+                    CandidateSolutions::preliminary_solve(db, env, &constraints, inferable, path_bound)
                 });
 
                 match solutions {
@@ -8070,7 +8071,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             generic_context.inferable_typevars(db),
         );
         let constraints = ConstraintSetBuilder::new();
-        let Solutions::Constrained(solutions) = path_bounds.solve(db, env, &constraints) else {
+        let Solutions::Constrained(solutions) = path_bounds.solve(
+            db,
+            env,
+            &constraints,
+            generic_context.inferable_typevars(db),
+        ) else {
             return TypeContext::default();
         };
 

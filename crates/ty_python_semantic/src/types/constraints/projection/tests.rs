@@ -85,12 +85,13 @@ fn collect_paths<'db, 'c>(
     budget: SolutionBudget,
 ) -> Result<SolutionProjection<Paths<'db>>, ProjectionError> {
     let env = db.program_environment();
+    let inferable = TypeVarSet::from_typevars(db, typevars.iter().copied());
     set.try_fold_solutions(
         db,
         &env,
-        TypeVarSet::from_typevars(db, typevars.iter().copied()),
+        inferable,
         budget,
-        |_, bound| CandidateSolutions::default_solve(db, &env, builder, bound),
+        |_, bound| CandidateSolutions::default_solve(db, &env, builder, inferable, bound),
         Paths::default(),
         |mut paths, path, budget| {
             for binding in path {
@@ -135,7 +136,7 @@ fn path_limit_is_checked_before_solving() {
             },
             |_, bound| {
                 selected += 1;
-                CandidateSolutions::default_solve(db, &env, &builder, bound)
+                CandidateSolutions::default_solve(db, &env, &builder, inferable, bound)
             },
             0,
             |count, _, _| {
@@ -500,7 +501,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
         let mut selected = 0;
         let collected = set.solutions_with(db, &env, inferable, budget, |_, bound| {
             selected += 1;
-            CandidateSolutions::default_solve(db, &env, &builder, bound)
+            CandidateSolutions::default_solve(db, &env, &builder, inferable, bound)
         });
         // One additional path is selected to discover that it exceeds the budget; later
         // paths are not solved.
@@ -512,7 +513,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
             &env,
             inferable,
             budget,
-            |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
+            |_, bound| CandidateSolutions::default_solve(db, &env, &builder, inferable, bound),
             Type::Never,
             |accumulated, path, budget| {
                 assert_eq!(path.len(), 1);
@@ -637,7 +638,13 @@ class E: ...
 
         assert_eq!(
             paths.try_fold_with(
-                |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
+                |_, bound| CandidateSolutions::default_solve(
+                    db,
+                    &env,
+                    &builder,
+                    TypeVarSet::from_typevars(db, [t]),
+                    bound
+                ),
                 Type::object(),
                 &mut ProjectionTypeBudget::new(7),
                 |accumulated, path, budget| {
