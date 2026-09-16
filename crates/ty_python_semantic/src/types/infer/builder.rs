@@ -6453,9 +6453,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         peer_ty: Option<Type<'db>>,
         mut infer_expression: impl FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        let peer_tcx = if is_empty_collection_type_context(tcx)
-            && is_collection_literal(expression)
+        let db = self.db();
+        let env = self.program_environment();
+        let peer_tcx = if is_collection_literal(expression)
             && let Some(peer_ty) = peer_ty
+            && prefer_collection_literal_peer_context(db, env, tcx)
         {
             TypeContext::new(Some(peer_ty))
         } else {
@@ -8519,25 +8521,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_expression;
 
         let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
-        let (body_ty, orelse_ty) =
-            if is_empty_collection_type_context(tcx) && is_collection_literal(body) {
-                // Infer the peer branch first so the body can use its type as context.
-                let orelse_ty = self.infer_expression(orelse, tcx);
-                let body_ty = self.infer_expression_with_collection_literal_peer_context(
-                    body,
-                    tcx,
-                    Some(orelse_ty),
-                );
-                (body_ty, orelse_ty)
-            } else {
-                let body_ty = self.infer_expression(body, tcx);
-                let orelse_ty = self.infer_expression_with_collection_literal_peer_context(
-                    orelse,
-                    tcx,
-                    Some(body_ty),
-                );
-                (body_ty, orelse_ty)
-            };
+        let (body_ty, orelse_ty) = if is_collection_literal(body)
+            && prefer_collection_literal_peer_context(db, env, tcx)
+        {
+            // Infer the peer branch first so the body can use its type as context.
+            let orelse_ty = self.infer_expression(orelse, tcx);
+            let body_ty = self.infer_expression_with_collection_literal_peer_context(
+                body,
+                tcx,
+                Some(orelse_ty),
+            );
+            (body_ty, orelse_ty)
+        } else {
+            let body_ty = self.infer_expression(body, tcx);
+            let orelse_ty = self.infer_expression_with_collection_literal_peer_context(
+                orelse,
+                tcx,
+                Some(body_ty),
+            );
+            (body_ty, orelse_ty)
+        };
 
         let test_truthiness = match test_ty.try_bool(db, env) {
             Ok(_) => analyze_condition_expression(test, &|node| {
@@ -11432,8 +11435,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = bool_op;
         // The first operand has no peers. If no later operand is a collection literal,
         // accumulating prior types cannot affect inference.
-        let track_peer_types = is_empty_collection_type_context(tcx)
-            && values.iter().skip(1).any(is_collection_literal);
+        let track_peer_types = values.iter().skip(1).any(is_collection_literal)
+            && prefer_collection_literal_peer_context(self.db(), self.program_environment(), tcx);
         self.infer_chained_boolean_types(
             *op,
             track_peer_types,
@@ -12557,6 +12560,25 @@ fn is_collection_literal(expression: &ast::Expr) -> bool {
 fn is_empty_collection_type_context(tcx: TypeContext<'_>) -> bool {
     tcx.annotation
         .is_none_or(|annotation| annotation == Type::Dynamic(DynamicType::UnspecializedTypeVar))
+}
+
+fn prefer_collection_literal_peer_context<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    tcx: TypeContext<'db>,
+) -> bool {
+    is_empty_collection_type_context(tcx)
+        // Peer type context should be preferred over `list[UnspecializedTypeVar]`, which
+        // provides no useful element type.
+        || tcx
+            .annotation
+            .and_then(|annotation| annotation.class_specialization(db, env))
+            .is_some_and(|(_, specialization)| {
+                specialization
+                    .types(db)
+                    .iter()
+                    .all(|ty| *ty == Type::Dynamic(DynamicType::UnspecializedTypeVar))
+            })
 }
 
 /// An iterator over arguments to a functional call.

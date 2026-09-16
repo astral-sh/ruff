@@ -1901,6 +1901,51 @@ sort = build_sort_spec(params) or {"name": -1}
 use_sort(sort)
 ```
 
+An unspecialized collection parameter is not useful type context for a collection literal. The other
+operand of a conditional or boolean expression can supply it instead:
+
+```py
+def f[T](values: list[T]) -> list[T]:
+    return values
+
+def _(values: list[object], flag: bool):
+    reveal_type(f(values if flag else [1]))  # revealed: list[object]
+    reveal_type(f([1] if flag else values))  # revealed: list[object]
+    reveal_type(f(values or [1]))  # revealed: list[object]
+    reveal_type(f(values and [1]))  # revealed: list[object]
+```
+
+The same applies to set literals:
+
+```py
+def g[T](values: set[T]) -> set[T]:
+    return values
+
+def _(values: set[object], flag: bool):
+    reveal_type(g(values if flag else {1}))  # revealed: set[object]
+    reveal_type(g({1} if flag else values))  # revealed: set[object]
+    reveal_type(g(values or {1}))  # revealed: set[object]
+```
+
+As well as generic constructors:
+
+```py
+def _(values: dict[str | None, object], flag: bool):
+    reveal_type(dict(values if flag else {None: None}))  # revealed: dict[str | None, object]
+    reveal_type(dict({None: None} if flag else values))  # revealed: dict[str | None, object]
+    reveal_type(dict(values or {None: None}))  # revealed: dict[str | None, object]
+```
+
+Explicit gradual element types remain preferred over the other operand's specialization:
+
+```py
+from typing import Any
+
+def _(values: list[int], flag: bool):
+    x: list[Any] = values if flag else reveal_type([])  # revealed: list[Any]
+    reveal_type(x)  # revealed: list[Any]
+```
+
 ## Lambda expressions
 
 If a lambda expression is annotated as a `Callable` type, the body of the lambda is inferred with
