@@ -304,8 +304,8 @@ def f(
     reveal_type(z)  # revealed: type[Unknown]
 ```
 
-A callable signature is also invalid when it appears inside a union, an intersection or an alias used as the
-argument to `type[...]`:
+A callable signature is also invalid when it appears inside a union, an intersection or an alias
+used as the argument to `type[...]`:
 
 ```py
 from ty_extensions import Intersection
