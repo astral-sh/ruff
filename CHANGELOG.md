@@ -9,7 +9,7 @@ Released on 2026-09-16.
 - Visit functional `TypedDict` keyword arguments correctly ([#28584](https://github.com/astral-sh/ruff/pull/28584))
 - \[`flake8-simplify`\] Detect nested `async with` under sync parent (`SIM117`) ([#27821](https://github.com/astral-sh/ruff/pull/27821))
 - \[`flake8-simplify`\] Preserve operand order in `SIM109` fix ([#27824](https://github.com/astral-sh/ruff/pull/27824))
-- \[`pyupgrade`\] Preserve grouping in multiline `UP040` fixes ([#28164](https://github.com/astral-sh/ruff/pull/28164))
+- \[`pyupgrade`\] Preserve required parentheses in multiline `UP040` fixes ([#28164](https://github.com/astral-sh/ruff/pull/28164))
 - \[`pyupgrade`\] Skip `TypeVarTuple` and `ParamSpec` conversions with bounds or constraints (`UP040`, `UP046`, `UP047`) ([#28505](https://github.com/astral-sh/ruff/pull/28505))
 
 ### Rule changes
@@ -18,11 +18,11 @@ Released on 2026-09-16.
 - Recognize PEP-728 `TypedDict` class keywords ([#28533](https://github.com/astral-sh/ruff/pull/28533))
 - Recognize quoted types in `typing.TypeForm` ([#28507](https://github.com/astral-sh/ruff/pull/28507))
 - Support conditional assignment to `__lazy_modules__` ([#28491](https://github.com/astral-sh/ruff/pull/28491))
-- \[`flake8-type-checking`\] Prefer lazy imports over `TYPE_CHECKING` on 3.15+ (`TC001`, `TC002`, `TC003`) ([#28541](https://github.com/astral-sh/ruff/pull/28541))
+- \[`flake8-type-checking`\] Prefer lazy imports over `TYPE_CHECKING` on Python 3.15 and later (`TC001`, `TC002`, `TC003`) ([#28541](https://github.com/astral-sh/ruff/pull/28541))
 - \[`pyupgrade`\] Make the fix for `UP040` always unsafe ([#28526](https://github.com/astral-sh/ruff/pull/28526))
 - \[`pyupgrade`\] Stop recommending deprecated `ByteString` aliases (`UP035`) ([#28498](https://github.com/astral-sh/ruff/pull/28498))
-- \[`ruff`, `flake8-use-pathlib`\] Support `parent_mode` (`RUF064`, `PTH103`) ([#28528](https://github.com/astral-sh/ruff/pull/28528))
-- [ruff] Detect `\Z` in `pytest.raises()` match patterns (`RUF043`) ([#28598](https://github.com/astral-sh/ruff/pull/28598))
+- \[`ruff`, `flake8-use-pathlib`\] Recognize the `parent_mode` argument (`RUF064`, `PTH103`) ([#28528](https://github.com/astral-sh/ruff/pull/28528))
+- \[`ruff`\] Detect `\Z` in `pytest.raises()` match patterns (`RUF043`) ([#28598](https://github.com/astral-sh/ruff/pull/28598))
 
 ### CLI
 
@@ -30,11 +30,7 @@ Released on 2026-09-16.
 
 ### Configuration
 
-- [flake8-tidy-imports] Add `extend-banned-api` ([#28644](https://github.com/astral-sh/ruff/pull/28644))
-
-### Other changes
-
-- Add a GitHub repository threat model for Ruff ([#28395](https://github.com/astral-sh/ruff/pull/28395))
+- \[`flake8-tidy-imports`\] Add `extend-banned-api` ([#28644](https://github.com/astral-sh/ruff/pull/28644))
 
 ### Contributors
 
