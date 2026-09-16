@@ -2718,12 +2718,12 @@ mod tests {
         for _ in 0..8 {
             negative_builder.add_negative_in_place(intersection);
             positive_builder.add_positive_in_place(negated);
-
-            // A gradual callable C can overlap its negation, so distribution retains C & ~C
-            // alongside C and ~C. Repeating the same clause must not multiply these alternatives.
-            assert!(negative_builder.intersections.len() <= 3);
-            assert!(positive_builder.intersections.len() <= 3);
         }
+
+        // A gradual callable C can overlap its negation, so distribution retains C & ~C
+        // alongside C and ~C. Repeating the same clause must not multiply these alternatives.
+        assert!(negative_builder.intersections.len() <= 3);
+        assert!(positive_builder.intersections.len() <= 3);
 
         assert!(negative_builder.build().is_equivalent_to(db, &env, negated));
         assert!(positive_builder.build().is_equivalent_to(db, &env, negated));

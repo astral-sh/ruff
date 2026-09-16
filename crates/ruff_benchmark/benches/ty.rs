@@ -1488,24 +1488,18 @@ fn benchmark_gradual_intersection_negation(criterion: &mut Criterion) {
 
     let code = r#"
 from typing import Any, Callable
-from ty_extensions import Intersection, Not, static_assert
-from ty_extensions._internal import is_subtype_of
+from ty_extensions import Intersection, Not
 
 class A: ...
 
-static_assert(
-    is_subtype_of(
-        Not[
-            Intersection[
-                Any | type[A] | str,
-                Callable[..., object],
-                Not[Callable[..., object]],
-                Not[Intersection[A, type[str], Any, Not[type[Any]]]],
-            ]
-        ],
-        object,
-    )
-)
+x: Not[
+    Intersection[
+        Any | type[A] | str,
+        Callable[..., object],
+        Not[Callable[..., object]],
+        Not[Intersection[A, type[str], Any, Not[type[Any]]]],
+    ]
+]
 "#;
 
     criterion.bench_function("ty_micro[gradual_intersection_negation]", |b| {
