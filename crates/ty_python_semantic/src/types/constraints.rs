@@ -88,7 +88,7 @@
 
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
-use std::convert::Infallible;
+use std::convert::{Infallible, identity};
 use std::fmt::{Debug, Display};
 use std::iter;
 use std::marker::PhantomData;
@@ -3174,92 +3174,83 @@ impl<'db> PathBound<'db> {
         }
     }
 
-    /// Returns the positive, negative, and declared restrictions for this variable.
+    /// Returns the positive, negative, and declared restrictions after mapping their types.
     fn constraints<'c>(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
+        map: impl Fn(Type<'db>) -> Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let variable = self.bound_typevar;
-        let mut positive = Vec::new();
-        // Refinement must preserve which bounds came from the caller. Missing bounds stay absent,
-        // since `Never` is not the bottom of the parameter-signature domain.
-        if let Some(lower) = self.evidence_lower {
-            positive.extend(Constraint::new_lower_bound(
+        let subject = map(Type::TypeVar(variable));
+        let lower_bound = |provenance, lower| {
+            Constraint::when_lower_bound(
                 db,
-                ConstraintProvenance::Evidence,
-                variable,
-                lower,
-            ));
-        }
-        if !self.validity_lower.is_never() {
-            positive.extend(Constraint::new_lower_bound(
-                db,
-                ConstraintProvenance::Validity,
-                variable,
-                self.validity_lower,
-            ));
-        }
-        for (provenance, upper) in self
-            .upper
-            .iter_evidence()
-            .map(|ty| (ConstraintProvenance::Evidence, ty))
-            .chain(
-                self.upper
-                    .iter_validity()
-                    .map(|ty| (ConstraintProvenance::Validity, ty)),
+                env,
+                builder,
+                provenance,
+                subject,
+                map(Constraint::normalize_bound(db, variable, lower)),
             )
-        {
-            positive.extend(Constraint::new_upper_bound(
-                db, env, provenance, variable, upper,
-            ));
-        }
-        let declaration = match variable.require_bound_or_constraints(db, env) {
-            TypeVarBoundOrConstraints::UpperBound(upper) => {
-                positive.extend(Constraint::new_upper_bound(
-                    db,
-                    env,
-                    ConstraintProvenance::Validity,
-                    variable,
-                    upper.top_materialization(db, env),
-                ));
+        };
+        let upper_bound = |provenance, upper| {
+            Constraint::when_upper_bound(
+                db,
+                env,
+                builder,
+                provenance,
+                subject,
+                map(Constraint::normalize_bound(db, variable, upper)),
+            )
+        };
+        // Map aggregated bounds before splitting them: substituting their own union as the
+        // solution should not require checking each member against the entire union again.
+        // Missing bounds stay absent, since `Never` is not the bottom of the ParamSpec domain.
+        let positive = self.evidence_lower.when_none_or(db, builder, |lower| {
+            lower_bound(ConstraintProvenance::Evidence, lower)
+        });
+        let positive = positive.and(db, builder, || {
+            if self.validity_lower.is_never() {
                 ConstraintSet::always(builder)
+            } else {
+                lower_bound(ConstraintProvenance::Validity, self.validity_lower)
             }
+        });
+        let positive = positive.and(db, builder, || {
+            self.upper.iter_evidence().when_all(db, builder, |upper| {
+                upper_bound(ConstraintProvenance::Evidence, upper)
+            })
+        });
+        let positive = positive.and(db, builder, || {
+            self.upper.iter_validity().when_all(db, builder, |upper| {
+                upper_bound(ConstraintProvenance::Validity, upper)
+            })
+        });
+        let declaration = match variable.require_bound_or_constraints(db, env) {
+            TypeVarBoundOrConstraints::UpperBound(upper) => upper_bound(
+                ConstraintProvenance::Validity,
+                upper.top_materialization(db, env),
+            ),
             TypeVarBoundOrConstraints::Constraints(choices) => {
                 choices.elements(db).iter().when_any(db, builder, |choice| {
-                    let constraints = iter::chain(
-                        Constraint::new_lower_bound(
-                            db,
+                    lower_bound(
+                        ConstraintProvenance::Validity,
+                        choice.bottom_materialization(db, env),
+                    )
+                    .and(db, builder, || {
+                        upper_bound(
                             ConstraintProvenance::Validity,
-                            variable,
-                            choice.bottom_materialization(db, env),
-                        ),
-                        Constraint::new_upper_bound(
-                            db,
-                            env,
-                            ConstraintProvenance::Validity,
-                            variable,
                             choice.top_materialization(db, env),
-                        ),
-                    );
-                    let (node, source_order) = Constraint::new_nodes(
-                        db,
-                        env,
-                        &mut builder.storage.borrow_mut(),
-                        constraints,
-                    );
-                    ConstraintSet::from_node(builder, node, source_order)
+                        )
+                    })
                 })
             }
         };
-        let (node, source_order) =
-            Constraint::new_nodes(db, env, &mut builder.storage.borrow_mut(), positive);
-        let positive = ConstraintSet::from_node(builder, node, source_order);
         let excluded = self.excluded.iter().when_all(db, builder, |constraint| {
-            let (node, source_order) =
-                constraint.new_node(db, env, &mut builder.storage.borrow_mut());
-            ConstraintSet::from_node(builder, node, source_order).negate(db, builder)
+            constraint
+                .map_types(db, env, builder, &map)
+                .negate(db, builder)
         });
         positive
             .and(db, builder, || declaration)
@@ -3851,9 +3842,9 @@ impl<'db> PathBounds<'db> {
         choose: &mut impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
     ) -> Result<Option<(Solution<'db>, bool)>, ProjectionError> {
         let builder = ConstraintSetBuilder::new();
-        let when = path
-            .iter()
-            .when_all(db, &builder, |bound| bound.constraints(db, env, &builder));
+        let when = path.iter().when_all(db, &builder, |bound| {
+            bound.constraints(db, env, &builder, identity)
+        });
         let refined = Self::compute_bounded(
             db,
             env,
@@ -3949,7 +3940,7 @@ impl<'db> PathBounds<'db> {
             .iter()
             .map(|bound| {
                 let when = ConstraintSetBuilder::new()
-                    .into_owned(|builder| bound.constraints(db, env, builder));
+                    .into_owned(|builder| bound.constraints(db, env, builder, identity));
                 let support =
                     RefCell::new(FxHashSet::from_iter([bound.bound_typevar.identity(db)]));
                 // Cached diagram support can omit lazy alias bodies. Recovery must include
@@ -4068,15 +4059,12 @@ impl<'db> PathBounds<'db> {
             skip: None,
         });
         let builder = ConstraintSetBuilder::new();
-        let when = path
-            .iter()
-            .when_all(db, &builder, |bound| bound.constraints(db, env, &builder));
-        let when = when.apply_type_mapping_impl(
-            db,
-            &mapping,
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::new(env),
-        );
+        let visitor = ApplyTypeMappingVisitor::new(env);
+        let when = path.iter().when_all(db, &builder, |bound| {
+            bound.constraints(db, env, &builder, |ty| {
+                ty.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor)
+            })
+        });
         !when.is_never_satisfied(db, env)
     }
 
