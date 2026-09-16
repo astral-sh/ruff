@@ -60,8 +60,8 @@ use crate::reachability_constraints::{
     ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
 use crate::scope::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, Scope, ScopeId, ScopeKind,
-    ScopeLaziness,
+    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, Scope, ScopeFlags, ScopeId,
+    ScopeKind, ScopeLaziness,
 };
 use crate::statement::StatementInner;
 use crate::symbol::{ScopedSymbolId, Symbol};
@@ -295,12 +295,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
     // A map from a collection initializer definition to statements containing a constraining use.
     uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
-    /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
-    ///
-    /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
-    generator_functions: FxHashSet<FileScopeId>,
-    /// Hashset of all [`FileScopeId`]s that correspond to asynchronous comprehensions.
-    async_comprehensions: FxHashSet<FileScopeId>,
+    /// Sparse properties of scopes; entries are created only when setting a flag.
+    scope_flags: FxHashMap<FileScopeId, ScopeFlags>,
     /// Node indices of syntactic annotation roots.
     annotations: Vec<NodeIndex>,
     /// Snapshots of enclosing-scope place states visible from nested scopes.
@@ -357,8 +353,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
-            generator_functions: FxHashSet::default(),
-            async_comprehensions: FxHashSet::default(),
+            scope_flags: FxHashMap::default(),
             annotations: Vec::new(),
 
             enclosing_snapshots: FxHashMap::default(),
@@ -400,8 +395,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn mark_current_comprehension_async(&mut self) {
         let scope = self.current_scope();
         if self.scopes[scope].kind() == ScopeKind::Comprehension {
-            self.async_comprehensions.insert(scope);
+            self.scope_flags
+                .entry(scope)
+                .or_default()
+                .insert(ScopeFlags::IS_ASYNC_COMPREHENSION);
         }
+    }
+
+    fn is_async_comprehension(&self, scope: FileScopeId) -> bool {
+        self.scope_flags
+            .get(&scope)
+            .is_some_and(|flags| flags.contains(ScopeFlags::IS_ASYNC_COMPREHENSION))
     }
 
     fn expect_single_definition(
@@ -530,6 +534,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.exception_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
+        if self.active_boolean_test_scope.is_some() {
+            self.scope_flags
+                .entry(file_scope_id)
+                .or_default()
+                .insert(ScopeFlags::IN_BOOLEAN_TEST);
+        }
         self.place_tables.push(PlaceTableBuilder::default());
         self.use_def_maps
             .push(Box::new(UseDefMapBuilder::new(scope_kind)));
@@ -3064,7 +3074,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let comprehension_scope = self.current_scope();
 
         if generators.iter().any(|generator| generator.is_async) {
-            self.async_comprehensions.insert(comprehension_scope);
+            self.scope_flags
+                .entry(comprehension_scope)
+                .or_default()
+                .insert(ScopeFlags::IS_ASYNC_COMPREHENSION);
         }
 
         self.add_unpackable_assignment(
@@ -3404,8 +3417,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
             semantic_syntax_errors,
-            generator_functions: FrozenSet::from(self.generator_functions),
-            async_comprehensions: FrozenSet::from(self.async_comprehensions),
+            scope_flags: FrozenMap::from(self.scope_flags),
             annotations: self.annotations.into_boxed_slice(),
             narrowing_alias_predicates: FrozenMap::from(self.alias_predicates),
         }
@@ -3567,7 +3579,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     generators,
                     |builder| builder.visit_expr(elt),
                 );
-                if self.async_comprehensions.contains(&scope) {
+                if self.is_async_comprehension(scope) {
                     self.mark_current_comprehension_async();
                 }
             }
@@ -3581,7 +3593,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     generators,
                     |builder| builder.visit_expr(elt),
                 );
-                if self.async_comprehensions.contains(&scope) {
+                if self.is_async_comprehension(scope) {
                     self.mark_current_comprehension_async();
                 }
             }
@@ -3614,7 +3626,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         builder.visit_expr(value);
                     },
                 );
-                if self.async_comprehensions.contains(&scope) {
+                if self.is_async_comprehension(scope) {
                     self.mark_current_comprehension_async();
                 }
             }
@@ -3650,7 +3662,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
                 let scope = self.current_scope();
                 if self.scopes[scope].kind() == ScopeKind::Function {
-                    self.generator_functions.insert(scope);
+                    self.scope_flags
+                        .entry(scope)
+                        .or_default()
+                        .insert(ScopeFlags::IS_GENERATOR_FUNCTION);
                 }
                 walk_expr(self, expr);
                 self.record_exception_checkpoint();

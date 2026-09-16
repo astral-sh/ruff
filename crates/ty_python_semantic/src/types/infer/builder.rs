@@ -102,6 +102,7 @@ use crate::types::generics::{
 use crate::types::infer::builder::binary_expressions::BinaryInferenceState;
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
+use crate::types::infer::builder::redundant_conditions::RedundantConditionContext;
 use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeAndRange,
     TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
@@ -2737,7 +2738,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     err.report_diagnostic(&self.context, guard);
                 }
 
-                self.check_condition_redundancy(guard, guard_ty);
+                self.check_condition_redundancy(
+                    guard,
+                    guard_ty,
+                    RedundantConditionContext::Standalone,
+                );
             }
 
             self.infer_body(body);
@@ -8394,7 +8399,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 err.report_diagnostic(&self.context, expr);
             }
 
-            self.check_condition_redundancy(expr, test_ty);
+            self.check_condition_redundancy(
+                expr,
+                test_ty,
+                RedundantConditionContext::Expression {
+                    allow_none_returning_calls: false,
+                },
+            );
         }
     }
 
@@ -8553,7 +8564,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        self.check_condition_redundancy(test, test_ty);
+        self.check_condition_redundancy(
+            test,
+            test_ty,
+            RedundantConditionContext::Expression {
+                allow_none_returning_calls: false,
+            },
+        );
 
         match test_truthiness {
             Truthiness::AlwaysTrue => body_ty,
