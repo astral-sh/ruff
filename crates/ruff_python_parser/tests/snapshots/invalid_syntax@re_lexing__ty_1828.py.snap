@@ -182,7 +182,7 @@ Module(
 1 | # Regression test for https://github.com/astral-sh/ty/issues/1828
 2 | (c: int = 1,f"""{d=[
 3 | def a(
-  |     ^ Syntax Error: Expected `]`, found name
+  |     ^ Syntax Error: Expected `]`, found identifier
 4 | class A:
 5 |     pass
   |

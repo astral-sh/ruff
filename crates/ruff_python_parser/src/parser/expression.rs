@@ -46,7 +46,7 @@ const LITERAL_SET: TokenSet = TokenSet::new([
 
 /// Tokens that represents either an expression or the start of one.
 pub(super) const EXPR_SET: TokenSet = TokenSet::new([
-    TokenKind::Name,
+    TokenKind::Identifier,
     TokenKind::Minus,
     TokenKind::Plus,
     TokenKind::Tilde,
@@ -117,14 +117,14 @@ const END_EXPR_SET: TokenSet = TokenSet::new([
 const END_SEQUENCE_SET: TokenSet = END_EXPR_SET.remove(TokenKind::Comma);
 
 impl<'src> Parser<'src> {
-    /// Returns `true` if the parser is at a name or keyword (including soft keyword) token.
-    pub(super) fn at_name_or_keyword(&self) -> bool {
-        self.at(TokenKind::Name) || self.current_token_kind().is_keyword()
+    /// Returns `true` if the parser is at an identifier or keyword (including soft keyword) token.
+    pub(super) fn at_identifier_or_keyword(&self) -> bool {
+        self.at(TokenKind::Identifier) || self.current_token_kind().is_keyword()
     }
 
-    /// Returns `true` if the parser is at a name or soft keyword token.
-    pub(super) fn at_name_or_soft_keyword(&self) -> bool {
-        self.at(TokenKind::Name) || self.at_soft_keyword()
+    /// Returns `true` if the parser is at an identifier or soft keyword token.
+    pub(super) fn at_identifier_or_soft_keyword(&self) -> bool {
+        self.at(TokenKind::Identifier) || self.at_soft_keyword()
     }
 
     /// Returns `true` if the parser is at a soft keyword token.
@@ -506,8 +506,8 @@ impl<'src> Parser<'src> {
     fn parse_identifier_with_context(&mut self, context: ExpressionContext) -> ast::Identifier {
         let range = self.current_token_range();
 
-        if self.at(TokenKind::Name) {
-            let name = self.bump_name();
+        if self.at(TokenKind::Identifier) {
+            let name = self.bump_identifier();
             return ast::Identifier {
                 id: name,
                 range,
@@ -518,7 +518,7 @@ impl<'src> Parser<'src> {
         if self.current_token_kind().is_soft_keyword() {
             let text = self.src_text(range);
             let id = self.intern_name(text);
-            self.bump_soft_keyword_as_name();
+            self.bump_soft_keyword_as_identifier();
             return ast::Identifier {
                 id,
                 range,
@@ -639,7 +639,7 @@ impl<'src> Parser<'src> {
                     node_index: AtomicNodeIndex::NONE,
                 })
             }
-            TokenKind::Name => Expr::Name(self.parse_name(context)),
+            TokenKind::Identifier => Expr::Name(self.parse_name(context)),
             TokenKind::IpyEscapeCommand => {
                 Expr::IpyEscapeCommand(self.parse_ipython_escape_command_expression())
             }
@@ -1770,12 +1770,12 @@ impl<'src> Parser<'src> {
         };
 
         let conversion = if self.eat(TokenKind::Exclamation) {
-            // Ensure that the `r` is lexed as a `r` name token instead of a raw string
+            // Ensure that the `r` is lexed as an identifier token instead of a raw string
             // in `f{abc!r"` (note the missing `}`).
             self.tokens.re_lex_raw_string_in_format_spec();
 
             let conversion_flag_range = self.current_token_range();
-            if self.at(TokenKind::Name) {
+            if self.at(TokenKind::Identifier) {
                 // test_err f_string_conversion_follows_exclamation
                 // f"{x! s}"
                 // t"{x! s}"
@@ -1789,7 +1789,7 @@ impl<'src> Parser<'src> {
                         TextRange::new(self.prev_token_end, conversion_flag_range.start()),
                     );
                 }
-                let name = self.bump_name();
+                let name = self.bump_identifier();
                 match &*name {
                     "s" => ConversionFlag::Str,
                     "r" => ConversionFlag::Repr,

@@ -1433,7 +1433,7 @@ fn find_goto_target_impl<'a>(
         tokens
             .at_offset(offset)
             .max_by_key(|token| match token.kind() {
-                TokenKind::Name
+                TokenKind::Identifier
                 | TokenKind::String
                 | TokenKind::Complex
                 | TokenKind::Float
