@@ -2379,6 +2379,35 @@ def invalid_inner() -> Outer:
     return (1, ("inner", None, (2, None, None)))  # error: [invalid-return-type]
 ```
 
+### A recursive union with a self-recursive tuple member
+
+A union can refer to a tuple that recurses both through the union and through itself. These
+references preserve their type arguments when the union is specialized.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar, Union
+
+T = TypeVar("T")
+Tree = Union[int, "Node[T]"]
+Node = tuple[T, "Tree[T]", "Node[T] | None"]
+type ExplicitTree[T] = int | ExplicitNode[T]
+type ExplicitNode[T] = tuple[T, ExplicitTree[T], ExplicitNode[T] | None]
+
+def inspect(value: Tree[int], explicit: ExplicitTree[int]):
+    reveal_type(value)  # revealed: Tree[int]
+    reveal_type(explicit)  # revealed: int | tuple[int, ExplicitTree[int], ExplicitNode[int] | None]
+
+valid: Tree[str] = ("leaf", 1, None)
+invalid: Tree[str] = (1, 1, None)  # error: [invalid-assignment]
+explicit_valid: ExplicitTree[str] = ("leaf", 1, None)
+explicit_invalid: ExplicitTree[str] = (1, 1, None)  # error: [invalid-assignment]
+```
+
 ### Three mutually recursive generic aliases
 
 The three aliases alternate containers while preserving the leaf type. Currently, only the alias at

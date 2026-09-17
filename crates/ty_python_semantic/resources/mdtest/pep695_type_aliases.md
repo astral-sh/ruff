@@ -1140,6 +1140,43 @@ functional_value: RepeatedFunctional = 1
 FunctionalCycle = TypeAliasType("FunctionalCycle", Functional["FunctionalCycle"])  # error: [cyclic-type-alias-definition]
 ```
 
+### Cycles through implicit recursive alias arguments
+
+A type argument exposed outside containers can close an invalid cycle, even when the wrapper's own
+recursive reference is inside a list. Rejecting that cycle preserves the other union alternatives.
+
+```py
+from typing import TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+Wrapper = T | list["Wrapper[T]"]
+
+type Cycle = Wrapper[Cycle]  # error: [cyclic-type-alias-definition]
+type WithLeaf = int | Wrapper[WithLeaf]  # error: [cyclic-type-alias-definition]
+
+valid: WithLeaf = 1
+invalid: WithLeaf = "wrong"  # error: [invalid-assignment]
+
+FunctionalCycle = TypeAliasType("FunctionalCycle", Wrapper["FunctionalCycle"])  # error: [cyclic-type-alias-definition]
+```
+
+### Finite nested applications of implicit recursive aliases
+
+Nested applications of the same wrapper are finite. Recursion beneath `list` does not make the
+exposed argument recursive, even when successive list elements have different type arguments.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Wrapper = T | list["Wrapper[list[T]]"]
+type Nested = Wrapper[Wrapper[int]]
+
+valid: Nested = 1
+invalid: Nested = "wrong"  # error: [invalid-assignment]
+```
+
 ### With legacy generic
 
 ```py

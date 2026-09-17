@@ -37,14 +37,14 @@ impl<'db> Type<'db> {
 /// An alias's cycles and the type variables exposed outside containers and other enclosing types.
 /// Only arguments substituted for these variables can introduce an unguarded cycle.
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
-struct AliasCycleSummary<'db> {
+pub(super) struct AliasCycleSummary<'db> {
     /// The divergent marker or unbound reference that closes an unguarded cycle.
-    cycle: Option<Type<'db>>,
+    pub(super) cycle: Option<Type<'db>>,
     typevars: Box<[BoundTypeVarInstance<'db>]>,
 }
 
 impl<'db> AliasCycleSummary<'db> {
-    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
+    pub(super) fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
         let mut typevars = FxOrderSet::default();
         let cycle = Self::collect(db, ty, &mut typevars);
         Self {
@@ -59,8 +59,7 @@ impl<'db> AliasCycleSummary<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) -> Option<Type<'db>> {
         match ty {
-            // Nested recursive binders stop this walk, so a bare reference closes
-            // an unguarded cycle in the recursive body being checked.
+            // A bare reference is unguarded: recursive binders do not introduce a container.
             Type::RecursiveVar(_) => Some(ty),
             Type::TypeAlias(alias) => {
                 // Inspect the definition independently of its arguments. Nested applications like
@@ -76,20 +75,14 @@ impl<'db> AliasCycleSummary<'db> {
                         .map(|context| context.default_specialization(db, None))
                 });
 
-                // Process supplied arguments after completing the definition's summary. An
-                // exposed argument can still close a cycle in the caller, as in
-                // `type Identity[T] = T; type Cycle = Identity[Cycle]`.
-                summary.typevars.iter().find_map(|&typevar| {
-                    if let Some(argument) =
-                        specialization.and_then(|specialization| specialization.get(db, typevar))
-                        && argument != Type::TypeVar(typevar)
-                    {
-                        Self::collect(db, argument, typevars)
-                    } else {
-                        typevars.insert(typevar);
-                        None
-                    }
-                })
+                summary.collect_exposed_arguments(db, specialization, typevars)
+            }
+            Type::Recursive(recursive) => {
+                let summary = recursive.cycle_summary(db);
+                if summary.cycle.is_some() {
+                    return summary.cycle;
+                }
+                summary.collect_exposed_arguments(db, recursive.arguments(db), typevars)
             }
             Type::TypeVar(typevar) => {
                 typevars.insert(typevar);
@@ -101,6 +94,26 @@ impl<'db> AliasCycleSummary<'db> {
                 .find_map(|&element| Self::collect(db, element, typevars)),
             _ => ty.is_divergent().then_some(ty),
         }
+    }
+
+    /// Follow only arguments exposed outside containers in the completed constructor summary.
+    fn collect_exposed_arguments(
+        &self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+    ) -> Option<Type<'db>> {
+        self.typevars.iter().find_map(|&typevar| {
+            if let Some(argument) =
+                specialization.and_then(|specialization| specialization.get(db, typevar))
+                && argument != Type::TypeVar(typevar)
+            {
+                Self::collect(db, argument, typevars)
+            } else {
+                typevars.insert(typevar);
+                None
+            }
+        })
     }
 }
 
@@ -127,6 +140,9 @@ impl<'db> AliasCycleRecovery<'_, 'db> {
                     self.context,
                 );
                 self.recover(db, value)
+            }),
+            Type::Recursive(recursive) => self.visitor.visit(db, ty, || {
+                recursive.map_or(db, self.env, None, |unfolded| self.recover(db, unfolded))
             }),
             Type::Union(union) => {
                 let elements: Vec<_> = union

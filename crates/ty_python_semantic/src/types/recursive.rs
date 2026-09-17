@@ -45,6 +45,7 @@ use ty_python_core::place_table;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use super::generics::{ApplySpecialization, Specialization};
 use super::relation::{TypeRelation, TypeRelationChecker};
+use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind, Type,
@@ -152,6 +153,30 @@ pub struct RecursiveType<'db> {
 impl get_size2::GetSize for RecursiveType<'_> {}
 
 impl<'db> RecursiveType<'db> {
+    /// Summarize the open constructor body without applying semantic substitutions.
+    pub(super) fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial=|db, id, _, ()| AliasCycleSummary::from_type(db, Type::divergent(id)),
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn cycle_summary_impl<'db>(
+            db: &'db dyn Db,
+            recursive: RecursiveType<'db>,
+            (): (),
+        ) -> AliasCycleSummary<'db> {
+            let mut summary = AliasCycleSummary::from_type(db, recursive.body(db));
+            // Nested bodies can refer to an enclosing binder. Close only the cycle marker,
+            // so recovery never exposes an unbound variable as a standalone type.
+            if let Some(Type::RecursiveVar(variable)) = summary.cycle {
+                summary.cycle = Some(Type::divergent(variable.cycle(db).0));
+            }
+            summary
+        }
+
+        cycle_summary_impl(db, self.constructor(db), ())
+    }
+
     /// Seed a query cycle with `μa. a`, using the same identity for binder and variable.
     pub(super) fn initial(
         db: &'db dyn Db,
