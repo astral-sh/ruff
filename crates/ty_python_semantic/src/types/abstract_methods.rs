@@ -1,8 +1,14 @@
-//! Abstract-method discovery and diagnostics for class validation.
+//! Abstract-method discovery and diagnostics shared by class validation and constructor calls.
 
-use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_db::{
+    diagnostic::{Annotation, Span, SubDiagnostic, SubDiagnosticSeverity},
+    parsed::parsed_module,
+};
 use ruff_python_ast::name::Name;
-use ty_python_core::{definition::Definition, place_table, use_def_map};
+use ty_python_core::{
+    definition::{Definition, DefinitionKind},
+    place_table, use_def_map,
+};
 
 use crate::{
     Db, FxIndexMap, ProgramEnvironment, TypeQualifiers,
@@ -12,8 +18,8 @@ use crate::{
         ClassBase, ClassLiteral, ClassType, LintDiagnosticGuard, Parameters, Signature, Type,
         binding_type,
         diagnostic::{AbstractMethodAnnotationPolicy, abstract_method_span},
-        function::AbstractMethodKind,
-        infer::infer_definition_types,
+        function::{AbstractMethodKind, FunctionDecorators},
+        infer::{function_known_decorators, infer_definition_types},
     },
 };
 
@@ -71,26 +77,26 @@ impl<'db> AbstractMethods<'db> {
 
         let defining_class_name = defining_class.name(db);
 
-        if let Type::FunctionLiteral(function) = binding_type(db, *definition) {
+        let secondary_span = if let Type::FunctionLiteral(function) = binding_type(db, *definition)
+        {
             let policy = if kind.is_explicit() {
                 AbstractMethodAnnotationPolicy::ExcludeVerboseBody
             } else {
                 AbstractMethodAnnotationPolicy::AlwaysIncludeBody
             };
-            let secondary_span = abstract_method_span(db, function, policy);
-            let mut secondary_annotation = Annotation::secondary(secondary_span);
-            secondary_annotation = if defining_class.class_literal(db)
-                == self.class.class_literal(db)
-            {
-                secondary_annotation
-                    .message(format_args!("`{first_method_name}` declared as abstract"))
-            } else {
-                secondary_annotation.message(format_args!(
-                    "`{first_method_name}` declared as abstract on superclass `{defining_class_name}`",
-                ))
-            };
-            diagnostic.annotate(secondary_annotation);
-        }
+            abstract_method_span(db, function, policy)
+        } else {
+            let module = parsed_module(db, definition.python_file(db)).load(db);
+            Span::from(definition.focus_range(db, &module))
+        };
+        let secondary_annotation = Annotation::secondary(secondary_span);
+        diagnostic.annotate(if *defining_class == self.class {
+            secondary_annotation.message(format_args!("`{first_method_name}` declared as abstract"))
+        } else {
+            secondary_annotation.message(format_args!(
+                "`{first_method_name}` declared as abstract on superclass `{defining_class_name}`",
+            ))
+        });
 
         if !kind.is_explicit() {
             let mut sub = SubDiagnostic::new(
@@ -129,6 +135,77 @@ impl<'db> AbstractMethods<'db> {
                 }
             }
         }
+
+        let mut annotation_override = None;
+
+        for superclass in self
+            .class
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .take_while(|superclass| superclass != defining_class)
+        {
+            let Some(literal) = superclass.class_literal(db).as_static() else {
+                continue;
+            };
+            let scope = literal.body_scope(db);
+            let Some(symbol_id) = place_table(db, scope).symbol_id(first_method_name) else {
+                continue;
+            };
+            let use_def_map = use_def_map(db, scope);
+            let bindings = use_def_map.end_of_scope_symbol_bindings(symbol_id);
+            if place_from_bindings(db, env, bindings)
+                .place
+                .ignore_possibly_undefined()
+                .is_some()
+            {
+                continue;
+            }
+            let declarations = place_from_declarations(
+                db,
+                env,
+                use_def_map.end_of_scope_symbol_declarations(symbol_id),
+            );
+            if let Some(first_declaration) = declarations.first_declaration
+                && !declarations
+                    .ignore_conflicting_declarations()
+                    .qualifiers
+                    .contains(TypeQualifiers::CLASS_VAR)
+            {
+                annotation_override = Some((superclass, first_declaration));
+            }
+        }
+
+        if let Some((overriding_class, declaration)) = annotation_override {
+            if overriding_class == self.class {
+                diagnostic.info(format_args!(
+                    "The instance-attribute annotation for `{first_method_name}` \
+                    does not override the abstract method",
+                ));
+            } else {
+                diagnostic.info(format_args!(
+                    "The instance-attribute annotation for `{first_method_name}` on superclass `{}` \
+                    does not override the abstract method",
+                    overriding_class.name(db)
+                ));
+            }
+
+            let file = declaration.file(db);
+
+            if db.should_check_file(file) {
+                let mut sub = SubDiagnostic::new(
+                    SubDiagnosticSeverity::Help,
+                    "Either assign a value or add `ClassVar` to this declaration",
+                );
+                let declaration_module = parsed_module(db, declaration.python_file(db)).load(db);
+                sub.annotate(
+                    Annotation::secondary(Span::from(
+                        declaration.focus_range(db, &declaration_module),
+                    ))
+                    .message("Instance-attribute declaration"),
+                );
+                diagnostic.sub(sub);
+            }
+        }
     }
 
     /// Unless `--verbose` was specified on the command line,
@@ -161,6 +238,10 @@ impl<'db> AbstractMethods<'db> {
     pub(super) fn len(&self) -> usize {
         self.methods.len()
     }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.methods.is_empty()
+    }
 }
 
 #[salsa::tracked]
@@ -169,7 +250,9 @@ impl<'db> ClassType<'db> {
     /// and have not been overridden with a concrete implementation anywhere in the MRO
     ///
     /// The value of the map is a struct containing information about the abstract method.
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    // Inferring class members can call constructors that query abstractness again.
+    // Start with no abstract methods while resolving these cycles.
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size, cycle_initial=|_, _, _| FxIndexMap::default())]
     pub(in crate::types) fn abstract_methods(
         self,
         db: &'db dyn Db,
@@ -225,6 +308,8 @@ impl<'db> ClassType<'db> {
             let scope = class_literal.body_scope(db);
             let place_table = place_table(db, scope);
             let use_def_map = use_def_map(db, class_literal.body_scope(db));
+            let can_be_implicitly_abstract =
+                !class_literal.file(db).is_stub(db) && class.is_protocol(db);
 
             // Treat abstract methods from superclasses as having been overridden
             // if this class has a synthesized method by that name,
@@ -248,6 +333,18 @@ impl<'db> ClassType<'db> {
 
             for (symbol_id, bindings_iterator) in use_def_map.all_end_of_scope_symbol_bindings() {
                 let name = place_table.symbol(symbol_id).name();
+                // Avoid inferring signatures for methods that cannot introduce abstractness.
+                // Inspect all reachable definitions: an earlier overload can be abstract even
+                // when the final implementation is concrete.
+                if !can_be_implicitly_abstract
+                    && !abstract_methods.contains_key(name)
+                    && use_def_map
+                        .reachable_symbol_bindings(symbol_id)
+                        .filter_map(|binding| binding.binding.definition())
+                        .all(|definition| !might_be_explicitly_abstract(db, definition))
+                {
+                    continue;
+                }
                 let place_and_definition = place_from_bindings(db, env, bindings_iterator);
                 let Place::Defined(DefinedPlace { ty, .. }) = place_and_definition.place else {
                     continue;
@@ -273,6 +370,26 @@ impl<'db> ClassType<'db> {
 
         abstract_methods
     }
+}
+
+/// Whether a binding could resolve to a method marked with `@abstractmethod`.
+///
+/// Keep the definition dependency in this query so unrelated edits to a superclass's module do
+/// not invalidate abstract-method discovery for all of its subclasses. Use cached decorator
+/// metadata to avoid reloading ASTs that were discarded after checking their files.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true)]
+fn might_be_explicitly_abstract<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    let DefinitionKind::Function(function) = definition.kind(db) else {
+        return true;
+    };
+    if !function.has_decorators() {
+        return false;
+    }
+    let decorators = function_known_decorators(db, definition);
+    decorators
+        .known_decorators()
+        .contains(FunctionDecorators::ABSTRACT_METHOD)
+        || decorators.has_unknown_decorators()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]

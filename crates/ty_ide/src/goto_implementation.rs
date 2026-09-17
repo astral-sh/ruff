@@ -117,10 +117,10 @@ pub fn goto_implementation(
 }
 
 /// Select and prepare the appropriate `ImplementationsFinder` for `goto_target`.
-fn prepare_implementations_finder_for_goto_target<'db>(
-    model: &SemanticModel<'db>,
-    goto_target: &GotoTarget<'_>,
-) -> Option<ImplementationsFinder<'db>> {
+fn prepare_implementations_finder_for_goto_target<'a>(
+    model: &SemanticModel<'a>,
+    goto_target: &GotoTarget<'a>,
+) -> Option<ImplementationsFinder<'a>> {
     let db = model.db();
     let env = model.program_environment();
     match goto_target {

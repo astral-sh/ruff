@@ -130,7 +130,7 @@ fn create_remove_argument_fix(
             break;
         }
         match token.kind() {
-            TokenKind::Name if delete_first_arg => {
+            TokenKind::Identifier if delete_first_arg => {
                 fix_end = Some(token.start());
                 break;
             }

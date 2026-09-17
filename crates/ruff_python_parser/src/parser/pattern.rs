@@ -31,10 +31,10 @@ const PATTERN_START_SET: TokenSet = TokenSet::new([
     // Star pattern
     TokenKind::Star,
     // Capture pattern
-    // Wildcard pattern ('_' is a name token)
+    // Wildcard pattern ('_' is an identifier token)
     // Value pattern (name or attribute)
     // Class pattern
-    TokenKind::Name,
+    TokenKind::Identifier,
     // Group pattern
     TokenKind::Lpar,
     // Sequence pattern
@@ -49,7 +49,7 @@ const MAPPING_PATTERN_START_SET: TokenSet = TokenSet::new([
     // Double star pattern
     TokenKind::DoubleStar,
     // Value pattern
-    TokenKind::Name,
+    TokenKind::Identifier,
 ])
 .union(LITERAL_PATTERN_START_SET);
 
@@ -325,7 +325,7 @@ impl Parser<'_> {
         ) {
             // TODO(dhruvmanila): This recovery isn't possible currently because
             // of the soft keyword transformer. If there's a missing closing
-            // parenthesis, it'll consider `case` a name token instead.
+            // parenthesis, it'll consider `case` an identifier token instead.
             self.add_error(
                 ParseErrorType::OtherError(format!(
                     "Missing '{closing}'",
@@ -537,7 +537,7 @@ impl Parser<'_> {
                     }
                 }
 
-                if self.at_name_or_keyword() {
+                if self.at_identifier_or_keyword() {
                     if self.peek() == TokenKind::Dot {
                         // test_ok match_attr_pattern_soft_keyword
                         // match foo:

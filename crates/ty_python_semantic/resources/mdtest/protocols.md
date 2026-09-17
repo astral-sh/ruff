@@ -1497,6 +1497,35 @@ class C(A, Protocol):
     x = 42  # fine, due to declaration in the base class
 ```
 
+## Imported `Final` values do not declare protocol members
+
+An imported `Final` qualifier does not turn an import into an explicit protocol-member declaration.
+If a real declaration exists, the imported qualifier still makes that protocol member read-only.
+
+`constants.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`main.py`:
+
+```py
+from typing import Protocol
+
+class ImportOnly(Protocol):
+    from constants import VALUE  # error: [ambiguous-protocol-member]
+
+class ExplicitlyDeclared(Protocol):
+    VALUE: int
+    from constants import VALUE
+
+def mutate(value: ExplicitlyDeclared) -> None:
+    value.VALUE = 2  # error: [invalid-assignment]
+```
+
 ## Hashable protocol assignability
 
 An explicitly disabled `__hash__` method makes an object incompatible with the standard-library
@@ -4160,10 +4189,10 @@ class Container[T](Protocol):
     value: T
 
     def replace[U](self, value: U) -> None:
-        pass
+        return
 
     def flatten[U](self: "Container[Container[U]]") -> None:
-        pass
+        return
 
 class Implementation[T](Container[T]):
     pass
@@ -7012,9 +7041,9 @@ def check(value: Recursive[int]) -> None:
 ### Generic constructors inheriting recursive protocols
 
 A generic constructor can infer its specialization from an expected recursive protocol even when the
-protocol includes a method with an explicitly constrained receiver. Invalid constructor arguments
-are rejected. Without an expected type, the empty tuple is an `Iterable[Never]`, so the constructor
-infers `T = Never` regardless of the protocol's variance.
+protocol includes a concrete method with an explicitly constrained receiver. Invalid constructor
+arguments are rejected. Without an expected type, the empty tuple is an `Iterable[Never]`, so the
+constructor infers `T = Never` regardless of the protocol's variance.
 
 ```toml
 [environment]
@@ -7028,8 +7057,10 @@ from collections.abc import Iterable
 from typing import Protocol
 
 class Chain[T](Protocol):
-    def value(self) -> T: ...
-    def combine[S](self: Chain[S], pair: tuple[S, T]) -> Chain[T]: ...
+    def value(self) -> T:
+        raise RuntimeError
+    def combine[S](self: Chain[S], pair: tuple[S, T]) -> Chain[T]:
+        raise RuntimeError
 
 class Concrete[T](Chain[T]):
     def __init__(self, values: Iterable[T]) -> None: ...
@@ -7045,9 +7076,9 @@ def make() -> Chain[int]:
 
 ### Specialized sources with constrained protocol receivers
 
-A concrete class can inherit recursive methods with explicitly constrained receivers. Concrete,
-symbolic, and unknown specializations bind those receivers and preserve the corresponding return
-types.
+A concrete class can inherit implemented recursive methods with explicitly constrained receivers.
+Concrete, symbolic, and unknown specializations bind those receivers and preserve the corresponding
+return types.
 
 ```toml
 [environment]
@@ -7060,8 +7091,10 @@ from __future__ import annotations
 from typing import Protocol
 
 class Chain[T](Protocol):
-    def value(self) -> T: ...
-    def accumulate[S](self: Chain[S]) -> Chain[S]: ...
+    def value(self) -> T:
+        raise RuntimeError
+    def accumulate[S](self: Chain[S]) -> Chain[S]:
+        return self
 
 class Concrete[T](Chain[T]): ...
 

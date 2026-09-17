@@ -548,6 +548,18 @@ for function in map(Function, [object()]):
     function()
 ```
 
+## Constructing a dictionary from gradual-length tuples
+
+Each tuple supplied to `dict` must contain two elements. A gradual tuple can materialize to that
+length, and so its element type supplies both the key and value types.
+
+```py
+from typing import Any
+
+def _(values: list[tuple[Any, ...]]):
+    reveal_type(dict(values))  # revealed: dict[Any, Any]
+```
+
 ## Failed `dict` calls do not expose internal type variables
 
 Several `dict` overloads accept one positional argument. When none matches, an arbitrarily selected

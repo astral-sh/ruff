@@ -151,6 +151,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .inference_flags()
                     .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
         };
+        let ignore_experimental_runtime_errors = |builder: &Self| {
+            ignore_runtime_errors(builder)
+                || matches!(builder.scope.scope(db).kind(), ScopeKind::TypeAlias)
+        };
 
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
@@ -405,7 +409,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let left_ty = self.infer_type_expression(&binary.left);
                         let right_ty = self.infer_type_expression(&binary.right);
 
-                        if !ignore_runtime_errors(self) {
+                        if !ignore_experimental_runtime_errors(self) {
                             // Infer the operands as values to report the types used by the runtime
                             // operation rather than their interpretation as type expressions.
                             let mut speculative_builder = self.speculate_without_diagnostics();
@@ -718,7 +722,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let operand_ty = self.infer_type_expression(operand);
 
-                if !ignore_runtime_errors(self) {
+                if !ignore_experimental_runtime_errors(self) {
                     let operand_value = self
                         .speculate_without_diagnostics()
                         .infer_expression(operand, TypeContext::default());
@@ -1417,9 +1421,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => slice_ty,
             };
-            SubclassOfType::try_from_instance(db, env, slice_ty).unwrap_or_else(|| match slice_ty {
-                Type::Callable(_) => invalid_type_argument(builder, slice),
-                _ => todo_type!("unsupported type[X] special form"),
+            SubclassOfType::try_from_instance(db, env, slice_ty).unwrap_or_else(|unsupported| {
+                match unsupported {
+                    Type::Callable(_) => invalid_type_argument(builder, slice),
+                    _ => todo_type!("unsupported type[X] special form"),
+                }
             })
         };
 
@@ -1432,7 +1438,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::StringLiteral(_) => {
                 infer_type_argument(self, slice)
             }
-            ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
+            ast::Expr::BinOp(binary)
+                if matches!(binary.op, ast::Operator::BitOr | ast::Operator::BitAnd) =>
+            {
                 infer_type_argument(self, slice)
             }
             ast::Expr::Tuple(_) => {
@@ -1532,7 +1540,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         invalid_type_argument(self, slice)
                     }
                     value_ty @ (Type::SpecialForm(
-                        SpecialFormType::Top | SpecialFormType::Bottom | SpecialFormType::Annotated,
+                        SpecialFormType::Top
+                        | SpecialFormType::Bottom
+                        | SpecialFormType::Annotated
+                        | SpecialFormType::Intersection,
                     )
                     | Type::KnownInstance(_)
                     | Type::GenericAlias(_)

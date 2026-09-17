@@ -774,30 +774,55 @@ fn finds_uv_on_path_without_uv_environment_variable() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Version-sensitive diagnostics attribute their assumed Python version to workspace metadata,
-/// not to a command-line override.
+/// uv's interpreter version describes the concrete workspace environment, not the project's
+/// minimum supported Python version. The environment supplies packages, while `requires-python`
+/// determines the version that ty checks the project against. This allows ty to detect accidental
+/// use of language or library features unavailable on the minimum supported Python version.
 #[cfg(feature = "test-uv")]
 #[test]
-fn reports_uv_workspace_python_version_source() -> anyhow::Result<()> {
+fn uses_requires_python_with_uv_workspace() -> anyhow::Result<()> {
     let case = workspace_case()?;
-    case.write_file("packages/member/member.py", "frozendict")?;
+    case.write_file(
+        "pyproject.toml",
+        r#"
+[project]
+name = "workspace"
+version = "0.1.0"
+requires-python = ">=3.8"
 
-    for output_format in ["full", "concise"] {
-        let mut command = uv_sync_command(&case, None)?;
-        command
-            .current_dir(case.root().join("packages/member"))
-            .arg(".")
-            .arg("--output-format")
-            .arg(output_format);
+[tool.uv.workspace]
+members = ["packages/*"]
+"#,
+    )?;
+    case.write_file(".python-version", ">=3.12")?;
+    case.write_file("packages/member/member.py", "from typing import override")?;
 
-        let output = command.output()?;
-        let stdout = String::from_utf8(output.stdout)?;
-        assert!(!output.status.success());
-        assert!(!stdout.contains("specified on the command line"));
-        if output_format == "full" {
-            assert!(stdout.contains("provided by uv metadata"));
-        }
-    }
+    let mut command = uv_sync_command(&case, None)?;
+    command
+        .current_dir(case.root().join("packages/member"))
+        .arg(".")
+        .env("TY_OUTPUT_FORMAT", "full");
+
+    assert_cmd_snapshot!(command, @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `typing` has no member `override`
+     --> member.py:1:20
+      |
+    1 | from typing import override
+      |                    ^^^^^^^^
+    info: The member may be available on other Python versions or platforms
+    info: Python 3.8 was assumed when resolving imports
+     --> <temp_dir>/pyproject.toml:5:19
+      |
+    5 | requires-python = ">=3.8"
+      |                   ^^^^^^^ Python version configuration
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
 
     Ok(())
 }

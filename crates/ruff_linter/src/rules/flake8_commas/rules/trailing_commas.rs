@@ -59,7 +59,7 @@ impl SimpleToken {
 impl From<(TokenKind, TextRange)> for SimpleToken {
     fn from((tok, range): (TokenKind, TextRange)) -> Self {
         let ty = match tok {
-            TokenKind::Name => TokenType::Named,
+            TokenKind::Identifier => TokenType::Named,
             TokenKind::String => TokenType::String,
             TokenKind::Newline => TokenType::Newline,
             TokenKind::NonLogicalNewline => TokenType::NonLogicalNewline,

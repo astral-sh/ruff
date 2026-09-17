@@ -269,7 +269,6 @@ impl<'db> Type<'db> {
 
         fn upcast_partial<'db>(
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
             partial: FunctoolsPartialInstance<'db>,
         ) -> Option<FunctoolsPartialInstance<'db>> {
             // A partial's wrapped function is fixed, but its reduced signature can differ between
@@ -279,18 +278,13 @@ impl<'db> Type<'db> {
             else {
                 return None;
             };
-            let Type::Callable(upper_callable) =
-                Type::Callable(CallableType::unknown(db)).top_materialization(db, env)
-            else {
-                return None;
-            };
             Some(FunctoolsPartialInstance::new(
                 db,
                 InternedType::new(
                     db,
                     Type::FunctionLiteral(unspecialized_function(db, function)),
                 ),
-                upper_callable,
+                CallableType::top(db),
             ))
         }
 
@@ -389,7 +383,7 @@ impl<'db> Type<'db> {
                 }
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
                     UpcastResult::unstable(
-                        upcast_partial(db, env, partial)
+                        upcast_partial(db, partial)
                             .map(|partial| {
                                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial))
                             })
@@ -402,7 +396,7 @@ impl<'db> Type<'db> {
                 }
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(partial)) => {
                     UpcastResult::unstable(
-                        upcast_partial(db, env, partial)
+                        upcast_partial(db, partial)
                             .map(|partial| {
                                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(
                                     partial,

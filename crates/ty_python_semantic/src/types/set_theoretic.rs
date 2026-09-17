@@ -154,6 +154,78 @@ impl<'db> UnionType<'db> {
         builder.build()
     }
 
+    /// Widen tuple unions that acquire new lengths between successive cycle results.
+    ///
+    /// Normalizing an existing union during cycle recovery does not imply that its tuple lengths
+    /// are growing. Compare the results of successive iterations so stable, finite unions keep
+    /// their shapes, including unions nested in a collection's type arguments.
+    pub(crate) fn widen_growing_tuples(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: Type<'db>,
+        current: Type<'db>,
+    ) -> Option<Type<'db>> {
+        if previous == current {
+            return None;
+        }
+        let previous_types = match &previous {
+            Type::Union(union) => union.elements(db),
+            ty => std::slice::from_ref(ty),
+        };
+        let current_types = match &current {
+            Type::Union(union) => union.elements(db),
+            ty => std::slice::from_ref(ty),
+        };
+        let previous_lengths: Vec<_> = previous_types
+            .iter()
+            .filter_map(|ty| ty.exact_tuple_instance_spec(db).map(|tuple| tuple.len()))
+            .collect();
+        if previous_lengths.is_empty()
+            || !current_types.iter().any(|ty| {
+                ty.exact_tuple_instance_spec(db)
+                    .is_some_and(|tuple| !previous_lengths.contains(&tuple.len()))
+            })
+        {
+            return None;
+        }
+
+        // Recovery cannot perform relation queries, including when combining tuple elements.
+        // Mark those elements recursive so growing literal unions also widen promptly.
+        let mut elements = UnionBuilder::new(db, env)
+            .cycle_recovery(true)
+            .or_recursively_defined(RecursivelyDefined::Yes);
+        let mut result = UnionBuilder::new(db, env)
+            .cycle_recovery(true)
+            .or_recursively_defined(current.as_union().map_or(RecursivelyDefined::No, |union| {
+                union.recursively_defined(db)
+            }));
+        // During the first cycle iterations, the caller can discard previous alternatives.
+        // Retain their tuple elements for widening without restoring unrelated alternatives.
+        for ty in current_types {
+            if ty.exact_tuple_instance_spec(db).is_none() {
+                result.add_in_place(*ty);
+            }
+        }
+        for ty in previous_types.iter().chain(current_types) {
+            if let Some(tuple) = ty.exact_tuple_instance_spec(db) {
+                for element in tuple.iter_element_types(db) {
+                    elements.add_in_place(element);
+                }
+            }
+        }
+        let element_type = match elements.build() {
+            // `tuple[Never, ...]` normalizes to the empty tuple, which does not contain
+            // fixed-length types like `tuple[Never]`. Preserve a static upper bound.
+            Type::Never => Type::object(),
+            element_type => element_type,
+        };
+        Some(
+            result
+                .add(Type::homogeneous_tuple(db, env, element_type))
+                .build(),
+        )
+    }
+
     /// A fallible version of [`UnionType::from_elements`].
     ///
     /// If all items in `elements` are `Some()`, the result of unioning all elements is returned.
@@ -776,8 +848,6 @@ impl std::iter::FusedIterator for NegativeIntersectionElementsIterator<'_, '_> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for IntersectionType<'_> {}
 
-const MAX_INTERSECTION_DNF_TERMS: usize = 4;
-
 pub(crate) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     intersection: IntersectionType<'db>,
@@ -885,69 +955,7 @@ impl<'db> IntersectionType<'db> {
         I::IntoIter: Clone,
         Type<'db>: From<T>,
     {
-        // TODO: Consider folding this logic into IntersectionBuilder itself, and having it check
-        // an optional budget as part of its existing `add_positive` methods.
-
-        let elements = elements.into_iter().map(Type::from);
-        let union_count = elements.clone().filter(|ty| ty.is_union()).count();
-        if union_count <= 1 {
-            // If there are no unions, then all we have to do is check for redundant elements. If
-            // there is a single union, the product of all union counts should be reasonable, even
-            // if it exceeds the budget below. In both cases, just return the precise answer
-            // without considering the budget.
-            return Some(Self::from_elements(db, env, elements));
-        }
-
-        let non_union_elements = elements.clone().filter(|element| !element.is_union());
-        let initial = Self::from_elements(db, env, non_union_elements);
-        let insert_candidate = |candidates: &mut Vec<Type<'db>>,
-                                new_ty: Type<'db>,
-                                check_budget: bool|
-         -> Option<()> {
-            if new_ty.is_never()
-                || candidates
-                    .iter()
-                    .any(|old| new_ty.is_redundant_with(db, env, *old))
-            {
-                return Some(());
-            }
-
-            candidates.retain(|old| !old.is_redundant_with(db, env, new_ty));
-            if check_budget && candidates.len() >= MAX_INTERSECTION_DNF_TERMS {
-                return None;
-            }
-            candidates.push(new_ty);
-            Some(())
-        };
-
-        let mut frontier = Vec::new();
-        let mut next = Vec::new();
-        insert_candidate(&mut frontier, initial, true)?;
-
-        for (idx, clause) in elements.filter_map(Type::as_union).enumerate() {
-            // Don't check the budget for the first union clause. That ensures that we have a
-            // chance for pairs of types to "annihilate" each other without contributing to the
-            // result. For instance, this allows us to return the precise result for
-            // `(A | B | C | D | E) & (A | B | F | G | H)` (in which each class is final), since
-            // most of the pairs are disjoint.
-            let check_budget = idx > 0;
-
-            next.clear();
-            for candidate in &frontier {
-                for alternative in clause.elements(db) {
-                    let refined = Self::from_two_elements(db, env, *candidate, *alternative);
-                    insert_candidate(&mut next, refined, check_budget)?;
-                }
-            }
-
-            if next.is_empty() {
-                return Some(Type::Never);
-            }
-
-            std::mem::swap(&mut frontier, &mut next);
-        }
-
-        Some(UnionType::from_elements(db, env, frontier))
+        IntersectionBuilder::bounded_from_elements(db, env, elements)
     }
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.

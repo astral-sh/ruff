@@ -215,7 +215,10 @@ pub(crate) fn is_discarded_dict_key_assignment<'db>(
 /// `@staticmethod`).
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, _, _| FunctionDecoratorInference::default(),
+    cycle_initial=|_, _, _| FunctionDecoratorInference {
+        has_unknown_decorators: true,
+        ..FunctionDecoratorInference::default()
+    },
     heap_size=ruff_memory_usage::heap_size
 )]
 pub(crate) fn function_known_decorators<'db>(
@@ -259,6 +262,8 @@ pub(crate) struct FunctionDecoratorInference<'db> {
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
     known_decorators: FunctionDecorators,
+    /// Whether any decorator is unrecognized, or decorator inference is incomplete.
+    has_unknown_decorators: bool,
     diagnostics: TypeCheckDiagnostics,
 }
 
@@ -284,8 +289,12 @@ impl<'db> FunctionDecoratorInference<'db> {
         &self.called_functions
     }
 
-    fn known_decorators(&self) -> FunctionDecorators {
+    pub(super) fn known_decorators(&self) -> FunctionDecorators {
         self.known_decorators
+    }
+
+    pub(super) fn has_unknown_decorators(&self) -> bool {
+        self.has_unknown_decorators
     }
 
     fn diagnostics(&self) -> &TypeCheckDiagnostics {
@@ -1295,18 +1304,6 @@ impl<'db> DefinitionTypes<'db> {
             Self::Empty | Self::Binding(..) => Either::Right([].iter().copied()),
         }
     }
-
-    fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> + '_ {
-        match self {
-            Self::Declaration(declaration) | Self::BindingAndDeclaration(declaration) => {
-                Either::Left(Either::Left(std::iter::once(*declaration)))
-            }
-            Self::Other(other) => {
-                Either::Left(Either::Right(other.declarations.iter().map(|(_, ty)| *ty)))
-            }
-            Self::Empty | Self::Binding(..) => Either::Right(std::iter::empty()),
-        }
-    }
 }
 
 /// Compact representations for common combinations of extra definition inference data.
@@ -1733,10 +1730,6 @@ impl<'db> DefinitionInference<'db> {
         owner: Definition<'db>,
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)> {
         self.types.declarations(owner)
-    }
-
-    fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> {
-        self.types.declaration_types()
     }
 
     fn fallback_type(&self) -> Option<Type<'db>> {

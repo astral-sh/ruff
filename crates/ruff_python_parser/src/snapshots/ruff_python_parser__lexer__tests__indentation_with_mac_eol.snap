@@ -6,7 +6,7 @@ expression: indentation_with_eol(MAC_EOL)
 ```
 [
     Def 0..3,
-    Name 4..7,
+    Identifier 4..7,
     Lpar 7..8,
     Rpar 8..9,
     Colon 9..10,

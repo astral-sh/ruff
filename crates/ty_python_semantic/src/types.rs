@@ -46,11 +46,10 @@ pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
 use self::known_instance::MethodWrapperKind;
 pub(crate) use self::match_pattern::{
-    ClassPatternPositionalSource, callable_pattern_type, class_pattern_positional_sources,
-    definite_match_pattern_type, definite_match_pattern_type_for_subject,
-    exact_sequence_pattern_type, mapping_pattern_type, pattern_binding_fallthrough_type,
-    sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
-    typed_dict_matches_class_pattern,
+    ClassPatternPositionalSource, class_pattern_positional_sources, definite_match_pattern_type,
+    definite_match_pattern_type_for_subject, exact_sequence_pattern_type, mapping_pattern_type,
+    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
+    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::NegativeIntersectionElements;
@@ -2263,7 +2262,7 @@ impl<'db> Type<'db> {
         // So we avoid unioning in the first couple iterations, and just use the later iteration's
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
-        if cycle.iteration() <= crate::TAINTED_CYCLES {
+        let result = if cycle.iteration() <= crate::TAINTED_CYCLES {
             let self_degraded_by_overload =
                 any_over_type(db, env, self, false, |ty| {
                     matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
@@ -2288,8 +2287,13 @@ impl<'db> Type<'db> {
             // We should use the previous union type as the base and only add new element types in
             // this cycle, if any.
             UnionType::from_elements_cycle_recovery(db, env, [previous, self])
-        }
-        .recursive_type_normalized_impl_with_cycle(db, env, cycle)
+        };
+        // An inferred attribute updated with `self.items += (item,)` can settle on the
+        // initializer plus a single update during the first few iterations. Widen new tuple
+        // lengths during those iterations too, so repeated updates are represented.
+        UnionType::widen_growing_tuples(db, env, previous, result)
+            .unwrap_or(result)
+            .recursive_type_normalized_impl_with_cycle(db, env, cycle)
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -4610,58 +4614,17 @@ impl<'db> Type<'db> {
                 };
             }
 
-            match ty {
-                Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
-                    let return_type = match wrapper.kind(db) {
-                        MethodWrapperKind::Staticmethod => wrapper.wrapped(db),
-                        MethodWrapperKind::Classmethod => Type::BoundMethod(
-                            BoundMethodType::from_callable(db, wrapper.wrapped(db), owner, owner),
-                        ),
-                    };
-                    return Ok(Some(DescriptorGetResult {
-                        return_type,
-                        kind: AttributeKind::NormalOrNonDataDescriptor,
-                    }));
-                }
-                Type::Callable(callable) if callable.is_staticmethod_like(db) => {
-                    // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
-                    // The underlying function is returned as-is, without binding self.
-                    return Ok(Some(DescriptorGetResult {
-                        return_type: ty,
-                        kind: AttributeKind::NormalOrNonDataDescriptor,
-                    }));
-                }
-                Type::Callable(callable)
-                    if let is_function_like = callable.is_function_like(db)
-                        && (is_function_like || callable.is_classmethod_like(db)) =>
-                {
-                    // For "function-like" or "classmethod-like" callables, model the behavior of
-                    // `FunctionType.__get__` or `classmethod.__get__`.
-                    //
-                    // It is a shortcut to model this in `try_call_dunder_get`. If we
-                    // want to be really precise, we should instead return a new method-wrapper
-                    // type variant for the synthesized `__get__` method of these synthesized
-                    // functions. The method-wrapper would then be returned from
-                    // `find_name_in_mro` when called on function-like `Callable`s. This would
-                    // allow us to correctly model the behavior of *explicit*
-                    // `SomeDataclass.__init__.__get__` calls.
-                    let return_type = if instance.is_none() && is_function_like {
-                        ty
-                    } else {
-                        let self_type = instance.unwrap_or_else(|| {
-                            // For classmethod-like callables, bind to the owner class.
-                            owner.to_instance_approximation(db, env).unwrap_or(owner)
-                        });
-
-                        Type::Callable(callable.bind_self(db, env, Some(self_type)))
-                    };
-
-                    return Ok(Some(DescriptorGetResult {
-                        return_type,
-                        kind: AttributeKind::NormalOrNonDataDescriptor,
-                    }));
-                }
-                _ => {}
+            if let Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) = ty {
+                let return_type = match wrapper.kind(db) {
+                    MethodWrapperKind::Staticmethod => wrapper.wrapped(db),
+                    MethodWrapperKind::Classmethod => Type::BoundMethod(
+                        BoundMethodType::from_callable(db, wrapper.wrapped(db), owner, owner),
+                    ),
+                };
+                return Ok(Some(DescriptorGetResult {
+                    return_type,
+                    kind: AttributeKind::NormalOrNonDataDescriptor,
+                }));
             }
 
             let Place::Defined(DefinedPlace {
@@ -4734,6 +4697,56 @@ impl<'db> Type<'db> {
                 .display(db, env),
             owner.display(db, env)
         );
+
+        // Bind known callable descriptors outside the tracked lookup. Checking a protocol
+        // receiver can recursively access this method; the lookup's `None` cycle value would
+        // leave it unbound and falsely reject the protocol match.
+        match self {
+            Type::Callable(callable) if callable.is_staticmethod_like(db) => {
+                // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
+                // The underlying function is returned as-is, without binding self.
+                return Ok(Some(DescriptorGetResult {
+                    return_type: self,
+                    kind: AttributeKind::NormalOrNonDataDescriptor,
+                }));
+            }
+            Type::Callable(callable)
+                if let is_function_like = callable.is_function_like(db)
+                    && (is_function_like || callable.is_classmethod_like(db)) =>
+            {
+                // For "function-like" or "classmethod-like" callables, model the behavior of
+                // `FunctionType.__get__` or `classmethod.__get__`.
+                //
+                // It is a shortcut to model this in `try_call_dunder_get`. If we
+                // want to be really precise, we should instead return a new method-wrapper
+                // type variant for the synthesized `__get__` method of these synthesized
+                // functions. The method-wrapper would then be returned from
+                // `find_name_in_mro` when called on function-like `Callable`s. This would
+                // allow us to correctly model the behavior of *explicit*
+                // `SomeDataclass.__init__.__get__` calls.
+                let return_type = if is_function_like {
+                    instance.map_or(self, |instance| {
+                        Type::Callable(callable.bind_self(db, env, Some(instance)))
+                    })
+                } else {
+                    // Class methods receive the owner class even through an instance, while
+                    // `typing.Self` denotes an instance of that class.
+                    let typing_self = owner.to_instance_approximation(db, env).unwrap_or(owner);
+                    Type::Callable(callable.bind_self_with_receiver(
+                        db,
+                        env,
+                        Some(owner),
+                        Some(typing_self),
+                    ))
+                };
+
+                return Ok(Some(DescriptorGetResult {
+                    return_type,
+                    kind: AttributeKind::NormalOrNonDataDescriptor,
+                }));
+            }
+            _ => {}
+        }
 
         // Function descriptors have fixed binding behavior, so avoid retaining a tracked query
         // for every function and access context.

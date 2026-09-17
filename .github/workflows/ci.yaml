@@ -294,7 +294,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.26.5"
+          go-version: "1.26.6"
       - name: "Run ShellCheck"
         env:
           GOSUMDB: sum.golang.org
@@ -392,9 +392,11 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - name: "Install uv"
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
           enable-cache: "true"
       - name: ty mdtests (GitHub annotations)
         if: ${{ needs.determine_changes.outputs.ty == 'true' }}
@@ -456,9 +458,11 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - name: "Install uv"
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
           enable-cache: "true"
       - name: "Run tests"
         run: uv run --locked --only-dev cargo nextest run --cargo-profile profiling --all-features
@@ -490,10 +494,22 @@ jobs:
           cache-bin: "false"
       - name: "Install Rust toolchain"
         run: rustup show
-      - name: "Install uv"
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      # Renovate needs a separate version/checksum pair for each archive.
+      - name: "Install uv (Windows)"
+        if: runner.os == 'Windows'
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "e94225dea91e051472847bd6d146d7d66c4f54ffcd1f106678866a99580845f9"
+          enable-cache: "true"
+      - name: "Install uv (macOS)"
+        if: runner.os == 'macOS'
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.11"
+          checksum: "e01b69ee15e81918d5e8fc9cf39b3db7f59c5576e5e306cd9b7aeb2c7b7321c3"
           enable-cache: "true"
       - name: "Run tests"
         run: |
@@ -582,9 +598,11 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
       - run: uv run --only-dev cargo fuzz build -s none
 
   fuzz-parser:
@@ -599,9 +617,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: ruff-linux-debug
@@ -641,9 +661,11 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       # Run all code generation scripts, and verify that the current output is
@@ -686,11 +708,13 @@ jobs:
           ref: ${{ needs.determine_changes.outputs.comparison_base }}
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           activate-environment: true
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -802,9 +826,11 @@ jobs:
       # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
       - name: Fetch full history without tags
         run: git fetch --no-tags --filter=blob:none --unshallow origin
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -852,9 +878,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
       - run: uv run --only-dev cargo shear --deny-warnings
 
   ty-completion-evaluation:
@@ -869,9 +897,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -944,9 +974,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
@@ -980,10 +1012,12 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           python-version: 3.13
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
       - name: "Update README File"
         run: uv run scripts/transform_readme.py --target mkdocs
       - name: "Generate docs"
@@ -1051,8 +1085,11 @@ jobs:
           repository: "astral-sh/ruff-lsp"
           path: ruff-lsp
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
           # ruff-lsp's archived CI only tested through Python 3.12.
           python-version: "3.12"
 
@@ -1140,9 +1177,11 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1188,9 +1227,11 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1260,9 +1301,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
 
       - name: "Download benchmark binary"
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -1317,9 +1360,11 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "e9933d907fb9cd27d606d819bbded419f2844c0e2efc98225ecfa409288eb28d"
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1370,9 +1415,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.12.11"
+          checksum: "e9933d907fb9cd27d606d819bbded419f2844c0e2efc98225ecfa409288eb28d"
 
       - name: "Download benchmark binary"
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1

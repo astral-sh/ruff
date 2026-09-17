@@ -668,9 +668,8 @@ from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 
-# TODO: Support intersections inside `type[...]`.
-# error: [static-assert-error]
 static_assert(is_equivalent_to(type[P] & type[Any], type[P & Any]))
+static_assert(is_equivalent_to(type[Any] & type[P], type[P & Any]))
 ```
 
 ### Type var bounds and `NewTypes`

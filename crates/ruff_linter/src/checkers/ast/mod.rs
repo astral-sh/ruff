@@ -53,7 +53,7 @@ use ruff_python_parser::semantic_errors::{
 use ruff_python_parser::typing::{AnnotationKind, ParsedAnnotation, parse_type_annotation};
 use ruff_python_parser::{ParseError, Parsed};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
-use ruff_python_semantic::analyze::{imports, typing};
+use ruff_python_semantic::analyze::{class, imports, typing};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, GeneratorKind, Globals,
     Import, ImportLaziness, Module, ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind,
@@ -1452,7 +1452,18 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 if let Some(arguments) = arguments {
                     self.semantic.flags |= SemanticModelFlags::CLASS_BASE;
-                    self.visit_arguments(arguments);
+                    for base in &*arguments.args {
+                        self.visit_expr(base);
+                    }
+                    for keyword in &*arguments.keywords {
+                        if keyword.arg.as_ref().is_some_and(|arg| arg == "extra_items")
+                            && self.is_typed_dict(class_def)
+                        {
+                            self.visit_type_definition(&keyword.value);
+                        } else {
+                            self.visit_keyword(keyword);
+                        }
+                    }
                     self.semantic.flags -= SemanticModelFlags::CLASS_BASE;
                 }
 
@@ -2138,10 +2149,41 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
 
-                        // Ex) TypedDict("a", a=int)
-                        for keyword in &*arguments.keywords {
-                            let Keyword { value, .. } = keyword;
-                            self.visit_type_definition(value);
+                        // Before Python 3.13, field names could be passed as keyword arguments when
+                        // the field mapping is omitted or `None`:
+                        //
+                        // ```pycon
+                        // >>> from typing import TypedDict
+                        // >>> TypedDict("a", closed=int).__required_keys__
+                        // frozenset({'closed'})
+                        // >>> TypedDict("a", None, closed=int).__required_keys__
+                        // frozenset({'closed'})
+                        // ```
+                        let legacy_fields = self.target_version() < PythonVersion::PY313
+                            && matches!(&*arguments.args, [_] | [_, Expr::NoneLiteral(_)]);
+
+                        for Keyword { arg, value, .. } in &*arguments.keywords {
+                            let is_type = match arg.as_deref() {
+                                // `total` is a boolean argument available since `TypedDict` was
+                                // introduced.
+                                Some("total") => false,
+
+                                // `extra_items` could be either the known type argument added in
+                                // 3.15 or a legacy field name before 3.13. Either way, it's a type.
+                                Some("extra_items") => true,
+
+                                // Other names may be legacy fields.
+                                Some(_) => legacy_fields,
+
+                                // Unpacked keyword dictionaries can contain type expressions.
+                                None => true,
+                            };
+
+                            if is_type {
+                                self.visit_type_definition(value);
+                            } else {
+                                self.visit_non_type_definition(value);
+                            }
                         }
                     }
                     Some(typing::Callable::MypyExtension) => {
@@ -2966,6 +3008,28 @@ impl<'a> Checker<'a> {
         scope.add(id, binding_id);
     }
 
+    fn is_typed_dict(&self, class_def: &ast::StmtClassDef) -> bool {
+        class::any_base_class(class_def, &self.semantic, |base| {
+            let base = helpers::map_subscript(base);
+            if self.semantic.match_typing_expr(base, "TypedDict") {
+                return true;
+            }
+            // Handle bases defined by assignments, which `any_base_class` does not traverse:
+            // ```python
+            // Base = TypedDict("Base", {})
+            // class Record(Base, extra_items=str): ...
+            // ```
+            let Some(binding_id) = self.semantic.lookup_attribute(base) else {
+                return false;
+            };
+            matches!(
+                typing::find_binding_value(self.semantic.binding(binding_id), &self.semantic),
+                Some(Expr::Call(call))
+                    if self.semantic.match_typing_expr(&call.func, "TypedDict")
+            )
+        })
+    }
+
     /// After initial traversal of the AST, visit all class bases that were deferred.
     ///
     /// This method should only be relevant in stub files, where forward references are
@@ -2988,7 +3052,18 @@ impl<'a> Checker<'a> {
             self.semantic.restore(snapshot);
             // Set this flag to avoid infinite recursion, or we'll just defer it again:
             self.semantic.flags |= SemanticModelFlags::DEFERRED_CLASS_BASE;
-            self.visit_expr(expr);
+            // A forward base may only now identify this class as a `TypedDict`.
+            if let Stmt::ClassDef(class_def) = self.semantic.current_statement()
+                && class_def.keywords().iter().any(|keyword| {
+                    keyword.arg.as_ref().is_some_and(|arg| arg == "extra_items")
+                        && keyword.value.range() == expr.range()
+                })
+                && self.is_typed_dict(class_def)
+            {
+                self.visit_type_definition(expr);
+            } else {
+                self.visit_expr(expr);
+            }
         }
         self.semantic.restore(snapshot);
     }
