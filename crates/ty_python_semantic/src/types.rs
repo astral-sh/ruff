@@ -147,6 +147,7 @@ mod enums;
 mod equality;
 mod function;
 mod generics;
+mod graph;
 pub mod ide_support;
 mod infer;
 mod instance;

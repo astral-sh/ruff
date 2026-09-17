@@ -672,6 +672,25 @@ def _[T]() -> None:
     static_assert(constraints == expected)
 ```
 
+### Negated gradual bounds with one-sided ranges
+
+Every type is assignable to and from `Any`. A one-sided range therefore cannot have a solution that
+violates an `Any` bound on either side, including the side with no explicit bound.
+
+```py
+from typing import Any
+from ty_extensions._internal import ConstraintSet
+
+def _[T]() -> None:
+    above_int = ConstraintSet.lower_bound(int, T)
+    below_int = ConstraintSet.upper_bound(T, int)
+
+    reveal_type((above_int & ~ConstraintSet.upper_bound(T, Any)).solutions(inferable=tuple[T]))  # revealed: None
+    reveal_type((below_int & ~ConstraintSet.lower_bound(Any, T)).solutions(inferable=tuple[T]))  # revealed: None
+    reveal_type((above_int & ~ConstraintSet.equality(T, Any)).solutions(inferable=tuple[T]))  # revealed: None
+    reveal_type((below_int & ~ConstraintSet.equality(T, Any)).solutions(inferable=tuple[T]))  # revealed: None
+```
+
 ### Intersection of two negated ranges
 
 When one of the bounds is entirely contained within the other, the intersection simplifies to the
@@ -954,6 +973,31 @@ If the holes don't overlap, the union is always satisfied.
 def _[T]() -> None:
     static_assert(~ConstraintSet.range(SubSub, T, Sub) | ~ConstraintSet.range(Base, T, Super))
     static_assert(~ConstraintSet.range(SubSub, T, Sub) | ~ConstraintSet.lower_bound(Unrelated, T))
+```
+
+### Bounds through type variable aliases
+
+An alias of a type variable carries the same bounds as that variable. Each alternative retains its
+own bounds: the `bytes` alternative does not change the lower or upper bound in the other solution.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Identity[T] = T
+
+def lower[T, U]():
+    constraints = (ConstraintSet.lower_bound(int, T) & ConstraintSet.lower_bound(Identity[T], U)) | ConstraintSet.equality(
+        U, bytes
+    )
+    # revealed: tuple[Solution[U=T@lower | int], Solution[U=bytes]]
+    reveal_type(constraints.solutions_for(U, inferable=tuple[T, U]))
+
+def upper[T, U]():
+    constraints = (ConstraintSet.upper_bound(T, str) & ConstraintSet.upper_bound(U, Identity[T])) | ConstraintSet.equality(
+        U, bytes
+    )
+    # revealed: tuple[Solution[U=T@upper & str], Solution[U=bytes]]
+    reveal_type(constraints.solutions_for(U, inferable=tuple[T, U]))
 ```
 
 ## Negation

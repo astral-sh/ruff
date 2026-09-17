@@ -416,7 +416,7 @@ impl PathAssignments {
     /// the BDD. You should make this call from inside of your callback, so that as you get further
     /// down into the BDD structure, we remember all of the information that we have learned from
     /// the path we're on.
-    pub(super) fn walk_edge<'db, R>(
+    fn walk_edge<'db, R>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -492,19 +492,6 @@ impl PathAssignments {
         self.assignments.truncate(start);
         self.remaining_overall_fuel = previous_remaining_overall_fuel;
         result
-    }
-
-    pub(super) fn positive_constraints(
-        &self,
-    ) -> impl Iterator<Item = (ConstraintId, ConstraintId)> + '_ {
-        self.assignments.iter().filter_map(
-            |(assignment, (source_constraint, _))| match assignment {
-                ConstraintAssignment::Positive(constraint) => {
-                    Some((*constraint, *source_constraint))
-                }
-                ConstraintAssignment::Negative(_) | ConstraintAssignment::Unconstrained(_) => None,
-            },
-        )
     }
 
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
@@ -1385,7 +1372,7 @@ mod tests {
     }
 
     #[test]
-    fn solution_walker_break_restores_path_assignments() {
+    fn solution_walker_break_preserves_storage() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -1407,30 +1394,30 @@ mod tests {
             set.source_order,
         );
 
-        // Both limits interrupt an edge with path-local assignments: the visit limit stops
-        // below the root, and the path limit stops after collecting the first alternative.
+        // Interrupting either traversal or collection leaves the shared constraint storage usable.
         for (remaining_paths, remaining_visits, error) in [
             (usize::MAX, 1, ProjectionError::TraversalBudgetExceeded),
             (1, usize::MAX, ProjectionError::PathBudgetExceeded),
         ] {
-            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
             let mut storage = builder.storage.borrow_mut();
             let mut limits = BoundedSolutionLimits {
                 remaining_paths,
                 remaining_visits,
             };
-            let mut walker = SolutionWalker::new(source_orders.clone());
+            let mut walker =
+                SolutionWalker::new(source_orders.clone(), TypeVarSet::from_typevars(db, [t]));
             assert_eq!(
-                walker.visit_node(db, &env, &mut storage, &mut path, set.node, &mut limits),
+                walker.visit_node(db, &env, &mut storage, set.node, &mut limits),
                 ControlFlow::Break(error)
             );
             drop(walker);
 
             let mut limits = UnboundedSolutionLimits;
-            let mut walker = SolutionWalker::new(source_orders.clone());
+            let mut walker =
+                SolutionWalker::new(source_orders.clone(), TypeVarSet::from_typevars(db, [t]));
             let ControlFlow::Continue(()) =
-                walker.visit_node(db, &env, &mut storage, &mut path, set.node, &mut limits);
-            assert_eq!(walker.finish(db, &env, &mut storage), expected);
+                walker.visit_node(db, &env, &mut storage, set.node, &mut limits);
+            assert_eq!(walker.finish(), expected);
         }
     }
 }

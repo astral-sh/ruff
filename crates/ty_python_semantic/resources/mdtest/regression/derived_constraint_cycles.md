@@ -146,8 +146,7 @@ def f[T](sentinel):
 ## Recursive structural growth without nested typevars
 
 A substitution can remove the last nested typevar from a derived constraint while still producing an
-increasingly deep family of concrete bounds. Structural growth must continue to consume fuel after
-that substitution.
+increasingly deep family of concrete bounds. Inference finishes without enumerating those bounds.
 
 ```py
 from typing import Iterable, Protocol, TypeAlias, TypeVar
@@ -179,6 +178,75 @@ type Deep = tuple[tuple[tuple[tuple[tuple[tuple[tuple[tuple[tuple[tuple[int]]]]]
 def check_deep_bound[T, U]():
     constraints = ConstraintSet.upper_bound(T, U) & ConstraintSet.upper_bound(U, Deep)
     static_assert(constraints.implies_subtype_of(T, Deep))
+```
+
+## Solving recursive lower bounds
+
+These bounds permit arbitrarily nested tuples. The cyclic bindings remain symbolic, while the
+independent binding for `V` resolves to `str`. Repeated partial substitutions do not add tuple
+layers to the symbolic result. An incompatible upper bound still rejects the constraints.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def cycle[T, U, V]():
+    constraints = (
+        ConstraintSet.lower_bound(int, T)
+        & ConstraintSet.lower_bound(tuple[U], T)
+        & ConstraintSet.lower_bound(T, U)
+        & ConstraintSet.equality(V, str)
+    )
+    # revealed: tuple[Solution[T=int | tuple[U@cycle]]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T, U, V]))
+    # revealed: tuple[Solution[U=T@cycle | tuple[U@cycle] | int]]
+    reveal_type(constraints.solutions_for(U, inferable=tuple[T, U, V]))
+    reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))  # revealed: tuple[Solution[V=str]]
+
+    incompatible = constraints & ConstraintSet.upper_bound(U, int)
+    reveal_type(incompatible.solutions_for(T, inferable=tuple[T, U, V]))  # revealed: None
+```
+
+## Equal variables with recursive bounds
+
+Equal variables can share a recursive bound without adding further list layers to it. The collected
+bounds retain variable references, and the independent binding remains concrete.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def equal_cycle[T, U, V]():
+    constraints = ConstraintSet.equality(T, list[U]) & ConstraintSet.equality(U, T) & ConstraintSet.equality(V, str)
+    # revealed: tuple[Solution[T=list[U@equal_cycle] | U@equal_cycle]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T, U, V]))
+    # revealed: tuple[Solution[U=T@equal_cycle | list[U@equal_cycle]]]
+    reveal_type(constraints.solutions_for(U, inferable=tuple[T, U, V]))
+    reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))  # revealed: tuple[Solution[V=str]]
+```
+
+## Equal variables inside a finite tuple
+
+Equality between variables does not make a tuple containing them recursive. The element variables
+are all constrained to `int`. The tuple binding retains their references, without accumulating
+intermediate tuples with partially substituted elements.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def aliases[A, B, C, R]():
+    constraints = (
+        ConstraintSet.equality(B, A)
+        & ConstraintSet.equality(C, A)
+        & ConstraintSet.equality(R, tuple[A, B, C])
+        & ConstraintSet.equality(A, int)
+    )
+    # revealed: tuple[Solution[A=B@aliases | C@aliases | int]]
+    reveal_type(constraints.solutions_for(A, inferable=tuple[A, B, C, R]))
+    # revealed: tuple[Solution[B=A@aliases | C@aliases | int]]
+    reveal_type(constraints.solutions_for(B, inferable=tuple[A, B, C, R]))
+    # revealed: tuple[Solution[C=A@aliases | B@aliases | int]]
+    reveal_type(constraints.solutions_for(C, inferable=tuple[A, B, C, R]))
+    # revealed: tuple[Solution[R=tuple[A@aliases, B@aliases, C@aliases]]]
+    reveal_type(constraints.solutions_for(R, inferable=tuple[A, B, C, R]))
 ```
 
 [ty#24660]: https://github.com/astral-sh/ruff/pull/24660
