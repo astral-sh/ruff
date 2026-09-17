@@ -315,13 +315,15 @@ impl FileWatcherCompletion {
             // Notify the client about files that changed while the watch was absent.
             session.bump_revision();
             session.resume_suspended_workspace_diagnostic_request(client);
-            if session
-                .client_capabilities()
-                .supports_workspace_diagnostic_refresh()
-            {
+            let capabilities = session.client_capabilities();
+            if capabilities.supports_workspace_diagnostic_refresh() {
                 client.send_request::<lsp_types::DiagnosticRefreshRequest>(session, (), |_, ()| {});
             } else {
                 publish_all_document_diagnostics(session, client);
+            }
+
+            if capabilities.supports_inlay_hint_refresh() {
+                client.send_request::<lsp_types::InlayHintRefreshRequest>(session, (), |_, ()| {});
             }
         }
 

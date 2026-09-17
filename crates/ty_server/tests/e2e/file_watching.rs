@@ -1,8 +1,8 @@
 use anyhow::Result;
 use insta::{assert_json_snapshot, assert_snapshot};
 use lsp_types::{
-    BaseUri, FileSystemWatcher, GlobPattern, TextDocumentContentChangeEvent,
-    TextDocumentContentChangeWholeDocument,
+    BaseUri, FileSystemWatcher, GlobPattern, InlayHintRefreshRequest,
+    TextDocumentContentChangeEvent, TextDocumentContentChangeWholeDocument,
 };
 use ruff_db::system::SystemPath;
 use ruff_python_trivia::textwrap::dedent;
@@ -35,6 +35,8 @@ fn refreshes_script_dependency_after_rewatch() -> Result<()> {
         .with_file(dependency, "value = 1")?
         .with_watched_file_support(true)
         .enable_workspace_diagnostic_refresh(true)
+        .enable_inlay_hints(true)
+        .enable_inlay_hint_refresh(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -104,6 +106,8 @@ fn refreshes_script_dependency_after_rewatch() -> Result<()> {
     server.acknowledge_request(request_id);
     assert_eq!(server.acknowledge_unregistration()?, project_id);
     server.await_diagnostic_refresh();
+    let (refresh_id, ()) = server.await_request::<InlayHintRefreshRequest>();
+    server.acknowledge_request(refresh_id);
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(server.document_diagnostic_request(script, None)),
         @r#"6:14..6:19[ERROR]: Object of type `Literal["wrong"]` is not assignable to `int`"#

@@ -1460,6 +1460,17 @@ impl TestServerBuilder {
         self
     }
 
+    /// Enable server-requested refreshes for inlay hints.
+    pub(crate) fn enable_inlay_hint_refresh(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .workspace
+            .get_or_insert_default()
+            .inlay_hint
+            .get_or_insert_default()
+            .refresh_support = Some(enabled);
+        self
+    }
+
     /// Enable or disable the completion snippet capability.
     pub(crate) fn enable_completion_snippets(mut self, enabled: bool) -> Self {
         self.client_capabilities
