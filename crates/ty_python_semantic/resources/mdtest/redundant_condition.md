@@ -803,26 +803,6 @@ warning[redundant-condition]: An empty tuple is always falsy
    |         ------ This statement is unreachable
 ```
 
-The condition of a loop guard can be false because it negates an always-truthy operand. The
-diagnostic identifies the operand, while the unreachable annotation identifies the code that cannot
-execute:
-
-```py
-def negated_loop(nonempty: tuple[str, str]):
-    while not nonempty:  # snapshot: redundant-condition
-        print("unreachable")
-```
-
-```snapshot
-warning[redundant-condition]: A 2-element tuple is always truthy
-  --> src/mdtest_snippet.py:64:15
-   |
-64 |     while not nonempty:  # snapshot: redundant-condition
-   |               ^^^^^^^^ Inferred type is `tuple[str, str]`
-65 |         print("unreachable")
-   |         -------------------- This statement is unreachable
-```
-
 The same is true for `match` guards:
 
 ```py
@@ -834,12 +814,32 @@ def negated_guard(nonempty: tuple[str, str]):
 
 ```snapshot
 warning[redundant-condition]: A 2-element tuple is always truthy
-  --> src/mdtest_snippet.py:68:23
+  --> src/mdtest_snippet.py:65:23
    |
-68 |         case _ if not nonempty:  # snapshot: redundant-condition
+65 |         case _ if not nonempty:  # snapshot: redundant-condition
    |                       ^^^^^^^^ Inferred type is `tuple[str, str]`
-69 |             print("unreachable")
+66 |             print("unreachable")
    |             -------------------- This statement is unreachable
+```
+
+The condition of a loop guard can be false because it negates an always-truthy operand. The
+diagnostic identifies the operand, and we also add a secondary annotation identifying the code that
+cannot execute:
+
+```py
+def negated_loop(nonempty: tuple[str, str]):
+    while not nonempty:  # snapshot: redundant-condition
+        print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:68:15
+   |
+68 |     while not nonempty:  # snapshot: redundant-condition
+   |               ^^^^^^^^ Inferred type is `tuple[str, str]`
+69 |         print("unreachable")
+   |         -------------------- This statement is unreachable
 ```
 
 Negating an empty tuple makes a loop condition true. Without a reachable `break`, the statement
@@ -2958,8 +2958,8 @@ warning[redundant-condition]: A 2-element tuple is always truthy
    |         -------------------- This statement is unreachable
 ```
 
-An operand does not explain the branch's reachability when another operand determines the result. In
-this condition, the empty tuple makes the `and` test false:
+One operand does not explain the branch's reachability when another operand determines the result.
+In this condition, the empty tuple makes the `and` test false:
 
 ```py
 def contributing_operands(empty: tuple[()], nonempty: tuple[str, str]):

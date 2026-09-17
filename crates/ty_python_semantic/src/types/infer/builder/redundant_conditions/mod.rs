@@ -185,11 +185,71 @@ struct BooleanTest<'ast, 'db> {
 }
 
 impl BooleanTest<'_, '_> {
-    /// An annotation belongs to a diagnostic when the reported test alone determines the complete
-    /// test's outcome. Treat every other operand as unknown, preserving `and`, `or`, and `not`.
-    /// Tests inside calls or conditional expressions select control flow independently.
-    fn truthiness_for_annotation(self, condition: &RedundantCondition<'_, '_>) -> Option<bool> {
-        fn truthiness_from_reported_test(
+    /// Determine whether a redundant-condition diagnostic can also explain why some code is
+    /// unreachable.
+    ///
+    /// The expression we warn about can be just one subexpression of an `if` condition, loop
+    /// condition, `assert` test, or `match` guard. Before adding a secondary annotation to a
+    /// diagnostic that warns that the always-truthy or always-falsy condition makes some other
+    /// code unreachable, we check whether the truthiness of the particular (sub)expression
+    /// the diagnostic is being emitted on is enough to determine the outcome of the entire
+    /// enclosing condition.
+    ///
+    /// For example, we warn that `nonempty` is always truthy here:
+    ///
+    /// ```python
+    /// nonempty = (1, 2)
+    /// assert not nonempty
+    /// print("unreachable")
+    /// ```
+    ///
+    /// `nonempty` is only a subexpression of the overall `assert` test (`not nonempty`), but
+    /// the overall test must also be false as a result of the subexpression being always truthy.
+    /// This method therefore returns `AlwaysFalse`, allowing the diagnostic on `nonempty` to also
+    /// point out that the `print` call below the assertion is unreachable.
+    ///
+    /// Similarly, in this example, knowing that `nonempty` is truthy tells us that the
+    /// `if` body is always entered, whatever the value of `flag`:
+    ///
+    /// ```py
+    /// nonempty = (1, 2)
+    ///
+    /// def _(flag: bool):
+    ///     if nonempty or flag:
+    ///         print("reachable")
+    ///     else:
+    ///         print("unreachable")
+    /// ```
+    ///
+    /// In this situation, if the diagnostic is emitted on the `nonempty` subexpression, this method
+    /// returns `AlwaysTrue` to indicate that the truthiness of this subexpression is sufficient to
+    /// make the overall condition always-truthy, thus allowing us to note in the diagnostic that the
+    /// `else` branch is unreachable.
+    ///
+    /// In this last example, however, whether we enter the body also depends on `flag`:
+    ///
+    /// ```py
+    /// nonempty = (1, 2)
+    ///
+    /// def _(flag: bool):
+    ///     if nonempty and flag:
+    ///         print("reachable")
+    ///     else:
+    ///         print("unreachable")
+    /// ```
+    ///
+    /// If a diagnostic is emitted on the `nonempty` subexpression, this method will return `Ambiguous`
+    /// because the truthiness of `nonempty` does not settle the question of whether the overall
+    /// condition will be always-truthy or always-falsy. This is true even if type inference has
+    /// separately established that `flag` is always truthy: explaining why the `else` branch is
+    /// unreachable would then require facts about both operands, so we should not attach that
+    /// explanation to a diagnostic that only points to `nonempty`.
+    ///
+    /// To make this distinction, `truthiness_from_condition` evaluates `and`, `or`, and `not` using the
+    /// known truthiness of `condition.expression`, but treats every other operand as potentially truthy
+    /// or falsy.
+    fn truthiness_implied_by(self, condition: &RedundantCondition<'_, '_>) -> Truthiness {
+        fn truthiness_from_condition(
             expression: &ast::Expr,
             condition: &RedundantCondition<'_, '_>,
         ) -> Truthiness {
@@ -203,10 +263,10 @@ impl BooleanTest<'_, '_> {
                         .iter()
                         .fold(Truthiness::from(op.is_and()), |result, value| match op {
                             ast::BoolOp::Or => {
-                                result.or_else(|| truthiness_from_reported_test(value, condition))
+                                result.or_else(|| truthiness_from_condition(value, condition))
                             }
                             ast::BoolOp::And => {
-                                result.and_then(|| truthiness_from_reported_test(value, condition))
+                                result.and_then(|| truthiness_from_condition(value, condition))
                             }
                         })
                 }
@@ -214,19 +274,20 @@ impl BooleanTest<'_, '_> {
                     op: ast::UnaryOp::Not,
                     operand,
                     ..
-                }) => truthiness_from_reported_test(operand, condition).negate(),
+                }) => truthiness_from_condition(operand, condition).negate(),
                 _ => Truthiness::Ambiguous,
             }
         }
 
-        let is_truthy = match self.truthiness {
-            Truthiness::AlwaysTrue => true,
-            Truthiness::AlwaysFalse => false,
-            Truthiness::Ambiguous => return None,
-        };
+        if self.truthiness.is_ambiguous() {
+            return Truthiness::Ambiguous;
+        }
 
-        (truthiness_from_reported_test(self.expression, condition) == self.truthiness)
-            .then_some(is_truthy)
+        if truthiness_from_condition(self.expression, condition) == self.truthiness {
+            self.truthiness
+        } else {
+            Truthiness::Ambiguous
+        }
     }
 }
 
@@ -406,12 +467,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         for condition in
             self.redundant_conditions(boolean_test, RedundantConditionContext::Standalone)
         {
-            if let Some(mut diagnostic) = self.report_redundant_condition(&condition)
-                && let Some(test_is_truthy) = boolean_test.truthiness_for_annotation(&condition)
-            {
+            if let Some(mut diagnostic) = self.report_redundant_condition(&condition) {
                 self.add_secondary_annotations_for_redundant_match(
                     &mut diagnostic,
-                    test_is_truthy,
+                    boolean_test.truthiness_implied_by(&condition),
                     branch_suite,
                 );
             }
@@ -536,15 +595,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         for condition in self.redundant_conditions(boolean_test, context) {
                             if let Some(mut diagnostic) =
                                 self.report_redundant_condition(&condition)
-                                && let Some(test_is_truthy) =
-                                    boolean_test.truthiness_for_annotation(&condition)
                             {
-                                // An operand's truthiness can differ from the complete condition's,
-                                // so only annotate branch reachability for the complete test.
+                                // An operand's truthiness can differ from the full condition's,
+                                // so use the latter to determine which branch is unreachable.
                                 self.add_secondary_annotations_for_redundant_if_or_elif(
                                     &condition,
                                     &mut diagnostic,
-                                    test_is_truthy,
+                                    boolean_test.truthiness_implied_by(&condition),
                                     if_stmt,
                                     branch_index,
                                     &suite[i + 1..],
@@ -559,13 +616,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     for condition in self
                         .redundant_conditions(boolean_test, RedundantConditionContext::Assertion)
                     {
-                        if let Some(mut diagnostic) = self.report_redundant_condition(&condition)
-                            && let Some(test_is_truthy) =
-                                boolean_test.truthiness_for_annotation(&condition)
-                        {
+                        if let Some(mut diagnostic) = self.report_redundant_condition(&condition) {
                             self.add_secondary_annotations_for_redundant_assert(
                                 &mut diagnostic,
-                                test_is_truthy,
+                                boolean_test.truthiness_implied_by(&condition),
                                 &suite[i + 1..],
                             );
                         }
@@ -577,13 +631,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     for condition in self
                         .redundant_conditions(boolean_test, RedundantConditionContext::Standalone)
                     {
-                        if let Some(mut diagnostic) = self.report_redundant_condition(&condition)
-                            && let Some(test_is_truthy) =
-                                boolean_test.truthiness_for_annotation(&condition)
-                        {
+                        if let Some(mut diagnostic) = self.report_redundant_condition(&condition) {
                             self.add_secondary_annotations_for_redundant_while(
                                 &mut diagnostic,
-                                test_is_truthy,
+                                boolean_test.truthiness_implied_by(&condition),
                                 &while_statement.body,
                                 &suite[i + 1..],
                             );
@@ -698,7 +749,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// This ensures that the same mistake is not reported twice.
     ///
     /// Callers construct diagnostics for the selected conditions using the [`diagnostic`] module,
-    /// and can add annotations using the surrounding statement context.
+    /// and can add secondary annotations using the surrounding statement context.
     ///
     /// Independent tests within subexpressions are included in the same result.
     ///

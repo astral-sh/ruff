@@ -907,45 +907,40 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn add_secondary_annotations_for_redundant_while(
         &self,
         diagnostic: &mut Diagnostic,
-        test_is_truthy: bool,
+        full_condition_truthiness: Truthiness,
         suite_if_true: &[ast::Stmt],
         following_suite: &[ast::Stmt],
     ) {
-        if test_is_truthy {
-            if !suite_ends_with_exit(self, following_suite, SuiteExitKind::Defensive)
-                && let Some(stmt) = first_nontrivial_statement(following_suite)
-                && self.is_unreachable(stmt)
-            {
-                diagnostic.annotate(
-                    self.context
-                        .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
-                        .message("This following statement is unreachable"),
-                );
-            }
-        } else {
-            if let Some(stmt) = first_nontrivial_statement(suite_if_true)
-                && self.is_unreachable(stmt)
-            {
-                diagnostic.annotate(
-                    self.context
-                        .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
-                        .message("This statement is unreachable"),
-                );
-            }
+        if full_condition_truthiness.is_always_true()
+            && !suite_ends_with_exit(self, following_suite, SuiteExitKind::Defensive)
+            && let Some(stmt) = first_nontrivial_statement(following_suite)
+            && self.is_unreachable(stmt)
+        {
+            diagnostic.annotate(
+                self.context
+                    .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                    .message("This following statement is unreachable"),
+            );
+        } else if full_condition_truthiness.is_always_false()
+            && let Some(stmt) = first_nontrivial_statement(suite_if_true)
+            && self.is_unreachable(stmt)
+        {
+            diagnostic.annotate(
+                self.context
+                    .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                    .message("This statement is unreachable"),
+            );
         }
     }
 
     pub(super) fn add_secondary_annotations_for_redundant_assert(
         &self,
         diagnostic: &mut Diagnostic,
-        test_is_truthy: bool,
+        full_condition_truthiness: Truthiness,
         following_suite: &[ast::Stmt],
     ) {
-        if test_is_truthy {
-            return;
-        }
-
-        if let Some(stmt) = first_nontrivial_statement(following_suite)
+        if full_condition_truthiness.is_always_false()
+            && let Some(stmt) = first_nontrivial_statement(following_suite)
             && self.is_unreachable(stmt)
         {
             diagnostic.annotate(
@@ -959,14 +954,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn add_secondary_annotations_for_redundant_match(
         &self,
         diagnostic: &mut Diagnostic,
-        test_is_truthy: bool,
+        full_condition_truthiness: Truthiness,
         suite_if_true: &[ast::Stmt],
     ) {
-        if test_is_truthy {
-            return;
-        }
-
-        if let Some(stmt) = first_nontrivial_statement(suite_if_true)
+        if full_condition_truthiness.is_always_false()
+            && let Some(stmt) = first_nontrivial_statement(suite_if_true)
             && self.is_unreachable(stmt)
         {
             diagnostic.annotate(
@@ -981,11 +973,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &self,
         condition: &RedundantCondition<'_, 'db>,
         diagnostic: &mut Diagnostic,
-        test_is_truthy: bool,
+        full_condition_truthiness: Truthiness,
         if_stmt: &ast::StmtIf,
         branch_index: usize,
         following_suite: &[ast::Stmt],
     ) {
+        if full_condition_truthiness.is_ambiguous() {
+            return;
+        }
+
         let RedundantCondition {
             expression: test,
             value_type: _,
@@ -997,7 +993,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .chain(if_stmt.elif_else_clauses.iter().map(|clause| &*clause.body))
             .collect();
 
-        if test_is_truthy {
+        if full_condition_truthiness.is_always_true() {
             let mut implicit_else_is_unreachable = false;
 
             // The branch index includes the initial `if`, but `elif_else_clauses` does not.
@@ -1049,16 +1045,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
             }
-        } else {
-            if let Some(stmt) = first_nontrivial_statement(if_elif_else_suites[branch_index])
-                && self.is_unreachable(stmt)
-            {
-                diagnostic.annotate(
-                    self.context
-                        .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
-                        .message("This statement is unreachable"),
-                );
-            }
+        } else if let Some(stmt) = first_nontrivial_statement(if_elif_else_suites[branch_index])
+            && self.is_unreachable(stmt)
+        {
+            diagnostic.annotate(
+                self.context
+                    .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                    .message("This statement is unreachable"),
+            );
         }
     }
 
