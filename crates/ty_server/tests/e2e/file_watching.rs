@@ -180,8 +180,8 @@ fn picks_up_edits_to_unwatched_pth_files() -> Result<()> {
     assert_json_snapshot!(watcher_snapshot(&watches), @r#"
     [
       "file://<temp_dir>/src :: **",
-      "file://<temp_dir>/old :: **",
-      "file://<temp_dir>/venv/<site-packages> :: **"
+      "file://<temp_dir>/venv :: **",
+      "file://<temp_dir>/old :: **"
     ]
     "#);
     server.open_text_document(main, &source, 1);
@@ -218,8 +218,8 @@ fn picks_up_edits_to_unwatched_pth_files() -> Result<()> {
     assert_json_snapshot!(watcher_snapshot(&watches), @r#"
     [
       "file://<temp_dir>/src :: **",
-      "file://<temp_dir>/old :: **",
-      "file://<temp_dir>/venv/<site-packages> :: **"
+      "file://<temp_dir>/venv :: **",
+      "file://<temp_dir>/old :: **"
     ]
     "#);
     server.acknowledge_request(request_id);
@@ -230,8 +230,8 @@ fn picks_up_edits_to_unwatched_pth_files() -> Result<()> {
     assert_json_snapshot!(watcher_snapshot(&watches), @r#"
     [
       "file://<temp_dir>/src :: **",
-      "file://<temp_dir>/new :: **",
-      "file://<temp_dir>/venv/<site-packages> :: **"
+      "file://<temp_dir>/venv :: **",
+      "file://<temp_dir>/new :: **"
     ]
     "#);
     assert_eq!(server.acknowledge_unregistration()?, stale_pth_id);

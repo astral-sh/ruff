@@ -318,6 +318,9 @@ pub(crate) mod tests {
             };
 
             let program_settings = ProgramSettings {
+                virtual_environment: self
+                    .third_party_packages
+                    .then(|| SystemPathBuf::from("/.venv")),
                 python_version: PythonVersionWithSource {
                     version: self.python_version,
                     source: PythonVersionSource::default(),
