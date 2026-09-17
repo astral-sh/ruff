@@ -4,11 +4,11 @@
 //! symbol's name, this is a "semantic search" where the text and the semantic
 //! meaning must match.
 //!
-//! Some symbols (such as parameters and local variables) are visible only
-//! within their scope. All other symbols, such as those defined at the global
-//! scope or within classes, are visible outside the module. Finding
-//! all references to these externally-visible symbols therefore requires
-//! an expensive search of all source files in the workspace.
+//! Some symbols (local variables) are visible only within their scope/file.
+//! Other symbols can have references in other modules, requiring an expensive cross-module
+//! search.
+//! * Members can be visible outside the module, even when assigned inside a function.
+//! * Parameters can also have cross-file references through keyword argument labels.
 
 use crate::goto::{Definitions, GotoTarget};
 use crate::{Db, ReferenceKind, ReferenceTarget};
@@ -330,20 +330,30 @@ pub(crate) fn has_any_external_visible_definitions(
     definitions: &Definitions<'_>,
 ) -> bool {
     definitions.iter().any(|definition| match definition {
-        ResolvedDefinition::Definition(definition) => match definition.scope(db).scope(db).kind() {
-            ScopeKind::Module | ScopeKind::Class => true,
-            ScopeKind::Comprehension => {
-                matches!(definition.kind(db), DefinitionKind::NamedExpression(_))
-                    && definition.place(db).as_symbol().is_some_and(|symbol_id| {
-                        ty_python_core::semantic_index(db, definition.program_file(db))
-                            .symbol_resolves_to_global_scope(symbol_id, definition.file_scope(db))
-                    })
+        ResolvedDefinition::Definition(definition) => {
+            // A member's accessibility does not depend on the scope of its assignment.
+            if definition.place(db).is_member() {
+                return true;
             }
-            ScopeKind::TypeParams
-            | ScopeKind::Function
-            | ScopeKind::Lambda
-            | ScopeKind::TypeAlias => false,
-        },
+
+            match definition.scope(db).scope(db).kind() {
+                ScopeKind::Module | ScopeKind::Class => true,
+                ScopeKind::Comprehension => {
+                    matches!(definition.kind(db), DefinitionKind::NamedExpression(_))
+                        && definition.place(db).as_symbol().is_some_and(|symbol_id| {
+                            ty_python_core::semantic_index(db, definition.program_file(db))
+                                .symbol_resolves_to_global_scope(
+                                    symbol_id,
+                                    definition.file_scope(db),
+                                )
+                        })
+                }
+                ScopeKind::TypeParams
+                | ScopeKind::Function
+                | ScopeKind::Lambda
+                | ScopeKind::TypeAlias => false,
+            }
+        }
         ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => true,
     })
 }

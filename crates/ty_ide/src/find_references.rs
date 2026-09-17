@@ -1360,6 +1360,76 @@ def process_model():
     }
 
     #[test]
+    fn multi_file_instance_attribute_references() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+class C:
+    def __init__(self) -> None:
+        self.<CURSOR>value: int = 42
+"#,
+            )
+            .source(
+                "main.py",
+                r#"
+from lib import C
+
+print(C().value)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> lib.py:4:14
+          |
+        4 |         self.value: int = 42
+          |              -----
+          |
+         ::: main.py:4:11
+          |
+        4 | print(C().value)
+          |           -----
+        ");
+    }
+
+    #[test]
+    fn multi_file_comprehension_attribute_references() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+class C:
+    def __init__(self) -> None:
+        [None for self.<CURSOR>value in [42]]
+"#,
+            )
+            .source(
+                "main.py",
+                r#"
+from lib import C
+
+print(C().value)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> lib.py:4:24
+          |
+        4 |         [None for self.value in [42]]
+          |                        -----
+          |
+         ::: main.py:4:11
+          |
+        4 | print(C().value)
+          |           -----
+        ");
+    }
+
+    #[test]
     fn multi_file_parameter_references_include_keyword_argument_labels() {
         let test = CursorTest::builder()
             .source(
