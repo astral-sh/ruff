@@ -925,6 +925,30 @@ class AlsoCovariant(Generic[T_co]):
         raise NotImplementedError
 ```
 
+## Variance with unresolved descriptor setters
+
+A descriptor's read type constrains variance even when its variadic setter prevents us from
+determining a write domain. Returning `T_contra` is still invalid in a contravariant class.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+R = TypeVar("R")
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Descriptor(Generic[R]):
+    def __init__(self, func: Callable[..., R]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> R:
+        raise NotImplementedError
+    def __set__(self, *args: object) -> None: ...
+
+class Contravariant(Generic[T_contra]):
+    @Descriptor
+    # error: [invalid-generic-class]
+    def value(self) -> T_contra:
+        raise NotImplementedError
+```
+
 ## Variance in cached methods and properties
 
 `cached_property` preserves the decorated method's return type. Returning `T_contra` is invalid in a

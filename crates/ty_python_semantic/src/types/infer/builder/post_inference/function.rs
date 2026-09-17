@@ -162,9 +162,9 @@ pub(super) fn check_class_method_typevar_variance<'db>(
             continue;
         };
         let write_ty = match descriptor_setter_domain(db, env, member.ty, instance) {
-            DescriptorSetterDomain::Missing => None,
+            // An unresolved write domain does not erase a known read requirement.
+            DescriptorSetterDomain::Missing | DescriptorSetterDomain::Deferred => None,
             DescriptorSetterDomain::Known(ty) => Some(ty),
-            DescriptorSetterDomain::Deferred => continue,
         };
         check_method_typevar_variance(
             context,
