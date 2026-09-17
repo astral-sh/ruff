@@ -100,6 +100,7 @@ import sys
 from _typeshed import SupportsRead, SupportsWrite
 from collections.abc import Callable
 from typing import Any, Literal
+from typing_extensions import LiteralString
 
 from .decoder import JSONDecodeError as JSONDecodeError, JSONDecoder as JSONDecoder
 from .encoder import JSONEncoder as JSONEncoder
@@ -114,7 +115,7 @@ def dumps(
     check_circular: bool = True,
     allow_nan: bool = True,
     cls: type[JSONEncoder] | None = None,
-    indent: None | int | str = None,
+    indent: None | int | LiteralString = None,
     separators: tuple[str, str] | None = None,
     default: Callable[[Any], Any] | None = None,
     sort_keys: bool = False,
@@ -172,7 +173,7 @@ def dump(
     check_circular: bool = True,
     allow_nan: bool = True,
     cls: type[JSONEncoder] | None = None,
-    indent: None | int | str = None,
+    indent: None | int | LiteralString = None,
     separators: tuple[str, str] | None = None,
     default: Callable[[Any], Any] | None = None,
     sort_keys: bool = False,
