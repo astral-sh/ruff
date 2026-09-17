@@ -1,6 +1,6 @@
 use std::fs;
 
-pub use project_watcher::ProjectWatcher;
+pub use project_watcher::{ProjectWatcher, WatchPaths, watch_paths};
 use ruff_db::system::{System, SystemPath, SystemPathBuf, SystemVirtualPathBuf};
 pub use watcher::{EventHandler, Watcher, directory_watcher};
 
