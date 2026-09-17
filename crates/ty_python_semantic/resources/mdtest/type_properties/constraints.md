@@ -1176,6 +1176,48 @@ def same_paramspec[**P]() -> None:
     static_assert(constraints == expected)
 ```
 
+## Recursive lower bounds
+
+### Mutual dependencies
+
+Integers and tuples of `U` are lower bounds for `T`. `V` includes `T`, and `U` includes `V`, so the
+solution retains these mutually recursive dependencies.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def ring[T, U, V]():
+    constraints = (
+        ConstraintSet.lower_bound(int, T)
+        & ConstraintSet.lower_bound(tuple[U], T)
+        & ConstraintSet.lower_bound(T, V)
+        & ConstraintSet.lower_bound(V, U)
+    )
+    # revealed: tuple[Solution[T=int | tuple[U@ring]]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T, U, V]))
+    reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))  # revealed: tuple[Solution[V=T@ring]]
+    reveal_type(constraints.solutions_for(U, inferable=tuple[T, U, V]))  # revealed: tuple[Solution[U=V@ring]]
+```
+
+### Equal variables
+
+When all three variables are equal, each binding has the same recursive type expression. It includes
+integers wrapped in arbitrarily many one-element tuples. An explicit `object` bound does not
+restrict this solution.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def shared[T: object, U, V]():
+    constraints = ConstraintSet.equality(T, int | tuple[U]) & ConstraintSet.equality(U, V) & ConstraintSet.equality(V, T)
+    # revealed: tuple[Solution[T=int | tuple[T@shared]]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T, U, V]))
+    # revealed: tuple[Solution[V=int | tuple[T@shared]]]
+    reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))
+    # revealed: tuple[Solution[U=int | tuple[T@shared]]]
+    reveal_type(constraints.solutions_for(U, inferable=tuple[T, U, V]))
+```
+
 ## Existential quantification
 
 Existential quantification removes the listed typevars from a constraint set. Any constraints that
