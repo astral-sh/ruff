@@ -3099,11 +3099,14 @@ impl<'db> Type<'db> {
             // `Unknown` and `@Todo` are nonstandard extensions,
             // but they are both exactly equivalent to `Any`
             Type::Dynamic(_) => true,
-            Type::TypeVar(_) | Type::TypeAlias(_) | Type::SubclassOf(_) => true,
+            Type::TypeVar(_) | Type::SubclassOf(_) => true,
+            // `Recursive` currently only represents implicit type aliases with declared names.
+            // Revisit this and `is_hintable` when general recursive type inference can produce
+            // types without a declared alias.
+            Type::TypeAlias(_) | Type::Recursive(_) => true,
             Type::TypeForm(typeform) => typeform.type_argument(db).is_spellable(db),
             Type::Intersection(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
-            Type::Recursive(_) => false,
             Type::Divergent(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
@@ -3137,7 +3140,8 @@ impl<'db> Type<'db> {
             Type::NominalInstance(_)
             | Type::NewTypeInstance(_)
             | Type::LiteralValue(_)
-            | Type::TypeAlias(_) => true,
+            | Type::TypeAlias(_)
+            | Type::Recursive(_) => true,
 
             Type::Intersection(_)
             | Type::EnumComplement(_)
@@ -3171,8 +3175,6 @@ impl<'db> Type<'db> {
             // but they're generally not spellable with the syntax we use by default
             // in our type display
             Type::Callable(_) => false,
-
-            Type::Recursive(_) => false,
 
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(_) => true,
