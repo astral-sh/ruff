@@ -48,6 +48,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         qualifiers: TypeQualifiers,
         provenance: Provenance<'db>,
     ) {
+        // Check the imported value before assignment recovery can replace its type.
+        if definition.kind(self.db()).as_star_import().is_none() {
+            self.check_deprecated(alias, ty);
+        }
+
         self.add_binding(alias.into(), definition).insert(self, ty);
 
         if qualifiers.contains(TypeQualifiers::FINAL) {
@@ -358,12 +363,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 let inferred = infer_definition_types(self.db(), *definition);
-                // Check non-star imports for deprecations
+                // Check non-star imports for missing direct dependencies.
                 if definition.kind(db).as_star_import().is_none() {
-                    // In the initial cycle, `bindings()` is empty, so no deprecation check is performed.
+                    // Cycle recovery can omit bindings; the fallback below checks the parent module.
                     for (_, ty) in inferred.bindings(*definition) {
-                        self.check_deprecated(alias, ty);
-
                         // `from namespace import child` can import a distribution other than the
                         // namespace's other children. Use inference's attribute-versus-submodule
                         // decision, and do not follow values re-exported from unrelated modules.
