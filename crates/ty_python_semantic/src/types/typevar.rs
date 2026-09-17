@@ -19,7 +19,9 @@ use crate::{
         InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
         Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
         TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        any_over_type_including_alias_arguments, binding_type, definition_expression_type,
+        any_over_type_including_alias_arguments, binding_type,
+        cyclic::TypeIdentity,
+        definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
         visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -460,7 +462,7 @@ impl<'db> TypeVarInstance<'db> {
         ty: Type<'db>,
         visitor: &TypeVarDefaultVisitor<'db>,
     ) -> bool {
-        type SeenTypeAliases<'db> = SmallVec<[Definition<'db>; 1]>;
+        type SeenTypes<'db> = SmallVec<[TypeIdentity<'db>; 1]>;
 
         #[derive(Copy, Clone)]
         struct State<'db, 'a> {
@@ -468,7 +470,7 @@ impl<'db> TypeVarInstance<'db> {
             env: &'a ProgramEnvironment<'db>,
             visitor: &'a TypeVarDefaultVisitor<'db>,
             seen_typevars: &'a RefCell<FxHashSet<TypeVarInstance<'db>>>,
-            seen_type_aliases: &'a RefCell<SeenTypeAliases<'db>>,
+            seen_types: &'a RefCell<SeenTypes<'db>>,
         }
 
         fn typevar_default_is_self_referential<'db>(
@@ -518,14 +520,13 @@ impl<'db> TypeVarInstance<'db> {
             }
 
             {
-                let mut seen_type_aliases = state.seen_type_aliases.borrow_mut();
-                let definition = type_alias.definition(db);
-                // A recursive alias can produce a new specialization every time its body is
-                // expanded, so use its definition as the stable recursion key.
-                if seen_type_aliases.contains(&definition) {
+                let mut seen_types = state.seen_types.borrow_mut();
+                // The shared recursive identity also stops specializations that keep growing.
+                let identity = Type::TypeAlias(type_alias).to_type_identity(db);
+                if seen_types.contains(&identity) {
                     return false;
                 }
-                seen_type_aliases.push(definition);
+                seen_types.push(identity);
             }
 
             let value_type = if specialization.is_some() {
@@ -564,12 +565,12 @@ impl<'db> TypeVarInstance<'db> {
                         return true;
                     }
                     {
-                        let mut seen_type_aliases = state.seen_type_aliases.borrow_mut();
-                        let definition = recursive.definition(db);
-                        if seen_type_aliases.contains(&definition) {
+                        let mut seen_types = state.seen_types.borrow_mut();
+                        let identity = Type::Recursive(recursive).to_type_identity(db);
+                        if seen_types.contains(&identity) {
                             return false;
                         }
-                        seen_type_aliases.push(definition);
+                        seen_types.push(identity);
                     }
                     type_is_self_referential_impl(
                         state,
@@ -585,14 +586,14 @@ impl<'db> TypeVarInstance<'db> {
         }
 
         let seen_typevars = RefCell::new(FxHashSet::default());
-        let seen_type_aliases = RefCell::new(SeenTypeAliases::new());
+        let seen_types = RefCell::new(SeenTypes::new());
 
         let state = State {
             db,
             env,
             visitor,
             seen_typevars: &seen_typevars,
-            seen_type_aliases: &seen_type_aliases,
+            seen_types: &seen_types,
         };
 
         type_is_self_referential_impl(state, ty, self.identity(db))
