@@ -1607,7 +1607,7 @@ impl<'db> PropertyInstanceType<'db> {
     }
 
     /// Pairs retained accessor types with their source methods, independently of decorators.
-    pub(super) fn accessors_with_functions(
+    fn accessors_with_functions(
         self,
         db: &'db dyn Db,
     ) -> impl Iterator<Item = (Type<'db>, FunctionType<'db>)> {
