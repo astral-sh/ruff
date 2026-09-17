@@ -1885,10 +1885,304 @@ def _(x: Intersection[Sequence[Sub1], Sequence[Unrelated1]]) -> None:
 def _(x: Intersection[Sequence[Sub1], Sequence[Sub2], Sequence[Unrelated1]]) -> None:
     reveal_type(first(x))  # revealed: Sub1 | Sub2
 
-# An intersection with two positive elements, neither of which satisfies the bound. In this case,
-# only the error related to the first element is reported.
+# Both rejected alternatives contribute to the bound violation.
 def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
-    # TODO: We only report the first error here, but we should report both.
-    # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1` does not satisfy upper bound `Base` of type variable `T`"
+    # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1 & Unrelated2` does not satisfy upper bound `Base` of type variable `T`"
     reveal_type(first(x))  # revealed: Unknown
+```
+
+## Correlated alternatives from intersection arguments
+
+An intersection of contravariant sinks offers alternative specializations. Evidence from the value
+argument selects the compatible alternative, regardless of argument order:
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Sink(Generic[T_contra]):
+    def put(self, value: T_contra) -> None: ...
+
+class A: ...
+class B: ...
+class C: ...
+
+def choose(sink: Sink[T], value: T) -> T:
+    return value
+
+def choose_reversed(value: T, sink: Sink[T]) -> T:
+    return value
+
+def _(sink: Intersection[Sink[A], Sink[B]], value: A) -> None:
+    reveal_type(choose(sink, value))  # revealed: A
+    reveal_type(choose_reversed(value, sink))  # revealed: A
+```
+
+An unrelated value is incompatible with both alternatives:
+
+```py
+def _(sink: Intersection[Sink[A], Sink[B]], value: C) -> None:
+    # error: [invalid-argument-type]
+    choose(sink, value)
+    # error: [invalid-argument-type]
+    choose_reversed(value, sink)
+```
+
+With no second argument, inference retains both alternatives and merges their assignments to
+`A | B`. Argument checking currently rejects that merged specialization even though either
+individual specialization would accept the sink:
+
+```py
+def element(sink: Sink[T]) -> T:
+    raise NotImplementedError
+
+def _(sink: Intersection[Sink[A], Sink[B]]) -> None:
+    # TODO: Validate the complete specializations separately.
+    # error: [invalid-argument-type] "Expected `Sink[A | B]`"
+    reveal_type(element(sink))  # revealed: A | B
+```
+
+Assignments to different type variables remain correlated within an alternative. Selecting the
+source whose first element is `A` also selects its second element, `B`:
+
+```py
+U = TypeVar("U")
+T_co = TypeVar("T_co", covariant=True)
+U_co = TypeVar("U_co", covariant=True)
+
+class Pair(Generic[T_co, U_co]):
+    def get(self) -> tuple[T_co, U_co]:
+        raise NotImplementedError
+
+def select(source: Pair[T, U], sink: Sink[T]) -> U:
+    return source.get()[1]
+
+def _(source: Intersection[Pair[A, B], Pair[B, C]], sink: Sink[A]) -> None:
+    reveal_type(select(source, sink))  # revealed: B
+```
+
+## Nested variance in intersection inference
+
+A covariant source nested inside a contravariant sink reverses the direction of the constraint. The
+value must satisfy both source element types:
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Source(Generic[T_co]):
+    def get(self) -> T_co:
+        raise NotImplementedError
+
+class Sink(Generic[T_contra]):
+    def put(self, value: T_contra) -> None: ...
+
+class A: ...
+class B: ...
+class C(A, B): ...
+
+def choose(value: T, sink: Sink[Source[T]]) -> T:
+    return value
+
+def _(both: C, only_a: A, sink: Sink[Intersection[Source[A], Source[B]]]) -> None:
+    reveal_type(choose(both, sink))  # revealed: C
+    # error: [invalid-argument-type]
+    choose(only_a, sink)
+```
+
+## Bounds and constraints on intersection alternatives
+
+Only alternatives satisfying a declared bound or constraint contribute to inference. The return type
+uses the union of all accepted assignments:
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import Intersection
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Source(Generic[T_co]):
+    def get(self) -> T_co:
+        raise NotImplementedError
+
+class Base: ...
+class A(Base): ...
+class B(Base): ...
+class C: ...
+class D: ...
+
+BoundedT = TypeVar("BoundedT", bound=Base)
+
+def bounded(source: Source[BoundedT]) -> BoundedT:
+    return source.get()
+
+ConstrainedT = TypeVar("ConstrainedT", A, B)
+
+def constrained(source: Source[ConstrainedT]) -> ConstrainedT:
+    return source.get()
+
+def _(both: Intersection[Source[A], Source[B]], mixed: Intersection[Source[A], Source[C]]) -> None:
+    reveal_type(bounded(both))  # revealed: A | B
+    reveal_type(constrained(both))  # revealed: A | B
+    reveal_type(bounded(mixed))  # revealed: A
+    reveal_type(constrained(mixed))  # revealed: A
+```
+
+If no alternative satisfies the declaration, the diagnostic combines the rejected evidence:
+
+```py
+def _(source: Intersection[Source[C], Source[D]]) -> None:
+    # error: [invalid-argument-type] "Argument type `C & D` does not satisfy upper bound `Base`"
+    reveal_type(bounded(source))  # revealed: Unknown
+    # error: [invalid-argument-type] "Argument type `C & D` does not satisfy constraints (`A`, `B`)"
+    reveal_type(constrained(source))  # revealed: Unknown
+```
+
+For a contravariant sink, the declared constraint must be a subtype of the sink's element type. A
+sink accepting only a strict subclass of `A` cannot select `A`; neither unrelated sink can select
+any declared constraint:
+
+```py
+class Sink(Generic[T_contra]):
+    def put(self, value: T_contra) -> None: ...
+
+class SubA(A): ...
+class Marker: ...
+
+def constrained_sink(sink: Sink[ConstrainedT]) -> ConstrainedT:
+    raise NotImplementedError
+
+def _(narrow: Intersection[Sink[SubA], Marker], unrelated: Intersection[Sink[C], Sink[D]]) -> None:
+    # error: [invalid-argument-type] "Argument type `SubA` does not satisfy constraints (`A`, `B`)"
+    reveal_type(constrained_sink(narrow))  # revealed: Unknown
+    # error: [invalid-argument-type] "Argument type `C | D` does not satisfy constraints (`A`, `B`)"
+    reveal_type(constrained_sink(unrelated))  # revealed: Unknown
+```
+
+## Fixed outer variables in intersection inference
+
+A caller's type variable must satisfy the callee's declaration for every type the caller permits. An
+unrelated intersection member cannot make an unrestricted type variable satisfy a bound or make
+incompatible declared constraints compatible:
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import Intersection
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Source(Generic[T_co]):
+    def get(self) -> T_co:
+        raise NotImplementedError
+
+class Marker: ...
+
+BoundedT = TypeVar("BoundedT", bound=str)
+
+def bounded(source: Source[BoundedT]) -> BoundedT:
+    return source.get()
+
+ConstrainedT = TypeVar("ConstrainedT", int, str)
+
+def constrained(source: Source[ConstrainedT]) -> ConstrainedT:
+    return source.get()
+
+S = TypeVar("S")
+
+def unrestricted(source: Intersection[Source[S], Marker]) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(bounded(source))  # revealed: Unknown
+
+S_constrained = TypeVar("S_constrained", int, bytes)
+
+def incompatible(source: Intersection[Source[S_constrained], Marker]) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(constrained(source))  # revealed: Unknown
+```
+
+A compatible outer variable keeps its identity. A separate valid intersection member can satisfy the
+parameter independently of the outer variable:
+
+```py
+S_bounded = TypeVar("S_bounded", bound=str)
+
+def compatible(source: Intersection[Source[S_bounded], Marker]) -> None:
+    reveal_type(bounded(source))  # revealed: S_bounded@compatible
+
+S_matching = TypeVar("S_matching", int, str)
+
+def compatible_constraints(source: Intersection[Source[S_matching], Marker]) -> None:
+    reveal_type(constrained(source))  # revealed: S_matching@compatible_constraints
+
+def independent(source: Intersection[Source[S], Source[str]]) -> None:
+    reveal_type(bounded(source))  # revealed: str
+```
+
+## Gradual evidence in intersection inference
+
+Narrowing a gradual argument to a source retains the source's known element type during inference.
+The result currently loses its gradual component, but cannot discard the string contribution and
+claim that the returned value supports integer-only methods:
+
+```py
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+class Source(Generic[T_co]):
+    def get(self) -> T_co:
+        raise NotImplementedError
+
+class StrSource(Source[str]): ...
+
+def choose(value: T, source: Source[T]) -> T:
+    return source.get()
+
+def _(unknown, any_: Any) -> None:
+    assert isinstance(unknown, StrSource)
+    assert isinstance(any_, StrSource)
+    unknown_result = choose(1, unknown)
+    any_result = choose(1, any_)
+    # TODO: revealed: Literal[1] | (Unknown & str)
+    reveal_type(unknown_result)  # revealed: Literal[1] | str
+    # TODO: revealed: Literal[1] | (Any & str)
+    reveal_type(any_result)  # revealed: Literal[1] | str
+    unknown_result.bit_length()  # error: [unresolved-attribute]
+    any_result.bit_length()  # error: [unresolved-attribute]
+```
+
+Gradual specializations inherited through concrete subclasses can satisfy bounds and constraints
+even when another intersection member has an incompatible static specialization:
+
+```py
+from ty_extensions import Intersection
+from ty_extensions._internal import Unknown
+
+class AnySource(Source[Any]): ...
+class UnknownSource(Source[Unknown]): ...
+
+BoundedT = TypeVar("BoundedT", bound=int)
+
+def bounded(source: Source[BoundedT]) -> BoundedT:
+    return source.get()
+
+ConstrainedT = TypeVar("ConstrainedT", int, bytes)
+
+def constrained(source: Source[ConstrainedT]) -> ConstrainedT:
+    return source.get()
+
+def _(any_: Intersection[AnySource, StrSource], unknown: Intersection[UnknownSource, StrSource]) -> None:
+    reveal_type(bounded(any_))  # revealed: Any
+    reveal_type(constrained(any_))  # revealed: Any
+    reveal_type(bounded(unknown))  # revealed: Unknown
+    reveal_type(constrained(unknown))  # revealed: Unknown
 ```
