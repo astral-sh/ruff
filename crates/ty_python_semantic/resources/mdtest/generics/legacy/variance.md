@@ -641,6 +641,16 @@ class PreservedSignature(Generic[T_co]):
     def method(self, value: T_co) -> None: ...
 ```
 
+A preserved return type permits covariance. Declared-method validation checks the exposed method; it
+does not infer variance from whether an attribute can be reassigned.
+
+```py
+class PreservedReturn(Generic[T_co]):
+    @preserve_signature
+    def method(self) -> T_co:
+        raise NotImplementedError
+```
+
 A decorator can instead replace the signature with a callable that accepts any value. The original
 use of `T_co` no longer affects variance.
 
@@ -669,9 +679,9 @@ class Consumer(Generic[T_co]):
 
 ```snapshot
 error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `method`
-  --> src/mdtest_snippet.py:35:9
+  --> src/mdtest_snippet.py:39:9
    |
-35 |     def method(self) -> T_co:
+39 |     def method(self) -> T_co:
    |         ^^^^^^
 info: Type variable `T_co` is declared as covariant, but this method requires it to be contravariant
 ```

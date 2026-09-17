@@ -2,9 +2,8 @@ use crate::{
     Db,
     diagnostic::format_enumeration,
     types::{
-        BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, KnownInstanceType, Signature,
-        StaticClassLiteral, Type, TypeVarKind, TypeVarVariance,
-        attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
+        BoundTypeVarIdentity, KnownInstanceType, Signature, StaticClassLiteral, Type, TypeVarKind,
+        TypeVarVariance,
         context::InferContext,
         diagnostic::{
             INVALID_GENERIC_CLASS, INVALID_LEGACY_POSITIONAL_PARAMETER,
@@ -17,7 +16,7 @@ use crate::{
         member::class_member,
         signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
-        variance::{VarianceInferable, VarianceTerm},
+        variance::{MemberVariance, VarianceInferable},
         visitor::find_over_type,
     },
 };
@@ -87,13 +86,7 @@ pub(super) fn check_class_method_typevar_variance<'db>(
     }
 
     let env = context.program_environment();
-    // Keep `Self` symbolic when checking the class declaration. Binding it to `C[T]` would
-    // incorrectly treat a parameter annotated as `Self` as consuming the class's `T`.
-    let instance = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
-        db,
-        Type::instance(db, env, class.identity_specialization(db)),
-        BindingContext::Definition(class.definition(db)),
-    ));
+    let instance = class.variance_receiver(db, env);
     let mut reported = FxHashSet::default();
     for member in all_end_of_scope_members(db, class.body_scope(db))
         .unique_by(|member| member.member.name.clone())
@@ -116,21 +109,11 @@ pub(super) fn check_class_method_typevar_variance<'db>(
                 if function.definition(db).scope(db) == class.body_scope(db)
                     && !exclude_from_variance(db, function)
                 {
-                    let accessor = accessor
-                        .try_call_dunder_get(
-                            db,
-                            env,
-                            Some(instance),
-                            instance.to_meta_type(db, env),
-                        )
-                        .unwrap_or_else(|error| Some(error.fallback()))
-                        .map_or(accessor, |result| result.return_type);
                     check_method_typevar_variance(
                         context,
                         generic_context,
                         function,
-                        accessor,
-                        None,
+                        MemberVariance::accessor(db, env, accessor, instance),
                         &mut reported,
                     );
                 }
@@ -141,21 +124,11 @@ pub(super) fn check_class_method_typevar_variance<'db>(
             .local_function_bindings(db, class.body_scope(db))
             .filter(|(function, _)| !exclude_from_variance(db, *function))
         {
-            let read_ty = ty
-                .try_call_dunder_get(db, env, Some(instance), instance.to_meta_type(db, env))
-                .unwrap_or_else(|error| Some(error.fallback()))
-                .map_or(ty, |result| result.return_type);
-            let write_ty = match descriptor_setter_domain(db, env, ty, instance) {
-                // An unresolved write domain does not erase a known read requirement.
-                DescriptorSetterDomain::Missing | DescriptorSetterDomain::Deferred => None,
-                DescriptorSetterDomain::Known(ty) => Some(ty),
-            };
             check_method_typevar_variance(
                 context,
                 generic_context,
                 function,
-                read_ty,
-                write_ty,
+                MemberVariance::of(db, env, ty, instance),
                 &mut reported,
             );
         }
@@ -190,14 +163,13 @@ fn check_method_typevar_variance<'db>(
     context: &InferContext<'db, '_>,
     generic_context: GenericContext<'db>,
     function: FunctionType<'db>,
-    read_ty: Type<'db>,
-    write_ty: Option<Type<'db>>,
+    member: MemberVariance<'db>,
     reported: &mut FxHashSet<(Definition<'db>, BoundTypeVarIdentity<'db>)>,
 ) {
     let db = context.db();
     let env = context.program_environment();
     let last_definition = function.literal(db).last_definition;
-    let signatures = match read_ty {
+    let signatures = match member.read_ty {
         Type::FunctionLiteral(function) => Some(function.signature(db)),
         Type::BoundMethod(method) => method.function(db).map(|function| {
             function.bound_signatures(
@@ -224,17 +196,9 @@ fn check_method_typevar_variance<'db>(
         if declared_variance == TypeVarVariance::Invariant {
             continue;
         }
-        let required_variance = VarianceTerm::join(
-            db,
-            [
-                read_ty.variance_of(db, env, typevar.identity(db)),
-                write_ty.map_or(VarianceTerm::BIVARIANT, |ty| {
-                    ty.with_polarity(TypeVarVariance::Contravariant)
-                        .variance_of(db, env, typevar.identity(db))
-                }),
-            ],
-        )
-        .evaluate(db);
+        let required_variance = member
+            .variance_of(db, env, typevar.identity(db))
+            .evaluate(db);
         if declared_variance.join(required_variance) == declared_variance
             || !reported.insert((function.definition(db), typevar.identity(db)))
         {
