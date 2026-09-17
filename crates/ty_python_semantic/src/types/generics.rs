@@ -3499,7 +3499,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         return PathBoundSolution::Unsatisfiable;
                     }
                 };
-                if matches!(solution, PathBoundSolution::Unsatisfiable | PathBoundSolution::ViolatesDeclaredUpperBound | PathBoundSolution::ViolatesDeclaredConstraints) {
+                if matches!(
+                    solution,
+                    PathBoundSolution::Unsatisfiable
+                        | PathBoundSolution::ViolatesDeclaredUpperBound
+                        | PathBoundSolution::ViolatesDeclaredConstraints
+                ) {
                     if let Some(failure) = self.constraint_failure_from_failed_bounds(path_bound) {
                         failures.push(failure);
                     }
@@ -4469,7 +4474,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         ConstraintSetAnalysis::Unconstrained => true,
                         ConstraintSetAnalysis::Constrained(SolutionPaths::Complete(paths)) => paths
                             .iter()
-                            .flatten()
+                            .flat_map(|solution| &solution.solved_typevars)
                             .any(|binding| is_gradual(binding.solution)),
                         ConstraintSetAnalysis::Unsatisfiable(failures) => failures
                             .iter()
@@ -5775,14 +5780,14 @@ mod tests {
         let bounds = PathBound::exact(typevar, int).with_upper_evidence(str);
 
         assert!(matches!(
-            PathBounds::preliminary_solve(
+            CandidateSolutions::preliminary_solve(
                 db,
                 &env,
                 &constraints,
                 context.inferable_typevars(db),
                 &bounds,
             ),
-            PathBoundSolution::Unsatisfiable
+            PathBoundSolution::ViolatesDeclaredConstraints
         ));
         assert!(
             builder
