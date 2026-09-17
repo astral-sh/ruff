@@ -911,3 +911,35 @@ class IPolys(Protocol[T]):
     @overload
     def __getitem__(self, key: slice) -> IPolys[T] | Domain[T]: ...
 ```
+
+## Returned callables with recursive parameter aliases
+
+A type variable used by a recursive parameter alias belongs to the function. The returned callable
+uses the type argument inferred from that parameter.
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+Tree = tuple[T, "Tree[T] | None"]
+
+def make(value: Tree[T]) -> Callable[[T], T]:
+    raise NotImplementedError
+
+callback = make((1, None))
+reveal_type(callback)  # revealed: (int, /) -> int
+callback("bad")  # error: [invalid-argument-type]
+```
+
+The type argument can also change at each recursive step.
+
+```py
+Growing = tuple[T, "Growing[list[T]] | None"]
+
+def make_growing(value: Growing[T]) -> Callable[[T], T]:
+    raise NotImplementedError
+
+callback_growing = make_growing((1, None))
+reveal_type(callback_growing)  # revealed: (int, /) -> int
+callback_growing("bad")  # error: [invalid-argument-type]
+```
