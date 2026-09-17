@@ -1835,5 +1835,31 @@ reveal_type(function(1))  # revealed: str
 function("wrong")  # error: [invalid-argument-type]
 ```
 
+## Unannotated subclass defaults inherit specialized declarations
+
+An inherited annotation is specialized using the subclass's base arguments before it provides
+context for an initializer. A further generic subclass retains its own type variables.
+
+```py
+class Base[T]:
+    items: list[T]
+
+class Integers(Base[int]):
+    items = []
+
+reveal_type(Integers.items)  # revealed: list[int]
+reveal_type(Integers().items)  # revealed: list[int]
+
+class Invalid(Base[int]):
+    items = ["wrong"]  # error: [invalid-assignment]
+
+class Child[U](Base[U]):
+    items = []
+
+def check(child: Child[str]) -> None:
+    reveal_type(child.items)  # revealed: list[str]
+    child.items.append(1)  # error: [invalid-argument-type]
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
