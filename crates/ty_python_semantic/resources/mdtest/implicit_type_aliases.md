@@ -2667,9 +2667,6 @@ def inspect(value: Tree[Tree[int]]):
 A recursive alias can appear inside a generic function's list parameter. Both legacy and PEP 695
 functions infer result types from the elements of the argument list.
 
-TODO: These results still include recursive alternatives instead of inferring only the leaf type.
-Improving these constraint solutions is separate from supporting recursive aliases.
-
 ```toml
 [environment]
 python-version = "3.12"
@@ -2688,11 +2685,15 @@ def first_list(value: list[Tree[W]]) -> W:
 def modern_first_list[W](value: list[Tree[W]]) -> W:
     raise NotImplementedError
 
+# TODO: should be `int`
 reveal_type(first_list([1]))  # revealed: int | tuple[Tree[int]]
+# TODO: should be `int`
 reveal_type(modern_first_list([1]))  # revealed: int | tuple[Tree[int]]
 
+# TODO: should be `int`
 # revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
 reveal_type(first_list([((1,),)]))
+# TODO: should be `int`
 # revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
 reveal_type(modern_first_list([((1,),)]))
 ```
@@ -3065,11 +3066,11 @@ These aliases contain no dynamic types when specialized with `int`, so both mate
 equivalent to the original type.
 
 ```py
-from ty_extensions import Bottom, Top
+from ty_extensions import Bottom, Top, static_assert
 from ty_extensions._internal import is_equivalent_to
 
-reveal_type(is_equivalent_to(GrowingA[int], Top[GrowingA[int]]))  # revealed: ConstraintSet[Literal[True]]
-reveal_type(is_equivalent_to(GrowingA[int], Bottom[GrowingA[int]]))  # revealed: ConstraintSet[Literal[True]]
+static_assert(is_equivalent_to(GrowingA[int], Top[GrowingA[int]]))
+static_assert(is_equivalent_to(GrowingA[int], Bottom[GrowingA[int]]))
 ```
 
 ### Materialized recursive aliases in collections

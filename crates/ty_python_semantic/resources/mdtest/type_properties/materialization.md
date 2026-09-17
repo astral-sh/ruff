@@ -1295,7 +1295,7 @@ common materialization.
 
 ```py
 from typing import Any, TypeVar
-from ty_extensions import Bottom, Top
+from ty_extensions import Bottom, Top, static_assert
 from ty_extensions._internal import is_subtype_of, is_disjoint_from
 
 T = TypeVar("T")
@@ -1307,11 +1307,11 @@ def into_top(value: Growing[int]) -> Top[Growing[int]]:
 def overlapping_bounds(value: Bottom[Growing[Any]]) -> Top[Growing[int]]:
     return value
 
-reveal_type(is_subtype_of(Growing[int], Top[Growing[int]]))  # revealed: ConstraintSet[Literal[True]]
-reveal_type(is_subtype_of(Bottom[Growing[int]], Growing[int]))  # revealed: ConstraintSet[Literal[True]]
-reveal_type(is_subtype_of(Bottom[Growing[Any]], Top[Growing[str]]))  # revealed: ConstraintSet[Literal[True]]
-reveal_type(is_disjoint_from(list[Growing[int]], list[Growing[Any]]))  # revealed: ConstraintSet[Literal[False]]
-reveal_type(is_subtype_of(Bottom[Growing[int]], Top[Growing[str]]))  # revealed: ConstraintSet[Literal[False]]
+static_assert(is_subtype_of(Growing[int], Top[Growing[int]]))
+static_assert(is_subtype_of(Bottom[Growing[int]], Growing[int]))
+static_assert(is_subtype_of(Bottom[Growing[Any]], Top[Growing[str]]))
+static_assert(not is_disjoint_from(list[Growing[int]], list[Growing[Any]]))
+static_assert(not is_subtype_of(Bottom[Growing[int]], Top[Growing[str]]))
 ```
 
 A fixed `Any` in the body still distinguishes the two materializations, even when the type argument
@@ -1322,8 +1322,8 @@ the materializations of two specializations.
 WithAny = tuple[T, Any] | list["WithAny[list[T]]"]
 Phantom = int | list["Phantom[T]"]
 
-reveal_type(is_subtype_of(Top[WithAny[int]], Bottom[WithAny[int]]))  # revealed: ConstraintSet[Literal[False]]
-reveal_type(is_subtype_of(Top[Phantom[int]], Top[Phantom[str]]))  # revealed: ConstraintSet[Literal[True]]
+static_assert(not is_subtype_of(Top[WithAny[int]], Bottom[WithAny[int]]))
+static_assert(is_subtype_of(Top[Phantom[int]], Top[Phantom[str]]))
 ```
 
 ## Materialization does not force invalid recursive specializations
