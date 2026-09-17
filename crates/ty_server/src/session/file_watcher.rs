@@ -131,7 +131,7 @@ impl LspFileWatcher {
                         let watcher = if db.system().is_file(path)
                             && let (Some(parent), Some(name)) = (path.parent(), path.file_name())
                         {
-                            relative_watcher(parent, name)
+                            relative_watcher(parent, &escape_glob_file_name(name))
                         } else {
                             relative_watcher(path, "**")
                         };
@@ -350,6 +350,23 @@ fn relative_watcher(path: &SystemPath, pattern: &str) -> FileSystemWatcher {
         }),
         kind: None,
     }
+}
+
+/// Escapes glob operators in a file name using single-character classes.
+/// LSP defines the operators but not an escape syntax, so we assume clients
+/// interpret these classes like VS Code does.
+fn escape_glob_file_name(name: &str) -> String {
+    let mut escaped = String::with_capacity(name.len());
+    for character in name.chars() {
+        if matches!(character, '*' | '?' | '{' | '}' | '[' | ']') {
+            escaped.push('[');
+            escaped.push(character);
+            escaped.push(']');
+        } else {
+            escaped.push(character);
+        }
+    }
+    escaped
 }
 
 struct PendingRegistration {

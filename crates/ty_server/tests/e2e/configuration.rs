@@ -23,7 +23,7 @@ def foo() -> str:
 
     let builder = TestServerBuilder::new()?;
 
-    let settings_path = builder.file_path("ty2.toml");
+    let settings_path = builder.file_path("ty[dev].toml");
 
     let mut server = builder
         .with_workspace(
@@ -65,7 +65,7 @@ unresolved-reference="warn"
       {
         "globPattern": {
           "baseUri": "file://<temp_dir>/",
-          "pattern": "ty2.toml"
+          "pattern": "ty[[]dev[]].toml"
         }
       }
     ]
