@@ -1037,7 +1037,32 @@ from typing import Generic, TypeVar
 T_co = TypeVar("T_co", covariant=True)
 
 class Aliased(Generic[T_co]):
-    # TODO: Emit `invalid-generic-class`; this method remains available through `alias`.
+    # error: [invalid-generic-class]
+    def method(self, value: T_co) -> None: ...
+
+    alias = method
+    def method(self, value: object) -> None: ...
+```
+
+Multiple aliases of the same method produce only one diagnostic, whether or not the original name is
+overwritten.
+
+```py
+class MultipleAliases(Generic[T_co]):
+    # error: [invalid-generic-class]
+    def method(self, value: T_co) -> None: ...
+
+    first = method
+    second = method
+```
+
+Aliases also retain method-specific exclusions.
+
+```py
+from typing import no_type_check
+
+class UncheckedAlias(Generic[T_co]):
+    @no_type_check
     def method(self, value: T_co) -> None: ...
 
     alias = method

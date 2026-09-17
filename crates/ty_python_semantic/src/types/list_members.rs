@@ -719,7 +719,7 @@ pub struct Member<'db> {
 }
 
 impl<'db> Member<'db> {
-    /// Recover local functions retained in the exposed type, including property accessors.
+    /// Recover local functions retained in the exposed type, including aliases and property accessors.
     /// Unlike [`Self::local_functions`], this does not recover definitions replaced by decorators.
     pub(super) fn local_functions_from_type(
         &self,
@@ -754,7 +754,7 @@ impl<'db> Member<'db> {
 
         functions
             .into_iter()
-            .filter(|function| is_local_member_function(db, *function, &self.name, scope))
+            .filter(|function| function.definition(db).scope(db) == scope)
             .collect()
     }
 
@@ -769,7 +769,8 @@ impl<'db> Member<'db> {
         db: &'db dyn Db,
         scope: ScopeId<'db>,
     ) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
-        let member_functions = self.local_functions_from_type(db, scope);
+        let mut member_functions = self.local_functions_from_type(db, scope);
+        member_functions.retain(|function| function.name(db) == &self.name);
         let mut functions = smallvec::SmallVec::<[FunctionType<'db>; 1]>::new();
         for definition in end_of_scope_function_definitions(db, scope, &self.name) {
             let function = member_functions
@@ -848,17 +849,6 @@ fn end_of_scope_function_definitions<'db>(
             Some(definition)
         })
         .collect()
-}
-
-fn is_local_member_function<'db>(
-    db: &'db dyn Db,
-    function: FunctionType<'db>,
-    member_name: &Name,
-    member_scope: ScopeId<'db>,
-) -> bool {
-    function.python_file(db) == member_scope.python_file(db)
-        && function.definition(db).scope(db) == member_scope
-        && function.name(db) == member_name
 }
 
 /// Extract callable functions represented by a type.

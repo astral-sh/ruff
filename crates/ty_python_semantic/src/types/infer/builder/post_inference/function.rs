@@ -2,8 +2,8 @@ use crate::{
     Db,
     diagnostic::format_enumeration,
     types::{
-        BindingContext, BoundTypeVarInstance, KnownInstanceType, Signature, StaticClassLiteral,
-        Type, TypeVarKind, TypeVarVariance,
+        BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, KnownInstanceType, Signature,
+        StaticClassLiteral, Type, TypeVarKind, TypeVarVariance,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         context::InferContext,
         diagnostic::{
@@ -28,6 +28,7 @@ use ruff_db::{
 };
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashSet;
 use ty_python_core::definition::Definition;
 
 pub(crate) fn check_function_definition<'db>(
@@ -93,6 +94,7 @@ pub(super) fn check_class_method_typevar_variance<'db>(
         Type::instance(db, env, class.identity_specialization(db)),
         BindingContext::Definition(class.definition(db)),
     ));
+    let mut reported = FxHashSet::default();
     for member in all_end_of_scope_members(db, class.body_scope(db))
         .unique_by(|member| member.member.name.clone())
     {
@@ -129,12 +131,18 @@ pub(super) fn check_class_method_typevar_variance<'db>(
                         function,
                         accessor,
                         None,
+                        &mut reported,
                     );
                 }
             }
             continue;
         }
-        let functions = member.local_functions(db, class.body_scope(db));
+        let mut functions = member.local_functions(db, class.body_scope(db));
+        for function in member.local_functions_from_type(db, class.body_scope(db)) {
+            if !functions.contains(&function) {
+                functions.push(function);
+            }
+        }
         let Some(&function) = functions.first() else {
             continue;
         };
@@ -158,7 +166,14 @@ pub(super) fn check_class_method_typevar_variance<'db>(
             DescriptorSetterDomain::Known(ty) => Some(ty),
             DescriptorSetterDomain::Deferred => continue,
         };
-        check_method_typevar_variance(context, generic_context, function, read_ty, write_ty);
+        check_method_typevar_variance(
+            context,
+            generic_context,
+            function,
+            read_ty,
+            write_ty,
+            &mut reported,
+        );
     }
 }
 
@@ -192,6 +207,7 @@ fn check_method_typevar_variance<'db>(
     function: FunctionType<'db>,
     read_ty: Type<'db>,
     write_ty: Option<Type<'db>>,
+    reported: &mut FxHashSet<(Definition<'db>, BoundTypeVarIdentity<'db>)>,
 ) {
     let db = context.db();
     let env = context.program_environment();
@@ -234,7 +250,9 @@ fn check_method_typevar_variance<'db>(
             ],
         )
         .evaluate(db);
-        if declared_variance.join(required_variance) == declared_variance {
+        if declared_variance.join(required_variance) == declared_variance
+            || !reported.insert((function.definition(db), typevar.identity(db)))
+        {
             continue;
         }
         let node = last_definition.node(db, context.file(), context.module());
