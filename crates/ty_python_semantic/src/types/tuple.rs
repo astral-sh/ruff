@@ -304,6 +304,14 @@ impl<'db> TupleType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
+        if type_mapping.is_structural() {
+            return TupleType::new_internal(
+                db,
+                self.program(db),
+                self.tuple(db)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            );
+        }
         TupleType::new(
             db,
             visitor.env,
@@ -333,18 +341,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: TupleType<'db>,
         target: TupleType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.check_tuple_spec_pair(db, source.tuple(db), target.tuple(db))
-    }
-
-    fn check_tuple_spec_pair(
-        &self,
-        db: &'db dyn Db,
-        source: &TupleSpec<'db>,
-        target: &TupleSpec<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        match source {
-            Tuple::Fixed(source) => self.check_fixed_length_tuple_vs_tuple_spec(db, source, target),
-            Tuple::Variable(source) => self.check_variable_length_vs_tuple_spec(db, source, target),
+        match source.tuple(db) {
+            Tuple::Fixed(source) => {
+                self.check_fixed_length_tuple_vs_tuple_spec(db, source, target.tuple(db))
+            }
+            Tuple::Variable(source_spec) => {
+                self.check_variable_length_vs_tuple_spec(db, source_spec, target.tuple(db))
+            }
         }
     }
 
@@ -471,18 +474,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // Unlike a dynamic homogeneous segment, a symbolic type variable tuple ranges
                 // over all specializations rather than making a gradual choice of length.
                 let env = self.env;
-                if !self.is_eager_assignability()
-                    || source.variable().gradual_element_type(db, env).is_none()
-                {
+                if !self.relation.is_assignability() {
                     return self.never();
                 }
+                let Some(source_element) = source.variable().gradual_element_type(db, env) else {
+                    return self.never();
+                };
 
                 // In addition, the other tuple must have enough elements to match up with this
                 // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
                 // relation.
                 let mut result = self.always();
                 let mut target_iter = target.iter_all_elements();
-                for source_ty in source.prenormalized_prefix_elements(db, env, None) {
+                for source_ty in source.prenormalized_prefix_elements(db, self, None) {
                     let Some(target_ty) = target_iter.next() else {
                         return self.never();
                     };
@@ -495,7 +499,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
                 }
                 let suffix: Vec<_> = source
-                    .prenormalized_suffix_elements(db, env, None)
+                    .prenormalized_suffix_elements(db, self, None)
                     .collect();
                 for &source_ty in suffix.iter().rev() {
                     let Some(target_ty) = target_iter.next_back() else {
@@ -510,7 +514,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
                 }
 
-                result
+                // The gradual segment supplies the remaining elements.
+                result.and(db, self.constraints, || {
+                    target_iter.when_all(db, self.constraints, |target_ty| {
+                        self.check_type_pair(db, source_element, target_ty)
+                    })
+                })
             }
 
             Tuple::Variable(target) => {
@@ -668,10 +677,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // variable-length part.
                 let mut result = self.always();
                 let pairwise = source
-                    .prenormalized_prefix_elements(db, env, source_prenormalize_variable)
+                    .prenormalized_prefix_elements(db, self, source_prenormalize_variable)
                     .zip_longest(target.prenormalized_prefix_elements(
                         db,
-                        env,
+                        self,
                         target_prenormalize_variable,
                     ));
                 for pair in pairwise {
@@ -687,7 +696,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !self.is_eager_assignability() || !source_variable.is_dynamic() {
+                            if !self.relation.is_assignability()
+                                || source.variable().gradual_element_type(db, env).is_none()
+                            {
                                 return self.never();
                             }
                             self.check_type_pair(db, source_variable, other_ty)
@@ -702,10 +713,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 let source_suffix: Vec<_> = source
-                    .prenormalized_suffix_elements(db, env, source_prenormalize_variable)
+                    .prenormalized_suffix_elements(db, self, source_prenormalize_variable)
                     .collect();
                 let target_suffix: Vec<_> = target
-                    .prenormalized_suffix_elements(db, env, target_prenormalize_variable)
+                    .prenormalized_suffix_elements(db, self, target_prenormalize_variable)
                     .collect();
                 let pairwise = source_suffix
                     .iter()
@@ -724,7 +735,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !self.is_eager_assignability() || !source_variable.is_dynamic() {
+                            if !self.relation.is_assignability()
+                                || source.variable().gradual_element_type(db, env).is_none()
+                            {
                                 return self.never();
                             }
                             self.check_type_pair(db, source_variable, target_ty)
@@ -2109,14 +2122,18 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn prenormalized_prefix_elements<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        checker: &'a TypeRelationChecker<'_, '_, 'db>,
         variable: Option<Type<'db>>,
     ) -> impl Iterator<Item = Type<'db>> + 'a {
+        // Nested element comparisons must retain the outer recursive comparison's guards.
         let variable = variable.unwrap_or_else(|| self.variable().element_type(db));
-        self.iter_prefix_elements().chain(
-            self.iter_suffix_elements()
-                .take_while(move |element| element.is_equivalent_to(db, env, variable)),
-        )
+        self.iter_prefix_elements()
+            .chain(self.iter_suffix_elements().take_while(move |element| {
+                checker
+                    .as_equivalence_checker()
+                    .check_type_pair(db, *element, variable)
+                    .is_always_satisfied(db, checker.env)
+            }))
     }
 
     /// Returns the suffix of the prenormalization of this tuple.
@@ -2141,12 +2158,16 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn prenormalized_suffix_elements<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        checker: &'a TypeRelationChecker<'_, '_, 'db>,
         variable: Option<Type<'db>>,
     ) -> impl Iterator<Item = Type<'db>> + 'a {
         let variable = variable.unwrap_or_else(|| self.variable().element_type(db));
-        self.iter_suffix_elements()
-            .skip_while(move |element| element.is_equivalent_to(db, env, variable))
+        self.iter_suffix_elements().skip_while(move |element| {
+            checker
+                .as_equivalence_checker()
+                .check_type_pair(db, *element, variable)
+                .is_always_satisfied(db, checker.env)
+        })
     }
 
     fn recursive_type_normalized_impl(

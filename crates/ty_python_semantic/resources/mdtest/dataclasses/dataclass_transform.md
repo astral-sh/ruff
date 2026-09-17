@@ -1246,6 +1246,57 @@ class Person:
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
 ```
 
+### Ambiguous field specifiers
+
+Overloads with different return types can still describe the same field. If neither overload
+provides a default, the field remains required:
+
+```py
+from typing import Any, Literal, overload
+from typing_extensions import dataclass_transform
+
+@overload
+def field(value: int) -> int: ...
+@overload
+def field(value: str) -> str: ...
+def field(value: Any) -> Any: ...
+
+@dataclass_transform(field_specifiers=(field,))
+class Model: ...
+
+def _(value: Any):
+    reveal_type(field(value))  # revealed: Unknown
+
+    class Person(Model):
+        id: int = field(value)
+        name: str
+
+    Person(id=1, name="Alice")  # ok
+    Person(name="Alice")  # error: [missing-argument] "No argument provided for required parameter `id`"
+    reveal_type(Person.__init__)  # revealed: (self: Person, id: int, name: str) -> None
+```
+
+When matching overloads disagree about field options, we treat the field-specifier as providing a
+default value:
+
+```py
+@overload
+def field_with_init(value: int, *, init: Literal[True] = True) -> int: ...
+@overload
+def field_with_init(value: str, *, init: Literal[False] = False) -> str: ...
+def field_with_init(value: Any, *, init: bool = True) -> Any: ...
+
+@dataclass_transform(field_specifiers=(field_with_init,))
+class ModelWithInit: ...
+
+def _(value: Any):
+    class Person(ModelWithInit):
+        id: int = field_with_init(value)
+
+    Person()  # ok
+    reveal_type(Person.__init__)  # revealed: (self: Person, id: int = ...) -> None
+```
+
 ### Converter field specifier with overloaded callables
 
 ```py

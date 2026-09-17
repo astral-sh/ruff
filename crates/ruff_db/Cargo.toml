@@ -1,6 +1,6 @@
 [package]
 name = "ruff_db"
-version = "0.0.13"
+version = "0.0.14"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -54,7 +54,7 @@ zip = { workspace = true }
 etcetera = { workspace = true, optional = true }
 
 [target.'cfg(target_arch="wasm32")'.dependencies]
-web-time = { version = "1.1.0" }
+web-time = { version = "1.1.0", default-features = false }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["filters"] }

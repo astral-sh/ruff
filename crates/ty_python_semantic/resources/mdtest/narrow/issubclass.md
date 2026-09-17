@@ -131,6 +131,103 @@ def _(flag1: bool, flag2: bool):
         reveal_type(t)  # revealed: <class 'str'>
 ```
 
+## Recursive tuples as `classinfo`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A recursive tuple of integer classes narrows a successful check to `type[int]`. An unsuccessful
+check does not exclude integers: the tuple can be empty or contain only a subclass of `int`.
+Implicit and PEP 695 aliases describe the same class-info values.
+
+```py
+ClassInfo = type[int] | tuple["ClassInfo", ...]
+type ExplicitClassInfo = type[int] | tuple[ExplicitClassInfo, ...]
+
+def implicit(value: type, classes: ClassInfo):
+    if issubclass(value, classes):
+        reveal_type(value)  # revealed: type[int]
+    else:
+        reveal_type(value)  # revealed: type
+
+def explicit(value: type, classes: ExplicitClassInfo):
+    if issubclass(value, classes):
+        reveal_type(value)  # revealed: type[int]
+    else:
+        reveal_type(value)  # revealed: type
+```
+
+Even when the leaf class is final, a failed check does not exclude its instances: the recursive
+tuple can be empty.
+
+```py
+from typing import final
+
+@final
+class Leaf: ...
+
+FinalClasses = type[Leaf] | tuple["FinalClasses", ...]
+type ExplicitFinalClasses = type[Leaf] | tuple[ExplicitFinalClasses, ...]
+
+def final_classes(value: type, classes: FinalClasses, explicit_classes: ExplicitFinalClasses):
+    if issubclass(value, classes):
+        reveal_type(value)  # revealed: <class 'Leaf'>
+    else:
+        reveal_type(value)  # revealed: type
+    if issubclass(value, explicit_classes):
+        reveal_type(value)  # revealed: <class 'Leaf'>
+    else:
+        reveal_type(value)  # revealed: type
+```
+
+A tuple tree with no class objects can only make the check fail:
+
+```py
+OnlyTuples = tuple["OnlyTuples", ...]
+type ExplicitOnlyTuples = tuple[ExplicitOnlyTuples, ...]
+
+def only_tuples(value: type, classes: OnlyTuples, explicit_classes: ExplicitOnlyTuples):
+    if issubclass(value, classes):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: type
+    if issubclass(value, explicit_classes):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: type
+```
+
+## `classinfo` with changing recursive arguments
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Deeper tuples can contain different classes when the recursive type arguments change. The outer
+argument `int` does not describe all the classes tested: `(list,)` is also a valid class-info value.
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+Growing: TypeAlias = type[T] | tuple["Growing[list[T]]", ...]
+type ExplicitGrowing[T] = type[T] | tuple[ExplicitGrowing[list[T]], ...]
+
+classes: Growing[int] = (list,)
+explicit_classes: ExplicitGrowing[int] = (list,)
+
+def implicit(value: type, classes: Growing[int]):
+    if issubclass(value, classes):
+        reveal_type(value)  # revealed: type
+
+def explicit(value: type, classes: ExplicitGrowing[int]):
+    if issubclass(value, classes):
+        reveal_type(value)  # revealed: type
+```
+
 ## `classinfo` is a PEP-604 union of types
 
 ```toml
@@ -462,12 +559,11 @@ def flag() -> bool:
 
 t = int if flag() else str
 
-# error: [invalid-argument-type] "Argument to function `issubclass` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["str"]"
+# error: [invalid-argument-type] "Argument to function `issubclass` is incorrect: Expected `_ClassInfo`, found `Literal["str"]"
 if issubclass(t, "str"):
     reveal_type(t)  # revealed: <class 'int'> | <class 'str'>
 
-# TODO: this should cause us to emit a diagnostic during
-# type checking
+# error: [invalid-argument-type]
 if issubclass(t, (bytes, "str")):
     reveal_type(t)  # revealed: <class 'int'> | <class 'str'>
 

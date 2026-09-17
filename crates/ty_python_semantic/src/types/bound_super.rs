@@ -65,7 +65,7 @@ impl<'db> TypeVarOwnerContext<'db> {
                     .require_bound_or_constraints(db, env)
                     .as_type(db, env),
             )
-            .unwrap_or_else(SubclassOfType::subclass_of_unknown),
+            .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown()),
         }
     }
 }
@@ -644,9 +644,26 @@ impl<'db> BoundSuperType<'db> {
         };
 
         let owner = match owner_type {
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             Type::Never => SuperOwnerKind::Dynamic(DynamicType::Unknown),
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
             Type::Divergent(divergent) => SuperOwnerKind::Divergent(divergent),
+            Type::Recursive(recursive) => {
+                return recursive.map_or_else(
+                    db,
+                    env,
+                    || {
+                        Err(BoundSuperError::AbstractOwnerType {
+                            owner_type,
+                            pivot_class: pivot_class_type,
+                            typevar_context: None,
+                        })
+                    },
+                    delegate_to,
+                );
+            }
             Type::ClassLiteral(class) => SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
                 db,
                 pivot_class,
@@ -694,7 +711,7 @@ impl<'db> BoundSuperType<'db> {
                                 )?)
                             } else {
                                 let subclass_of = SubclassOfType::try_from_instance(db, env, bound)
-                                    .unwrap_or_else(SubclassOfType::subclass_of_unknown);
+                                    .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown());
                                 return delegate_with_error_mapped(
                                     subclass_of,
                                     Some(TypeVarOwnerContext::SubclassOf(bound_typevar)),

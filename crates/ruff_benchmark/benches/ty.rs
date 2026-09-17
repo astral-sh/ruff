@@ -85,7 +85,7 @@ fn setup_tomllib_case() -> FileCase {
 
     let src_root = SystemPath::new("/src");
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_override_options(Options {
+    metadata.set_override_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             ..EnvironmentOptions::default()
@@ -905,14 +905,15 @@ from collections.abc import Callable, Iterable
 from typing import Protocol
 
 class Chain[T](Protocol):
-    def value(self) -> T: ...
+    def value(self) -> T:
+        raise RuntimeError
 "
     .to_string();
 
     for i in 0..NUM_METHODS {
         writeln!(
             &mut code,
-            "    def method_{i}[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]: ..."
+            "    def method_{i}[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]:\n        raise RuntimeError"
         )
         .ok();
     }
@@ -1478,6 +1479,38 @@ fn benchmark_gradual_literal_union_equality(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4541>.
+///
+/// Negating a compound gradual intersection can repeatedly introduce equivalent alternatives.
+/// Keeping the expression inline forces immediate evaluation of the negation.
+fn benchmark_gradual_intersection_negation(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from typing import Any, Callable
+from ty_extensions import Intersection, Not
+
+class A: ...
+
+x: Not[
+    Intersection[
+        Any | type[A] | str,
+        Callable[..., object],
+        Not[Callable[..., object]],
+        Not[Intersection[A, type[str], Any, Not[type[Any]]]],
+    ]
+]
+"#;
+
+    criterion.bench_function("ty_micro[gradual_intersection_negation]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/3880>.
 ///
 /// Reachability analysis for a large literal OR pattern on `Any` used to rebuild the remaining
@@ -1735,7 +1768,7 @@ impl<'a> ProjectBenchmark<'a> {
         let src_root = SystemPath::new("/");
         let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
 
-        metadata.apply_override_options(Options {
+        metadata.set_override_options(Options {
             environment: Some(EnvironmentOptions {
                 python_version: Some(RangedValue::cli(self.project.config.python_version)),
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
@@ -1923,6 +1956,7 @@ criterion_group!(
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_gradual_literal_union_equality,
+    benchmark_gradual_intersection_negation,
     benchmark_literal_or_pattern_reachability,
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,

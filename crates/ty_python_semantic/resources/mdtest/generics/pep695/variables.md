@@ -1177,6 +1177,62 @@ def constrained[T: (int, str)](x: T):
     reveal_type(type(x))  # revealed: type[T@constrained]
 ```
 
+## Enum members on generic class objects
+
+An enum member cannot be reassigned through a generic class receiver. The restriction applies to
+every constraint or alternative in an upper bound. Non-member attributes remain writable.
+
+```py
+from enum import Enum
+from typing import Any, Protocol
+
+class A(Enum):
+    X = 0
+    label: str
+
+class B(Enum):
+    X = 0
+    label: str
+
+class Writable(Protocol):
+    X: Any
+```
+
+For a constrained type variable, the assignment must be valid for every constraint. These class
+objects also cannot satisfy a protocol that requires a writable enum member:
+
+```py
+def constrained[T: (A, B)](cls: type[T]):
+    cls.X = 0  # error: [invalid-assignment]
+    writable: Writable = cls  # error: [invalid-assignment]
+    cls.label = "label"
+```
+
+The same applies to a union bound, including one defined through a type alias:
+
+```py
+type Both = A | B
+
+def union_bound[T: Both](cls: type[T]):
+    cls.X = 0  # error: [invalid-assignment]
+    writable: Writable = cls  # error: [invalid-assignment]
+    cls.label = "label"
+```
+
+One enum alternative is enough to reject the write, even if another class allows assignment to the
+attribute:
+
+```py
+class Plain:
+    X: int = 0
+
+def mixed_constraints[T: (Plain, A)](cls: type[T]):
+    cls.X = 0  # error: [invalid-assignment]
+
+def mixed_bound[T: A | Plain](cls: type[T]):
+    cls.X = 0  # error: [invalid-assignment]
+```
+
 ## Cycles
 
 ### Bounds and constraints
@@ -1272,6 +1328,30 @@ class D[T = T]:
     x: T
 
 reveal_type(D().x)  # revealed: Unknown
+```
+
+### Defaults through recursive aliases
+
+A default that refers to its own type variable through a recursive alias falls back to `Unknown`.
+This also applies when another specialization of the same alias wraps the reference.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVar
+
+type Tree[U] = tuple[U, Tree[U] | None]
+T = TypeVar("T", default="Tree[T]")
+N = TypeVar("N", default="Tree[Tree[N]]")
+
+class Box(Generic[T]): ...
+class NestedBox(Generic[N]): ...
+
+reveal_type(Box())  # revealed: Box[Unknown]
+reveal_type(NestedBox())  # revealed: NestedBox[Unknown]
 ```
 
 [pep 695]: https://peps.python.org/pep-0695/

@@ -32,11 +32,15 @@ For implementors, see `import-resolution-diagram.svg` for a flow diagram that
 specifies ty's implementation of Python's import resolution algorithm.
 */
 
+mod search;
+
 use std::borrow::Cow;
 use std::fmt;
 use std::iter::FusedIterator;
+use std::sync::LazyLock;
 
 use compact_str::format_compact;
+use memchr::memmem::Finder;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::PythonFile;
@@ -56,6 +60,8 @@ use crate::path::{ModuleDirectory, ModulePath, SearchPath, SystemOrVendoredPathR
 use crate::strategy::MisconfigurationStrategy;
 use crate::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::{ResolverEnvironment, ResolverFile, SearchPathSettings, SearchPathSettingsError};
+
+use self::search::ModuleSearchCursor;
 
 /// Resolves a module name to a module.
 pub fn resolve_module<'db>(
@@ -508,11 +514,13 @@ impl StubPackageIndex {
         }
     }
 
-    /// Splits the indexed paths between the stub-overlay pass and its normal fallback.
+    /// Splits the indexed stub package paths into extra paths and remaining paths.
     ///
-    /// The overlay contains only extra paths, which all precede stdlib. The fallback retains the
-    /// remaining paths' positions relative to stdlib.
-    fn split_overlay(&self) -> (StubPackagePaths<'_>, StubPackagePaths<'_>) {
+    /// The first-phase stub override search uses the extra paths. The second phase combines
+    /// candidates from the remaining paths with those already discovered in extra paths.
+    ///
+    /// Extra paths all precede stdlib. The remaining paths retain their positions relative to stdlib.
+    fn split_by_extra_paths(&self) -> (StubPackagePaths<'_>, StubPackagePaths<'_>) {
         let before_stdlib = self.before_stdlib();
         let (extra, remaining) =
             before_stdlib.split_at(before_stdlib.partition_point(SearchPath::is_extra));
@@ -1204,16 +1212,8 @@ fn resolve_name<'db>(
     name: &ModuleName,
     mode: ModuleResolveMode,
 ) -> Option<ResolvedNames<'db>> {
-    let resolver = NameResolver::new(db, resolver_environment, name, mode);
-
-    match mode {
-        ModuleResolveMode::Typing => {
-            resolver.resolve_typing(stub_package_index(db, resolver_environment))
-        }
-        ModuleResolveMode::Runtime | ModuleResolveMode::RuntimeSomeShadowingAllowed => {
-            resolver.resolve_runtime(search_paths(db, resolver_environment, mode))
-        }
-    }
+    let context = ResolverContext::new(db, resolver_environment, mode);
+    ModuleSearchCursor::with_configured_search_paths(&context).resolve_name(name)
 }
 
 /// Like `resolve_name` but for cases where it failed to resolve the module
@@ -1229,14 +1229,8 @@ fn desperately_resolve_name<'db>(
 ) -> Option<ResolvedNames<'db>> {
     let importing_file = ResolverFile::new(db, importing_file, resolver_environment);
     let search_paths = absolute_desperate_search_paths(db, importing_file).unwrap_or_default();
-    let resolver = NameResolver::new(db, resolver_environment, name, mode);
-
-    match mode {
-        ModuleResolveMode::Typing => resolver.resolve_desperate_typing(search_paths),
-        ModuleResolveMode::Runtime | ModuleResolveMode::RuntimeSomeShadowingAllowed => {
-            resolver.resolve_runtime(search_paths.iter())
-        }
-    }
+    let context = ResolverContext::new(db, resolver_environment, mode);
+    ModuleSearchCursor::with_supplied_search_paths(&context, search_paths).resolve_name(name)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1407,219 +1401,6 @@ impl<'db> ModuleResolutionCandidate<'db> {
     }
 }
 
-struct NameResolver<'db, 'name> {
-    context: ResolverContext<'db>,
-    name: &'name ModuleName,
-    is_non_shadowable: bool,
-}
-
-impl<'db, 'name> NameResolver<'db, 'name> {
-    fn new(
-        db: &'db dyn Db,
-        resolver_environment: ResolverEnvironment<'db>,
-        name: &'name ModuleName,
-        mode: ModuleResolveMode,
-    ) -> Self {
-        let python_version = resolver_environment.python_version(db);
-        Self {
-            context: ResolverContext::new(db, resolver_environment, mode),
-            name,
-            is_non_shadowable: mode.is_non_shadowable(python_version.minor, name.as_str()),
-        }
-    }
-
-    /// Resolves the name as seen by a type checker.
-    ///
-    /// This includes PEP 561 stub packages and user-provided stub overlays, with runtime source as
-    /// a fallback when no stub provides the requested module. A stub overlay may use runtime
-    /// packages as parents, but its final module must come from a stub file.
-    fn resolve_typing(&self, stub_packages: &StubPackageIndex) -> Option<ResolvedNames<'db>> {
-        if self.name.components().nth(1).is_none() {
-            let candidates = self.discover_roots(
-                search_paths(
-                    self.context.db,
-                    self.context.resolver_environment,
-                    ModuleResolveMode::Typing,
-                ),
-                stub_packages.all(),
-            );
-            return self.resolve_remaining(candidates, ComponentFileFilter::ByMode);
-        }
-
-        // Only submodules need separate overlay resolution: their extra-path namespace parent can
-        // be shadowed before the resolver reaches the requested stub. Reuse those roots for the
-        // normal fallback so that each extra path is probed only once.
-        let (overlay_stub_packages, remaining_stub_packages) = stub_packages.split_overlay();
-        let mut candidates = self.discover_roots(
-            search_paths(
-                self.context.db,
-                self.context.resolver_environment,
-                ModuleResolveMode::Typing,
-            )
-            .take_while(|search_path| search_path.is_extra()),
-            overlay_stub_packages,
-        );
-        if let Some(resolved) =
-            self.resolve_remaining(candidates.clone(), ComponentFileFilter::StubOnly)
-        {
-            return Some(resolved);
-        }
-
-        let remaining_candidates = self.discover_roots(
-            search_paths(
-                self.context.db,
-                self.context.resolver_environment,
-                ModuleResolveMode::Typing,
-            )
-            .skip_while(|search_path| search_path.is_extra()),
-            remaining_stub_packages,
-        );
-        candidates.extend(remaining_candidates);
-
-        self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
-    }
-
-    /// Resolves the name for type checking against desperate ancestor search paths.
-    ///
-    /// These paths can contain PEP 561 stub packages, but never user-provided extra paths, so this
-    /// indexes them for stub packages without performing a separate stub-overlay pass. Runtime
-    /// resolution instead ignores stub packages and `.pyi` files entirely.
-    fn resolve_desperate_typing(&self, search_paths: &[SearchPath]) -> Option<ResolvedNames<'db>> {
-        let stub_packages =
-            StubPackageIndex::from_search_paths(self.context.db, search_paths.iter());
-        let candidates = self.discover_roots(search_paths.iter(), stub_packages.all());
-        self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
-    }
-
-    /// Resolves the name to the implementation that is available at runtime.
-    ///
-    /// The runtime resolver ignores stub packages and `.pyi` files. Its search paths also use the
-    /// real standard library instead of typeshed.
-    fn resolve_runtime<'a>(
-        &self,
-        search_paths: impl Iterator<Item = &'a SearchPath>,
-    ) -> Option<ResolvedNames<'db>> {
-        let candidates = self.discover_roots(search_paths, StubPackagePaths::default());
-        self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
-    }
-
-    fn discover_roots<'a>(
-        &self,
-        search_paths: impl Iterator<Item = &'a SearchPath>,
-        stub_paths: StubPackagePaths<'_>,
-    ) -> ResolvedNames<'db> {
-        let root_component = self.name.first_component();
-        let mut cur_candidates = Vec::new();
-        let stub_name = (!stub_paths.is_empty() && !self.is_non_shadowable)
-            .then(|| format!("{root_component}-stubs"));
-        let mut pending_stub_paths = Vec::new();
-
-        if let Some(stub_name) = &stub_name {
-            cur_candidates.extend(stub_paths.before_stdlib.iter().filter_map(|search_path| {
-                resolve_stub_package_in_search_path(&self.context, search_path, stub_name)
-            }));
-            // Defer file probes after stdlib until we know that stdlib does not win.
-            pending_stub_paths.extend(stub_paths.after_stdlib.iter().filter(|search_path| {
-                ModuleDirectory::new(&self.context, search_path.to_module_path())
-                    .may_contain_name(stub_name)
-            }));
-        }
-
-        for search_path in search_paths {
-            // When a builtin module is imported, standard module resolution is bypassed:
-            // the module name always resolves to the stdlib module,
-            // even if there's a module of the same name in the first-party root
-            // (which would normally result in the stdlib module being overridden).
-            // TODO: offer a diagnostic if there is a first-party module of the same name
-            if self.is_non_shadowable && !search_path.is_standard_library() {
-                continue;
-            }
-
-            let is_stdlib = search_path.is_standard_library();
-            // A terminal candidate can stop the search unless a matching post-stdlib stub package
-            // could still override it. A terminal stdlib candidate always stops the search.
-            let can_stop = is_stdlib || pending_stub_paths.is_empty();
-            let mut candidate = ModuleResolutionCandidate::root(&self.context, search_path);
-            let resolved = resolve_component(
-                &self.context,
-                &mut candidate,
-                root_component,
-                ComponentFileFilter::ByMode,
-            )
-            .is_ok();
-            let terminal = candidate.missing_submodule_is_terminal();
-            if resolved {
-                cur_candidates.push(candidate);
-            }
-            // A terminal candidate shadows all later search paths. Earlier candidates remain in
-            // play because they already shadow this candidate.
-            if terminal && can_stop {
-                break;
-            }
-
-            // Reaching this point for stdlib means that it did not provide a terminal candidate.
-            // The deferred post-stdlib stub packages are therefore eligible, so resolve them now.
-            if is_stdlib && let Some(stub_name) = &stub_name {
-                cur_candidates.extend(pending_stub_paths.drain(..).filter_map(|search_path| {
-                    resolve_stub_package_in_search_path(&self.context, search_path, stub_name)
-                }));
-            }
-        }
-
-        cur_candidates
-    }
-
-    fn resolve_remaining(
-        &self,
-        mut cur_candidates: ResolvedNames<'db>,
-        final_filter: ComponentFileFilter,
-    ) -> Option<ResolvedNames<'db>> {
-        if cur_candidates.is_empty() {
-            return None;
-        }
-
-        let mut components = self.name.components().skip(1).peekable();
-
-        loop {
-            // Keep a partial stub package's namespace while resolving the next part of the module
-            // name. Once the complete name is resolved, a concrete package or module shadows that
-            // namespace.
-            let has_remaining_components = components.peek().is_some();
-            cur_candidates =
-                normalize_candidates(self.context.db, cur_candidates, has_remaining_components);
-
-            let Some(component) = components.next() else {
-                return Some(cur_candidates);
-            };
-            let file_filter = if components.peek().is_some() {
-                ComponentFileFilter::ByMode
-            } else {
-                final_filter
-            };
-
-            let mut remaining_are_shadowed = false;
-            cur_candidates.retain_mut(|candidate| {
-                if remaining_are_shadowed {
-                    return false;
-                }
-
-                let resolved =
-                    resolve_component(&self.context, candidate, component, file_filter).is_ok();
-
-                // A terminal candidate shadows every lower-priority candidate, even if resolving
-                // this component fails. Higher-priority candidates remain in play.
-                remaining_are_shadowed = candidate.missing_submodule_is_terminal();
-
-                resolved
-            });
-
-            if cur_candidates.is_empty() {
-                return None;
-            }
-        }
-    }
-}
-
 fn resolve_stub_package_in_search_path<'db>(
     context: &ResolverContext<'db>,
     search_path: &SearchPath,
@@ -1649,7 +1430,7 @@ fn resolve_stub_package_in_search_path<'db>(
 fn normalize_candidates<'db>(
     db: &dyn Db,
     mut candidates: ResolvedNames<'db>,
-    has_remaining_components: bool,
+    for_module_name_prefix: bool,
 ) -> ResolvedNames<'db> {
     let best_concrete_precedence = candidates
         .iter()
@@ -1672,7 +1453,7 @@ fn normalize_candidates<'db>(
         // A higher-precedence partial namespace remains available while resolving its descendants.
         // At the final component, a concrete package or module shadows it.
         let preserved_for_descendants = best_concrete_precedence.is_none_or(|precedence| {
-            has_remaining_components
+            for_module_name_prefix
                 && candidate.py_typed == PyTyped::Partial
                 && candidate.precedence < precedence
         });
@@ -1851,8 +1632,18 @@ fn is_legacy_namespace_package(
     context: &ResolverContext,
     init: File,
 ) -> bool {
+    static PKG_FINDER: LazyLock<Finder<'static>> = LazyLock::new(|| Finder::new("pkg"));
+
     // Just an optimization, the stdlib and typeshed are never legacy namespace packages
     if package_path.search_path().is_standard_library() {
+        return false;
+    }
+
+    // Both namespace idioms reference `pkgutil` or `pkg_resources`. Keep non-ASCII
+    // sources as candidates because Python normalizes identifiers with NFKC.
+    // This best-effort filter does not account for escaped or concatenated module names.
+    let source = source_text(context.db, init);
+    if source.is_ascii() && PKG_FINDER.find(source.as_bytes()).is_none() {
         return false;
     }
 

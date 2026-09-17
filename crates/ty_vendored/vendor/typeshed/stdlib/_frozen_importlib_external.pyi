@@ -170,6 +170,10 @@ class PathFinder(importlib.abc.MetaPathFinder):
 
             """
 
+    if sys.version_info >= (3, 15):
+        @classmethod
+        def discover(cls, parent: ModuleSpec | None = None) -> Iterator[ModuleSpec]: ...
+
 SOURCE_SUFFIXES: Final[list[str]]
 DEBUG_BYTECODE_SUFFIXES: Final = [".pyc"]
 OPTIMIZED_BYTECODE_SUFFIXES: Final = [".pyc"]
@@ -203,6 +207,9 @@ class FileFinder(importlib.abc.PathEntryFinder):
         raised.
 
         """
+
+    if sys.version_info >= (3, 15):
+        def discover(self, parent: ModuleSpec | None = None) -> Iterator[ModuleSpec]: ...
 
 class _LoaderBasics:
     """Base class of common code needed by both SourceLoader and
@@ -375,7 +382,7 @@ if sys.version_info >= (3, 15):
         """
 
         def __init__(
-            self, name: str, path: MutableSequence[str], path_finder: Callable[[str, tuple[str, ...]], ModuleSpec]
+            self, name: str, path: MutableSequence[str], path_finder: Callable[[str, tuple[str, ...]], ModuleSpec | None]
         ) -> None: ...
         def __iter__(self) -> Iterator[str]: ...
         def __getitem__(self, index: int) -> str: ...
@@ -384,10 +391,12 @@ if sys.version_info >= (3, 15):
         def __contains__(self, item: str) -> bool: ...
         def append(self, item: str) -> None: ...
 
+    _NamespacePath = NamespacePath
+
 if sys.version_info >= (3, 11):
     class NamespaceLoader(importlib.abc.InspectLoader):
         def __init__(
-            self, name: str, path: MutableSequence[str], path_finder: Callable[[str, tuple[str, ...]], ModuleSpec]
+            self, name: str, path: MutableSequence[str], path_finder: Callable[[str, tuple[str, ...]], ModuleSpec | None]
         ) -> None: ...
         def is_package(self, fullname: str) -> Literal[True]: ...
         def get_source(self, fullname: str) -> Literal[""]: ...
@@ -423,7 +432,7 @@ if sys.version_info >= (3, 11):
 else:
     class _NamespaceLoader:
         def __init__(
-            self, name: str, path: MutableSequence[str], path_finder: Callable[[str, tuple[str, ...]], ModuleSpec]
+            self, name: str, path: MutableSequence[str], path_finder: Callable[[str, tuple[str, ...]], ModuleSpec | None]
         ) -> None: ...
         def is_package(self, fullname: str) -> Literal[True]: ...
         def get_source(self, fullname: str) -> Literal[""]: ...

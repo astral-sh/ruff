@@ -2,9 +2,10 @@ use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
 use crate::types::constraints::paths::PathAssignments;
+use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBoundsBuilder, ConstraintId, ConstraintSetStorage, NodeId,
-    PathBounds, SolutionLimits,
+    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, ConstraintId,
+    ConstraintSetStorage, NodeId, PathBoundBuilder, SolutionLimits,
 };
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
@@ -94,9 +95,9 @@ impl<'db> SolutionWalker<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-    ) -> PathBounds<'db> {
+    ) -> CandidateSolutions<'db> {
         if self.sorted_paths.is_empty() {
-            return PathBounds::Unsatisfiable;
+            return CandidateSolutions::Unsatisfiable;
         }
 
         self.sorted_paths.sort_by(|path1, path2| {
@@ -106,42 +107,53 @@ impl<'db> SolutionWalker<'db> {
         });
 
         let mut result = Vec::with_capacity(self.sorted_paths.len());
-        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
+        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, PathBoundBuilder<'db>> =
             FxIndexMap::default();
 
         for path in self.sorted_paths {
             mappings.clear();
             for (constraint, _) in path {
                 let constraint = storage.constraint_data(constraint);
-                let typevar = constraint.typevar;
-                if let Some(lower) = constraint.stored_lower_bound() {
-                    let bounds = mappings.entry(typevar).or_default();
-                    bounds.add_lower(db, env, lower);
-
-                    if let Type::TypeVar(lower_bound_typevar) = lower.ty() {
-                        let bounds = mappings.entry(lower_bound_typevar).or_default();
-                        bounds.add_upper(db, env, lower.with_type(Type::TypeVar(typevar)));
+                match constraint {
+                    Constraint::ConcreteLower(lower) => {
+                        let bounds = mappings.entry(lower.typevar).or_default();
+                        bounds.add_lower(db, env, lower.provenance, lower.bound);
                     }
-                }
-
-                if let Some(upper) = constraint.stored_upper_bound() {
-                    let bounds = mappings.entry(typevar).or_default();
-                    bounds.add_upper(db, env, upper);
-
-                    if let Type::TypeVar(upper_bound_typevar) = upper.ty() {
-                        let bounds = mappings.entry(upper_bound_typevar).or_default();
-                        bounds.add_lower(db, env, upper.with_type(Type::TypeVar(typevar)));
+                    Constraint::ConcreteUpper(upper) => {
+                        let bounds = mappings.entry(upper.typevar).or_default();
+                        bounds.add_upper(db, env, upper.provenance, upper.bound);
+                    }
+                    Constraint::ConcreteEquivalence(equivalence) => {
+                        let bounds = mappings.entry(equivalence.typevar).or_default();
+                        bounds.add_lower(db, env, equivalence.provenance, equivalence.bound);
+                        bounds.add_upper(db, env, equivalence.provenance, equivalence.bound);
+                    }
+                    Constraint::TypeVarRange(bound) => {
+                        let bounds = mappings.entry(bound.left).or_default();
+                        bounds.add_upper(db, env, bound.provenance, Type::TypeVar(bound.right));
+                        let bounds = mappings.entry(bound.right).or_default();
+                        bounds.add_lower(db, env, bound.provenance, Type::TypeVar(bound.left));
+                    }
+                    Constraint::TypeVarEquivalence(bound) => {
+                        let (left, right) = bound.in_builder(db, storage);
+                        let bounds = mappings.entry(left).or_default();
+                        bounds.add_lower(db, env, bound.provenance, Type::TypeVar(right));
+                        bounds.add_upper(db, env, bound.provenance, Type::TypeVar(right));
+                        let bounds = mappings.entry(right).or_default();
+                        bounds.add_lower(db, env, bound.provenance, Type::TypeVar(left));
+                        bounds.add_upper(db, env, bound.provenance, Type::TypeVar(left));
                     }
                 }
             }
 
-            let path_bounds = mappings
+            let typevars = mappings
                 .drain(..)
                 .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
                 .collect();
-            result.push(path_bounds);
+            let candidate = CandidateSolution { typevars };
+            result.push(candidate);
         }
 
-        PathBounds::Constrained(result.into_boxed_slice())
+        CandidateSolutions::Constrained(result.into_boxed_slice())
     }
 }

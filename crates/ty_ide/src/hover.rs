@@ -9,7 +9,7 @@ use std::fmt::{self, Display};
 use ty_python_core::ProgramFile;
 use ty_python_semantic::ProgramEnvironment;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
-use ty_python_semantic::types::{KnownInstanceType, Type, TypeAliasType, TypeVarVariance};
+use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
 
 use ty_python_semantic::{SemanticModel, TypeQualifiers};
 
@@ -101,17 +101,21 @@ pub fn hover<'db>(
                     },
                 )
             }
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias))
-            | Type::TypeAlias(alias) => {
-                let value_ty = alias.value_type(db);
-
+            ty if let Some(declaration) = ty.display_alias_declaration(db, &env) => {
                 alias_docstring = Definitions::from_ty(db, &env, ty)
                     .and_then(|def| def.docstring(db))
-                    .or_else(|| {
-                        Definitions::from_ty(db, &env, value_ty).and_then(|def| def.docstring(db))
+                    .or_else(|| match ty {
+                        Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
+                            Definitions::from_ty(db, &env, alias.value_type(db))
+                                .and_then(|def| def.docstring(db))
+                        }
+                        _ => None,
                     });
 
-                HoverContent::TypeAlias { alias, qualifiers }
+                HoverContent::TypeAlias {
+                    declaration: declaration.to_string(),
+                    qualifiers,
+                }
             }
             Type::TypeVar(typevar) => HoverContent::Type {
                 ty,
@@ -282,8 +286,8 @@ pub enum HoverContent<'db> {
         qualifiers: TypeQualifiers,
     },
     TypeAlias {
-        // The type alias being hovered
-        alias: TypeAliasType<'db>,
+        // The declaration of the type alias being hovered
+        declaration: String,
         // The type's qualifiers
         qualifiers: TypeQualifiers,
     },
@@ -349,7 +353,6 @@ fn create_qualifier_suffix(qualifiers: TypeQualifiers) -> String {
 
 impl fmt::Display for DisplayHoverContent<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let db = self.db;
         match self.content {
             HoverContent::Signature(signature) => {
                 self.kind.fenced_code_block(&signature, "python").fmt(f)
@@ -377,9 +380,11 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     .fenced_code_block(format!("{ty_string}{variance}{qualifier_suffix}"), syntax)
                     .fmt(f)
             }
-            HoverContent::TypeAlias { alias, qualifiers } => {
+            HoverContent::TypeAlias {
+                declaration,
+                qualifiers,
+            } => {
                 let qualifier_suffix = create_qualifier_suffix(*qualifiers);
-                let declaration = alias.display_declaration(db, self.env);
 
                 self.kind
                     .fenced_code_block(format!("{declaration}{qualifier_suffix}"), "python")
@@ -5756,6 +5761,156 @@ def function():
           |      ^^^- Cursor offset
           |      |
           |      source
+        ");
+    }
+
+    #[test]
+    fn hover_implicit_recursive_alias_annotation() {
+        let test = hover_test(
+            r#"
+        Tree = int | list["Tree"]
+        def consume(value: Tr<CURSOR>ee): ...
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        Tree = int | list[Tree]
+        ---------------------------------------------
+        ```python
+        Tree = int | list[Tree]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:3:20
+          |
+        3 | def consume(value: Tree): ...
+          |                    ^^-^
+          |                    | |
+          |                    | Cursor offset
+          |                    source
+        ");
+    }
+
+    #[test]
+    fn hover_implicit_recursive_alias_value() {
+        let test = hover_test(
+            r#"
+        Tree = int | list["Tree"]
+        def consume(value: Tree):
+            <CURSOR>value
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        Tree = int | list[Tree]
+        ---------------------------------------------
+        ```python
+        Tree = int | list[Tree]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:4:5
+          |
+        4 |     value
+          |     -^^^^
+          |     |
+          |     source
+          |     Cursor offset
+        ");
+    }
+
+    #[test]
+    fn hover_implicit_recursive_alias_generic() {
+        let test = hover_test(
+            r#"
+        from typing import TypeVar
+        T = TypeVar("T")
+        Tree = T | list["Tree[T]"]
+        def consume(value: Tree[int]):
+            <CURSOR>value
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        Tree = T | list[Tree[T]]
+        ---------------------------------------------
+        ```python
+        Tree = T | list[Tree[T]]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:6:5
+          |
+        6 |     value
+          |     -^^^^
+          |     |
+          |     source
+          |     Cursor offset
+        ");
+    }
+
+    #[test]
+    fn hover_implicit_recursive_alias_growing() {
+        let test = hover_test(
+            r#"
+        from typing import TypeVar
+        T = TypeVar("T")
+        Tree = T | list["Tree[list[T]]"]
+        def consume(value: Tree[int]):
+            <CURSOR>value
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        Tree = T | list[Tree[list[T]]]
+        ---------------------------------------------
+        ```python
+        Tree = T | list[Tree[list[T]]]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:6:5
+          |
+        6 |     value
+          |     -^^^^
+          |     |
+          |     source
+          |     Cursor offset
+        ");
+    }
+
+    #[test]
+    fn hover_implicit_recursive_alias_docstring() {
+        let test = hover_test(
+            r#"
+        class Link[T]:
+            """A linked value."""
+        Tree = Link["Tree"]
+        def consume(value: Tree):
+            <CURSOR>value
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        Tree = Link[Tree]
+        ---------------------------------------------
+        A linked value.
+
+        ---------------------------------------------
+        ```python
+        Tree = Link[Tree]
+        ```
+        ---
+        A linked value.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:6:5
+          |
+        6 |     value
+          |     -^^^^
+          |     |
+          |     source
+          |     Cursor offset
         ");
     }
 

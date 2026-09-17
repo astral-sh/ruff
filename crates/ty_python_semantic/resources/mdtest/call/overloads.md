@@ -774,6 +774,49 @@ def _(x: Alias) -> None:
     reveal_type(f(*(x,)))  # revealed: A | B
 ```
 
+### Expanding recursive aliases
+
+A recursive alias whose outermost type is a union can match several overloads. Its recursive members
+retain their types while each union alternative is checked.
+
+```py
+from typing import TypeVar, overload
+
+T = TypeVar("T")
+Tree = T | tuple["Tree[T]"]
+
+@overload
+def choose(value: int) -> str: ...
+@overload
+def choose(value: tuple[object]) -> bytes: ...
+def choose(value):
+    raise NotImplementedError
+
+def inspect(value: Tree[int]):
+    reveal_type(choose(value))  # revealed: str | bytes
+```
+
+### Expanding recursive tuple elements
+
+The boolean element of a recursive tuple expands to its two literal alternatives. Expanding the
+recursive element stops at the reference to the same tuple type.
+
+```py
+from typing import Literal, overload
+
+Recursive = tuple["Recursive", bool]
+
+@overload
+def choose(value: tuple[object, Literal[True]]) -> str: ...
+@overload
+def choose(value: tuple[object, Literal[False]]) -> bytes: ...
+def choose(value):
+    raise NotImplementedError
+
+def inspect(value: Recursive):
+    reveal_type(choose(value))  # revealed: str | bytes
+```
+
 ### No matching overloads
 
 > If argument expansion has been applied to all arguments and one or more of the expanded argument

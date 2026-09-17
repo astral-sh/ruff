@@ -23,8 +23,8 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
-    PathBounds, Solutions,
+    CandidateSolutions, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    OwnedConstraintSet, Solutions,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -149,8 +149,6 @@ fn merge_receiver_constraints<'db>(
 pub(crate) struct PartialSignatureApplication<'db> {
     signature: Signature<'db>,
     partial_application: PartialApplication<'db>,
-    inference: Option<TypeVarInference<'db>>,
-    unspecialized_return_ty: Type<'db>,
 }
 
 impl<'db> PartialSignatureApplication<'db> {
@@ -158,14 +156,10 @@ impl<'db> PartialSignatureApplication<'db> {
     pub(crate) fn new(
         signature: Signature<'db>,
         partial_application: PartialApplication<'db>,
-        inference: Option<TypeVarInference<'db>>,
-        unspecialized_return_ty: Type<'db>,
     ) -> Self {
         Self {
             signature,
             partial_application,
-            inference,
-            unspecialized_return_ty,
         }
     }
 }
@@ -248,20 +242,15 @@ impl<'db> CallableSignature<'db> {
     /// Returns the reduced overloaded signature exposed by a `functools.partial(...)` object.
     pub(crate) fn partially_apply(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
         overloads: impl IntoIterator<Item = PartialSignatureApplication<'db>>,
     ) -> Option<Self> {
         let mut new_overloads = Vec::new();
         let mut seen_overloads = FxHashSet::default();
 
         for overload in overloads {
-            let signature = overload.signature.partially_apply(
-                db,
-                env,
-                &overload.partial_application,
-                overload.inference,
-                overload.unspecialized_return_ty,
-            );
+            let signature = overload
+                .signature
+                .partially_apply(db, &overload.partial_application);
             let dedup_key = signature
                 .clone()
                 .with_definition(None)
@@ -334,7 +323,7 @@ impl<'db> CallableSignature<'db> {
                         .iter()
                         .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
                         .collect::<Vec<_>>();
-                    let parameters = if prefix_parameters.is_empty() {
+                    let mut parameters = if prefix_parameters.is_empty() {
                         Parameters::paramspec(db, typevar)
                     } else {
                         Parameters::concatenate(
@@ -343,6 +332,16 @@ impl<'db> CallableSignature<'db> {
                             ConcatenateTail::ParamSpec(typevar),
                         )
                     };
+
+                    // The synthesized ParamSpec parameters still correspond to the original
+                    // `*args` and `**kwargs` annotations. Keep their positions for diagnostics.
+                    for (parameter, source) in Arc::make_mut(&mut parameters.data)
+                        .value
+                        .iter_mut()
+                        .zip(self_signature.parameters.iter())
+                    {
+                        parameter.source_parameter_index = source.source_parameter_index;
+                    }
 
                     let env = visitor.env;
                     Some(CallableSignature::single(Signature {
@@ -468,18 +467,6 @@ impl<'db> CallableSignature<'db> {
         for signature in &self.overloads {
             signature.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
         }
-    }
-
-    /// Binds the first (presumably `self`) parameter of this signature. If a `self_type` is
-    /// provided, we will replace any occurrences of `typing.Self` in the parameter and return
-    /// annotations with that type.
-    pub(crate) fn bind_self(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        self_type: Option<Type<'db>>,
-    ) -> Self {
-        self.bind_self_with_receiver(db, env, self_type, self_type)
     }
 
     /// Binds the receiver using its runtime type while using `typing_self_type` to replace
@@ -1354,7 +1341,7 @@ impl<'db> Signature<'db> {
         let inferable = self.inferable_typevars(db);
 
         match when.solutions(db, env, inferable) {
-            Ok(Solutions::Unsatisfiable) => return None,
+            Ok(Solutions::Unsatisfiable(_)) => return None,
             Ok(Solutions::Unconstrained) | Err(_) => {
                 return Some(CallableSignature::single(self.clone()));
             }
@@ -1381,7 +1368,7 @@ impl<'db> Signature<'db> {
                 && let Some(upper) = bounds.as_single_upper_bound(db, env)
                 && lower.is_equivalent_to(db, env, upper)
                 && let Some(solution) =
-                    PathBounds::default_solve(db, env, &constraints, bounds).as_type()
+                    CandidateSolutions::default_solve(db, env, &constraints, bounds).as_type()
             {
                 return Some(solution);
             }
@@ -1396,7 +1383,7 @@ impl<'db> Signature<'db> {
                     .evidence_lower()
                     .is_some_and(|lower| !lower.is_never())
                 && let Some(solution) =
-                    PathBounds::default_solve(db, env, &constraints, bounds).as_type()
+                    CandidateSolutions::default_solve(db, env, &constraints, bounds).as_type()
             {
                 return Some(solution);
             }
@@ -1713,8 +1700,8 @@ impl<'db> Signature<'db> {
         )
     }
 
-    /// Returns the callable signature produced by partially applying this signature.
-    fn partially_apply(
+    /// Specializes a partial's full signature before matching its bound arguments again.
+    pub(crate) fn specialize_for_partial_application(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -1729,12 +1716,21 @@ impl<'db> Signature<'db> {
             |specialization| self.apply_specialization(db, specialization),
         );
 
-        let parameters = signature.parameters().as_slice();
         let return_ty = signature_specialization.map_or_else(
             || unspecialized_return_ty,
             |specialization| unspecialized_return_ty.apply_specialization(db, specialization),
         );
 
+        signature.with_return_type(return_ty)
+    }
+
+    /// Reduces a specialized signature using bindings matched against that same signature.
+    fn partially_apply(
+        &self,
+        db: &'db dyn Db,
+        partial_application: &PartialApplication<'db>,
+    ) -> Self {
+        let parameters = self.parameters().as_slice();
         let mut remaining = Vec::with_capacity(parameters.len());
         let mut first_keyword_bound_positional_or_keyword = None;
         for (index, parameter) in parameters.iter().enumerate() {
@@ -1759,7 +1755,7 @@ impl<'db> Signature<'db> {
 
         // Expand `P.args`/`P.kwargs` while the pair is still adjacent. The keyword-only reshuffle
         // below can separate them, which would otherwise prevent expansion.
-        let remaining = signature
+        let remaining = self
             .parameters
             .with_transformed_parameters(remaining)
             .expand_paramspec_variadics(db);
@@ -1791,9 +1787,7 @@ impl<'db> Signature<'db> {
 
         let reordered = remaining.with_transformed_parameters(reordered);
 
-        signature
-            .with_parameters(reordered)
-            .with_return_type(return_ty)
+        self.clone().with_parameters(reordered)
     }
 
     /// Returns the specialization used for the callable signature exposed by a partial object.
@@ -2952,12 +2946,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: `P`
                 // other: `P`
                 (Some(([], source_bound_typevar)), Some(([], target_bound_typevar))) => {
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_equivalence_bound(
                         db,
                         env,
                         self.constraints,
                         source_bound_typevar,
-                        Type::TypeVar(target_bound_typevar),
                         Type::TypeVar(target_bound_typevar),
                     );
                     result.intersect(db, self.constraints, param_spec_matches);
@@ -3177,12 +3170,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         result.intersect(db, self.constraints, param_spec_prefix_matches);
                     } else {
                         // When the prefixes match exactly, we just relate the remaining tails.
-                        let param_spec_matches = ConstraintSet::constrain_typevar(
+                        let param_spec_matches = ConstraintSet::constrain_typevar_equivalence_bound(
                             db,
                             env,
                             self.constraints,
                             source_bound_typevar,
-                            Type::TypeVar(target_bound_typevar),
                             Type::TypeVar(target_bound_typevar),
                         );
                         result.intersect(db, self.constraints, param_spec_matches);
@@ -6209,6 +6201,46 @@ mod tests {
                 parameter.definition().is_some(),
                 "source-backed parameter should have a definition"
             );
+        }
+    }
+
+    #[test]
+    fn paramspec_identity_specialization_preserves_source_positions() {
+        for prefix in ["", "first: int, "] {
+            let mut db = setup_db();
+            db.write_dedented(
+                "/src/a.py",
+                &format!("def f[**P]({prefix}*args: P.args, **kwargs: P.kwargs) -> None: ..."),
+            )
+            .unwrap();
+            let signature = get_function_f(&db, "/src/a.py")
+                .literal(&db)
+                .last_definition
+                .signature(&db);
+            let generic_context = signature.generic_context.expect("f has a ParamSpec");
+            let expected_positions = (0..signature.parameters.len())
+                .map(Some)
+                .collect::<Vec<_>>();
+            let specialized = CallableSignature::single(signature).apply_type_mapping_impl(
+                &db,
+                &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
+                    generic_context.identity_specialization(&db),
+                )),
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::new(&db.program_environment()),
+            );
+
+            assert_eq!(specialized.overloads.len(), 1);
+            for signature in &specialized.overloads {
+                assert_eq!(
+                    signature
+                        .parameters()
+                        .iter()
+                        .map(Parameter::source_parameter_index)
+                        .collect::<Vec<_>>(),
+                    expected_positions,
+                );
+            }
         }
     }
 

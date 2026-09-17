@@ -1167,7 +1167,7 @@ An intersection of `int` and `Any` likewise retains only the compatible `int` co
 variances.
 
 ```py
-type GradualInt = Intersection[int, Any]
+type GradualInt = int & Any
 
 static_assert(is_subtype_of(ConstrainedCovariant[int], Top[ConstrainedCovariant[GradualInt]]))
 static_assert(not is_subtype_of(ConstrainedCovariant[str], Top[ConstrainedCovariant[GradualInt]]))
@@ -1255,10 +1255,10 @@ python-version = "3.12"
 
 ```py
 from typing import Any
-from ty_extensions import Bottom, Intersection, Top, static_assert
+from ty_extensions import Bottom, Top, static_assert
 from ty_extensions._internal import is_assignable_to, is_subtype_of
 
-type GradualInt = Intersection[int, Any]
+type GradualInt = int & Any
 
 class MixedConstrained[T: (int, str), U]:
     value: T
@@ -1284,6 +1284,46 @@ static_assert(is_assignable_to(MixedConstrained[int, str], Top[MixedConstrained[
 static_assert(not is_assignable_to(MixedConstrained[str, str], Top[MixedConstrained[GradualInt, Any]]))
 static_assert(is_assignable_to(Bottom[MixedConstrained[GradualInt, Any]], MixedConstrained[int, int]))
 static_assert(not is_assignable_to(Bottom[MixedConstrained[GradualInt, Any]], MixedConstrained[str, int]))
+```
+
+## Growing recursive aliases
+
+A recursive alias can keep nesting its type argument as it unfolds. This does not change the
+materialization bounds: its values fit the top materialization, and its bottom materialization fits
+any compatible top materialization. In particular, choosing `int` for `Any` gives the two aliases a
+common materialization.
+
+```py
+from typing import Any, TypeVar
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of, is_disjoint_from
+
+T = TypeVar("T")
+Growing = T | list["Growing[list[T]]"]
+
+def into_top(value: Growing[int]) -> Top[Growing[int]]:
+    return value
+
+def overlapping_bounds(value: Bottom[Growing[Any]]) -> Top[Growing[int]]:
+    return value
+
+static_assert(is_subtype_of(Growing[int], Top[Growing[int]]))
+static_assert(is_subtype_of(Bottom[Growing[int]], Growing[int]))
+static_assert(is_subtype_of(Bottom[Growing[Any]], Top[Growing[str]]))
+static_assert(not is_disjoint_from(list[Growing[int]], list[Growing[Any]]))
+static_assert(not is_subtype_of(Bottom[Growing[int]], Top[Growing[str]]))
+```
+
+A fixed `Any` in the body still distinguishes the two materializations, even when the type argument
+is fully static. Conversely, an argument that does not affect the alias's value does not distinguish
+the materializations of two specializations.
+
+```py
+WithAny = tuple[T, Any] | list["WithAny[list[T]]"]
+Phantom = int | list["Phantom[T]"]
+
+static_assert(not is_subtype_of(Top[WithAny[int]], Bottom[WithAny[int]]))
+static_assert(is_subtype_of(Top[Phantom[int]], Top[Phantom[str]]))
 ```
 
 ## Materialization does not force invalid recursive specializations

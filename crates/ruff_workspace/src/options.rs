@@ -2155,6 +2155,9 @@ pub struct Flake8TidyImportsOptions {
     ban_relative_imports: Option<Strictness>,
 
     /// Specific modules or module members that may not be imported or accessed.
+    /// These can be extended by the
+    /// [`extend-banned-api`](#lint_flake8-tidy-imports_extend-banned-api) option.
+    ///
     /// Note that this rule is only meant to flag accidental uses,
     /// and can be circumvented via `eval` or `importlib`.
     #[option(
@@ -2167,6 +2170,20 @@ pub struct Flake8TidyImportsOptions {
         "#
     )]
     banned_api: Option<FxHashMap<String, ApiBan>>,
+
+    /// Additional modules or module members that may not be imported or accessed.
+    /// These entries will be added to the
+    /// [`banned-api`](#lint_flake8-tidy-imports_banned-api) mapping and will override
+    /// any existing entries if the two settings overlap.
+    #[option(
+        default = r#"{}"#,
+        value_type = r#"dict[str, { "msg": str }]"#,
+        scope = "extend-banned-api",
+        example = r#"
+            "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+        "#
+    )]
+    extend_banned_api: Option<FxHashMap<String, ApiBan>>,
 
     /// List of specific modules that may not be imported at module level, and should instead be
     /// imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:`
@@ -2220,6 +2237,11 @@ pub struct Flake8TidyImportsOptions {
 
 impl Flake8TidyImportsOptions {
     pub(crate) fn try_into_settings(self) -> Result<flake8_tidy_imports::settings::Settings> {
+        let mut banned_api = self.banned_api.unwrap_or_default();
+        if let Some(extend_banned_api) = self.extend_banned_api {
+            banned_api.extend(extend_banned_api);
+        }
+
         let require_lazy = self.require_lazy.unwrap_or_default();
         let ban_lazy = self.ban_lazy.unwrap_or_default();
 
@@ -2231,7 +2253,7 @@ impl Flake8TidyImportsOptions {
 
         Ok(flake8_tidy_imports::settings::Settings {
             ban_relative_imports: self.ban_relative_imports.unwrap_or(Strictness::Parents),
-            banned_api: self.banned_api.unwrap_or_default(),
+            banned_api,
             banned_module_level_imports: self.banned_module_level_imports.unwrap_or_default(),
             require_lazy,
             ban_lazy,

@@ -15,6 +15,14 @@ self-hosted-runner:
     - depot-ubuntu-24.04-arm-8
     - github-ubuntu-24.04-x86_64-2
     - github-ubuntu-24.04-x86_64-4
+    - github-ubuntu-24.04-x86_64-32
     - github-windows-2025-x86_64-8
     - github-windows-2025-x86_64-16
     - codspeed-macro
+
+paths:
+  ".github/workflows/{ty-ecosystem-report,ty-ecosystem-analyzer,memory_report}.yaml":
+    ignore:
+      # actionlint doesn't yet support the cache-mode feature.
+      # The schema hook validates it.
+      - '^unexpected key "cache-mode" for "workflow" section\.'
