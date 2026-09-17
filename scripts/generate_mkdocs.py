@@ -81,7 +81,6 @@ SECTIONS: list[Section] = [
     Section("FAQ", "faq.md", generated=False),
     Section("Contributing", "contributing.md", generated=True),
     Section("Proposing Lint Rules", "rule-proposals.md", generated=False),
-    Section("Migrating to Categories", "migrating-to-categories.md", generated=False),
 ]
 
 LINK_REWRITES: dict[str, str] = {
