@@ -47,7 +47,7 @@ pub struct ProjectMetadata {
     /// the file specified by [`Self::config_file_override`] if it is `Some` (e.g. when using `--config-file <path>`).
     options: Options,
 
-    /// The Python version and interpreter path derived from uv workspace metadata.
+    /// The Python environment derived from uv workspace metadata.
     ///
     /// These options have higher precedence than project and user-level configuration.
     #[cfg_attr(test, serde(skip_serializing_if = "Option::is_none"))]
@@ -575,7 +575,6 @@ impl ProjectMetadata {
         self.uv_workspace_options = self.environment.metadata.as_ref().map(|uv_workspace| {
             Box::new(Options {
                 environment: Some(EnvironmentOptions {
-                    python_version: uv_workspace.python_version().cloned(),
                     python: uv_workspace
                         .environment()
                         .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata)),
@@ -712,9 +711,10 @@ mod tests {
     use ruff_db::testing::assert_function_query_was_not_run_by_name;
     use ruff_python_ast::PythonVersion;
     use ruff_ranged_value::ValueSource;
+    use ty_python_semantic::PythonVersionSource;
     use ty_static::EnvVars;
 
-    use crate::db::testing::TestDb;
+    use crate::db::{ProjectDatabase, testing::TestDb};
     use crate::metadata::{Options, uv::UvMetadata, value::RelativePathBuf};
     use crate::uv::{DependencyMetadataError, ProjectEnvironment};
     use crate::{Db as _, ProjectMetadata, ProjectMetadataError};
@@ -1198,11 +1198,13 @@ unclosed table, expected `]`
             (
                 root.join("pyproject.toml"),
                 r#"
+                [project]
+                requires-python = ">=3.10"
+
                 [tool.uv.workspace]
 
                 [tool.ty.environment]
                 python = "/project-venv"
-                python-version = "3.10"
                 "#,
             ),
             (member.join("pyproject.toml"), "[project]\nname = 'member'"),
@@ -1240,12 +1242,15 @@ unclosed table, expected `]`
 
         let merged_options = project.to_merged_options();
         let project_environment = merged_options.options().environment.as_ref();
+        // ty checks the project's minimum supported version, not the version of the selected
+        // environment. Even though the environment uses Python 3.13, `requires-python` keeps the
+        // target at Python 3.10 so that ty can detect unsupported language and library features.
         assert_eq!(
             project_environment
                 .and_then(|environment| environment.python_version.as_deref())
                 .copied()
                 .map(PythonVersion::from),
-            Some(PythonVersion::PY313)
+            Some(PythonVersion::PY310)
         );
         assert_eq!(
             project_environment
@@ -1263,7 +1268,7 @@ unclosed table, expected `]`
             project_environment
                 .and_then(|environment| environment.python_version.as_ref())
                 .map(ruff_ranged_value::RangedValue::source),
-            Some(ValueSource::UvMetadata)
+            Some(ValueSource::File(_))
         );
 
         let user_config_directory = root.join("config");
@@ -1287,7 +1292,7 @@ unclosed table, expected `]`
                 .and_then(|environment| environment.python_version.as_deref())
                 .copied()
                 .map(PythonVersion::from),
-            Some(PythonVersion::PY313)
+            Some(PythonVersion::PY310)
         );
         assert_eq!(
             project_environment
@@ -1295,6 +1300,65 @@ unclosed table, expected `]`
                 .map(|python| python.path().as_str()),
             Some(environment.as_str())
         );
+
+        Ok(())
+    }
+
+    /// When the project does not declare a minimum supported Python version, ty falls back to the
+    /// version inferred from the selected environment. ty derives the version from `pyvenv.cfg`,
+    /// which is the same version as in uv metadata's result, but without needing any special casing.
+    #[test]
+    fn infers_python_version_from_uv_environment() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+        let environment = root.join("uv-venv");
+        let site_packages = if cfg!(windows) {
+            environment.join("Lib/site-packages")
+        } else {
+            environment.join("lib/python3.13/site-packages")
+        };
+
+        system.memory_file_system().write_files_all([
+            (
+                root.join("pyproject.toml"),
+                r#"
+                [tool.uv.workspace]
+                "#,
+            ),
+            (
+                environment.join("pyvenv.cfg"),
+                r#"
+                home = /missing
+                version_info = 3.13.0
+                "#,
+            ),
+            (site_packages.join("marker"), ""),
+        ])?;
+
+        let metadata = serde_json::json!({
+            "schema": {"version": "preview"},
+            "workspace_root": root,
+            "environment": {
+                "root": environment,
+                "python": {"version": "3.13.0"},
+            },
+        });
+        let uv_environment = ProjectEnvironment {
+            metadata: Some(UvMetadata::from_metadata(
+                metadata.to_string().as_bytes(),
+                &system,
+            )?),
+            error: None,
+        };
+        let mut project =
+            ProjectMetadata::discover_with_uv_workspace(&root, &system, uv_environment)?;
+        project.apply_configuration_files(&system)?;
+
+        let db = ProjectDatabase::fallible(project, system)?;
+
+        let python_version = &db.project().program_settings(&db).python_version;
+        assert_eq!(python_version.version, PythonVersion::PY313);
+        assert_matches!(python_version.source, PythonVersionSource::PyvenvCfgFile(_));
 
         Ok(())
     }
