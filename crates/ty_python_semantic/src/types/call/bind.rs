@@ -6209,54 +6209,22 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut specializations = alternatives
             .iter()
             .map(|types| {
-                // Only inferred bindings require static evidence. A gradual return-only default
-                // does not weaken the evidence for the inferred bindings.
-                if types
-                    .iter()
-                    .filter_map(|binding| binding.and_then(resolved_type))
-                    .any(|ty| ty.bottom_materialization(db, env) != ty.top_materialization(db, env))
-                {
-                    return None;
-                }
-                Some(generic_context.specialize_recursive(
+                generic_context.specialize_recursive(
                     db,
                     types.iter().map(|binding| binding.and_then(resolved_type)),
-                ))
+                )
             })
-            .collect::<Option<Vec<_>>>()?;
+            .collect::<Vec<_>>();
 
-        // Intersecting returns requires the same call to satisfy every retained specialization,
-        // without choosing a different materialization of a gradual type for each one. For
-        // example, `Any` is assignable to both `int` and `str`, but this does not prove that a
-        // value typed as `Any` has type `int & str`.
-        //
-        // Solved types alone cannot establish this: comparing `Any` against a generic parameter
-        // can succeed without constraining its type variables, while another argument supplies
-        // complete, static solutions for them. The constraint set does not currently record
-        // that those solutions still depend on gradual assignability. Rejecting individual
-        // solutions during subtype revalidation can also discard a valid gradual alternative
-        // while keeping a static sibling.
-        //
-        // TODO: Track gradual evidence per alternative. Until then, use the merged fallback
-        // for the whole call when an inference-relevant relation involves gradual types.
-        // A gradual argument unrelated to inference does not change the solutions, so it need
-        // not prevent intersecting their returns.
         let relations: Vec<_> = self
             .argument_relations()
             .map(|relation| {
                 let contributes_to_inference = [relation.declared_type, relation.argument_type]
                     .into_iter()
                     .any(mentions_inferable);
-                if contributes_to_inference
-                    && (relation.argument_type.bottom_materialization(db, env)
-                        != relation.argument_type.top_materialization(db, env)
-                        || relation.declared_type.has_dynamic(db, env))
-                {
-                    return None;
-                }
-                Some((relation, contributes_to_inference))
+                (relation, contributes_to_inference)
             })
-            .collect::<Option<_>>()?;
+            .collect();
 
         specializations.retain(|&specialization| {
             // TODO: Remove revalidation once constraint generation and solution selection
@@ -6275,6 +6243,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         .declared_type
                         .apply_specialization(db, specialization);
                     if *contributes_to_inference {
+                        // Gradual assignability alone can accept different materializations in
+                        // each alternative: `Any` matching both `int` and `str` does not prove
+                        // that the argument has type `int & str`.
                         actual.is_subtype_of(db, env, formal)
                     } else {
                         actual.is_assignable_to(db, env, formal)

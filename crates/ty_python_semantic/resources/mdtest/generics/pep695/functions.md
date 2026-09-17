@@ -1100,8 +1100,7 @@ def _(value: Intersection[Source[A], Source[B]]) -> None:
 ```
 
 An argument of type `Any` still contributes gradual evidence when its parameter annotation is an
-alias. As in the other gradual cases, inference currently falls back to the merged assignments
-instead of refining the static alternatives:
+alias. This call still uses the merged assignments instead of refining the static alternatives:
 
 ```py
 from typing import Any
@@ -1441,10 +1440,8 @@ def _(
 
 ## Gradual intersection arguments
 
-Gradual types in arguments that contribute to type-variable inference currently prevent us from
-intersecting the independently inferred return types. Inference keeps the known types contributed by
-gradual intersections, but does not yet preserve their gradual components. Direct member access
-shows the more precise types:
+A gradually narrowed source contributes its known element types to inference. These examples still
+lose the gradual component and merge multiple known element types, unlike direct member access:
 
 ```py
 from typing import Any
@@ -1507,8 +1504,8 @@ def _(unknown, any_: Any) -> None:
 ```
 
 A gradual argument's known element type also contributes when another argument is an intersection.
-The result includes `D`, but still unions the first argument's `A` and `B` contributions instead of
-intersecting them:
+The first argument's static alternatives refine the result to `(A & B) | D`. Inference still loses
+the gradual component of the second argument's element type:
 
 ```py
 class D: ...
@@ -1523,9 +1520,9 @@ def _(x: Intersection[Source[A], Source[B]], unknown, any_: Any) -> None:
     reveal_type(unknown.get())  # revealed: Unknown & D
     reveal_type(any_.get())  # revealed: Any & D
     # TODO: revealed: (A & B) | (Unknown & D)
-    reveal_type(correlated(x, unknown))  # revealed: A | D | B
+    reveal_type(correlated(x, unknown))  # revealed: (A & B) | D
     # TODO: revealed: (A & B) | (Any & D)
-    reveal_type(correlated(x, any_))  # revealed: A | D | B
+    reveal_type(correlated(x, any_))  # revealed: (A & B) | D
 ```
 
 Unrelated gradual arguments do not affect `T` and do not prevent intersecting the inferred return
