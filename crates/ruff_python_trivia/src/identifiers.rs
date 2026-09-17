@@ -3,9 +3,9 @@ use memchr::memmem::Finder;
 /// A reusable text prefilter for an identifier or keyword.
 ///
 /// A match only indicates that a source may contain the name: matches in
-/// comments and strings are included. [`Self::may_match`] accepts all non-ASCII
-/// sources because Python normalizes identifiers with NFKC. For keywords, use
-/// [`Self::match_keyword`] to search their literal spelling instead. Callers should
+/// comments and strings are included. Matchers created with [`Self::new`] accept
+/// all non-ASCII sources because Python normalizes identifiers with NFKC. Matchers
+/// created with [`Self::keyword`] search their literal spelling instead. Callers should
 /// validate candidates using the AST or semantic analysis.
 ///
 /// Construct a matcher once and reuse it across sources to avoid preprocessing
@@ -13,34 +13,39 @@ use memchr::memmem::Finder;
 #[derive(Debug, Clone)]
 pub struct IdentifierMatcher<'a> {
     finder: Finder<'a>,
+    is_keyword: bool,
 }
 
 impl<'a> IdentifierMatcher<'a> {
-    /// Creates a matcher that borrows `name` without allocating.
+    /// Creates an identifier matcher that borrows `name` without allocating.
     pub fn new(name: &'a str) -> Self {
         Self {
             finder: Finder::new(name),
+            is_keyword: false,
         }
     }
 
-    /// Returns whether `source` may contain the identifier.
+    /// Creates a keyword matcher that borrows `keyword` without allocating.
     ///
-    /// Returns `true` immediately for non-ASCII source. Otherwise, searches for
-    /// the literal spelling bounded by bytes other than ASCII letters, digits or `_`.
+    /// Python recognizes keywords by their literal spelling, without NFKC normalization,
+    /// so keyword matchers skip the ASCII check.
+    pub fn keyword(keyword: &'a str) -> Self {
+        Self {
+            finder: Finder::new(keyword),
+            is_keyword: true,
+        }
+    }
+
+    /// Returns whether `source` may contain the configured identifier or keyword.
+    ///
+    /// Identifier matchers return `true` immediately for non-ASCII source. Otherwise,
+    /// searches for the literal spelling bounded by bytes other than ASCII letters,
+    /// digits or `_`. Matches may occur in comments, strings, or Unicode identifiers.
     pub fn may_match(&self, source: &str) -> bool {
-        if !source.is_ascii() {
+        if !self.is_keyword && !source.is_ascii() {
             return true;
         }
 
-        self.match_keyword(source)
-    }
-
-    /// Returns whether `source` may contain the configured Python keyword.
-    ///
-    /// Keywords are recognized by their literal spelling, without NFKC normalization,
-    /// so this skips the ASCII check even for non-ASCII source. Matches use ASCII
-    /// identifier boundaries and may occur in comments, strings, or Unicode identifiers.
-    pub fn match_keyword(&self, source: &str) -> bool {
         let bytes = source.as_bytes();
         let len = self.finder.needle().len();
         self.finder
@@ -99,12 +104,14 @@ mod tests {
 
     #[test]
     fn keyword_uses_literal_spelling() {
-        let matcher = IdentifierMatcher::new("class");
-        assert!(matcher.match_keyword("class C: pass"));
-        assert!(matcher.match_keyword("class Café: pass"));
-        assert!(matcher.match_keyword("# class"));
-        assert!(!matcher.match_keyword("# café"));
-        assert!(!matcher.match_keyword("ｃｌａｓｓ = 1"));
-        assert!(!matcher.match_keyword("subclass = 1"));
+        let matcher = IdentifierMatcher::keyword("class");
+        assert!(matcher.may_match("class C: pass"));
+        assert!(matcher.may_match("class Café: pass"));
+        assert!(matcher.may_match("# class"));
+        assert!(matcher.may_match(r#""class""#));
+        assert!(matcher.may_match("éclass = 1"));
+        assert!(!matcher.may_match("# café"));
+        assert!(!matcher.may_match("ｃｌａｓｓ = 1"));
+        assert!(!matcher.may_match("subclass = 1"));
     }
 }

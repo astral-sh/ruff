@@ -37,7 +37,7 @@ pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
 
 static CLASS_MATCHER: LazyLock<IdentifierMatcher<'static>> =
-    LazyLock::new(|| IdentifierMatcher::new("class"));
+    LazyLock::new(|| IdentifierMatcher::keyword("class"));
 
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
@@ -233,19 +233,19 @@ impl<'a> ImplementationsFinder<'a> {
         db: &'scan dyn Db,
         file: ProgramFile<'scan>,
     ) -> Vec<ResolvedDefinition<'scan>> {
-        let source = source_text(db, file.file(db));
+        if !self.name_matcher.may_match(&source_text(db, file.file(db))) {
+            return Vec::new();
+        }
+
         let roots = &self.roots;
         match &self.kind {
-            ImplementationsFinderKind::ClassFamily if self.name_matcher.match_keyword(&source) => {
+            ImplementationsFinderKind::ClassFamily => {
                 class_implementations_for_file(db, file, roots)
             }
             ImplementationsFinderKind::MemberFamily {
                 name,
                 accessor_role,
-            } if self.name_matcher.may_match(&source) => {
-                member_implementations_for_file(db, file, roots, name, *accessor_role)
-            }
-            _ => Vec::new(),
+            } => member_implementations_for_file(db, file, roots, name, *accessor_role),
         }
     }
 
@@ -480,7 +480,7 @@ fn member_implementations_for_file<'db>(
 
     // The finder already checked for the member name. An override also requires a class.
     let source = source_text(db, file.file(db));
-    if !CLASS_MATCHER.match_keyword(&source) {
+    if !CLASS_MATCHER.may_match(&source) {
         return definitions;
     }
 
@@ -1959,7 +1959,7 @@ fn direct_subtypes<'db>(
         }
 
         let source = source_text(db, file);
-        if !CLASS_MATCHER.match_keyword(&source) {
+        if !CLASS_MATCHER.may_match(&source) {
             continue;
         }
 
