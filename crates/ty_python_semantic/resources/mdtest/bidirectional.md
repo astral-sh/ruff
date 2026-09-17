@@ -2955,20 +2955,23 @@ def _():
 Gradual types that explicitly constrain a collection are preserved in the inferred type.
 
 ```py
-from ty_extensions._internal import Unknown
-
-def _(unknown: Unknown):
+def _(unknown):
     x1 = [1]
     x1.reverse()
     x1.append(unknown)
     reveal_type(x1)  # revealed: list[Unknown | int]
 ```
 
-An unannotated lambda expression does not influence the inferred type for a collection literal,
-while an explicitly annotated callback does introduce constraints.
+An upper bound on the element type introduced by a callback does not influence the type of the
+collection literal:
 
 ```py
-def key(value: Unknown) -> int:
+from typing import Any
+
+def key(value) -> int:
+    return 0
+
+def any_key(value: Any) -> int:
     return 0
 
 def _():
@@ -2978,7 +2981,13 @@ def _():
 
     x2 = [(0, "a")]
     x2.sort(key=key)
+    # TODO: This should reveal `list[tuple[int, str]]`.
     reveal_type(x2)  # revealed: list[Unknown | tuple[int, str]]
+
+    x3 = [(0, "a")]
+    x3.sort(key=any_key)
+    # TODO: This should reveal `list[tuple[int, str]]`.
+    reveal_type(x3)  # revealed: list[Any | tuple[int, str]]
 ```
 
 ## Multi-inference diagnostics
