@@ -3,7 +3,7 @@ use crate::{
     diagnostic::format_enumeration,
     types::{
         BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, KnownInstanceType, Signature,
-        StaticClassLiteral, Type, TypeVarKind, TypeVarVariance,
+        StaticClassLiteral, Type, TypeVarKind, TypeVarVariance, UnionBuilder,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         context::InferContext,
         diagnostic::{
@@ -137,41 +137,35 @@ pub(super) fn check_class_method_typevar_variance<'db>(
             }
             continue;
         }
-        let mut functions = member.local_functions(db, class.body_scope(db));
-        for function in member.local_functions_from_type(db, class.body_scope(db)) {
-            if !functions.contains(&function) {
-                functions.push(function);
+        let mut bindings = member
+            .local_function_bindings(db, class.body_scope(db))
+            .filter(|(function, _)| !exclude_from_variance(db, *function))
+            .peekable();
+        let Some(&(function, _)) = bindings.peek() else {
+            continue;
+        };
+        let mut reads = UnionBuilder::new(db, env);
+        let mut writes = UnionBuilder::new(db, env);
+        for (_, ty) in bindings {
+            let read_ty = ty
+                .try_call_dunder_get(db, env, Some(instance), instance.to_meta_type(db, env))
+                .unwrap_or_else(|error| Some(error.fallback()))
+                .map_or(ty, |result| result.return_type);
+            reads = reads.add(read_ty);
+            // An unresolved write domain does not erase a known read requirement.
+            if let DescriptorSetterDomain::Known(write_ty) =
+                descriptor_setter_domain(db, env, ty, instance)
+            {
+                writes = writes.add(write_ty);
             }
         }
-        let Some(&function) = functions.first() else {
-            continue;
-        };
-        // A combined member type does not retain the association between each alternative and its
-        // source definition. If any source is exempt, defer checking the combined type.
-        if functions
-            .iter()
-            .any(|function| exclude_from_variance(db, *function))
-        {
-            continue;
-        }
-        let Some(read_ty) = instance
-            .member(db, env, &member.name)
-            .place
-            .ignore_possibly_undefined()
-        else {
-            continue;
-        };
-        let write_ty = match descriptor_setter_domain(db, env, member.ty, instance) {
-            // An unresolved write domain does not erase a known read requirement.
-            DescriptorSetterDomain::Missing | DescriptorSetterDomain::Deferred => None,
-            DescriptorSetterDomain::Known(ty) => Some(ty),
-        };
+        let write_ty = writes.build();
         check_method_typevar_variance(
             context,
             generic_context,
             function,
-            read_ty,
-            write_ty,
+            reads.build(),
+            (!write_ty.is_never()).then_some(write_ty),
             &mut reported,
         );
     }

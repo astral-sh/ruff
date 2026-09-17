@@ -848,9 +848,32 @@ class Contravariant(Generic[T_contra]):
             raise NotImplementedError
 
     else:
-        # TODO: Emit `invalid-generic-class`; `no_type_check` only applies to the first branch.
+        # error: [invalid-generic-class]
         def value(self) -> T_contra:
             raise NotImplementedError
+```
+
+Even a suppressed definition with a valid signature does not exempt another branch. This holds
+regardless of the order of the branches.
+
+```py
+class UncheckedFirst(Generic[T_co]):
+    if condition():
+        @no_type_check
+        def method(self, value: object) -> None: ...
+
+    else:
+        # error: [invalid-generic-class]
+        def method(self, value: T_co) -> None: ...
+
+class UncheckedLast(Generic[T_co]):
+    if condition():
+        # error: [invalid-generic-class]
+        def method(self, value: T_co) -> None: ...
+
+    else:
+        @no_type_check
+        def method(self, value: object) -> None: ...
 ```
 
 ## Variance in read-only descriptors

@@ -7,6 +7,7 @@
 
 use std::cmp::Ordering;
 
+use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
@@ -19,7 +20,7 @@ use crate::{
     reachability::ReachabilityConstraintsExtension,
     types::{
         ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, StaticClassLiteral,
-        SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
+        SubclassOfInner, Type, TypeVarBoundOrConstraints, UnionType, class::CodeGeneratorKind,
         function::FunctionType, infer_definition_types, may_exist_at_runtime,
     },
 };
@@ -719,9 +720,50 @@ pub struct Member<'db> {
 }
 
 impl<'db> Member<'db> {
+    /// Pairs source methods with the alternatives that remain in this member's exposed type.
+    ///
+    /// Keeping definitions separate lets callers apply exclusions without exempting other
+    /// definitions of the same name. Alternatives absorbed by a wider type, such as `object`,
+    /// no longer contribute a method signature.
+    pub(super) fn local_function_bindings(
+        &self,
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+    ) -> impl Iterator<Item = (FunctionType<'db>, Type<'db>)> {
+        let env = ProgramEnvironment::from_scope(scope);
+        let functions = self.local_functions(db, scope);
+        let retained = self.local_functions_from_type(db, scope);
+        let exposed = self.ty;
+        functions
+            .into_iter()
+            .chain(retained)
+            .unique()
+            .filter_map(move |function| {
+                let definition = function.definition(db);
+                let binding = infer_definition_types(db, definition)
+                    .binding_type(definition)
+                    .resolve_type_alias(db);
+                let exposed_union = exposed.as_union_like(db);
+                let exposed_alternatives = exposed_union
+                    .map_or(std::slice::from_ref(&exposed), |union| union.elements(db));
+                let binding_union = binding.as_union_like(db);
+                let binding_alternatives = binding_union
+                    .map_or(std::slice::from_ref(&binding), |union| union.elements(db));
+                let retained = UnionType::from_elements(
+                    db,
+                    &env,
+                    binding_alternatives
+                        .iter()
+                        .copied()
+                        .filter(|ty| exposed_alternatives.contains(ty)),
+                );
+                (!retained.is_never()).then_some((function, retained))
+            })
+    }
+
     /// Recover local functions retained in the exposed type, including aliases and property accessors.
     /// Unlike [`Self::local_functions`], this does not recover definitions replaced by decorators.
-    pub(super) fn local_functions_from_type(
+    fn local_functions_from_type(
         &self,
         db: &'db dyn Db,
         scope: ScopeId<'db>,
