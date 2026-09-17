@@ -224,7 +224,7 @@ tempfile = { version = "3.9.0", default-features = false, features = ["getrandom
 test-case = { version = "3.3.1", default-features = false }
 thiserror = { version = "2.0.0", default-features = false, features = ["std"] }
 thin-vec = { version = "0.2.14", default-features = false, features = ["std"] }
-tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["background_threads_runtime_support"] }
+tikv-jemallocator = { version = "0.7.0", default-features = false, features = ["background_threads_runtime_support"] }
 toml = { version = "1.0.0", default-features = false, features = ["display", "parse", "serde", "std"] }
 toml_parser = { version = "1.0.0", default-features = false, features = ["std"] }
 tracing = { version = "0.1.40", default-features = false, features = ["attributes", "std"] }
