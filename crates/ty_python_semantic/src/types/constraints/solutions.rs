@@ -268,12 +268,6 @@ impl<'db> SolutionWalker<'db> {
         path: &mut PathAssignments,
         upper_bounds: &Slice<BoundTypeVarInstance<'db>, UpperBound>,
     ) -> ControlFlow<L::Break> {
-        // High level plan: We find the next typevar with a declared upper bound, create a
-        // throwaway BDD that represents that upper bound, and then walk that upper bound BDD's
-        // paths. Because we perform that walk with the current `path` from the original BDD still
-        // in force, any satisfiable paths we find in the upper bound BDD will be compatible with
-        // the current candidate solution.
-
         let Some(((_, upper_bound), upper_bounds)) = upper_bounds.split_first() else {
             // We've checked all typevars that have an upper bound, and we now know that the
             // candidate solution is valid.
