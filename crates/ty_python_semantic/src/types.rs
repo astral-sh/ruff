@@ -5116,6 +5116,9 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => alias
                 .value_type(db)
                 .is_definitely_non_data_descriptor_impl(db, program),
+            Type::Recursive(recursive) => recursive.map_or(db, env, true, |unfolded| {
+                unfolded.is_definitely_non_data_descriptor_impl(db, program)
+            }),
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
                 false
             }
@@ -5158,6 +5161,9 @@ impl<'db> Type<'db> {
                     .value_type(db)
                     .is_data_descriptor_impl(db, program, any_of_union)
             }
+            Type::Recursive(recursive) => recursive.map_or(db, env, !any_of_union, |unfolded| {
+                unfolded.is_data_descriptor_impl(db, program, any_of_union)
+            }),
             _ => {
                 !self
                     .class_member_with_policy(
