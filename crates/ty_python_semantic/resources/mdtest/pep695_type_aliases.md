@@ -1083,6 +1083,31 @@ def use(value: Cycle):
     value[0]  # error: [not-subscriptable]
 ```
 
+### Recursive arguments inside implicit containers
+
+An implicit recursive alias can keep an enclosing alias's self-reference inside a container. These
+references are valid even when they occur in the implicit alias's type arguments.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Lists = list["Lists[T]"]
+type Recursive = Lists[Recursive]
+type Nested = list[Lists[Nested]]
+
+recursive: Recursive = []
+nested: Nested = []
+```
+
+The argument can also occur directly as a tuple element: the tuple still separates successive
+recursive references.
+
+```py
+Pairs = tuple[T, list["Pairs[T]"]]
+type RecursivePair = Pairs[RecursivePair]
+```
+
 ### Finite nested applications of recursive aliases
 
 A recursive alias can appear in its own type arguments without creating a cycle in its expansion.

@@ -382,6 +382,20 @@ impl<'db> RecursiveType<'db> {
                     })
                 })
             }
+            TypeMapping::EagerExpansion => {
+                visitor.visit(db, Type::Recursive(self), mapping, || {
+                    // Expand arguments only where the body exposes them. Expanding stored arguments
+                    // first can feed a recursive alias's previous approximation into its own arguments.
+                    self.map_type(db, visitor.env, |unfolded| {
+                        let mapped = unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
+                        if mapped == unfolded {
+                            Type::Recursive(self)
+                        } else {
+                            mapped
+                        }
+                    })
+                })
+            }
             _ => visitor.visit(db, Type::Recursive(self), mapping, || {
                 // Map arguments before unfolding so recursive backedges retain their mapped
                 // arguments. Keep the application's materialization throughout the traversal.
