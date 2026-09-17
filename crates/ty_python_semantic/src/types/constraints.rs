@@ -4521,17 +4521,17 @@ impl<'db> SolutionPaths<'db> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) enum SolutionViolationKind {
+enum SolutionViolationKind {
     UpperBound,
     Constraints,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct SolutionViolation<'db> {
-    pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
-    pub(crate) argument: Option<Type<'db>>,
-    pub(crate) variance: TypeVarVariance,
-    pub(crate) kind: SolutionViolationKind,
+    bound_typevar: BoundTypeVarInstance<'db>,
+    argument: Option<Type<'db>>,
+    variance: TypeVarVariance,
+    kind: SolutionViolationKind,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
@@ -4555,7 +4555,7 @@ impl<'db> Solution<'db> {
         matches!(self.validity, SolutionValidity::Valid)
     }
 
-    pub(crate) fn violations(&self) -> &[SolutionViolation<'db>] {
+    fn violations(&self) -> &[SolutionViolation<'db>] {
         match &self.validity {
             SolutionValidity::Valid => &[],
             SolutionValidity::Invalid(violations) => violations,
