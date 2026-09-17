@@ -997,8 +997,7 @@ impl<'db> UnionBuilder<'db> {
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full =
-            !matches!(ty, Type::TypeAlias(_) | Type::Recursive(_)) && !self.cycle_recovery;
+        let should_simplify_full = !ty.is_alias_like() && !self.cycle_recovery;
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
@@ -1079,17 +1078,13 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if should_simplify_full
-                && !matches!(element_type, Type::TypeAlias(_) | Type::Recursive(_))
-            {
+            if should_simplify_full && !element_type.is_alias_like() {
                 // Preserving aliases also excludes comparisons that expand aliases nested in
                 // type arguments. A recursive alias can rebuild this union during specialization.
                 if !self.unpack_aliases
-                    && [ty, element_type].into_iter().any(|ty| {
-                        any_over_type(db, &self.env, ty, false, |ty| {
-                            matches!(ty, Type::TypeAlias(_) | Type::Recursive(_))
-                        })
-                    })
+                    && [ty, element_type]
+                        .into_iter()
+                        .any(|ty| any_over_type(db, &self.env, ty, false, Type::is_alias_like))
                 {
                     continue;
                 }
