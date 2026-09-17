@@ -1930,7 +1930,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             //     3. If neither a converter nor a default value is provided, we allow the field to be
             //        considered assignable to any type.
             (Type::KnownInstance(KnownInstanceType::Field(field)), _)
-                if self.is_eager_assignability() =>
+                if self.relation.is_assignability() =>
             {
                 field
                     .default_type(db)
@@ -2112,7 +2112,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
             (Type::Intersection(intersection), _)
-                if self.is_eager_assignability()
+                if self.relation.is_assignability()
                     && intersection.positive(db).iter().any(Type::is_dynamic) =>
             {
                 // If the intersection contains `Any`/`Unknown`/`@Todo`, it is assignable to any type.
@@ -2847,16 +2847,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::SubclassOf(subclass_of_ty), _) if subclass_of_ty.is_dynamic() => self
                 .check_type_pair(db, KnownClass::Type.to_instance(db, env), target)
                 .or(db, self.constraints, || {
-                    ConstraintSet::from_bool(self.constraints, self.is_eager_assignability()).and(
-                        db,
-                        self.constraints,
-                        || self.check_type_pair(db, target, KnownClass::Type.to_instance(db, env)),
-                    )
+                    ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+                        .and(db, self.constraints, || {
+                            self.check_type_pair(db, target, KnownClass::Type.to_instance(db, env))
+                        })
                 }),
 
             // Any `type[...]` type is assignable to `type[Any]`
             (_, Type::SubclassOf(subclass_of_ty))
-                if subclass_of_ty.is_dynamic() && self.is_eager_assignability() =>
+                if subclass_of_ty.is_dynamic() && self.relation.is_assignability() =>
             {
                 self.check_type_pair(db, source, KnownClass::Type.to_instance(db, env))
             }
@@ -3609,6 +3608,23 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             ) if left_wrapper.kind(db) == right_wrapper.kind(db) => nontrivial_check(self, || {
                 self.with_recursion_guard(db, left, right, || {
                     self.check_type_pair(db, left_wrapper.wrapped(db), right_wrapper.wrapped(db))
+                })
+            }),
+
+            (
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(left_partial)),
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(right_partial)),
+            )
+            | (
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(left_partial)),
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(right_partial)),
+            ) => nontrivial_check(self, || {
+                self.with_recursion_guard(db, left, right, || {
+                    self.check_type_pair(
+                        db,
+                        left_partial.wrapped(db).inner(db),
+                        right_partial.wrapped(db).inner(db),
+                    )
                 })
             }),
 

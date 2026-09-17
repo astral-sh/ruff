@@ -14,8 +14,9 @@ use crate::types::class_base::ClassBase;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget, SolutionProjection};
 use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
-    PathBoundSolution, PathBounds, SolutionPaths, Solutions, TypeVarSolution,
+    CandidateSolutions, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    PathBound, PathBoundSolution, Solution, SolutionPaths, SolutionViolation,
+    SolutionViolationKind, Solutions, TypeVarSolution,
 };
 use crate::types::cyclic::{ActiveRecursionDetector, CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::infer::original_class_type;
@@ -2801,7 +2802,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     |_variance, path_bound| {
                         let outcome = choose(path_bound.bound_typevar, Some(path_bound))
                             .unwrap_or_else(|| {
-                                PathBounds::default_solve(
+                                CandidateSolutions::default_solve(
                                     db,
                                     builder.env,
                                     builder.constraints,
@@ -2953,17 +2954,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 budget,
                 |_variance, path_bound| {
                     choose(path_bound.bound_typevar, Some(path_bound)).unwrap_or_else(|| {
-                        PathBounds::default_solve(db, builder.env, builder.constraints, path_bound)
+                        CandidateSolutions::default_solve(db, builder.env, builder.constraints, path_bound)
                     })
                 },
             )?;
             Ok(match solutions {
-                Solutions::Unsatisfiable => SolutionProjection::Unsatisfiable,
+                Solutions::Unsatisfiable(_) => SolutionProjection::Unsatisfiable,
                 Solutions::Unconstrained => SolutionProjection::Unconstrained,
                 Solutions::Constrained(solutions) => {
                     let mut merged_types = FxHashMap::default();
                     for solution in solutions.as_slice() {
-                        builder.merge_solution(&mut merged_types, solution);
+                        builder.merge_solution(&mut merged_types, &solution.solved_typevars);
                     }
 
                     // Solving charges only present bindings, but context-aligned alternatives
@@ -3128,7 +3129,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // alternatives: a bare `U` survives on one path, but is removed from a merged `U | int`.
         let mut paths = Vec::with_capacity(solutions.as_slice().len());
         for mut path in solutions.into_vec() {
-            path.retain_mut(|binding| {
+            path.solved_typevars.retain_mut(|binding| {
                 if !generic_context.contains(db, binding.bound_typevar.identity(db)) {
                     return false;
                 }
@@ -3138,8 +3139,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 );
                 true
             });
-            let resolved = resolve_solution(db, self.env, self.inferable, &path);
+            let resolved = resolve_solution(db, self.env, self.inferable, &path.solved_typevars);
             let path_types: FxHashMap<_, _> = path
+                .solved_typevars
                 .iter()
                 .zip(resolved)
                 .map(|(binding, ty)| (binding.bound_typevar.identity(db), ty))
@@ -3504,26 +3506,26 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Solves one relation without recording it or changing the legacy type mappings.
     fn analyze_constraint_set(&self, set: ConstraintSet<'db, 'c>) -> ConstraintSetAnalysis<'db> {
         let db = self.db;
-        let mut failures = SmallVec::new();
         let solutions = set.solutions_with(
             db,
             self.env,
             self.inferable,
             SolutionBudget::default(),
             |_variance, path_bound| {
-                let solution =
-                    PathBounds::preliminary_solve(db, self.env, self.constraints, path_bound);
-                if matches!(solution, PathBoundSolution::Unsatisfiable)
-                    && let Some(failure) = self.constraint_failure_from_failed_bounds(path_bound)
-                {
-                    failures.push(failure);
-                }
-                solution
+                CandidateSolutions::preliminary_solve(db, self.env, self.constraints, path_bound)
             },
         );
 
         match solutions {
-            Ok(Solutions::Unsatisfiable) => ConstraintSetAnalysis::Unsatisfiable(failures),
+            Ok(Solutions::Unsatisfiable(solutions)) => {
+                let failures = solutions
+                    .as_slice()
+                    .iter()
+                    .flat_map(Solution::violations)
+                    .filter_map(Self::constraint_failure_from_violation)
+                    .collect();
+                ConstraintSetAnalysis::Unsatisfiable(failures)
+            }
             Ok(Solutions::Unconstrained) => ConstraintSetAnalysis::Unconstrained,
             Ok(Solutions::Constrained(solutions)) => ConstraintSetAnalysis::Constrained(solutions),
             Err(_) => ConstraintSetAnalysis::BudgetExceeded,
@@ -3551,7 +3553,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         };
 
         for solution in solutions.as_slice() {
-            for binding in solution {
+            for binding in &solution.solved_typevars {
                 let solution = self.remove_inferable_typevar_artifacts_from_solution(
                     binding.bound_typevar,
                     binding.solution,
@@ -3561,39 +3563,27 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    /// Classifies a failed path when its lower bound violates a type-variable declaration.
-    ///
-    /// Conflicting inferred lower and upper bounds are not necessarily violations of the type
-    /// variable's declaration, so they remain generic unsatisfiable constraints.
-    fn constraint_failure_from_failed_bounds(
-        &self,
-        path_bound: &PathBound<'db>,
+    /// Converts a solver-reported solution violation into a diagnostic failure.
+    fn constraint_failure_from_violation(
+        violation: &SolutionViolation<'db>,
     ) -> Option<ConstraintFailure<'db>> {
-        let db = self.db;
-        let bound_typevar = path_bound.bound_typevar;
-        let argument = path_bound.evidence_lower()?;
-        let variance = if path_bound.has_upper_evidence() {
-            ConstraintFailureVariance::Invariant
-        } else {
-            ConstraintFailureVariance::Contravariant
+        let bound_typevar = violation.bound_typevar;
+        let argument = violation.argument?;
+        let variance = match violation.variance {
+            TypeVarVariance::Contravariant => ConstraintFailureVariance::Contravariant,
+            TypeVarVariance::Invariant => ConstraintFailureVariance::Invariant,
+            TypeVarVariance::Covariant | TypeVarVariance::Bivariant => return None,
         };
-        let error = match bound_typevar
-            .typevar(db)
-            .bound_or_constraints(db, self.env)?
-        {
-            TypeVarBoundOrConstraints::UpperBound(bound) => (!argument
-                .when_assignable_to(db, self.env, bound, self.constraints, self.inferable)
-                .is_always_satisfied(db, self.env))
-            .then_some(SpecializationError::MismatchedBound {
+        let error = match violation.kind {
+            SolutionViolationKind::UpperBound => SpecializationError::MismatchedBound {
                 bound_typevar,
                 argument,
-            }),
-            TypeVarBoundOrConstraints::Constraints(_) => (!path_bound.has_upper_evidence())
-                .then_some(SpecializationError::MismatchedConstraint {
-                    bound_typevar,
-                    argument,
-                }),
-        }?;
+            },
+            SolutionViolationKind::Constraints => SpecializationError::MismatchedConstraint {
+                bound_typevar,
+                argument,
+            },
+        };
         Some(ConstraintFailure { error, variance })
     }
 

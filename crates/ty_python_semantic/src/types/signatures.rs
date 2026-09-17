@@ -23,8 +23,8 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
-    PathBounds, Solutions,
+    CandidateSolutions, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    OwnedConstraintSet, Solutions,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -323,7 +323,7 @@ impl<'db> CallableSignature<'db> {
                         .iter()
                         .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
                         .collect::<Vec<_>>();
-                    let parameters = if prefix_parameters.is_empty() {
+                    let mut parameters = if prefix_parameters.is_empty() {
                         Parameters::paramspec(db, typevar)
                     } else {
                         Parameters::concatenate(
@@ -332,6 +332,16 @@ impl<'db> CallableSignature<'db> {
                             ConcatenateTail::ParamSpec(typevar),
                         )
                     };
+
+                    // The synthesized ParamSpec parameters still correspond to the original
+                    // `*args` and `**kwargs` annotations. Keep their positions for diagnostics.
+                    for (parameter, source) in Arc::make_mut(&mut parameters.data)
+                        .value
+                        .iter_mut()
+                        .zip(self_signature.parameters.iter())
+                    {
+                        parameter.source_parameter_index = source.source_parameter_index;
+                    }
 
                     let env = visitor.env;
                     Some(CallableSignature::single(Signature {
@@ -1331,7 +1341,7 @@ impl<'db> Signature<'db> {
         let inferable = self.inferable_typevars(db);
 
         match when.solutions(db, env, inferable) {
-            Ok(Solutions::Unsatisfiable) => return None,
+            Ok(Solutions::Unsatisfiable(_)) => return None,
             Ok(Solutions::Unconstrained) | Err(_) => {
                 return Some(CallableSignature::single(self.clone()));
             }
@@ -1358,7 +1368,7 @@ impl<'db> Signature<'db> {
                 && let Some(upper) = bounds.as_single_upper_bound(db, env)
                 && lower.is_equivalent_to(db, env, upper)
                 && let Some(solution) =
-                    PathBounds::default_solve(db, env, &constraints, bounds).as_type()
+                    CandidateSolutions::default_solve(db, env, &constraints, bounds).as_type()
             {
                 return Some(solution);
             }
@@ -1373,7 +1383,7 @@ impl<'db> Signature<'db> {
                     .evidence_lower()
                     .is_some_and(|lower| !lower.is_never())
                 && let Some(solution) =
-                    PathBounds::default_solve(db, env, &constraints, bounds).as_type()
+                    CandidateSolutions::default_solve(db, env, &constraints, bounds).as_type()
             {
                 return Some(solution);
             }
@@ -6191,6 +6201,46 @@ mod tests {
                 parameter.definition().is_some(),
                 "source-backed parameter should have a definition"
             );
+        }
+    }
+
+    #[test]
+    fn paramspec_identity_specialization_preserves_source_positions() {
+        for prefix in ["", "first: int, "] {
+            let mut db = setup_db();
+            db.write_dedented(
+                "/src/a.py",
+                &format!("def f[**P]({prefix}*args: P.args, **kwargs: P.kwargs) -> None: ..."),
+            )
+            .unwrap();
+            let signature = get_function_f(&db, "/src/a.py")
+                .literal(&db)
+                .last_definition
+                .signature(&db);
+            let generic_context = signature.generic_context.expect("f has a ParamSpec");
+            let expected_positions = (0..signature.parameters.len())
+                .map(Some)
+                .collect::<Vec<_>>();
+            let specialized = CallableSignature::single(signature).apply_type_mapping_impl(
+                &db,
+                &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
+                    generic_context.identity_specialization(&db),
+                )),
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::new(&db.program_environment()),
+            );
+
+            assert_eq!(specialized.overloads.len(), 1);
+            for signature in &specialized.overloads {
+                assert_eq!(
+                    signature
+                        .parameters()
+                        .iter()
+                        .map(Parameter::source_parameter_index)
+                        .collect::<Vec<_>>(),
+                    expected_positions,
+                );
+            }
         }
     }
 

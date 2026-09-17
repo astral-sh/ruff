@@ -746,6 +746,37 @@ def consume_int_or_str(value: int | str) -> None: ...
 reveal_type(infer_str(consume_int_or_str))  # revealed: str
 ```
 
+## Gradual class parameters
+
+A callback that accepts `type[Any]` or `type[Unknown]` can accept any class object.
+
+```py
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
+
+def invoke[T](callback: Callable[[type], T]) -> T:
+    return callback(int)
+
+def _(f: Callable[[type[Any]], int], g: Callable[[type[Unknown]], str]):
+    reveal_type(invoke(f))  # revealed: int
+    reveal_type(invoke(g))  # revealed: str
+```
+
+A gradual class argument can also satisfy a callback's metaclass parameter:
+
+```py
+class Meta(type): ...
+
+def f(cls: Meta) -> int:
+    return 1
+
+def invoke_any[T](callback: Callable[[type[Any]], T], cls: type[Any]) -> T:
+    return callback(cls)
+
+def _(cls: type[Any]):
+    reveal_type(invoke_any(f, cls))  # revealed: int
+```
+
 ## Inferring gradual tuple returns with concrete bounds
 
 A callback returning `tuple[Any, ...]` satisfies a fixed-length tuple bound because both its
@@ -791,6 +822,34 @@ infer_prefix(wrong_element)  # error: [invalid-argument-type]
 infer_fixed(get_ints)  # error: [invalid-argument-type]
 infer_prefix(get_ints)  # error: [invalid-argument-type]
 infer_suffix(get_ints)  # error: [invalid-argument-type]
+```
+
+## Inferring type variables from gradual tuple elements
+
+A callback returning a gradual-length tuple can constrain the type variables of a fixed-length
+tuple.
+
+```py
+from typing import Any, Callable
+
+def infer_pair[K, V](callback: Callable[[], tuple[K, V]]) -> tuple[K, V]:
+    return callback()
+
+def _(
+    callback: Callable[[], tuple[Any, ...]],
+    prefix: Callable[[], tuple[int, *tuple[Any, ...]]],
+    suffix: Callable[[], tuple[*tuple[Any, ...], str]],
+):
+    reveal_type(infer_pair(callback))  # revealed: tuple[Any, Any]
+    reveal_type(infer_pair(prefix))  # revealed: tuple[int, Any]
+    reveal_type(infer_pair(suffix))  # revealed: tuple[Any, str]
+```
+
+A concrete homogeneous tuple does not guarantee the required length:
+
+```py
+def _(callback: Callable[[], tuple[int, ...]]):
+    infer_pair(callback)  # error: [invalid-argument-type]
 ```
 
 ## Source type variables in gradual tuple returns

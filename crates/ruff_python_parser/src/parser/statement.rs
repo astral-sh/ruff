@@ -100,7 +100,7 @@ impl<'src> Parser<'src> {
         let token = self.current_token_kind();
         matches!(
             token,
-            TokenKind::Star | TokenKind::DoubleStar | TokenKind::Name
+            TokenKind::Star | TokenKind::DoubleStar | TokenKind::Identifier
         ) || token.is_keyword()
     }
 
@@ -345,7 +345,7 @@ impl<'src> Parser<'src> {
                     // it's followed by an unexpected token.
                     let (first, second) = self.peek2();
 
-                    if (first == TokenKind::Name || first.is_soft_keyword())
+                    if (first == TokenKind::Identifier || first.is_soft_keyword())
                         && matches!(second, TokenKind::Lsqb | TokenKind::Equal)
                     {
                         return Stmt::TypeAlias(self.parse_type_alias_statement());
@@ -669,7 +669,7 @@ impl<'src> Parser<'src> {
             }
         }
 
-        let module = if self.at_name_or_soft_keyword() {
+        let module = if self.at_identifier_or_soft_keyword() {
             // test_ok from_import_soft_keyword_module_name
             // from match import pattern
             // from type import bar
@@ -794,7 +794,7 @@ impl<'src> Parser<'src> {
         };
 
         let asname = if self.eat(TokenKind::As) {
-            if self.at_name_or_soft_keyword() {
+            if self.at_identifier_or_soft_keyword() {
                 // test_ok import_as_name_soft_keyword
                 // import foo as match
                 // import bar as case
@@ -1786,7 +1786,7 @@ impl<'src> Parser<'src> {
         };
 
         let name = if self.eat(TokenKind::As) {
-            if self.at_name_or_soft_keyword() {
+            if self.at_identifier_or_soft_keyword() {
                 // test_ok except_stmt_as_name_soft_keyword
                 // try: ...
                 // except Exception as match: ...
@@ -3337,7 +3337,7 @@ impl<'src> Parser<'src> {
 
                     kwonlyargs_snapshot.get_or_insert_with(|| parser.parameter_scratch.snapshot());
 
-                    if parser.at_name_or_soft_keyword() {
+                    if parser.at_identifier_or_soft_keyword() {
                         let param = parser.parse_parameter(
                             param_start,
                             function_kind,
@@ -3522,7 +3522,7 @@ impl<'src> Parser<'src> {
 
                     last_keyword_only_separator_range = None;
                 }
-                _ if parser.at_name_or_soft_keyword() => {
+                _ if parser.at_identifier_or_soft_keyword() => {
                     let param = parser.parse_parameter_with_default(param_start, function_kind);
 
                     // TODO(dhruvmanila): Pyright seems to only highlight the first non-default argument
@@ -3552,7 +3552,7 @@ impl<'src> Parser<'src> {
                 }
                 _ => {
                     // This corresponds to the expected token kinds for `is_list_element`.
-                    unreachable!("Expected Name, '*', '**', or '/'");
+                    unreachable!("Expected identifier, '*', '**', or '/'");
                 }
             }
         });
@@ -3920,7 +3920,7 @@ impl<'src> Parser<'src> {
             // test_err match_classify_as_keyword
             // match yield foo:
             //     case _: ...
-            TokenKind::Name
+            TokenKind::Identifier
             | TokenKind::Int
             | TokenKind::Float
             | TokenKind::Complex

@@ -523,6 +523,58 @@ reveal_type(int_method(C[int](), 1))  # revealed: int
 reveal_type(str_method(C[str](), "a"))  # revealed: str
 ```
 
+### Partial functions
+
+Partials of distinct function literals are disjoint because their read-only `func` attributes cannot
+refer to the same function. The same applies to their `__call__` methods:
+
+```py
+from collections.abc import Callable
+from functools import partial
+from typing import Any
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from
+
+def f() -> int:
+    return 0
+
+def g() -> int:
+    return 0
+
+partial_f = partial(f)
+partial_g = partial(g)
+
+static_assert(is_disjoint_from(TypeOf[partial_f], TypeOf[partial_g]))
+static_assert(is_disjoint_from(TypeOf[partial_g], TypeOf[partial_f]))
+static_assert(is_disjoint_from(TypeOf[partial_f.__call__], TypeOf[partial_g.__call__]))
+static_assert(is_disjoint_from(TypeOf[partial_g.__call__], TypeOf[partial_f.__call__]))
+```
+
+The partial of a function literal is not disjoint from the partial of a callable type with the same
+signature:
+
+```py
+def _(h: Callable[[], int]):
+    partial_h = partial(h)
+
+    static_assert(not is_disjoint_from(TypeOf[partial_f], TypeOf[partial_h]))
+    static_assert(not is_disjoint_from(TypeOf[partial_h], TypeOf[partial_f]))
+    static_assert(not is_disjoint_from(TypeOf[partial_f.__call__], TypeOf[partial_h.__call__]))
+    static_assert(not is_disjoint_from(TypeOf[partial_h.__call__], TypeOf[partial_f.__call__]))
+```
+
+A partial is also not disjoint from its top materialization:
+
+```py
+def _(h: Callable[[], Any]):
+    partial_h = partial(h)
+
+    static_assert(not is_disjoint_from(TypeOf[partial_h], Top[TypeOf[partial_h]]))
+    static_assert(not is_disjoint_from(Top[TypeOf[partial_h]], TypeOf[partial_h]))
+    static_assert(not is_disjoint_from(TypeOf[partial_h.__call__], Top[TypeOf[partial_h.__call__]]))
+    static_assert(not is_disjoint_from(Top[TypeOf[partial_h.__call__]], TypeOf[partial_h.__call__]))
+```
+
 ### Bound methods
 
 Bound methods are disjoint when their names or possible receiver types cannot overlap.

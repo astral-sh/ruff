@@ -438,6 +438,32 @@ DeprType.__str__  # error: [deprecated] "Use OtherType instead"
 depr_func.__str__  # error: [deprecated] "Use other_func instead"
 ```
 
+### Conflicting local annotation
+
+Importing a deprecated item still produces a warning when the imported value is incompatible with an
+existing local annotation.
+
+`module.py`:
+
+```py
+from typing_extensions import deprecated
+
+@deprecated("Use current instead")
+def old() -> None: ...
+```
+
+`main.py`:
+
+```py
+old: str
+
+# error: [invalid-assignment]
+# error: [deprecated] "Use current instead"
+from module import old
+
+reveal_type(old)  # revealed: str
+```
+
 ### Non-Import Deprecated
 
 If the items aren't imported and instead referenced using `module.item` then each use should produce

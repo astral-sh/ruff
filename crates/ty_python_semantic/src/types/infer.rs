@@ -1353,18 +1353,6 @@ impl<'db> DefinitionTypes<'db> {
             Self::Empty | Self::Binding(..) => Either::Right([].iter().copied()),
         }
     }
-
-    fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> + '_ {
-        match self {
-            Self::Declaration(declaration) | Self::BindingAndDeclaration(declaration) => {
-                Either::Left(Either::Left(std::iter::once(*declaration)))
-            }
-            Self::Other(other) => {
-                Either::Left(Either::Right(other.declarations.iter().map(|(_, ty)| *ty)))
-            }
-            Self::Empty | Self::Binding(..) => Either::Right(std::iter::empty()),
-        }
-    }
 }
 
 /// Compact representations for common combinations of extra definition inference data.
@@ -1791,10 +1779,6 @@ impl<'db> DefinitionInference<'db> {
         owner: Definition<'db>,
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)> {
         self.types.declarations(owner)
-    }
-
-    fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> {
-        self.types.declaration_types()
     }
 
     fn fallback_type(&self) -> Option<Type<'db>> {

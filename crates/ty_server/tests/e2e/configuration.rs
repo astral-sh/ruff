@@ -1,11 +1,13 @@
 use anyhow::Result;
 use insta::assert_json_snapshot;
 use ruff_db::system::SystemPath;
+use ruff_python_trivia::textwrap::dedent;
 use serde_json::{Map, json};
 use ty_server::{ClientOptions, WorkspaceOptions};
 
 use crate::TestServerBuilder;
 use crate::pull_diagnostics::filter_result_id;
+use crate::workspace_folders::condensed_document_diagnostic_snapshot;
 
 #[test]
 fn configuration_file() -> Result<()> {
@@ -73,6 +75,16 @@ def foo() -> str:
             Some(ClientOptions {
                 workspace: WorkspaceOptions {
                     configuration_file: Some(settings_path.to_string()),
+                    configuration: Some(
+                        Map::from_iter([
+                            ("rules".to_string(), json!({"unresolved-reference": "warn"})),
+                            (
+                                "environment".to_string(),
+                                json!({"python": "./missing-environment"}),
+                            ),
+                        ])
+                        .into(),
+                    ),
                     ..WorkspaceOptions::default()
                 },
                 ..ClientOptions::default()
@@ -100,6 +112,118 @@ unresolved-reference="warn"
     }
     "#);
     assert_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn invalid_python_environment_preserves_valid_configuration() -> Result<()> {
+    let main = SystemPath::new("src/main.py");
+    let content = dedent(
+        "
+        import sys
+        sys.platform
+        ",
+    );
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(
+            "src/ty.toml",
+            dedent(
+                r#"
+                [environment]
+                python = "./missing-environment"
+                python-platform = "win32"
+                "#,
+            ),
+        )?
+        .with_file(main, &content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let message = server.await_notification::<lsp_types::ShowMessageNotification>();
+    assert_eq!(message.kind, lsp_types::MessageType::Error);
+
+    server.open_text_document(main, &content, 1);
+    let platform = server.hover_request(main, lsp_types::Position::new(2, 5));
+    assert_json_snapshot!(platform, @r#"
+    {
+      "contents": {
+        "kind": "plaintext",
+        "value": "Literal[\"win32\"]"
+      },
+      "range": {
+        "start": {
+          "line": 2,
+          "character": 4
+        },
+        "end": {
+          "line": 2,
+          "character": 12
+        }
+      }
+    }
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn invalid_include_pattern_preserves_rules_and_diagnostics() -> Result<()> {
+    let main = SystemPath::new("src/main.py");
+    let content = "undefined";
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(
+            "src/ty.toml",
+            dedent(
+                r#"
+                [src]
+                include = ["["]
+
+                [rules]
+                unresolved-reference = "warn"
+                unknown-rule = "warn"
+                "#,
+            ),
+        )?
+        .with_file(main, content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let message = server.await_notification::<lsp_types::ShowMessageNotification>();
+    assert_eq!(message.kind, lsp_types::MessageType::Error);
+
+    let settings_diagnostics =
+        server.await_notification::<lsp_types::PublishDiagnosticsNotification>();
+    assert_json_snapshot!(settings_diagnostics, @r#"
+    {
+      "uri": "file://<temp_dir>/src/ty.toml",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 6,
+              "character": 0
+            },
+            "end": {
+              "line": 6,
+              "character": 12
+            }
+          },
+          "severity": 2,
+          "code": "unknown-rule",
+          "source": "ty",
+          "message": "Unknown rule `unknown-rule`. Did you mean `unknown-argument`?"
+        }
+      ]
+    }
+    "#);
+
+    server.open_text_document(main, content, 1);
+    let diagnostics = server.document_diagnostic_request(main, None);
+    insta::assert_snapshot!(condensed_document_diagnostic_snapshot(diagnostics), @"0:0..0:9[WARNING]: Name `undefined` used when not defined");
 
     Ok(())
 }

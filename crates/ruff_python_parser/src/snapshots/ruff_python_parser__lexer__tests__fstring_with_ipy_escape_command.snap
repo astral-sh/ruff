@@ -9,7 +9,7 @@ expression: lex_source(source)
     FStringMiddle 2..6 (flags = DOUBLE_QUOTES | F_STRING),
     Lbrace 6..7,
     Exclamation 7..8,
-    Name 8..11,
+    Identifier 8..11,
     Rbrace 11..12,
     FStringMiddle 12..16 (flags = DOUBLE_QUOTES | F_STRING),
     FStringEnd 16..17 (flags = DOUBLE_QUOTES | F_STRING),

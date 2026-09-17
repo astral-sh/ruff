@@ -1469,6 +1469,16 @@ fn property_wrapper_descriptor<'db>(
     }
 }
 
+/// Source methods for property accessors, including accessors replaced by decorators.
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
+)]
+pub struct PropertyAccessorDefinitions<'db> {
+    getter: Option<Definition<'db>>,
+    setter: Option<Definition<'db>>,
+    deleter: Option<Definition<'db>>,
+}
+
 /// Represents a property with known accessors and the standard descriptor behavior.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct PropertyInstanceType<'db> {
@@ -1480,6 +1490,9 @@ pub struct PropertyInstanceType<'db> {
     pub deleter: Option<Type<'db>>,
     #[returns(copy)]
     instance_class: PropertyInstanceClass<'db>,
+    /// Source definitions survive decorators that replace accessors with callable objects.
+    #[returns(copy)]
+    accessor_definitions: PropertyAccessorDefinitions<'db>,
 }
 
 fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -1511,7 +1524,14 @@ impl<'db> PropertyInstanceType<'db> {
         setter: Option<Type<'db>>,
         deleter: Option<Type<'db>>,
     ) -> Self {
-        Self::new_internal(db, getter, setter, deleter, PropertyInstanceClass::Builtin)
+        Self::new_internal(
+            db,
+            getter,
+            setter,
+            deleter,
+            PropertyInstanceClass::Builtin,
+            PropertyAccessorDefinitions::default(),
+        )
     }
 
     fn new_with_class(
@@ -1527,6 +1547,7 @@ impl<'db> PropertyInstanceType<'db> {
             setter,
             deleter,
             PropertyInstanceClass::from_class(db, class),
+            PropertyAccessorDefinitions::default(),
         )
     }
 
@@ -1537,7 +1558,79 @@ impl<'db> PropertyInstanceType<'db> {
         setter: Option<Type<'db>>,
         deleter: Option<Type<'db>>,
     ) -> Self {
-        Self::new_internal(db, getter, setter, deleter, self.instance_class(db))
+        let previous = self.accessor_definitions(db);
+        let definitions = PropertyAccessorDefinitions {
+            getter: previous.getter.filter(|_| getter == self.getter(db)),
+            setter: previous.setter.filter(|_| setter == self.setter(db)),
+            deleter: previous.deleter.filter(|_| deleter == self.deleter(db)),
+        };
+        Self::new_internal(
+            db,
+            getter,
+            setter,
+            deleter,
+            self.instance_class(db),
+            definitions,
+        )
+    }
+
+    /// Records the source of an accessor supplied by a method decorator.
+    fn with_accessor_definition(
+        self,
+        db: &'db dyn Db,
+        decorator: Type<'db>,
+        accessor: Type<'db>,
+        definition: Definition<'db>,
+    ) -> Self {
+        let mut definitions = self.accessor_definitions(db);
+        let (accessor_ty, accessor_definition) = match decorator {
+            Type::BoundMethod(method)
+                if method.self_instance(db).is_property_instance()
+                    && let Some(function) = method.function(db) =>
+            {
+                match function.name(db).as_str() {
+                    "getter" => (self.getter(db), &mut definitions.getter),
+                    "setter" => (self.setter(db), &mut definitions.setter),
+                    "deleter" => (self.deleter(db), &mut definitions.deleter),
+                    _ => return self,
+                }
+            }
+            _ => (self.getter(db), &mut definitions.getter),
+        };
+        if accessor_ty == Some(accessor) {
+            *accessor_definition = Some(definition);
+        }
+        Self::new_internal(
+            db,
+            self.getter(db),
+            self.setter(db),
+            self.deleter(db),
+            self.instance_class(db),
+            definitions,
+        )
+    }
+
+    /// Pairs retained accessor types with their source methods, independently of decorators.
+    fn accessors_with_functions(
+        self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = (Type<'db>, FunctionType<'db>)> {
+        let definitions = self.accessor_definitions(db);
+        [
+            (self.getter(db), definitions.getter),
+            (self.setter(db), definitions.setter),
+            (self.deleter(db), definitions.deleter),
+        ]
+        .into_iter()
+        .filter_map(move |(accessor, definition)| {
+            let accessor = accessor?;
+            let function = accessor.as_function_literal().or_else(|| {
+                definition.and_then(|definition| {
+                    infer_definition_types(db, definition).function_type(definition)
+                })
+            })?;
+            Some((accessor, function))
+        })
     }
 
     fn instance_fallback(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
@@ -1597,7 +1690,14 @@ impl<'db> PropertyInstanceType<'db> {
             ),
             class => class,
         };
-        Self::new_internal(db, getter, setter, deleter, instance_class)
+        Self::new_internal(
+            db,
+            getter,
+            setter,
+            deleter,
+            instance_class,
+            self.accessor_definitions(db),
+        )
     }
 
     fn recursive_type_normalized_impl(
@@ -1643,6 +1743,7 @@ impl<'db> PropertyInstanceType<'db> {
             setter,
             deleter,
             instance_class,
+            self.accessor_definitions(db),
         ))
     }
 
@@ -10379,17 +10480,21 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             }
 
             Type::BoundMethod(method_type) => {
-                // TODO: do we need to replace self?
-                let variance = method_type.func(db).variance_of(db, env, typevar);
-                if method_type.function(db).is_some() {
-                    variance
+                if let Some(function) = method_type.function(db) {
+                    function
+                        .bound_signatures(
+                            db,
+                            method_type.signature_receiver(db),
+                            method_type.typing_self_type(db),
+                        )
+                        .variance_of(db, env, typevar)
                 } else {
                     // A callable object's type does not include the additional receiver bound
                     // by classmethod, which is also exposed through `__self__`.
                     VarianceTerm::join(
                         db,
                         [
-                            variance,
+                            method_type.func(db).variance_of(db, env, typevar),
                             method_type.self_instance(db).variance_of(db, env, typevar),
                         ],
                     )
