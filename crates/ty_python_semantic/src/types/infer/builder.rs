@@ -3052,6 +3052,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         match object_ty {
+            Type::Recursive(recursive) => recursive.map_or(db, env, true, |unfolded| {
+                self.validate_attribute_deletion(target, unfolded, attribute, emit_diagnostics)
+            }),
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             Type::Union(union) => {
                 for element_ty in union.elements(db) {
                     if !self.validate_attribute_deletion(
@@ -5096,7 +5102,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Ok(previous_value)
             }
             ast::Expr::Attribute(attr) => {
-                let result = self.infer_attribute_load(attr);
+                let result = self
+                    .infer_attribute_load(attr)
+                    .map(|ty| ty.inner_type())
+                    .map_err(|ty| ty.inner_type());
                 let previous_value = result.unwrap_or_else(|recovery_ty| recovery_ty);
                 self.store_expression_type(target, previous_value);
                 result
@@ -5503,6 +5512,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             kind: CallableTypeKind,
         ) -> Option<Type<'d>> {
             match ty {
+                Type::Recursive(recursive) => recursive.map_or(db, env, None, |unfolded| {
+                    propagate_callable_kind(db, env, unfolded, kind)
+                }),
+                Type::RecursiveVar(_) => {
+                    unreachable!("semantic operation on an unbound recursive variable")
+                }
                 Type::Callable(callable) => Some(Type::Callable(callable.with_kind(db, kind))),
                 Type::Union(union) => union.try_map(db, env, |element| {
                     propagate_callable_kind(db, env, *element, kind)
@@ -6643,6 +6658,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
+        self.finish_expression_type(expression, ty, tcx)
+    }
+
+    /// Apply context before recording an inferred expression type.
+    fn finish_expression_type(
+        &mut self,
+        expression: &ast::Expr,
+        ty: Type<'db>,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let ty = self.apply_type_context(expression, ty, tcx);
         self.store_expression_type(expression, ty);
         ty
@@ -6708,14 +6733,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .exactly_one()
                 .ok()
         };
-        let Some(target_callable) = (match target {
+        let Some(target_callable) = (match target.resolve_type_alias(db) {
             Type::Callable(callable) => Some(callable),
             Type::Union(union) => exactly_one_callable(union),
-            Type::TypeAlias(_) => match target.resolve_type_alias(db) {
-                Type::Callable(callable) => Some(callable),
-                Type::Union(union) => exactly_one_callable(union),
-                _ => None,
-            },
             _ => None,
         }) else {
             return ty;
@@ -6870,7 +6890,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::Intersection(intersection) => intersection
                 .iter_positive(self.db())
                 .any(|ty| self.has_string_literal_completion_candidates(ty)),
-            Type::TypeAlias(_) => true,
+            Type::TypeAlias(_) | Type::Recursive(_) => true,
             _ => false,
         }
     }
@@ -9665,6 +9685,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mut identity_bindings = self
                     .infer_attribute_load_impl(attribute, identity_instance)
                     .unwrap_or_else(|recovery_ty| recovery_ty)
+                    .inner_type()
                     .bindings(db, env)
                     .match_parameters(db, env, &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
@@ -10330,10 +10351,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
+        self.infer_name_load_with_definition(name_node).0
+    }
+
+    /// Resolve a name once, retaining its definition for type-alias interpretation.
+    fn infer_name_load_with_definition(
+        &mut self,
+        name_node: &ast::ExprName,
+    ) -> (Type<'db>, Option<Definition<'db>>) {
         let db = self.db();
         let expr = PlaceExpr::from_expr_name(name_node);
 
         let (resolved, _) = self.infer_place_load(expr, ast::ExprRef::Name(name_node));
+        let definition = match resolved.place {
+            Place::Defined(place) => place.provenance.definition(),
+            Place::Undefined => None,
+        };
         let env = self.program_environment();
 
         let ty = resolved.unwrap_with_diagnostic(db, env, |lookup_error| match lookup_error {
@@ -10347,7 +10380,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         });
 
-        ty.inner_type()
+        (ty.inner_type(), definition)
     }
 
     /// Infer the type of a place expression from its ordered load sources.
@@ -10691,7 +10724,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_attribute_load(
         &mut self,
         attribute: &ast::ExprAttribute,
-    ) -> Result<Type<'db>, Type<'db>> {
+    ) -> Result<TypeAndQualifiers<'db>, TypeAndQualifiers<'db>> {
         let value_type =
             self.infer_maybe_standalone_expression(&attribute.value, TypeContext::default());
         self.infer_attribute_load_impl(attribute, value_type)
@@ -10730,7 +10763,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         attribute: &ast::ExprAttribute,
         mut value_type: Type<'db>,
-    ) -> Result<Type<'db>, Type<'db>> {
+    ) -> Result<TypeAndQualifiers<'db>, TypeAndQualifiers<'db>> {
         fn union_elements_missing_attribute<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
@@ -10771,19 +10804,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let (resolved, keys) =
                 self.infer_place_load(place_expr, ast::ExprRef::Attribute(attribute));
             constraint_keys.extend(keys);
-            if let Place::Defined(DefinedPlace {
-                ty,
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) = resolved.place
+            if let Place::Defined(
+                place @ DefinedPlace {
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                },
+            ) = resolved.place
             {
-                assigned_type = Some(ty);
+                assigned_type = Some(
+                    TypeAndQualifiers::new(place.ty, place.origin, resolved.qualifiers)
+                        .with_provenance(place.provenance),
+                );
             }
         }
         let member_lookup = value_type
             .try_member_lookup(db, env, &attr.id)
             .unwrap_or_else(|error| {
-                error.report_diagnostic(&self.context, value_type, attribute, assigned_type);
+                error.report_diagnostic(
+                    &self.context,
+                    value_type,
+                    attribute,
+                    assigned_type.map(|ty| ty.inner_type()),
+                );
                 error.fallback_member(db)
             });
         let fallback_place = member_lookup.member(db).map_type(|ty| {
@@ -11059,9 +11101,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         });
 
-        let resolved_type = resolved_type.inner_type();
-
-        self.check_deprecated(attr, resolved_type);
+        self.check_deprecated(attr, resolved_type.inner_type());
 
         // Deleting an attribute does not invoke its getter. Augmented assignment, however,
         // reads the property here even though its AST target has a store context.
@@ -11097,7 +11137,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match ctx {
             ExprContext::Load => self
                 .infer_attribute_load(attribute)
-                .unwrap_or_else(|recovery_ty| recovery_ty),
+                .unwrap_or_else(|recovery_ty| recovery_ty)
+                .inner_type(),
             ExprContext::Store => {
                 self.infer_expression(value, TypeContext::default());
                 Type::Never
@@ -11216,6 +11257,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         match (op, operand_type) {
+            (_, Type::RecursiveVar(_)) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             (ast::UnaryOp::Invert | ast::UnaryOp::UAdd | ast::UnaryOp::USub, Type::Dynamic(_))
             | (_, Type::Divergent(_)) => operand_type,
             (_, Type::Never) => Type::Never,
@@ -11286,6 +11330,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 Type::from_truthiness(db, env, original_truthiness.negate())
             }
+            (_, Type::Recursive(_)) => fallback_unary_expression_type(),
             // Handle constrained TypeVars specially: check each constraint individually.
             //
             // TODO: We expect to replace this with more general support once we migrate to the new

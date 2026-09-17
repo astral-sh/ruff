@@ -2362,5 +2362,53 @@ class Ok1(Generic[U, *Ts]): ...
 class Ok2(Generic[U, Unpack[Ts]]): ...
 ```
 
+## Inferring constructor type arguments through growing recursive aliases
+
+A constructor infers its type argument from an already-annotated recursive value. Each level of
+children wraps the leaf type in another list, but the root's leaf type determines the
+specialization.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+Growing = tuple[T, list["Growing[list[T]]"]]
+
+class Root(Generic[U]):
+    def __init__(self, value: Growing[U]) -> None:
+        self.value = value[0]
+
+def probe(value: Growing[int]):
+    root = Root(value)
+    reveal_type(root)  # revealed: Root[int]
+    reveal_type(root.value)  # revealed: int
+```
+
+## Inferring constructor type arguments from recursive children
+
+Each child swaps the two payload types and wraps its new payload in a sequence. A constructor that
+reads a child's payload infers its type argument from beyond the root, even as the payload types
+become increasingly nested.
+
+```py
+from collections.abc import Sequence
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+Tree = tuple[T, Sequence["Tree[Sequence[U], T]"]]
+
+class FirstChild(Generic[V]):
+    def __init__(self, value: Tree[int, V]) -> None:
+        self.value = value[1][0][0][0]
+
+def probe(value: Tree[int, str]):
+    child = FirstChild(value)
+    reveal_type(child)  # revealed: FirstChild[str]
+    reveal_type(child.value)  # revealed: str
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

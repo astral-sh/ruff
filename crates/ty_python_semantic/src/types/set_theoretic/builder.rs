@@ -654,6 +654,7 @@ impl<'db> UnionBuilder<'db> {
 
     /// Adds a type to this union.
     pub(crate) fn add_in_place(&mut self, ty: Type<'db>) {
+        ty.assert_not_recursive_var();
         self.add_in_place_impl(ty, &mut vec![]);
     }
 
@@ -695,13 +696,13 @@ impl<'db> UnionBuilder<'db> {
             }
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
-            Type::TypeAlias(alias) if self.unpack_aliases => {
+            Type::TypeAlias(_) if self.unpack_aliases => {
                 if seen_aliases.contains(&ty) {
                     // Union contains itself recursively via a type alias. This is an error, just
                     // leave out the recursive alias. TODO surface this error.
                 } else {
                     seen_aliases.push(ty);
-                    self.add_in_place_impl(alias.value_type(db), seen_aliases);
+                    self.add_in_place_impl(ty.resolve_type_alias(db), seen_aliases);
                 }
             }
             Type::LiteralValue(literal) => {
@@ -996,7 +997,7 @@ impl<'db> UnionBuilder<'db> {
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery;
+        let should_simplify_full = !ty.is_alias_like() && !self.cycle_recovery;
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
@@ -1077,15 +1078,13 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
+            if should_simplify_full && !element_type.is_alias_like() {
                 // Preserving aliases also excludes comparisons that expand aliases nested in
                 // type arguments. A recursive alias can rebuild this union during specialization.
                 if !self.unpack_aliases
-                    && [ty, element_type].into_iter().any(|ty| {
-                        any_over_type(db, &self.env, ty, false, |ty| {
-                            matches!(ty, Type::TypeAlias(_))
-                        })
-                    })
+                    && [ty, element_type]
+                        .into_iter()
+                        .any(|ty| any_over_type(db, &self.env, ty, false, Type::is_alias_like))
                 {
                     continue;
                 }
@@ -1348,9 +1347,9 @@ impl<'db> IntersectionBuilder<'db> {
         let mut seen_aliases = FxHashSet::default();
         while let Some((ty, negated)) = pending.pop() {
             match ty {
-                Type::TypeAlias(alias) => {
-                    if seen_aliases.insert((alias, negated)) {
-                        pending.push((alias.value_type(db), negated));
+                Type::TypeAlias(_) | Type::Recursive(_) => {
+                    if seen_aliases.insert((ty, negated)) {
+                        pending.push((ty.resolve_type_alias(db), negated));
                     }
                 }
                 Type::Union(union) => {
@@ -1394,7 +1393,7 @@ impl<'db> IntersectionBuilder<'db> {
     ) -> ControlFlow<L::Break> {
         let db = self.db;
         match ty {
-            Type::TypeAlias(alias) => {
+            Type::TypeAlias(_) | Type::Recursive(_) => {
                 if seen_aliases.contains(&ty) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
@@ -1403,7 +1402,7 @@ impl<'db> IntersectionBuilder<'db> {
                     return ControlFlow::Continue(());
                 }
                 seen_aliases.push(ty);
-                let value_type = alias.value_type(db);
+                let value_type = ty.resolve_type_alias(db);
                 self.add_positive_impl::<L>(value_type, seen_aliases)?;
             }
             Type::Union(union) => {
@@ -1466,7 +1465,7 @@ impl<'db> IntersectionBuilder<'db> {
         let db = self.db;
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
-            Type::TypeAlias(alias) => {
+            Type::TypeAlias(_) | Type::Recursive(_) => {
                 if seen_aliases.contains(&ty) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
@@ -1475,7 +1474,7 @@ impl<'db> IntersectionBuilder<'db> {
                     return ControlFlow::Continue(());
                 }
                 seen_aliases.push(ty);
-                let value_type = alias.value_type(db);
+                let value_type = ty.resolve_type_alias(db);
                 self.add_negative_impl::<L>(value_type, seen_aliases)?;
             }
             Type::Union(union) => {

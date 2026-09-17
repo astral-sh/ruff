@@ -1520,7 +1520,7 @@ def g[T: A](b: B[T]):
 Gradual lower bounds are intersected with their inferred upper bounds.
 
 ```py
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any, Callable, TypeAlias
 from ty_extensions._internal import Unknown
 
@@ -1689,7 +1689,8 @@ def _(
     reveal_type(bounded_gradual(unknown_value, list_upper))  # revealed: list[int] & Unknown
 ```
 
-Recursive declared bounds do not introduce `Divergent` into a concrete solution:
+`list[int]` does not satisfy the bound `int | list[Recursive]`: `list` is invariant. The declared
+bound and upper bound therefore do not select a concrete type from gradual input.
 
 ```py
 Recursive: TypeAlias = int | list["Recursive"]
@@ -1700,6 +1701,25 @@ def bounded_recursive[T: Recursive](value: T, upper: Callable[[T], None]) -> T:
 def _(any_value: Any, unknown_value: Unknown, upper: Callable[[list[int]], None]):
     any_result = bounded_recursive(any_value, upper)
     unknown_result = bounded_recursive(unknown_value, upper)
+
+    reveal_type(any_result)  # revealed: Any
+    reveal_type(any_result[0])  # revealed: Any
+    reveal_type(unknown_result)  # revealed: Unknown
+    reveal_type(unknown_result[0])  # revealed: Unknown
+```
+
+`list[int]` satisfies the recursive bound formed with covariant `Sequence`. The inferred upper bound
+therefore restricts the gradual result to `list[int]`, and indexing preserves its element type.
+
+```py
+CovariantRecursive: TypeAlias = int | Sequence["CovariantRecursive"]
+
+def bounded_covariant_recursive[T: CovariantRecursive](value: T, upper: Callable[[T], None]) -> T:
+    return value
+
+def _(any_value: Any, unknown_value: Unknown, upper: Callable[[list[int]], None]):
+    any_result = bounded_covariant_recursive(any_value, upper)
+    unknown_result = bounded_covariant_recursive(unknown_value, upper)
 
     reveal_type(any_result)  # revealed: list[int] & Any
     reveal_type(any_result[0])  # revealed: int & Any
@@ -1736,8 +1756,8 @@ def _(values: list[Bound], sink: Callable[[object], None]) -> None:
     reveal_type(first(values, sink))
 ```
 
-The same holds for recursive aliases, whose recursive positions currently fall back to `Divergent`.
-This is a reduced regression test for [ty#4335](https://github.com/astral-sh/ty/issues/4335).
+The same holds for recursive aliases. This is a reduced regression test for
+[ty#4335](https://github.com/astral-sh/ty/issues/4335).
 
 ```py
 Recursive = None | int | set[int] | Sequence["Recursive"] | Mapping[str, "Recursive"]
@@ -1746,7 +1766,7 @@ def first_recursive[T: Recursive](values: list[T], sink: Callable[[T], None]) ->
     return values[0]
 
 def _(values: list[Recursive], sink: Callable[[object], None]) -> None:
-    # revealed: None | int | set[int] | Sequence[Divergent] | Mapping[str, Divergent]
+    # revealed: None | int | set[int] | Sequence[Recursive] | Mapping[str, Recursive]
     reveal_type(first_recursive(values, sink))
 ```
 
@@ -2611,6 +2631,51 @@ from typing import Any
 def f(l: list[tuple[Any | str, Any | str]]) -> None:
     # revealed: dict[Any | str, Any | str]
     reveal_type(dict(l))
+```
+
+## Inferring type arguments through recursive aliases
+
+Generic calls infer leaf types from already-annotated recursive values. The argument can use a
+structurally equivalent alias or spell out the outer tuple. A tuple parameter can also receive a
+recursive alias, and separate occurrences of an alias contribute their own leaf types.
+
+```py
+type Tree[T] = tuple[T, Tree[T] | None]
+type OtherTree[T] = tuple[T, OtherTree[T] | None]
+
+def leaf[U](value: Tree[U]) -> U:
+    return value[0]
+
+def first[U](value: tuple[U, object]) -> U:
+    return value[0]
+
+def either_leaf[U](value: tuple[Tree[U], Tree[U]]) -> U:
+    return value[0][0]
+
+def probe(value: Tree[int], other: OtherTree[str], plain: tuple[bytes, Tree[bytes] | None]):
+    reveal_type(leaf(value))  # revealed: int
+    reveal_type(leaf(other))  # revealed: str
+    reveal_type(leaf(plain))  # revealed: bytes
+    reveal_type(first(value))  # revealed: int
+    reveal_type(either_leaf((value, other)))  # revealed: int | str
+```
+
+## Inferring type arguments from deeper recursive levels
+
+These trees have distinct types at their first three levels and integer values at every level
+afterward. A function selecting a grandchild infers its type from the third level, even though its
+parameter does not constrain the first two levels.
+
+```py
+from collections.abc import Sequence
+
+type Levels[T, U, V] = tuple[T, Sequence[Levels[U, V, int]]]
+
+def grandchild_value[U](value: Levels[object, object, U]) -> U:
+    return value[1][0][1][0][0]
+
+def probe(value: Levels[int, str, bytes]):
+    reveal_type(grandchild_value(value))  # revealed: bytes
 ```
 
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md

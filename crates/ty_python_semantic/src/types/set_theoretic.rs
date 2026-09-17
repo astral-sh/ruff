@@ -1,5 +1,6 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
+use rustc_hash::FxHashSet;
 
 use std::convert::Infallible;
 
@@ -8,9 +9,12 @@ use crate::place::{
 };
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
-use crate::types::{InstanceProjection, Type, TypePair, TypeQualifiers};
+use crate::types::{
+    ApplyTypeMappingVisitor, InstanceProjection, PromotionKind, PromotionMode, Type, TypeContext,
+    TypeMapping, TypePair, TypeQualifiers,
+};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Program};
 
 pub(crate) mod builder;
 mod generic_gradual_intersections;
@@ -121,9 +125,7 @@ impl<'db> UnionType<'db> {
 
     /// Returns `true` if any direct element of this union is a type alias.
     pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
-        self.elements(db)
-            .iter()
-            .any(|element| matches!(element, Type::TypeAlias(_)))
+        self.elements(db).iter().copied().any(Type::is_alias_like)
     }
 
     /// Recursively expands aliases that expose top-level union elements.
@@ -134,8 +136,34 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        // Rebuild the union so that `UnionBuilder` simplifies any redundancies exposed.
-        Self::from_elements(db, env, self.elements(db).iter().copied())
+        // Relation checks expand the same target union for many different source types.
+        self.cached_expand_aliases(db, env.program(db))
+    }
+
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, program| {
+            result.cycle_normalized(db, &ProgramEnvironment::from_program(program), *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn cached_expand_aliases(self, db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
+        let env = &ProgramEnvironment::from_program(program);
+        // Expose both alias forms without expanding aliases inside containers during reduction.
+        let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
+        let mut pending = vec![Type::Union(self)];
+        let mut seen = FxHashSet::default();
+        while let Some(element) = pending.pop() {
+            if !seen.insert(element) {
+                continue;
+            }
+            match element.resolve_type_alias(db) {
+                Type::Union(union) => pending.extend(union.elements(db).iter().rev().copied()),
+                resolved => builder.add_in_place(resolved),
+            }
+        }
+        builder.build()
     }
 
     pub(crate) fn from_elements_cycle_recovery<I, T>(
@@ -247,6 +275,30 @@ impl<'db> UnionType<'db> {
         Some(builder.build())
     }
 
+    /// Map the union's elements, preserving open bodies during structural substitutions.
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        if type_mapping.is_structural() {
+            Type::Union(UnionType::new(
+                db,
+                self.elements(db)
+                    .iter()
+                    .map(|element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                    .collect::<Box<[_]>>(),
+                self.recursively_defined(db),
+            ))
+        } else {
+            self.map_leave_aliases(db, visitor.env, |element| {
+                element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            })
+        }
+    }
+
     /// Apply a transformation function to all elements of the union,
     /// and create a new union from the resulting set of types.
     pub(crate) fn map(
@@ -262,7 +314,7 @@ impl<'db> UnionType<'db> {
     }
 
     /// A version of [`UnionType::map`] that does not unpack type aliases.
-    pub(crate) fn map_leave_aliases(
+    fn map_leave_aliases(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -317,6 +369,7 @@ impl<'db> UnionType<'db> {
         let mut iter = elements.iter().enumerate();
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty)?;
+            // The builder unpacks `TypeAlias` nodes but preserves structural recursive types.
             if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_)) {
                 let mut builder = UnionBuilder::new(db, env);
                 for prev in &elements[..i] {
@@ -1029,6 +1082,59 @@ impl<'db> IntersectionType<'db> {
             Either::Left(std::iter::once(Type::object()))
         } else {
             Either::Right(positive.iter().copied())
+        }
+    }
+
+    /// Map both signs of the intersection, preserving open bodies during structural substitutions.
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        if type_mapping.is_structural() {
+            let positive = self
+                .positive(db)
+                .iter()
+                .map(|positive| positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                .collect::<FxOrderSet<_>>();
+            let mut negative = NegativeIntersectionElements::default();
+            for element in self.negative(db) {
+                negative.insert(element.apply_type_mapping_impl(
+                    db,
+                    &type_mapping.flip(),
+                    tcx,
+                    visitor,
+                ));
+            }
+            Type::Intersection(IntersectionType::new(db, positive, negative))
+        } else {
+            let mut builder = IntersectionBuilder::new(db, visitor.env);
+            for positive in self.positive(db) {
+                builder.add_positive_in_place(positive.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                ));
+            }
+            // Regular promotion should remove negative contributions from intersections,
+            // so we don't preserve them here when regular promotion is enabled.
+            if !matches!(
+                type_mapping,
+                TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
+            ) {
+                for negative in self.negative(db) {
+                    builder.add_negative_in_place(negative.apply_type_mapping_impl(
+                        db,
+                        &type_mapping.flip(),
+                        tcx,
+                        visitor,
+                    ));
+                }
+            }
+            builder.build()
         }
     }
 

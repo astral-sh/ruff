@@ -13,9 +13,10 @@ use crate::{
     },
     reachability::DeclarationsIteratorExtension,
     types::{
-        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, IntersectionType, KnownClass,
-        LiteralValueTypeKind, MemberLookupPolicy, NegativeIntersectionElements, StaticClassLiteral,
-        Type, UnionType, binding_type,
+        ApplyTypeMappingVisitor, ClassBase, ClassLiteral, DynamicType, EnumLiteralType,
+        IntersectionType, KnownClass, LiteralValueTypeKind, MemberLookupPolicy,
+        NegativeIntersectionElements, StaticClassLiteral, Type, TypeContext, TypeMapping,
+        UnionType, binding_type,
         function::FunctionType,
         set_theoretic::{
             RecursivelyDefined,
@@ -891,6 +892,30 @@ impl<'db> EnumComplementType<'db> {
         // `Color & Any & ~Literal[Color.RED]`, are not equivalent to that literal union because the
         // additional intersection components must remain.
         self.rest(db).is_empty()
+    }
+
+    /// Map the complement's remaining components without expanding open recursive bodies.
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        if type_mapping.is_structural() {
+            Type::EnumComplement(EnumComplementType::new(
+                db,
+                self.enum_class_literal(db),
+                self.excluded_names(db).clone(),
+                self.rest(db)
+                    .iter()
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                    .collect::<FxOrderSet<_>>(),
+            ))
+        } else {
+            self.to_intersection(db, visitor.env)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+        }
     }
 
     /// Reconstruct the equivalent set-theoretic intersection.
