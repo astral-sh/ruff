@@ -205,7 +205,6 @@ impl<'db> SolutionWalker<'db> {
         let Some((constraint, constraints)) = constraints.split_first() else {
             return process_satisfied(self, storage, limits, path);
         };
-        // XXX let _ = storage.constraint_source_order(*constraint);
         self.source_orders.insert(*constraint);
         path.walk_edge(
             db,
