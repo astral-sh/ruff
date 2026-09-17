@@ -1632,17 +1632,16 @@ fn is_legacy_namespace_package(
     context: &ResolverContext,
     init: File,
 ) -> bool {
-    static NAMESPACE_MODULES: LazyLock<IdentifierMatcher<'static>> = LazyLock::new(|| {
-        IdentifierMatcher::new(["pkgutil", "pkg_resources"])
-            .expect("two short names are within Aho-Corasick's size limits")
-    });
+    static NAME_MATCHER: LazyLock<IdentifierMatcher<'static>> =
+        LazyLock::new(|| IdentifierMatcher::new("__name__"));
 
     // Just an optimization, the stdlib and typeshed are never legacy namespace packages
     if package_path.search_path().is_standard_library() {
         return false;
     }
 
-    if !NAMESPACE_MODULES.may_match(&source_text(context.db, init)) {
+    // Both supported namespace declarations pass `__name__` as an argument.
+    if !NAME_MATCHER.may_match(&source_text(context.db, init)) {
         return false;
     }
 

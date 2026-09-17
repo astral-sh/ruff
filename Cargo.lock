@@ -3689,7 +3689,6 @@ dependencies = [
 name = "ruff_python_trivia"
 version = "0.0.14"
 dependencies = [
- "aho-corasick",
  "itertools 0.15.0",
  "memchr",
  "ruff_source_file",

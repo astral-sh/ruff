@@ -16,7 +16,6 @@ license = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
-aho-corasick = { workspace = true }
 itertools = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }

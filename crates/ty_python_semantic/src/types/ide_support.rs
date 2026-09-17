@@ -37,7 +37,7 @@ pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
 
 static CLASS_MATCHER: LazyLock<IdentifierMatcher<'static>> =
-    LazyLock::new(|| IdentifierMatcher::single("class"));
+    LazyLock::new(|| IdentifierMatcher::new("class"));
 
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
@@ -219,7 +219,7 @@ impl<'a> ImplementationsFinder<'a> {
         Some(Self {
             initial_definitions,
             roots: family_roots,
-            name_matcher: Cow::Owned(IdentifierMatcher::single(member_name)),
+            name_matcher: Cow::Owned(IdentifierMatcher::new(member_name)),
             kind: ImplementationsFinderKind::MemberFamily {
                 name: member_name,
                 accessor_role,
@@ -1938,7 +1938,7 @@ fn direct_subtypes<'db>(
 ) -> Vec<ClassLiteral<'db>> {
     let target_name = target_class.name(db);
     let target_is_object = target_class.is_known(db, KnownClass::Object);
-    let target_matcher = IdentifierMatcher::single(target_name.as_str());
+    let target_matcher = IdentifierMatcher::new(target_name.as_str());
     let mut subtypes = vec![];
 
     for &module in modules {

@@ -173,7 +173,7 @@ fn references_for_search(
                 .collect()
         };
         let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
-        let matcher = IdentifierMatcher::single(search.target_text.as_str());
+        let matcher = IdentifierMatcher::new(search.target_text.as_str());
         let other_references = files
             .into_par_iter()
             .with_min_len(minimum_job_len)
