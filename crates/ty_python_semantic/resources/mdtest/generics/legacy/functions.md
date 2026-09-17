@@ -1641,6 +1641,40 @@ reveal_type(narrow(1))  # revealed: int
 reveal_type(narrow("hello"))  # revealed: str
 ```
 
+## Selecting constraints for narrowed caller type variables
+
+Caller type variables are not inferable when selecting a constraint for a callee's type variable:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+ReversedT = TypeVar("ReversedT", str, int)
+S = TypeVar("S")
+
+def constrained(value: T) -> T:
+    return value
+
+def reversed_constraints(value: ReversedT) -> ReversedT:
+    return value
+
+def narrowed(value: S) -> None:
+    if isinstance(value, str):
+        reveal_type(constrained(value))  # revealed: str
+        reveal_type(reversed_constraints(value))  # revealed: str
+```
+
+The caller's variable also remains fixed when the narrowed value is nested in a tuple:
+
+```py
+def constrained_tuple(value: tuple[T]) -> T:
+    return value[0]
+
+def narrowed_tuple(value: S) -> None:
+    if isinstance(value, str):
+        reveal_type(constrained_tuple((value,)))  # revealed: str
+```
+
 ## Redundant callback bounds preserve constrained type-variable relationships
 
 A contravariant callback can contribute both another constrained type variable and a redundant
