@@ -361,20 +361,35 @@ impl<'db> SolutionWalker<'db> {
         // using the solution as-is, rather than trying to force it to be exactly equal to one of
         // the declared constraints. (We call this a "family" solution since it's a single solution
         // that satisfies the entire family of declared constraints.)
-        let has_non_concrete_evidence = path
-            .positive_constraints()
-            .map(|(constraint, _)| storage.constraint_data(constraint))
-            .filter(|constraint| {
-                // Constraints involving other typevars are not relevant
-                constraint.provides_bound_for(db, bound_typevar)
-            })
-            .all(|constraint| {
-                // None means the typevar is constrained by another typevar; otherwise check if
-                // the concrete constraint is dynamic
-                constraint
-                    .as_concrete()
-                    .is_none_or(|(_, constrained_ty)| !constrained_ty.is_fully_static(db, env))
-            });
+        let mut evidence = CandidateTypeVarRangeSolver::default();
+        for (constraint, _) in path.positive_constraints() {
+            let constraint = storage.constraint_data(constraint);
+
+            // Constraints involving other typevars are not relevant
+            if !constraint.provides_bound_for(db, bound_typevar) {
+                continue;
+            }
+
+            // Only consider evidence constraints
+            if constraint.provenance() != ConstraintProvenance::Evidence {
+                continue;
+            }
+
+            evidence.add_constraint(db, bound_typevar, constraint);
+        }
+        let Some(evidence) = evidence.finish(db, env, storage, bound_typevar) else {
+            // If the evidence is not satisfiable, then we can return early; none of the
+            // constraints can possibly be satisfied.
+            return ControlFlow::Continue(());
+        };
+        let has_no_evidence = evidence.evidence_lower.is_none() && !evidence.upper.has_evidence();
+        let has_non_concrete_evidence = has_no_evidence
+            || evidence.has_only_gradual_evidence == Some(true)
+            || evidence.evidence_lower.is_some_and(Type::is_type_var)
+            || evidence
+                .as_single_upper_bound(db, env)
+                .is_some_and(Type::is_type_var);
+
         if has_non_concrete_evidence {
             let mut any_trivial_failures = false;
             for declared_constraint in &constrained_typevar.declared_constraints {

@@ -2096,25 +2096,13 @@ def select(first: Callable[[T], None], second: Callable[[T], None]) -> T:
     raise NotImplementedError
 
 def forward_object(specific: Callable[[S], None], redundant: Callable[[object], None]) -> S:
-    # XXX: no error
-    # error: [invalid-argument-type]
     result = select(specific, redundant)
-    # XXX: revealed: S@forward_object
-    # revealed: S@forward_object | int | str
-    reveal_type(result)
-    # XXX: no error
-    # error: [invalid-return-type]
+    reveal_type(result)  # revealed: S@forward_object
     return result
 
 def forward_object_reversed(specific: Callable[[S], None], redundant: Callable[[object], None]) -> S:
-    # XXX: no error
-    # error: [invalid-argument-type]
     result = select(redundant, specific)
-    # XXX: revealed: S@forward_object_reversed
-    # revealed: int | str | S@forward_object_reversed
-    reveal_type(result)
-    # XXX: no error
-    # error: [invalid-return-type]
+    reveal_type(result)  # revealed: S@forward_object_reversed
     return result
 ```
 
@@ -2123,25 +2111,13 @@ A union of the type variable's constraints is also a redundant upper bound, even
 
 ```py
 def forward_union(specific: Callable[[S], None], redundant: Callable[[int | str], None]) -> S:
-    # XXX: no error
-    # error: [invalid-argument-type]
     result = select(specific, redundant)
-    # XXX: revealed: S@forward_union
-    # revealed: S@forward_union | int | str
-    reveal_type(result)
-    # XXX: no error
-    # error: [invalid-return-type]
+    reveal_type(result)  # revealed: S@forward_union
     return result
 
 def forward_union_reversed(specific: Callable[[S], None], redundant: Callable[[int | str], None]) -> S:
-    # XXX: no error
-    # error: [invalid-argument-type]
     result = select(redundant, specific)
-    # XXX: revealed: S@forward_union_reversed
-    # revealed: int | str | S@forward_union_reversed
-    reveal_type(result)
-    # XXX: no error
-    # error: [invalid-return-type]
+    reveal_type(result)  # revealed: S@forward_union_reversed
     return result
 ```
 
@@ -2160,25 +2136,13 @@ def select_nominal(first: Callable[[TNominal], None], second: Callable[[TNominal
     raise NotImplementedError
 
 def forward_nominal(specific: Callable[[SNominal], None], redundant: Callable[[Base], None]) -> SNominal:
-    # XXX: no error
-    # error: [invalid-argument-type]
     result = select_nominal(specific, redundant)
-    # XXX: revealed: SNominal@forward_nominal
-    # revealed: SNominal@forward_nominal | Left | Right
-    reveal_type(result)
-    # XXX: no error
-    # error: [invalid-return-type]
+    reveal_type(result)  # revealed: SNominal@forward_nominal
     return result
 
 def forward_nominal_reversed(specific: Callable[[SNominal], None], redundant: Callable[[Base], None]) -> SNominal:
-    # XXX: no error
-    # error: [invalid-argument-type]
     result = select_nominal(redundant, specific)
-    # XXX: revealed: SNominal@forward_nominal_reversed
-    # revealed: Left | Right | SNominal@forward_nominal_reversed
-    reveal_type(result)
-    # XXX: no error
-    # error: [invalid-return-type]
+    reveal_type(result)  # revealed: SNominal@forward_nominal_reversed
     return result
 ```
 

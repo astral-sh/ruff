@@ -366,6 +366,16 @@ impl<'db> Constraint<'db> {
         }
     }
 
+    pub(super) fn provenance(self) -> ConstraintProvenance {
+        match self {
+            Constraint::ConcreteLower(this) => this.provenance,
+            Constraint::ConcreteUpper(this) => this.provenance,
+            Constraint::ConcreteEquivalence(this) => this.provenance,
+            Constraint::TypeVarRange(this) => this.provenance,
+            Constraint::TypeVarEquivalence(this) => this.provenance,
+        }
+    }
+
     pub(super) fn with_provenance(mut self, provenance: ConstraintProvenance) -> Self {
         match &mut self {
             Constraint::ConcreteLower(this) => this.provenance = provenance,
