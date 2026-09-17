@@ -1,7 +1,7 @@
 use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{self as ast, ArgOrKeyword, ExprContext};
+use ruff_python_ast::{self as ast, ArgOrKeyword, ExprContext, HasNodeIndex};
 use ruff_text_size::Ranged;
 use ty_module_resolver::file_to_module;
 
@@ -19,7 +19,10 @@ use crate::types::diagnostic::{
 use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
-use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
+use crate::types::infer::{
+    InferenceFlags, InferenceRegion, TypeExpressionFlags, infer_union_types,
+};
+use crate::types::known_instance::DeferredUnionType;
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
@@ -35,10 +38,26 @@ use crate::types::{
     UnionType, UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::PlaceExpr;
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{SemanticIndex, place_table};
+
+/// Find a name whose definition can anchor the shared RHS of an assignment.
+fn assignment_target_definition<'db>(
+    index: &SemanticIndex<'db>,
+    target: &ast::Expr,
+) -> Option<Definition<'db>> {
+    match target {
+        ast::Expr::Name(name) => index.try_definition(name),
+        ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+        | ast::Expr::List(ast::ExprList { elts, .. }) => elts
+            .iter()
+            .find_map(|target| assignment_target_definition(index, target)),
+        ast::Expr::Starred(starred) => assignment_target_definition(index, &starred.value),
+        _ => None,
+    }
+}
 
 /// Given a string literal or a union of string literals, return an iterator over the contained
 /// strings, or `None` if the type is neither.
@@ -186,6 +205,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_subscript_load_impl(value_ty, subscript)
     }
 
+    fn deferred_union_type(
+        &self,
+        subscript: &ast::ExprSubscript,
+        is_optional: bool,
+    ) -> Option<DeferredUnionType<'db>> {
+        if self.in_string_annotation() {
+            return None;
+        }
+        let db = self.db();
+        // Chained and unpacking assignments infer their shared RHS in an expression region.
+        // Every target definition retains that RHS, so any name target provides a stable anchor.
+        let definition = match self.region {
+            InferenceRegion::Definition(definition) => Some(definition),
+            InferenceRegion::Expression(expression, _) => {
+                expression.assigned_to(db).and_then(|assignment| {
+                    assignment
+                        .node(self.module())
+                        .targets
+                        .iter()
+                        .find_map(|target| assignment_target_definition(self.index, target))
+                })
+            }
+            _ => None,
+        }?;
+        let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+            return None;
+        };
+        let relative_node_index = subscript
+            .node_index()
+            .load()
+            .as_u32()
+            .zip(assignment.value(self.module()).node_index().load().as_u32())
+            .and_then(|(node, base)| node.checked_sub(base))?;
+        Some(DeferredUnionType::new(
+            db,
+            definition,
+            relative_node_index,
+            self.typevar_binding_context,
+            is_optional,
+        ))
+    }
+
     fn infer_subscript_load_impl(
         &mut self,
         value_ty: Type<'db>,
@@ -320,6 +381,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
 
+                    if let Some(deferred) = self.deferred_union_type(subscript, true) {
+                        // Optional still resolves its members eagerly to preserve the None value
+                        // when its argument denotes None, including through an alias. Otherwise,
+                        // retain the stable wrapper without embedding those members in its value.
+                        let inference = &infer_union_types(db, deferred).inference;
+                        let argument_ty = inference.expression_type(slice.as_ref());
+                        if argument_ty.is_none(db) {
+                            // No deferred union value remains for scope checking to collect.
+                            self.extend_expression(inference);
+                            return Ok(argument_ty);
+                        }
+                        return Ok(Type::KnownInstance(KnownInstanceType::UnionType(
+                            UnionTypeInstance::deferred(db, deferred),
+                        )));
+                    }
+
                     let ty = self.infer_type_expression(slice);
 
                     // `Optional[None]` is equivalent to `None`:
@@ -341,6 +418,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 SpecialFormType::Union => match **slice {
                     ast::Expr::Tuple(ref tuple) => {
+                        // A stable value lets recursive references resolve the assignment before
+                        // the union's members.
+                        if let Some(deferred) = self.deferred_union_type(subscript, false) {
+                            return Ok(Type::KnownInstance(KnownInstanceType::UnionType(
+                                UnionTypeInstance::deferred(db, deferred),
+                            )));
+                        }
                         let elements = tuple.iter().map(|elt| self.infer_type_expression(elt));
 
                         let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
