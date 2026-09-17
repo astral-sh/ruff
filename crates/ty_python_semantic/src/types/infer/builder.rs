@@ -5094,7 +5094,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Resolve the target type, assuming a load context.
         let target_result = match &**target {
             ast::Expr::Name(name) => {
-                let (previous_value, _) = self.infer_name_load(name);
+                let previous_value = self.infer_name_load(name);
                 self.store_expression_type(target, previous_value);
                 Ok(previous_value)
             }
@@ -10334,8 +10334,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
     }
 
+    fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
+        self.infer_name_load_with_definition(name_node).0
+    }
+
     /// Resolve a name once, retaining its definition for type-alias interpretation.
-    fn infer_name_load(
+    fn infer_name_load_with_definition(
         &mut self,
         name_node: &ast::ExprName,
     ) -> (Type<'db>, Option<Definition<'db>>) {
@@ -10671,7 +10675,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
         match name.ctx {
-            ExprContext::Load => self.infer_name_load(name).0,
+            ExprContext::Load => self.infer_name_load(name),
             ExprContext::Store => Type::Never,
             ExprContext::Del => {
                 self.infer_name_load(name);

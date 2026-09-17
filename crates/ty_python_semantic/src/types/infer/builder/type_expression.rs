@@ -193,7 +193,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         expression: &ast::Expr,
     ) -> (Type<'db>, Option<Definition<'db>>) {
         match expression {
-            ast::Expr::Name(name) if name.ctx.is_load() => self.infer_name_load(name),
+            ast::Expr::Name(name) if name.ctx.is_load() => {
+                self.infer_name_load_with_definition(name)
+            }
             ast::Expr::Attribute(attribute) if attribute.ctx.is_load() => {
                 let resolved = self.infer_attribute_load(attribute).unwrap_or_else(|ty| ty);
                 (resolved.inner_type(), resolved.provenance().definition())
