@@ -1038,6 +1038,22 @@ static_assert(not is_subtype_of(Preserved[int], Preserved[object]))
 static_assert(not is_subtype_of(Preserved[object], Preserved[int]))
 ```
 
+A decorator returning a mutable `list[T]` also makes its owner invariant, independently of the
+original method's covariant return annotation.
+
+```py
+def mutable[R](func: Callable[..., R]) -> list[R]:
+    raise NotImplementedError
+
+class Mutable[T]:
+    @mutable
+    def value(self) -> T:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Mutable[int], Mutable[object]))
+static_assert(not is_subtype_of(Mutable[object], Mutable[int]))
+```
+
 ### Descriptor read and write types
 
 Descriptor access determines the member's variance. A getter returning `T` and a setter accepting
@@ -1250,6 +1266,43 @@ class D[T]:
 
 static_assert(is_subtype_of(D[B], D[A]))
 static_assert(not is_subtype_of(D[A], D[B]))
+```
+
+## Variance in composed return types
+
+A mutable member makes a union or intersection return type invariant.
+
+```py
+from typing import Callable
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Marker: ...
+
+class UnionReturn[T]:
+    def value(self) -> list[T] | tuple[T, ...]:
+        raise NotImplementedError
+
+class IntersectionReturn[T]:
+    def value(self) -> Intersection[list[T], Marker]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(UnionReturn[int], UnionReturn[object]))
+static_assert(not is_subtype_of(UnionReturn[object], UnionReturn[int]))
+static_assert(not is_subtype_of(IntersectionReturn[int], IntersectionReturn[object]))
+static_assert(not is_subtype_of(IntersectionReturn[object], IntersectionReturn[int]))
+```
+
+Returning a tuple of consumers requires contravariance: tuples preserve the variance of their
+elements, and the callables consume `T`.
+
+```py
+class Callbacks[T]:
+    def callbacks(self) -> tuple[Callable[[T], None], ...]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Callbacks[object], Callbacks[int]))
+static_assert(not is_subtype_of(Callbacks[int], Callbacks[object]))
 ```
 
 ## Tuple elements

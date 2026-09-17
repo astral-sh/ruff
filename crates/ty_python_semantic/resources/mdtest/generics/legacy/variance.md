@@ -394,6 +394,40 @@ class ClassMethods(Generic[T_co]):
     def static_accepts(value: T_co) -> None: ...
 ```
 
+## Variance in composed return types
+
+A mutable member makes a union or intersection return type invariant. A union of read-only types can
+remain covariant.
+
+```py
+from typing import Callable, Generic, TypeVar
+from ty_extensions import Intersection
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Marker: ...
+
+class Returns(Generic[T_co]):
+    # error: [invalid-generic-class]
+    def union(self) -> list[T_co] | tuple[T_co, ...]:
+        raise NotImplementedError
+    # error: [invalid-generic-class]
+    def intersection(self) -> Intersection[list[T_co], Marker]:
+        raise NotImplementedError
+    def readonly(self) -> tuple[T_co, ...] | None:
+        raise NotImplementedError
+```
+
+Returning a tuple of consumers requires contravariance: tuples preserve the variance of their
+elements, and the callables consume `T_co`.
+
+```py
+class Callbacks(Generic[T_co]):
+    # error: [invalid-generic-class]
+    def callbacks(self) -> tuple[Callable[[T_co], None], ...]:
+        raise NotImplementedError
+```
+
 ## Variance in generic methods
 
 A method's independent type variable can accept arguments outside the class's covariant value type.
@@ -705,10 +739,10 @@ class ReplacedWithProperty(Generic[T_co]):
     def value(self, value: T_co) -> None: ...
 ```
 
-## Variance in decorators returning unions
+## Variance in decorators returning non-callables
 
-A decorator returning `list[T_co] | tuple[T_co, ...]` makes covariance invalid: `list` is invariant,
-even though `tuple` is covariant.
+A decorator returning `list[T_co]` makes covariance invalid, even though the original method's
+return type permits covariance.
 
 ```py
 from typing import Callable, Generic, TypeVar
@@ -716,69 +750,13 @@ from typing import Callable, Generic, TypeVar
 R = TypeVar("R")
 T_co = TypeVar("T_co", covariant=True)
 
-def mutable_union(func: Callable[..., R]) -> list[R] | tuple[R, ...]:
+def mutable(func: Callable[..., R]) -> list[R]:
     raise NotImplementedError
 
 class Covariant(Generic[T_co]):
-    @mutable_union
+    @mutable
     # error: [invalid-generic-class]
     def mutable(self) -> T_co:
-        raise NotImplementedError
-```
-
-In contrast, returning `tuple[T_co, ...] | None` preserves covariance.
-
-```py
-def readonly_union(func: Callable[..., R]) -> tuple[R, ...] | None:
-    raise NotImplementedError
-
-class ReadOnly(Generic[T_co]):
-    @readonly_union
-    def value(self) -> T_co:
-        raise NotImplementedError
-```
-
-## Variance in decorators returning intersections
-
-A decorator returning an intersection with `list[T_co]` also makes covariance invalid.
-
-```py
-from typing import Callable, Generic, TypeVar
-from ty_extensions import Intersection
-
-R = TypeVar("R")
-T_co = TypeVar("T_co", covariant=True)
-
-class Marker: ...
-
-def mutable_intersection(func: Callable[..., R]) -> Intersection[list[R], Marker]:
-    raise NotImplementedError
-
-class Covariant(Generic[T_co]):
-    @mutable_intersection
-    # error: [invalid-generic-class]
-    def intersection(self) -> T_co:
-        raise NotImplementedError
-```
-
-## Variance in decorators returning containers of callables
-
-A decorator can return a tuple of callables that accept `T_co`. Although the tuple is covariant, the
-callables require contravariance, making the class's covariance invalid.
-
-```py
-from typing import Callable, Generic, TypeVar
-
-R = TypeVar("R")
-T_co = TypeVar("T_co", covariant=True)
-
-def callbacks(func: Callable[..., R]) -> tuple[Callable[[R], None], ...]:
-    raise NotImplementedError
-
-class Callbacks(Generic[T_co]):
-    @callbacks
-    # error: [invalid-generic-class]
-    def value(self) -> T_co:
         raise NotImplementedError
 ```
 
