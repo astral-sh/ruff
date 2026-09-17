@@ -2727,8 +2727,8 @@ for tree in (legacy(1), modern(1)):
     if isinstance(tree, tuple):
         reveal_type(tree[0])  # revealed: Tree[Literal[1]]
 
-reveal_type([legacy(1)])  # revealed: list[int | tuple[Tree[int]]]
-reveal_type([modern(1)])  # revealed: list[int | tuple[Tree[int]]]
+reveal_type([legacy(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
+reveal_type([modern(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
 take([legacy(1)])
 take([modern(1)])
 annotated: list[Tree[int]] = [legacy(1), modern(1)]
