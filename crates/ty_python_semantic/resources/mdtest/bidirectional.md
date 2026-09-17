@@ -1335,6 +1335,29 @@ x10: Callable[[list[int]], MultiPath[int] | MultiPath[list[int]]] = reveal_type(
 # fmt: on
 ```
 
+## Generic class specialization through recursive callable aliases
+
+A recursive callable context specializes a generic class used as a factory. The returned container
+keeps the recursive element type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+
+Factory = Callable[[], list["Factory"]]
+type ExplicitFactory = Callable[[], list[ExplicitFactory]]
+
+factory: Factory = list
+explicit_factory: ExplicitFactory = list
+
+reveal_type(factory())  # revealed: list[Factory]
+reveal_type(explicit_factory())  # revealed: list[ExplicitFactory]
+```
+
 ## Narrow union declared type for generic calls
 
 When a generic call is checked against a union declared type, the union is narrowed to the first
