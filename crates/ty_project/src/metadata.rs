@@ -239,15 +239,6 @@ impl ProjectMetadata {
         }
     }
 
-    /// Discovers the closest project without considering uv workspace metadata.
-    pub fn discover_without_uv(
-        path: &SystemPath,
-        system: &dyn System,
-    ) -> Result<ProjectMetadata, ProjectMetadataError> {
-        Self::discover_with_uv_workspace(path, system, ProjectEnvironment::default())
-            .map(|metadata| metadata.with_use_uv(UseUv::from_system(system)))
-    }
-
     fn discover_with_uv_workspace(
         path: &SystemPath,
         system: &dyn System,

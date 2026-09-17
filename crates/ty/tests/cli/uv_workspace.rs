@@ -409,7 +409,17 @@ fn uses_uv_workspace_root_without_checking_siblings() -> anyhow::Result<()> {
 #[cfg(feature = "test-uv")]
 #[test]
 fn explicit_script_path_disables_uv_workspace_discovery() -> anyhow::Result<()> {
-    let case = workspace_case()?.with_filter(r"exit code: 1", "exit status: 1");
+    // uv's formatting of resolution failures varies by version; retain the missing dependency.
+    let case = workspace_case()?
+        .with_filter(r"exit code: 1", "exit status: 1")
+        .with_filter(
+            concat!(
+                r"(?s)[ \t]*(?:×|error:) No solution found when resolving dependencies:?",
+                r".*?missing-workspace-dependency==99\.0\.0",
+                r".*?hint: Packages were unavailable because the network was disabled\.[^\n]*",
+            ),
+            " <missing-workspace-dependency==99.0.0 unavailable offline>",
+        );
     case.write_file(
         "packages/member/pyproject.toml",
         r#"
@@ -430,11 +440,7 @@ fn explicit_script_path_disables_uv_workspace_discovery() -> anyhow::Result<()> 
     exit_code: 1
     ----- stdout -----
     member.py:1:14: error[invalid-assignment] Object of type `Literal["selected-member"]` is not assignable to `int`
-    pyproject.toml: warning[uv-metadata] `uv workspace metadata` failed with status exit status: 1: error: No solution found when resolving dependencies
-      cause: Because missing-workspace-dependency was not found in the cache and member depends on missing-workspace-dependency==99.0.0, we can conclude that member's requirements are unsatisfiable.
-             And because your workspace requires member, we can conclude that your workspace's requirements are unsatisfiable.
-
-    hint: Packages were unavailable because the network was disabled. When the network is disabled, registry packages may only be read from the cache.
+    pyproject.toml: warning[uv-metadata] `uv workspace metadata` failed with status exit status: 1: <missing-workspace-dependency==99.0.0 unavailable offline>
 
     Found 2 diagnostics
 

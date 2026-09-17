@@ -148,24 +148,26 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .map(|path| SystemPath::absolute(path, &cwd));
     let force_exclude = args.force_exclude();
 
+    let use_uv = UseUv::from_system(&system);
+    let use_uv = if use_uv == UseUv::On
+        && let [path] = check_paths.as_slice()
+        && system.is_file(path)
+        && system
+            .read_to_string(path)
+            .is_ok_and(|source| ScriptTag::parse(source.as_bytes()).is_some())
+    {
+        // A single PEP 723 script uses its own uv environment, even with an explicit ty
+        // configuration file. The other explicit paths still discover workspace metadata.
+        UseUv::Scripts
+    } else {
+        use_uv
+    };
+
     let mut project_metadata = match &config_file {
-        Some(config_file) => ProjectMetadata::from_config_file(
-            config_file.clone(),
-            &project_path,
-            &system,
-            UseUv::from_system(&system),
-        )?,
-        None if UseUv::from_system(&system) == UseUv::On
-            && let [path] = check_paths.as_slice()
-            && system
-                .read_to_string(path)
-                .is_ok_and(|source| ScriptTag::parse(source.as_bytes()).is_some()) =>
-        {
-            // A standalone PEP 723 script uses its own uv environment instead of the
-            // enclosing workspace. Other explicit paths still discover workspace metadata.
-            ProjectMetadata::discover_without_uv(&project_path, &system)?
+        Some(config_file) => {
+            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system, use_uv)?
         }
-        None => ProjectMetadata::discover(&project_path, &system)?,
+        None => ProjectMetadata::discover_with_uv(&project_path, &system, use_uv)?,
     };
 
     project_metadata.apply_configuration_files(&system)?;
