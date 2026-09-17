@@ -8014,6 +8014,58 @@ td["<CURSOR>"]
     }
 
     #[test]
+    fn string_literal_completions_recursive_typed_dict_alias_keys() {
+        let builder = completion_test_builder(
+            r#"
+from typing import TypedDict
+
+class Item(TypedDict, total=False):
+    field_number: int
+    field_text: str
+
+Tree = Item | list["Tree"]
+
+def consume(value: Tree):
+    value["<CURSOR>"]
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        field_number :: Literal["field_number"]
+        field_text :: Literal["field_text"]
+        "#,
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_recursive_typed_dict_alias_keys_deletion() {
+        let builder = completion_test_builder(
+            r#"
+from typing import TypedDict
+
+class Item(TypedDict, total=False):
+    field_number: int
+    field_text: str
+
+Tree = Item | list["Tree"]
+
+def consume(value: Tree):
+    del value["<CURSOR>"]
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        field_number :: Literal["field_number"]
+        field_text :: Literal["field_text"]
+        "#,
+        );
+    }
+
+    #[test]
     fn string_literal_completions_typed_dict_literal_keys() {
         let builder = completion_test_builder(
             r#"
