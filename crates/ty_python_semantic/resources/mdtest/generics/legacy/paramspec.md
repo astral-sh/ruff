@@ -1353,3 +1353,40 @@ def target(first: T, values: list[T]) -> None: ...
 target("a", ["a"])
 forward(target, "a", ["a"])
 ```
+
+### Generic constructors with bounded return types
+
+A class object can be passed as a callable that constructs instances. `Factory` takes no constructor
+arguments, but its instances have a generic, writable `value` attribute:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Factory(Generic[T]):
+    value: T
+```
+
+The `construct` helper captures a callable's parameters in `P`, forwards its arguments, and returns
+the resulting instance. The bound on `R` requires that instance to be assignable to
+`Factory[object]`:
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+R = TypeVar("R", bound=Factory[object])
+
+def construct(factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+```
+
+`P` captures an empty parameter list, so the forwarded call supplies no information for `T`. The
+result should therefore be `Factory[Unknown]`, which is assignable to `Factory[object]` and
+satisfies `R`'s bound. We accept the call, but currently infer `Factory[object]` instead:
+
+```py
+# TODO: revealed: Factory[Unknown]
+reveal_type(construct(Factory))  # revealed: Factory[object]
+```

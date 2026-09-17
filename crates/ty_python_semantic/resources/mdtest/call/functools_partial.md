@@ -711,6 +711,65 @@ reveal_type(bound)  # revealed: partial[(cfg: Any) -> Any]
 reveal_type(bound({}))  # revealed: Any
 ```
 
+### Truthiness-narrowed gradual ParamSpec callable bound with `partial`
+
+A truthiness-narrowed gradual callable remains valid input to a `ParamSpec` wrapper. Binding the
+wrapper produces a gradual callable that remains assignable to a callback with a fixed parameter
+list:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+from typing import Any, Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def legacy_wrapper(
+    original: Callable[P, dict[str, Any]],
+    state: str,
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> dict[str, Any]:
+    return original(*args, **kwargs)
+
+def pep695_wrapper[**P](
+    original: Callable[P, dict[str, Any]],
+    state: str,
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> dict[str, Any]:
+    return original(*args, **kwargs)
+
+def patch(original: Callable[..., Any]) -> None:
+    if original:  # error: [truthiness-test-of-callable]
+        legacy = partial(legacy_wrapper, original, "state")
+        reveal_type(legacy)  # revealed: partial[(...) -> dict[str, Any]]
+        callback: Callable[[str], dict[str, Any]] = legacy
+        pep695 = partial(pep695_wrapper, original, "state")
+        reveal_type(pep695)  # revealed: partial[(...) -> dict[str, Any]]
+        callback = pep695
+```
+
+Adding an unrelated intersection member does not change which arguments the callable accepts:
+
+```py
+from ty_extensions import Intersection
+
+class Marker: ...
+
+def intersected(original: Intersection[Callable[..., Any], Marker]) -> None:
+    legacy = partial(legacy_wrapper, original, "state")
+    reveal_type(legacy)  # revealed: partial[(...) -> dict[str, Any]]
+    callback: Callable[[str], dict[str, Any]] = legacy
+    pep695 = partial(pep695_wrapper, original, "state")
+    reveal_type(pep695)  # revealed: partial[(...) -> dict[str, Any]]
+    callback = pep695
+```
+
 ### ParamSpec callable with keyword-bound wrapper parameters
 
 ```py
