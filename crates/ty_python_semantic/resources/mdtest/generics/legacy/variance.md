@@ -1107,6 +1107,99 @@ class UncheckedGetter(Generic[T_co]):
     def value(self, value: T_co) -> None: ...
 ```
 
+## Variance in decorated property accessors
+
+A decorated property getter still produces its exposed return type, even when the decorator replaces
+the function with a callable object.
+
+```py
+from functools import cache
+from typing import Callable, Generic, ParamSpec, TypeVar, no_type_check
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+def preserve(func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+class Cached(Generic[T_contra]):
+    @property
+    @cache
+    # error: [invalid-generic-class]
+    def value(self) -> T_contra:
+        raise NotImplementedError
+
+class Preserved(Generic[T_contra]):
+    @property
+    @preserve
+    # error: [invalid-generic-class]
+    def value(self) -> T_contra:
+        raise NotImplementedError
+
+class Covariant(Generic[T_co]):
+    @property
+    @preserve
+    def value(self: "Covariant[T_co]") -> T_co:
+        raise NotImplementedError
+```
+
+The same applies to a decorated setter's input. Suppressing the getter does not suppress the
+setter's variance check.
+
+```py
+class Setter(Generic[T_co]):
+    @property
+    @no_type_check
+    @preserve
+    def value(self) -> list[T_co]:
+        raise NotImplementedError
+
+    @value.setter
+    @preserve
+    # error: [invalid-generic-class]
+    def value(self, value: T_co) -> None: ...
+```
+
+The decorated signature determines variance. Replacing the getter's return type with `int` removes
+its variance requirement, while replacing a setter's parameter with `list[T_co]` introduces one.
+
+```py
+def replace_getter(func: object) -> Callable[[object], int]:
+    raise NotImplementedError
+
+def replace_setter(func: Callable[..., R]) -> Callable[[object, list[R]], None]:
+    raise NotImplementedError
+
+class Changed(Generic[T_co]):
+    @property
+    @replace_getter
+    def value(self) -> list[T_co]:
+        raise NotImplementedError
+
+    @value.setter
+    @replace_setter
+    # error: [invalid-generic-class]
+    def value(self, value: object) -> T_co:
+        raise NotImplementedError
+```
+
+Replacing a decorated getter also removes its original variance requirement.
+
+```py
+class Replaced(Generic[T_contra]):
+    @property
+    @preserve
+    def value(self) -> T_contra:
+        raise NotImplementedError
+
+    @value.getter
+    @preserve
+    def value(self) -> int:
+        return 0
+```
+
 ## Variance in replaced property getters
 
 Replacing a getter removes its variance requirements. The replacement returns `int`, so it does not

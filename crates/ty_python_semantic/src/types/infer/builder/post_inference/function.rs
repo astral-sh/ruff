@@ -107,12 +107,14 @@ pub(super) fn check_class_method_typevar_variance<'db>(
             continue;
         };
         member.ty = ty.resolve_type_alias(db);
-        if member.ty.is_property_instance() {
+        if let Type::PropertyInstance(property) = member.ty {
             // Each retained accessor has its own exclusions. Checking bound accessor signatures
             // includes the setter's input, which an ordinary property read would not expose.
-            for function in member.local_functions_from_type(db, class.body_scope(db)) {
-                if !exclude_from_variance(db, function)
-                    && let Some(accessor) = Type::FunctionLiteral(function)
+            for (accessor, function) in property.accessors_with_functions(db) {
+                if function.definition(db).scope(db) == class.body_scope(db)
+                    && !exclude_from_variance(db, function)
+                {
+                    let accessor = accessor
                         .try_call_dunder_get(
                             db,
                             env,
@@ -120,12 +122,12 @@ pub(super) fn check_class_method_typevar_variance<'db>(
                             instance.to_meta_type(db, env),
                         )
                         .unwrap_or_else(|error| Some(error.fallback()))
-                {
+                        .map_or(accessor, |result| result.return_type);
                     check_method_typevar_variance(
                         context,
                         generic_context,
                         function,
-                        accessor.return_type,
+                        accessor,
                         None,
                     );
                 }
