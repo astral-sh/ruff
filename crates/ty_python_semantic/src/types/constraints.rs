@@ -4748,11 +4748,19 @@ impl InteriorNode {
             return PathAssignments::new(constraints, FxHashSet::default());
         }
 
+        let bound_is_concrete = |bound: Type<'db>| {
+            !bound.has_typevar(db, env)
+                && !bound.has_unspecialized_type_var(db, env)
+                && bound.bottom_materialization(db, env) == bound.top_materialization(db, env)
+        };
+
         let mut independent_typevars = FxHashSet::default();
         let mut dependent_typevars = FxHashSet::default();
         for constraint_id in &constraints {
             let constraint = storage.constraint_data(*constraint_id);
-            if let Some(typevar) = constraint.as_concrete(db, env) {
+            if let Some((typevar, bound)) = constraint.as_concrete()
+                && bound_is_concrete(bound)
+            {
                 let typevar = storage.typevar_id(db, typevar);
                 independent_typevars.insert(typevar);
             } else {

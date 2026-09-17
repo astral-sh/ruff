@@ -407,26 +407,11 @@ impl<'db> Constraint<'db> {
         )
     }
 
-    pub(super) fn as_concrete(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<BoundTypeVarInstance<'db>> {
-        let bound_is_concrete = |bound: Type<'db>| {
-            !bound.has_typevar(db, env)
-                && !bound.has_unspecialized_type_var(db, env)
-                && bound.bottom_materialization(db, env) == bound.top_materialization(db, env)
-        };
+    pub(super) fn as_concrete(self) -> Option<(BoundTypeVarInstance<'db>, Type<'db>)> {
         match self {
-            Constraint::ConcreteLower(this) => {
-                bound_is_concrete(this.bound).then_some(this.typevar)
-            }
-            Constraint::ConcreteUpper(this) => {
-                bound_is_concrete(this.bound).then_some(this.typevar)
-            }
-            Constraint::ConcreteEquivalence(this) => {
-                bound_is_concrete(this.bound).then_some(this.typevar)
-            }
+            Constraint::ConcreteLower(this) => Some((this.typevar, this.bound)),
+            Constraint::ConcreteUpper(this) => Some((this.typevar, this.bound)),
+            Constraint::ConcreteEquivalence(this) => Some((this.typevar, this.bound)),
             Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => None,
         }
     }
