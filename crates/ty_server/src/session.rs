@@ -452,7 +452,7 @@ impl Session {
     /// Returns a reference to the project's [`ProjectDatabase`] in which the given `path` belongs.
     ///
     /// If the path is a system path, it will return the project database that is closest to the
-    /// given path, or the first project if no project is found for the path.
+    /// given path, then one whose search paths contain it, then the first project.
     ///
     /// If the path is a virtual path, it will return the first project database in the session.
     pub(crate) fn project_db(&self, path: &AnySystemPath) -> &ProjectDatabase {
@@ -480,7 +480,7 @@ impl Session {
     /// Returns a reference to the project's [`ProjectState`] in which the given `path` belongs.
     ///
     /// If the path is a system path, it will return the project database that is closest to the
-    /// given path, or the first project if no project is found for the path.
+    /// given path, then one whose search paths contain it, then the first project.
     ///
     /// If the path is a virtual path, it will return the first project database in the session.
     fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
@@ -522,11 +522,18 @@ impl Session {
             .and_then(|root| self.projects.get(root))
     }
 
-    /// Returns the workspace root of the closest containing project.
+    /// Selects a containing project or the first project that can resolve this dependency.
     fn project_root_for_path(&self, path: &SystemPath) -> Option<&SystemPathBuf> {
         self.projects
             .range(..=path.to_path_buf())
             .rfind(|(workspace_root, _)| path.starts_with(workspace_root))
+            .or_else(|| {
+                self.projects.iter().find(|(_, project)| {
+                    project.db.program_for_dependency(path).is_some()
+                        || ty_ide::cached_vendored_root(&project.db)
+                            .is_some_and(|root| path.starts_with(root))
+                })
+            })
             .map(|(root, _)| root)
     }
 

@@ -1,6 +1,7 @@
 use anyhow::Result;
-use lsp_types::{Contents, MarkupKind, Position};
+use lsp_types::{Contents, MarkupKind, Position, TextDocumentContentChangeEvent};
 use ruff_db::system::SystemPath;
+use ty_server::ClientOptions;
 
 use crate::TestServerBuilder;
 
@@ -234,6 +235,81 @@ python-version = "3.12"
     "#);
 
     Ok(())
+}
+
+#[test]
+fn external_dependency_uses_its_project_environment_and_settings() {
+    for disabled in [false, true] {
+        let path = SystemPath::new("deps/library.py");
+        let source = "\
+import sys
+sys.platform
+value = 42
+";
+        let mut server = TestServerBuilder::new()
+            .expect("test server")
+            .with_workspace(SystemPath::new("a"), None)
+            .expect("first workspace")
+            .with_workspace(
+                SystemPath::new("b/src"),
+                Some(ClientOptions::default().with_disable_language_services(disabled)),
+            )
+            .expect("dependency workspace")
+            .with_file(
+                "b/ty.toml",
+                r#"[environment]
+extra-paths = ["../deps"]
+python-platform = "win32"
+"#,
+            )
+            .expect("configuration")
+            .with_file(path, source)
+            .expect("dependency")
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(path, source, 1);
+        if disabled {
+            assert!(server.hover_request(path, Position::new(1, 5)).is_none());
+            continue;
+        }
+        let hover = server
+            .hover_request(path, Position::new(1, 5))
+            .expect("hover");
+        assert!(
+            matches!(hover.contents, Contents::MarkupContent(markup) if markup.value == "Literal[\"win32\"]")
+        );
+
+        server.change_text_document(
+            path,
+            vec![
+                TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                    lsp_types::TextDocumentContentChangeWholeDocument {
+                        text: "\
+value = 'edited'
+value
+"
+                        .into(),
+                    },
+                ),
+            ],
+            2,
+        );
+        let hover = server
+            .hover_request(path, Position::new(1, 0))
+            .expect("edited hover");
+        assert!(
+            matches!(hover.contents, Contents::MarkupContent(markup) if markup.value == "Literal[\"edited\"]")
+        );
+        server.close_text_document(path);
+        server.open_text_document(path, source, 3);
+        let hover = server
+            .hover_request(path, Position::new(1, 5))
+            .expect("reopened hover");
+        assert!(
+            matches!(hover.contents, Contents::MarkupContent(markup) if markup.value == "Literal[\"win32\"]")
+        );
+    }
 }
 
 fn hover_content_format(formats: Vec<MarkupKind>) -> Result<MarkupKind> {
