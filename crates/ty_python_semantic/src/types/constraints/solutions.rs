@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
+use indexmap::map::Slice;
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
@@ -75,7 +76,7 @@ impl<'db> SolutionWalker<'db> {
                     let validations = validations.get_or_insert_with(|| {
                         Validations::from_support(db, env, storage, all_typevars)
                     });
-                    let upper_bounds = validations.iter_upper_bounds();
+                    let upper_bounds = validations.upper_bounds.as_slice();
                     this.validate_satisfied_path(db, env, storage, limits, path, upper_bounds)
                 }
                 None => this.found_satisfied_path(db, env, storage, limits, path),
@@ -230,19 +231,19 @@ impl<'db> SolutionWalker<'db> {
 
     /// Having found a satisfiable path in the BDD, validates that path against the declared upper
     /// bound (TODO and constraints) of all relevant typevars.
-    fn validate_satisfied_path<'a, L: SolutionLimits>(
+    fn validate_satisfied_path<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
-        upper_bounds: impl Iterator<Item = (BoundTypeVarInstance<'db>, &'a UpperBound)> + Clone,
+        upper_bounds: &Slice<BoundTypeVarInstance<'db>, UpperBound>,
     ) -> ControlFlow<L::Break> {
         // We have a path that represents a valid solution to the constraint set. Check if the
         // solution satisfies all of the typevars' declared upper bounds (TODO and constraints).
         let previous_count = self.pending.len();
-        self.validate_upper_bound(db, env, storage, limits, path, &mut upper_bounds.clone())?;
+        self.validate_upper_bound(db, env, storage, limits, path, upper_bounds)?;
         if self.pending.len() > previous_count {
             // We will only add pending candidate solutions during the validation process if _all_
             // validations
@@ -258,14 +259,14 @@ impl<'db> SolutionWalker<'db> {
         self.attribute_typevar_failures(db, env, storage, limits, path, upper_bounds)
     }
 
-    fn validate_upper_bound<'a, L: SolutionLimits>(
+    fn validate_upper_bound<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
-        upper_bounds: &mut dyn Iterator<Item = (BoundTypeVarInstance<'db>, &'a UpperBound)>,
+        upper_bounds: &Slice<BoundTypeVarInstance<'db>, UpperBound>,
     ) -> ControlFlow<L::Break> {
         // High level plan: We find the next typevar with a declared upper bound, create a
         // throwaway BDD that represents that upper bound, and then walk that upper bound BDD's
@@ -273,7 +274,7 @@ impl<'db> SolutionWalker<'db> {
         // in force, any satisfiable paths we find in the upper bound BDD will be compatible with
         // the current candidate solution.
 
-        let Some((_, upper_bound)) = upper_bounds.next() else {
+        let Some(((_, upper_bound), upper_bounds)) = upper_bounds.split_first() else {
             // We've checked all typevars that have an upper bound, and we now know that the
             // candidate solution is valid.
             // TODO: Check the declared constraints here instead of `preliminary_solve` before
@@ -445,14 +446,14 @@ impl<'db> SolutionWalker<'db> {
     /// constraints were violated. Adds an [`Invalid`][SolutionValidity::Invalid] candidate
     /// solution for the path recording those violations, so that a later stage can transform them
     /// into useful diagnostics.
-    fn attribute_typevar_failures<'a, L: SolutionLimits>(
+    fn attribute_typevar_failures<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
-        upper_bounds: impl Iterator<Item = (BoundTypeVarInstance<'db>, &'a UpperBound)> + Clone,
+        upper_bounds: &Slice<BoundTypeVarInstance<'db>, UpperBound>,
     ) -> ControlFlow<L::Break> {
         let mut upper_bound_violations = FxHashSet::default();
         for (bound_typevar, upper_bound) in upper_bounds {
@@ -475,7 +476,7 @@ impl<'db> SolutionWalker<'db> {
                 )?;
             }
             if !satisfied {
-                upper_bound_violations.insert(bound_typevar);
+                upper_bound_violations.insert(*bound_typevar);
             }
         }
 
@@ -551,14 +552,6 @@ impl<'db> Validations<'db> {
             );
         }
         result
-    }
-
-    fn iter_upper_bounds(
-        &self,
-    ) -> impl Iterator<Item = (BoundTypeVarInstance<'db>, &UpperBound)> + Clone {
-        self.upper_bounds
-            .iter()
-            .map(|(bound_typevar, upper_bound)| (*bound_typevar, upper_bound))
     }
 
     fn add_typevar(
