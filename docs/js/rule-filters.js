@@ -1,16 +1,23 @@
 (() => {
   let restoreFilters = () => {};
   let layoutObserver;
-  let filterListeners;
   const collator = new Intl.Collator(undefined, { numeric: true });
+
+  if (window.Tablesort) {
+    // Tablesort comparators return descending order.
+    Tablesort.extend(
+      "natural",
+      () => true,
+      (a, b) => collator.compare(b.trim(), a.trim()),
+    );
+  }
 
   document$.subscribe(() => {
     layoutObserver?.disconnect();
-    filterListeners?.abort();
     restoreFilters = () => {};
 
     const form = document.getElementById("rule-filters");
-    if (!form) {
+    if (!form || !("popover" in HTMLElement.prototype)) {
       return;
     }
 
@@ -23,12 +30,10 @@
     table.id = "rule-catalog";
     const categoryMetadata =
       table.tHead.querySelector(".rule-category").dataset;
-    const categoryOrder = categoryMetadata.categories.split(" ");
     const body = table.tBodies[0];
 
     const rows = [...body.rows].map((element) => ({
       element,
-      code: element.querySelector(".rule-code").textContent.trim(),
       name: element.querySelector(".rule-identity code").textContent.trim(),
       text: [".rule-code", ".rule-identity"]
         .map((selector) => element.querySelector(selector).textContent)
@@ -36,7 +41,6 @@
         .toLowerCase(),
       category: element.querySelector(".rule-category").textContent.trim(),
       linter: element.querySelector(".rule-linter").dataset.linter,
-      linterLabel: element.querySelector(".rule-linter").dataset.linterLabel,
       status: element.querySelector(".rule-status").dataset.status,
       fixable: element.querySelector(".rule-status").dataset.fixable === "true",
       isDefault:
@@ -48,121 +52,97 @@
     const count = form.querySelector(".rule-filters__count");
     const empty = form.querySelector(".rule-filters__empty");
 
-    const filters = [...form.querySelectorAll("[data-filter]")].map(
-      (details) => {
-        const name = details.dataset.filter;
-        const summary = details.querySelector("summary");
-        const selection = summary.firstElementChild;
-        const options = [...details.querySelectorAll("input")];
-        const allValues = options.map((option) => option.value);
+    const filters = [...form.querySelectorAll("[data-filter]")].map((group) => {
+      const name = group.dataset.filter;
+      const trigger = group.querySelector("[popovertarget]");
+      const panel = group.querySelector("[popover]");
+      const selection = trigger.firstElementChild;
+      const options = [...panel.querySelectorAll("input")];
+      const allValues = options.map((option) => option.value);
 
-        const isAll = () => options.every((option) => option.checked);
-        const values = () =>
-          options
-            .filter((option) => option.checked)
-            .map((option) => option.value);
+      const isAll = () => options.every((option) => option.checked);
 
-        const updateSummary = () => {
-          const labels = options
-            .filter((option) => option.checked)
-            .map((option) => option.parentElement.textContent.trim());
+      const updateSummary = () => {
+        const labels = options
+          .filter((option) => option.checked)
+          .map((option) => option.parentElement.textContent.trim());
 
-          selection.textContent =
-            labels.length === options.length
-              ? "All"
-              : labels.length === 0
-                ? "None"
-                : labels.length === 1
-                  ? labels[0]
-                  : `${labels.length} selected`;
-          summary.title =
-            isAll() || !labels.length
-              ? selection.textContent
-              : labels.join(", ");
-          summary.setAttribute(
-            "aria-label",
-            `${details.closest("fieldset").querySelector("legend").textContent}: ${selection.textContent}`,
-          );
-        };
+        selection.textContent =
+          labels.length === options.length
+            ? "All"
+            : labels.length === 0
+              ? "None"
+              : labels.length === 1
+                ? labels[0]
+                : `${labels.length} selected`;
+        trigger.title =
+          isAll() || !labels.length ? selection.textContent : labels.join(", ");
+        trigger.setAttribute(
+          "aria-label",
+          `${group.closest("fieldset").querySelector("legend").textContent}: ${selection.textContent}`,
+        );
+      };
 
-        const setValues = (selected = allValues) => {
-          for (const option of options) {
-            option.checked = selected.includes(option.value);
-          }
-        };
-
-        const presets = {
-          all: allValues,
-          default: categoryMetadata.defaultCategories.split(" "),
-          none: [],
-        };
-
-        for (const button of details.querySelectorAll("[data-preset]")) {
-          button.addEventListener("click", () => {
-            setValues(presets[button.dataset.preset]);
-            applyFilters();
-          });
+      const setValues = (selected = allValues) => {
+        for (const option of options) {
+          option.checked = selected.includes(option.value);
         }
+      };
 
-        details.addEventListener("toggle", () => {
-          if (details.open) {
-            for (const other of filters) {
-              if (other.details !== details) {
-                other.details.open = false;
-              }
-            }
-          }
+      const presets = {
+        all: allValues,
+        default: categoryMetadata.defaultCategories.split(" "),
+        none: [],
+      };
+
+      for (const button of panel.querySelectorAll("[data-preset]")) {
+        button.addEventListener("click", () => {
+          setValues(presets[button.dataset.preset]);
+          applyFilters();
         });
+      }
 
-        details.addEventListener("focusout", (event) => {
-          if (event.relatedTarget && !details.contains(event.relatedTarget)) {
-            details.open = false;
-          }
-        });
-
-        return {
-          name,
-          details,
-          summary,
-          values,
-          isAll,
-          setValues,
-          updateSummary,
-        };
-      },
-    );
-    const [category, linter, status] = filters;
-
-    filterListeners = new AbortController();
-    document.addEventListener(
-      "click",
-      (event) => {
-        for (const { details } of filters) {
-          if (!details.contains(event.target)) {
-            details.open = false;
-          }
-        }
-      },
-      { signal: filterListeners.signal },
-    );
-
-    document.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key !== "Escape") {
+      const controls = [...panel.querySelectorAll("button, input")];
+      group.addEventListener("keydown", (event) => {
+        if (
+          !panel.matches(":popover-open") ||
+          (event.key !== "ArrowDown" && event.key !== "ArrowUp") ||
+          event.altKey ||
+          event.ctrlKey ||
+          event.metaKey
+        ) {
           return;
         }
 
-        for (const { details, summary } of filters) {
-          if (details.open) {
-            details.open = false;
-            summary.focus();
-            event.preventDefault();
-          }
+        event.preventDefault();
+        const direction = event.key === "ArrowDown" ? 1 : -1;
+        const index = controls.indexOf(event.target);
+        const nextIndex =
+          index === -1
+            ? direction === 1
+              ? 0
+              : controls.length - 1
+            : Math.max(0, Math.min(controls.length - 1, index + direction));
+        controls[nextIndex]?.focus();
+      });
+
+      group.addEventListener("focusout", (event) => {
+        if (
+          panel.matches(":popover-open") &&
+          event.relatedTarget &&
+          !group.contains(event.relatedTarget)
+        ) {
+          panel.hidePopover();
         }
-      },
-      { signal: filterListeners.signal },
-    );
+      });
+
+      return {
+        name,
+        isAll,
+        setValues,
+        updateSummary,
+      };
+    });
 
     function clearFilters() {
       search.value = "";
@@ -183,23 +163,20 @@
       toc.parentElement.classList.add("rule-index-nav");
     }
 
-    const columns = ["code", "name", "category", "linter"];
-    let sortBy = "linter";
-    let descending = false;
-    const headers = [...table.tHead.rows[0].cells];
-
-    for (const [index, key] of columns.entries()) {
-      const button = headers[index].querySelector("button");
-      button.disabled = false;
-      button.addEventListener("click", () => {
-        descending = sortBy === key ? !descending : key === "category";
-        sortBy = key;
-        sortRows();
-        updateURL();
-      });
+    if (window.Tablesort) {
+      // Rule cells also contain messages; sort by the name alone.
+      for (const row of rows) {
+        row.element.cells[1].dataset.sort = row.name;
+      }
+      for (const button of table.tHead.querySelectorAll("button")) {
+        button.disabled = false;
+      }
+      new Tablesort(table);
     }
 
     const siteHeader = document.querySelector(".md-header");
+    // Keep the sticky filters and column headers below the site header, and leave
+    // enough scroll-margin clearance for linked rows when these heights change.
     layoutObserver = new ResizeObserver(() => {
       article.style.setProperty(
         "--rule-site-header-height",
@@ -219,49 +196,15 @@
       layoutObserver.observe(element);
     }
 
-    function sortRows() {
-      for (const [index, key] of columns.entries()) {
-        headers[index].setAttribute(
-          "aria-sort",
-          key === sortBy ? (descending ? "descending" : "ascending") : "none",
-        );
-      }
-
-      const sorted = [...rows].sort((a, b) => {
-        // Keep rules without codes or an originating linter at the end.
-        if (
-          (sortBy === "code" || sortBy === "linter") &&
-          (a.code === "—" || b.code === "—")
-        ) {
-          return Number(a.code === "—") - Number(b.code === "—");
-        }
-
-        const key = sortBy === "linter" ? "linterLabel" : sortBy;
-
-        // Categories are generated from highest to lowest severity.
-        const comparison =
-          sortBy === "category"
-            ? categoryOrder.indexOf(b.category) -
-              categoryOrder.indexOf(a.category)
-            : collator.compare(a[key], b[key]);
-
-        return (
-          (descending ? -1 : 1) * comparison ||
-          (sortBy === "linter" ? collator.compare(a.code, b.code) : 0) ||
-          collator.compare(a.name, b.name)
-        );
-      });
-      body.append(...sorted.map((row) => row.element));
-    }
-
     function filter() {
       for (const filter of filters) {
         filter.updateSummary();
       }
 
-      const categories = category.values();
-      const selectedLinters = linter.values();
-      const statuses = status.values();
+      const formData = new FormData(form);
+      const categories = formData.getAll("category");
+      const selectedLinters = formData.getAll("linter");
+      const statuses = formData.getAll("status");
       const terms = search.value
         .trim()
         .toLowerCase()
@@ -310,6 +253,7 @@
     }
 
     function updateURL(clearFragment = false) {
+      const formData = new FormData(form);
       const url = new URL(location.href);
       if (clearFragment) {
         url.hash = "";
@@ -327,7 +271,7 @@
           continue;
         }
 
-        const selected = filter.values();
+        const selected = formData.getAll(filter.name);
         // An omitted parameter means All; preserve an explicit empty selection.
         if (!selected.length) {
           url.searchParams.set(filter.name, "none");
@@ -338,17 +282,8 @@
         }
       }
 
-      if (sortBy !== "linter") {
-        url.searchParams.set("sort", sortBy);
-      } else {
-        url.searchParams.delete("sort");
-      }
-
-      if (descending) {
-        url.searchParams.set("dir", "desc");
-      } else {
-        url.searchParams.delete("dir");
-      }
+      url.searchParams.delete("sort");
+      url.searchParams.delete("dir");
 
       history.replaceState(history.state, "", url);
       updateFragmentLinks();
@@ -370,11 +305,6 @@
         );
       }
 
-      sortBy = columns.includes(url.searchParams.get("sort"))
-        ? url.searchParams.get("sort")
-        : "linter";
-      descending = url.searchParams.get("dir") === "desc";
-
       let fragment;
       try {
         fragment = decodeURIComponent(url.hash.slice(1));
@@ -385,12 +315,13 @@
       // Former linter heading links now open the corresponding filtered view.
       if (linters.has(fragment)) {
         clearFilters();
-        linter.setValues([fragment]);
+        filters
+          .find((filter) => filter.name === "linter")
+          .setValues([fragment]);
         updateURL();
       }
 
       filter();
-      sortRows();
       updateFragmentLinks();
 
       const target = fragment && document.getElementById(fragment);

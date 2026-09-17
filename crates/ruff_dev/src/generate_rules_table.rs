@@ -33,15 +33,14 @@ fn generate_table(
 ) {
     let table_start = table_out.len();
     table_out.push('\n');
-    let categories = Category::iter().join(" ");
     let default_categories = Category::default_categories().iter().join(" ");
     let _ = writeln!(
         table_out,
         "| <button type='button' title='Sort by code' disabled>Code</button> {{ scope='col' .rule-code }} \
          | <button type='button' title='Sort by rule' disabled>Rule</button> {{ scope='col' .rule-identity }} \
-         | <button type='button' title='Sort by category' disabled>Category</button> {{ scope='col' .rule-category data-categories='{categories}' data-default-categories='{default_categories}' }} \
+         | <button type='button' title='Sort by category' disabled>Category</button> {{ scope='col' .rule-category data-default-categories='{default_categories}' }} \
          | <button type='button' title='Sort by linter' disabled>Linter</button> {{ scope='col' .rule-linter }} \
-         | Status {{ scope='col' .rule-status aria-label='Status, fix availability, and default selection' }} |"
+         | Status {{ scope='col' .rule-status data-sort-method='none' aria-label='Status, fix availability, and default selection' }} |"
     );
     table_out.push_str("| ---- | ---- | -------- | ------ | -: |");
     table_out.push('\n');
@@ -175,10 +174,11 @@ fn generate_table(
         let _ = write!(
             table_out,
             "| <span class='rule-identity'>{ss}{explanation}<br><span class='rule-message'>{message}</span>{se}</span> \
-             | {ss}{category}{se} {{ .rule-category }} \
-             | {ss}{linter_name}{se} {{ {linter_anchor} .rule-linter data-linter='{linter_slug}' data-linter-label='{linter_label}' }} \
+             | {ss}{category}{se} {{ .rule-category data-sort='{category_rank}' }} \
+             | {ss}{linter_name}{se} {{ {linter_anchor} .rule-linter data-linter='{linter_slug}' }} \
              | <div {SYMBOLS_CONTAINER}>{status_token}{fix_token}{default_token}</div> {{ .rule-status data-status='{status}' data-fixable='{fixable}' data-default='{default}' }} |",
             category = rule.category(),
+            category_rank = rule.category() as usize,
             explanation = rule
                 .explanation()
                 .is_some()
