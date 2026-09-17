@@ -1799,7 +1799,8 @@ pub enum Type<'db> {
     Dynamic(DynamicType<'db>),
     /// A cycle marker used during recursive type inference.
     Divergent(DivergentType),
-    /// A recursive type whose references are bound by its body. See [`recursive`] for details.
+    /// A recursive type whose references are bound by its body.
+    /// See the module documentation in `recursive.rs` for details.
     Recursive(RecursiveType<'db>),
     /// A variable in a recursive type body, with no standalone type semantics.
     ///
