@@ -35,6 +35,7 @@ specifies ty's implementation of Python's import resolution algorithm.
 use std::borrow::Cow;
 use std::fmt;
 use std::iter::FusedIterator;
+use std::sync::LazyLock;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
@@ -47,6 +48,7 @@ use ruff_python_ast::{
     self as ast, PySourceType,
     visitor::{Visitor, walk_body},
 };
+use ruff_python_trivia::IdentifierMatcher;
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
@@ -1850,8 +1852,17 @@ fn is_legacy_namespace_package(
     context: &ResolverContext,
     init: File,
 ) -> bool {
+    static NAMESPACE_MODULES: LazyLock<IdentifierMatcher<'static>> = LazyLock::new(|| {
+        IdentifierMatcher::new(["pkgutil", "pkg_resources"])
+            .expect("two short names are within Aho-Corasick's size limits")
+    });
+
     // Just an optimization, the stdlib and typeshed are never legacy namespace packages
     if package_path.search_path().is_standard_library() {
+        return false;
+    }
+
+    if !NAMESPACE_MODULES.may_match(&source_text(context.db, init)) {
         return false;
     }
 

@@ -22,6 +22,7 @@ use ruff_python_ast::{
     name::Name,
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
+use ruff_python_trivia::IdentifierMatcher;
 use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_project::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
@@ -30,7 +31,7 @@ use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, ScopeKind};
 use ty_python_semantic::{
     Db as SemanticDb, FixtureExposure, FixtureNameSource, ImportAliasResolution,
-    ResolvedDefinition, SemanticModel, contains_identifier, fixture_bindings_for_parameter,
+    ResolvedDefinition, SemanticModel, fixture_bindings_for_parameter,
     fixture_exposures_for_definition, pytest_global_plugin_files,
 };
 
@@ -172,12 +173,13 @@ fn references_for_search(
                 .collect()
         };
         let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
+        let matcher = IdentifierMatcher::single(search.target_text.as_str());
         let other_references = files
             .into_par_iter()
             .with_min_len(minimum_job_len)
             .map_with_db(db, |db, other_file| {
                 let source = ruff_db::source::source_text(db, other_file);
-                if !contains_identifier(&source, &search.target_text) {
+                if !matcher.may_match(&source) {
                     return Vec::new();
                 }
 

@@ -3687,7 +3687,9 @@ dependencies = [
 name = "ruff_python_trivia"
 version = "0.0.12"
 dependencies = [
+ "aho-corasick",
  "itertools 0.15.0",
+ "memchr",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
@@ -4787,6 +4789,7 @@ dependencies = [
  "ruff_memory_usage",
  "ruff_python_ast",
  "ruff_python_stdlib",
+ "ruff_python_trivia",
  "rustc-hash",
  "salsa",
  "strum",

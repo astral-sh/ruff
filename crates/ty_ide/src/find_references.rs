@@ -287,6 +287,35 @@ def f(items):
     }
 
     #[test]
+    fn normalized_identifier_references_across_files() {
+        let test = CursorTest::builder()
+            .source("lib.py", "<CURSOR>C = 1")
+            .source(
+                "main.py",
+                r#"
+from lib import 𝒞
+print(𝒞)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+         --> lib.py:1:1
+          |
+        1 | C = 1
+          | -
+          |
+         ::: main.py:2:17
+          |
+        2 | from lib import 𝒞
+          |                 -
+        3 | print(𝒞)
+          |       -
+        ");
+    }
+
+    #[test]
     fn parameter_references_in_function() {
         let test = cursor_test(
             "
