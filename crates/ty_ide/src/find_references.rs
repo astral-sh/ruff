@@ -1360,6 +1360,60 @@ def process_model():
     }
 
     #[test]
+    fn multi_file_instance_attribute_references() {
+        assert_snapshot!(references_across_files(
+            r#"
+class C:
+    def __init__(self) -> None:
+        self.<CURSOR>value: int = 42
+"#,
+            r#"
+from lib import C
+
+print(C().<CURSOR>value)
+"#,
+        ), @"
+        info[references]: Found 2 references
+         --> lib.py:4:14
+          |
+        4 |         self.value: int = 42
+          |              -----
+          |
+         ::: main.py:4:11
+          |
+        4 | print(C().value)
+          |           -----
+        ");
+    }
+
+    #[test]
+    fn multi_file_comprehension_attribute_references() {
+        assert_snapshot!(references_across_files(
+            r#"
+class C:
+    def __init__(self) -> None:
+        [None for self.<CURSOR>value in [42]]
+"#,
+            r#"
+from lib import C
+
+print(C().<CURSOR>value)
+"#,
+        ), @"
+        info[references]: Found 2 references
+         --> lib.py:4:24
+          |
+        4 |         [None for self.value in [42]]
+          |                        -----
+          |
+         ::: main.py:4:11
+          |
+        4 | print(C().value)
+          |           -----
+        ");
+    }
+
+    #[test]
     fn multi_file_parameter_references_include_keyword_argument_labels() {
         let test = CursorTest::builder()
             .source(
@@ -3106,6 +3160,24 @@ class C:
         pytest_cursor_test_builder()
             .source("test_example.py", source)
             .build()
+    }
+
+    /// Both files mark the same symbol; requests from either end must find the same references.
+    fn references_across_files(definition: &str, usage: &str) -> String {
+        let definition_test = CursorTest::builder()
+            .source("lib.py", definition)
+            .source("main.py", usage.replace("<CURSOR>", ""))
+            .build();
+        let usage_test = CursorTest::builder()
+            .source("lib.py", definition.replace("<CURSOR>", ""))
+            .source("main.py", usage)
+            .build();
+
+        let references = definition_test.references();
+        assert!(references.contains("lib.py"), "{references}");
+        assert!(references.contains("main.py"), "{references}");
+        assert_eq!(references, usage_test.references());
+        references
     }
 
     fn pytest_cursor_test_builder() -> SitePackagesCursorTestBuilder {
