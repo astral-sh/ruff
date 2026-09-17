@@ -344,31 +344,28 @@ impl<'db> SolutionWalker<'db> {
             match constraint {
                 Constraint::ConcreteLower(lower) => {
                     let solver = mappings.entry(lower.typevar).or_default();
-                    solver.add_lower(lower.provenance, lower.bound);
+                    solver.add_constraint(db, lower.typevar, constraint);
                 }
                 Constraint::ConcreteUpper(upper) => {
                     let solver = mappings.entry(upper.typevar).or_default();
-                    solver.add_upper(upper.provenance, upper.bound);
+                    solver.add_constraint(db, upper.typevar, constraint);
                 }
                 Constraint::ConcreteEquivalence(equivalence) => {
                     let solver = mappings.entry(equivalence.typevar).or_default();
-                    solver.add_lower(equivalence.provenance, equivalence.bound);
-                    solver.add_upper(equivalence.provenance, equivalence.bound);
+                    solver.add_constraint(db, equivalence.typevar, constraint);
                 }
                 Constraint::TypeVarRange(bound) => {
                     let solver = mappings.entry(bound.left).or_default();
-                    solver.add_upper(bound.provenance, Type::TypeVar(bound.right));
+                    solver.add_constraint(db, bound.left, constraint);
                     let solver = mappings.entry(bound.right).or_default();
-                    solver.add_lower(bound.provenance, Type::TypeVar(bound.left));
+                    solver.add_constraint(db, bound.right, constraint);
                 }
                 Constraint::TypeVarEquivalence(bound) => {
                     let (left, right) = bound.in_builder(db, storage);
                     let solver = mappings.entry(left).or_default();
-                    solver.add_lower(bound.provenance, Type::TypeVar(right));
-                    solver.add_upper(bound.provenance, Type::TypeVar(right));
+                    solver.add_constraint(db, left, constraint);
                     let solver = mappings.entry(right).or_default();
-                    solver.add_lower(bound.provenance, Type::TypeVar(left));
-                    solver.add_upper(bound.provenance, Type::TypeVar(left));
+                    solver.add_constraint(db, right, constraint);
                 }
             }
         }

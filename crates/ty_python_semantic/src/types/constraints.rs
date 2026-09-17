@@ -3051,6 +3051,49 @@ struct CandidateTypeVarRangeSolver<'db> {
 }
 
 impl<'db> CandidateTypeVarRangeSolver<'db> {
+    fn add_constraint(
+        &mut self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        constraint: Constraint<'db>,
+    ) {
+        match constraint {
+            Constraint::ConcreteLower(lower) => {
+                debug_assert!(bound_typevar.is_same_typevar_as(db, lower.typevar));
+                self.add_lower(lower.provenance, lower.bound);
+            }
+            Constraint::ConcreteUpper(upper) => {
+                debug_assert!(bound_typevar.is_same_typevar_as(db, upper.typevar));
+                self.add_upper(upper.provenance, upper.bound);
+            }
+            Constraint::ConcreteEquivalence(equivalence) => {
+                debug_assert!(bound_typevar.is_same_typevar_as(db, equivalence.typevar));
+                self.add_lower(equivalence.provenance, equivalence.bound);
+                self.add_upper(equivalence.provenance, equivalence.bound);
+            }
+            Constraint::TypeVarRange(bound) => {
+                if bound_typevar.is_same_typevar_as(db, bound.left) {
+                    self.add_upper(bound.provenance, Type::TypeVar(bound.right));
+                } else if bound_typevar.is_same_typevar_as(db, bound.right) {
+                    self.add_lower(bound.provenance, Type::TypeVar(bound.left));
+                } else {
+                    panic!("typevar should match one side or the other");
+                }
+            }
+            Constraint::TypeVarEquivalence(bound) => {
+                if bound_typevar.is_same_typevar_as(db, bound.left) {
+                    self.add_lower(bound.provenance, Type::TypeVar(bound.right));
+                    self.add_upper(bound.provenance, Type::TypeVar(bound.right));
+                } else if bound_typevar.is_same_typevar_as(db, bound.right) {
+                    self.add_lower(bound.provenance, Type::TypeVar(bound.left));
+                    self.add_upper(bound.provenance, Type::TypeVar(bound.left));
+                } else {
+                    panic!("typevar should match one side or the other");
+                }
+            }
+        }
+    }
+
     fn add_lower(&mut self, provenance: ConstraintProvenance, ty: Type<'db>) {
         // Lower bounds are unioned. Our type representation is in DNF, so unioning a new
         // element is typically cheap (in that it does not involve a combinatorial
