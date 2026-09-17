@@ -13,7 +13,7 @@ use crate::types::constraints::{
     CandidateTypeVarSolution, ConstraintAssignment, ConstraintId, ConstraintSetStorage, NodeId,
     SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
 };
-use crate::types::typevar::TypeVarBoundOrConstraints;
+use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints};
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
@@ -502,12 +502,25 @@ impl<'db> SolutionWalker<'db> {
 #[derive(Default)]
 struct Validations<'db> {
     upper_bounds: FxIndexMap<BoundTypeVarInstance<'db>, UpperBound>,
+    constrained: FxIndexMap<BoundTypeVarInstance<'db>, Constrained<'db>>,
 }
 
 type ValidationConstraints = Option<SmallVec<[ConstraintId; 4]>>;
 
 struct UpperBound {
     constraints: ValidationConstraints,
+}
+
+struct Constrained<'db> {
+    #[expect(unused)]
+    declared_constraints: SmallVec<[DeclaredConstraint<'db>; 4]>,
+}
+
+struct DeclaredConstraint<'db> {
+    #[expect(unused)]
+    constraints: ValidationConstraints,
+    #[expect(unused)]
+    constrained_ty: Type<'db>,
 }
 
 impl<'db> Validations<'db> {
@@ -555,9 +568,16 @@ impl<'db> Validations<'db> {
                 bound_typevar,
                 bound,
             ),
-            Some(TypeVarBoundOrConstraints::Constraints(_)) => {
-                // TODO
-            }
+            Some(TypeVarBoundOrConstraints::Constraints(declared_constraints)) => self
+                .add_constrained(
+                    db,
+                    env,
+                    storage,
+                    typevar_queue,
+                    seen_typevars,
+                    bound_typevar,
+                    declared_constraints,
+                ),
             None => {}
         }
     }
@@ -617,6 +637,49 @@ impl<'db> Validations<'db> {
                 constraints,
             );
             UpperBound { constraints }
+        });
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn add_constrained(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        typevar_queue: &mut Support,
+        seen_typevars: &mut Support,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        declared_constraints: TypeVarConstraints<'db>,
+    ) {
+        self.constrained.entry(bound_typevar).or_insert_with(|| {
+            let declared_constraints = declared_constraints
+                .elements(db)
+                .iter()
+                .map(|&constrained_ty| {
+                    let constraints = Constraint::new_equivalence_bound(
+                        db,
+                        env,
+                        ConstraintProvenance::Validity,
+                        bound_typevar,
+                        constrained_ty,
+                    );
+                    let constraints = Self::intern_typevar_constraints(
+                        db,
+                        env,
+                        storage,
+                        typevar_queue,
+                        seen_typevars,
+                        constraints,
+                    );
+                    DeclaredConstraint {
+                        constraints,
+                        constrained_ty,
+                    }
+                })
+                .collect();
+            Constrained {
+                declared_constraints,
+            }
         });
     }
 }
