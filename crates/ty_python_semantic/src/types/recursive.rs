@@ -377,11 +377,21 @@ impl<'db> RecursiveType<'db> {
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
                 Type::Recursive(self.with_arguments(db, arguments))
             }
+            TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => {
+                Type::Recursive(self)
+            }
             TypeMapping::Materialize(kind) => {
-                Type::Recursive(if self.materialization_kind(db).is_some() {
-                    self
-                } else {
-                    self.with_materialization(db, Some(*kind))
+                visitor.visit(db, Type::Recursive(self), mapping, || {
+                    self.map_type(db, visitor.env, |unfolded| {
+                        let mapped = unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
+                        // Preserve static aliases, including recursive references that the
+                        // visitor leaves unchanged while materializing their enclosing body.
+                        Type::Recursive(if mapped == unfolded {
+                            self
+                        } else {
+                            self.with_materialization(db, Some(*kind))
+                        })
+                    })
                 })
             }
             _ => {
@@ -536,11 +546,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 } else {
                     MaterializationKind::Bottom
                 });
-        // Top-to-bottom requires the body itself to be fully static. Equal static
-        // arguments do not rule out a fixed `Any` in that body.
+        // Top-to-bottom also requires a static body: equal arguments do not rule
+        // out a fixed `Any`. Unchanged materializations retain the original binder.
+        let unmaterialized_target = Type::Recursive(target.with_materialization(db, None));
         if matches!(
             (source_kind, target_kind),
             (MaterializationKind::Top, MaterializationKind::Bottom)
+        ) && unmaterialized_target.materialize(
+            db,
+            MaterializationKind::Top,
+            self.materialization_visitor,
+        ) != unmaterialized_target.materialize(
+            db,
+            MaterializationKind::Bottom,
+            self.materialization_visitor,
         ) {
             return self.never();
         }

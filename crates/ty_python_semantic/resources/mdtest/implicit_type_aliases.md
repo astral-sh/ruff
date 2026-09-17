@@ -3037,12 +3037,39 @@ static_assert(is_subtype_of(Bottom[NestedList[str]], Top[NestedList[str]]))
 static_assert(is_subtype_of(Bottom[NestedDict[str, int]], Top[NestedDict[str, int]]))
 ```
 
-Materializations are distinguished from the original alias in the display.
+Materialization preserves aliases whose type arguments and recursive bodies are fully static.
 
 ```py
 def inspect(top: Top[NestedDict[str, int]], bottom: Bottom[NestedDict[str, int]]):
-    reveal_type(top)  # revealed: Top[NestedDict[str, int]]
-    reveal_type(bottom)  # revealed: Bottom[NestedDict[str, int]]
+    reveal_type(top)  # revealed: NestedDict[str, int]
+    reveal_type(bottom)  # revealed: NestedDict[str, int]
+```
+
+### Mutually recursive aliases with growing specializations
+
+The type arguments grow when these aliases refer back to each other. Inferring a list containing one
+of these values preserves the alias without expanding the recursive references indefinitely.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+GrowingA = tuple[T, "GrowingB[T] | None"]
+GrowingB = tuple[T, "GrowingA[list[T]] | None", "GrowingB[T] | None"]
+
+def f(a: GrowingA[int]):
+    reveal_type([a])  # revealed: list[GrowingA[int]]
+```
+
+These aliases contain no dynamic types when specialized with `int`, so both materializations are
+equivalent to the original type.
+
+```py
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import is_equivalent_to
+
+reveal_type(is_equivalent_to(GrowingA[int], Top[GrowingA[int]]))  # revealed: ConstraintSet[Literal[True]]
+reveal_type(is_equivalent_to(GrowingA[int], Bottom[GrowingA[int]]))  # revealed: ConstraintSet[Literal[True]]
 ```
 
 ### Materialized recursive aliases in collections
