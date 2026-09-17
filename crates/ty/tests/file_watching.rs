@@ -3,6 +3,10 @@ use std::io::Write;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, anyhow};
+use insta::assert_snapshot;
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics,
+};
 use ruff_db::files::{File, FileError, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{
@@ -261,6 +265,15 @@ impl TestCase {
             .collect::<Vec<String>>();
         names.sort();
         names
+    }
+
+    fn render_diagnostics(&self, diagnostics: &[Diagnostic]) -> String {
+        DisplayDiagnostics::new(
+            self.db(),
+            &DisplayDiagnosticConfig::new("ty").format(DiagnosticFormat::Concise),
+            diagnostics,
+        )
+        .to_string()
     }
 }
 
@@ -1029,27 +1042,33 @@ fn script_exclusion_tracks_file_creation_and_metadata_edits() -> anyhow::Result<
         # ///
         missing
         ";
-    assert!(case.db().check().is_empty());
+    assert_eq!(case.db().check().as_slice(), &[]);
 
     std::fs::write(path.as_std_path(), dedent(script).as_ref())?;
     let changes = case.take_watch_changes(event_for_file("script.py"));
     let changes = case.apply_changes(&changes);
     assert!(changes.scripts_to_synchronize(case.db()).is_empty());
     let file = case.system_file(&path)?;
-    assert!(case.db().check().is_empty());
-    assert!(case.db().check_file(file).is_empty());
+    assert_eq!(case.db().check().as_slice(), &[]);
+    assert_eq!(case.db().check_file(file).as_slice(), &[]);
 
     update_file(&path, "missing\n")?;
     let changes = case.take_watch_changes(event_for_file("script.py"));
     case.apply_changes(&changes);
-    assert_eq!(case.db().check().len(), 1);
-    assert_eq!(case.db().check_file(file).len(), 1);
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"script.py:1:1: error[unresolved-reference] Name `missing` used when not defined"
+    );
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check_file(file)),
+        @"script.py:1:1: error[unresolved-reference] Name `missing` used when not defined"
+    );
 
     update_file(&path, script)?;
     let changes = case.take_watch_changes(event_for_file("script.py"));
     case.apply_changes(&changes);
-    assert!(case.db().check().is_empty());
-    assert!(case.db().check_file(file).is_empty());
+    assert_eq!(case.db().check().as_slice(), &[]);
+    assert_eq!(case.db().check_file(file).as_slice(), &[]);
 
     Ok(())
 }
@@ -1071,8 +1090,14 @@ fn explicitly_included_file_remains_checked_when_becoming_a_script() -> anyhow::
     case.db
         .project()
         .set_included_paths(&mut case.db, vec![path.clone()]);
-    assert_eq!(case.db().check().len(), 1);
-    assert_eq!(case.db().check_file(file).len(), 1);
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"script.py:1:1: error[unresolved-reference] Name `missing` used when not defined"
+    );
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check_file(file)),
+        @"script.py:1:1: error[unresolved-reference] Name `missing` used when not defined"
+    );
 
     update_file(
         &path,
@@ -1085,8 +1110,14 @@ fn explicitly_included_file_remains_checked_when_becoming_a_script() -> anyhow::
     )?;
     let changes = case.take_watch_changes(event_for_file("script.py"));
     case.apply_changes(&changes);
-    assert_eq!(case.db().check().len(), 1);
-    assert_eq!(case.db().check_file(file).len(), 1);
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"script.py:5:1: error[unresolved-reference] Name `missing` used when not defined"
+    );
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check_file(file)),
+        @"script.py:5:1: error[unresolved-reference] Name `missing` used when not defined"
+    );
 
     Ok(())
 }
@@ -1526,15 +1557,16 @@ fn script_dependency_changes() -> anyhow::Result<()> {
         )
     })?;
     let dependency = case.root_path().join("dependencies/dependency.py");
-    assert!(case.db().check().is_empty());
+    assert_eq!(case.db().check().as_slice(), &[]);
 
     update_file(&dependency, "value = 'wrong'")?;
     let changes = case.stop_watch(event_for_file("dependency.py"));
     case.apply_changes(&changes);
 
-    let diagnostics = case.db().check();
-    assert_eq!(diagnostics.len(), 1);
-    assert_eq!(diagnostics[0].id().as_str(), "invalid-assignment");
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @r#"script.py:8:15: error[invalid-assignment] Object of type `Literal["wrong"]` is not assignable to `int`"#
+    );
     Ok(())
 }
 
@@ -1638,7 +1670,7 @@ fn nested_search_path_picks_up_missed_dependency_edit() -> anyhow::Result<()> {
     let dependency = case.root_path().join("dependencies/pkg/dependency.py");
 
     // The first check caches the dependency through the parent search path.
-    assert!(case.db().check().is_empty());
+    assert_eq!(case.db().check().as_slice(), &[]);
 
     // Stop watching the parent before editing the dependency, so ty misses that file event.
     update_file(case.project_path("pyproject.toml"), "[tool.ty]\n")?;
@@ -1670,9 +1702,10 @@ fn nested_search_path_picks_up_missed_dependency_edit() -> anyhow::Result<()> {
     let changes = case.take_watch_changes(event_for_file("main.py"));
     case.apply_changes(&changes);
 
-    let diagnostics = case.db().check();
-    assert_eq!(diagnostics.len(), 1);
-    assert_eq!(diagnostics[0].id().as_str(), "invalid-assignment");
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @r#"main.py:3:15: error[invalid-assignment] Object of type `Literal["wrong"]` is not assignable to `int`"#
+    );
     Ok(())
 }
 
@@ -1715,7 +1748,7 @@ version = 3.12
     })?;
 
     // The initial import resolves through `old`, as named by `dependency.pth`.
-    assert!(case.db().check().is_empty());
+    assert_eq!(case.db().check().as_slice(), &[]);
 
     // Stop watching the virtual environment before changing its `.pth` file.
     update_file(case.project_path("pyproject.toml"), "[tool.ty]\n")?;
@@ -1751,15 +1784,17 @@ version = 3.12
 #[test]
 fn change_python_version_and_platform() -> anyhow::Result<()> {
     let mut case = setup(|context: &mut SetupContext| {
-        // `sys.last_exc` is a Python 3.12 only feature
         // `os.getegid()` is Unix only
         context.write_project_file(
             "bar.py",
-            r#"
-import sys
-import os
-print(sys.last_exc, os.getegid())
-"#,
+            r"
+            import sys
+            import os
+            from typing_extensions import reveal_type
+
+            reveal_type(sys.version_info[:2])
+            os.getegid()
+            ",
         )?;
         context.set_options(Options {
             environment: Some(EnvironmentOptions {
@@ -1775,17 +1810,12 @@ print(sys.last_exc, os.getegid())
         Ok(())
     })?;
 
-    let diagnostics = case.db.check();
-
-    assert_eq!(diagnostics.len(), 2);
-    assert_eq!(
-        diagnostics[0].headline_message(),
-        "Module `sys` has no member `last_exc`"
-    );
-    assert_eq!(
-        diagnostics[1].headline_message(),
-        "Module `os` has no member `getegid`"
-    );
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"
+    bar.py:6:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`
+    bar.py:7:1: error[unresolved-attribute] Module `os` has no member `getegid`
+    ");
 
     // Change the python version
     case.update_options(Options {
@@ -1800,8 +1830,10 @@ print(sys.last_exc, os.getegid())
     })
     .expect("Search path settings to be valid");
 
-    let diagnostics = case.db.check();
-    assert!(diagnostics.is_empty());
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"bar.py:6:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[12]]`"
+    );
 
     Ok(())
 }
@@ -1833,15 +1865,9 @@ fn reloading_options_updates_inferred_python_version_diagnostics_when_metadata_i
         Ok(())
     })?;
 
-    let diagnostics = case.db.check();
-
-    assert_eq!(diagnostics.len(), 1);
-    assert_eq!(
-        diagnostics[0].headline_message(),
-        format!(
-            "Ignoring unsupported inferred Python version `3.{unsupported_minor}`; ty will use Python {} instead.",
-            PythonVersion::latest_ty()
-        )
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @".venv/pyvenv.cfg: warning[unsupported-python-version] Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead."
     );
 
     std::fs::rename(
@@ -1854,11 +1880,7 @@ fn reloading_options_updates_inferred_python_version_diagnostics_when_metadata_i
     // manually reloads the options instead of exercising the file-watching path for that rename.
     case.update_options(Options::default())?;
 
-    let diagnostics = case.db.check();
-    assert!(
-        diagnostics.is_empty(),
-        "Expected no diagnostics but got: {diagnostics:#?}"
-    );
+    assert_eq!(case.db().check().as_slice(), &[]);
 
     Ok(())
 }
@@ -2517,12 +2539,7 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
     let foo = case
         .system_file(case.project_path("foo.py"))
         .expect("foo.py to exist");
-    let diagnostics = case.db().check_file(foo);
-
-    assert!(
-        diagnostics.is_empty(),
-        "Expected no diagnostics but got: {diagnostics:#?}"
-    );
+    assert_eq!(case.db().check_file(foo).as_slice(), &[]);
 
     // Enable division-by-zero in the user configuration with warning severity
     update_file(
@@ -2537,11 +2554,9 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
 
     case.apply_changes(&changes);
 
-    let diagnostics = case.db().check_file(foo);
-
-    assert!(
-        diagnostics.len() == 1,
-        "Expected exactly one diagnostic but got: {diagnostics:#?}"
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check_file(foo)),
+        @"foo.py:1:5: warning[division-by-zero] Cannot divide object of type `Literal[10]` by zero"
     );
 
     // Removing the option from the user configuration must not retain the old warning level.
@@ -2550,11 +2565,7 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
     let changes = case.stop_watch(event_for_file("ty.toml"));
     case.apply_changes(&changes);
 
-    let diagnostics = case.db().check_file(foo);
-    assert!(
-        diagnostics.is_empty(),
-        "Expected no diagnostics but got: {diagnostics:#?}"
-    );
+    assert_eq!(case.db().check_file(foo).as_slice(), &[]);
 
     Ok(())
 }
@@ -2577,7 +2588,7 @@ fn project_reload_preserves_override_options() -> anyhow::Result<()> {
     let foo = case
         .system_file(case.project_path("foo.py"))
         .expect("foo.py to exist");
-    assert!(case.db().check_file(foo).is_empty());
+    assert_eq!(case.db().check_file(foo).as_slice(), &[]);
 
     case.update_options(Options::from_toml_str(
         r#"
@@ -2587,11 +2598,7 @@ fn project_reload_preserves_override_options() -> anyhow::Result<()> {
         ValueSource::Cli,
     )?)?;
 
-    let diagnostics = case.db().check_file(foo);
-    assert!(
-        diagnostics.is_empty(),
-        "Expected override options to survive reload but got: {diagnostics:#?}"
-    );
+    assert_eq!(case.db().check_file(foo).as_slice(), &[]);
 
     Ok(())
 }
@@ -2614,7 +2621,10 @@ fn project_reload_preserves_fallback_options() -> anyhow::Result<()> {
     let foo = case
         .system_file(case.project_path("foo.py"))
         .expect("foo.py to exist");
-    assert_eq!(case.db().check_file(foo).len(), 1);
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check_file(foo)),
+        @"foo.py:1:5: warning[division-by-zero] Cannot divide object of type `Literal[10]` by zero"
+    );
 
     case.update_options(Options::from_toml_str(
         r#"
@@ -2624,11 +2634,9 @@ fn project_reload_preserves_fallback_options() -> anyhow::Result<()> {
         ValueSource::Cli,
     )?)?;
 
-    let diagnostics = case.db().check_file(foo);
-    assert_eq!(
-        diagnostics.len(),
-        1,
-        "Expected fallback options to survive reload but got: {diagnostics:#?}"
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check_file(foo)),
+        @"foo.py:1:5: warning[division-by-zero] Cannot divide object of type `Literal[10]` by zero"
     );
 
     Ok(())
@@ -2665,12 +2673,7 @@ fn changes_to_config_file_override() -> anyhow::Result<()> {
     let foo = case
         .system_file(case.project_path("foo.py"))
         .expect("foo.py to exist");
-    let diagnostics = case.db().check_file(foo);
-
-    assert!(
-        diagnostics.is_empty(),
-        "Expected no diagnostics but got: {diagnostics:#?}"
-    );
+    assert_eq!(case.db().check_file(foo).as_slice(), &[]);
 
     // Enable division-by-zero in the explicitly specified configuration with warning severity
     update_file(
@@ -2685,11 +2688,9 @@ fn changes_to_config_file_override() -> anyhow::Result<()> {
 
     case.apply_changes(&changes);
 
-    let diagnostics = case.db().check_file(foo);
-
-    assert!(
-        diagnostics.len() == 1,
-        "Expected exactly one diagnostic but got: {diagnostics:#?}"
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check_file(foo)),
+        @"foo.py:1:5: warning[division-by-zero] Cannot divide object of type `Literal[10]` by zero"
     );
 
     Ok(())
@@ -2771,7 +2772,7 @@ fn rename_files_casing_only() -> anyhow::Result<()> {
 fn submodule_cache_invalidation_created() -> anyhow::Result<()> {
     let mut case = setup([("lib.py", ""), ("bar/__init__.py", ""), ("bar/foo.py", "")])?;
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"bar.foo",
     );
@@ -2780,7 +2781,7 @@ fn submodule_cache_invalidation_created() -> anyhow::Result<()> {
     let changes = case.stop_watch(event_for_file("wazoo.py"));
     case.apply_changes(&changes);
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"
     bar.foo
@@ -2802,7 +2803,7 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
         ("bar/wazoo.py", ""),
     ])?;
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"
     bar.foo
@@ -2814,7 +2815,7 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
     let changes = case.stop_watch(event_for_file("wazoo.py"));
     case.apply_changes(&changes);
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"bar.foo",
     );
@@ -2828,7 +2829,7 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
 fn submodule_cache_invalidation_created_then_deleted() -> anyhow::Result<()> {
     let mut case = setup([("lib.py", ""), ("bar/__init__.py", ""), ("bar/foo.py", "")])?;
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"bar.foo",
     );
@@ -2841,7 +2842,7 @@ fn submodule_cache_invalidation_created_then_deleted() -> anyhow::Result<()> {
     let changes = case.stop_watch(event_for_file("wazoo.py"));
     case.apply_changes(&changes);
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"bar.foo",
     );
@@ -2856,7 +2857,7 @@ fn submodule_cache_invalidation_created_then_deleted() -> anyhow::Result<()> {
 fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> {
     let mut case = setup([("lib.py", ""), ("bar/__init__.py", ""), ("bar/foo.py", "")])?;
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"bar.foo",
     );
@@ -2867,7 +2868,7 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
     let changes = case.take_watch_changes(event_for_file("wazoo.py"));
     case.apply_changes(&changes);
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"
     bar.foo
@@ -2884,6 +2885,7 @@ mod uv_metadata {
     use std::time::Duration;
 
     use anyhow::Context;
+    use insta::assert_snapshot;
     use ruff_db::diagnostic::DiagnosticId;
     use ruff_db::files::File;
     use ruff_db::system::{OsSystem, System as _};
@@ -2914,7 +2916,10 @@ mod uv_metadata {
         )?;
         let project = case.db().project();
         let program_settings = project.program_settings(case.db()).clone();
-        assert_eq!(case.db().check()[0].id().as_str(), "invalid-assignment");
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @r#"main.py:1:14: error[invalid-assignment] Object of type `Literal["wrong"]` is not assignable to `int`"#
+        );
 
         // uv rejects this setting, but ty must still apply its rule configuration.
         update_and_synchronize_project(
@@ -2953,7 +2958,7 @@ mod uv_metadata {
             invalid-assignment = "ignore"
             "#,
         )?;
-        assert!(case.db().check().is_empty());
+        assert_eq!(case.db().check().as_slice(), &[]);
         Ok(())
     }
 
@@ -3011,7 +3016,7 @@ mod uv_metadata {
             )],
         )?;
 
-        assert!(case.db().check().is_empty());
+        assert_eq!(case.db().check().as_slice(), &[]);
 
         assert!(!update_and_synchronize_script(
             &mut case,
@@ -3025,7 +3030,7 @@ mod uv_metadata {
             "#,
         )?);
 
-        assert!(case.db().check().is_empty());
+        assert_eq!(case.db().check().as_slice(), &[]);
 
         Ok(())
     }
@@ -3046,9 +3051,10 @@ mod uv_metadata {
             )],
         )?;
 
-        let diagnostics = case.db().check();
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"script.py:6:6: error[unresolved-import] Cannot resolve imported module `attrs`"
+        );
 
         let synchronized = update_and_synchronize_script(
             &mut case,
@@ -3070,7 +3076,7 @@ mod uv_metadata {
         });
         case.apply_changes(&changes);
 
-        assert!(case.db().check().is_empty());
+        assert_eq!(case.db().check().as_slice(), &[]);
 
         Ok(())
     }
@@ -3082,11 +3088,9 @@ mod uv_metadata {
             &[("script.py", "from attrs import define\n")],
         )?;
 
-        let ordinary = case.db().check();
-        assert!(
-            ordinary
-                .iter()
-                .any(|diagnostic| diagnostic.id().as_str() == "unresolved-import")
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"script.py:1:6: error[unresolved-import] Cannot resolve imported module `attrs`"
         );
 
         update_and_synchronize_script(
@@ -3099,8 +3103,7 @@ mod uv_metadata {
             from attrs import define
             "#,
         )?;
-        let diagnostics = case.db().check();
-        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        assert_eq!(case.db().check().as_slice(), &[]);
 
         Ok(())
     }
@@ -3140,11 +3143,7 @@ mod uv_metadata {
         )?;
         assert!(synchronized);
 
-        let corrected = case.db().check();
-        assert!(
-            corrected.is_empty(),
-            "unexpected diagnostics: {corrected:?}"
-        );
+        assert_eq!(case.db().check().as_slice(), &[]);
 
         Ok(())
     }
@@ -3176,16 +3175,17 @@ mod uv_metadata {
             .context("script environment has no site-packages")?
             .to_path_buf();
         let pth = site_packages.join("dependency.pth");
-        let diagnostics = case.db().check();
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"script.py:6:6: error[unresolved-import] Cannot resolve imported module `dependency`"
+        );
 
         let dependencies = case.root_path().join("dependencies");
         std::fs::write(pth.as_std_path(), dependencies.as_str())?;
         let changes = case.take_watch_changes(event_for_file("dependency.pth"));
         case.apply_changes(&changes);
 
-        assert!(case.db().check().is_empty());
+        assert_eq!(case.db().check().as_slice(), &[]);
 
         let dependency = dependencies.join("dependency.py");
         update_file(&dependency, "value = 2")?;
