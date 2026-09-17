@@ -2936,7 +2936,7 @@ def forward_object[S: (int, str)](
     # error: [invalid-argument-type]
     result = select(specific, redundant)
     # XXX: revealed: S@forward_object
-    # revealed: S@forward_object | int | str
+    # revealed: int | str
     reveal_type(result)
     # XXX: no error
     # error: [invalid-return-type]
@@ -2950,7 +2950,7 @@ def forward_object_reversed[S: (int, str)](
     # error: [invalid-argument-type]
     result = select(redundant, specific)
     # XXX: revealed: S@forward_object_reversed
-    # revealed: int | str | S@forward_object_reversed
+    # revealed: int | str
     reveal_type(result)
     # XXX: no error
     # error: [invalid-return-type]
@@ -2969,7 +2969,7 @@ def forward_union[S: (int, str)](
     # error: [invalid-argument-type]
     result = select(specific, redundant)
     # XXX: revealed: S@forward_union
-    # revealed: S@forward_union | int | str
+    # revealed: int | str
     reveal_type(result)
     # XXX: no error
     # error: [invalid-return-type]
@@ -2983,7 +2983,7 @@ def forward_union_reversed[S: (int, str)](
     # error: [invalid-argument-type]
     result = select(redundant, specific)
     # XXX: revealed: S@forward_union_reversed
-    # revealed: int | str | S@forward_union_reversed
+    # revealed: int | str
     reveal_type(result)
     # XXX: no error
     # error: [invalid-return-type]
@@ -3012,7 +3012,7 @@ def forward_nominal[S: (Left, Right)](
     # error: [invalid-argument-type]
     result = select_nominal(specific, redundant)
     # XXX: revealed: S@forward_nominal
-    # revealed: S@forward_nominal | Left | Right
+    # revealed: Left | Right
     reveal_type(result)
     # XXX: no error
     # error: [invalid-return-type]
@@ -3026,7 +3026,7 @@ def forward_nominal_reversed[S: (Left, Right)](
     # error: [invalid-argument-type]
     result = select_nominal(redundant, specific)
     # XXX: revealed: S@forward_nominal_reversed
-    # revealed: Left | Right | S@forward_nominal_reversed
+    # revealed: Left | Right
     reveal_type(result)
     # XXX: no error
     # error: [invalid-return-type]

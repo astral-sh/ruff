@@ -17,6 +17,14 @@ use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints};
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
+type ProcessSatisfied<'a, 'db, L, B> = dyn FnMut(
+        &mut SolutionWalker<'db>,
+        &mut ConstraintSetStorage<'db>,
+        &mut L,
+        &mut PathAssignments,
+    ) -> ControlFlow<B>
+    + 'a;
+
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,
 
@@ -96,7 +104,6 @@ impl<'db> SolutionWalker<'db> {
     /// Visit a BDD node and all of its descendants, invoking the `process_satisfied` callback for
     /// any satisfiable path that is discovered.
     #[expect(clippy::too_many_arguments)]
-    #[expect(clippy::type_complexity)]
     fn visit_node_and_then<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
@@ -105,12 +112,7 @@ impl<'db> SolutionWalker<'db> {
         limits: &mut L,
         path: &mut PathAssignments,
         node: NodeId,
-        process_satisfied: &mut dyn FnMut(
-            &mut Self,
-            &mut ConstraintSetStorage<'db>,
-            &mut L,
-            &mut PathAssignments,
-        ) -> ControlFlow<L::Break>,
+        process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break> {
         limits.visit_node()?;
         if node == ALWAYS_FALSE {
@@ -149,7 +151,6 @@ impl<'db> SolutionWalker<'db> {
     /// (This is a helper method used by [`visit_node_and_then`][Self::visit_node_and_then]. You
     /// will probably not need to call this directly.)
     #[expect(clippy::too_many_arguments)]
-    #[expect(clippy::type_complexity)]
     fn visit_edge<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
@@ -159,12 +160,7 @@ impl<'db> SolutionWalker<'db> {
         path: &mut PathAssignments,
         assignment: ConstraintAssignment,
         child: NodeId,
-        process_satisfied: &mut dyn FnMut(
-            &mut Self,
-            &mut ConstraintSetStorage<'db>,
-            &mut L,
-            &mut PathAssignments,
-        ) -> ControlFlow<L::Break>,
+        process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break> {
         // Don't bother adding the assignment and checking the sequent map if the edge takes us to
         // the ALWAYS_FALSE terminal.
@@ -195,7 +191,6 @@ impl<'db> SolutionWalker<'db> {
     }
 
     #[expect(clippy::too_many_arguments)]
-    #[expect(clippy::type_complexity)]
     fn visit_constraints_and_then<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
@@ -204,12 +199,7 @@ impl<'db> SolutionWalker<'db> {
         limits: &mut L,
         path: &mut PathAssignments,
         constraints: &[ConstraintId],
-        process_satisfied: &mut dyn FnMut(
-            &mut Self,
-            &mut ConstraintSetStorage<'db>,
-            &mut L,
-            &mut PathAssignments,
-        ) -> ControlFlow<L::Break>,
+        process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break> {
         let Some((constraint, constraints)) = constraints.split_first() else {
             return process_satisfied(self, storage, limits, path);
@@ -316,11 +306,35 @@ impl<'db> SolutionWalker<'db> {
         path: &mut PathAssignments,
         constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
     ) -> ControlFlow<L::Break> {
+        self.validate_constrained_and_then(
+            db,
+            env,
+            storage,
+            limits,
+            path,
+            constrained,
+            &mut |this, storage, limits, path| {
+                this.found_satisfied_path(db, env, storage, limits, path)
+            },
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn validate_constrained_and_then<L: SolutionLimits>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        path: &mut PathAssignments,
+        constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
+        process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
+    ) -> ControlFlow<L::Break> {
         let Some(((&bound_typevar, constrained_typevar), constrained)) = constrained.split_first()
         else {
             // We've checked all constrained typevars, and we now know that the candidate solution
             // is valid.
-            return self.found_satisfied_path(db, env, storage, limits, path);
+            return process_satisfied(self, storage, limits, path);
         };
 
         // Constrained typevars are more complex than bounded typevars, since they introduce a
@@ -358,7 +372,15 @@ impl<'db> SolutionWalker<'db> {
                     &mut |this, storage, limits, path| {
                         // The candidate solution satisfies this declared constraint, but we still
                         // need to check any remaining constrained typevars.
-                        this.validate_constrained(db, env, storage, limits, path, constrained)
+                        this.validate_constrained_and_then(
+                            db,
+                            env,
+                            storage,
+                            limits,
+                            path,
+                            constrained,
+                            process_satisfied,
+                        )
                     },
                 )?;
             }
@@ -402,9 +424,57 @@ impl<'db> SolutionWalker<'db> {
 
             if has_non_concrete_evidence {
                 // We're _eligible_ to return the family solution, but first we should make sure
-                // that it's actually compatible.
+                // that it's actually compatible. First check any remaining constrained typevars
+                // with _no_ validity assignment for this typevar.
                 let pending_before_family_solution = self.pending.len();
-                self.validate_constrained(db, env, storage, limits, path, constrained)?;
+                self.validate_constrained_and_then(
+                    db,
+                    env,
+                    storage,
+                    limits,
+                    path,
+                    constrained,
+                    &mut |this, storage, limits, path| {
+                        // If we find a solution for the remaining constrained typevars, we still
+                        // have to validate that solution satisfies each of the individual declared
+                        // constraints. Note that we _don't_ update the candidate solution for
+                        // those declared constraints — we want to return the family solution,
+                        // after all. We just want to make sure that the individual declared
+                        // constraints don't _invalidate_ that solution.
+                        for declared_constraint in &constrained_typevar.declared_constraints {
+                            let mut satisfied = false;
+                            if let Some(constraints) = declared_constraint.constraints.as_deref() {
+                                this.visit_constraints_and_then(
+                                    db,
+                                    env,
+                                    storage,
+                                    limits,
+                                    path,
+                                    constraints,
+                                    &mut |this, storage, _limits, path| {
+                                        let solution = this.pending_candidate_solution(
+                                            db, env, storage, path, None,
+                                        );
+                                        if solution.is_some() {
+                                            satisfied = true;
+                                        }
+                                        ControlFlow::Continue(())
+                                    },
+                                )?;
+                            }
+                            if !satisfied {
+                                // This family solution does _not_ satisfy at least one of the
+                                // declared constraints, so we cannot use it. Return without
+                                // recording the solution.
+                                return ControlFlow::Continue(());
+                            }
+                        }
+
+                        // This family solution satisfies all of the declared constraints
+                        // individually, so we can record it.
+                        process_satisfied(this, storage, limits, path)
+                    },
+                )?;
                 let pending_after_family_solution = self.pending.len();
                 let family_solution_is_valid =
                     pending_before_family_solution != pending_after_family_solution;

@@ -2100,7 +2100,7 @@ def forward_object(specific: Callable[[S], None], redundant: Callable[[object], 
     # error: [invalid-argument-type]
     result = select(specific, redundant)
     # XXX: revealed: S@forward_object
-    # revealed: S@forward_object | int | str
+    # revealed: int | str
     reveal_type(result)
     # XXX: no error
     # error: [invalid-return-type]
@@ -2111,7 +2111,7 @@ def forward_object_reversed(specific: Callable[[S], None], redundant: Callable[[
     # error: [invalid-argument-type]
     result = select(redundant, specific)
     # XXX: revealed: S@forward_object_reversed
-    # revealed: int | str | S@forward_object_reversed
+    # revealed: int | str
     reveal_type(result)
     # XXX: no error
     # error: [invalid-return-type]
@@ -2127,7 +2127,7 @@ def forward_union(specific: Callable[[S], None], redundant: Callable[[int | str]
     # error: [invalid-argument-type]
     result = select(specific, redundant)
     # XXX: revealed: S@forward_union
-    # revealed: S@forward_union | int | str
+    # revealed: int | str
     reveal_type(result)
     # XXX: no error
     # error: [invalid-return-type]
@@ -2138,7 +2138,7 @@ def forward_union_reversed(specific: Callable[[S], None], redundant: Callable[[i
     # error: [invalid-argument-type]
     result = select(redundant, specific)
     # XXX: revealed: S@forward_union_reversed
-    # revealed: int | str | S@forward_union_reversed
+    # revealed: int | str
     reveal_type(result)
     # XXX: no error
     # error: [invalid-return-type]
@@ -2164,7 +2164,7 @@ def forward_nominal(specific: Callable[[SNominal], None], redundant: Callable[[B
     # error: [invalid-argument-type]
     result = select_nominal(specific, redundant)
     # XXX: revealed: SNominal@forward_nominal
-    # revealed: SNominal@forward_nominal | Left | Right
+    # revealed: Left | Right
     reveal_type(result)
     # XXX: no error
     # error: [invalid-return-type]
@@ -2175,7 +2175,7 @@ def forward_nominal_reversed(specific: Callable[[SNominal], None], redundant: Ca
     # error: [invalid-argument-type]
     result = select_nominal(redundant, specific)
     # XXX: revealed: SNominal@forward_nominal_reversed
-    # revealed: Left | Right | SNominal@forward_nominal_reversed
+    # revealed: Left | Right
     reveal_type(result)
     # XXX: no error
     # error: [invalid-return-type]
