@@ -49,7 +49,7 @@ pub enum TypeIdentity<'db> {
     GrowingProtocol(Definition<'db>),
     GrowingTypeAlias(Definition<'db>),
     GrowingTypedDict(Definition<'db>),
-    GrowingRecursive(RecursiveType<'db>),
+    GrowingRecursive(Definition<'db>),
     Other(Type<'db>),
 }
 
@@ -77,7 +77,7 @@ impl<'db> Type<'db> {
             }
             (Type::TypeAlias(a), Type::TypeAlias(b)) => a.definition(db) == b.definition(db),
             (Type::TypedDict(a), Type::TypedDict(b)) => a.definition(db) == b.definition(db),
-            (Type::Recursive(a), Type::Recursive(b)) => a.constructor(db) == b.constructor(db),
+            (Type::Recursive(a), Type::Recursive(b)) => a.definition(db) == b.definition(db),
             _ => false,
         }
     }
@@ -113,8 +113,8 @@ impl<'db> Type<'db> {
                     RecursiveDefinition::TypeAlias(_) => TypeIdentity::GrowingTypeAlias(definition),
                     RecursiveDefinition::Protocol(_) => TypeIdentity::GrowingProtocol(definition),
                     RecursiveDefinition::TypedDict(_) => TypeIdentity::GrowingTypedDict(definition),
-                    RecursiveDefinition::Structural(recursive) => {
-                        TypeIdentity::GrowingRecursive(recursive)
+                    RecursiveDefinition::Structural(_) => {
+                        TypeIdentity::GrowingRecursive(definition)
                     }
                 })
             }
