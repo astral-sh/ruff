@@ -991,7 +991,7 @@ mod tests {
             suppress_all_in(r#"
                 from typing import TypeAlias
 
-                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
                 def get_data() -> dict[str, JsonValue]:
@@ -1013,11 +1013,11 @@ mod tests {
         ```py
         from typing import TypeAlias
 
-        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
         def get_data() -> dict[str, JsonValue]:
-            return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}  # ty: ignore[invalid-return-type]
+            return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}
 
 
         def f() -> None:
@@ -1035,7 +1035,7 @@ mod tests {
             suppress_all_in(r#"
                 from typing import TypeAlias
 
-                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
                 def get_data() -> dict[str, JsonValue]:
@@ -1056,11 +1056,11 @@ mod tests {
         ```py
         from typing import TypeAlias
 
-        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
         def get_data() -> dict[str, JsonValue]:
-            return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}  # ty: ignore[invalid-return-type]
+            return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}
 
 
         def f() -> None:
