@@ -445,38 +445,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         .unwrap_or(Truthiness::Ambiguous)
     }
 
-    pub(super) fn check_match_condition_redundancy(
-        &self,
-        test: &ast::Expr,
-        test_type: Type<'db>,
-        branch_suite: &[ast::Stmt],
-    ) {
-        if !self.should_check_redundant_conditions() {
-            return;
-        }
-
-        let truthiness = self.condition_truthiness(test);
-
-        let boolean_test = BooleanTest {
-            expression: test,
-            value_type: test_type,
-            truthiness,
-            evaluation: ExpressionContext::Condition,
-        };
-
-        for condition in
-            self.redundant_conditions(boolean_test, RedundantConditionContext::Standalone)
-        {
-            if let Some(mut diagnostic) = self.report_redundant_condition(&condition) {
-                self.add_secondary_annotations_for_redundant_match(
-                    &mut diagnostic,
-                    boolean_test.truthiness_implied_by(&condition),
-                    branch_suite,
-                );
-            }
-        }
-    }
-
     /// Check whether a `not` expression used as a value contains a redundant boolean test.
     /// Report a diagnostic if so.
     ///
@@ -521,8 +489,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    /// Sweep over an entire suite of statements to examine if any direct `if`-statement conditions,
-    /// `elif`-statement conditions or `assert`-statement conditionsin that suite are redundant.
+    /// Sweep over an entire suite of statements to examine if any direct `if`, `elif`, `assert`,
+    /// or `while` conditions or `match` guards in that suite are redundant.
     ///
     /// We suppress conditions in [`ConditionKind::Boolean`] and [`ConditionKind::ShortCircuit`] when
     /// the code they make unreachable is a "defensive exit". See the doc-comment for
@@ -530,7 +498,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// All types in the suite must already be inferred before this method is called. This is so we
     /// can recognize terminal statements from their types, including calls returning `Never` and
-    /// `return NotImplemented` statements.
+    /// `return NotImplemented` statements. Reachability annotations can also require types from
+    /// patterns and guards in later `match` cases.
     ///
     /// ## Assertions
     ///
@@ -635,9 +604,33 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             self.add_secondary_annotations_for_redundant_while(
                                 &mut diagnostic,
                                 boolean_test.truthiness_implied_by(&condition),
-                                &while_statement.body,
+                                while_statement,
                                 &suite[i + 1..],
                             );
+                        }
+                    }
+                }
+                ast::Stmt::Match(match_statement) => {
+                    for (case_index, case) in match_statement.cases.iter().enumerate() {
+                        let Some(guard) = case.guard.as_deref() else {
+                            continue;
+                        };
+
+                        let boolean_test = self.boolean_test(guard, ExpressionContext::Condition);
+                        for condition in self.redundant_conditions(
+                            boolean_test,
+                            RedundantConditionContext::Standalone,
+                        ) {
+                            if let Some(mut diagnostic) =
+                                self.report_redundant_condition(&condition)
+                            {
+                                self.add_secondary_annotations_for_redundant_match(
+                                    &mut diagnostic,
+                                    boolean_test.truthiness_implied_by(&condition),
+                                    case,
+                                    &match_statement.cases[case_index + 1..],
+                                );
+                            }
                         }
                     }
                 }
@@ -1035,7 +1028,7 @@ impl<'ast> Visitor<'ast> for SubexpressionChecker<'_, 'ast, '_> {
 /// Which exits are accepted when checking the final statement of a suite.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SuiteExitKind {
-    /// Accept any return statement, as well as defensive exits.
+    /// Accept any return, break, or continue statement, as well as defensive exits.
     Any,
     /// Only accept exits that can indicate a defensive runtime check.
     Defensive,
@@ -1050,7 +1043,7 @@ enum SuiteExitKind {
 /// - or a nested `if` statement with an explicit `else` where every branch of the
 ///   `if`/`elif`/`else` ends in a recognized exit of the requested kind.
 ///
-/// [`SuiteExitKind::Any`] also accepts every `return` statement, while
+/// [`SuiteExitKind::Any`] also accepts every `return`, `break`, and `continue` statement, while
 /// [`SuiteExitKind::Defensive`] only accepts `return NotImplemented`.
 ///
 /// Potentially failing assertions count as exits even when they might succeed. This heuristic
@@ -1069,6 +1062,7 @@ fn suite_ends_with_exit(
         .find(|stmt| !is_trivial_statement(stmt))
         .is_some_and(|stmt| match stmt {
             ast::Stmt::Raise(_) => true,
+            ast::Stmt::Break(_) | ast::Stmt::Continue(_) => kind == SuiteExitKind::Any,
             ast::Stmt::Assert(ast::StmtAssert { test, .. }) => {
                 builder.condition_truthiness(test).may_be_false()
             }

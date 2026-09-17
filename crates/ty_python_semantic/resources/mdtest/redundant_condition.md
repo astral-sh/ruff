@@ -863,6 +863,186 @@ warning[redundant-condition]: An empty tuple is always falsy
    |     -------------------- This following statement is unreachable
 ```
 
+## Unreachable `else` suites for `while` loops
+
+The `else` suite of a `while` loop is only reachable if the loop condition can be falsy. Here,
+`nonempty` is always truthy, so the `else` suite is unreachable. The `break` exits the loop without
+running the `else` suite, allowing the final `print` to run:
+
+```py
+def loop_else(nonempty: tuple[int, int]):
+    while nonempty:  # snapshot: redundant-condition
+        break
+    else:
+        "Some documentation about this branch"
+
+        print(
+            "unreachable",
+        )
+    print("reachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+ --> src/mdtest_snippet.py:2:11
+  |
+2 |     while nonempty:  # snapshot: redundant-condition
+  |           ^^^^^^^^ Inferred type is `tuple[int, int]`
+3 |         break
+4 |     else:
+5 |         "Some documentation about this branch"
+6 |
+7 |         print(
+  |         ------ This statement is unreachable
+```
+
+Without a reachable `break`, both the `else` suite and the following statements are unreachable:
+
+```py
+def infinite_loop(value: int):
+    while isinstance(value, int):  # snapshot: redundant-condition-strict
+        print("loop body")
+    else:
+        print("unreachable else")
+
+    print("unreachable following statement")
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:12:11
+   |
+12 |     while isinstance(value, int):  # snapshot: redundant-condition-strict
+   |           ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+13 |         print("loop body")
+14 |     else:
+15 |         print("unreachable else")
+   |         ------------------------- This statement is unreachable
+16 |
+17 |     print("unreachable following statement")
+   |     ---------------------------------------- This following statement is also unreachable
+```
+
+A truthy operand alone does not make the `else` suite unreachable when another operand can stop the
+loop; the `else` branch here is reachable and does not receive a diagnostic falsely describing it as
+unreachable:
+
+```py
+def conditional_loop(nonempty: tuple[int, int], enabled: bool):
+    while nonempty and enabled:  # snapshot: redundant-condition
+        break
+    else:
+        print("reachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:19:11
+   |
+19 |     while nonempty and enabled:  # snapshot: redundant-condition
+   |           ^^^^^^^^ Inferred type is `tuple[int, int]`
+```
+
+## Unreachable cases after always-true match guards
+
+An irrefutable pattern with an always-true guard selects its case whenever it is reached. The
+diagnostic points to the first later case with a nontrivial body, skipping cases containing only
+`pass`:
+
+```py
+def catchall(value: object, nonempty: tuple[int, int]):
+    match value:
+        case _ if nonempty:  # snapshot: redundant-condition
+            print("selected")
+        case str():
+            pass
+        case int():
+            print(
+                "unreachable",
+            )
+        case bytes():
+            print("Also unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+ --> src/mdtest_snippet.py:3:19
+  |
+3 |           case _ if nonempty:  # snapshot: redundant-condition
+  |                     ^^^^^^^^ Inferred type is `tuple[int, int]`
+4 |               print("selected")
+5 |           case str():
+6 |               pass
+7 | /         case int():
+8 | |             print(
+  | |__________________- This following branch is unreachable
+```
+
+A [capture pattern](https://docs.python.org/3/reference/compound_stmts.html#capture-patterns) is
+also irrefutable. Boolean guards diagnosed by the strict rule receive the same annotation:
+
+```py
+def capture(value: object, number: int):
+    match value:
+        case captured if isinstance(number, int):  # snapshot: redundant-condition-strict
+            print(captured)
+        case _:
+            print("unreachable")
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:15:26
+   |
+15 |           case captured if isinstance(number, int):  # snapshot: redundant-condition-strict
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+16 |               print(captured)
+17 | /         case _:
+18 | |             print("unreachable")
+   | |________________________________- This following branch is unreachable
+```
+
+An always-true guard on a refutable pattern does not prevent later cases from matching; we do not
+describe any code as unreachable here:
+
+```py
+def refutable(value: object, nonempty: tuple[int, int]):
+    match value:
+        case int() if nonempty:  # snapshot: redundant-condition
+            print("integer")
+        case _:
+            print("reachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:21:23
+   |
+21 |         case int() if nonempty:  # snapshot: redundant-condition
+   |                       ^^^^^^^^ Inferred type is `tuple[int, int]`
+```
+
+An irrefutable pattern can also fall through when its guard has ambiguous truthiness. We do not
+describe any code as unreachable here, as a diagnostic on one truthy operand does not imply that the
+whole guard succeeds:
+
+```py
+def conditional_guard(value: object, nonempty: tuple[int, int], enabled: bool):
+    match value:
+        case _ if nonempty and enabled:  # snapshot: redundant-condition
+            print("selected")
+        case _:
+            print("reachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:27:19
+   |
+27 |         case _ if nonempty and enabled:  # snapshot: redundant-condition
+   |                   ^^^^^^^^ Inferred type is `tuple[int, int]`
+```
+
 ## Always truthy values appearing later in compound conditions
 
 A subexpression in a compound condition can be inferred as always truthy or always falsy even if the
@@ -2640,6 +2820,88 @@ error[redundant-condition-strict]: Condition is always false
     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[False]`
 112 |             print("unreachable")
     |             -------------------- This statement is unreachable
+```
+
+## Unreachable branches after trivial clauses
+
+An always-truthy `elif` makes every later branch unreachable. If the immediately following branch
+has a trivial body, we point to the first later branch with a nontrivial body:
+
+```py
+def later_branch(nonempty: tuple[int, int], flag: bool):
+    if flag:
+        print("first branch")
+    elif nonempty:  # snapshot: redundant-condition
+        print("second branch")
+    elif flag:
+        pass
+    else:
+        print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+ --> src/mdtest_snippet.py:4:10
+  |
+4 |       elif nonempty:  # snapshot: redundant-condition
+  |            ^^^^^^^^ Inferred type is `tuple[int, int]`
+5 |           print("second branch")
+6 |       elif flag:
+7 |           pass
+8 | /     else:
+9 | |         print("unreachable")
+  | |____________________________- This following branch is unreachable
+```
+
+## Reachability after loop exits
+
+An always-taken `break` makes the remaining statements in the loop body unreachable, while the
+statements after the loop remain reachable:
+
+```py
+def exits_loop(items: list[int], nonempty: tuple[int, int]):
+    for item in items:
+        if nonempty:  # snapshot: redundant-condition
+            break
+
+        print("unreachable", item)
+
+    print("reachable")
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+ --> src/mdtest_snippet.py:3:12
+  |
+3 |         if nonempty:  # snapshot: redundant-condition
+  |            ^^^^^^^^ Inferred type is `tuple[int, int]`
+4 |             break
+5 |
+6 |         print("unreachable", item)
+  |         -------------------------- This following statement is unreachable
+```
+
+An always-taken `continue` also makes the remaining statements in the loop body unreachable:
+
+```py
+def continues_loop(items: list[int], value: int):
+    for item in items:
+        if isinstance(value, int):  # snapshot: redundant-condition-strict
+            continue
+
+        print("unreachable", item)
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:11:12
+   |
+11 |         if isinstance(value, int):  # snapshot: redundant-condition-strict
+   |            ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+12 |             continue
+13 |
+14 |         print("unreachable", item)
+   |         -------------------------- This following statement is unreachable
 ```
 
 ## Reachability after exhaustive `if`/`elif` chains
@@ -5542,10 +5804,51 @@ def fallthrough_elif(value: int | str):
     raise TypeError
 ```
 
-We recognize an implicit `else` when the preceding `if` or `elif` branch ends in a `return`, a
-`raise`, a call returning `Never`, or a potentially failing assertion. A nested `if` must have an
-explicit `else`, and every branch must end in one of these statements. These exits can be mixed
-within the nested conditional:
+We recognize an implicit `else` when the preceding `if` or `elif` branch ends in a `return`,
+`break`, `continue`, `raise`, a call returning `Never`, or a potentially failing assertion.
+
+A `break` skips the rest of the loop body, so the statement following the `break` here acts as an
+implicit `else`. We therefore do not emit a `redundant-condition-strict` diagnostic here, since the
+branch is clearly marked as "deliberately unreachable" by the fact that it always raises:
+
+```py
+def break_after_valid_value(values: list[int]):
+    for value in values:
+        if isinstance(value, int):  # no diagnostic
+            break
+        raise TypeError("expected an integer")
+```
+
+A `continue` also skips the rest of the loop body, so the same exemption applies -- no
+`redundant-condition-strict` diagnostic is emitted here:
+
+```py
+def continue_after_valid_value(values: list[int]):
+    for value in values:
+        if isinstance(value, int):  # no diagnostic
+            continue
+        raise TypeError("expected an integer")
+```
+
+Non-boolean conditions still produce `redundant-condition` when the truthy branch ends in `break` or
+`continue`, even if the following statements raise, however:
+
+```py
+def non_boolean_break(values: list[tuple[int, int]]):
+    for value in values:
+        if value:  # error: [redundant-condition] "Object of type `tuple[int, int]` is always truthy"
+            break
+        raise TypeError("expected a nonempty tuple")
+
+def non_boolean_continue(values: list[tuple[int, int]]):
+    for value in values:
+        if value:  # error: [redundant-condition] "Object of type `tuple[int, int]` is always truthy"
+            continue
+        raise TypeError("expected a nonempty tuple")
+```
+
+A nested `if` must have an explicit `else`, and every branch must end in one of the recognized
+exits. These exits can be mixed within the nested conditional:
 
 ```py
 from typing import Never
