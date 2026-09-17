@@ -194,6 +194,25 @@ def use_constraints[T: (TypeForm[int], TypeForm[str])](form: T, value: int | str
     assert_type(value, form)
 ```
 
+## Recursive aliases of `TypeForm`
+
+A value whose type is a recursive alias of `TypeForm` represents the type inside that `TypeForm`.
+Casting to it unwraps the `TypeForm` while preserving recursive references in its type argument. The
+same projection applies when the alias is one alternative in a union of type forms.
+
+```py
+from typing import cast
+from typing_extensions import TypeForm
+
+RecursiveForm = TypeForm[list["RecursiveForm"]]
+
+def cast_recursive_form(form: RecursiveForm) -> None:
+    reveal_type(cast(form, object()))  # revealed: list[RecursiveForm]
+
+def cast_union(form: RecursiveForm | TypeForm[int]) -> None:
+    reveal_type(cast(form, object()))  # revealed: list[RecursiveForm] | int
+```
+
 ## Runtime class objects and gradual values
 
 Runtime class objects are also valid `TypeForm` values when their instance type is compatible with
