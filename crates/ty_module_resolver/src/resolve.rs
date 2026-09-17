@@ -37,7 +37,6 @@ mod search;
 use std::borrow::Cow;
 use std::fmt;
 use std::iter::FusedIterator;
-use std::sync::LazyLock;
 
 use compact_str::format_compact;
 use rustc_hash::{FxBuildHasher, FxHashSet};
@@ -51,7 +50,6 @@ use ruff_python_ast::{
     self as ast, PySourceType,
     visitor::{Visitor, walk_body},
 };
-use ruff_python_trivia::IdentifierMatcher;
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
@@ -1632,16 +1630,8 @@ fn is_legacy_namespace_package(
     context: &ResolverContext,
     init: File,
 ) -> bool {
-    static NAME_MATCHER: LazyLock<IdentifierMatcher<'static>> =
-        LazyLock::new(|| IdentifierMatcher::new("__name__"));
-
     // Just an optimization, the stdlib and typeshed are never legacy namespace packages
     if package_path.search_path().is_standard_library() {
-        return false;
-    }
-
-    // Both supported namespace declarations pass `__name__` as an argument.
-    if !NAME_MATCHER.may_match(&source_text(context.db, init)) {
         return false;
     }
 

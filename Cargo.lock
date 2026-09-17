@@ -4791,7 +4791,6 @@ dependencies = [
  "ruff_memory_usage",
  "ruff_python_ast",
  "ruff_python_stdlib",
- "ruff_python_trivia",
  "rustc-hash",
  "salsa",
  "strum",
