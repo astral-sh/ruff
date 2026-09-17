@@ -10,7 +10,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_python_trivia::IdentifierMatcher;
+use ruff_python_trivia::NameMatcher;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use ty_module_resolver::ResolverFile;
@@ -79,7 +79,7 @@ pub fn incoming_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
         let files = db.project().files(db);
         let files: Vec<_> = files.iter().filter(|other| *other != source_file).collect();
         let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
-        let matcher = needle.map(IdentifierMatcher::new);
+        let matcher = needle.map(NameMatcher::new);
         // The byte-level text prefilter still pays off as a coarse gate:
         // files that don't contain the target name (or an import of it)
         // textually are skipped before any AST work. Files that route the

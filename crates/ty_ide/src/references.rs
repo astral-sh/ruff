@@ -22,7 +22,7 @@ use ruff_python_ast::{
     name::Name,
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
-use ruff_python_trivia::IdentifierMatcher;
+use ruff_python_trivia::NameMatcher;
 use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_project::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
@@ -173,7 +173,7 @@ fn references_for_search(
                 .collect()
         };
         let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
-        let matcher = IdentifierMatcher::new(search.target_text.as_str());
+        let matcher = NameMatcher::new(search.target_text.as_str());
         let other_references = files
             .into_par_iter()
             .with_min_len(minimum_job_len)

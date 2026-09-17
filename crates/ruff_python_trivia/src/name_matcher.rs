@@ -11,12 +11,12 @@ use memchr::memmem::Finder;
 /// Construct a matcher once and reuse it across sources to avoid preprocessing
 /// the name for each source. Cache matchers for fixed names in a [`std::sync::LazyLock`].
 #[derive(Debug, Clone)]
-pub struct IdentifierMatcher<'a> {
+pub struct NameMatcher<'a> {
     finder: Finder<'a>,
     is_keyword: bool,
 }
 
-impl<'a> IdentifierMatcher<'a> {
+impl<'a> NameMatcher<'a> {
     /// Creates an identifier matcher that borrows `name` without allocating.
     pub fn new(name: &'a str) -> Self {
         Self {
@@ -67,11 +67,11 @@ fn is_ascii_identifier_continue(byte: u8) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::IdentifierMatcher;
+    use super::NameMatcher;
 
     #[test]
     fn identifier_boundaries() {
-        let matcher = IdentifierMatcher::new("x");
+        let matcher = NameMatcher::new("x");
         assert!(matcher.may_match("x"));
         assert!(matcher.may_match("x = 1"));
         assert!(matcher.may_match("obj.x"));
@@ -90,21 +90,21 @@ mod tests {
 
     #[test]
     fn strings_and_comments_are_candidates() {
-        let matcher = IdentifierMatcher::new("name");
+        let matcher = NameMatcher::new("name");
         assert!(matcher.may_match(r#""name""#));
         assert!(matcher.may_match("# name"));
     }
 
     #[test]
     fn non_ascii_source_is_a_candidate() {
-        let matcher = IdentifierMatcher::new("C");
+        let matcher = NameMatcher::new("C");
         assert!(matcher.may_match("𝒞 = 1"));
         assert!(matcher.may_match("# café"));
     }
 
     #[test]
     fn keyword_uses_literal_spelling() {
-        let matcher = IdentifierMatcher::keyword("class");
+        let matcher = NameMatcher::keyword("class");
         assert!(matcher.may_match("class C: pass"));
         assert!(matcher.may_match("class Café: pass"));
         assert!(matcher.may_match("# class"));
