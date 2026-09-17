@@ -1355,9 +1355,9 @@ impl<'db> IntersectionBuilder<'db> {
         let mut seen_aliases = FxHashSet::default();
         while let Some((ty, negated)) = pending.pop() {
             match ty {
-                Type::TypeAlias(alias) => {
-                    if seen_aliases.insert((alias, negated)) {
-                        pending.push((alias.value_type(db), negated));
+                Type::TypeAlias(_) | Type::Recursive(_) => {
+                    if seen_aliases.insert((ty, negated)) {
+                        pending.push((ty.resolve_type_alias(db), negated));
                     }
                 }
                 Type::Union(union) => {

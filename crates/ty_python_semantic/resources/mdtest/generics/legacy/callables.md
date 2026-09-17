@@ -471,6 +471,39 @@ reveal_type(infer_from_consumers(consume_recursive, consume_int_or_str))  # reve
 reveal_type(infer_from_consumers(consume_int_or_str, consume_recursive))  # revealed: int
 ```
 
+## Narrowing recursive inferred union upper bounds
+
+The third consumer restricts two recursive unions to the literal `5`. Its position does not change
+the inferred result.
+
+```py
+from typing import Callable, Literal, TypeVar
+
+T = TypeVar("T")
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+First = Literal[5] | A | B | list["First"]
+Second = Literal[5] | C | D | list["Second"]
+
+def infer_from_consumers(
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+    third: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+def consume_first(value: First) -> None: ...
+def consume_second(value: Second) -> None: ...
+def consume_literal(value: Literal[5]) -> None: ...
+
+reveal_type(infer_from_consumers(consume_first, consume_second, consume_literal))  # revealed: Literal[5]
+reveal_type(infer_from_consumers(consume_literal, consume_first, consume_second))  # revealed: Literal[5]
+```
+
 ## Overloaded callable as generic `Callable` argument
 
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set
