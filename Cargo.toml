@@ -146,7 +146,7 @@ jiff = { version = "0.2.0", default-features = false, features = [
 jod-thread = { version = "1.0.0", default-features = false }
 js-sys = { version = "0.3.69", default-features = false, features = ["std"] }
 libc = { version = "0.2.153", default-features = false, features = ["std"] }
-libcst = { version = "1.8.4", default-features = false }
+libcst = { version = "1.9.0", default-features = false }
 log = { version = "0.4.17", default-features = false }
 lsp-server = { version = "0.10.0", default-features = false }
 lsp-types = { package = "gen-lsp-types", version = "0.11.0", default-features = false, features = ["url"] }
