@@ -36,7 +36,7 @@ clap_complete_command = { workspace = true }
 clearscreen = { workspace = true }
 colored = { workspace = true }
 crossbeam = { workspace = true }
-ctrlc = { version = "3.4.4" }
+ctrlc = { version = "3.4.4", default-features = false }
 indicatif = { workspace = true }
 jiff = { workspace = true }
 rayon = { workspace = true }

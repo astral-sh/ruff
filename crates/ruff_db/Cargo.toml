@@ -54,7 +54,7 @@ zip = { workspace = true }
 etcetera = { workspace = true, optional = true }
 
 [target.'cfg(target_arch="wasm32")'.dependencies]
-web-time = { version = "1.1.0" }
+web-time = { version = "1.1.0", default-features = false }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["filters"] }
