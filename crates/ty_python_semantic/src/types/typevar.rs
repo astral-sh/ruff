@@ -499,6 +499,24 @@ impl<'db> TypeVarInstance<'db> {
             self_identity: TypeVarIdentity<'db>,
         ) -> bool {
             let db = state.db;
+            let specialization = type_alias.specialization(db);
+            // A nested specialization can contain self even when its alias body was already visited.
+            if let Some(specialization) = specialization {
+                if specialization
+                    .types(db)
+                    .iter()
+                    .any(|ty| type_is_self_referential_impl(state, *ty, self_identity))
+                {
+                    return true;
+                }
+            } else if let Some(generic_context) = type_alias.generic_context(db)
+                && generic_context.variables(db).any(|typevar| {
+                    typevar_default_is_self_referential(state, typevar.typevar(db), self_identity)
+                })
+            {
+                return true;
+            }
+
             {
                 let mut seen_type_aliases = state.seen_type_aliases.borrow_mut();
                 let definition = type_alias.definition(db);
@@ -510,25 +528,11 @@ impl<'db> TypeVarInstance<'db> {
                 seen_type_aliases.push(definition);
             }
 
-            let value_type = if let Some(specialization) = type_alias.specialization(db) {
-                if specialization
-                    .types(db)
-                    .iter()
-                    .any(|ty| type_is_self_referential_impl(state, *ty, self_identity))
-                {
-                    return true;
-                }
+            let value_type = if specialization.is_some() {
                 type_alias.value_type(db)
-            } else if let Some(generic_context) = type_alias.generic_context(db)
-                && generic_context.variables(db).any(|typevar| {
-                    typevar_default_is_self_referential(state, typevar.typevar(db), self_identity)
-                })
-            {
-                return true;
             } else {
                 type_alias.raw_value_type(db)
             };
-
             type_is_self_referential_impl(state, value_type, self_identity)
         }
 
@@ -549,6 +553,29 @@ impl<'db> TypeVarInstance<'db> {
                 }
                 Type::TypeAlias(alias) => {
                     type_alias_is_self_referential(state, alias, self_identity)
+                }
+                Type::Recursive(recursive) => {
+                    if recursive.arguments(db).is_some_and(|arguments| {
+                        arguments
+                            .types(db)
+                            .iter()
+                            .any(|ty| type_is_self_referential_impl(state, *ty, self_identity))
+                    }) {
+                        return true;
+                    }
+                    {
+                        let mut seen_type_aliases = state.seen_type_aliases.borrow_mut();
+                        let definition = recursive.definition(db);
+                        if seen_type_aliases.contains(&definition) {
+                            return false;
+                        }
+                        seen_type_aliases.push(definition);
+                    }
+                    type_is_self_referential_impl(
+                        state,
+                        recursive.unfold(db, state.env),
+                        self_identity,
+                    )
                 }
                 Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
                     type_alias_is_self_referential(state, alias, self_identity)
