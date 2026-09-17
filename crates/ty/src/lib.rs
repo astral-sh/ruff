@@ -25,12 +25,13 @@ use ruff_db::files::File;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
 use ruff_diagnostics::Applicability;
+use ruff_python_ast::script::ScriptTag;
 use salsa::Database;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{
-    ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UvSyncProgress,
-    watch,
+    ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UseUv,
+    UvSyncProgress, watch,
 };
 use ty_project::{ProjectDatabase, ProjectMetadata, ProjectReloadResult};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
@@ -147,16 +148,26 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .map(|path| SystemPath::absolute(path, &cwd));
     let force_exclude = args.force_exclude();
 
+    let use_uv = UseUv::from_system(&system);
+    let use_uv = if use_uv == UseUv::On
+        && let [path] = check_paths.as_slice()
+        && system.is_file(path)
+        && system
+            .read_to_string(path)
+            .is_ok_and(|source| ScriptTag::parse(source.as_bytes()).is_some())
+    {
+        // A single PEP 723 script uses its own uv environment, even with an explicit ty
+        // configuration file. The other explicit paths still discover workspace metadata.
+        UseUv::Scripts
+    } else {
+        use_uv
+    };
+
     let mut project_metadata = match &config_file {
         Some(config_file) => {
-            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
+            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system, use_uv)?
         }
-        None if check_paths.iter().any(|path| system.is_file(path)) => {
-            // `uv check --script` passes a file as its check path. Standalone scripts must not
-            // inherit the enclosing workspace; their environments are synchronized separately.
-            ProjectMetadata::discover_without_uv(&project_path, &system)?
-        }
-        None => ProjectMetadata::discover(&project_path, &system)?,
+        None => ProjectMetadata::discover_with_uv(&project_path, &system, use_uv)?,
     };
 
     project_metadata.apply_configuration_files(&system)?;

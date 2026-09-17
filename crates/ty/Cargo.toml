@@ -20,6 +20,7 @@ doctest = false
 [dependencies]
 ruff_db = { workspace = true, features = ["os", "cache", "junit"] }
 ruff_diagnostics = { workspace = true }
+ruff_python_ast = { workspace = true }
 ruff_ranged_value = { workspace = true }
 ty_combine = { workspace = true }
 ty_project = { workspace = true, features = ["zstd", "junit"] }
@@ -35,7 +36,7 @@ clap_complete_command = { workspace = true }
 clearscreen = { workspace = true }
 colored = { workspace = true }
 crossbeam = { workspace = true }
-ctrlc = { version = "3.4.4" }
+ctrlc = { version = "3.4.4", default-features = false }
 indicatif = { workspace = true }
 jiff = { workspace = true }
 rayon = { workspace = true }
@@ -52,7 +53,6 @@ tikv-jemallocator = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
-ruff_python_ast = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ty_module_resolver = { workspace = true }
 ty_python_core = { workspace = true }

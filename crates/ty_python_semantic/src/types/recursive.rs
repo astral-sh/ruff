@@ -1,8 +1,64 @@
-//! Binding and capture-avoiding substitution for structural recursive types.
+//! Structural recursive types and their binding and substitution operations.
 //!
-//! `RecursiveVar` is syntax, with no standalone type semantics. Only structural
-//! substitutions may inspect an open body. Ordinary type operations receive its
-//! closed unfolding, including during intermediate normalization steps.
+//! A structural recursive type describes recursion within the type itself.
+//! We write `μa. B` for a recursive type with body `B`, where occurrences of the recursive
+//! variable `a` refer to the whole type. The `μa` is called a binder: it determines
+//! what `a` refers to within `B`. For example:
+//!
+//! ```text
+//! R = μa. tuple[int, a | None]
+//! ```
+//!
+//! Such a recursive type is constructed, for example,
+//! from the implicit type alias `R = tuple[int, "R | None"]`.
+//!
+//! A type is *closed* if every recursive variable is bound within that type;
+//! otherwise, it is *open* (there is a dangling reference).
+//! All types exposed to ordinary type operations must be closed, including during
+//! intermediate normalization steps. The binding and substitution operations
+//! in this module must maintain that invariant: an open body cannot be passed
+//! directly to operations such as assignability checking.
+//!
+//! Substitution replaces occurrences of a variable with a type. It is
+//! *capture-avoiding* when it preserves which binder every remaining variable refers
+//! to, including variables in the inserted expression. We write `B[a := R]` for this
+//! substitution of `R` for `a` in `B`. Unfolding exposes one layer of a recursive type
+//! by substituting the whole type for its bound references:
+//!
+//! ```text
+//! unfold(μa. B) = B[a := μa. B]
+//! unfold(R) = tuple[int, R | None]
+//! ```
+//!
+//! The result is closed, so ordinary type operations can inspect it. Binding works in
+//! the other direction: it replaces applications of a recursive type with variables
+//! and encloses the resulting open body in a `RecursiveType`. Both operations respect
+//! nested binders. A variable refers to the nearest enclosing binder with the same
+//! alias cycle identity; substitution does not enter that binder's body when it binds the
+//! target variable. The binder's arguments are outside its scope and are still substituted.
+//!
+//! A *type constructor* takes type arguments and produces a type. Recursive types can
+//! also be parameterized this way. With type variable `T`, the alias
+//! `Tree = tuple[T, "Tree[list[T]] | None"]` has the recursive type constructor:
+//!
+//! ```text
+//! μF. λT. tuple[T, F[list[T]] | None]
+//! ```
+//!
+//! Here `μF` binds the recursive constructor, and `λT` binds its type parameter.
+//! The occurrence `F[list[T]]` is stored as `RecursiveVar` with the constructor's
+//! alias cycle identity and unspecialized arguments `[list[T]]`.
+//!
+//! To infer `x[1]` for `x: Tree[int]`, first unfold `x`'s type: substitute the constructor
+//! for `F`, then apply `T := int`. This order closes the body before specializing it:
+//!
+//! ```text
+//! unfold((μF. λT. tuple[T, F[list[T]] | None])[int])
+//! = tuple[int, (μF. λT. tuple[T, F[list[T]] | None])[list[int]] | None]
+//! = tuple[int, Tree[list[int]] | None]
+//! ```
+//!
+//! Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
 
 mod graph;
 
@@ -27,7 +83,7 @@ use crate::{Db, FxIndexMap, FxOrderSet, Program, ProgramEnvironment};
 /// A reference to an alias cycle or an equation in an anonymous recursive binder.
 /// An escaping reference has no type semantics; in particular, it is neither a
 /// gradual type nor an assignability operand.
-/// Only binding and substitution operations may construct recursive variables.
+/// Only recursive-type binding and substitution operations may construct or operate on recursive variables.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveVar<'db> {
     #[returns(copy)]
@@ -59,13 +115,14 @@ impl get_size2::GetSize for RecursiveVarTarget {}
 
 impl<'db> RecursiveVar<'db> {
     /// Substitute alias references by cycle identity and graph references by binder position.
-    pub(super) fn apply_type_mapping(
+    pub(super) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
         mapping: &TypeMapping<'_, 'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        let TypeMapping::Recursive(RecursiveMapping(substitution)) = mapping else {
+        let TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(substitution)) = mapping
+        else {
             unreachable!("semantic operation on an unbound recursive variable");
         };
         let arguments = self
@@ -109,7 +166,7 @@ pub struct RecursiveMapping<'a, 'db>(RecursiveSubstitution<'a, 'db>);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 enum RecursiveSubstitution<'a, 'db> {
     Unfold(RecursiveType<'db>),
-    Bind(RecursiveBinding<'db>),
+    Bind(#[get_size(ignore)] salsa::Id),
     Reindex(&'a [usize]),
     Rebuild(&'a [Type<'db>]),
     Extract(&'a RecursiveGraphBuilder<'db>),
@@ -118,46 +175,14 @@ enum RecursiveSubstitution<'a, 'db> {
 impl RecursiveSubstitution<'_, '_> {
     fn alias_cycle(self, db: &dyn Db) -> Option<salsa::Id> {
         let recursive = match self {
-            Self::Unfold(recursive) | Self::Bind(RecursiveBinding::Constructor(recursive)) => {
-                recursive
-            }
-            Self::Bind(RecursiveBinding::Alias(cycle)) => return Some(cycle),
+            Self::Unfold(recursive) => recursive,
+            Self::Bind(cycle) => return Some(cycle),
             _ => return None,
         };
         match recursive.origin(db) {
             RecursiveOrigin::Alias { cycle, .. } => Some(cycle),
             RecursiveOrigin::ConstraintSolution(_) => None,
         }
-    }
-}
-
-/// Inference binds references across alias iterations; transformations bind an exact constructor.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RecursiveBinding<'db> {
-    Alias(salsa::Id),
-    Constructor(RecursiveType<'db>),
-}
-
-impl get_size2::GetSize for RecursiveBinding<'_> {}
-
-impl<'db> RecursiveBinding<'db> {
-    fn matching_alias_cycle(
-        self,
-        db: &'db dyn Db,
-        recursive: RecursiveType<'db>,
-    ) -> Option<salsa::Id> {
-        let RecursiveOrigin::Alias { cycle, .. } = recursive.origin(db) else {
-            return None;
-        };
-        let matches = match self {
-            Self::Alias(target) => cycle == target && recursive.materialization_kind(db).is_none(),
-            Self::Constructor(target) => {
-                recursive.origin(db) == target.origin(db)
-                    && recursive.graph(db) == target.graph(db)
-                    && recursive.materialization_kind(db) == target.materialization_kind(db)
-            }
-        };
-        matches.then_some(cycle)
     }
 }
 
@@ -211,34 +236,6 @@ impl get_size2::GetSize for RecursiveGraph<'_> {}
 /// result to ordinary type operations.
 /// Use the binding operations in this module to construct recursive types.
 ///
-/// For example, with type variable `T`, the alias
-/// `Tree = tuple[T, "Tree[list[T]] | None"]` has the recursive constructor:
-///
-/// ```text
-/// μF. λT. tuple[T, F[list[T]] | None]
-/// ```
-///
-/// Here `μF` binds the recursive constructor, and `λT` binds its type parameter.
-/// The occurrence `F[list[T]]` is stored as `RecursiveVar` with the constructor's
-/// alias cycle identity and unspecialized arguments `[list[T]]`.
-///
-/// To infer the container subscript `x[1]` for `x: Tree[int]`, first unfold `x`'s type.
-/// Unfolding replaces references to the recursive binder with the recursive type
-/// itself. Writing `B[a := R]` for capture-avoiding substitution of `R` for `a` in `B`:
-///
-/// ```text
-/// unfold(μa. B) = B[a := μa. B]
-/// ```
-///
-/// For `Tree[int]`, substitute the constructor for `F`, then apply `T := int`:
-///
-/// ```text
-/// unfold((μF. λT. tuple[T, F[list[T]] | None])[int])
-/// = tuple[int, (μF. λT. tuple[T, F[list[T]] | None])[list[int]] | None]
-/// = tuple[int, Tree[list[int]] | None]
-/// ```
-///
-/// Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
     #[returns(copy)]
@@ -257,6 +254,7 @@ pub struct RecursiveType<'db> {
 
 impl get_size2::GetSize for RecursiveType<'_> {}
 
+#[salsa::tracked]
 impl<'db> RecursiveType<'db> {
     /// Seed an alias query with `μa. a`, naming its variable by the query cycle.
     pub(super) fn initial(
@@ -305,6 +303,11 @@ impl<'db> RecursiveType<'db> {
 
     /// References exposed by the constructor, before substituting its arguments.
     /// Local graph references select bodies; references to enclosing aliases remain exposed.
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial=|_, id, _| Box::new([Type::divergent(id)]),
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(super) fn unguarded_body_references(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         let mut pending = vec![self.entry(db)];
         let mut visited = FxHashSet::default();
@@ -316,10 +319,6 @@ impl<'db> RecursiveType<'db> {
             for reference in self.graph(db).bodies(db)[index].unguarded_references(db) {
                 let reference = match reference {
                     Type::RecursiveVar(variable) => match variable.target(db) {
-                        RecursiveVarTarget::Alias(cycle) if matches!(self.origin(db), RecursiveOrigin::Alias { cycle: bound, .. } if cycle == bound) =>
-                        {
-                            continue;
-                        }
                         RecursiveVarTarget::Graph { depth, index } => {
                             // Graph extraction keeps nested constructors closed. References to
                             // an enclosing graph occur in the application's arguments instead.
@@ -327,7 +326,8 @@ impl<'db> RecursiveType<'db> {
                             pending.push(index);
                             continue;
                         }
-                        RecursiveVarTarget::Alias(_) => reference,
+                        // Close the marker without exposing an unbound variable.
+                        RecursiveVarTarget::Alias(cycle) => Type::divergent(cycle),
                     },
                     _ => reference,
                 };
@@ -400,7 +400,7 @@ impl<'db> RecursiveType<'db> {
             db,
             &ProgramEnvironment::from_definition(definition),
             result,
-            RecursiveBinding::Alias(cycle),
+            cycle,
         )
     }
 
@@ -410,11 +410,13 @@ impl<'db> RecursiveType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         original: Type<'db>,
-        binding: RecursiveBinding<'db>,
+        cycle: salsa::Id,
     ) -> Type<'db> {
         let body = original.apply_type_mapping_impl(
             db,
-            &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(binding))),
+            &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Bind(cycle),
+            )),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
         );
@@ -514,26 +516,39 @@ impl<'db> RecursiveType<'db> {
         if self.materialization_kind(db).is_some() && !self.may_have_unbounded_specialization(db) {
             return materialized_unfold(db, self);
         }
-        let unfolded = self.body(db).apply_type_mapping_impl(
-            db,
-            &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Unfold(self))),
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::new(env),
-        );
-        let unfolded = match self.arguments(db) {
-            Some(arguments) => unfolded.apply_type_mapping(
-                db,
-                env,
-                &TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(arguments)),
-                TypeContext::default(),
-            ),
-            None => unfolded,
-        };
+        let unfolded = self.unfolded_body(db);
         match self.materialization_kind(db) {
             Some(kind) => unfolded.apply_type_mapping(
                 db,
                 env,
                 &TypeMapping::Materialize(kind),
+                TypeContext::default(),
+            ),
+            None => unfolded,
+        }
+    }
+
+    /// Share the closed, specialized body across mappings with different visitors.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, recursive: RecursiveType<'db>| Type::Recursive(recursive),
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn unfolded_body(self, db: &'db dyn Db) -> Type<'db> {
+        let env = self.environment(db);
+        let unfolded = self.body(db).apply_type_mapping_impl(
+            db,
+            &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Unfold(self),
+            )),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(&env),
+        );
+        match self.arguments(db) {
+            Some(arguments) => unfolded.apply_type_mapping(
+                db,
+                &env,
+                &TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(arguments)),
                 TypeContext::default(),
             ),
             None => unfolded,
@@ -550,19 +565,21 @@ impl<'db> RecursiveType<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         match mapping {
-            TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(binding)))
-                if let Some(cycle) = binding.matching_alias_cycle(db, self) =>
+            TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Bind(cycle),
+            )) if matches!(self.origin(db), RecursiveOrigin::Alias { cycle: own_cycle, .. } if own_cycle == *cycle)
+                && self.materialization_kind(db).is_none() =>
             {
                 let arguments = self
                     .arguments(db)
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
                 Type::RecursiveVar(RecursiveVar::new_internal(
                     db,
-                    RecursiveVarTarget::Alias(cycle),
+                    RecursiveVarTarget::Alias(*cycle),
                     arguments,
                 ))
             }
-            TypeMapping::Recursive(RecursiveMapping(substitution)) => {
+            TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(substitution)) => {
                 let graph = if matches!(self.origin(db), RecursiveOrigin::Alias { cycle, .. }
                     if Some(cycle) == substitution.alias_cycle(db))
                 {
@@ -604,50 +621,54 @@ impl<'db> RecursiveType<'db> {
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
                 Type::Recursive(self.with_arguments(db, arguments))
             }
+            TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => {
+                Type::Recursive(self)
+            }
             TypeMapping::Materialize(kind) => {
-                Type::Recursive(if self.materialization_kind(db).is_some() {
-                    self
-                } else {
-                    self.with_materialization(db, Some(*kind))
+                visitor.visit(db, Type::Recursive(self), mapping, || {
+                    self.map_type(db, visitor.env, |unfolded| {
+                        let mapped = unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
+                        // Preserve static aliases, including recursive references that the
+                        // visitor leaves unchanged while materializing their enclosing body.
+                        Type::Recursive(if mapped == unfolded {
+                            self
+                        } else {
+                            self.with_materialization(db, Some(*kind))
+                        })
+                    })
+                })
+            }
+            TypeMapping::EagerExpansion => {
+                visitor.visit(db, Type::Recursive(self), mapping, || {
+                    // Expand arguments only where the body exposes them. Expanding stored arguments
+                    // first can feed a recursive alias's previous approximation into its own arguments.
+                    self.map_type(db, visitor.env, |unfolded| {
+                        let mapped = unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
+                        if mapped == unfolded {
+                            Type::Recursive(self)
+                        } else {
+                            mapped
+                        }
+                    })
                 })
             }
             _ if matches!(self.origin(db), RecursiveOrigin::Alias { .. }) => {
-                // Transform the constructor before applying the arguments. Binding a specialized
-                // unfolding would bake those arguments into the body of every later application.
-                let constructor = self.constructor(db);
-                let mapped = visitor.visit(db, Type::Recursive(constructor), mapping, || {
-                    constructor.map_type(db, visitor.env, |unfolded| {
+                visitor.visit(db, Type::Recursive(self), mapping, || {
+                    // Map arguments before unfolding so recursive backedges retain their mapped
+                    // arguments. Keep the application's materialization throughout the traversal.
+                    let arguments = self.arguments(db).map(|arguments| {
+                        arguments.apply_type_mapping_impl(db, mapping, &[], visitor)
+                    });
+                    let recursive = self.with_arguments(db, arguments);
+                    recursive.map_type(db, visitor.env, |unfolded| {
                         let mapped = unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
-                        constructor.bind(
-                            db,
-                            visitor.env,
-                            mapped,
-                            RecursiveBinding::Constructor(constructor),
-                        )
+                        if mapped == unfolded {
+                            Type::Recursive(recursive)
+                        } else {
+                            mapped
+                        }
                     })
-                });
-                let mapped = match self.arguments(db) {
-                    Some(arguments) => mapped.apply_type_mapping(
-                        db,
-                        visitor.env,
-                        &TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(
-                            arguments.apply_type_mapping_impl(db, mapping, &[], visitor),
-                        )),
-                        tcx,
-                    ),
-                    None => mapped,
-                };
-                // Materialization belongs to the application: specializing a previously
-                // materialized formal parameter must also materialize its replacement.
-                match self.materialization_kind(db) {
-                    Some(kind) => mapped.apply_type_mapping(
-                        db,
-                        visitor.env,
-                        &TypeMapping::Materialize(kind),
-                        tcx,
-                    ),
-                    None => mapped,
-                }
+                })
             }
             _ if visitor.recursive_roots.iter().any(|root| {
                 self.graph(db) == root.graph(db)
@@ -746,11 +767,20 @@ impl<'db> RecursiveType<'db> {
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
-    /// A sufficient relation between materializations of the same recursive constructor.
-    /// Restricting the family of argument materializations restricts the family of
-    /// instantiated bodies, even when unfolding would grow the arguments indefinitely.
-    /// Structural comparison remains an alternative: aliases need not be injective.
-    pub(super) fn when_recursive_arguments_relate(
+    /// Prove a relation between applications of the same recursive constructor
+    /// (same unspecialized body) based on inclusion or overlap of their type
+    /// arguments' materialization families.
+    ///
+    /// For example, every materialization of `R[int]` is also a materialization of
+    /// `R[Any]`: choosing `int` restricts the possibilities for the argument without
+    /// changing the constructor's body. Comparing arguments lets us establish
+    /// relations between the applications' top and bottom materializations without
+    /// unfolding their bodies, even when unfolding would keep growing the arguments.
+    ///
+    /// Argument comparison is sufficient but not necessary to establish the relation:
+    /// different arguments can produce equivalent alias types. If this check cannot
+    /// establish the relation, the caller can still unfold and compare the bodies.
+    pub(super) fn when_recursive_types_relate_by_arguments(
         &self,
         db: &'db dyn Db,
         source: RecursiveType<'db>,
@@ -794,11 +824,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 } else {
                     MaterializationKind::Bottom
                 });
-        // Top-to-bottom requires the body itself to be fully static. Equal static
-        // arguments do not rule out a fixed `Any` in that body.
+        // Top-to-bottom also requires a static body: equal arguments do not rule
+        // out a fixed `Any`. Unchanged materializations retain the original binder.
+        let unmaterialized_target = Type::Recursive(target.with_materialization(db, None));
         if matches!(
             (source_kind, target_kind),
             (MaterializationKind::Top, MaterializationKind::Bottom)
+        ) && unmaterialized_target.materialize(
+            db,
+            MaterializationKind::Top,
+            self.materialization_visitor,
+        ) != unmaterialized_target.materialize(
+            db,
+            MaterializationKind::Bottom,
+            self.materialization_visitor,
         ) {
             return self.never();
         }

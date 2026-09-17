@@ -48,7 +48,7 @@ from a import foo
 reveal_type(foo)  # revealed: Unknown
 ```
 
-## No implicit shadowing
+## Imported annotations do not constrain local assignments
 
 `b.py`:
 
@@ -59,7 +59,8 @@ x: int
 ```py
 from b import x
 
-x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]"
+x = "foo"
+reveal_type(x)  # revealed: Literal["foo"]
 ```
 
 ## Import cycle

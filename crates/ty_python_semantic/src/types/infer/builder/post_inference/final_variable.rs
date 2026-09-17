@@ -38,13 +38,6 @@ pub(crate) fn check_final_without_value<'db>(
             continue;
         }
 
-        // Imports inherit the `Final` qualifier from the source module, but the
-        // import itself provides the value. Don't flag imported `Final` symbols,
-        // even if a later `del` removes the binding at end-of-scope.
-        if first_declaration.is_some_and(|decl| decl.kind(db).is_import()) {
-            continue;
-        }
-
         // Check if the symbol has any bindings in the current scope.
         let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
         let binding_place = place_from_bindings(db, env, bindings);

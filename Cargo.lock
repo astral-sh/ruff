@@ -336,7 +336,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bb31b46c14244e20ee9984b11bf5c992b91fb6939fea616e3512c8baecdbe5f"
 dependencies = [
  "memchr",
- "regex-automata",
  "serde_core",
 ]
 
@@ -3690,6 +3689,7 @@ name = "ruff_python_trivia"
 version = "0.0.14"
 dependencies = [
  "itertools 0.15.0",
+ "memchr",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
@@ -4782,6 +4782,8 @@ dependencies = [
  "compact_str",
  "get-size2",
  "insta",
+ "itertools 0.15.0",
+ "memchr",
  "ordermap",
  "regex",
  "regex-syntax",
@@ -4950,6 +4952,7 @@ dependencies = [
  "crossbeam",
  "dunce",
  "gen-lsp-types",
+ "indexmap",
  "insta",
  "jod-thread",
  "libc",

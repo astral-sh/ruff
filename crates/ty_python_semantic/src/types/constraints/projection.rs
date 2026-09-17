@@ -3,7 +3,9 @@
 use rustc_hash::FxHashSet;
 
 use super::resolution::SolutionType;
-use super::{ConstraintSet, PathBound, PathBoundSolution, PathBounds, Solutions, TypeVarSolution};
+use super::{
+    CandidateSolutions, ConstraintSet, PathBound, PathBoundSolution, Solutions, TypeVarSolution,
+};
 use crate::types::typevar::TypeVarSet;
 use crate::types::{Type, TypeVarVariance};
 use crate::{Db, ProgramEnvironment};
@@ -123,7 +125,7 @@ impl<'db> ConstraintSet<'db, '_> {
             env,
             inferable,
             SolutionBudget::default(),
-            |_variance, path_bound| PathBounds::default_solve(db, env, builder, path_bound),
+            |_variance, path_bound| CandidateSolutions::default_solve(db, env, builder, path_bound),
         )
     }
 
@@ -133,8 +135,8 @@ impl<'db> ConstraintSet<'db, '_> {
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
         budget: SolutionBudget,
-    ) -> Result<PathBounds<'db>, ProjectionError> {
-        PathBounds::compute_bounded(
+    ) -> Result<CandidateSolutions<'db>, ProjectionError> {
+        CandidateSolutions::compute_bounded(
             db,
             env,
             &mut self.builder.storage.borrow_mut(),
@@ -166,7 +168,12 @@ impl<'db> ConstraintSet<'db, '_> {
         let path_bounds = self.bounded_path_bounds(db, env, inferable, budget)?;
         let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
         path_bounds.try_solve_with(db, env, choose, |solution| {
-            for binding in solution {
+            for violation in solution.violations() {
+                if let Some(argument) = violation.argument {
+                    type_budget.charge_type(db, argument)?;
+                }
+            }
+            for binding in &solution.solved_typevars {
                 type_budget.charge_type(db, binding.solution.ty())?;
             }
             Ok(())
@@ -214,7 +221,7 @@ impl<'db> ConstraintSet<'db, '_> {
     }
 }
 
-impl<'db> PathBounds<'db> {
+impl<'db> CandidateSolutions<'db> {
     fn try_fold_with<T>(
         &self,
         db: &'db dyn Db,
@@ -237,14 +244,17 @@ impl<'db> PathBounds<'db> {
         let mut retained = false;
         for path in paths {
             let Some((solution, incomplete)) =
-                Self::solve_path_with(db, env, inferable, path, &mut choose)
+                Self::solve_path_with(db, env, inferable, &path.typevars, &mut choose)
             else {
                 continue;
             };
+            if !solution.is_valid() {
+                continue;
+            }
             if incomplete {
                 return Err(ProjectionError::IncompleteSolution);
             }
-            accumulated = fold(accumulated, &solution, budget)?;
+            accumulated = fold(accumulated, &solution.solved_typevars, budget)?;
             retained = true;
         }
 

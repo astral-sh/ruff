@@ -471,6 +471,39 @@ reveal_type(infer_from_consumers(consume_recursive, consume_int_or_str))  # reve
 reveal_type(infer_from_consumers(consume_int_or_str, consume_recursive))  # revealed: int
 ```
 
+## Narrowing recursive inferred union upper bounds
+
+The third consumer restricts two recursive unions to the literal `5`. Its position does not change
+the inferred result.
+
+```py
+from typing import Callable, Literal, TypeVar
+
+T = TypeVar("T")
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+First = Literal[5] | A | B | list["First"]
+Second = Literal[5] | C | D | list["Second"]
+
+def infer_from_consumers(
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+    third: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+def consume_first(value: First) -> None: ...
+def consume_second(value: Second) -> None: ...
+def consume_literal(value: Literal[5]) -> None: ...
+
+reveal_type(infer_from_consumers(consume_first, consume_second, consume_literal))  # revealed: Literal[5]
+reveal_type(infer_from_consumers(consume_literal, consume_first, consume_second))  # revealed: Literal[5]
+```
+
 ## Overloaded callable as generic `Callable` argument
 
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set
@@ -755,6 +788,39 @@ reveal_type(callback)  # revealed: (*args: Any, **kwargs: Any) -> None
 static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
 ```
 
+## Gradual class parameters
+
+A callback that accepts `type[Any]` or `type[Unknown]` can accept any class object.
+
+```py
+from typing import Any, Callable, TypeVar
+from ty_extensions._internal import Unknown
+
+T = TypeVar("T")
+
+def invoke(callback: Callable[[type], T]) -> T:
+    return callback(int)
+
+def _(f: Callable[[type[Any]], int], g: Callable[[type[Unknown]], str]):
+    reveal_type(invoke(f))  # revealed: int
+    reveal_type(invoke(g))  # revealed: str
+```
+
+A gradual class argument can also satisfy a callback's metaclass parameter:
+
+```py
+class Meta(type): ...
+
+def f(cls: Meta) -> int:
+    return 1
+
+def invoke_any(callback: Callable[[type[Any]], T], cls: type[Any]) -> T:
+    return callback(cls)
+
+def _(cls: type[Any]):
+    reveal_type(invoke_any(f, cls))  # revealed: int
+```
+
 ## Inferring gradual tuple returns with concrete bounds
 
 ```toml
@@ -810,6 +876,38 @@ infer_prefix(wrong_element)  # error: [invalid-argument-type]
 infer_fixed(get_ints)  # error: [invalid-argument-type]
 infer_prefix(get_ints)  # error: [invalid-argument-type]
 infer_suffix(get_ints)  # error: [invalid-argument-type]
+```
+
+## Inferring type variables from gradual tuple elements
+
+A callback returning a gradual-length tuple can constrain the type variables of a fixed-length
+tuple.
+
+```py
+from typing import Any, Callable, TypeVar
+from typing_extensions import Unpack
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+def infer_pair(callback: Callable[[], tuple[K, V]]) -> tuple[K, V]:
+    return callback()
+
+def _(
+    callback: Callable[[], tuple[Any, ...]],
+    prefix: Callable[[], tuple[int, Unpack[tuple[Any, ...]]]],
+    suffix: Callable[[], tuple[Unpack[tuple[Any, ...]], str]],
+):
+    reveal_type(infer_pair(callback))  # revealed: tuple[Any, Any]
+    reveal_type(infer_pair(prefix))  # revealed: tuple[int, Any]
+    reveal_type(infer_pair(suffix))  # revealed: tuple[Any, str]
+```
+
+A concrete homogeneous tuple does not guarantee the required length:
+
+```py
+def _(callback: Callable[[], tuple[int, ...]]):
+    infer_pair(callback)  # error: [invalid-argument-type]
 ```
 
 ## Source type variables in gradual tuple returns
@@ -932,4 +1030,36 @@ class IPolys(Protocol[T]):
     def __getitem__(self, key: int) -> IPolys[T]: ...
     @overload
     def __getitem__(self, key: slice) -> IPolys[T] | Domain[T]: ...
+```
+
+## Returned callables with recursive parameter aliases
+
+A type variable used by a recursive parameter alias belongs to the function. The returned callable
+uses the type argument inferred from that parameter.
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+Tree = tuple[T, "Tree[T] | None"]
+
+def make(value: Tree[T]) -> Callable[[T], T]:
+    raise NotImplementedError
+
+callback = make((1, None))
+reveal_type(callback)  # revealed: (int, /) -> int
+callback("bad")  # error: [invalid-argument-type]
+```
+
+The type argument can also change at each recursive step.
+
+```py
+Growing = tuple[T, "Growing[list[T]] | None"]
+
+def make_growing(value: Growing[T]) -> Callable[[T], T]:
+    raise NotImplementedError
+
+callback_growing = make_growing((1, None))
+reveal_type(callback_growing)  # revealed: (int, /) -> int
+callback_growing("bad")  # error: [invalid-argument-type]
 ```

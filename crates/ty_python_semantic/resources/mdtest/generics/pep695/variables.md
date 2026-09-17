@@ -1330,4 +1330,28 @@ class D[T = T]:
 reveal_type(D().x)  # revealed: Unknown
 ```
 
+### Defaults through recursive aliases
+
+A default that refers to its own type variable through a recursive alias falls back to `Unknown`.
+This also applies when another specialization of the same alias wraps the reference.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVar
+
+type Tree[U] = tuple[U, Tree[U] | None]
+T = TypeVar("T", default="Tree[T]")
+N = TypeVar("N", default="Tree[Tree[N]]")
+
+class Box(Generic[T]): ...
+class NestedBox(Generic[N]): ...
+
+reveal_type(Box())  # revealed: Box[Unknown]
+reveal_type(NestedBox())  # revealed: NestedBox[Unknown]
+```
+
 [pep 695]: https://peps.python.org/pep-0695/

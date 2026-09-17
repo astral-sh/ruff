@@ -982,25 +982,51 @@ impl<'db> TypeAliasType<'db> {
             settings,
         }
     }
+}
 
-    /// Returns a source-style display of this type alias's declaration.
-    pub fn display_declaration<'env>(
+impl<'db> Type<'db> {
+    /// Displays an alias declaration with its original type parameters, if this type denotes one.
+    /// Recursive types without a source alias use ordinary type display instead.
+    pub fn display_alias_declaration<'env>(
         self,
         db: &'db dyn Db,
         env: &'env ProgramEnvironment<'db>,
-    ) -> impl Display + 'env {
-        let value_ty = self.raw_value_type(db);
-        DisplayTypeAliasDeclaration {
+    ) -> Option<impl Display + 'env> {
+        let (ty, definition, name, generic_context, value_ty) = match self {
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias))
+            | Type::TypeAlias(alias) => (
+                Type::TypeAlias(alias),
+                alias.definition(db),
+                alias.name(db),
+                alias.generic_context(db),
+                alias.raw_value_type(db),
+            ),
+            Type::Recursive(recursive) => {
+                let (definition, name) = recursive.alias(db)?;
+                let constructor = recursive.constructor(db);
+                (
+                    Type::Recursive(constructor),
+                    definition,
+                    name,
+                    constructor.parameters(db),
+                    constructor.unfold(db, env),
+                )
+            }
+            _ => return None,
+        };
+        Some(DisplayTypeAliasDeclaration {
             db,
             env,
-            type_alias: self,
-            value_ty,
-            settings: DisplaySettings::from_possibly_ambiguous_types(
+            type_alias: TypeAliasDisplay {
                 db,
-                env,
-                [Type::TypeAlias(self), value_ty],
-            ),
-        }
+                ty,
+                definition,
+                name,
+                settings: DisplaySettings::from_possibly_ambiguous_types(db, env, [ty, value_ty]),
+            },
+            generic_context,
+            value_ty,
+        })
     }
 }
 
@@ -1081,24 +1107,25 @@ impl Display for TypeAliasDisplay<'_> {
 struct DisplayTypeAliasDeclaration<'env, 'db> {
     db: &'db dyn Db,
     env: &'env ProgramEnvironment<'db>,
-    type_alias: TypeAliasType<'db>,
+    type_alias: TypeAliasDisplay<'db>,
+    generic_context: Option<GenericContext<'db>>,
     value_ty: Type<'db>,
-    settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayTypeAliasDeclaration<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let db = self.db;
-        let generic_context = self.type_alias.generic_context(db);
         let settings = self
+            .type_alias
             .settings
-            .with_generic_context(db, generic_context.as_ref());
+            .with_generic_context(db, self.generic_context.as_ref());
+        let explicit_alias = matches!(self.type_alias.ty, Type::TypeAlias(_));
 
-        f.write_str("type ")?;
-        self.type_alias
-            .display_with(db, settings.clone())
-            .fmt_detailed(f)?;
-        if let Some(generic_context) = generic_context {
+        if explicit_alias {
+            f.write_str("type ")?;
+        }
+        self.type_alias.fmt_detailed(f)?;
+        if explicit_alias && let Some(generic_context) = self.generic_context {
             generic_context.display(db).fmt_detailed(f)?;
         }
         f.write_str(" = ")?;

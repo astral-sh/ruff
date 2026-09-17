@@ -55,7 +55,7 @@ impl ProjectWatcher {
             // script's `site-packages` was unwatched when a `.pth` file changed from `/old`
             // to `/new`, this pass registered `/old` using stale contents. The refresh above
             // updates the `.pth` file; recompute the plan and register `/new` before returning.
-            if self.cache_key == Some(watch_paths(db, db.project()).cache_key) {
+            if self.cache_key == Some(watch_paths(db, db.project()).cache_key()) {
                 return;
             }
         }
@@ -69,11 +69,11 @@ impl ProjectWatcher {
     fn update_once(&mut self, db: &mut ProjectDatabase) -> bool {
         let watch_plan = watch_paths(db, db.project());
 
-        if self.cache_key == Some(watch_plan.cache_key) {
+        if self.cache_key == Some(watch_plan.cache_key()) {
             return false;
         }
 
-        let paths = &watch_plan.paths;
+        let paths = watch_plan.paths();
         let previously_watched = self.watched_paths.clone();
         let mut watcher_paths = self.watcher.paths_mut();
         let mut newly_covered_paths = Vec::new();
@@ -132,7 +132,7 @@ impl ProjectWatcher {
             }
         );
 
-        self.cache_key = Some(watch_plan.cache_key);
+        self.cache_key = Some(watch_plan.cache_key());
 
         if newly_covered_paths.is_empty() {
             return false;
@@ -159,10 +159,23 @@ impl ProjectWatcher {
     }
 }
 
+/// The paths watched for a project and its scripts, with a key for detecting changes.
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct WatchPaths {
+pub struct WatchPaths {
     cache_key: u64,
     paths: Box<[SystemPathBuf]>,
+}
+
+impl WatchPaths {
+    /// A key for changes to the watched paths.
+    pub fn cache_key(&self) -> u64 {
+        self.cache_key
+    }
+
+    /// Paths whose changes need watching.
+    pub fn paths(&self) -> &[SystemPathBuf] {
+        &self.paths
+    }
 }
 
 /// Watches are registered in project, module, then configuration order. On Linux, the last
@@ -173,7 +186,7 @@ struct WatchPaths {
 /// search roots, rather than through symlinks inside the project. Configuration paths come last
 /// so their events use the explicit paths checked for configuration changes.
 #[salsa::tracked(returns(ref))]
-fn watch_paths(db: &dyn Db, project: Project) -> WatchPaths {
+pub fn watch_paths(db: &dyn Db, project: Project) -> WatchPaths {
     let project_path = project.root(db);
 
     // Watch both the project root and any paths provided by the user on the CLI (removing any redundant nested paths).

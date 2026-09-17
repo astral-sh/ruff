@@ -69,7 +69,7 @@ pub(crate) fn whitespace_before_parameters(line: &LogicalLine, context: &LintCon
         if matches!(kind, TokenKind::Lpar | TokenKind::Lsqb)
             && matches!(
                 prev_token,
-                TokenKind::Name | TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
+                TokenKind::Identifier | TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
             )
             && (pre_pre_kind != Some(TokenKind::Class))
             && token.start() != prev_end

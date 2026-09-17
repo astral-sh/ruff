@@ -1497,6 +1497,16 @@ fn property_wrapper_descriptor<'db>(
     }
 }
 
+/// Source methods for property accessors, including accessors replaced by decorators.
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
+)]
+pub struct PropertyAccessorDefinitions<'db> {
+    getter: Option<Definition<'db>>,
+    setter: Option<Definition<'db>>,
+    deleter: Option<Definition<'db>>,
+}
+
 /// Represents a property with known accessors and the standard descriptor behavior.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct PropertyInstanceType<'db> {
@@ -1508,6 +1518,9 @@ pub struct PropertyInstanceType<'db> {
     pub deleter: Option<Type<'db>>,
     #[returns(copy)]
     instance_class: PropertyInstanceClass<'db>,
+    /// Source definitions survive decorators that replace accessors with callable objects.
+    #[returns(copy)]
+    accessor_definitions: PropertyAccessorDefinitions<'db>,
 }
 
 fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -1539,7 +1552,14 @@ impl<'db> PropertyInstanceType<'db> {
         setter: Option<Type<'db>>,
         deleter: Option<Type<'db>>,
     ) -> Self {
-        Self::new_internal(db, getter, setter, deleter, PropertyInstanceClass::Builtin)
+        Self::new_internal(
+            db,
+            getter,
+            setter,
+            deleter,
+            PropertyInstanceClass::Builtin,
+            PropertyAccessorDefinitions::default(),
+        )
     }
 
     fn new_with_class(
@@ -1555,6 +1575,7 @@ impl<'db> PropertyInstanceType<'db> {
             setter,
             deleter,
             PropertyInstanceClass::from_class(db, class),
+            PropertyAccessorDefinitions::default(),
         )
     }
 
@@ -1565,7 +1586,79 @@ impl<'db> PropertyInstanceType<'db> {
         setter: Option<Type<'db>>,
         deleter: Option<Type<'db>>,
     ) -> Self {
-        Self::new_internal(db, getter, setter, deleter, self.instance_class(db))
+        let previous = self.accessor_definitions(db);
+        let definitions = PropertyAccessorDefinitions {
+            getter: previous.getter.filter(|_| getter == self.getter(db)),
+            setter: previous.setter.filter(|_| setter == self.setter(db)),
+            deleter: previous.deleter.filter(|_| deleter == self.deleter(db)),
+        };
+        Self::new_internal(
+            db,
+            getter,
+            setter,
+            deleter,
+            self.instance_class(db),
+            definitions,
+        )
+    }
+
+    /// Records the source of an accessor supplied by a method decorator.
+    fn with_accessor_definition(
+        self,
+        db: &'db dyn Db,
+        decorator: Type<'db>,
+        accessor: Type<'db>,
+        definition: Definition<'db>,
+    ) -> Self {
+        let mut definitions = self.accessor_definitions(db);
+        let (accessor_ty, accessor_definition) = match decorator {
+            Type::BoundMethod(method)
+                if method.self_instance(db).is_property_instance()
+                    && let Some(function) = method.function(db) =>
+            {
+                match function.name(db).as_str() {
+                    "getter" => (self.getter(db), &mut definitions.getter),
+                    "setter" => (self.setter(db), &mut definitions.setter),
+                    "deleter" => (self.deleter(db), &mut definitions.deleter),
+                    _ => return self,
+                }
+            }
+            _ => (self.getter(db), &mut definitions.getter),
+        };
+        if accessor_ty == Some(accessor) {
+            *accessor_definition = Some(definition);
+        }
+        Self::new_internal(
+            db,
+            self.getter(db),
+            self.setter(db),
+            self.deleter(db),
+            self.instance_class(db),
+            definitions,
+        )
+    }
+
+    /// Pairs retained accessor types with their source methods, independently of decorators.
+    fn accessors_with_functions(
+        self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = (Type<'db>, FunctionType<'db>)> {
+        let definitions = self.accessor_definitions(db);
+        [
+            (self.getter(db), definitions.getter),
+            (self.setter(db), definitions.setter),
+            (self.deleter(db), definitions.deleter),
+        ]
+        .into_iter()
+        .filter_map(move |(accessor, definition)| {
+            let accessor = accessor?;
+            let function = accessor.as_function_literal().or_else(|| {
+                definition.and_then(|definition| {
+                    infer_definition_types(db, definition).function_type(definition)
+                })
+            })?;
+            Some((accessor, function))
+        })
     }
 
     fn instance_fallback(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
@@ -1625,7 +1718,14 @@ impl<'db> PropertyInstanceType<'db> {
             ),
             class => class,
         };
-        Self::new_internal(db, getter, setter, deleter, instance_class)
+        Self::new_internal(
+            db,
+            getter,
+            setter,
+            deleter,
+            instance_class,
+            self.accessor_definitions(db),
+        )
     }
 
     fn recursive_type_normalized_impl(
@@ -1671,6 +1771,7 @@ impl<'db> PropertyInstanceType<'db> {
             setter,
             deleter,
             instance_class,
+            self.accessor_definitions(db),
         ))
     }
 
@@ -1828,6 +1929,7 @@ pub enum Type<'db> {
     /// A cycle marker used during recursive type inference.
     Divergent(DivergentType),
     /// A recursive type whose references are bound by its body.
+    /// See the module documentation in `recursive.rs` for details.
     Recursive(RecursiveType<'db>),
     /// A variable in a recursive type body, with no standalone type semantics.
     ///
@@ -2375,6 +2477,11 @@ impl<'db> Type<'db> {
         matches!(self, Type::SpecialForm(SpecialFormType::TypeAlias))
     }
 
+    /// Whether this type wraps an alias body that can be unfolded.
+    const fn is_alias_like(self) -> bool {
+        matches!(self, Type::TypeAlias(_) | Type::Recursive(_))
+    }
+
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
         self.is_instance_of(db, KnownClass::NotImplementedType)
     }
@@ -2538,10 +2645,9 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<ClassType<'db>> {
-        match self {
+        match self.resolve_type_alias(db) {
             Type::NominalInstance(instance) => Some(instance.class(db, env)),
             Type::ProtocolInstance(instance) => instance.class_origin(db).map(|class| *class),
-            Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db, env),
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db, env),
             Type::TypeVar(typevar) => {
                 let TypeVarBoundOrConstraints::UpperBound(bound) =
@@ -3143,11 +3249,14 @@ impl<'db> Type<'db> {
             // `Unknown` and `@Todo` are nonstandard extensions,
             // but they are both exactly equivalent to `Any`
             Type::Dynamic(_) => true,
-            Type::TypeVar(_) | Type::TypeAlias(_) | Type::SubclassOf(_) => true,
+            Type::TypeVar(_) | Type::SubclassOf(_) => true,
+            // `Recursive` currently only represents implicit type aliases with declared names.
+            // Revisit this and `is_hintable` when general recursive type inference can produce
+            // types without a declared alias.
+            Type::TypeAlias(_) | Type::Recursive(_) => true,
             Type::TypeForm(typeform) => typeform.type_argument(db).is_spellable(db),
             Type::Intersection(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
-            Type::Recursive(_) => false,
             Type::Divergent(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
@@ -3181,7 +3290,8 @@ impl<'db> Type<'db> {
             Type::NominalInstance(_)
             | Type::NewTypeInstance(_)
             | Type::LiteralValue(_)
-            | Type::TypeAlias(_) => true,
+            | Type::TypeAlias(_)
+            | Type::Recursive(_) => true,
 
             Type::Intersection(_)
             | Type::EnumComplement(_)
@@ -3215,8 +3325,6 @@ impl<'db> Type<'db> {
             // but they're generally not spellable with the syntax we use by default
             // in our type display
             Type::Callable(_) => false,
-
-            Type::Recursive(_) => false,
 
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(_) => true,
@@ -5158,6 +5266,9 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => alias
                 .value_type(db)
                 .is_definitely_non_data_descriptor_impl(db, program),
+            Type::Recursive(recursive) => recursive.map_or(db, env, true, |unfolded| {
+                unfolded.is_definitely_non_data_descriptor_impl(db, program)
+            }),
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
                 false
             }
@@ -5200,6 +5311,9 @@ impl<'db> Type<'db> {
                     .value_type(db)
                     .is_data_descriptor_impl(db, program, any_of_union)
             }
+            Type::Recursive(recursive) => recursive.map_or(db, env, !any_of_union, |unfolded| {
+                unfolded.is_data_descriptor_impl(db, program, any_of_union)
+            }),
             _ => {
                 !self
                     .class_member_with_policy(
@@ -8125,6 +8239,10 @@ impl<'db> Type<'db> {
                         .map_or(types, |kind| types.materialize(db, env, kind))
                 }),
             Type::TypeAlias(alias) => alias.value_type(db).generator_types(db, env, mode),
+            // A provisional recursive body may unfold to itself without exposing a generator.
+            Type::Recursive(recursive) => recursive.map_or(db, env, None, |unfolded| {
+                unfolded.generator_types(db, env, mode)
+            }),
             Type::Union(union) => {
                 let mut yield_builder = Some(UnionBuilder::new(db, env));
                 let mut send_builder = Some(UnionBuilder::new(db, env));
@@ -9056,7 +9174,7 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if let TypeMapping::Recursive(mapping) = type_mapping
+        if let TypeMapping::ApplyRecursiveSubstitution(mapping) = type_mapping
             && let Some(ty) = mapping.extract_type(db, self, visitor)
         {
             return ty;
@@ -9203,7 +9321,7 @@ impl<'db> Type<'db> {
                 recursive.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
             Type::RecursiveVar(reference) => {
-                reference.apply_type_mapping(db, type_mapping, visitor)
+                reference.apply_type_mapping_impl(db, type_mapping, visitor)
             }
 
             Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, || {
@@ -9345,81 +9463,13 @@ impl<'db> Type<'db> {
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             )),
 
-            Type::Union(union) if type_mapping.is_structural() => Type::Union(UnionType::new(
-                db,
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                    .collect::<Box<[_]>>(),
-                union.recursively_defined(db),
-            )),
-            Type::Union(union) => union.map_leave_aliases(db, visitor.env, |element| {
-                element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            }),
+            Type::Union(union) => union.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             Type::Intersection(intersection) => {
-                if type_mapping.is_structural() {
-                    let positive = intersection
-                        .positive(db)
-                        .iter()
-                        .map(|positive| {
-                            positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                        })
-                        .collect::<FxOrderSet<_>>();
-                    let mut negative = NegativeIntersectionElements::default();
-                    for element in intersection.negative(db) {
-                        negative.insert(element.apply_type_mapping_impl(
-                            db,
-                            &type_mapping.flip(),
-                            tcx,
-                            visitor,
-                        ));
-                    }
-                    Type::Intersection(IntersectionType::new(db, positive, negative))
-                } else {
-                    let mut builder = IntersectionBuilder::new(db, visitor.env);
-                    for positive in intersection.positive(db) {
-                        builder.add_positive_in_place(positive.apply_type_mapping_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
-                        ));
-                    }
-                    // Regular promotion should remove negative contributions from intersections,
-                    // so we don't preserve them here when regular promotion is enabled.
-                    if !matches!(
-                        type_mapping,
-                        TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
-                    ) {
-                        for negative in intersection.negative(db) {
-                            builder.add_negative_in_place(negative.apply_type_mapping_impl(
-                                db,
-                                &type_mapping.flip(),
-                                tcx,
-                                visitor,
-                            ));
-                        }
-                    }
-                    builder.build()
-                }
+                intersection.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
-
-            Type::EnumComplement(complement) if type_mapping.is_structural() => {
-                Type::EnumComplement(EnumComplementType::new(
-                    db,
-                    complement.enum_class_literal(db),
-                    complement.excluded_names(db).clone(),
-                    complement
-                        .rest(db)
-                        .iter()
-                        .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                        .collect::<FxOrderSet<_>>(),
-                ))
+            Type::EnumComplement(complement) => {
+                complement.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
-            Type::EnumComplement(complement) => complement
-                .to_intersection(db, visitor.env)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
             Type::TypeIs(type_is) => visitor.visit(db, self, type_mapping, || {
                 type_is.with_type(
@@ -9457,81 +9507,12 @@ impl<'db> Type<'db> {
                 )
             }),
 
-            Type::TypeAlias(alias) => {
-                match type_mapping {
-                    TypeMapping::Recursive(_) => {
-                        Type::TypeAlias(alias.map_stored_specialization(db, type_mapping, visitor))
-                    }
-                    TypeMapping::Materialize(_) if alias.materialization_kind(db).is_some() => self,
-                    TypeMapping::EagerExpansion if alias.materialization_kind(db).is_some() => {
-                        alias
-                            .value_type_with_recursion(db, visitor.recursion_context)
-                            .expand_eagerly(db, visitor.env)
-                    }
-                    // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
-                    // detection rather than the visitor's cycle detection, because the visitor tracks
-                    // Type values and `RecursiveList` is different from `RecursiveList[T]`.
-                    TypeMapping::EagerExpansion => {
-                        alias.raw_value_type(db).expand_eagerly(db, visitor.env)
-                    }
-                    // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
-                    // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
-                    TypeMapping::ApplySpecialization(specialization)
-                    | TypeMapping::ApplySpecializationWithMaterialization {
-                        specialization, ..
-                    } if let Some(mut current_specialization) =
-                        specialization.as_specialization(db) =>
-                    {
-                        if let TypeMapping::ApplySpecializationWithMaterialization {
-                            materialization_kind,
-                            ..
-                        } = type_mapping
-                        {
-                            current_specialization = current_specialization
-                                .with_materialization_kind(db, Some(*materialization_kind));
-                        }
-                        Type::TypeAlias(alias.apply_specialization(db, |generic_context| {
-                            alias
-                                .specialization(db)
-                                .unwrap_or_else(|| generic_context.default_specialization(db, None))
-                                .apply_specialization_impl(db, current_specialization, visitor)
-                        }))
-                    }
-                    _ => {
-                        // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
-                        // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
-                        // will detect the cycle and return the fallback value.
-                        let mapped = visitor.visit(db, self, type_mapping, || {
-                            alias
-                                .value_type_with_recursion(db, visitor.recursion_context)
-                                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                        });
-
-                        // If the type mapping does not result in any change to this type alias, keep the
-                        // alias node instead of eagerly expanding it. A recursive backedge also returns
-                        // the alias itself, and fully static aliases must retain their original identity.
-                        if mapped == self
-                            || alias.value_type_with_recursion(db, visitor.recursion_context)
-                                == mapped
-                        {
-                            self
-                        } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
-                            && alias.is_recursive(db)
-                        {
-                            Type::TypeAlias(
-                                alias.with_materialization_kind(db, Some(*materialization_kind)),
-                            )
-                        } else {
-                            mapped
-                        }
-                    }
-                }
-            }
+            Type::TypeAlias(alias) => alias.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
             Type::LiteralValue(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
-                | TypeMapping::Recursive(_)
+                | TypeMapping::ApplyRecursiveSubstitution(_)
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf { .. }
@@ -9553,7 +9534,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
-                | TypeMapping::Recursive(_)
+                | TypeMapping::ApplyRecursiveSubstitution(_)
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf(..)
@@ -10565,17 +10546,21 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             }
 
             Type::BoundMethod(method_type) => {
-                // TODO: do we need to replace self?
-                let variance = method_type.func(db).variance_of(db, env, typevar);
-                if method_type.function(db).is_some() {
-                    variance
+                if let Some(function) = method_type.function(db) {
+                    function
+                        .bound_signatures(
+                            db,
+                            method_type.signature_receiver(db),
+                            method_type.typing_self_type(db),
+                        )
+                        .variance_of(db, env, typevar)
                 } else {
                     // A callable object's type does not include the additional receiver bound
                     // by classmethod, which is also exposed through `__self__`.
                     VarianceTerm::join(
                         db,
                         [
-                            variance,
+                            method_type.func(db).variance_of(db, env, typevar),
                             method_type.self_instance(db).variance_of(db, env, typevar),
                         ],
                     )
@@ -10821,7 +10806,7 @@ pub enum TypeMapping<'a, 'db> {
         materialization_kind: MaterializationKind,
     },
     /// A structural substitution constructed only by the recursive-type binder.
-    Recursive(RecursiveMapping<'a, 'db>),
+    ApplyRecursiveSubstitution(RecursiveMapping<'a, 'db>),
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode, PromotionKind),
@@ -10902,7 +10887,7 @@ impl<'db> TypeMapping<'_, 'db> {
                 }
             }
             TypeMapping::Promote(..)
-            | TypeMapping::Recursive(_)
+            | TypeMapping::ApplyRecursiveSubstitution(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
@@ -10948,7 +10933,7 @@ impl<'db> TypeMapping<'_, 'db> {
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)
-            | TypeMapping::Recursive(_)
+            | TypeMapping::ApplyRecursiveSubstitution(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
@@ -10964,7 +10949,7 @@ impl<'db> TypeMapping<'_, 'db> {
     /// Binding and unfolding may traverse open recursive bodies, so neither inference queries
     /// nor semantic operations may run on the intermediate types.
     const fn is_structural(&self) -> bool {
-        matches!(self, TypeMapping::Recursive(_))
+        matches!(self, TypeMapping::ApplyRecursiveSubstitution(_))
     }
 }
 

@@ -1048,6 +1048,7 @@ fn specialize_generic_class_from_solutions<'db>(
         .clone()
         .map(|typevar| {
             solution
+                .solved_typevars
                 .iter()
                 .find(|binding| binding.bound_typevar == typevar)
                 .map(|binding| binding.solution.ty())

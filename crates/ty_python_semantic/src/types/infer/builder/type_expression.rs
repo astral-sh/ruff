@@ -8,10 +8,10 @@ use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashSet;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
+use crate::types::definition_resolution::{ImportAliasResolution, resolve_definition};
 use crate::types::diagnostic::{
     self, EXPERIMENTAL_SYNTAX, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE,
     UNSUPPORTED_OPERATOR, report_invalid_argument_number_to_special_form,
@@ -20,14 +20,14 @@ use crate::types::diagnostic::{
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{
-    InferenceFlags, TypeExpressionFlags, implicit_alias_parameters, infer_recursive_implicit_alias,
+    InferenceFlags, TypeExpressionFlags, implicit_alias_parameters, infer_implicit_alias_type,
 };
-use crate::types::inferred_declaration;
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType};
 use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::place_table;
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
@@ -67,15 +67,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         ) {
             return None;
         }
-        let mut imports = FxHashSet::default();
-        while definition.kind(db).is_import() {
-            if !imports.insert(definition) {
+        if definition.kind(db).is_import() {
+            // Imports bind names without declaring their types, so resolve their definitions directly.
+            let table = place_table(db, definition.scope(db));
+            let symbol = table.symbol(definition.place(db).as_symbol()?);
+            let definitions = resolve_definition(
+                db,
+                self.program_environment(),
+                definition,
+                Some(symbol.name().as_str()),
+                ImportAliasResolution::ResolveAliases,
+            );
+            let [resolved] = definitions.as_slice() else {
                 return None;
-            }
-            definition = inferred_declaration(db, definition)
-                .declared()?
-                .provenance()
-                .definition()?;
+            };
+            definition = resolved.definition()?;
         }
         let module = parsed_module(db, definition.program_file(db).python_file(db)).load(db);
         let value = definition.kind(db).value(&module)?;
@@ -101,14 +107,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             _ => return None,
         }
         let parameters = implicit_alias_parameters(db, definition);
-        let ty = infer_recursive_implicit_alias(db, definition, parameters);
+        let ty = infer_implicit_alias_type(db, definition, parameters);
         any_over_type(db, self.program_environment(), ty, false, |ty| {
             matches!(ty, Type::Recursive(_))
         })
         .then_some((ty, parameters))
     }
 
-    pub(in crate::types::infer) fn finish_recursive_implicit_alias(
+    pub(in crate::types::infer) fn finish_implicit_alias_type(
         mut self,
         definition: Definition<'db>,
         value: &ast::Expr,
@@ -193,7 +199,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         expression: &ast::Expr,
     ) -> (Type<'db>, Option<Definition<'db>>) {
         match expression {
-            ast::Expr::Name(name) if name.ctx.is_load() => self.infer_name_load(name),
+            ast::Expr::Name(name) if name.ctx.is_load() => {
+                self.infer_name_load_with_definition(name)
+            }
             ast::Expr::Attribute(attribute) if attribute.ctx.is_load() => {
                 let resolved = self.infer_attribute_load(attribute).unwrap_or_else(|ty| ty);
                 (resolved.inner_type(), resolved.provenance().definition())

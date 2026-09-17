@@ -586,7 +586,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::RescopeReturnCallables(_)
-                | TypeMapping::Recursive(_) => Type::KnownInstance(self),
+                | TypeMapping::ApplyRecursiveSubstitution(_) => Type::KnownInstance(self),
             },
             KnownInstanceType::UnionType(instance) => {
                 Type::KnownInstance(KnownInstanceType::UnionType(

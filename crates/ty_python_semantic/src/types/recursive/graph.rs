@@ -89,8 +89,9 @@ impl<'db> RecursiveGraphBuilder<'db> {
         root_count: usize,
     ) -> Option<GraphSolution<'db>> {
         let builder = self;
-        let mapping =
-            TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Extract(&builder)));
+        let mapping = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+            RecursiveSubstitution::Extract(&builder),
+        ));
         let visitor = ApplyTypeMappingVisitor::new(env);
         let mut bodies = Vec::new();
         loop {
@@ -171,8 +172,9 @@ impl<'db> RecursiveGraphBuilder<'db> {
                     recursive_roots[*global] = true;
                 }
             }
-            let mapping =
-                TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Rebuild(&closed)));
+            let mapping = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Rebuild(&closed),
+            ));
             let visitor = ApplyTypeMappingVisitor::new(env);
             let mut definitions: Vec<_> = component
                 .iter()
@@ -257,8 +259,9 @@ impl<'db> RecursiveGraphBuilder<'db> {
             .into_iter()
             .map(|target| indices[target.expect("every forwarding chain was resolved")])
             .collect();
-        let mapping =
-            TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Reindex(&indices)));
+        let mapping = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+            RecursiveSubstitution::Reindex(&indices),
+        ));
         let visitor = ApplyTypeMappingVisitor::new(env);
         *bodies = kept
             .into_iter()
@@ -290,8 +293,9 @@ impl<'db> RecursiveGraphBuilder<'db> {
         let mut classes = vec![0; bodies.len()];
         let mut class_count = 1;
         loop {
-            let mapping =
-                TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Reindex(&classes)));
+            let mapping = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Reindex(&classes),
+            ));
             let visitor = ApplyTypeMappingVisitor::new(env);
             let signatures: Vec<_> = bodies
                 .iter()
@@ -343,8 +347,9 @@ impl<'db> RecursiveGraphBuilder<'db> {
             }
             class_count = labels.len();
         }
-        let mapping =
-            TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Reindex(&classes)));
+        let mapping = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+            RecursiveSubstitution::Reindex(&classes),
+        ));
         let visitor = ApplyTypeMappingVisitor::new(env);
         let mut representatives = vec![0; class_count];
         for (index, class) in classes.iter().enumerate() {

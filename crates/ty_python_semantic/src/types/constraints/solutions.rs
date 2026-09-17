@@ -5,8 +5,8 @@ use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::relations::PathRelations;
 use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintAssignment, ConstraintId, ConstraintSetStorage, NodeId,
-    PathBoundBuilder, PathBounds, SolutionLimits,
+    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, ConstraintAssignment,
+    ConstraintId, ConstraintSetStorage, NodeId, PathBoundBuilder, SolutionLimits,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{BoundTypeVarInstance, Type};
@@ -100,9 +100,9 @@ impl<'db> SolutionWalker<'db> {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         inferable: TypeVarSet<'db>,
-    ) -> PathBounds<'db> {
+    ) -> CandidateSolutions<'db> {
         if self.sorted_paths.is_empty() {
-            return PathBounds::Unsatisfiable;
+            return CandidateSolutions::Unsatisfiable;
         }
 
         self.sorted_paths.sort_by(|path1, path2| {
@@ -168,9 +168,11 @@ impl<'db> SolutionWalker<'db> {
 
             let relations = PathRelations::new(db, env, &mappings, inferable);
             let path_bounds = relations.collect_bounds(db, env, std::mem::take(&mut mappings));
-            result.push(path_bounds);
+            result.push(CandidateSolution {
+                typevars: path_bounds,
+            });
         }
 
-        PathBounds::Constrained(result.into_boxed_slice(), inferable)
+        CandidateSolutions::Constrained(result.into_boxed_slice(), inferable)
     }
 }

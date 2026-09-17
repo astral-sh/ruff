@@ -10,13 +10,12 @@ use crate::types::function::FunctionType;
 use crate::types::generics::{ApplySpecialization, GenericContext};
 use crate::types::graph::DependencyGraph;
 use crate::types::known_instance::walk_known_instance_type;
-use crate::types::recursive::RecursiveType;
 use crate::types::signatures::{Signature, walk_signature};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
 use crate::types::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
-    BoundTypeVarInstance, CallableType, KnownInstanceType, Type, TypeAliasType, TypeContext,
-    TypeMapping,
+    BoundTypeVarInstance, CallableType, KnownInstanceType, RecursiveType, Type, TypeAliasType,
+    TypeContext, TypeMapping,
 };
 use crate::{Db, FxOrderMap, ProgramEnvironment};
 
@@ -421,6 +420,161 @@ mod tests {
                     "{name}"
                 );
             }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn recursive_alias_arguments_resolve_selected_dependencies() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            from typing import TypeVar
+
+            V = TypeVar("V")
+            Tree = tuple[V, "Tree[V] | None"]
+            Growing = tuple[V, "Growing[list[V]] | None"]
+            type ExplicitTree[V] = tuple[V, ExplicitTree[V] | None]
+            type ExplicitGrowing[V] = tuple[V, ExplicitGrowing[list[V]] | None]
+
+            class Source[U]:
+                explicit: ExplicitTree[U]
+                implicit: Tree[U]
+                explicit_growing: ExplicitGrowing[U]
+                implicit_growing: Growing[U]
+
+            explicit_expected: ExplicitTree[int]
+            implicit_expected: Tree[int]
+            explicit_growing_expected: ExplicitGrowing[int]
+            implicit_growing_expected: Growing[int]
+            "#,
+        )?;
+        let db = &db;
+        let env = db.program_environment();
+        let file = system_path_to_file(db, "/src/a.py")?;
+        let file = ProgramFile::new(db, file, env.program(db));
+        let class = global_symbol(db, file, "Source")
+            .place
+            .expect_type()
+            .as_class_literal()
+            .ok_or_else(|| anyhow::anyhow!("expected Source"))?;
+        let u = class
+            .generic_context(db)
+            .and_then(|context| context.variables(db).next())
+            .ok_or_else(|| anyhow::anyhow!("expected Source's U"))?;
+        let source = Type::instance(db, &env, class.identity_specialization(db));
+        let t = create_typevar(db, "T");
+        let int = KnownClass::Int.to_instance(db, &env);
+        for name in [
+            "explicit",
+            "implicit",
+            "explicit_growing",
+            "implicit_growing",
+        ] {
+            let alias = source.member(db, &env, name).place.expect_type();
+            let expected = global_symbol(db, file, &format!("{name}_expected"))
+                .place
+                .expect_type();
+            let inferable = TypeVarSet::from_typevars(db, [t, u]);
+            assert_eq!(
+                resolve_solution(db, &env, inferable, &[binding(t, alias)]).as_ref(),
+                [SolutionType::Unresolved(alias)],
+                "{name}: missing dependency"
+            );
+            let resolved =
+                resolve_solution(db, &env, inferable, &[binding(t, alias), binding(u, int)]);
+            let [
+                SolutionType::Resolved { ty: mapped, .. },
+                SolutionType::Resolved { ty: resolved_u, .. },
+            ] = resolved.as_ref()
+            else {
+                anyhow::bail!("{name}: expected both dependencies to resolve, got {resolved:?}");
+            };
+            assert!(mapped.is_equivalent_to(db, &env, expected), "{name}");
+            assert_eq!(*resolved_u, int, "{name}");
+            assert_eq!(
+                resolve_solution(
+                    db,
+                    &env,
+                    TypeVarSet::from_typevars(db, [t]),
+                    &[binding(t, alias)]
+                )
+                .as_ref(),
+                [SolutionType::Resolved {
+                    ty: alias,
+                    selected: alias
+                }],
+                "{name}: non-inferable variable"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn recursive_alias_bodies_retain_captured_dependencies() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            from typing import TypeVar
+
+            V = TypeVar("V")
+
+            class C[U]:
+                Growing = tuple[int, "C.Growing[tuple[V, U]] | None"]
+                type ExplicitGrowing[V] = tuple[int, C.ExplicitGrowing[tuple[V, U]] | None]
+
+            def source(
+                explicit_growing: C.ExplicitGrowing[int],
+                implicit_growing: C.Growing[int],
+            ) -> None: ...
+            "#,
+        )?;
+        let db = &db;
+        let env = db.program_environment();
+        let file = system_path_to_file(db, "/src/a.py")?;
+        let file = ProgramFile::new(db, file, env.program(db));
+        let u = global_symbol(db, file, "C")
+            .place
+            .expect_type()
+            .as_class_literal()
+            .and_then(|class| class.generic_context(db))
+            .and_then(|context| context.variables(db).next())
+            .ok_or_else(|| anyhow::anyhow!("expected C's U"))?;
+        let source = global_symbol(db, file, "source")
+            .place
+            .expect_type()
+            .as_function_literal()
+            .ok_or_else(|| anyhow::anyhow!("expected source"))?;
+        let signature = source
+            .signature(db)
+            .overloads
+            .first()
+            .ok_or_else(|| anyhow::anyhow!("expected source's signature"))?;
+        let t = create_typevar(db, "T");
+        let int = KnownClass::Int.to_instance(db, &env);
+        for parameter in signature.parameters() {
+            let alias = parameter.annotated_type();
+            let inferable = TypeVarSet::from_typevars(db, [t, u]);
+            assert_eq!(
+                resolve_solution(db, &env, inferable, &[binding(t, alias)]).as_ref(),
+                [SolutionType::Unresolved(alias)],
+                "{parameter:?}: missing captured dependency"
+            );
+            // Specializing an alias's arguments cannot replace a variable captured in its body.
+            assert_eq!(
+                resolve_solution(db, &env, inferable, &[binding(t, alias), binding(u, int)])
+                    .as_ref(),
+                [
+                    SolutionType::Unresolved(alias),
+                    SolutionType::Resolved {
+                        ty: int,
+                        selected: int
+                    }
+                ],
+                "{parameter:?}: retained captured dependency"
+            );
         }
         Ok(())
     }

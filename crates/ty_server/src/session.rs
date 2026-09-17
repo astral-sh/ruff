@@ -8,16 +8,15 @@ use std::sync::Arc;
 use anyhow::{Context, anyhow};
 use lsp_server::{Message, RequestId};
 use lsp_types::{
-    ClientInfo, DiagnosticProvider, DiagnosticRegistrationOptions,
-    DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Registration, RegistrationParams,
-    TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Uri,
+    ClientInfo, DiagnosticProvider, DiagnosticRegistrationOptions, Registration,
+    RegistrationParams, TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Uri,
     WorkDoneProgressBegin,
 };
-use lsp_types::{DidChangeWatchedFilesNotification, ExitNotification, Notification};
 use lsp_types::{
     DocumentDiagnosticRequest, RegistrationRequest, Request, ShutdownRequest,
     UnregistrationRequest, WorkspaceDiagnosticRequest,
 };
+use lsp_types::{ExitNotification, Notification};
 use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -44,6 +43,7 @@ use crate::server::{
     publish_diagnostics_if_needed, publish_settings_diagnostics,
 };
 use crate::session::client::Client;
+use crate::session::file_watcher::LspFileWatcher;
 use crate::session::index::Document;
 use crate::session::request_queue::RequestQueue;
 use crate::system::{AnySystemPath, LSPSystem};
@@ -51,6 +51,7 @@ use crate::{PositionEncoding, TextDocument};
 use index::Index;
 
 pub(crate) mod client;
+mod file_watcher;
 pub(crate) mod index;
 mod options;
 mod request_queue;
@@ -119,6 +120,8 @@ pub(crate) struct Session {
     /// Registrations is a set of LSP methods that have been dynamically registered with the
     /// client.
     registrations: HashSet<String>,
+
+    file_watcher: Option<LspFileWatcher>,
 
     /// The name of the client (editor) that connected to this server.
     client_name: ClientName,
@@ -189,6 +192,7 @@ impl Session {
             suspended_workspace_diagnostics_request: None,
             revision: 0,
             registrations: HashSet::new(),
+            file_watcher: LspFileWatcher::new(resolved_client_capabilities),
             client_name,
         })
     }
@@ -336,6 +340,8 @@ impl Session {
         if capabilities.supports_inlay_hint_refresh() {
             client.send_request::<lsp_types::InlayHintRefreshRequest>(self, (), |_, ()| {});
         }
+
+        self.update_file_watcher(client);
     }
 
     /// Requests synchronization using the scripts' saved metadata.
@@ -582,6 +588,7 @@ impl Session {
         }
         let scripts = result.scripts_to_synchronize(db);
         Self::synchronize_closed_scripts(db, &scripts, client, capabilities, &script_progress);
+        self.update_file_watcher(client);
         result
     }
 
@@ -767,7 +774,7 @@ impl Session {
         let configuration_file = workspace.settings.configuration_file();
 
         let metadata = if let Some(configuration_file) = configuration_file {
-            ProjectMetadata::from_config_file_with_uv(
+            ProjectMetadata::from_config_file(
                 configuration_file.clone(),
                 workspace_directory,
                 &system,
@@ -777,47 +784,48 @@ impl Session {
             ProjectMetadata::discover_with_uv(workspace_directory, &system, self.use_uv)
         };
 
-        let project = metadata
-            .context("Failed to discover project configuration")
-            .and_then(|mut metadata| {
-                if let Some(fallback_options) = workspace.settings.fallback_options() {
-                    metadata.set_fallback_options(fallback_options.clone());
+        let (mut metadata, discovery_result) =
+            match metadata.context("Failed to discover project configuration") {
+                Ok(metadata) => (metadata, Ok(())),
+                Err(err) => {
+                    let Ok(metadata) = ProjectMetadata::from_options(
+                        Options::default(),
+                        workspace_directory.to_path_buf(),
+                        None,
+                        &UseDefaultStrategy,
+                    );
+                    (metadata.with_use_uv(self.use_uv), Err(err))
                 }
+            };
 
+        if let Some(fallback_options) = workspace.settings.fallback_options() {
+            metadata.set_fallback_options(fallback_options.clone());
+        }
+
+        if let Some(override_options) = workspace.settings.override_options() {
+            metadata.set_override_options(override_options.clone());
+        }
+
+        // Load user configuration even if project discovery failed.
+        let project = discovery_result
+            .and(
                 metadata
                     .apply_configuration_files(&system)
-                    .context("Failed to apply configuration files")?;
+                    .context("Failed to apply configuration files"),
+            )
+            .and_then(|()| ProjectDatabase::fallible(metadata.clone(), system.clone()));
 
-                if let Some(override_options) = workspace.settings.override_options() {
-                    metadata.set_override_options(override_options.clone());
-                }
-
-                ProjectDatabase::fallible(metadata, system.clone())
-            });
-
-        let mut db = match project {
-            Ok(db) => db,
-            Err(err) => {
-                tracing::error!(
-                    "Failed to create project for workspace `{uri}`: {err:#}. \
-                        Falling back to default settings"
-                );
-
-                client.show_error_message(format!(
-                    "Failed to load project for workspace {uri}. {}",
-                    self.client_name.log_guidance(),
-                ));
-
-                let Ok(metadata) = ProjectMetadata::from_options(
-                    Options::default(),
-                    workspace_directory.to_path_buf(),
-                    None,
-                    &UseDefaultStrategy,
-                )
-                .map(|metadata| metadata.with_use_uv(self.use_uv));
-                ProjectDatabase::use_defaults(metadata, system)
-            }
-        };
+        let mut db = project.unwrap_or_else(|err| {
+            tracing::error!(
+                "Failed to load project for workspace `{uri}`: {err:#}. \
+                 Continuing with valid settings"
+            );
+            client.show_error_message(format!(
+                "Failed to load project for workspace {uri}. {}",
+                self.client_name.log_guidance(),
+            ));
+            ProjectDatabase::use_defaults(metadata, system)
+        });
 
         // Carry forward diagnostic state if any exists
         let previous = self.projects.remove(&root);
@@ -1034,6 +1042,8 @@ impl Session {
 
         self.bump_revision();
 
+        self.update_file_watcher(client);
+
         Ok(())
     }
 
@@ -1084,7 +1094,6 @@ impl Session {
     /// `ty.experimental.rename` global setting.
     fn register_capabilities(&mut self, client: &Client) {
         static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
-        static FILE_WATCHER_REGISTRATION_ID: &str = "ty/workspace/didChangeWatchedFiles";
 
         let mut registrations = vec![];
         let mut unregistrations = vec![];
@@ -1138,26 +1147,19 @@ impl Session {
             }
         }
 
-        if let Some(register_options) = self.file_watcher_registration_options() {
-            if self
-                .registrations
-                .contains(DidChangeWatchedFilesNotification::METHOD.as_str())
-            {
-                unregistrations.push(Unregistration {
-                    id: FILE_WATCHER_REGISTRATION_ID.into(),
-                    method: DidChangeWatchedFilesNotification::METHOD.into(),
-                });
-            }
-            registrations.push(Registration {
-                id: FILE_WATCHER_REGISTRATION_ID.into(),
-                method: DidChangeWatchedFilesNotification::METHOD.into(),
-                register_options: Some(serde_json::to_value(register_options).unwrap()),
-            });
-        }
-
         // First, unregister any existing capabilities and then register or re-register them.
         self.unregister_dynamic_capability(client, unregistrations);
         self.register_dynamic_capability(client, registrations);
+        self.update_file_watcher(client);
+    }
+
+    fn update_file_watcher(&mut self, client: &Client) {
+        let Some(file_watcher) = &mut self.file_watcher else {
+            return;
+        };
+        if let Some(update) = file_watcher.update(self.projects.values().map(|state| &state.db)) {
+            update.apply(self, client);
+        }
     }
 
     /// Registers a list of dynamic capabilities with the client.
@@ -1207,92 +1209,6 @@ impl Session {
                 tracing::debug!("Unregistered dynamic capabilities");
             },
         );
-    }
-
-    /// Try to register the file watcher provided by the client if the client supports it.
-    ///
-    /// Note that this should be called *after* workspaces/projects have been initialized.
-    /// This is required because the globs we use for registering file watching take
-    /// project search paths into account.
-    fn file_watcher_registration_options(
-        &self,
-    ) -> Option<DidChangeWatchedFilesRegistrationOptions> {
-        fn make_watcher(glob: &str) -> FileSystemWatcher {
-            FileSystemWatcher {
-                glob_pattern: lsp_types::GlobPattern::Pattern(glob.into()),
-                // When `kind` is omitted, it defaults to `WatchKind.Create | WatchKind.Change | WatchKind.Delete`.
-                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#fileSystemWatcher
-                kind: None,
-            }
-        }
-
-        fn make_relative_watcher(relative_to: &SystemPath, glob: &str) -> FileSystemWatcher {
-            let base_uri = Uri::from_file_path(relative_to.as_std_path())
-                .expect("system path must be a valid URI");
-            let glob_pattern =
-                lsp_types::GlobPattern::RelativePattern(lsp_types::RelativePattern {
-                    base_uri: base_uri.into(),
-                    pattern: glob.to_string(),
-                });
-            FileSystemWatcher {
-                glob_pattern,
-                kind: Some(
-                    lsp_types::WatchKind::Change
-                        | lsp_types::WatchKind::Delete
-                        | lsp_types::WatchKind::Create,
-                ),
-            }
-        }
-
-        if !self.client_capabilities().supports_file_watcher() {
-            tracing::warn!(
-                "Your LSP client doesn't support file watching: \
-                 You may see stale results when files change outside the editor"
-            );
-            return None;
-        }
-
-        // We also want to watch everything in the search paths as
-        // well. But this seems to require "relative" watcher support.
-        // I had trouble getting this working without using a base uri.
-        //
-        // Specifically, I tried this for each search path:
-        //
-        //     make_watcher(&format!("{path}/**"))
-        //
-        // But while this seemed to work for the project root, it
-        // simply wouldn't result in any file notifications for changes
-        // to files outside of the project root.
-        let watchers = if !self.client_capabilities().supports_relative_file_watcher() {
-            tracing::warn!(
-                "Your LSP client doesn't support file watching outside of project: \
-                 You may see stale results when dependencies change"
-            );
-            // Initialize our list of watchers with the standard globs relative
-            // to the project root if we can't use relative globs.
-            vec![make_watcher("**")]
-        } else {
-            // Gather up all of our project roots and all of the corresponding
-            // project root system paths, then deduplicate them relative to
-            // one another. Then listen to everything.
-            let roots = self.project_dbs().map(|db| db.project().root(db));
-            let paths = self
-                .project_dbs()
-                .flat_map(|db| {
-                    ty_module_resolver::system_module_search_paths(
-                        db,
-                        db.project().program(db).resolver_environment(db),
-                    )
-                    .map(move |path| (db, path))
-                })
-                .filter(|(db, path)| !path.starts_with(db.project().root(*db)))
-                .map(|(_, path)| path)
-                .chain(roots);
-            ruff_db::system::deduplicate_nested_paths(paths)
-                .map(|path| make_relative_watcher(path, "**"))
-                .collect()
-        };
-        Some(DidChangeWatchedFilesRegistrationOptions { watchers })
     }
 
     /// Creates a document snapshot with the URI referencing the document to snapshot.
@@ -1482,6 +1398,7 @@ impl Session {
         }
 
         self.bump_revision();
+        self.update_file_watcher(client);
     }
 
     /// Returns a reference to the index.

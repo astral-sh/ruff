@@ -101,7 +101,7 @@ mod tests;
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-pub(super) fn infer_recursive_implicit_alias<'db>(
+pub(super) fn infer_implicit_alias_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     _parameters: Option<crate::types::GenericContext<'db>>,
@@ -123,7 +123,7 @@ pub(super) fn infer_recursive_implicit_alias<'db>(
         index,
         &module,
     )
-    .finish_recursive_implicit_alias(definition, value)
+    .finish_implicit_alias_type(definition, value)
 }
 
 bitflags::bitflags! {
@@ -1353,18 +1353,6 @@ impl<'db> DefinitionTypes<'db> {
             Self::Empty | Self::Binding(..) => Either::Right([].iter().copied()),
         }
     }
-
-    fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> + '_ {
-        match self {
-            Self::Declaration(declaration) | Self::BindingAndDeclaration(declaration) => {
-                Either::Left(Either::Left(std::iter::once(*declaration)))
-            }
-            Self::Other(other) => {
-                Either::Left(Either::Right(other.declarations.iter().map(|(_, ty)| *ty)))
-            }
-            Self::Empty | Self::Binding(..) => Either::Right(std::iter::empty()),
-        }
-    }
 }
 
 /// Compact representations for common combinations of extra definition inference data.
@@ -1791,10 +1779,6 @@ impl<'db> DefinitionInference<'db> {
         owner: Definition<'db>,
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)> {
         self.types.declarations(owner)
-    }
-
-    fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> {
-        self.types.declaration_types()
     }
 
     fn fallback_type(&self) -> Option<Type<'db>> {
