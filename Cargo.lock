@@ -4784,6 +4784,7 @@ dependencies = [
  "get-size2",
  "insta",
  "itertools 0.15.0",
+ "memchr",
  "ordermap",
  "regex",
  "regex-syntax",

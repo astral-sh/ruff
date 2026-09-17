@@ -21,6 +21,7 @@ camino = { workspace = true }
 compact_str = { workspace = true }
 get-size2 = { workspace = true }
 itertools = { workspace = true }
+memchr = { workspace = true }
 ordermap = { workspace = true }
 regex = { workspace = true }
 regex-syntax = { workspace = true }

@@ -37,8 +37,10 @@ mod search;
 use std::borrow::Cow;
 use std::fmt;
 use std::iter::FusedIterator;
+use std::sync::LazyLock;
 
 use compact_str::format_compact;
+use memchr::memmem::Finder;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::PythonFile;
@@ -1630,8 +1632,18 @@ fn is_legacy_namespace_package(
     context: &ResolverContext,
     init: File,
 ) -> bool {
+    static PKG_FINDER: LazyLock<Finder<'static>> = LazyLock::new(|| Finder::new("pkg"));
+
     // Just an optimization, the stdlib and typeshed are never legacy namespace packages
     if package_path.search_path().is_standard_library() {
+        return false;
+    }
+
+    // Both namespace idioms reference `pkgutil` or `pkg_resources`. Keep non-ASCII
+    // sources as candidates because Python normalizes identifiers with NFKC.
+    // This best-effort filter does not account for escaped or concatenated module names.
+    let source = source_text(context.db, init);
+    if source.is_ascii() && PKG_FINDER.find(source.as_bytes()).is_none() {
         return false;
     }
 
