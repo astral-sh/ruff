@@ -77,7 +77,16 @@ impl<'db> SolutionWalker<'db> {
                         Validations::from_support(db, env, storage, all_typevars)
                     });
                     let upper_bounds = validations.upper_bounds.as_slice();
-                    this.validate_satisfied_path(db, env, storage, limits, path, upper_bounds)
+                    let constrained = validations.constrained.as_slice();
+                    this.validate_satisfied_path(
+                        db,
+                        env,
+                        storage,
+                        limits,
+                        path,
+                        upper_bounds,
+                        constrained,
+                    )
                 }
                 None => this.found_satisfied_path(db, env, storage, limits, path),
             },
@@ -230,6 +239,7 @@ impl<'db> SolutionWalker<'db> {
 
     /// Having found a satisfiable path in the BDD, validates that path against the declared upper
     /// bound (TODO and constraints) of all relevant typevars.
+    #[expect(clippy::too_many_arguments)]
     fn validate_satisfied_path<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
@@ -238,11 +248,12 @@ impl<'db> SolutionWalker<'db> {
         limits: &mut L,
         path: &mut PathAssignments,
         upper_bounds: &Slice<BoundTypeVarInstance<'db>, UpperBound>,
+        constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
     ) -> ControlFlow<L::Break> {
         // We have a path that represents a valid solution to the constraint set. Check if the
         // solution satisfies all of the typevars' declared upper bounds (TODO and constraints).
         let previous_count = self.pending.len();
-        self.validate_upper_bound(db, env, storage, limits, path, upper_bounds)?;
+        self.validate_upper_bound(db, env, storage, limits, path, upper_bounds, constrained)?;
         if self.pending.len() > previous_count {
             // We will only add pending candidate solutions during the validation process if _all_
             // validations
@@ -255,9 +266,10 @@ impl<'db> SolutionWalker<'db> {
         // (TODO and constraints). If we can, we want to identify which particular upper bounds or
         // constraints were violated. To do that, we have to re-check this path against each one
         // individually.
-        self.attribute_typevar_failures(db, env, storage, limits, path, upper_bounds)
+        self.attribute_typevar_failures(db, env, storage, limits, path, upper_bounds, constrained)
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn validate_upper_bound<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
@@ -266,13 +278,12 @@ impl<'db> SolutionWalker<'db> {
         limits: &mut L,
         path: &mut PathAssignments,
         upper_bounds: &Slice<BoundTypeVarInstance<'db>, UpperBound>,
+        constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
     ) -> ControlFlow<L::Break> {
         let Some(((_, upper_bound), upper_bounds)) = upper_bounds.split_first() else {
-            // We've checked all typevars that have an upper bound, and we now know that the
-            // candidate solution is valid.
-            // TODO: Check the declared constraints here instead of `preliminary_solve` before
-            // declaring the candidate solution valid.
-            return self.found_satisfied_path(db, env, storage, limits, path);
+            // We've checked all typevars that have an upper bound. Next check the typevars with
+            // declared constraints.
+            return self.validate_constrained(db, env, storage, limits, path, constrained);
         };
 
         let Some(constraints) = upper_bound.constraints.as_deref() else {
@@ -291,9 +302,23 @@ impl<'db> SolutionWalker<'db> {
             path,
             constraints,
             &mut |this, storage, limits, path| {
-                this.validate_upper_bound(db, env, storage, limits, path, upper_bounds)
+                this.validate_upper_bound(db, env, storage, limits, path, upper_bounds, constrained)
             },
         )
+    }
+
+    fn validate_constrained<L: SolutionLimits>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        path: &mut PathAssignments,
+        _constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
+    ) -> ControlFlow<L::Break> {
+        // TODO: Check the declared constraints here instead of `preliminary_solve` before
+        // declaring the candidate solution valid.
+        self.found_satisfied_path(db, env, storage, limits, path)
     }
 
     /// Create a pending candidate solution for the current path.
@@ -425,6 +450,7 @@ impl<'db> SolutionWalker<'db> {
     /// constraints were violated. Adds an [`Invalid`][SolutionValidity::Invalid] candidate
     /// solution for the path recording those violations, so that a later stage can transform them
     /// into useful diagnostics.
+    #[expect(clippy::too_many_arguments)]
     fn attribute_typevar_failures<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
@@ -433,6 +459,7 @@ impl<'db> SolutionWalker<'db> {
         limits: &mut L,
         path: &mut PathAssignments,
         upper_bounds: &Slice<BoundTypeVarInstance<'db>, UpperBound>,
+        _constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
     ) -> ControlFlow<L::Break> {
         let mut upper_bound_violations = FxHashSet::default();
         for (bound_typevar, upper_bound) in upper_bounds {
