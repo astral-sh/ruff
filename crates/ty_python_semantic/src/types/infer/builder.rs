@@ -74,8 +74,8 @@ use crate::types::diagnostic::{
     INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
     POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics,
     UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
-    UNSOUND_YIELD, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, YieldKind,
-    autofix_with_notimplementederror, hint_if_stdlib_attribute_exists_on_other_versions,
+    UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
+    hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
     report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_dynamic_function_decorator_return,
@@ -162,6 +162,7 @@ use ty_python_core::{ExpressionNodeKey, Statement};
 
 mod annotation_expression;
 mod attribute_assignment;
+mod awaitable;
 mod binary_expressions;
 mod class;
 mod dict;
@@ -995,23 +996,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred_state = state;
         }
         previous
-    }
-
-    /// Returns `true` if `expr` is a call to a known diagnostic function
-    /// (e.g., `reveal_type` or `assert_type`) whose return value should not
-    /// trigger the `unused-awaitable` lint.
-    fn is_known_function_call(&self, expr: &ast::Expr) -> bool {
-        let ast::Expr::Call(call) = expr else {
-            return false;
-        };
-        matches!(
-            self.expression_type(&call.func),
-            Type::FunctionLiteral(f)
-                if matches!(
-                    f.known(self.db()),
-                    Some(KnownFunction::RevealType | KnownFunction::AssertType)
-                )
-        )
     }
 
     /// Get the already-inferred type of an expression node, or Unknown.
@@ -2160,7 +2144,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_body(&mut self, suite: &[ast::Stmt]) {
-        let db = self.db();
         for statement in suite {
             self.infer_maybe_standalone_statement(statement);
 
@@ -2170,17 +2153,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 value,
             }) = statement
             {
-                let ty = self.expression_type(value);
-                if ty.is_awaitable(self.db()) && !self.is_known_function_call(value) {
-                    if let Some(builder) =
-                        self.context.report_lint(&UNUSED_AWAITABLE, value.as_ref())
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Object of type `{}` is not awaited",
-                            ty.display(db, self.program_environment()),
-                        ));
-                    }
-                }
+                self.check_unused_awaitable(value);
             }
         }
 
@@ -10014,30 +9987,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 yielded_ty,
             );
         }
-    }
-
-    fn infer_await_expression(
-        &mut self,
-        await_expression: &ast::ExprAwait,
-        tcx: TypeContext<'db>,
-    ) -> Type<'db> {
-        let db = self.db();
-        let env = self.program_environment();
-        let ast::ExprAwait {
-            range: _,
-            node_index: _,
-            value,
-        } = await_expression;
-
-        let expr_type = self.infer_expression(
-            value,
-            tcx.map(|tcx| KnownClass::Awaitable.to_specialized_instance(db, env, &[tcx])),
-        );
-
-        expr_type.try_await(db, env).unwrap_or_else(|err| {
-            err.report_diagnostic(&self.context, expr_type, value.as_ref().into());
-            Type::unknown()
-        })
     }
 
     // Perform narrowing with applicable constraints between the current scope and the enclosing scope.
