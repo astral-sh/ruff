@@ -242,7 +242,7 @@ impl Declarations {
         ));
     }
 
-    pub(super) fn clear_imported_qualifiers(&mut self) {
+    fn clear_imported_qualifiers(&mut self) {
         self.live_declarations
             .retain(|declaration| !declaration.is_imported_qualifier());
     }
