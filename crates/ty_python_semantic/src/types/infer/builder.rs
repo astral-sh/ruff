@@ -2738,8 +2738,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Err(err) = guard_ty.try_bool(db, self.program_environment()) {
                     err.report_diagnostic(&self.context, guard);
                 }
-
-                self.check_match_condition_redundancy(guard, guard_ty, body);
             }
 
             self.infer_body(body);

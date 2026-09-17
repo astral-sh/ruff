@@ -833,23 +833,81 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &self,
         diagnostic: &mut Diagnostic,
         full_condition_truthiness: Truthiness,
-        suite_if_true: &[ast::Stmt],
+        while_statement: &ast::StmtWhile,
         following_suite: &[ast::Stmt],
     ) {
-        if full_condition_truthiness.is_always_true()
-            && !suite_ends_with_exit(self, following_suite, SuiteExitKind::Defensive)
-            && let Some(stmt) = first_nontrivial_statement(following_suite)
-            && self.is_unreachable(stmt)
-        {
-            diagnostic.annotate(
-                self.context
-                    .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
-                    .message("This following statement is unreachable"),
-            );
+        if full_condition_truthiness.is_always_true() {
+            let mut else_branch_is_unreachable = false;
+
+            if let Some(stmt) = first_nontrivial_statement(&while_statement.orelse)
+                && self.is_unreachable(stmt)
+            {
+                // E.g. for
+                //
+                // ```py
+                // def example(nonempty: tuple[int, int]):
+                //     while nonempty:
+                //         break
+                //     else:
+                //         print("unreachable")
+                // ```
+                //
+                // Since `nonempty` is always truthy, the loop can *only* ever terminate due to
+                // control flow encountering a `break` statement in the loop body. This means
+                // that the `else` suite is unreachable, since `else` suites for `while` and `for`
+                // statements are *only* executed if the control flow never hit a `break`.
+                diagnostic.annotate(
+                    self.context
+                        .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                        .message("This statement is unreachable"),
+                );
+                else_branch_is_unreachable = true;
+            }
+
+            if !suite_ends_with_exit(self, following_suite, SuiteExitKind::Defensive)
+                && let Some(stmt) = first_nontrivial_statement(following_suite)
+                && self.is_unreachable(stmt)
+            {
+                // E.g. in both cases here, the statement after the `while` loop is unreachable:
+                // the loop condition is always truthy and the loop contains no `break`, so it
+                // can never terminate.
+                //
+                // ```py
+                // def example(nonempty: tuple[int, int]):
+                //     while nonempty:
+                //         print("loop body")
+                //
+                //     print("unreachable")
+                //
+                // def example2(nonempty: tuple[int, int]):
+                //     while nonempty:
+                //         print("loop body")
+                //     else:
+                //         print("unreachable else")
+                //
+                //     print("unreachable following statement")
+                // ```
+                diagnostic.annotate(
+                    self.context
+                        .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                        .message(if else_branch_is_unreachable {
+                            "This following statement is also unreachable"
+                        } else {
+                            "This following statement is unreachable"
+                        }),
+                );
+            }
         } else if full_condition_truthiness.is_always_false()
-            && let Some(stmt) = first_nontrivial_statement(suite_if_true)
+            && let Some(stmt) = first_nontrivial_statement(&while_statement.body)
             && self.is_unreachable(stmt)
         {
+            // The body of the `while` loop here is unreachable due to the condition being always falsy:
+            //
+            // ```py
+            // def example(empty: tuple[()]):
+            //     while empty:
+            //         print("unreachable")
+            // ```
             diagnostic.annotate(
                 self.context
                     .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
@@ -880,12 +938,44 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &self,
         diagnostic: &mut Diagnostic,
         full_condition_truthiness: Truthiness,
-        suite_if_true: &[ast::Stmt],
+        case: &ast::MatchCase,
+        following_cases: &[ast::MatchCase],
     ) {
-        if full_condition_truthiness.is_always_false()
-            && let Some(stmt) = first_nontrivial_statement(suite_if_true)
+        if full_condition_truthiness.is_always_true()
+            && case.pattern.is_irrefutable()
+            && let Some((next_case, stmt)) = following_cases
+                .iter()
+                .find_map(|case| first_nontrivial_statement(&case.body).map(|stmt| (case, stmt)))
             && self.is_unreachable(stmt)
         {
+            // The second `case` branch here is unreachable because the first `case`
+            // has an irrefutable pattern with an always-truthy guard:
+            //
+            // ```py
+            // def example(value: object, nonempty: tuple[int, int]):
+            //     match value:
+            //         case _ if nonempty:
+            //             print("selected")
+            //         case str():
+            //             print("unreachable")
+            // ```
+            diagnostic.annotate(
+                self.context
+                    .secondary(self.branch_range_until_first_newline(next_case.start(), stmt))
+                    .message("This following branch is unreachable"),
+            );
+        } else if full_condition_truthiness.is_always_false()
+            && let Some(stmt) = first_nontrivial_statement(&case.body)
+            && self.is_unreachable(stmt)
+        {
+            // The `case` body here is unreachable due to the always-falsy guard:
+            //
+            // ```py
+            // def example(value: object, empty: tuple[()]):
+            //     match value:
+            //         case str() if empty:
+            //             print("unreachable")
+            // ```
             diagnostic.annotate(
                 self.context
                     .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
@@ -922,33 +1012,54 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let mut implicit_else_is_unreachable = false;
 
             // The branch index includes the initial `if`, but `elif_else_clauses` does not.
-            if let Some(next_branch) = if_stmt.elif_else_clauses.get(branch_index) {
-                if let Some(stmt) = first_nontrivial_statement(&next_branch.body)
-                    && self.is_unreachable(stmt)
-                {
-                    diagnostic.annotate(
-                        self.context
-                            .secondary(
-                                self.branch_range_until_first_newline(next_branch.start(), stmt),
-                            )
-                            .message("This following branch is unreachable"),
-                    );
-                }
-            } else {
-                if if_elif_else_suites
+            if let Some((next_branch, stmt)) = if_stmt.elif_else_clauses[branch_index..]
+                .iter()
+                .find_map(|clause| {
+                    first_nontrivial_statement(&clause.body).map(|stmt| (clause, stmt))
+                })
+                && self.is_unreachable(stmt)
+            {
+                // The `elif` branch here is unreachable because the preceding `if` condition is always true:
+                //
+                // ```py
+                // def example(nonempty: tuple[int, int], flag: bool):
+                //     if nonempty:
+                //         print("selected")
+                //     elif flag:
+                //         print("unreachable")
+                // ```
+                diagnostic.annotate(
+                    self.context
+                        .secondary(self.branch_range_until_first_newline(next_branch.start(), stmt))
+                        .message("This following branch is unreachable"),
+                );
+            } else if branch_index == if_stmt.elif_else_clauses.len()
+                && if_elif_else_suites
                     .iter()
                     .all(|suite| suite_ends_with_exit(self, suite, SuiteExitKind::Any))
-                    && !suite_ends_with_exit(self, following_suite, SuiteExitKind::Defensive)
-                    && let Some(stmt) = first_nontrivial_statement(following_suite)
-                    && self.is_unreachable(stmt)
-                {
-                    implicit_else_is_unreachable = true;
-                    diagnostic.annotate(
-                        self.context
-                            .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
-                            .message("This following statement is unreachable"),
-                    );
-                }
+                && !suite_ends_with_exit(self, following_suite, SuiteExitKind::Defensive)
+                && let Some(stmt) = first_nontrivial_statement(following_suite)
+                && self.is_unreachable(stmt)
+            {
+                // The suite following the `if`/`elif`/`else` chain here is unreachable because the final
+                // condition in the chain is always true, and every branch exits.
+                // This leaves no path to the following suite:
+                //
+                // ```py
+                // def example(value: int | str):
+                //     if isinstance(value, int):
+                //         return
+                //     elif isinstance(value, str):
+                //         return
+                //
+                //     print("unreachable")
+                // ```
+                implicit_else_is_unreachable = true;
+                diagnostic.annotate(
+                    self.context
+                        .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                        .message("This following statement is unreachable"),
+                );
             }
 
             if !implicit_else_is_unreachable
@@ -973,6 +1084,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } else if let Some(stmt) = first_nontrivial_statement(if_elif_else_suites[branch_index])
             && self.is_unreachable(stmt)
         {
+            // The `if` body here is unreachable because the condition is always false:
+            //
+            // ```py
+            // def example(empty: tuple[()]):
+            //     if empty:
+            //         print("unreachable")
+            // ```
             diagnostic.annotate(
                 self.context
                     .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
