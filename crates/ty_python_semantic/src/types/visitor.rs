@@ -922,11 +922,19 @@ pub(super) fn any_over_type_expanding_aliases<'db>(
     ) -> bool {
         any_over_type(db, env, ty, false, |nested| {
             query(nested)
-                || matches!(nested, Type::TypeAlias(alias) if active_aliases.visit(
-                    &Type::TypeAlias(alias).to_type_identity(db),
-                    || true,
-                    || search(db, env, alias.value_type(db), query, active_aliases),
-                ))
+                || match nested {
+                    Type::TypeAlias(alias) => active_aliases.visit(
+                        &nested.to_type_identity(db),
+                        || true,
+                        || search(db, env, alias.value_type(db), query, active_aliases),
+                    ),
+                    Type::Recursive(recursive) => active_aliases.visit(
+                        &nested.to_type_identity(db),
+                        || true,
+                        || search(db, env, recursive.unfold(db, env), query, active_aliases),
+                    ),
+                    _ => false,
+                }
         })
     }
 

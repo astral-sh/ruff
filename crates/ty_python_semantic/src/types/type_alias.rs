@@ -161,7 +161,7 @@ pub struct PEP695TypeAliasType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for PEP695TypeAliasType<'_> {}
 
-pub(super) fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     type_alias: PEP695TypeAliasType<'db>,
     visitor: &V,
@@ -275,7 +275,7 @@ pub struct ManualPEP695TypeAliasType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ManualPEP695TypeAliasType<'_> {}
 
-pub(super) fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     type_alias: ManualPEP695TypeAliasType<'db>,
     visitor: &V,
