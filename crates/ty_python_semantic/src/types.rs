@@ -8083,6 +8083,10 @@ impl<'db> Type<'db> {
                         .map_or(types, |kind| types.materialize(db, env, kind))
                 }),
             Type::TypeAlias(alias) => alias.value_type(db).generator_types(db, env, mode),
+            // A provisional recursive body may unfold to itself without exposing a generator.
+            Type::Recursive(recursive) => recursive.map_or(db, env, None, |unfolded| {
+                unfolded.generator_types(db, env, mode)
+            }),
             Type::Union(union) => {
                 let mut yield_builder = Some(UnionBuilder::new(db, env));
                 let mut send_builder = Some(UnionBuilder::new(db, env));
