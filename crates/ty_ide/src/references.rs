@@ -15,7 +15,7 @@ use crate::{Db, ReferenceKind, ReferenceTarget};
 use rayon::prelude::*;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::find_node::{CoveringNode, covering_node};
+use ruff_python_ast::find_node::CoveringNode;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
     self as ast, AnyNodeRef,
@@ -117,7 +117,11 @@ pub(crate) fn references(
     let is_externally_visible_symbol =
         has_any_external_visible_definitions(db, &target_definitions);
 
-    let is_parameter = parameter_owner_is_externally_visible(db, &target_definitions);
+    let is_parameter = target_definitions.iter().any(|resolved| {
+        resolved
+            .definition()
+            .is_some_and(|definition| definition.kind(db).is_parameter_def())
+    });
 
     let search = LocalReferenceSearch {
         target_text,
@@ -184,12 +188,20 @@ fn references_for_search(
                 }
 
                 let other_file = ProgramFile::new(db, other_file, program);
-                if has_fixture_target || is_externally_visible_symbol {
+                // A parameter's declaration and body uses must also be searched when the
+                // request starts from a keyword argument in another file.
+                if has_fixture_target
+                    || is_externally_visible_symbol
+                    || search.target_definitions.iter().any(|resolved| {
+                        resolved
+                            .definition()
+                            .is_some_and(|definition| definition.program_file(db) == other_file)
+                    })
+                {
                     references_for_file(db, other_file, search, mode)
                 } else {
-                    // Parameters are local by scope, but they can have cross-file references via keyword
-                    // argument labels (e.g. `f(param=...)`). Handle this case with a narrow scan that only
-                    // considers keyword arguments.
+                    // Outside their defining files, parameters can be referenced via keyword
+                    // argument labels (e.g. `f(param=...)`). Only consider keyword arguments here.
                     references_for_keyword_arguments_in_file(db, other_file, search, mode)
                 }
             })
@@ -334,75 +346,6 @@ pub(crate) fn has_any_external_visible_definitions(
         },
         ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => true,
     })
-}
-
-/// Determine whether a parameter's owning callable is externally visible.
-///
-/// Parameters are local by scope, but their keyword-argument labels can appear across files
-/// when the owning callable is visible outside of the current module.
-fn parameter_owner_is_externally_visible(
-    db: &dyn Db,
-    target_definitions: &Definitions<'_>,
-) -> bool {
-    target_definitions
-        .iter()
-        .any(|target| parameter_owner_is_externally_visible_for_target(db, target))
-}
-
-fn parameter_owner_is_externally_visible_for_target(
-    db: &dyn Db,
-    resolved: &ResolvedDefinition,
-) -> bool {
-    let Some(definition) = resolved.definition() else {
-        return false;
-    };
-    let parsed = parsed_module(db, definition.python_file(db));
-    let target = definition.focus_range(db, &parsed.load(db));
-    let module = parsed.load(db);
-
-    let covering = covering_node(module.syntax().into(), target.range());
-    let Ok(parameter_covering) =
-        covering.find_last(|node| matches!(node, AnyNodeRef::Parameter(_)))
-    else {
-        return false;
-    };
-
-    let mut owner: Option<AnyNodeRef<'_>> = None;
-    let mut seen_owner = false;
-    let mut class_ancestor_found = false;
-
-    // Heuristic: treat parameters as externally visible only when they belong to a top-level
-    // function or a method on a top-level class. Nested functions/classes are excluded to avoid
-    // broad, low-signal workspace scans.
-    for ancestor in parameter_covering.ancestors() {
-        if !seen_owner {
-            if matches!(
-                ancestor,
-                AnyNodeRef::StmtFunctionDef(_) | AnyNodeRef::ExprLambda(_)
-            ) {
-                owner = Some(ancestor);
-                seen_owner = true;
-            }
-            continue;
-        }
-
-        match ancestor {
-            AnyNodeRef::StmtFunctionDef(_) | AnyNodeRef::ExprLambda(_) => {
-                // Nested functions or lambdas are not externally visible.
-                return false;
-            }
-            AnyNodeRef::StmtClassDef(_) => {
-                if class_ancestor_found {
-                    // Nested classes are treated as not externally visible for now.
-                    return false;
-                }
-                class_ancestor_found = true;
-            }
-            _ => {}
-        }
-    }
-
-    matches!(owner, Some(AnyNodeRef::StmtFunctionDef(_)))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
