@@ -213,6 +213,21 @@ def cast_union(form: RecursiveForm | TypeForm[int]) -> None:
     reveal_type(cast(form, object()))  # revealed: list[RecursiveForm] | int
 ```
 
+A recursive `TypeForm` alias also denotes an ordinary value during assignment. An incompatible
+assignment reports a type mismatch, since the value is already a valid type form.
+
+```py
+type ExplicitForm = TypeForm[list[ExplicitForm]]
+
+def assign_recursive_form(form: RecursiveForm) -> None:
+    valid: TypeForm[list[RecursiveForm]] = form
+    invalid: TypeForm[int] = form  # error: [invalid-assignment]
+
+def assign_explicit_form(form: ExplicitForm) -> None:
+    valid: TypeForm[list[ExplicitForm]] = form
+    invalid: TypeForm[int] = form  # error: [invalid-assignment]
+```
+
 ## Runtime class objects and gradual values
 
 Runtime class objects are also valid `TypeForm` values when their instance type is compatible with
