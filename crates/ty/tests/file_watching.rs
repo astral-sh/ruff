@@ -24,6 +24,7 @@ use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata, UseUv};
 use ty_python_core::platform::PythonPlatform;
+use ty_static::EnvVars;
 
 struct TestCase {
     db: ProjectDatabase,
@@ -54,6 +55,14 @@ impl TestCase {
 
     fn root_path(&self) -> &SystemPath {
         &self.root_dir
+    }
+
+    fn write_virtual_environment(
+        &self,
+        path: impl AsRef<SystemPath>,
+        python_version: PythonVersion,
+    ) -> anyhow::Result<()> {
+        write_virtual_environment(self.root_path(), path, python_version)
     }
 
     fn db(&self) -> &ProjectDatabase {
@@ -306,6 +315,7 @@ struct SetupContext<'a> {
     override_options: Option<Options>,
     fallback_options: Option<Options>,
     included_paths: Option<Vec<SystemPathBuf>>,
+    allow_invalid_settings: bool,
 }
 
 impl<'a> SetupContext<'a> {
@@ -336,7 +346,7 @@ impl<'a> SetupContext<'a> {
     ) -> anyhow::Result<()> {
         let relative_path = relative_path.as_ref();
         let absolute_path = self.join_project_path(relative_path);
-        Self::write_file_impl(absolute_path, &dedent(content))
+        write_file(absolute_path, &dedent(content))
     }
 
     fn write_file(
@@ -346,27 +356,23 @@ impl<'a> SetupContext<'a> {
     ) -> anyhow::Result<()> {
         let relative_path = relative_path.as_ref();
         let absolute_path = self.join_root_path(relative_path);
-        Self::write_file_impl(absolute_path, content)
+        write_file(absolute_path, content)
     }
 
-    fn write_file_impl(path: impl AsRef<SystemPath>, content: &str) -> anyhow::Result<()> {
-        let path = path.as_ref();
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create parent directory for file `{path}`"))?;
-        }
-
-        let mut file = std::fs::File::create(path.as_std_path())
-            .with_context(|| format!("Failed to open file `{path}`"))?;
-        file.write_all(content.as_bytes())
-            .with_context(|| format!("Failed to write to file `{path}`"))?;
-        file.sync_data()?;
-
-        Ok(())
+    fn write_virtual_environment(
+        &self,
+        path: impl AsRef<SystemPath>,
+        python_version: PythonVersion,
+    ) -> anyhow::Result<()> {
+        write_virtual_environment(self.root_path(), path, python_version)
     }
 
     fn set_options(&mut self, options: Options) {
         self.options = Some(options);
+    }
+
+    fn allow_invalid_settings(&mut self) {
+        self.allow_invalid_settings = true;
     }
 
     fn set_config_file_override(&mut self, path: impl AsRef<SystemPath>) {
@@ -458,6 +464,7 @@ where
         override_options: None,
         fallback_options: None,
         included_paths: None,
+        allow_invalid_settings: false,
     };
 
     setup_files
@@ -470,6 +477,7 @@ where
         override_options,
         fallback_options,
         included_paths,
+        allow_invalid_settings,
         ..
     } = setup_context;
 
@@ -513,7 +521,11 @@ where
         }
     }
 
-    let mut db = ProjectDatabase::fallible(project, system)?;
+    let mut db = if allow_invalid_settings {
+        ProjectDatabase::use_defaults(project, system)
+    } else {
+        ProjectDatabase::fallible(project, system)?
+    };
 
     if let Some(included_paths) = included_paths {
         db.project().set_included_paths(&mut db, included_paths);
@@ -555,6 +567,59 @@ where
         .try_take_watch_changes(event_for_file(".watcher_ready"), Duration::from_millis(500));
 
     Ok(test_case)
+}
+
+/// Creates or updates a mock virtual environment, resolving relative paths against the test root.
+fn write_virtual_environment(
+    root: &SystemPath,
+    path: impl AsRef<SystemPath>,
+    python_version: PythonVersion,
+) -> anyhow::Result<()> {
+    let environment = root.join(path);
+    let python_home = root.join("base/bin");
+    write_file(python_home.join("python"), "")?;
+    write_file(
+        environment.join(if cfg!(windows) {
+            "Scripts/python.exe"
+        } else {
+            "bin/python"
+        }),
+        "",
+    )?;
+    let site_packages = if cfg!(windows) {
+        environment.join("Lib/site-packages")
+    } else {
+        environment.join(format!("lib/python{python_version}/site-packages"))
+    };
+    std::fs::create_dir_all(site_packages)?;
+    let pyvenv_cfg = environment.join("pyvenv.cfg");
+    let pyvenv_cfg_contents = format!(
+        r"
+        home = {python_home}
+        version = {python_version}
+        "
+    );
+    if pyvenv_cfg.as_std_path().try_exists()? {
+        update_file(pyvenv_cfg, &pyvenv_cfg_contents)
+    } else {
+        write_file(pyvenv_cfg, &dedent(&pyvenv_cfg_contents))
+    }
+}
+
+fn write_file(path: impl AsRef<SystemPath>, content: &str) -> anyhow::Result<()> {
+    let path = path.as_ref();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create parent directory for file `{path}`"))?;
+    }
+
+    let mut file = std::fs::File::create(path.as_std_path())
+        .with_context(|| format!("Failed to open file `{path}`"))?;
+    file.write_all(content.as_bytes())
+        .with_context(|| format!("Failed to write to file `{path}`"))?;
+    file.sync_data()?;
+
+    Ok(())
 }
 
 /// Dedents and updates a file's content, ensuring that its last modified time changes.
@@ -1835,6 +1900,282 @@ fn change_python_version_and_platform() -> anyhow::Result<()> {
         @"bar.py:6:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[12]]`"
     );
 
+    Ok(())
+}
+
+#[test]
+fn recreating_default_environment_updates_inferred_python_version() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context
+            .write_virtual_environment(context.join_project_path(".venv"), PythonVersion::PY311)?;
+        context.write_project_file(
+            "main.py",
+            r"
+            import sys
+            from typing_extensions import reveal_type
+
+            reveal_type(sys.version_info[:2])
+            ",
+        )
+    })?;
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`"
+    );
+
+    let environment = case.project_path(".venv");
+
+    // Without `.venv`, ty uses its default Python version.
+    std::fs::remove_dir_all(&environment)?;
+    let changes = case.take_watch_changes(event_for_file(".venv"));
+    case.apply_changes(&changes);
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`"
+    );
+
+    case.write_virtual_environment(&environment, PythonVersion::PY311)?;
+    let changes = case.stop_watch(event_for_file(".venv"));
+    case.apply_changes(&changes);
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`"
+    );
+    Ok(())
+}
+
+#[test]
+fn repairing_default_environment_updates_inferred_python_version() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context
+            .write_virtual_environment(context.join_project_path(".venv"), PythonVersion::PY311)?;
+        // Without `home`, the environment cannot be selected at startup.
+        context.write_project_file(
+            ".venv/pyvenv.cfg",
+            r"
+            version = 3.11
+            ",
+        )?;
+        context.write_project_file(
+            "main.py",
+            r"
+            import sys
+            from typing_extensions import reveal_type
+
+            reveal_type(sys.version_info[:2])
+            ",
+        )
+    })?;
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`"
+    );
+
+    // Write a valid `pyvenv.cfg`.
+    case.write_virtual_environment(case.project_path(".venv"), PythonVersion::PY311)?;
+    let changes = case.stop_watch(event_for_file("pyvenv.cfg"));
+    case.apply_changes(&changes);
+
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`"
+    );
+    Ok(())
+}
+
+#[test]
+fn creating_site_packages_after_metadata_updates_inferred_python_version() -> anyhow::Result<()> {
+    let library = if cfg!(windows) { "Lib" } else { "lib" };
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_file("base/bin/python", "")?;
+        std::fs::create_dir(context.join_project_path(".venv"))?;
+        context.write_project_file(
+            "main.py",
+            r"
+            import sys
+            from typing_extensions import reveal_type
+
+            reveal_type(sys.version_info[:2])
+            ",
+        )
+    })?;
+
+    // uv writes pyvenv.cfg before creating site-packages. Process these in separate batches.
+    let python_home = case.root_path().join("base/bin");
+    write_file(
+        case.project_path(".venv/pyvenv.cfg"),
+        &dedent(&format!(
+            r"
+            home = {python_home}
+            version = 3.11
+            "
+        )),
+    )?;
+    let changes = case.take_watch_changes(event_for_file("pyvenv.cfg"));
+    case.apply_changes(&changes);
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`"
+    );
+
+    let library = case.project_path(".venv").join(library);
+    let site_packages = library.join(if cfg!(windows) {
+        "site-packages"
+    } else {
+        "python3.11/site-packages"
+    });
+    std::fs::create_dir_all(site_packages)?;
+    // Watchers may report the library directory, its descendants, or both.
+    let changes = case.stop_watch(|change: &ChangeEvent| {
+        matches!(change, ChangeEvent::Created { path, .. } if path.starts_with(&library))
+    });
+    case.apply_changes(&changes);
+
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`"
+    );
+    Ok(())
+}
+
+#[test]
+fn moving_configured_interpreter_parent_into_project_updates_inferred_python_version()
+-> anyhow::Result<()> {
+    let python = if cfg!(windows) {
+        "envs/env/Scripts/python.exe"
+    } else {
+        "envs/env/bin/python"
+    };
+    let mut case = setup(|context: &mut SetupContext| {
+        context.allow_invalid_settings();
+        context.write_virtual_environment("unwatched/env", PythonVersion::PY311)?;
+        context.write_project_file(
+            "pyproject.toml",
+            &format!(
+                r#"
+                [tool.ty.environment]
+                python = "./{python}"
+                "#
+            ),
+        )?;
+        context.write_project_file(
+            "main.py",
+            r"
+            import sys
+            from typing_extensions import reveal_type
+
+            reveal_type(sys.version_info[:2])
+            ",
+        )
+    })?;
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`"
+    );
+
+    // Moving the parent can produce a single directory event for the whole environment.
+    std::fs::rename(
+        case.root_path().join("unwatched"),
+        case.project_path("envs"),
+    )?;
+    let changes = case.stop_watch(event_for_file("envs"));
+    case.apply_changes(&changes);
+
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`"
+    );
+    Ok(())
+}
+
+#[test]
+fn repairing_activated_environment_updates_inferred_python_version() -> anyhow::Result<()> {
+    let mut case = setup_with_system(
+        |context: &mut SetupContext| {
+            context.allow_invalid_settings();
+            context.write_virtual_environment(
+                context.join_project_path("active-env"),
+                PythonVersion::PY311,
+            )?;
+            context.write_project_file(
+                "active-env/pyvenv.cfg",
+                r"
+                version = 3.11
+                ",
+            )?;
+            context.write_project_file(
+                "main.py",
+                r"
+                import sys
+                from typing_extensions import reveal_type
+
+                reveal_type(sys.version_info[:2])
+                ",
+            )
+        },
+        |system| {
+            system.set_env_var(
+                EnvVars::VIRTUAL_ENV,
+                system.current_directory().join("active-env").as_str(),
+            );
+        },
+    )?;
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`"
+    );
+
+    case.write_virtual_environment(case.project_path("active-env"), PythonVersion::PY311)?;
+    let changes = case.stop_watch(event_for_file("pyvenv.cfg"));
+    case.apply_changes(&changes);
+
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`"
+    );
+    Ok(())
+}
+
+#[test]
+fn external_interpreter_changes_update_inferred_python_version() -> anyhow::Result<()> {
+    let python = if cfg!(windows) {
+        "environment/Scripts/python.exe"
+    } else {
+        "environment/bin/python"
+    };
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_virtual_environment("environment", PythonVersion::PY311)?;
+        context.write_project_file(
+            "main.py",
+            r"
+            import sys
+            from typing_extensions import reveal_type
+
+            reveal_type(sys.version_info[:2])
+            ",
+        )?;
+        context.write_project_file(
+            "pyproject.toml",
+            &format!(
+                r#"
+                [tool.ty.environment]
+                python = "../{python}"
+                "#
+            ),
+        )
+    })?;
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`"
+    );
+
+    case.write_virtual_environment("environment", PythonVersion::PY312)?;
+    let events = case.stop_watch(event_for_file("pyvenv.cfg"));
+    case.apply_changes(&events);
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[12]]`"
+    );
     Ok(())
 }
 

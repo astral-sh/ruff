@@ -296,35 +296,16 @@ impl PythonEnvironment {
             PythonEnvironment::new(path, origin, system)
         }
 
-        if let Ok(virtual_env) = system.env_var(EnvVars::VIRTUAL_ENV) {
-            return resolve_environment(
-                system,
-                SystemPath::new(&virtual_env),
-                SysPrefixPathOrigin::VirtualEnvVar,
-            )
-            .map(Some);
-        }
-
-        if let Some(conda_env) = conda_environment_from_env(system, CondaEnvironmentKind::Child) {
-            return resolve_environment(system, &conda_env, SysPrefixPathOrigin::CondaPrefixVar)
-                .map(Some);
-        }
-
-        if let Some(project_root) = project_root {
-            tracing::debug!("Discovering virtual environment in `{project_root}`");
-            let virtual_env_directory = project_root.join(".venv");
-
-            match PythonEnvironment::new(
-                &virtual_env_directory,
-                SysPrefixPathOrigin::LocalVenv,
-                system,
-            ) {
+        if let Some((path, origin)) = Self::virtual_environment_candidate(project_root, system) {
+            let is_local_venv = matches!(origin, SysPrefixPathOrigin::LocalVenv);
+            match resolve_environment(system, &path, origin) {
                 Ok(environment) => return Ok(Some(environment)),
+                Err(err) if !is_local_venv => return Err(err),
                 Err(err) => {
-                    if system.is_directory(&virtual_env_directory) {
+                    if system.is_directory(&path) {
                         tracing::debug!(
                             "Ignoring automatically detected virtual environment at `{}`: {}",
-                            &virtual_env_directory,
+                            &path,
                             err
                         );
                     }
@@ -344,6 +325,24 @@ impl PythonEnvironment {
         }
 
         Ok(None)
+    }
+
+    /// Returns the virtual environment location to try and its origin, without checking whether
+    /// it exists. `VIRTUAL_ENV` takes precedence over a child Conda environment, followed by the
+    /// project's `.venv`. System Python fallbacks are handled by [`Self::discover`].
+    pub fn virtual_environment_candidate(
+        project_root: Option<&SystemPath>,
+        system: &dyn System,
+    ) -> Option<(SystemPathBuf, SysPrefixPathOrigin)> {
+        if let Ok(virtual_env) = system.env_var(EnvVars::VIRTUAL_ENV) {
+            return Some((virtual_env.into(), SysPrefixPathOrigin::VirtualEnvVar));
+        }
+
+        if let Some(conda_env) = conda_environment_from_env(system, CondaEnvironmentKind::Child) {
+            return Some((conda_env, SysPrefixPathOrigin::CondaPrefixVar));
+        }
+
+        project_root.map(|root| (root.join(".venv"), SysPrefixPathOrigin::LocalVenv))
     }
 
     pub fn new(
