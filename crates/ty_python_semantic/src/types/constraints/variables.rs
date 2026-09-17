@@ -407,6 +407,47 @@ impl<'db> Constraint<'db> {
         )
     }
 
+    pub(super) fn provides_bound_for(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        match self {
+            Constraint::ConcreteLower(bound) => bound.typevar.is_same_typevar_as(db, bound_typevar),
+            Constraint::ConcreteUpper(bound) => bound.typevar.is_same_typevar_as(db, bound_typevar),
+            Constraint::ConcreteEquivalence(bound) => {
+                bound.typevar.is_same_typevar_as(db, bound_typevar)
+            }
+            Constraint::TypeVarRange(bound) => {
+                bound.left.is_same_typevar_as(db, bound_typevar)
+                    || bound.right.is_same_typevar_as(db, bound_typevar)
+            }
+            Constraint::TypeVarEquivalence(bound) => {
+                bound.left.is_same_typevar_as(db, bound_typevar)
+                    || bound.right.is_same_typevar_as(db, bound_typevar)
+            }
+        }
+    }
+
+    pub(super) fn provides_lower_bound_for(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        match self {
+            Constraint::ConcreteLower(bound) => bound.typevar.is_same_typevar_as(db, bound_typevar),
+            Constraint::ConcreteUpper(_) => false,
+            Constraint::ConcreteEquivalence(bound) => {
+                bound.typevar.is_same_typevar_as(db, bound_typevar)
+            }
+            Constraint::TypeVarRange(bound) => bound.right.is_same_typevar_as(db, bound_typevar),
+            Constraint::TypeVarEquivalence(bound) => {
+                bound.left.is_same_typevar_as(db, bound_typevar)
+                    || bound.right.is_same_typevar_as(db, bound_typevar)
+            }
+        }
+    }
+
     pub(super) fn as_concrete(self) -> Option<(BoundTypeVarInstance<'db>, Type<'db>)> {
         match self {
             Constraint::ConcreteLower(this) => Some((this.typevar, this.bound)),

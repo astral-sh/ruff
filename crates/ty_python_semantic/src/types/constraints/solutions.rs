@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use std::ops::ControlFlow;
+use std::ops::{ControlFlow, Range};
 
 use indexmap::map::Slice;
 use rustc_hash::FxHashSet;
@@ -314,11 +314,175 @@ impl<'db> SolutionWalker<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
-        _constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
+        constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
     ) -> ControlFlow<L::Break> {
-        // TODO: Check the declared constraints here instead of `preliminary_solve` before
-        // declaring the candidate solution valid.
-        self.found_satisfied_path(db, env, storage, limits, path)
+        let Some(((&bound_typevar, constrained_typevar), constrained)) = constrained.split_first()
+        else {
+            // We've checked all constrained typevars, and we now know that the candidate solution
+            // is valid.
+            return self.found_satisfied_path(db, env, storage, limits, path);
+        };
+
+        // Constrained typevars are more complex than bounded typevars, since they introduce a
+        // disjunction; and because they are _equivalence_ bounds, not _upper_ bounds. As long as
+        // the candidate solution satisfies _at least one_ of the declared constraints, the
+        // solution is valid.
+        //
+        // Naively, that means we would just check each of the declared constraints separately,
+        // adding the respective equivalence bound to the current path. Because the constraint
+        // gives an equivalence bound, this will "tighten" the solution to be exactly the declared
+        // constraint, as long as the solution satisfies that constraint. If more than one declared
+        // constraint is valid, we first prune them with a "tightest constraint wins" heuristic. If
+        // there are still multiple valid declared constraints, it would be the caller's
+        // responsibility to decide whether to report that as an ambiguous solve, or to do
+        // something useful with the different possible solutions.
+        //
+        // However, if the candidate solution maps this typevar to a dynamic type, or to another
+        // typevar, and that solution satisfies _all_ of the declared constraints, then we _don't_
+        // want to report separate tightened solutions for each declared constraint. Rather, we
+        // want to report the dynamic type or typevar itself as the solution.
+
+        // First determine which declared constraints are satisfied by this solution.
+        let previously_pending = self.pending.len();
+        let mut constraint_solutions = SmallVec::<[Range<usize>; 4]>::default();
+        for declared_constraint in &constrained_typevar.declared_constraints {
+            let start = self.pending.len();
+            if let Some(constraints) = declared_constraint.constraints.as_deref() {
+                self.visit_constraints_and_then(
+                    db,
+                    env,
+                    storage,
+                    limits,
+                    path,
+                    constraints,
+                    &mut |this, storage, limits, path| {
+                        // The candidate solution satisfies this declared constraint, but we still
+                        // need to check any remaining constrained typevars.
+                        this.validate_constrained(db, env, storage, limits, path, constrained)
+                    },
+                )?;
+            }
+            let end = self.pending.len();
+            constraint_solutions.push(start..end);
+        }
+
+        // Fast path: If exactly one constraint was satisfied, we can return its solutions
+        // immediately. If _no_ constraints were satisfied, we can return its _lack_ of solutions
+        // immediately.
+        let satisfied_constraint_count = constraint_solutions
+            .iter()
+            .filter(|range| !range.is_empty())
+            .count();
+        if satisfied_constraint_count <= 1 {
+            return ControlFlow::Continue(());
+        }
+
+        // If _every_ declared constraint was satisfied, _and_ the solution is either dynamic or
+        // another typevar, then we can consider using the solution as-is, rather than trying to
+        // force it to be exactly equal to one of the declared constraints. (We call this a
+        // "family" solution since it's a single solution that satisfies the entire family of
+        // declared constraints.)
+        let all_constraints_satisfied =
+            satisfied_constraint_count == constrained_typevar.declared_constraints.len();
+        if all_constraints_satisfied {
+            let has_non_concrete_evidence = path
+                .positive_constraints()
+                .map(|(constraint, _)| storage.constraint_data(constraint))
+                .filter(|constraint| {
+                    // Constraints involving other typevars are not relevant
+                    constraint.provides_bound_for(db, bound_typevar)
+                })
+                .all(|constraint| {
+                    // None means the typevar is constrained by another typevar; otherwise check if
+                    // the concrete constraint is dynamic
+                    constraint
+                        .as_concrete()
+                        .is_none_or(|(_, constrained_ty)| !constrained_ty.is_fully_static(db, env))
+                });
+
+            if has_non_concrete_evidence {
+                // We're _eligible_ to return the family solution, but first we should make sure
+                // that it's actually compatible.
+                let pending_before_family_solution = self.pending.len();
+                self.validate_constrained(db, env, storage, limits, path, constrained)?;
+                let pending_after_family_solution = self.pending.len();
+                let family_solution_is_valid =
+                    pending_before_family_solution != pending_after_family_solution;
+
+                // If the family solution is valid, _replace_ all of the per-declared-constraint
+                // solutions with it.
+                if family_solution_is_valid {
+                    self.pending
+                        .drain(previously_pending..pending_before_family_solution);
+                    return ControlFlow::Continue(());
+                }
+            }
+        }
+
+        // At this point, we know that more than one constraint was satisfied. Check to see if any
+        // one of them is "tighter" than all of the others. If so, we prefer that single solution.
+        let mut current_best: Option<usize> = None;
+        let has_lower_bound_evidence = path.positive_constraints().any(|(constraint, _)| {
+            let constraint = storage.constraint_data(constraint);
+            constraint.provides_lower_bound_for(db, bound_typevar)
+        });
+        for (idx, declared_constraint) in
+            constrained_typevar.declared_constraints.iter().enumerate()
+        {
+            if constraint_solutions[idx].is_empty() {
+                continue;
+            }
+
+            let Some(best) = current_best else {
+                current_best = Some(idx);
+                continue;
+            };
+
+            let best = constrained_typevar.declared_constraints[best].constrained_ty;
+            let candidate = declared_constraint.constrained_ty;
+            let candidate_assignable_to_best = candidate.is_assignable_to(db, env, best);
+            let best_assignable_to_candidate = best.is_assignable_to(db, env, candidate);
+
+            // If these two declared constraints cannot be compared, then there cannot possibly
+            // be a single "tightest" solution.
+            if !candidate_assignable_to_best && !best_assignable_to_candidate {
+                current_best = None;
+                break;
+            }
+
+            // Lower-bound evidence asks for the narrowest compatible declared constraint
+            // above the lower bound. With only upper-bound evidence, ask for the widest
+            // compatible declared constraint below the upper bound. If the candidates are
+            // assignable in both directions, prefer a fully static constraint over a
+            // gradual one. Otherwise, keep the current best to preserve the TypeVar's
+            // declared constraint order.
+            let this_solution_is_better =
+                if candidate_assignable_to_best != best_assignable_to_candidate {
+                    if has_lower_bound_evidence {
+                        candidate_assignable_to_best
+                    } else {
+                        best_assignable_to_candidate
+                    }
+                } else {
+                    let candidate_is_static = candidate.is_fully_static(db, env);
+                    let best_is_static = best.is_fully_static(db, env);
+                    candidate_is_static && !best_is_static
+                };
+
+            if this_solution_is_better {
+                current_best = Some(idx);
+            }
+        }
+
+        // If there was a single "best" constraint, remove the solutions from the other
+        // constraints.
+        if let Some(best) = current_best {
+            let solutions = &constraint_solutions[best];
+            self.pending.truncate(solutions.end);
+            self.pending.drain(previously_pending..solutions.start);
+        }
+
+        ControlFlow::Continue(())
     }
 
     /// Create a pending candidate solution for the current path.
@@ -539,14 +703,11 @@ struct UpperBound {
 }
 
 struct Constrained<'db> {
-    #[expect(unused)]
     declared_constraints: SmallVec<[DeclaredConstraint<'db>; 4]>,
 }
 
 struct DeclaredConstraint<'db> {
-    #[expect(unused)]
     constraints: ValidationConstraints,
-    #[expect(unused)]
     constrained_ty: Type<'db>,
 }
 
