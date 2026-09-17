@@ -1728,7 +1728,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        match object_ty {
+        // Aliases must use the same union and TypedDict checks as their underlying types.
+        match object_ty.resolve_type_alias(db) {
             Type::Union(union) => {
                 let mut infer_slice_ty = MultiInferenceGuard::new(infer_slice_ty);
                 let mut infer_rhs_value = MultiInferenceGuard::new(infer_rhs_value);
