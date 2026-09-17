@@ -2224,6 +2224,26 @@ def assign():
 valid: Tree[int] = [1, [2]]
 ```
 
+### Recursive aliases provide tuple element contexts
+
+A recursive tuple alias supplies the expected types for its elements, including the parameters of a
+lambda expression.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+
+Implicit = tuple[Callable[[int], int], "Implicit | None"]
+type Explicit = tuple[Callable[[int], int], Explicit | None]
+
+implicit: Implicit = (lambda value: reveal_type(value) or value, None)  # revealed: int
+explicit: Explicit = (lambda value: reveal_type(value) or value, None)  # revealed: int
+```
+
 ### Recursive aliases in union contexts
 
 ```toml

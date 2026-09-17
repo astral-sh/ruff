@@ -2494,10 +2494,9 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<ClassType<'db>> {
-        match self {
+        match self.resolve_type_alias(db) {
             Type::NominalInstance(instance) => Some(instance.class(db, env)),
             Type::ProtocolInstance(instance) => instance.class_origin(db).map(|class| *class),
-            Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db, env),
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db, env),
             Type::TypeVar(typevar) => {
                 let TypeVarBoundOrConstraints::UpperBound(bound) =
