@@ -1,10 +1,8 @@
 //! Resolve dependencies between the selected bindings of one solution alternative.
 
-use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 
 use rustc_hash::FxHashMap;
-use ty_python_core::Program;
 
 use super::TypeVarSolution;
 use crate::types::cyclic::CycleDetector;
@@ -88,7 +86,7 @@ impl<'db> Resolver<'_, 'db> {
             .solution
             .iter()
             .map(|binding| match binding.solution {
-                SolutionType::Resolved { .. } => Cow::Borrowed([].as_slice()),
+                SolutionType::Resolved { .. } => Vec::new(),
                 SolutionType::Unresolved(ty) => {
                     Dependencies::collect(db, self.env, self.inferable, ty)
                 }
@@ -131,7 +129,7 @@ impl<'db> Resolver<'_, 'db> {
                     let binding = &self.solution[*index];
                     let original = binding.solution.ty();
                     let mut replacements = FxOrderMap::default();
-                    for dependency in dependencies[*index].iter() {
+                    for dependency in &dependencies[*index] {
                         let &index = indices.get(&dependency.identity(db))?;
                         if component.contains(&index) {
                             continue;
@@ -204,41 +202,7 @@ struct Dependencies<'a, 'db> {
 
 impl<'db> Dependencies<'_, 'db> {
     /// Collect dependencies in traversal order for graph construction and substitution.
-    #[expect(clippy::unnecessary_wraps, reason = "Query cycles return None")]
     fn collect(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        inferable: TypeVarSet<'db>,
-        ty: Type<'db>,
-    ) -> Cow<'db, [BoundTypeVarInstance<'db>]> {
-        #[salsa::tracked(
-            returns(ref),
-            cycle_result=|_, _, _, _, _| None,
-            heap_size=ruff_memory_usage::heap_size,
-        )]
-        fn collect_impl<'db>(
-            db: &'db dyn Db,
-            program: Program<'db>,
-            inferable: TypeVarSet<'db>,
-            ty: Type<'db>,
-        ) -> Option<Box<[BoundTypeVarInstance<'db>]>> {
-            let env = ProgramEnvironment::from_program(program);
-            Some(Dependencies::compute(db, &env, inferable, ty).into_boxed_slice())
-        }
-
-        if matches!(TypeKind::from(ty), TypeKind::Atomic) {
-            return Cow::Borrowed(&[]);
-        }
-
-        // Share completed walks across paths. Query cycles still use the ordinary walker;
-        // an incomplete dependency list cannot establish that a candidate is closed.
-        match collect_impl(db, env.program(db), inferable, ty) {
-            Some(dependencies) => Cow::Borrowed(dependencies),
-            None => Cow::Owned(Self::compute(db, env, inferable, ty)),
-        }
-    }
-
-    fn compute(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
