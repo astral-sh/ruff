@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 
 use indexmap::map::Slice;
-use rustc_hash::FxHashSet;
+use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 
 use crate::types::constraints::paths::PathAssignments;
@@ -571,7 +571,7 @@ impl<'db> SolutionWalker<'db> {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         path: &PathAssignments,
-        upper_bound_violations: Option<&FxHashSet<BoundTypeVarInstance<'db>>>,
+        typevar_violations: Option<&FxHashMap<BoundTypeVarInstance<'db>, SolutionViolationKind>>,
     ) -> Option<PendingCandidateSolution<'db>> {
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
         // any unions or intersections in our type mappings in a stable order. Constraints might
@@ -635,14 +635,14 @@ impl<'db> SolutionWalker<'db> {
             .map(|(bound_typevar, solver)| {
                 let range = solver.finish(db, env, storage, bound_typevar)?;
 
-                if let Some(upper_bound_violations) = upper_bound_violations
-                    && upper_bound_violations.contains(&bound_typevar)
+                if let Some(typevar_violations) = typevar_violations
+                    && let Some(&kind) = typevar_violations.get(&bound_typevar)
                 {
                     violations.push(SolutionViolation {
                         bound_typevar,
                         argument: range.inference_lower(db, env),
                         variance: range.variance(),
-                        kind: SolutionViolationKind::UpperBound,
+                        kind,
                     });
                 }
 
@@ -651,7 +651,7 @@ impl<'db> SolutionWalker<'db> {
             .collect();
         let typevars = typevars?;
 
-        let validity = match upper_bound_violations {
+        let validity = match typevar_violations {
             None => SolutionValidity::Valid,
             Some(_) if violations.is_empty() => return None,
             Some(_) => SolutionValidity::Invalid(violations.into_boxed_slice()),
@@ -693,9 +693,10 @@ impl<'db> SolutionWalker<'db> {
         limits: &mut L,
         path: &mut PathAssignments,
         upper_bounds: &Slice<BoundTypeVarInstance<'db>, UpperBound>,
-        _constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
+        constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
     ) -> ControlFlow<L::Break> {
-        let mut upper_bound_violations = FxHashSet::default();
+        let mut violations = FxHashMap::default();
+
         for (bound_typevar, upper_bound) in upper_bounds {
             let mut satisfied = false;
             if let Some(constraints) = upper_bound.constraints.as_deref() {
@@ -716,18 +717,45 @@ impl<'db> SolutionWalker<'db> {
                 )?;
             }
             if !satisfied {
-                upper_bound_violations.insert(*bound_typevar);
+                violations.insert(*bound_typevar, SolutionViolationKind::UpperBound);
+            }
+        }
+
+        for (bound_typevar, constrained_typevar) in constrained {
+            let mut satisfied = false;
+            for declared_constraint in &constrained_typevar.declared_constraints {
+                if let Some(constraints) = declared_constraint.constraints.as_deref() {
+                    self.visit_constraints_and_then(
+                        db,
+                        env,
+                        storage,
+                        limits,
+                        path,
+                        constraints,
+                        &mut |this, storage, _limits, path| {
+                            let pending =
+                                this.pending_candidate_solution(db, env, storage, path, None);
+                            if pending.is_some() {
+                                satisfied = true;
+                            }
+                            ControlFlow::Continue(())
+                        },
+                    )?;
+                }
+            }
+            if !satisfied {
+                violations.insert(*bound_typevar, SolutionViolationKind::Constraints);
             }
         }
 
         // Complete validation failed, but no single declaration explains why. The declarations
         // are only inconsistent in combination, so there is no attributable candidate to retain.
-        if upper_bound_violations.is_empty() {
+        if violations.is_empty() {
             return ControlFlow::Continue(());
         }
 
         if let Some(pending) =
-            self.pending_candidate_solution(db, env, storage, path, Some(&upper_bound_violations))
+            self.pending_candidate_solution(db, env, storage, path, Some(&violations))
         {
             self.pending.push(pending);
         }

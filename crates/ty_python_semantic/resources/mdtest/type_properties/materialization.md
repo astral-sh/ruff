@@ -2403,14 +2403,10 @@ def invalid_materialized_bounds(
     bounded_item(structural)  # error: [invalid-argument-type]
     union_bounded_item(inherited)  # error: [invalid-argument-type]
     union_bounded_item(structural)  # error: [invalid-argument-type]
-    # XXX: error: [invalid-argument-type]
-    constrained_item(inherited)
-    # XXX: error: [invalid-argument-type]
-    constrained_item(structural)
-    # XXX: error: [invalid-argument-type]
-    legacy_constrained_item(inherited)
-    # XXX: error: [invalid-argument-type]
-    legacy_constrained_item(structural)
+    constrained_item(inherited)  # error: [invalid-argument-type]
+    constrained_item(structural)  # error: [invalid-argument-type]
+    legacy_constrained_item(inherited)  # error: [invalid-argument-type]
+    legacy_constrained_item(structural)  # error: [invalid-argument-type]
 
 def consistent_item[T](value: InferenceBase[T], values: list[T]) -> T:
     raise NotImplementedError
@@ -2605,8 +2601,7 @@ def recursive_materialized_bounds(
     valid: RecursiveValue[str],
 ) -> None:
     bounded_recursive_value(top)  # error: [invalid-argument-type]
-    # XXX: error: [invalid-argument-type]
-    constrained_recursive_value(top)
+    constrained_recursive_value(top)  # error: [invalid-argument-type]
     reveal_type(bounded_recursive_value(valid))  # revealed: str
     reveal_type(constrained_recursive_value(valid))  # revealed: str
 ```
