@@ -3,7 +3,7 @@ use crate::{
     diagnostic::format_enumeration,
     types::{
         BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, KnownInstanceType, Signature,
-        StaticClassLiteral, Type, TypeVarKind, TypeVarVariance, UnionBuilder,
+        StaticClassLiteral, Type, TypeVarKind, TypeVarVariance,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         context::InferContext,
         diagnostic::{
@@ -137,37 +137,28 @@ pub(super) fn check_class_method_typevar_variance<'db>(
             }
             continue;
         }
-        let mut bindings = member
+        for (function, ty) in member
             .local_function_bindings(db, class.body_scope(db))
             .filter(|(function, _)| !exclude_from_variance(db, *function))
-            .peekable();
-        let Some(&(function, _)) = bindings.peek() else {
-            continue;
-        };
-        let mut reads = UnionBuilder::new(db, env);
-        let mut writes = UnionBuilder::new(db, env);
-        for (_, ty) in bindings {
+        {
             let read_ty = ty
                 .try_call_dunder_get(db, env, Some(instance), instance.to_meta_type(db, env))
                 .unwrap_or_else(|error| Some(error.fallback()))
                 .map_or(ty, |result| result.return_type);
-            reads = reads.add(read_ty);
-            // An unresolved write domain does not erase a known read requirement.
-            if let DescriptorSetterDomain::Known(write_ty) =
-                descriptor_setter_domain(db, env, ty, instance)
-            {
-                writes = writes.add(write_ty);
-            }
+            let write_ty = match descriptor_setter_domain(db, env, ty, instance) {
+                // An unresolved write domain does not erase a known read requirement.
+                DescriptorSetterDomain::Missing | DescriptorSetterDomain::Deferred => None,
+                DescriptorSetterDomain::Known(ty) => Some(ty),
+            };
+            check_method_typevar_variance(
+                context,
+                generic_context,
+                function,
+                read_ty,
+                write_ty,
+                &mut reported,
+            );
         }
-        let write_ty = writes.build();
-        check_method_typevar_variance(
-            context,
-            generic_context,
-            function,
-            reads.build(),
-            (!write_ty.is_never()).then_some(write_ty),
-            &mut reported,
-        );
     }
 }
 

@@ -1060,17 +1060,56 @@ class Widened(Generic[T_co]):
         method = object()
 ```
 
+## Variance in conditional method definitions
+
 When conditional branches define different methods, either method can be exposed. Consuming `T_co`
-in one branch makes covariance invalid.
+in one branch makes covariance invalid. The diagnostic points to that definition's parameter.
 
 ```py
+from typing import Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+def condition() -> bool:
+    return True
+
 class Conditional(Generic[T_co]):
     if condition():
-        # error: [invalid-generic-class]
+        # snapshot: invalid-generic-class
         def method(self, value: T_co) -> None: ...
 
     else:
         def method(self, value: object) -> None: ...
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `method`
+  --> src/mdtest_snippet.py:11:33
+   |
+11 |         def method(self, value: T_co) -> None: ...
+   |                                 ^^^^
+info: Type variable `T_co` is declared as covariant, but this method requires it to be contravariant
+```
+
+The diagnostic still points to the incompatible parameter when the valid definition comes first.
+
+```py
+class Reversed(Generic[T_co]):
+    if condition():
+        def method(self, value: object) -> None: ...
+
+    else:
+        # snapshot: invalid-generic-class
+        def method(self, value: T_co) -> None: ...
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `method`
+  --> src/mdtest_snippet.py:21:33
+   |
+21 |         def method(self, value: T_co) -> None: ...
+   |                                 ^^^^
+info: Type variable `T_co` is declared as covariant, but this method requires it to be contravariant
 ```
 
 ## Variance in aliased methods
