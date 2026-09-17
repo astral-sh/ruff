@@ -710,6 +710,40 @@ fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// A config outside the selected member controls ty's rules, while uv's selected environment
+/// takes precedence over its Python setting.
+#[cfg(feature = "test-uv")]
+#[test]
+fn explicit_config_file_uses_uv_environment_and_ty_rules() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    case.write_file(
+        "config/ty.toml",
+        r#"
+        [environment]
+        python = "missing-configured-environment"
+
+        [rules]
+        invalid-assignment = "ignore"
+        "#,
+    )?;
+
+    let mut command = uv_sync_command(&case, None)?;
+    command
+        .current_dir(case.root().join("packages/member"))
+        .args(["--config-file", "../../config/ty.toml", "."]);
+
+    assert_cmd_snapshot!(command, @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 /// Workspace discovery can find uv on `PATH` when the `UV` executable override is absent.
 #[cfg(feature = "test-uv")]
 #[test]

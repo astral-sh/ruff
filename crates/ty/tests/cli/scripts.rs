@@ -1417,7 +1417,7 @@ fn excluded_scripts_do_not_initialize_their_environments() -> anyhow::Result<()>
         case.command()
             .arg(".")
             .args(["--config-file", "ty.toml"])
-            .env(EnvVars::TY_UV, "1")
+            .env(EnvVars::TY_UV, "scripts")
             .env(EnvVars::UV, "missing-uv-executable"),
         @"
     success: true
