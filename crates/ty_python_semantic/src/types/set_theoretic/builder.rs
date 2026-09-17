@@ -53,7 +53,7 @@ use crate::types::{
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
     StringLiteralType, SubclassOfType, Type, TypePair, TypeVarBoundOrConstraints, UnionType,
 };
-use crate::{Db, FxOrderMap, FxOrderSet, ProgramEnvironment};
+use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
@@ -1264,7 +1264,7 @@ impl<'db> IntersectionBuilder<'db> {
     /// multiply dead or repeated branches.
     fn extend_distributed<L: IntersectionLimits>(
         &self,
-        distributed: &mut FxOrderSet<InnerIntersectionBuilder<'db>>,
+        distributed: &mut FxIndexSet<InnerIntersectionBuilder<'db>>,
         other: Self,
         check_budget: bool,
     ) -> ControlFlow<L::Break> {
@@ -1415,7 +1415,7 @@ impl<'db> IntersectionBuilder<'db> {
                 // (T2 & T4)`. If `self` is already a union-of-intersections `(T1 & T2) | (T3 & T4)`
                 // and we add `T5 | T6` to it, that flattens all the way out to `(T1 & T2 & T5) | (T1 &
                 // T2 & T6) | (T3 & T4 & T5) ...` -- you get the idea.
-                let mut distributed = FxOrderSet::default();
+                let mut distributed = FxIndexSet::default();
                 for elem in union.elements(db) {
                     let mut branch = self.clone();
                     branch.add_positive_impl::<L>(*elem, seen_aliases)?;
@@ -1491,7 +1491,7 @@ impl<'db> IntersectionBuilder<'db> {
                 // and negative constraints D, then our new intersection
                 // is (existing & ~C) | (existing & D)
 
-                let mut distributed = FxOrderSet::default();
+                let mut distributed = FxIndexSet::default();
                 // A single negative element can encode double negation. It only introduces a
                 // disjunction if expanding that element does, for example `~~Alias` for a union.
                 let branches = intersection.positive(db).len() + intersection.negative(db).len();
@@ -2722,8 +2722,16 @@ mod tests {
 
         // A gradual callable C can overlap its negation, so distribution retains C & ~C
         // alongside C and ~C. Repeating the same clause must not multiply these alternatives.
-        assert!(negative_builder.intersections.len() <= 3);
-        assert!(positive_builder.intersections.len() <= 3);
+        assert!(
+            negative_builder.intersections.len() <= 3,
+            "{:?}",
+            negative_builder.intersections,
+        );
+        assert!(
+            positive_builder.intersections.len() <= 3,
+            "{:?}",
+            positive_builder.intersections,
+        );
 
         assert!(negative_builder.build().is_equivalent_to(db, &env, negated));
         assert!(positive_builder.build().is_equivalent_to(db, &env, negated));
