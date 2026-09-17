@@ -1014,6 +1014,90 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
     }
 
+    /// Returns `true` if adding `await` at `expression` would produce valid Python.
+    ///
+    /// Accounts for asynchronous functions, notebook cells, annotation restrictions, enclosing
+    /// scopes, and the different scoping behavior of comprehensions and generator expressions.
+    fn can_await_here(&self, expression: &ast::Expr) -> bool {
+        let Some(expression_scope) = self.index.try_expression_scope_id(expression) else {
+            return false;
+        };
+        let annotation_parent_scope = self
+            .index
+            .annotation_parent_scope_id(self.module(), expression);
+
+        let db = self.db();
+
+        let mut in_eager_comprehension = false;
+
+        for (scope_id, scope) in self.index.ancestor_scopes(expression_scope) {
+            // The first iterable of a comprehension stays in the annotation's enclosing scope.
+            // Eager comprehensions also inherit the restriction, but a generator body can allow
+            // `await` before we reach the scope enclosing its annotation.
+            // Conservatively reject annotations on every Python version, even though some allow
+            // `await` before Python 3.14 without `from __future__ import annotations`. Avoiding
+            // invalid syntax matters more than offering every possible fix in this rare context.
+            if Some(scope_id) == annotation_parent_scope {
+                return false;
+            }
+
+            // Before Python 3.11, awaiting in a nested list, set, or dict comprehension cannot
+            // implicitly make its containing comprehension or generator expression asynchronous.
+            if in_eager_comprehension
+                && scope.kind() == ScopeKind::Comprehension
+                && self.program_environment().python_version(db) < PythonVersion::PY311
+                && !scope_id.is_async_comprehension(self.index)
+            {
+                return false;
+            }
+
+            match scope.node() {
+                NodeWithScopeKind::Function(function) => {
+                    return function.node(self.module()).is_async;
+                }
+                NodeWithScopeKind::Lambda(_)
+                | NodeWithScopeKind::Class(_)
+                | NodeWithScopeKind::ClassTypeParameters(_)
+                | NodeWithScopeKind::FunctionTypeParameters(_)
+                | NodeWithScopeKind::TypeAliasTypeParameters(_)
+                | NodeWithScopeKind::TypeAlias(_) => {
+                    return false;
+                }
+                NodeWithScopeKind::GeneratorExpression(_) => {
+                    return true;
+                }
+                NodeWithScopeKind::Module => {
+                    return source_text(db, self.file()).is_notebook();
+                }
+                NodeWithScopeKind::DictComprehension(_)
+                | NodeWithScopeKind::ListComprehension(_)
+                | NodeWithScopeKind::SetComprehension(_) => {
+                    in_eager_comprehension = true;
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Suggest awaiting an expression, adding parentheses if its precedence requires them.
+    fn await_expression_fix(&self, expression: &ast::Expr) -> Option<Fix> {
+        if !self.can_await_here(expression) {
+            return None;
+        }
+
+        Some(
+            if expression.precedence() <= ast::OperatorPrecedence::Await {
+                Fix::unsafe_edits(
+                    Edit::insertion("await (".to_string(), expression.start()),
+                    [Edit::insertion(")".to_string(), expression.end())],
+                )
+            } else {
+                Fix::unsafe_edit(Edit::insertion("await ".to_string(), expression.start()))
+            },
+        )
+    }
+
     /// Get the already-inferred type of an expression node, or Unknown.
     fn expression_type(&self, expr: &ast::Expr) -> Type<'db> {
         self.try_expression_type(expr).unwrap_or_else(Type::unknown)
@@ -2171,14 +2255,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }) = statement
             {
                 let ty = self.expression_type(value);
-                if ty.is_awaitable(self.db()) && !self.is_known_function_call(value) {
-                    if let Some(builder) =
+                if ty.is_awaitable(db)
+                    && !self.is_known_function_call(value)
+                    && let Some(builder) =
                         self.context.report_lint(&UNUSED_AWAITABLE, value.as_ref())
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Object of type `{}` is not awaited",
-                            ty.display(db, self.program_environment()),
-                        ));
+                {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Object of type `{}` is not awaited",
+                        ty.display(db, self.program_environment()),
+                    ));
+                    if let Some(fix) = self.await_expression_fix(value) {
+                        diagnostic.help("Did you mean to `await` this expression?");
+                        diagnostic.set_fix(fix);
                     }
                 }
             }

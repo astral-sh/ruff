@@ -23,7 +23,6 @@ use ty_python_core::{
     definition::DefinitionKind,
     place::PlaceExpr,
     predicate::{Predicate, PredicateNode},
-    scope::{NodeWithScopeKind, ScopeKind},
 };
 
 use crate::{
@@ -461,18 +460,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut diagnostic = builder.into_diagnostic("Condition is always truthy");
                 add_always_truthy_concise_message(&mut diagnostic);
                 annotate_inferred_type(&mut diagnostic);
-                if test_type.try_await(db, env).is_ok() && self.can_await_here(test) {
+                if test_type.try_await(db, env).is_ok()
+                    && let Some(fix) = self.await_expression_fix(test)
+                {
                     diagnostic.help("Did you mean to `await` this expression?");
-
-                    let fix = if test.precedence() <= ast::OperatorPrecedence::Await {
-                        Fix::unsafe_edits(
-                            Edit::insertion("await (".to_string(), test.start()),
-                            [Edit::insertion(")".to_string(), test.end())],
-                        )
-                    } else {
-                        Fix::unsafe_edit(Edit::insertion("await ".to_string(), test.start()))
-                    };
-
                     diagnostic.set_fix(fix);
                 } else if let Type::NominalInstance(instance) = test_type {
                     let class = instance.class(db, env);
@@ -798,72 +789,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
         }
-    }
-
-    /// Returns `true` if adding `await` at `expression` would produce valid Python.
-    ///
-    /// Accounts for asynchronous functions, notebook cells, annotation restrictions, enclosing
-    /// scopes, and the different scoping behavior of comprehensions and generator expressions.
-    fn can_await_here(&self, expression: &ast::Expr) -> bool {
-        let Some(expression_scope) = self.index.try_expression_scope_id(expression) else {
-            return false;
-        };
-        let annotation_parent_scope = self
-            .index
-            .annotation_parent_scope_id(self.module(), expression);
-
-        let db = self.db();
-
-        let mut in_eager_comprehension = false;
-
-        for (scope_id, scope) in self.index.ancestor_scopes(expression_scope) {
-            // The first iterable of a comprehension stays in the annotation's enclosing scope.
-            // Eager comprehensions also inherit the restriction, but a generator body can allow
-            // `await` before we reach the scope enclosing its annotation.
-            // Conservatively reject annotations on every Python version, even though some allow
-            // `await` before Python 3.14 without `from __future__ import annotations`. Avoiding
-            // invalid syntax matters more than offering every possible fix in this rare context.
-            if Some(scope_id) == annotation_parent_scope {
-                return false;
-            }
-
-            // Before Python 3.11, awaiting in a nested list, set, or dict comprehension cannot
-            // implicitly make its containing comprehension or generator expression asynchronous.
-            if in_eager_comprehension
-                && scope.kind() == ScopeKind::Comprehension
-                && self.program_environment().python_version(db) < PythonVersion::PY311
-                && !scope_id.is_async_comprehension(self.index)
-            {
-                return false;
-            }
-
-            match scope.node() {
-                NodeWithScopeKind::Function(function) => {
-                    return function.node(self.module()).is_async;
-                }
-                NodeWithScopeKind::Lambda(_)
-                | NodeWithScopeKind::Class(_)
-                | NodeWithScopeKind::ClassTypeParameters(_)
-                | NodeWithScopeKind::FunctionTypeParameters(_)
-                | NodeWithScopeKind::TypeAliasTypeParameters(_)
-                | NodeWithScopeKind::TypeAlias(_) => {
-                    return false;
-                }
-                NodeWithScopeKind::GeneratorExpression(_) => {
-                    return true;
-                }
-                NodeWithScopeKind::Module => {
-                    return source_text(db, self.file()).is_notebook();
-                }
-                NodeWithScopeKind::DictComprehension(_)
-                | NodeWithScopeKind::ListComprehension(_)
-                | NodeWithScopeKind::SetComprehension(_) => {
-                    in_eager_comprehension = true;
-                }
-            }
-        }
-
-        false
     }
 
     /// Return a [`TextRange`] spanning from `branch_start` up to and including
