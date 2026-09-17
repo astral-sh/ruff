@@ -4020,10 +4020,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         };
 
         match (formal, actual) {
-            // Expand PEP 695 type aliases in the formal type.
+            // Expand type aliases in the formal type.
             // This is necessary for solving generics like `def head[T](my_list: MyList[T]) -> T`.
             (Type::TypeAlias(alias), _) => {
                 return self.infer_map_impl(alias.value_type(db), actual, polarity, visitor);
+            }
+            (Type::Recursive(recursive), _) => {
+                return self.infer_map_impl(
+                    recursive.unfold(db, self.env),
+                    actual,
+                    polarity,
+                    visitor,
+                );
             }
 
             (Type::TypeForm(formal_typeform), Type::TypeForm(actual_typeform)) => {
@@ -4728,6 +4736,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // e.g., `reveal_type(alias)` should reveal the type alias, not its value type.
             (formal, Type::TypeAlias(alias)) => {
                 return self.infer_map_impl(formal, alias.value_type(db), polarity, visitor);
+            }
+            (formal, Type::Recursive(recursive)) => {
+                return self.infer_map_impl(
+                    formal,
+                    recursive.unfold(db, self.env),
+                    polarity,
+                    visitor,
+                );
             }
 
             // TODO: Add more forms that we can structurally induct into: type[C], callables
