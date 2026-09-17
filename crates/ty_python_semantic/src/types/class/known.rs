@@ -148,6 +148,9 @@ pub enum KnownClass {
     Template,
     // pathlib
     Path,
+    // datetime
+    Date,
+    DateTime,
     // functools
     FunctoolsPartial,
     // unittest
@@ -278,6 +281,8 @@ impl KnownClass {
             | Self::TypedDictFallback
             | Self::Template
             | Self::Path
+            | Self::Date
+            | Self::DateTime
             | Self::FunctoolsPartial
             | Self::ConstraintSet
             | Self::ConstraintSetSolution
@@ -422,6 +427,8 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::FunctoolsPartial
             | Self::Path
+            | Self::Date
+            | Self::DateTime
             | Self::ExtensionTypedDictFallback
             | Self::TypedDictFallback
             | Self::UnittestTestCase
@@ -916,6 +923,8 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::Template
             | Self::Path
+            | Self::Date
+            | Self::DateTime
             | Self::FunctoolsPartial
             | Self::Mapping
             | Self::MutableMapping
@@ -1170,6 +1179,8 @@ impl KnownClass {
             Self::ExtensionTypedDictFallback => "_TypedDict",
             Self::Template => "Template",
             Self::Path => "Path",
+            Self::Date => "date",
+            Self::DateTime => "datetime",
             Self::FunctoolsPartial => "partial",
             Self::ProtocolMeta => "_ProtocolMeta",
             Self::UnittestTestCase => "TestCase",
@@ -1608,6 +1619,7 @@ impl KnownClass {
             | Self::TyExtensionsIterator => KnownModule::TyExtensionsInternal,
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
+            Self::Date | Self::DateTime => KnownModule::Datetime,
             Self::FunctoolsPartial => KnownModule::Functools,
             Self::UnittestTestCase => KnownModule::UnittestCase,
             Self::PydanticBaseModel => KnownModule::PydanticMain,
@@ -1730,6 +1742,8 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::Template
             | Self::Path
+            | Self::Date
+            | Self::DateTime
             | Self::FunctoolsPartial
             | Self::UnittestTestCase
             | Self::PydanticBaseModel
@@ -1847,6 +1861,8 @@ impl KnownClass {
             "TypedDictFallback" => &[Self::TypedDictFallback],
             "Template" => &[Self::Template],
             "Path" => &[Self::Path],
+            "date" => &[Self::Date],
+            "datetime" => &[Self::DateTime],
             "partial" => &[Self::FunctoolsPartial],
             "_ProtocolMeta" => &[Self::ProtocolMeta],
             "_TypedDict" => &[Self::ExtensionTypedDictFallback],
@@ -1959,6 +1975,8 @@ impl KnownClass {
             | Self::AsyncGenerator
             | Self::Template
             | Self::Path
+            | Self::Date
+            | Self::DateTime
             | Self::FunctoolsPartial
             | Self::UnittestTestCase
             | Self::PydanticBaseModel

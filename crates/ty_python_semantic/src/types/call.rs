@@ -1,5 +1,5 @@
 use super::context::InferContext;
-use super::{ClassType, Signature, Type, TypeContext, UnionType};
+use super::{ClassType, KnownClass, Signature, Type, TypeContext, UnionType};
 use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
@@ -7,6 +7,7 @@ use crate::types::function::OverloadLiteral;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
 use crate::{Program, ProgramEnvironment};
 use ruff_python_ast as ast;
+use ruff_python_ast::PythonVersion;
 
 mod arguments;
 pub(crate) mod bind;
@@ -109,6 +110,62 @@ fn reflected_method_priority<'db>(
     }
 }
 
+/// `datetime` inherits from `date`, but their inherited ordering and subtraction methods
+/// reject mixed operands at runtime. Keep that exception at operator sites so that ordinary
+/// assignments and calls can still use the subclass relationship.
+fn is_unsafe_datetime_operation<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    left: Type<'db>,
+    right: Type<'db>,
+    dunder: &str,
+    reflected_dunder: &str,
+) -> bool {
+    let (Some(left_class), Some(right_class)) =
+        (left.nominal_class(db, env), right.nominal_class(db, env))
+    else {
+        return false;
+    };
+
+    // The first date-related base distinguishes date-only subclasses from datetime subclasses.
+    let date_base = |class: ClassType<'db>| {
+        class.iter_mro(db).find_map(|base| {
+            base.into_class().and_then(|base| {
+                base.known(db)
+                    .filter(|known| matches!(known, KnownClass::Date | KnownClass::DateTime))
+            })
+        })
+    };
+    match (date_base(left_class), date_base(right_class)) {
+        (Some(KnownClass::Date), Some(KnownClass::DateTime)) => {
+            // Before 3.13 a date subclass on the left compares only the date fields.
+            // NewType wrappers use their concrete base class and retain date's behavior.
+            if dunder != "__sub__"
+                && env.python_version(db) < PythonVersion::PY313
+                && !left_class.is_known(db, KnownClass::Date)
+            {
+                return false;
+            }
+        }
+        (Some(KnownClass::DateTime), Some(KnownClass::Date)) => {}
+        _ => return false,
+    }
+
+    let inherits_operator = |class: ClassType<'db>, method: &str| {
+        for base in class.iter_mro(db) {
+            let Some(base) = base.into_class() else {
+                return false;
+            };
+            if !base.own_class_member(db, env, None, method).is_undefined() {
+                return matches!(base.known(db), Some(KnownClass::Date | KnownClass::DateTime));
+            }
+        }
+        // A missing reflected method cannot make an otherwise unsafe operation valid.
+        true
+    };
+    inherits_operator(left_class, dunder) && inherits_operator(right_class, reflected_dunder)
+}
+
 impl<'db> Type<'db> {
     /// Return the result of dispatching a rich comparison method between two operands.
     ///
@@ -124,6 +181,12 @@ impl<'db> Type<'db> {
         reflected_dunder: &'static str,
         policy: MemberLookupPolicy,
     ) -> Option<Type<'db>> {
+        if matches!(dunder, "__lt__" | "__le__" | "__gt__" | "__ge__")
+            && is_unsafe_datetime_operation(db, env, left, right, dunder, reflected_dunder)
+        {
+            return None;
+        }
+
         let call_dunder = |name, receiver: Type<'db>, argument: Type<'db>| {
             receiver
                 .try_call_dunder_with_policy(
@@ -216,6 +279,19 @@ impl<'db> Type<'db> {
         right_ty: Type<'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallBinOpError> {
+        if op == ast::Operator::Sub
+            && is_unsafe_datetime_operation(
+                db,
+                env,
+                left_ty,
+                right_ty,
+                op.dunder(),
+                op.reflected_dunder(),
+            )
+        {
+            return Err(CallBinOpError::NotSupported);
+        }
+
         // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from
         // the Python spec [1] is:
         //
