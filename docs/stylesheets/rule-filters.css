@@ -238,63 +238,18 @@
   width: 12%;
 }
 
-/* Keep sort icons inside the keyboard-accessible buttons. */
-#rule-catalog th::after {
-  display: none;
-}
-
 #rule-catalog th[data-sort-method="none"] {
   cursor: default;
 }
 
+#rule-catalog th[data-sort-method="none"]::after {
+  display: none;
+}
+
 #rule-catalog th button {
-  display: inline-flex;
-  align-items: baseline;
-  max-width: 100%;
-  gap: 0.2em;
   color: inherit;
   font: inherit;
   cursor: pointer;
-}
-
-#rule-catalog th button::after {
-  content: "";
-  flex: none;
-  width: 0.65em;
-  height: 0.75em;
-  height: 1cap;
-  background: currentColor;
-  clip-path: polygon(
-    50% 0,
-    100% 35%,
-    65% 35%,
-    65% 65%,
-    100% 65%,
-    50% 100%,
-    0 65%,
-    35% 65%,
-    35% 35%,
-    0 35%
-  );
-  opacity: 0.45;
-}
-
-#rule-catalog th[aria-sort="ascending"] button::after,
-#rule-catalog th[aria-sort="descending"] button::after {
-  clip-path: polygon(
-    50% 0,
-    100% 35%,
-    65% 35%,
-    65% 100%,
-    35% 100%,
-    35% 35%,
-    0 35%
-  );
-  opacity: 1;
-}
-
-#rule-catalog th[aria-sort="descending"] button::after {
-  transform: rotate(180deg);
 }
 
 #rule-catalog .rule-code code {
@@ -341,7 +296,7 @@
   }
 
   #rule-catalog th:nth-child(1) {
-    width: 4em;
+    width: 4.5em;
   }
 
   #rule-catalog th:nth-child(2) {
@@ -384,16 +339,12 @@
     padding-inline: 0.1rem;
   }
 
-  #rule-catalog th:nth-child(1) {
-    width: 3.5em;
-  }
-
   #rule-catalog th:nth-child(3) {
     width: 6em;
   }
 
   #rule-catalog th:nth-child(4) {
-    width: 8em;
+    width: 6.5em;
   }
 
   #rule-catalog th:nth-child(5) {
