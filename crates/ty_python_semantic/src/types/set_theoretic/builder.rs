@@ -654,7 +654,6 @@ impl<'db> UnionBuilder<'db> {
 
     /// Adds a type to this union.
     pub(crate) fn add_in_place(&mut self, ty: Type<'db>) {
-        // An empty union accepts its first element without a type relation check.
         ty.assert_not_recursive_var();
         self.add_in_place_impl(ty, &mut vec![]);
     }

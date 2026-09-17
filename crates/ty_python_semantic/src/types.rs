@@ -1799,7 +1799,7 @@ pub enum Type<'db> {
     Dynamic(DynamicType<'db>),
     /// A cycle marker used during recursive type inference.
     Divergent(DivergentType),
-    /// A recursive type whose references are bound by its body.
+    /// A recursive type whose references are bound by its body. See [`recursive`] for details.
     Recursive(RecursiveType<'db>),
     /// A variable in a recursive type body, with no standalone type semantics.
     ///
@@ -9137,7 +9137,7 @@ impl<'db> Type<'db> {
                 recursive.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
             Type::RecursiveVar(reference) => {
-                reference.apply_type_mapping(db, type_mapping, visitor)
+                reference.apply_type_mapping_impl(db, type_mapping, visitor)
             }
 
             Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, || {
@@ -9393,7 +9393,7 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => {
                 match type_mapping {
-                    TypeMapping::Recursive(_) => {
+                    TypeMapping::ApplyRecursiveSubstitution(_) => {
                         Type::TypeAlias(alias.map_stored_specialization(db, type_mapping, visitor))
                     }
                     TypeMapping::Materialize(_) if alias.materialization_kind(db).is_some() => self,
@@ -9465,7 +9465,7 @@ impl<'db> Type<'db> {
             Type::LiteralValue(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
-                | TypeMapping::Recursive(_)
+                | TypeMapping::ApplyRecursiveSubstitution(_)
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf { .. }
@@ -9487,7 +9487,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
-                | TypeMapping::Recursive(_)
+                | TypeMapping::ApplyRecursiveSubstitution(_)
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf(..)
@@ -10755,7 +10755,7 @@ pub enum TypeMapping<'a, 'db> {
         materialization_kind: MaterializationKind,
     },
     /// A structural substitution constructed only by the recursive-type binder.
-    Recursive(RecursiveMapping<'db>),
+    ApplyRecursiveSubstitution(RecursiveMapping<'db>),
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode, PromotionKind),
@@ -10836,7 +10836,7 @@ impl<'db> TypeMapping<'_, 'db> {
                 }
             }
             TypeMapping::Promote(..)
-            | TypeMapping::Recursive(_)
+            | TypeMapping::ApplyRecursiveSubstitution(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
@@ -10882,7 +10882,7 @@ impl<'db> TypeMapping<'_, 'db> {
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)
-            | TypeMapping::Recursive(_)
+            | TypeMapping::ApplyRecursiveSubstitution(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
@@ -10898,7 +10898,7 @@ impl<'db> TypeMapping<'_, 'db> {
     /// Binding and unfolding may traverse open recursive bodies, so neither inference queries
     /// nor semantic operations may run on the intermediate types.
     const fn is_structural(&self) -> bool {
-        matches!(self, TypeMapping::Recursive(_))
+        matches!(self, TypeMapping::ApplyRecursiveSubstitution(_))
     }
 }
 

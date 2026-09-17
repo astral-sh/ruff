@@ -1,8 +1,43 @@
 //! Binding and capture-avoiding substitution for structural recursive types.
 //!
-//! `RecursiveVar` is syntax, with no standalone type semantics. Only structural
-//! substitutions may inspect an open body. Ordinary type operations receive its
-//! closed unfolding, including during intermediate normalization steps.
+//! An *open body* contains `RecursiveVar` references to an enclosing recursive binder.
+//! These variables are syntax, with no standalone type semantics. Only structural
+//! substitutions may inspect an open body. Ordinary type operations receive a *closed*
+//! type, where every recursive variable remains inside the body of its own binder,
+//! including during intermediate normalization steps.
+//!
+//! Substitution is *capture-avoiding*: it replaces references to the target binder
+//! without changing which binder owns any other variable. A nested binder with the
+//! same identity shadows the target in its body, but not in its arguments.
+//!
+//! For example, with type variable `T`, the alias
+//! `Tree = tuple[T, "Tree[list[T]] | None"]` has the recursive constructor:
+//!
+//! ```text
+//! μF. λT. tuple[T, F[list[T]] | None]
+//! ```
+//!
+//! Here `μF` binds the recursive constructor, and `λT` binds its type parameter.
+//! The occurrence `F[list[T]]` is stored as `RecursiveVar` with the constructor's
+//! `RecursiveCycle` and unspecialized arguments `[list[T]]`.
+//!
+//! To infer the container subscript `x[1]` for `x: Tree[int]`, first unfold `x`'s type.
+//! Unfolding replaces references to the recursive binder with the recursive type
+//! itself. Writing `B[a := R]` for capture-avoiding substitution of `R` for `a` in `B`:
+//!
+//! ```text
+//! unfold(μa. B) = B[a := μa. B]
+//! ```
+//!
+//! For `Tree[int]`, substitute the constructor for `F`, then apply `T := int`:
+//!
+//! ```text
+//! unfold((μF. λT. tuple[T, F[list[T]] | None])[int])
+//! = tuple[int, (μF. λT. tuple[T, F[list[T]] | None])[list[int]] | None]
+//! = tuple[int, Tree[list[int]] | None]
+//! ```
+//!
+//! Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
 
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
@@ -20,7 +55,7 @@ use crate::{Db, ProgramEnvironment};
 /// A recursive variable named by its binder's query cycle.
 /// An escaping reference has no type semantics; in particular, it is neither a
 /// gradual type nor an assignability operand.
-/// Only binding and substitution operations may construct recursive variables.
+/// Only recursive-type binding and substitution operations may construct or operate on recursive variables.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveVar<'db> {
     /// Refers to the nearest enclosing recursive binder with this cycle identity.
@@ -37,7 +72,7 @@ impl get_size2::GetSize for RecursiveVar<'_> {}
 
 impl<'db> RecursiveVar<'db> {
     /// Unfold references to the target cycle, retaining variables bound by other cycles.
-    pub(super) fn apply_type_mapping(
+    pub(super) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
         mapping: &TypeMapping<'_, 'db>,
@@ -47,12 +82,12 @@ impl<'db> RecursiveVar<'db> {
             .arguments(db)
             .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
         match mapping {
-            TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Unfold(recursive)))
-                if self.cycle(db) == recursive.cycle(db) =>
-            {
+            TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Unfold(recursive),
+            )) if self.cycle(db) == recursive.cycle(db) => {
                 Type::Recursive(recursive.with_arguments(db, arguments))
             }
-            TypeMapping::Recursive(_) => {
+            TypeMapping::ApplyRecursiveSubstitution(_) => {
                 Type::RecursiveVar(Self::new_internal(db, self.cycle(db), arguments))
             }
             _ => unreachable!("semantic operation on an unbound recursive variable"),
@@ -66,7 +101,11 @@ pub struct RecursiveMapping<'db>(RecursiveSubstitution<'db>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 enum RecursiveSubstitution<'db> {
+    /// Replace references to a binder with applications of its recursive constructor.
+    /// In the module example, this replaces `F[list[T]]` with `Tree[list[T]]`.
     Unfold(RecursiveType<'db>),
+    /// Replace applications of the target binder with variables to form an open body.
+    /// In the module example, this replaces `Tree[list[T]]` with `F[list[T]]`.
     Bind(RecursiveCycle),
 }
 
@@ -91,35 +130,6 @@ impl get_size2::GetSize for RecursiveCycle {}
 /// references with closed types, then applies that substitution before exposing the
 /// result to ordinary type operations.
 /// Use the binding operations in this module to construct recursive types.
-///
-/// For example, with type variable `T`, the alias
-/// `Tree = tuple[T, "Tree[list[T]] | None"]` has the recursive constructor:
-///
-/// ```text
-/// μF. λT. tuple[T, F[list[T]] | None]
-/// ```
-///
-/// Here `μF` binds the recursive constructor, and `λT` binds its type parameter.
-/// The occurrence `F[list[T]]` is stored as `RecursiveVar` with the constructor's
-/// `RecursiveCycle` and unspecialized arguments `[list[T]]`.
-///
-/// To infer the container subscript `x[1]` for `x: Tree[int]`, first unfold `x`'s type.
-/// Unfolding replaces references to the recursive binder with the recursive type
-/// itself. Writing `B[a := R]` for capture-avoiding substitution of `R` for `a` in `B`:
-///
-/// ```text
-/// unfold(μa. B) = B[a := μa. B]
-/// ```
-///
-/// For `Tree[int]`, substitute the constructor for `F`, then apply `T := int`:
-///
-/// ```text
-/// unfold((μF. λT. tuple[T, F[list[T]] | None])[int])
-/// = tuple[int, (μF. λT. tuple[T, F[list[T]] | None])[list[int]] | None]
-/// = tuple[int, Tree[list[int]] | None]
-/// ```
-///
-/// Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
     /// The defining symbol of the implicit alias, including for qualified references.
@@ -189,9 +199,9 @@ impl<'db> RecursiveType<'db> {
     ) -> Type<'db> {
         let body = original.apply_type_mapping_impl(
             db,
-            &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(
-                self.cycle(db),
-            ))),
+            &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Bind(self.cycle(db)),
+            )),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
         );
@@ -279,7 +289,9 @@ impl<'db> RecursiveType<'db> {
         }
         let unfolded = self.body(db).apply_type_mapping_impl(
             db,
-            &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Unfold(self))),
+            &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Unfold(self),
+            )),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
         );
@@ -312,15 +324,15 @@ impl<'db> RecursiveType<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         match mapping {
-            TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(cycle)))
-                if self.cycle(db) == *cycle && self.materialization_kind(db).is_none() =>
-            {
+            TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Bind(cycle),
+            )) if self.cycle(db) == *cycle && self.materialization_kind(db).is_none() => {
                 let arguments = self
                     .arguments(db)
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
                 Type::RecursiveVar(RecursiveVar::new_internal(db, self.cycle(db), arguments))
             }
-            TypeMapping::Recursive(RecursiveMapping(substitution)) => {
+            TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(substitution)) => {
                 // This binder shadows the target in its body, but not in its arguments.
                 let body = if self.cycle(db) == substitution.cycle(db) {
                     self.body(db)
@@ -452,11 +464,20 @@ impl<'db> RecursiveType<'db> {
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
-    /// A sufficient relation between materializations of the same recursive constructor.
-    /// Restricting the family of argument materializations restricts the family of
-    /// instantiated bodies, even when unfolding would grow the arguments indefinitely.
-    /// Structural comparison remains an alternative: aliases need not be injective.
-    pub(super) fn when_recursive_arguments_relate(
+    /// Prove a relation between applications of the same recursive constructor
+    /// (same unspecialized body) based on inclusion or overlap of their type
+    /// arguments' materialization families.
+    ///
+    /// For example, every materialization of `R[int]` is also a materialization of
+    /// `R[Any]`: choosing `int` restricts the possibilities for the argument without
+    /// changing the constructor's body. Comparing arguments lets us establish
+    /// relations between the applications' top and bottom materializations without
+    /// unfolding their bodies, even when unfolding would keep growing the arguments.
+    ///
+    /// Argument comparison is sufficient but not necessary to establish the relation:
+    /// different arguments can produce equivalent alias types. If this check cannot
+    /// establish the relation, the caller can still unfold and compare the bodies.
+    pub(super) fn when_recursive_types_relate_by_arguments(
         &self,
         db: &'db dyn Db,
         source: RecursiveType<'db>,

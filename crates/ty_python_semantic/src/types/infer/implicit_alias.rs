@@ -23,7 +23,7 @@ use crate::{Db, FxOrderSet, ProgramEnvironment};
 /// reference. Literal values and `Annotated` metadata do not contribute parameters.
 ///
 /// This collects parameters before the alias's type has been inferred, so
-/// [`infer_recursive_implicit_alias`](super::infer_recursive_implicit_alias) can seed a generic
+/// [`infer_implicit_alias_type`](super::infer_implicit_alias_type) can seed a generic
 /// recursive reference. References to the alias itself are skipped when resolving type variables.
 /// Return `None` when no parameters are found; a query cycle also provisionally returns `None`.
 /// This can seed a separate non-generic alias query while parameter discovery is incomplete.

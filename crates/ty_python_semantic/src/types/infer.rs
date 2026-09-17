@@ -101,7 +101,7 @@ mod tests;
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-pub(super) fn infer_recursive_implicit_alias<'db>(
+pub(super) fn infer_implicit_alias_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     _parameters: Option<crate::types::GenericContext<'db>>,
@@ -123,7 +123,7 @@ pub(super) fn infer_recursive_implicit_alias<'db>(
         index,
         &module,
     )
-    .finish_recursive_implicit_alias(definition, value)
+    .finish_implicit_alias_type(definition, value)
 }
 
 bitflags::bitflags! {

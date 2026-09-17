@@ -1773,7 +1773,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // Both comparing arguments and unfolding can revisit this pair.
                 self.with_recursion_guard(db, source, target, || {
                     let by_arguments = if let Type::Recursive(target_recursive) = target {
-                        self.when_recursive_arguments_relate(db, source_recursive, target_recursive)
+                        self.when_recursive_types_relate_by_arguments(
+                            db,
+                            source_recursive,
+                            target_recursive,
+                        )
                     } else {
                         self.never()
                     };

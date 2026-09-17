@@ -20,7 +20,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{
-    InferenceFlags, TypeExpressionFlags, implicit_alias_parameters, infer_recursive_implicit_alias,
+    InferenceFlags, TypeExpressionFlags, implicit_alias_parameters, infer_implicit_alias_type,
 };
 use crate::types::inferred_declaration;
 use crate::types::signatures::{ConcatenateTail, Signature};
@@ -101,14 +101,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             _ => return None,
         }
         let parameters = implicit_alias_parameters(db, definition);
-        let ty = infer_recursive_implicit_alias(db, definition, parameters);
+        let ty = infer_implicit_alias_type(db, definition, parameters);
         any_over_type(db, self.program_environment(), ty, false, |ty| {
             matches!(ty, Type::Recursive(_))
         })
         .then_some((ty, parameters))
     }
 
-    pub(in crate::types::infer) fn finish_recursive_implicit_alias(
+    pub(in crate::types::infer) fn finish_implicit_alias_type(
         mut self,
         definition: Definition<'db>,
         value: &ast::Expr,
