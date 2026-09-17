@@ -4283,6 +4283,238 @@ class Box[T](Protocol):
 reveal_type(Box.first())  # revealed: Box[Unknown]
 ```
 
+## Restricted method receivers
+
+A protocol can restrict a method to receivers that also satisfy another type. An implementation with
+the same restriction satisfies the protocol even when its instances do not themselves satisfy that
+restriction. The receiver's name does not affect compatibility.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Protocol, Self
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Other: ...
+class Extra: ...
+
+class P(Protocol):
+    def restricted(self: Intersection[Self, Other], value: int) -> int: ...
+
+class C:
+    def restricted(this: Intersection[Self, Other], value: int) -> int:
+        return value
+
+p: P = C()
+
+def call(p: P, narrowed: Intersection[P, Other]) -> int:
+    p.restricted(1)  # error: [invalid-argument-type]
+    reveal_type(narrowed.restricted(1))  # revealed: int
+    return narrowed.restricted(1)
+```
+
+An unrestricted implementation also satisfies the protocol. An implementation that imposes an
+additional receiver restriction, accepts the wrong argument type, or returns the wrong type does
+not.
+
+```py
+class Unrestricted:
+    def restricted(self, value: int) -> int:
+        return value
+
+class MoreRestricted:
+    def restricted(self: Intersection[Self, Other, Extra], value: int) -> int:
+        return value
+
+class WrongArgument:
+    def restricted(self: Intersection[Self, Other], value: str) -> int:
+        return 1
+
+class WrongReturn:
+    def restricted(self: Intersection[Self, Other], value: int) -> str:
+        return ""
+
+static_assert(is_assignable_to(Unrestricted, P))
+static_assert(not is_assignable_to(MoreRestricted, P))
+static_assert(not is_assignable_to(WrongArgument, P))
+static_assert(not is_assignable_to(WrongReturn, P))
+```
+
+A stored bound method keeps its captured receiver. Narrowing the object that stores it cannot make
+the captured receiver satisfy `Other`.
+
+```py
+class Stored:
+    restricted = C().restricted
+
+class Narrowed(C, Other): ...
+
+class ValidStored:
+    restricted = Narrowed().restricted
+
+static_assert(not is_assignable_to(Stored, P))
+static_assert(is_assignable_to(ValidStored, P))
+```
+
+The same receiver restrictions are compared when both types are protocols.
+
+```py
+class Same(Protocol):
+    def restricted(this: Intersection[Self, Other], value: int) -> int: ...
+
+class Stronger(Protocol):
+    def restricted(self: Intersection[Self, Other, Extra], value: int) -> int: ...
+
+static_assert(is_assignable_to(Same, P))
+static_assert(is_assignable_to(P, Same))
+static_assert(not is_assignable_to(Stronger, P))
+static_assert(is_assignable_to(P, Stronger))
+```
+
+## Restricted callback receivers
+
+Callback protocols compare the receiver restriction on `__call__` in the same way as other methods.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Protocol, Self
+from ty_extensions import Intersection
+
+class Other: ...
+
+class P(Protocol):
+    def __call__(self: Intersection[Self, Other], value: int) -> int: ...
+
+class C:
+    def __call__(self: Intersection[Self, Other], value: int) -> int:
+        return value
+
+p: P = C()
+```
+
+## Restricted classmethod receivers
+
+A classmethod can likewise restrict `cls` to classes whose instances satisfy another type. Matching
+restrictions are compatible, while an additional restriction or an incompatible argument is
+rejected.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Protocol, Self
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Other: ...
+class Extra: ...
+
+class P(Protocol):
+    @classmethod
+    def restricted(cls: type[Intersection[Self, Other]], value: int) -> int: ...
+
+class C:
+    @classmethod
+    def restricted(klass: type[Intersection[Self, Other]], value: int) -> int:
+        return value
+
+class MoreRestricted:
+    @classmethod
+    def restricted(cls: type[Intersection[Self, Other, Extra]], value: int) -> int:
+        return value
+
+class WrongArgument:
+    @classmethod
+    def restricted(cls: type[Intersection[Self, Other]], value: str) -> int:
+        return 1
+
+p: P = C()
+static_assert(not is_assignable_to(MoreRestricted, P))
+static_assert(not is_assignable_to(WrongArgument, P))
+
+def call(narrowed: type[Intersection[P, Other]]) -> int:
+    reveal_type(narrowed.restricted(1))  # revealed: int
+    return narrowed.restricted(1)
+```
+
+Equivalent protocol declarations preserve the classmethod's receiver restriction as well.
+
+```py
+class Same(Protocol):
+    @classmethod
+    def restricted(cls: type[Intersection[Self, Other]], value: int) -> int: ...
+
+static_assert(is_assignable_to(Same, P))
+static_assert(is_assignable_to(P, Same))
+```
+
+A compatible staticmethod can satisfy the classmethod contract without imposing a receiver
+restriction of its own.
+
+```py
+class Static:
+    @staticmethod
+    def restricted(value: int) -> int:
+        return value
+
+static_assert(is_assignable_to(Static, P))
+```
+
+## Overloaded methods with restricted receivers
+
+Each overload can impose a different receiver restriction. The implementation must provide the
+corresponding parameter and return types for each receiver domain; swapping the restrictions is
+incompatible.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Protocol, Self, overload
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Other: ...
+class Extra: ...
+
+class P(Protocol):
+    @overload
+    def method(self: Intersection[Self, Other], value: int) -> int: ...
+    @overload
+    def method(self: Intersection[Self, Extra], value: str) -> str: ...
+
+class Valid:
+    @overload
+    def method(self: Intersection[Self, Other], value: int) -> int: ...
+    @overload
+    def method(self: Intersection[Self, Extra], value: str) -> str: ...
+    def method(self, value: int | str) -> int | str:
+        return value
+
+class Invalid:
+    @overload
+    def method(self: Intersection[Self, Extra], value: int) -> int: ...
+    @overload
+    def method(self: Intersection[Self, Other], value: str) -> str: ...
+    def method(self, value: int | str) -> int | str:
+        return value
+
+static_assert(is_assignable_to(Valid, P))
+static_assert(not is_assignable_to(Invalid, P))
+```
+
 ## Subtyping of protocols with generic method members
 
 Protocol method members can be generic. They can have generic contexts scoped to the class:
