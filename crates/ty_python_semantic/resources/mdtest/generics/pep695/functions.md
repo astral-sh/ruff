@@ -2633,5 +2633,50 @@ def f(l: list[tuple[Any | str, Any | str]]) -> None:
     reveal_type(dict(l))
 ```
 
+## Inferring type arguments through recursive aliases
+
+Generic calls infer leaf types from already-annotated recursive values. The argument can use a
+structurally equivalent alias or spell out the outer tuple. A tuple parameter can also receive a
+recursive alias, and separate occurrences of an alias contribute their own leaf types.
+
+```py
+type Tree[T] = tuple[T, Tree[T] | None]
+type OtherTree[T] = tuple[T, OtherTree[T] | None]
+
+def leaf[U](value: Tree[U]) -> U:
+    return value[0]
+
+def first[U](value: tuple[U, object]) -> U:
+    return value[0]
+
+def either_leaf[U](value: tuple[Tree[U], Tree[U]]) -> U:
+    return value[0][0]
+
+def probe(value: Tree[int], other: OtherTree[str], plain: tuple[bytes, Tree[bytes] | None]):
+    reveal_type(leaf(value))  # revealed: int
+    reveal_type(leaf(other))  # revealed: str
+    reveal_type(leaf(plain))  # revealed: bytes
+    reveal_type(first(value))  # revealed: int
+    reveal_type(either_leaf((value, other)))  # revealed: int | str
+```
+
+## Inferring type arguments from deeper recursive levels
+
+These trees have distinct types at their first three levels and integer values at every level
+afterward. A function selecting a grandchild infers its type from the third level, even though its
+parameter does not constrain the first two levels.
+
+```py
+from collections.abc import Sequence
+
+type Levels[T, U, V] = tuple[T, Sequence[Levels[U, V, int]]]
+
+def grandchild_value[U](value: Levels[object, object, U]) -> U:
+    return value[1][0][1][0][0]
+
+def probe(value: Levels[int, str, bytes]):
+    reveal_type(grandchild_value(value))  # revealed: bytes
+```
+
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371
