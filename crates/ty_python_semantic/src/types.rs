@@ -9296,81 +9296,13 @@ impl<'db> Type<'db> {
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             )),
 
-            Type::Union(union) if type_mapping.is_structural() => Type::Union(UnionType::new(
-                db,
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                    .collect::<Box<[_]>>(),
-                union.recursively_defined(db),
-            )),
-            Type::Union(union) => union.map_leave_aliases(db, visitor.env, |element| {
-                element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            }),
+            Type::Union(union) => union.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             Type::Intersection(intersection) => {
-                if type_mapping.is_structural() {
-                    let positive = intersection
-                        .positive(db)
-                        .iter()
-                        .map(|positive| {
-                            positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                        })
-                        .collect::<FxOrderSet<_>>();
-                    let mut negative = NegativeIntersectionElements::default();
-                    for element in intersection.negative(db) {
-                        negative.insert(element.apply_type_mapping_impl(
-                            db,
-                            &type_mapping.flip(),
-                            tcx,
-                            visitor,
-                        ));
-                    }
-                    Type::Intersection(IntersectionType::new(db, positive, negative))
-                } else {
-                    let mut builder = IntersectionBuilder::new(db, visitor.env);
-                    for positive in intersection.positive(db) {
-                        builder.add_positive_in_place(positive.apply_type_mapping_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
-                        ));
-                    }
-                    // Regular promotion should remove negative contributions from intersections,
-                    // so we don't preserve them here when regular promotion is enabled.
-                    if !matches!(
-                        type_mapping,
-                        TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
-                    ) {
-                        for negative in intersection.negative(db) {
-                            builder.add_negative_in_place(negative.apply_type_mapping_impl(
-                                db,
-                                &type_mapping.flip(),
-                                tcx,
-                                visitor,
-                            ));
-                        }
-                    }
-                    builder.build()
-                }
+                intersection.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
-
-            Type::EnumComplement(complement) if type_mapping.is_structural() => {
-                Type::EnumComplement(EnumComplementType::new(
-                    db,
-                    complement.enum_class_literal(db),
-                    complement.excluded_names(db).clone(),
-                    complement
-                        .rest(db)
-                        .iter()
-                        .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                        .collect::<FxOrderSet<_>>(),
-                ))
+            Type::EnumComplement(complement) => {
+                complement.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
-            Type::EnumComplement(complement) => complement
-                .to_intersection(db, visitor.env)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
             Type::TypeIs(type_is) => visitor.visit(db, self, type_mapping, || {
                 type_is.with_type(
@@ -9408,76 +9340,7 @@ impl<'db> Type<'db> {
                 )
             }),
 
-            Type::TypeAlias(alias) => {
-                match type_mapping {
-                    TypeMapping::ApplyRecursiveSubstitution(_) => {
-                        Type::TypeAlias(alias.map_stored_specialization(db, type_mapping, visitor))
-                    }
-                    TypeMapping::Materialize(_) if alias.materialization_kind(db).is_some() => self,
-                    TypeMapping::EagerExpansion if alias.materialization_kind(db).is_some() => {
-                        alias
-                            .value_type_with_recursion(db, visitor.recursion_context)
-                            .expand_eagerly(db, visitor.env)
-                    }
-                    // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
-                    // detection rather than the visitor's cycle detection, because the visitor tracks
-                    // Type values and `RecursiveList` is different from `RecursiveList[T]`.
-                    TypeMapping::EagerExpansion => {
-                        alias.raw_value_type(db).expand_eagerly(db, visitor.env)
-                    }
-                    // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
-                    // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
-                    TypeMapping::ApplySpecialization(specialization)
-                    | TypeMapping::ApplySpecializationWithMaterialization {
-                        specialization, ..
-                    } if let Some(mut current_specialization) =
-                        specialization.as_specialization(db) =>
-                    {
-                        if let TypeMapping::ApplySpecializationWithMaterialization {
-                            materialization_kind,
-                            ..
-                        } = type_mapping
-                        {
-                            current_specialization = current_specialization
-                                .with_materialization_kind(db, Some(*materialization_kind));
-                        }
-                        Type::TypeAlias(alias.apply_specialization(db, |generic_context| {
-                            alias
-                                .specialization(db)
-                                .unwrap_or_else(|| generic_context.default_specialization(db, None))
-                                .apply_specialization_impl(db, current_specialization, visitor)
-                        }))
-                    }
-                    _ => {
-                        // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
-                        // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
-                        // will detect the cycle and return the fallback value.
-                        let mapped = visitor.visit(db, self, type_mapping, || {
-                            alias
-                                .value_type_with_recursion(db, visitor.recursion_context)
-                                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                        });
-
-                        // If the type mapping does not result in any change to this type alias, keep the
-                        // alias node instead of eagerly expanding it. A recursive backedge also returns
-                        // the alias itself, and fully static aliases must retain their original identity.
-                        if mapped == self
-                            || alias.value_type_with_recursion(db, visitor.recursion_context)
-                                == mapped
-                        {
-                            self
-                        } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
-                            && alias.is_recursive(db)
-                        {
-                            Type::TypeAlias(
-                                alias.with_materialization_kind(db, Some(*materialization_kind)),
-                            )
-                        } else {
-                            mapped
-                        }
-                    }
-                }
-            }
+            Type::TypeAlias(alias) => alias.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
             Type::LiteralValue(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_)
