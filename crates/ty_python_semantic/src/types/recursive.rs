@@ -152,6 +152,7 @@ pub struct RecursiveType<'db> {
 
 impl get_size2::GetSize for RecursiveType<'_> {}
 
+#[salsa::tracked]
 impl<'db> RecursiveType<'db> {
     /// Summarize the open constructor body without applying semantic substitutions.
     pub(super) fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
@@ -322,28 +323,39 @@ impl<'db> RecursiveType<'db> {
         if self.materialization_kind(db).is_some() && !self.may_have_unbounded_specialization(db) {
             return materialized_unfold(db, self);
         }
+        let unfolded = self.unfolded_body(db);
+        match self.materialization_kind(db) {
+            Some(kind) => unfolded.apply_type_mapping(
+                db,
+                env,
+                &TypeMapping::Materialize(kind),
+                TypeContext::default(),
+            ),
+            None => unfolded,
+        }
+    }
+
+    /// Share the closed, specialized body across mappings with different visitors.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, recursive: RecursiveType<'db>| Type::Recursive(recursive),
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn unfolded_body(self, db: &'db dyn Db) -> Type<'db> {
+        let env = self.environment(db);
         let unfolded = self.body(db).apply_type_mapping_impl(
             db,
             &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Unfold(self),
             )),
             TypeContext::default(),
-            &ApplyTypeMappingVisitor::new(env),
+            &ApplyTypeMappingVisitor::new(&env),
         );
-        let unfolded = match self.arguments(db) {
+        match self.arguments(db) {
             Some(arguments) => unfolded.apply_type_mapping(
                 db,
-                env,
+                &env,
                 &TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(arguments)),
-                TypeContext::default(),
-            ),
-            None => unfolded,
-        };
-        match self.materialization_kind(db) {
-            Some(kind) => unfolded.apply_type_mapping(
-                db,
-                env,
-                &TypeMapping::Materialize(kind),
                 TypeContext::default(),
             ),
             None => unfolded,
