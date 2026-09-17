@@ -80,6 +80,14 @@
 //! default we also issue a type error, since this implicit union of declared types may hide an
 //! error.
 //!
+//! Imports are bindings rather than declarations, but a member or wildcard import can inherit a
+//! `Final` qualifier from its source. We track this as a qualifier-only declaration that
+//! does not establish a declared type or replace a declaration or the undeclared sentinel.
+//! Ordinary assignments preserve it, another import replaces or clears it, and an explicit
+//! declaration shadows it. This storage is an implementation detail: declaration queries still
+//! return only genuine declarations, while separate imported-`Final` queries expose the imports
+//! whose source qualifiers need to be checked during type inference.
+//!
 //! To support type inference, we build a map from each use of a place to the bindings live at
 //! that use, and the type narrowing constraints that apply to each binding.
 //!
@@ -291,6 +299,17 @@ pub(super) enum LiveBindingStatus {
     PossiblyBound,
     /// Every live path contains a binding.
     Bound,
+}
+
+/// Describes how a binding changes the imported qualifiers for a place.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ImportedQualifierAction {
+    /// An ordinary binding leaves previous imported qualifiers in place.
+    Preserve,
+    /// The imported member or wildcard binding may contribute a `Final` qualifier.
+    Record,
+    /// A module import removes previous imported qualifiers from its scope.
+    Clear,
 }
 
 /// Identifies a [`LoopHeader`] within a single scope's [`UseDefMap`].
@@ -799,7 +818,8 @@ pub struct UseDefMap<'db> {
     range_reachability: Box<[(TextRange, RangeInfo)]>,
 
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
-    /// [`Declarations`] to know whether this binding is permitted by the live declarations.
+    /// [`Declarations`] to know whether this binding is permitted by the live declarations and
+    /// imported qualifiers.
     ///
     /// If the definition is both a declaration and a binding -- `x: int = 1` for example -- then
     /// we don't actually need anything here, all we'll need to validate is that our own RHS is a
@@ -1202,15 +1222,32 @@ impl<'db> UseDefMap<'db> {
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations = self.definitions_by_definition.get(&binding).map_or_else(
+        self.declarations_iterator(
+            self.retained_declarations_at_binding(binding),
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        )
+    }
+
+    /// Imports that may contribute a `Final` qualifier at this binding.
+    ///
+    /// These imports do not declare a type. Whether their source is actually `Final` is
+    /// determined during type inference.
+    pub fn imported_final_candidates_at_binding(
+        &self,
+        binding: Definition<'db>,
+    ) -> ImportedFinalCandidatesIterator<'_, 'db> {
+        self.imported_final_candidates_iterator(self.retained_declarations_at_binding(binding))
+    }
+
+    fn retained_declarations_at_binding(&self, binding: Definition<'db>) -> &[LiveDeclaration] {
+        self.definitions_by_definition.get(&binding).map_or_else(
             || ALWAYS_UNDECLARED_DECLARATIONS.as_slice(),
             |definitions| {
                 &self.interned_declarations[definitions
                     .declarations
                     .expect("binding definition should have retained declarations")]
             },
-        );
-        self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
+        )
     }
 
     pub fn end_of_scope_declarations<'map>(
@@ -1265,6 +1302,34 @@ impl<'db> UseDefMap<'db> {
             initial_undeclared: Some(state.initial_reachability),
             ..self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
         }
+    }
+
+    /// Imports that may contribute a `Final` qualifier at the end of the scope.
+    pub fn end_of_scope_imported_final_candidates(
+        &self,
+        place: ScopedPlaceId,
+    ) -> ImportedFinalCandidatesIterator<'_, 'db> {
+        let place_state_id = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].end_of_scope,
+            ScopedPlaceId::Member(member) => self.extra().member_states[member].end_of_scope,
+        };
+        self.imported_final_candidates_iterator(
+            &self.interned_declarations[place_state_id.declarations_id()],
+        )
+    }
+
+    /// Imports that may contribute a `Final` qualifier anywhere in the scope.
+    pub fn reachable_imported_final_candidates(
+        &self,
+        place: ScopedPlaceId,
+    ) -> ImportedFinalCandidatesIterator<'_, 'db> {
+        let place_state_id = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].reachable,
+            ScopedPlaceId::Member(member) => self.extra().member_states[member].reachable,
+        };
+        self.imported_final_candidates_iterator(
+            &self.interned_declarations[place_state_id.declarations_id()],
+        )
     }
 
     pub fn all_end_of_scope_symbol_declarations<'map>(
@@ -1326,6 +1391,17 @@ impl<'db> UseDefMap<'db> {
             constraint_tables: self.constraint_tables(),
             boundness_analysis,
             initial_undeclared: None,
+            inner: declarations.iter(),
+        }
+    }
+
+    fn imported_final_candidates_iterator<'map>(
+        &'map self,
+        declarations: &'map [LiveDeclaration],
+    ) -> ImportedFinalCandidatesIterator<'map, 'db> {
+        ImportedFinalCandidatesIterator {
+            all_definitions: &self.all_definitions,
+            constraint_tables: self.constraint_tables(),
             inner: declarations.iter(),
         }
     }
@@ -1490,22 +1566,69 @@ impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
             });
         }
 
-        self.inner.next().map(
-            |LiveDeclaration {
-                 declaration,
-                 reachability_constraint,
-             }| {
-                DeclarationWithConstraint {
-                    declaration: self.all_definitions.get(*declaration).state(),
-                    declaration_order: *declaration,
-                    reachability_constraint: *reachability_constraint,
-                }
-            },
-        )
+        self.inner
+            .find(|declaration| !declaration.is_imported_qualifier())
+            .map(|declaration| DeclarationWithConstraint {
+                declaration: self.all_definitions.get(declaration.declaration()).state(),
+                declaration_order: declaration.declaration(),
+                reachability_constraint: declaration.reachability_constraint,
+            })
     }
 }
 
 impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
+
+/// A member or wildcard import whose source may carry a `Final` qualifier.
+#[derive(Debug, Clone, Copy)]
+pub struct ImportedFinalCandidate<'db> {
+    pub definition: Definition<'db>,
+    pub reachability_constraint: ScopedReachabilityConstraintId,
+}
+
+/// Imports whose source qualifiers can affect a place at a particular point in control flow.
+///
+/// Unlike declaration iterators, this iterator never includes an undeclared sentinel.
+#[derive(Clone)]
+pub struct ImportedFinalCandidatesIterator<'map, 'db> {
+    all_definitions: &'map RetainedDefinitions<'db>,
+    constraint_tables: &'map ConstraintTables<'db>,
+    inner: LiveDeclarationsIterator<'map>,
+}
+
+impl<'map, 'db> ImportedFinalCandidatesIterator<'map, 'db> {
+    pub const fn predicates(&self) -> &'map Predicates<'db> {
+        &self.constraint_tables.predicates
+    }
+
+    pub const fn reachability_constraints(&self) -> &'map ReachabilityConstraints {
+        &self.constraint_tables.reachability_constraints
+    }
+}
+
+impl<'db> Iterator for ImportedFinalCandidatesIterator<'_, 'db> {
+    type Item = ImportedFinalCandidate<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.find_map(|declaration| {
+            if declaration.is_imported_qualifier()
+                && let Some(definition) = self
+                    .all_definitions
+                    .get(declaration.declaration())
+                    .state()
+                    .definition()
+            {
+                Some(ImportedFinalCandidate {
+                    definition,
+                    reachability_constraint: declaration.reachability_constraint,
+                })
+            } else {
+                None
+            }
+        })
+    }
+}
+
+impl std::iter::FusedIterator for ImportedFinalCandidatesIterator<'_, '_> {}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 struct ReachableDefinitions {
@@ -1982,7 +2105,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     if_chain_start_by_use: Vec<(ScopedUseId, Bindings)>,
 
     /// Live bindings for each so-far-recorded definition and, for binding-only definitions, the
-    /// live declarations.
+    /// live declarations, including qualifier-only declarations for imports.
     definitions_by_definition:
         FxHashMap<Definition<'db>, DefinitionsAtDefinition<Bindings, Declarations>>,
 
@@ -2107,12 +2230,17 @@ impl<'db> UseDefMapBuilder<'db> {
             .key((!self.reachability_constraints.is_saturated()).then_some(self.checkpoint_flow))
     }
 
+    /// Record a binding and update imported qualifiers according to `imported_qualifier_action`.
+    ///
+    /// Ordinary bindings preserve imported qualifiers. Imports replace them: member and wildcard
+    /// imports may themselves carry qualifiers, while module imports clear them.
     pub(super) fn record_binding(
         &mut self,
         place: ScopedPlaceId,
         binding: Definition<'db>,
         previous_definitions: PreviousDefinitions,
         can_be_shadowed: FutureDefinitions,
+        imported_qualifier_action: ImportedQualifierAction,
     ) {
         let pending = self.pending_reachability.current;
         let def_id = self.push_definition(DefinitionEntry::Unused(binding));
@@ -2137,19 +2265,22 @@ impl<'db> UseDefMapBuilder<'db> {
             previous_definitions,
             can_be_shadowed,
         );
+        match imported_qualifier_action {
+            ImportedQualifierAction::Record => {
+                place_state.record_imported_qualifier(def_id, self.reachability);
+            }
+            ImportedQualifierAction::Clear => place_state.clear_imported_qualifiers(),
+            ImportedQualifierAction::Preserve => {}
+        }
         self.definitions_by_definition
             .insert(binding, definitions_at_definition);
 
-        let bindings = match place {
-            ScopedPlaceId::Symbol(symbol) => {
-                &mut self.reachable_symbol_definitions[symbol].bindings
-            }
-            ScopedPlaceId::Member(member) => {
-                &mut self.reachable_member_definitions[member].bindings
-            }
+        let definitions = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.reachable_symbol_definitions[symbol],
+            ScopedPlaceId::Member(member) => &mut self.reachable_member_definitions[member],
         };
 
-        bindings.record_binding(
+        definitions.bindings.record_binding(
             def_id,
             self.reachability,
             self.is_class_scope,
@@ -2157,6 +2288,14 @@ impl<'db> UseDefMapBuilder<'db> {
             PreviousDefinitions::AreKept,
             can_be_shadowed,
         );
+
+        if let ImportedQualifierAction::Record = imported_qualifier_action {
+            definitions.declarations.record_imported_qualifier(
+                def_id,
+                self.reachability,
+                PreviousDefinitions::AreKept,
+            );
+        }
     }
 
     pub(crate) fn bindings_at_use(

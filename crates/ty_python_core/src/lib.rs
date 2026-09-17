@@ -33,8 +33,9 @@ use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, Scope
 use symbol::ScopedSymbolId;
 pub use use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
-    BindingsSnapshotId, DeclarationWithConstraint, DeclarationsIterator, LiveBinding, LoopHeaderId,
-    NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, UseDefMap,
+    BindingsSnapshotId, DeclarationWithConstraint, DeclarationsIterator, ImportedFinalCandidate,
+    ImportedFinalCandidatesIterator, LiveBinding, LoopHeaderId, NarrowingEvaluator,
+    PredicateNarrowingTargets, ScopedDefinitionId, UseDefMap,
 };
 use use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId};
 
@@ -1180,7 +1181,8 @@ mod tests {
         ast_ids::{HasScopedUseId, ScopedUseId},
         db::tests::{TestDb, TestDbBuilder},
         definition::{
-            DefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
+            DefinitionKind, DefinitionState, LambdaParameterDefinitionNodeKind,
+            ParameterDefinitionNodeKind,
         },
         program::Program,
     };
@@ -1347,6 +1349,43 @@ mod tests {
             .first_public_binding(global_table.symbol_id("foo").expect("symbol to exist"))
             .unwrap();
         assert_matches!(binding.kind(&db), DefinitionKind::ImportFrom(_));
+    }
+
+    #[test]
+    fn imported_final_candidates_are_separate_from_declarations() {
+        for annotation in ["", "x: int\n"] {
+            let TestCase { db, file } = test_case(&format!(
+                "{annotation}if condition:\n    from source import value as x\nx = 0\n"
+            ));
+            let scope = global_scope(&db, program_file(&db, file));
+            let symbol = place_table(&db, scope).symbol_id("x").unwrap();
+            let use_def = use_def_map(&db, scope);
+            let assignment = use_def.first_public_binding(symbol).unwrap();
+            let declaration = use_def.first_public_declaration(symbol);
+            assert_eq!(declaration.is_some(), !annotation.is_empty());
+            if let Some(declaration) = declaration {
+                assert_matches!(
+                    declaration.kind(&db),
+                    DefinitionKind::AnnotatedAssignment(_)
+                );
+            }
+            assert_eq!(
+                use_def
+                    .declarations_at_binding(assignment)
+                    .map(|declaration| declaration.declaration)
+                    .collect::<Vec<_>>(),
+                [declaration.map_or(DefinitionState::Undefined, DefinitionState::Defined)]
+            );
+
+            let mut candidates = use_def.imported_final_candidates_at_binding(assignment);
+            assert_matches!(
+                candidates
+                    .next()
+                    .map(|candidate| candidate.definition.kind(&db)),
+                Some(DefinitionKind::ImportFrom(_))
+            );
+            assert!(candidates.next().is_none());
+        }
     }
 
     #[test]
