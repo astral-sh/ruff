@@ -1,11 +1,12 @@
 use memchr::memmem::Finder;
 
-/// A reusable text prefilter for an identifier name.
+/// A reusable text prefilter for an identifier or keyword.
 ///
 /// A match only indicates that a source may contain the name: matches in
-/// comments and strings are included, and non-ASCII sources always match because
-/// Python normalizes identifiers with NFKC. Callers should validate candidates
-/// using the AST or semantic analysis.
+/// comments and strings are included. [`Self::may_match`] accepts all non-ASCII
+/// sources because Python normalizes identifiers with NFKC. For keywords, use
+/// [`Self::match_keyword`] to search their literal spelling instead. Callers should
+/// validate candidates using the AST or semantic analysis.
 ///
 /// Construct a matcher once and reuse it across sources to avoid preprocessing
 /// the name for each source. Cache matchers for fixed names in a [`std::sync::LazyLock`].
@@ -31,6 +32,15 @@ impl<'a> IdentifierMatcher<'a> {
             return true;
         }
 
+        self.match_keyword(source)
+    }
+
+    /// Returns whether `source` may contain the configured Python keyword.
+    ///
+    /// Keywords are recognized by their literal spelling, without NFKC normalization,
+    /// so this skips the ASCII check even for non-ASCII source. Matches use ASCII
+    /// identifier boundaries and may occur in comments, strings, or Unicode identifiers.
+    pub fn match_keyword(&self, source: &str) -> bool {
         let bytes = source.as_bytes();
         let len = self.finder.needle().len();
         self.finder
@@ -85,5 +95,16 @@ mod tests {
         let matcher = IdentifierMatcher::new("C");
         assert!(matcher.may_match("𝒞 = 1"));
         assert!(matcher.may_match("# café"));
+    }
+
+    #[test]
+    fn keyword_uses_literal_spelling() {
+        let matcher = IdentifierMatcher::new("class");
+        assert!(matcher.match_keyword("class C: pass"));
+        assert!(matcher.match_keyword("class Café: pass"));
+        assert!(matcher.match_keyword("# class"));
+        assert!(!matcher.match_keyword("# café"));
+        assert!(!matcher.match_keyword("ｃｌａｓｓ = 1"));
+        assert!(!matcher.match_keyword("subclass = 1"));
     }
 }

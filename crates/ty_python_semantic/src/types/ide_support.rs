@@ -233,19 +233,19 @@ impl<'a> ImplementationsFinder<'a> {
         db: &'scan dyn Db,
         file: ProgramFile<'scan>,
     ) -> Vec<ResolvedDefinition<'scan>> {
-        if !self.name_matcher.may_match(&source_text(db, file.file(db))) {
-            return Vec::new();
-        }
-
+        let source = source_text(db, file.file(db));
         let roots = &self.roots;
         match &self.kind {
-            ImplementationsFinderKind::ClassFamily => {
+            ImplementationsFinderKind::ClassFamily if self.name_matcher.match_keyword(&source) => {
                 class_implementations_for_file(db, file, roots)
             }
             ImplementationsFinderKind::MemberFamily {
                 name,
                 accessor_role,
-            } => member_implementations_for_file(db, file, roots, name, *accessor_role),
+            } if self.name_matcher.may_match(&source) => {
+                member_implementations_for_file(db, file, roots, name, *accessor_role)
+            }
+            _ => Vec::new(),
         }
     }
 
@@ -480,7 +480,7 @@ fn member_implementations_for_file<'db>(
 
     // The finder already checked for the member name. An override also requires a class.
     let source = source_text(db, file.file(db));
-    if !CLASS_MATCHER.may_match(&source) {
+    if !CLASS_MATCHER.match_keyword(&source) {
         return definitions;
     }
 
@@ -1959,7 +1959,7 @@ fn direct_subtypes<'db>(
         }
 
         let source = source_text(db, file);
-        if !CLASS_MATCHER.may_match(&source) {
+        if !CLASS_MATCHER.match_keyword(&source) {
             continue;
         }
 
