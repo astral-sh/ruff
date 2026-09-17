@@ -7,7 +7,7 @@ use smallvec::SmallVec;
 
 use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::support::Support;
-use crate::types::constraints::variables::{Constraint, ConstraintProvenance};
+use crate::types::constraints::variables::{Constraint, ConstraintProvenance, UnsatisfiableBound};
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, CandidateTypeVarRangeSolver,
     CandidateTypeVarSolution, ConstraintAssignment, ConstraintId, ConstraintSetStorage, NodeId,
@@ -504,8 +504,10 @@ struct Validations<'db> {
     upper_bounds: FxIndexMap<BoundTypeVarInstance<'db>, UpperBound>,
 }
 
+type ValidationConstraints = Option<SmallVec<[ConstraintId; 4]>>;
+
 struct UpperBound {
-    constraints: Option<SmallVec<[ConstraintId; 4]>>,
+    constraints: ValidationConstraints,
 }
 
 impl<'db> Validations<'db> {
@@ -560,6 +562,33 @@ impl<'db> Validations<'db> {
         }
     }
 
+    fn intern_typevar_constraints(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        typevar_queue: &mut Support,
+        seen_typevars: &mut Support,
+        constraints: impl Iterator<Item = Result<Constraint<'db>, UnsatisfiableBound>>,
+    ) -> ValidationConstraints {
+        let constraints: ValidationConstraints = constraints
+            .map(Result::ok)
+            .map(|constraint| {
+                constraint.map(|constraint| storage.intern_constraint(db, env, constraint))
+            })
+            .collect();
+
+        // If any typevars are mentioned in the upper bound, we have to validate them too.
+        // TODO: Consider calculating this at construction time, so that here we have a fixed
+        // set of typevars to check.
+        for constraint in constraints.iter().flatten() {
+            let constraint_support = storage.constraint_support(*constraint);
+            let new_typevars = constraint_support - &*seen_typevars;
+            *typevar_queue |= &new_typevars;
+        }
+
+        constraints
+    }
+
     #[expect(clippy::too_many_arguments)]
     fn add_upper_bound(
         &mut self,
@@ -579,24 +608,15 @@ impl<'db> Validations<'db> {
                 bound_typevar,
                 bound,
             );
-            let constraints = constraints
-                .map(Result::ok)
-                .map(|constraint| {
-                    constraint.map(|constraint| storage.intern_constraint(db, env, constraint))
-                })
-                .collect();
-            let upper_bound = UpperBound { constraints };
-
-            // If any typevars are mentioned in the upper bound, we have to validate them too.
-            // TODO: Consider calculating this at construction time, so that here we have a fixed
-            // set of typevars to check.
-            for constraint in upper_bound.constraints.iter().flatten() {
-                let constraint_support = storage.constraint_support(*constraint);
-                let new_typevars = constraint_support - &*seen_typevars;
-                *typevar_queue |= &new_typevars;
-            }
-
-            upper_bound
+            let constraints = Self::intern_typevar_constraints(
+                db,
+                env,
+                storage,
+                typevar_queue,
+                seen_typevars,
+                constraints,
+            );
+            UpperBound { constraints }
         });
     }
 }
