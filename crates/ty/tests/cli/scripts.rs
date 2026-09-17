@@ -1364,7 +1364,7 @@ fn ordinary_files_do_not_initialize_scripts() -> anyhow::Result<()> {
     assert_cmd_snapshot!(
         case.command()
             .arg("ordinary.py")
-            .env(EnvVars::TY_UV, "1")
+            .env(EnvVars::TY_UV, "scripts")
             .env(EnvVars::UV, "missing-uv-executable"),
         @"
     success: true
@@ -1769,6 +1769,7 @@ mod uv_metadata {
         assert_cmd_snapshot!(
             command_with_script_uv(&case)
                 .args(["first.py", "second.py"])
+                .env(EnvVars::TY_UV, "scripts")
                 .env(EnvVars::TY_MAX_PARALLELISM, "1"),
             @"
         success: true

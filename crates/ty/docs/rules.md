@@ -3963,8 +3963,6 @@ and environments from the enclosing workspace or other scripts do not apply.
 **Known limitations**
 
 
-Explicit file arguments bypass uv workspace discovery unless `--config-file` is specified.
-
 Imports guarded by `TYPE_CHECKING` are not reported because they are not executed at runtime. They
 can use development-only dependencies, such as type stub packages, without requiring those packages
 as runtime dependencies.
