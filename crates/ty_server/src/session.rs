@@ -777,47 +777,48 @@ impl Session {
             ProjectMetadata::discover_with_uv(workspace_directory, &system, self.use_uv)
         };
 
-        let project = metadata
-            .context("Failed to discover project configuration")
-            .and_then(|mut metadata| {
-                if let Some(fallback_options) = workspace.settings.fallback_options() {
-                    metadata.apply_fallback_options(fallback_options.clone());
+        let (mut metadata, discovery_result) =
+            match metadata.context("Failed to discover project configuration") {
+                Ok(metadata) => (metadata, Ok(())),
+                Err(err) => {
+                    let Ok(metadata) = ProjectMetadata::from_options(
+                        Options::default(),
+                        workspace_directory.to_path_buf(),
+                        None,
+                        &UseDefaultStrategy,
+                    );
+                    (metadata.with_use_uv(self.use_uv), Err(err))
                 }
+            };
 
+        if let Some(fallback_options) = workspace.settings.fallback_options() {
+            metadata.set_fallback_options(fallback_options.clone());
+        }
+
+        if let Some(override_options) = workspace.settings.override_options() {
+            metadata.set_override_options(override_options.clone());
+        }
+
+        // Load user configuration even if project discovery failed.
+        let project = discovery_result
+            .and(
                 metadata
                     .apply_configuration_files(&system)
-                    .context("Failed to apply configuration files")?;
+                    .context("Failed to apply configuration files"),
+            )
+            .and_then(|()| ProjectDatabase::fallible(metadata.clone(), system.clone()));
 
-                if let Some(override_options) = workspace.settings.override_options() {
-                    metadata.apply_override_options(override_options.clone());
-                }
-
-                ProjectDatabase::fallible(metadata, system.clone())
-            });
-
-        let mut db = match project {
-            Ok(db) => db,
-            Err(err) => {
-                tracing::error!(
-                    "Failed to create project for workspace `{uri}`: {err:#}. \
-                        Falling back to default settings"
-                );
-
-                client.show_error_message(format!(
-                    "Failed to load project for workspace {uri}. {}",
-                    self.client_name.log_guidance(),
-                ));
-
-                let Ok(metadata) = ProjectMetadata::from_options(
-                    Options::default(),
-                    workspace_directory.to_path_buf(),
-                    None,
-                    &UseDefaultStrategy,
-                )
-                .map(|metadata| metadata.with_use_uv(self.use_uv));
-                ProjectDatabase::use_defaults(metadata, system)
-            }
-        };
+        let mut db = project.unwrap_or_else(|err| {
+            tracing::error!(
+                "Failed to load project for workspace `{uri}`: {err:#}. \
+                 Continuing with valid settings"
+            );
+            client.show_error_message(format!(
+                "Failed to load project for workspace {uri}. {}",
+                self.client_name.log_guidance(),
+            ));
+            ProjectDatabase::use_defaults(metadata, system)
+        });
 
         // Carry forward diagnostic state if any exists
         let previous = self.projects.remove(&root);

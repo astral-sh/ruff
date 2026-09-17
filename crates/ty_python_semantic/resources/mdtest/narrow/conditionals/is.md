@@ -79,6 +79,65 @@ def overlapping_generic_types(integers: tuple[int, ...], strings: tuple[str, ...
         reveal_type(strings)  # revealed: tuple[str, ...] & tuple[int, ...]
 ```
 
+## `is` with `functools.partial`
+
+In the following example, the class body creates `callback` only once, so `C[int].callback` and
+`C[str].callback` refer to a single `functools.partial` object at a single runtime memory address.
+Each specialization gives that object a different static call signature, however, leading to ty
+treating the two "views" as inhabiting different types.
+
+Assigning `C[int].callback` to the local `callback` means that calls through this variable use the
+`T = int` signature: `callback(C[int](), ...)` needs an `int` as its second argument. Looking up
+`C[str].callback` uses `T = str` to describe calls through that expression. The identity check shows
+that the expressions can refer to the same partial; it does not make the local `callback` accept the
+second expression's `str` argument type. The string call below is therefore still an error.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+
+class C[T]:
+    def method(self, value: T) -> T:
+        return value
+
+    callback = partial(method)
+
+callback = C[int].callback
+if callback is C[str].callback:
+    reveal_type(callback)  # revealed: partial[(self, value: int) -> int]
+    reveal_type(callback(C[int](), 1))  # revealed: int
+    callback(C[int](), "wrong")  # error: [invalid-argument-type] "Expected `int`"
+```
+
+Passing a saved partial or its `__call__` wrapper through a generic identity function also preserves
+its call signature on the if-true branch.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+def double(value: int) -> int:
+    return value * 2
+
+saved = partial(double)
+if saved is identity(saved):
+    reveal_type(saved)  # revealed: partial[(value: int) -> int]
+    saved("wrong")  # error: [invalid-argument-type] "Expected `int`"
+
+saved_call = saved.__call__
+if saved_call is identity(saved_call):
+    reveal_type(saved_call)  # revealed: (value: int) -> int
+    saved_call("wrong")  # error: [invalid-argument-type] "Expected `int`"
+```
+
 ## `is` with a `NewType`
 
 A `NewType` constructor returns its argument unchanged, so its tag belongs to one static view rather
@@ -513,6 +572,16 @@ def excluded_newtype_in_unions(
     if value is other:
         reveal_type(value)  # revealed: int & ~UserId
         reveal_type(other)  # revealed: UserId
+```
+
+Excluding a union containing the tag still permits identity with a value carrying that tag. The
+other union member describes a different runtime type.
+
+```py
+def excluded_union(value: Not[UserId | bytes], other: UserId) -> None:
+    reveal_type(value is other)  # revealed: bool
+    if value is other:
+        reveal_type(value)  # revealed: int & ~UserId
 ```
 
 Unlike a negated `NewType`, a negated runtime class genuinely rules out identity with its instances.

@@ -28,11 +28,10 @@ use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ErrorContext,
-    FindLegacyTypeVarsVisitor, IntersectionType, Type, TypeContext, TypeMapping, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
+    IntersectionType, Type, TypeContext, TypeMapping, UnionType,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::Truthiness;
@@ -168,27 +167,6 @@ pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TupleType<'_> {}
-
-impl<'db> VarianceInferable<'db> for TupleType<'db> {
-    fn variance_of(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
-    ) -> VarianceTerm<'db> {
-        let elements = match self.tuple(db) {
-            Tuple::Fixed(tuple) => Either::Left(tuple.iter_all_elements()),
-            Tuple::Variable(tuple) => Either::Right(
-                tuple
-                    .iter_prefix_elements()
-                    .chain(std::iter::once(tuple.variable().tuple_class_type()))
-                    .chain(tuple.iter_suffix_elements()),
-            ),
-        };
-
-        VarianceTerm::join(db, elements.map(|ty| ty.variance_of(db, env, typevar)))
-    }
-}
 
 #[salsa::tracked]
 impl<'db> TupleType<'db> {
@@ -355,18 +333,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: TupleType<'db>,
         target: TupleType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.check_tuple_spec_pair(db, source.tuple(db), target.tuple(db))
-    }
-
-    fn check_tuple_spec_pair(
-        &self,
-        db: &'db dyn Db,
-        source: &TupleSpec<'db>,
-        target: &TupleSpec<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        match source {
-            Tuple::Fixed(source) => self.check_fixed_length_tuple_vs_tuple_spec(db, source, target),
-            Tuple::Variable(source) => self.check_variable_length_vs_tuple_spec(db, source, target),
+        match source.tuple(db) {
+            Tuple::Fixed(source) => {
+                self.check_fixed_length_tuple_vs_tuple_spec(db, source, target.tuple(db))
+            }
+            Tuple::Variable(source_spec) => {
+                self.check_variable_length_vs_tuple_spec(db, source_spec, target.tuple(db))
+            }
         }
     }
 
@@ -493,11 +466,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // Unlike a dynamic homogeneous segment, a symbolic type variable tuple ranges
                 // over all specializations rather than making a gradual choice of length.
                 let env = self.env;
-                if !self.is_eager_assignability()
-                    || source.variable().gradual_element_type(db, env).is_none()
-                {
+                if !self.relation.is_assignability() {
                     return self.never();
                 }
+                let Some(source_element) = source.variable().gradual_element_type(db, env) else {
+                    return self.never();
+                };
 
                 // In addition, the other tuple must have enough elements to match up with this
                 // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
@@ -532,7 +506,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
                 }
 
-                result
+                // The gradual segment supplies the remaining elements.
+                result.and(db, self.constraints, || {
+                    target_iter.when_all(db, self.constraints, |target_ty| {
+                        self.check_type_pair(db, source_element, target_ty)
+                    })
+                })
             }
 
             Tuple::Variable(target) => {
@@ -709,7 +688,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !self.is_eager_assignability() || !source_variable.is_dynamic() {
+                            if !self.relation.is_assignability()
+                                || source.variable().gradual_element_type(db, env).is_none()
+                            {
                                 return self.never();
                             }
                             self.check_type_pair(db, source_variable, other_ty)
@@ -746,7 +727,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !self.is_eager_assignability() || !source_variable.is_dynamic() {
+                            if !self.relation.is_assignability()
+                                || source.variable().gradual_element_type(db, env).is_none()
+                            {
                                 return self.never();
                             }
                             self.check_type_pair(db, source_variable, target_ty)
@@ -964,7 +947,7 @@ impl<'db> VariableSegment<'db> {
     ///
     /// Preserve the `TypeVarTuple` here so that variance inference and generic-context traversal
     /// can still observe it. Runtime element operations must use [`Self::element_type`] instead.
-    fn tuple_class_type(self) -> Type<'db> {
+    pub(super) fn tuple_class_type(self) -> Type<'db> {
         match self {
             Self::Homogeneous(element) => element,
             Self::TypeVarTuple(typevartuple) => Type::TypeVar(typevartuple),

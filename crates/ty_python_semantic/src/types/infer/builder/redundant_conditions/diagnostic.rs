@@ -31,6 +31,7 @@ use crate::{
     importer::ImportRequest,
     place::{Place, PlaceAndQualifiers},
     place_load::{PlaceLoadMode, PlaceLoadResolutionStep, resolve_place_load},
+    reachability::is_range_reachable,
     types::{
         KnownClass, LintDiagnosticGuard, LintDiagnosticGuardBuilder, MemberLookupPolicy, Type,
         TypeContext,
@@ -38,7 +39,12 @@ use crate::{
         diagnostic::typing_module_for_fix,
         enum_metadata,
         function::KnownFunction,
-        infer::TypeInferenceBuilder,
+        infer::{
+            TypeInferenceBuilder,
+            builder::redundant_conditions::{
+                SuiteExitKind, is_trivial_statement, suite_ends_with_exit,
+            },
+        },
         infer_definition_types, infer_scope_types,
         narrow::{NarrowingConstraint, infer_narrowing_constraints},
         signatures::CallableSignature,
@@ -122,14 +128,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ));
             }
 
-            if let ast::Expr::Compare(ast::ExprCompare {
-                left,
-                ops,
-                comparators,
-                ..
-            }) = test
-                && ops.len() == 1
-                && let [single_comparator] = &**comparators
+            if let ast::Expr::Compare(compare) = test
+                && let Some((left, _, single_comparator)) = compare.as_single()
             {
                 if let (Type::LiteralValue(left_type), Type::LiteralValue(right_type)) = (
                     self.expression_type(left),
@@ -212,10 +212,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     function.signature(db),
                     function.name(db),
                 )),
-                Type::BoundMethod(method) => {
-                    let function = method.function(db);
+                Type::BoundMethod(method) if let Some(function) = method.function(db) => {
                     Some(FunctionInfo::Method(
-                        method.bound_signatures(db),
+                        function.bound_signatures(
+                            db,
+                            method.signature_receiver(db),
+                            method.typing_self_type(db),
+                        ),
                         CallableDescription::defining_class(db, *test_type)
                             .map(|class| {
                                 Cow::Owned(format!("{}.{}", class.name(db), function.name(db)))
@@ -284,6 +287,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     } else {
                         Fix::applicable_edit(call_edit, applicability)
                     };
+                    let source = source_text(db, self.file());
+                    let expression_text = &source[test.range()];
+                    let prefix = if is_awaitable_coro_function {
+                        "await "
+                    } else {
+                        ""
+                    };
+                    diagnostic.help(format_args!(
+                        "Replace with `{prefix}{expression_text}{call}`"
+                    ));
                     diagnostic.set_fix(fix);
                 }
 
@@ -611,16 +624,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let env = self.program_environment();
 
-        if let ast::Expr::Compare(ast::ExprCompare {
-            left,
-            ops,
-            comparators,
-            ..
-        }) = test
-            && let [single_op] = &**ops
-            && let [single_comparator] = &**comparators
+        if let ast::Expr::Compare(compare) = test
+            && let Some((left, single_op, single_comparator)) = compare.as_single()
             && let (ast::Expr::Call(call), other) | (other, ast::Expr::Call(call)) =
-                (&**left, single_comparator)
+                (left, single_comparator)
             && matches!(single_op, ast::CmpOp::Eq | ast::CmpOp::NotEq)
             && let ast::Arguments { args, keywords, .. } = &call.arguments
             && keywords.is_empty()
@@ -859,11 +866,124 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         false
     }
 
-    pub(super) fn annotate_redundant_if_or_elif(
+    /// Return a [`TextRange`] spanning from `branch_start` up to and including
+    /// the offset of the first newline character after the start of `first_statement`.
+    ///
+    /// For example, given this code:
+    ///
+    /// ```py
+    /// if foo:                       # line 1
+    ///     pass                      # line 2
+    /// elif bar:                     # line 3
+    ///     for i in range(10):       # line 4
+    ///         for j in range(5):    # line 5
+    ///             pass              # line 6
+    /// ```
+    ///
+    /// if this method is passed `branch_start` pointing to the start of the `elif`
+    /// node on line 3, and `first_statement` pointing to the start of the `for` loop
+    /// on line 4, this method would return a [`TextRange`] spanning from the start of
+    /// line 3 up to the end of line 4.
+    fn branch_range_until_first_newline(
+        &self,
+        branch_start: TextSize,
+        first_statement: &ast::Stmt,
+    ) -> TextRange {
+        TextRange::new(
+            branch_start,
+            source_text(self.db(), self.file()).line_end(first_statement.start()),
+        )
+    }
+
+    fn is_unreachable(&self, stmt: &ast::Stmt) -> bool {
+        !is_range_reachable(
+            self.db(),
+            self.index,
+            self.scope().file_scope_id(self.db()),
+            stmt.range(),
+        )
+    }
+
+    pub(super) fn add_secondary_annotations_for_redundant_while(
+        &self,
+        condition: &RedundantCondition<'_, 'db>,
+        diagnostic: &mut Diagnostic,
+        suite_if_true: &[ast::Stmt],
+        following_suite: &[ast::Stmt],
+    ) {
+        if condition.is_truthy {
+            if !suite_ends_with_exit(self, following_suite, SuiteExitKind::Defensive)
+                && let Some(stmt) = first_nontrivial_statement(following_suite)
+                && self.is_unreachable(stmt)
+            {
+                diagnostic.annotate(
+                    self.context
+                        .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                        .message("This following statement is unreachable"),
+                );
+            }
+        } else {
+            if let Some(stmt) = first_nontrivial_statement(suite_if_true)
+                && self.is_unreachable(stmt)
+            {
+                diagnostic.annotate(
+                    self.context
+                        .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                        .message("This statement is unreachable"),
+                );
+            }
+        }
+    }
+
+    pub(super) fn add_secondary_annotations_for_redundant_assert(
+        &self,
+        condition: &RedundantCondition<'_, 'db>,
+        diagnostic: &mut Diagnostic,
+        following_suite: &[ast::Stmt],
+    ) {
+        if condition.is_truthy {
+            return;
+        }
+
+        if let Some(stmt) = first_nontrivial_statement(following_suite)
+            && self.is_unreachable(stmt)
+        {
+            diagnostic.annotate(
+                self.context
+                    .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                    .message("This following statement is unreachable"),
+            );
+        }
+    }
+
+    pub(super) fn add_secondary_annotations_for_redundant_match(
+        &self,
+        condition: &RedundantCondition<'_, 'db>,
+        diagnostic: &mut Diagnostic,
+        suite_if_true: &[ast::Stmt],
+    ) {
+        if condition.is_truthy {
+            return;
+        }
+
+        if let Some(stmt) = first_nontrivial_statement(suite_if_true)
+            && self.is_unreachable(stmt)
+        {
+            diagnostic.annotate(
+                self.context
+                    .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                    .message("This statement is unreachable"),
+            );
+        }
+    }
+
+    pub(super) fn add_secondary_annotations_for_redundant_if_or_elif(
         &self,
         condition: &RedundantCondition<'_, 'db>,
         diagnostic: &mut Diagnostic,
         if_stmt: &ast::StmtIf,
+        branch_index: usize,
+        following_suite: &[ast::Stmt],
     ) {
         let RedundantCondition {
             expression: test,
@@ -872,23 +992,71 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             kind,
         } = condition;
 
-        if *is_truthy
-            && *kind == ConditionKind::Boolean
-            && let Some(clause) = if_stmt.elif_else_clauses.last()
-            && clause.test.as_ref() == Some(test)
-            && !diagnostic.has_applicable_fix(Applicability::DisplayOnly)
-        {
-            if let Some(fix) = self.add_assert_never_else(clause, test) {
-                diagnostic.help("Add an `else` branch that calls `assert_never`");
-                diagnostic.set_fix(fix);
-            } else {
-                diagnostic.help(
-                    "Replace this `elif` with an `else` branch \
-                that asserts the condition to be `True`",
-                );
-                if let Some(fix) = self.replace_redundant_elif_with_assertion(clause, test) {
-                    diagnostic.set_fix(fix);
+        let if_elif_else_suites: Vec<&[ast::Stmt]> = std::iter::once(&*if_stmt.body)
+            .chain(if_stmt.elif_else_clauses.iter().map(|clause| &*clause.body))
+            .collect();
+
+        if *is_truthy {
+            let mut implicit_else_is_unreachable = false;
+
+            // The branch index includes the initial `if`, but `elif_else_clauses` does not.
+            if let Some(next_branch) = if_stmt.elif_else_clauses.get(branch_index) {
+                if let Some(stmt) = first_nontrivial_statement(&next_branch.body)
+                    && self.is_unreachable(stmt)
+                {
+                    diagnostic.annotate(
+                        self.context
+                            .secondary(
+                                self.branch_range_until_first_newline(next_branch.start(), stmt),
+                            )
+                            .message("This following branch is unreachable"),
+                    );
                 }
+            } else {
+                if if_elif_else_suites
+                    .iter()
+                    .all(|suite| suite_ends_with_exit(self, suite, SuiteExitKind::Any))
+                    && !suite_ends_with_exit(self, following_suite, SuiteExitKind::Defensive)
+                    && let Some(stmt) = first_nontrivial_statement(following_suite)
+                    && self.is_unreachable(stmt)
+                {
+                    implicit_else_is_unreachable = true;
+                    diagnostic.annotate(
+                        self.context
+                            .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                            .message("This following statement is unreachable"),
+                    );
+                }
+            }
+
+            if !implicit_else_is_unreachable
+                && *kind == ConditionKind::Boolean
+                && let Some(clause) = if_stmt.elif_else_clauses.last()
+                && clause.test.as_ref() == Some(test)
+                && !diagnostic.has_applicable_fix(Applicability::DisplayOnly)
+            {
+                if let Some(fix) = self.add_assert_never_else(clause, test) {
+                    diagnostic.help("Add an `else` branch that calls `assert_never`");
+                    diagnostic.set_fix(fix);
+                } else {
+                    diagnostic.help(
+                        "Replace this `elif` with an `else` branch \
+                        that asserts the condition to be `True`",
+                    );
+                    if let Some(fix) = self.replace_redundant_elif_with_assertion(clause, test) {
+                        diagnostic.set_fix(fix);
+                    }
+                }
+            }
+        } else {
+            if let Some(stmt) = first_nontrivial_statement(if_elif_else_suites[branch_index])
+                && self.is_unreachable(stmt)
+            {
+                diagnostic.annotate(
+                    self.context
+                        .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                        .message("This statement is unreachable"),
+                );
             }
         }
     }
@@ -975,8 +1143,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let candidates = match operand {
             ast::Expr::Name(_) => [Some(operand), None],
-            ast::Expr::Compare(compare) if compare.ops.len() == 1 => {
-                [Some(compare.left.as_ref()), compare.comparators.first()]
+            ast::Expr::Compare(compare) => {
+                let (left, _, right) = compare.as_single()?;
+                [Some(left), Some(right)]
             }
             ast::Expr::Call(call) => [call.arguments.args.first(), None],
             _ => return None,
@@ -1115,4 +1284,11 @@ fn logical_line_end(source: &str, tokens: &Tokens, offset: TextSize) -> TextSize
         .iter()
         .find(|token| token.kind() == TokenKind::Newline)
         .map_or_else(|| source.full_line_end(offset), Ranged::end)
+}
+
+/// Return the first "nontrivial" statement in `suite`, if any.
+///
+/// See [`is_trivial_statement`] for the definition of a trivial statement.
+fn first_nontrivial_statement(suite: &[ast::Stmt]) -> Option<&ast::Stmt> {
+    suite.iter().find(|stmt| !is_trivial_statement(stmt))
 }

@@ -1318,6 +1318,25 @@ error[invalid-generic-class]: Variance of type variable `T_co` is incompatible w
 help: Type variable `T_co` is declared as covariant, but base class `Contravariant` requires it to be contravariant
 ```
 
+A tuple base requires covariant access to its elements. A covariant declared type variable is valid
+here, while a contravariant one is incompatible with the tuple base.
+
+```py
+class GoodTuple(tuple[T_co, object], Generic[T_co]): ...
+
+# snapshot: invalid-generic-class
+class BadTuple(tuple[T_contra, object], Generic[T_contra]): ...
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `T_contra` is incompatible with base class `tuple`
+  --> src/mdtest_snippet.py:58:16
+   |
+58 | class BadTuple(tuple[T_contra, object], Generic[T_contra]): ...
+   |                ^^^^^^^^^^^^^^^^^^^^^^^
+help: Type variable `T_contra` is declared as contravariant, but base class `tuple` requires it to be covariant
+```
+
 ## Inferred variance
 
 Legacy type variables with inferred variance are validated according to their uses, rather than as

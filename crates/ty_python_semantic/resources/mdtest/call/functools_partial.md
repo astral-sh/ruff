@@ -463,6 +463,44 @@ reveal_type(bound())  # revealed: tuple[Literal[1]]
 reveal_type(bound("x", True))  # revealed: tuple[Literal[1], Literal["x"], Literal[True]]
 ```
 
+### Variadic callback with a bound keyword-only parameter
+
+Binding a callback specializes the variadic parameters to its positional parameter types. A bound
+keyword-only parameter keeps its default after that expansion, and can be overridden when calling
+the partial.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from functools import partial
+
+def run[T, *Ts](proc: Callable[[*Ts], T], *args: *Ts, kw: int = 0) -> T:
+    return proc(*args)
+
+def callback(x: int = 0, y: str = "") -> int:
+    return x
+
+bound = partial(run, callback, kw=1)
+reveal_type(bound)  # revealed: partial[(int, str, /, *, kw: int = 1) -> int]
+reveal_type(bound(1, "x"))  # revealed: int
+reveal_type(bound(1, "x", kw=2))  # revealed: int
+bound(1, "x", kw="invalid")  # error: [invalid-argument-type]
+```
+
+Binding one of the callback's positional arguments removes just that parameter. A later partial can
+consume the remaining positional argument while preserving the bound keyword.
+
+```py
+first_bound = partial(run, callback, 1, kw=1)
+reveal_type(first_bound)  # revealed: partial[(str, /, *, kw: int = 1) -> int]
+fully_bound = partial(first_bound, "x")
+reveal_type(fully_bound())  # revealed: int
+```
+
 ### Partially bound asyncio executor callback
 
 Binding the executor must not consume the callback's variadic arguments before it is called.
@@ -605,6 +643,32 @@ def test_union_partial(flag: bool) -> None:
     reveal_type(p)  # revealed: partial[() -> int] | partial[(y: str) -> int]
 
     bad: Callable[[bytes, bytes], int] = p  # error: [invalid-assignment]
+```
+
+### Union of partials with different wrapped functions
+
+The boolean-returning `partial` instance in the below example can be selected when `flag` is true.
+Its call signature is a subtype of the integer-returning `partial`'s signature, but each wraps a
+different function. Discarding `bool_partial` from the union would incorrectly make
+`selected is bool_partial` appear impossible:
+
+```py
+from functools import partial
+
+def integer() -> int:
+    return 1
+
+def boolean() -> bool:
+    return True
+
+int_partial = partial(integer)
+bool_partial = partial(boolean)
+
+def choose(flag: bool) -> None:
+    selected = bool_partial if flag else int_partial
+    reveal_type(selected)  # revealed: partial[() -> bool] | partial[() -> int]
+    reveal_type(selected.func)  # revealed: (def boolean() -> bool) | (def integer() -> int)
+    reveal_type(selected is bool_partial)  # revealed: bool
 ```
 
 ### Keyword-bound overload filtering

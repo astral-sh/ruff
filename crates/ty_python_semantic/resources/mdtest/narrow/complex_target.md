@@ -408,17 +408,49 @@ def _(x: tuple[Literal[IntTag.A], int] | tuple[Literal[IntTag.B], str]):
         reveal_type(x)  # revealed: tuple[Literal[IntTag.B], str]
 ```
 
-Narrowing is restricted to `Literal` tag elements. If any tuple has a non-literal type at the
-discriminating index, we can't safely narrow with equality:
+An `IntEnum` member compares equal to its integer value. A tuple whose tags are `IntTag.A` or `1`
+therefore always matches `1`, and is excluded from the other branch:
 
 ```py
-def _(x: tuple[Literal["tag1"], A] | tuple[str, B]):
-    # Can't narrow because second tuple has `str` (not literal) at index 0
+def enum_tag_equal_to_integer(
+    x: tuple[Literal[IntTag.A, 1], int] | tuple[Literal[1], str] | tuple[Literal[2], bytes],
+):
+    if x[0] == 1:
+        reveal_type(x)  # revealed: tuple[Literal[IntTag.A, 1], int] | tuple[Literal[1], str]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal[2], bytes]
+```
+
+An enum can customize `__ne__` independently of `__eq__`. An ambiguous inequality keeps tuples whose
+tag is that enum member in both branches, even when its literal type differs from the comparison
+value:
+
+```py
+class NeverUnequal(Enum):
+    A = 1
+    B = 2
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+def custom_inequality(
+    x: tuple[Literal[NeverUnequal.A], int] | tuple[Literal["a"], str] | tuple[Literal["b"], bytes],
+):
+    if "a" != x[0]:
+        reveal_type(x)  # revealed: tuple[Literal[NeverUnequal.A], int] | tuple[Literal["b"], bytes]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal[NeverUnequal.A], int] | tuple[Literal["a"], str]
+```
+
+An ambiguous tag keeps its tuple in both branches. Other tuples can still be excluded when their
+literal tags make the comparison always true or always false:
+
+```py
+def _(x: tuple[Literal["tag1"], A] | tuple[str, B] | tuple[Literal["tag2"], C]):
     if x[0] == "tag1":
         reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | tuple[str, B]
     else:
-        # But we *can* narrow with inequality
-        reveal_type(x)  # revealed: tuple[str, B]
+        reveal_type(x)  # revealed: tuple[str, B] | tuple[Literal["tag2"], C]
 ```
 
 This also applies when a tag is a union of literal and non-literal types. The non-literal
@@ -429,9 +461,24 @@ class MatchesAnything:
     def __eq__(self, other: object) -> bool:
         return True
 
-def nonliteral_tag_union(x: tuple[Literal["a"], int] | tuple[Literal["b"] | MatchesAnything, str]):
+def nonliteral_tag_union(
+    x: tuple[Literal["a"], int] | tuple[Literal["b"] | MatchesAnything, str] | tuple[Literal["c"], bytes],
+):
     if x[0] == "a":
         reveal_type(x)  # revealed: tuple[Literal["a"], int] | tuple[Literal["b"] | MatchesAnything, str]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["b"] | MatchesAnything, str] | tuple[Literal["c"], bytes]
+```
+
+An `int` tag can contain a subclass with custom equality, so it can match a string literal. This
+preserves the tuple with that tag without preventing narrowing of the literal tags:
+
+```py
+def integer_tag(x: tuple[int, A] | tuple[Literal["a"], B] | tuple[Literal["b"], C]):
+    if x[0] == "a":
+        reveal_type(x)  # revealed: tuple[int, A] | tuple[Literal["a"], B]
+    else:
+        reveal_type(x)  # revealed: tuple[int, A] | tuple[Literal["b"], C]
 ```
 
 If the index is out of bounds for any tuple in the union, we also skip narrowing (a diagnostic will
@@ -457,6 +504,56 @@ def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B] | list[int]):
         # compare equal to `"tag1"`, so `list[int]` cannot be narrowed out of this
         # union.
         reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | list[int]
+```
+
+### Tuple tags with non-literal comparators
+
+A boolean comparison value can match either boolean tag value, but cannot match a string literal:
+
+```py
+from typing import Literal
+
+def boolean_comparator(value: tuple[bool, int] | tuple[Literal["other"], str], other: bool):
+    if value[0] == other:
+        reveal_type(value)  # revealed: tuple[bool, int]
+    else:
+        reveal_type(value)  # revealed: tuple[bool, int] | tuple[Literal["other"], str]
+```
+
+When the comparison value is a union of literals, a matching tuple can have any of those tags. An
+unequal comparison can retain every tuple because the comparison value is not fixed:
+
+```py
+def union_comparator(
+    value: tuple[Literal["a"], int] | tuple[Literal["b"], str] | tuple[Literal["c"], bytes],
+    other: Literal["a", "b"],
+):
+    if other != value[0]:
+        reveal_type(value)  # revealed: tuple[Literal["a"], int] | tuple[Literal["b"], str] | tuple[Literal["c"], bytes]
+    else:
+        reveal_type(value)  # revealed: tuple[Literal["a"], int] | tuple[Literal["b"], str]
+```
+
+An intersection can restrict an enum comparison value to some of its members. A tuple with the whole
+enum as its tag remains possible, while an excluded member cannot match:
+
+```py
+from enum import Enum
+from ty_extensions import Intersection, Not
+
+class Color(Enum):
+    RED = 0
+    GREEN = 1
+    BLUE = 2
+
+def intersection_comparator(
+    value: tuple[Literal[Color.RED], int] | tuple[Color, str] | tuple[Literal[Color.GREEN], bytes],
+    other: Intersection[Color, Not[Literal[Color.RED]]],
+):
+    if value[0] == other:
+        reveal_type(value)  # revealed: tuple[Color, str] | tuple[Literal[Color.GREEN], bytes]
+    else:
+        reveal_type(value)  # revealed: tuple[Literal[Color.RED], int] | tuple[Color, str] | tuple[Literal[Color.GREEN], bytes]
 ```
 
 ### PEP 695 type aliases

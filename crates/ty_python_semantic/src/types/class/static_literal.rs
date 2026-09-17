@@ -1101,13 +1101,6 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Return `true` if Pydantic's effective model configuration marks this model as frozen.
-    fn is_frozen_pydantic_model(db: &'db dyn Db, field_policy: CodeGeneratorKind<'db>) -> bool {
-        field_policy
-            .pydantic_metadata()
-            .is_some_and(|metadata| metadata.is_frozen(db))
-    }
-
     /// Checks if the given dataclass parameter flag is set for this class.
     /// This checks both the `dataclass_params` and `transformer_params`.
     pub(crate) fn has_dataclass_param(
@@ -1173,7 +1166,13 @@ impl<'db> StaticClassLiteral<'db> {
     pub(in crate::types) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
         self.try_metaclass(db)
             .map(|(metaclass, _)| metaclass)
-            .unwrap_or_else(|_| ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()))
+            .unwrap_or_else(|error| match error.kind {
+                MetaclassErrorKind::Conflict {
+                    explicit_metaclass: Some(metaclass),
+                    ..
+                } => ClassMetaclass::Selected(metaclass.into()),
+                _ => ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()),
+            })
     }
 
     /// Return the selected metaclass or protocol fallback, or an error if it cannot be inferred.
@@ -1296,13 +1295,22 @@ impl<'db> StaticClassLiteral<'db> {
             // - https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass
             // - https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
             for (base_class, metaclass) in base_metaclasses {
+                if metaclass == SubclassOfType::subclass_of_unknown() {
+                    return Ok((ClassMetaclass::Selected(metaclass), None));
+                }
                 let Some(metaclass) = metaclass.to_class_type(db) else {
                     continue;
                 };
-                if candidate.metaclass.is_subclass_of(db, &env, metaclass) {
-                    continue;
-                }
-                if metaclass.is_subclass_of(db, &env, candidate.metaclass) {
+                if let Some(selected) = candidate
+                    .metaclass
+                    .most_derived_metaclass(db, &env, metaclass)
+                {
+                    let Some(metaclass) = selected.to_class_type(db) else {
+                        return Ok((ClassMetaclass::Selected(selected), None));
+                    };
+                    if metaclass == candidate.metaclass {
+                        continue;
+                    }
                     candidate = MetaclassCandidate {
                         metaclass,
                         base: Some(base_class),
@@ -1314,6 +1322,8 @@ impl<'db> StaticClassLiteral<'db> {
                         candidate,
                         base_metaclass: metaclass,
                         base: base_class,
+                        explicit_metaclass: explicit_metaclass
+                            .and_then(|metaclass| metaclass.to_class_type(db)),
                     },
                 });
             }
@@ -1626,6 +1636,15 @@ impl<'db> StaticClassLiteral<'db> {
                 .is_some_and(CodeGeneratorKind::is_dataclass_like)
         {
             return Member::unbound();
+        }
+
+        // Enum members are read-only on the class, but instances can shadow them.
+        if enum_metadata(db, ClassLiteral::Static(self))
+            .is_some_and(|metadata| metadata.contains_member(name))
+        {
+            let mut member = member;
+            member.inner.qualifiers.insert(TypeQualifiers::READ_ONLY);
+            return member;
         }
 
         // For enum classes, `nonmember(value)` creates a non-member attribute.
@@ -2106,14 +2125,8 @@ impl<'db> StaticClassLiteral<'db> {
 
                 signature_from_fields(vec![self_parameter], instance_ty)
             }
-            (
-                field_policy @ (CodeGeneratorKind::DataclassLike(_)
-                | CodeGeneratorKind::Pydantic(_)),
-                "__setattr__",
-            ) => {
-                if self.is_frozen_dataclass(db) == Some(true)
-                    || Self::is_frozen_pydantic_model(db, field_policy)
-                {
+            (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
+                if self.is_frozen_dataclass(db) == Some(true) {
                     let signature = Signature::new(
                         Parameters::standard([
                             Parameter::positional_or_keyword(Name::new_static("self"))

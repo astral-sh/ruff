@@ -38,6 +38,7 @@ warning[redundant-condition]: Function `func` is always truthy
   |
 3 | if func:  # snapshot: redundant-condition
   |    ^^^^ Did you mean to call this function?
+help: Replace with `func()`
   |
 2 |
   - if func:  # snapshot: redundant-condition
@@ -65,6 +66,7 @@ warning[redundant-condition]: Method `Foo.bar` is always truthy
    |
 10 |         if self.bar:  # snapshot: redundant-condition
    |            ^^^^^^^^ Did you mean to call this method?
+help: Replace with `self.bar()`
    |
 9  |     def baz(self):
    -         if self.bar:  # snapshot: redundant-condition
@@ -420,6 +422,23 @@ info: `Pattern` instances are always truthy because `Pattern` cannot be subclass
     | |______________________________^ `Pattern` defined here
 ```
 
+## Classmethods wrapping callable objects
+
+A bound classmethod is always truthy even when it wraps a callable instance instead of a Python
+function. Testing the method does not call the wrapped object.
+
+```py
+class CallableObject:
+    def __call__(self, cls: type[object]) -> bool:
+        return False
+
+class C:
+    method = classmethod(CallableObject())
+
+if C.method:  # error: [redundant-condition] "Object of type `MethodType[CallableObject]` is always truthy"
+    pass
+```
+
 ## Enum instances
 
 An enum with members is implicitly final, so its instances are always truthy if the enum defines
@@ -715,15 +734,73 @@ def _():
 def _():
     while not (func and coinflip()):  # error: [redundant-condition]
         pass
+```
 
-def f(x: str | int):
+An always-falsy `match` guard makes its `case` body unreachable. We add a secondary annotation to
+the first nontrivial statement's first line to note this. An always-truthy guard leaves its case
+body reachable, meanwhile, so no secondary annotation is added in this case:
+
+```py
+def f(x: str | int, empty: tuple[()]):
     match x:
-        case str() if func:  # error: [redundant-condition]
+        case str() if empty:  # snapshot: redundant-condition
             pass
+            print(
+                "unreachable",
+            )
+        case int() if func:  # snapshot: redundant-condition
+            print("reachable")
+```
 
-def _():
-    while func:  # error: [redundant-condition]
+```snapshot
+warning[redundant-condition]: An empty tuple is always falsy
+  --> src/mdtest_snippet.py:47:23
+   |
+47 |         case str() if empty:  # snapshot: redundant-condition
+   |                       ^^^^^ Inferred type is `tuple[()]`
+48 |             pass
+49 |             print(
+   |             ------ This statement is unreachable
+
+
+warning[redundant-condition]: Function `func` is always truthy
+  --> src/mdtest_snippet.py:52:23
+   |
+52 |         case int() if func:  # snapshot: redundant-condition
+   |                       ^^^^ Did you mean to call this function?
+help: Replace with `func()`
+   |
+51 |             )
+   -         case int() if func:  # snapshot: redundant-condition
+52 +         case int() if func():  # snapshot: redundant-condition
+53 |             print("reachable")
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+An always-falsy loop condition similarly makes the loop body unreachable:
+
+```py
+def _(empty: tuple[()]):
+    while empty:  # snapshot: redundant-condition
         pass
+        print(
+            "unreachable",
+        )
+    else:
+        print("reachable")
+    print("still reachable")
+```
+
+```snapshot
+warning[redundant-condition]: An empty tuple is always falsy
+  --> src/mdtest_snippet.py:55:11
+   |
+55 |     while empty:  # snapshot: redundant-condition
+   |           ^^^^^ Inferred type is `tuple[()]`
+56 |         pass
+57 |         print(
+   |         ------ This statement is unreachable
 ```
 
 ## Always truthy values appearing later in compound conditions
@@ -764,6 +841,7 @@ warning[redundant-condition]: Function `func` is always truthy
   |
 3 |     if flag and func:  # snapshot: redundant-condition
   |                 ^^^^ Did you mean to call this function?
+help: Replace with `func()`
   |
 2 | def compound_statement_conditions(flag: bool, other: bool):
   -     if flag and func:  # snapshot: redundant-condition
@@ -778,6 +856,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 19 |     selected = True if flag and func else False  # snapshot: redundant-condition
    |                                 ^^^^ Did you mean to call this function?
+help: Replace with `func()`
    |
 18 | def compound_expression_conditions(flag: bool):
    -     selected = True if flag and func else False  # snapshot: redundant-condition
@@ -792,6 +871,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 24 |     assert flag and func  # snapshot: redundant-condition
    |                     ^^^^ Did you mean to call this function?
+help: Replace with `func()`
    |
 23 | def compound_assertion_condition(flag: bool):
    -     assert flag and func  # snapshot: redundant-condition
@@ -976,6 +1056,7 @@ warning[redundant-condition]: Function `coroutine` is always truthy
   |
 3 |     if coroutine:  # snapshot: redundant-condition
   |        ^^^^^^^^^ Did you mean to `await` and call this function?
+help: Replace with `await coroutine()`
   |
 2 | async def inspect_async_function():
   -     if coroutine:  # snapshot: redundant-condition
@@ -1014,6 +1095,7 @@ warning[redundant-condition]: Function `always_truthy` is always truthy
   |
 7 |     if always_truthy:  # snapshot: redundant-condition
   |        ^^^^^^^^^^^^^ Did you mean to call this function?
+help: Replace with `always_truthy()`
   |
 6 | def inspect_truthy_function():
   -     if always_truthy:  # snapshot: redundant-condition
@@ -1028,6 +1110,7 @@ warning[redundant-condition]: Function `always_truthy_coro` is always truthy
    |
 14 |     if always_truthy_coro:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^^^^^^ Did you mean to `await` and call this function?
+help: Replace with `await always_truthy_coro()`
    |
 13 | async def foo():
    -     if always_truthy_coro:  # snapshot: redundant-condition
@@ -1061,6 +1144,7 @@ warning[redundant-condition]: Function `wut` is always truthy
   |
 3 | if wut:  # snapshot: redundant-condition
   |    ^^^ Did you mean to call this function?
+help: Replace with `wut(...)`
   |
 2 |
   - if wut:  # snapshot: redundant-condition
@@ -1075,6 +1159,7 @@ warning[redundant-condition]: Function `wuttt` is always truthy
   |
 8 |     if wuttt:  # snapshot: redundant-condition
   |        ^^^^^ Did you mean to `await` and call this function?
+help: Replace with `await wuttt(...)`
   |
 7 | async def bar():
   -     if wuttt:  # snapshot: redundant-condition
@@ -1110,6 +1195,7 @@ warning[redundant-condition]: Function `asynchronous` is always truthy
    |
 11 |     if asynchronous:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^ Did you mean to `await` and call this function?
+help: Replace with `await asynchronous(...)`
    |
 10 | async def inspect_asynchronous_overloads():
    -     if asynchronous:  # snapshot: redundant-condition
@@ -1141,6 +1227,7 @@ warning[redundant-condition]: Function `mixed` is always truthy
    |
 21 |     if mixed:  # snapshot: redundant-condition
    |        ^^^^^ Did you mean to call this function?
+help: Replace with `mixed(...)`
    |
 20 | async def inspect_mixed_overloads():
    -     if mixed:  # snapshot: redundant-condition
@@ -1190,6 +1277,7 @@ warning[redundant-condition]: Function `unannotated` is always truthy
    |
 18 |     if unannotated:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^ Did you mean to call this function?
+help: Replace with `unannotated()`
    |
 17 | async def check_synchronous_functions():
    -     if unannotated:  # snapshot: redundant-condition
@@ -1204,6 +1292,7 @@ warning[redundant-condition]: Function `dynamic` is always truthy
    |
 20 |     if dynamic:  # snapshot: redundant-condition
    |        ^^^^^^^ Did you mean to call this function?
+help: Replace with `dynamic()`
    |
 19 |         pass
    -     if dynamic:  # snapshot: redundant-condition
@@ -1218,6 +1307,7 @@ warning[redundant-condition]: Function `terminate` is always truthy
    |
 22 |     if terminate:  # snapshot: redundant-condition
    |        ^^^^^^^^^ Did you mean to call this function?
+help: Replace with `terminate()`
    |
 21 |         pass
    -     if terminate:  # snapshot: redundant-condition
@@ -1232,6 +1322,7 @@ warning[redundant-condition]: Function `terminate_via_alias` is always truthy
    |
 24 |     if terminate_via_alias:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^^^^^^^ Did you mean to call this function?
+help: Replace with `terminate_via_alias()`
    |
 23 |         pass
    -     if terminate_via_alias:  # snapshot: redundant-condition
@@ -1275,6 +1366,7 @@ warning[redundant-condition]: Function `make_coroutine` is always truthy
    |
 11 |     if make_coroutine:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^^ Did you mean to `await` and call this function?
+help: Replace with `await make_coroutine()`
    |
 10 | async def check_coroutine_factory():
    -     if make_coroutine:  # snapshot: redundant-condition
@@ -2276,9 +2368,122 @@ def negated_conditional_contexts(flag: bool):
         pass
     elif not 1 == 0:  # error: [redundant-condition-strict] "Condition `not 1 == 0` is always true"
         pass
+```
 
-    while not 1 == 0:  # error: [redundant-condition-strict] "Condition `not 1 == 0` is always true"
-        break
+If an always-true loop has no reachable `break`, we also add a secondary annotation noting that the
+following statement is unreachable:
+
+```py
+def negated_conditional_contexts(flag: bool):
+    while not 1 == 0:  # snapshot: redundant-condition-strict
+        print("loop body")
+    print("unreachable")
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:64:11
+   |
+64 |     while not 1 == 0:  # snapshot: redundant-condition-strict
+   |           ^^^^^^^^^^ Inferred type is `Literal[True]`
+65 |         print("loop body")
+66 |     print("unreachable")
+   |     -------------------- This following statement is unreachable
+```
+
+In cases where an always-true `if` or `elif` test makes a following branch unreachable, and that
+following branch has a "nontrivial" body, we warn about this in a secondary annotation. A nontrivial
+body is a suite of statements where at least one statement in the suite is not either `pass`, `...`
+or a string-literal expression: all of these are known to never have any runtime effect.
+
+```py
+def f(x: int):
+    if isinstance(x, int):  # snapshot: redundant-condition-strict
+        return
+    else:
+        return
+    print("unreachable")
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:68:8
+   |
+68 |       if isinstance(x, int):  # snapshot: redundant-condition-strict
+   |          ^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+69 |           return
+70 | /     else:
+71 | |         return
+   | |______________- This following branch is unreachable
+```
+
+For a branch with a multiline body, the secondary annotation ends on its first statement's first
+line rather than quoting the entire suite (which could be very long):
+
+```py
+def g(x: int | str):
+    if isinstance(x, int):
+        print("a")
+    elif isinstance(x, str):  # snapshot: redundant-condition-strict
+        print("b")
+    elif isinstance(x, bytes):
+        for byte in x:
+            print(byte)
+    else:
+        assert False, "unreachable"
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:76:10
+   |
+76 |       elif isinstance(x, str):  # snapshot: redundant-condition-strict
+   |            ^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+77 |           print("b")
+78 | /     elif isinstance(x, bytes):
+79 | |         for byte in x:
+   | |______________________- This following branch is unreachable
+```
+
+In cases where an always-false `if` test makes its own nontrivial body unreachable, we also issue a
+subdiagnostic warning:
+
+```py
+def f(x: int):
+    if not isinstance(x, int):  # snapshot: redundant-condition-strict
+        print("not an int")
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always false
+  --> src/mdtest_snippet.py:84:8
+   |
+84 |     if not isinstance(x, int):  # snapshot: redundant-condition-strict
+   |        ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[False]`
+85 |         print("not an int")
+   |         ------------------- This statement is unreachable
+```
+
+We also warn when always-true, always-terminal `if`s make the remaining suite unreachable:
+
+```py
+def f(x: int):
+    if isinstance(x, int):  # snapshot: redundant-condition-strict
+        return
+
+    print("hi")
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:87:8
+   |
+87 |     if isinstance(x, int):  # snapshot: redundant-condition-strict
+   |        ^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+88 |         return
+89 |
+90 |     print("hi")
+   |     ----------- This following statement is unreachable
 ```
 
 Outside a statement condition, a `not` expression still tests its operand's truthiness. The strict
@@ -2294,19 +2499,117 @@ def negated_integer_return(value: Literal[1, 2]) -> bool:
 
 When the strict rule is needed because of a test's type or short-circuit behavior, we report the
 complete compound condition instead of its operands. Only a single diagnostic is emitted on each of
-these:
+these.
 
 ```py
-def compound_truthy(x: str):
+def compound_conditions(x: str):
     if isinstance(x, str) and isinstance(x, str):  # error: [redundant-condition-strict]
         pass
+```
 
-    while isinstance(x, str) and isinstance(x, str):  # error: [redundant-condition-strict]
+A reachable `break` keeps the statement after the loop reachable, so this loop diagnostic has no
+secondary annotation alerting the user to unreachable code:
+
+```py
+def compound_conditions(x: str):
+    while isinstance(x, str) and isinstance(x, str):  # snapshot: redundant-condition-strict
         break
+```
 
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+   --> src/mdtest_snippet.py:100:11
+    |
+100 |     while isinstance(x, str) and isinstance(x, str):  # snapshot: redundant-condition-strict
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+```
+
+Here, however, the always-false `match` guard makes its case body unreachable:
+
+```py
     match x:
-        case str() if isinstance(x, str) and isinstance(x, str):  # error: [redundant-condition-strict]
-            pass
+        case str() if not isinstance(x, str) or not isinstance(x, str):  # snapshot: redundant-condition-strict
+            print("unreachable")
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always false
+   --> src/mdtest_snippet.py:103:23
+    |
+103 |         case str() if not isinstance(x, str) or not isinstance(x, str):  # snapshot: redundant-condition-strict
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[False]`
+104 |             print("unreachable")
+    |             -------------------- This statement is unreachable
+```
+
+## Reachability after exhaustive `if`/`elif` chains
+
+### Terminal branches
+
+When a final `elif` is always true and every branch exits, the statements after the chain are
+unreachable. We add a secondary annotation noting this that points to the first nontrivial statement
+following that `elif` branch, since it may be unintentional.
+
+We also do not offer a fix that adds an explicit `else` calling `assert_never` here. It *looks* as
+though the suite after the `if`/`elif`/`else` chain is meant to be reachable here, so adding another
+branch to the chain that is also terminal would just make the user's problems worse.
+
+```py
+def terminal_branches(value: int | str | bytes):
+    if isinstance(value, int):
+        return
+    elif isinstance(value, str):
+        raise ValueError
+    elif isinstance(value, bytes):  # snapshot: redundant-condition-strict
+        return
+    print("unreachable")
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+ --> src/mdtest_snippet.py:6:10
+  |
+6 |     elif isinstance(value, bytes):  # snapshot: redundant-condition-strict
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+7 |         return
+8 |     print("unreachable")
+  |     -------------------- This following statement is unreachable
+```
+
+### An earlier branch falls through
+
+An earlier branch that falls through keeps the following statements reachable, even if the final
+`elif` is always true and exits. Here, the initial `if` and final `elif` both return, but the middle
+branch continues after the chain if its assertion succeeds.
+
+```py
+def earlier_fallthrough(value: int | str | bytes, enabled: bool):
+    if isinstance(value, int):
+        return
+    elif isinstance(value, str):
+        assert enabled
+    elif isinstance(value, bytes):  # snapshot: redundant-condition-strict
+        return
+    print("reachable")
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+ --> src/mdtest_snippet.py:6:10
+  |
+6 |     elif isinstance(value, bytes):  # snapshot: redundant-condition-strict
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Add an `else` branch that calls `assert_never`
+   |
+1  + from typing import assert_never
+2  | def earlier_fallthrough(value: int | str | bytes, enabled: bool):
+--------------------------------------------------------------------------------
+8  |         return
+9  +     else:
+10 +         assert_never(value)
+11 |     print("reachable")
+   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Redundant boolean operands in ambiguous conditions
@@ -2475,6 +2778,37 @@ def unreachable_branches():
         pass
 ```
 
+## Reachability diagnostics for compound conditions
+
+We add secondary annotations noting reachability implications to diagnostics regarding complete
+conditions. A diagnostic on an operand does not receive a secondary annotation, however, even when
+that operand makes the complete condition always false:
+
+```py
+def check(empty: tuple[()], enabled: bool):
+    while empty and enabled:  # snapshot: redundant-condition
+        print("unreachable")
+
+    match enabled:
+        case _ if empty and enabled:  # snapshot: redundant-condition
+            print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: An empty tuple is always falsy
+ --> src/mdtest_snippet.py:2:11
+  |
+2 |     while empty and enabled:  # snapshot: redundant-condition
+  |           ^^^^^ Inferred type is `tuple[()]`
+
+
+warning[redundant-condition]: An empty tuple is always falsy
+ --> src/mdtest_snippet.py:6:19
+  |
+6 |         case _ if empty and enabled:  # snapshot: redundant-condition
+  |                   ^^^^^ Inferred type is `tuple[()]`
+```
+
 ## Boolean tests inside value expressions
 
 A call's arguments compute values, but can contain their own boolean tests. Those tests are checked
@@ -2536,6 +2870,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 28 |     selected = not func if flag else not func
    |                    ^^^^ Did you mean to call this function?
+help: Replace with `func()`
    |
 27 |     # snapshot: redundant-condition
    -     selected = not func if flag else not func
@@ -2550,6 +2885,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 28 |     selected = not func if flag else not func
    |                                          ^^^^ Did you mean to call this function?
+help: Replace with `func()`
    |
 27 |     # snapshot: redundant-condition
    -     selected = not func if flag else not func
@@ -4031,12 +4367,28 @@ assert (value := "foo")
 ```
 
 Always falsy variables that are not AST literals are still reported as redundant assertions by
-`redundant-condition`:
+`redundant-condition`. Since these assertions always fail, we also add a secondary annotation to the
+first nontrivial following statement, indicating that it is unreachable. For a multiline statement,
+the secondary annotation ends on its first line:
 
 ```py
 def failing_assertion(value: None):
-    # error: [redundant-condition] "`None` is always falsy"
-    assert value
+    assert value  # snapshot: redundant-condition
+    pass
+    print(
+        "unreachable",
+    )
+```
+
+```snapshot
+warning[redundant-condition]: `None` is always falsy
+  --> src/mdtest_snippet.py:35:12
+   |
+35 |     assert value  # snapshot: redundant-condition
+   |            ^^^^^
+36 |     pass
+37 |     print(
+   |     ------ This following statement is unreachable
 ```
 
 ## `sys.version_info` checks, `sys.platform` checks, `os.name` checks, `if TYPE_CHECKING` checks
@@ -4786,6 +5138,9 @@ The first condition's type does not affect whether a later boolean condition is 
 defensive check. Non-boolean conditions still produce the ordinary diagnostic, even when followed by
 a defensive exit and the strict rule is enabled.
 
+Note that in some cases we add secondary annotations to note that a later statement is inferred as
+unreachable, but we do not do that here:
+
 ```py
 def defensive_elif(items: list[int], value: int):
     if items:
@@ -4798,11 +5153,26 @@ def predicate() -> bool:
 
 def uncalled_function(flag: bool):
     if flag:
-        pass
-    elif predicate:  # error: [redundant-condition] "Function `predicate` is always truthy: Did you mean to call this function?"
-        pass
-    else:
-        raise AssertionError
+        return
+    elif predicate:  # snapshot: redundant-condition
+        return
+    raise AssertionError
+```
+
+```snapshot
+warning[redundant-condition]: Function `predicate` is always truthy
+   --> src/mdtest_snippet.py:166:10
+    |
+166 |     elif predicate:  # snapshot: redundant-condition
+    |          ^^^^^^^^^ Did you mean to call this function?
+help: Replace with `predicate()`
+    |
+165 |         return
+    -     elif predicate:  # snapshot: redundant-condition
+166 +     elif predicate():  # snapshot: redundant-condition
+167 |         return
+    |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Defensive operands in ambiguous conditions

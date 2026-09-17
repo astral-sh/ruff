@@ -338,6 +338,39 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         .unwrap_or(Truthiness::Ambiguous)
     }
 
+    pub(super) fn check_match_condition_redundancy(
+        &self,
+        test: &ast::Expr,
+        test_type: Type<'db>,
+        branch_suite: &[ast::Stmt],
+    ) {
+        if !self.should_check_redundant_conditions() {
+            return;
+        }
+
+        let truthiness = self.condition_truthiness(test);
+
+        for condition in self.redundant_conditions(
+            BooleanTest {
+                expression: test,
+                value_type: test_type,
+                truthiness,
+                evaluation: ExpressionContext::Condition,
+            },
+            RedundantConditionContext::Standalone,
+        ) {
+            if let Some(mut diagnostic) = self.report_redundant_condition(&condition)
+                && condition.expression.range() == test.range()
+            {
+                self.add_secondary_annotations_for_redundant_match(
+                    &condition,
+                    &mut diagnostic,
+                    branch_suite,
+                );
+            }
+        }
+    }
+
     /// Check whether a `not` expression used as a value contains a redundant boolean test.
     /// Report a diagnostic if so.
     ///
@@ -460,10 +493,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 self.report_redundant_condition(&condition)
                                 && condition.expression.range() == test.range()
                             {
-                                self.annotate_redundant_if_or_elif(
+                                // An operand's truthiness can differ from the complete condition's,
+                                // so only annotate branch reachability for the complete test.
+                                self.add_secondary_annotations_for_redundant_if_or_elif(
                                     &condition,
                                     &mut diagnostic,
                                     if_stmt,
+                                    branch_index,
+                                    &suite[i + 1..],
                                 );
                             }
                         }
@@ -481,7 +518,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         },
                         RedundantConditionContext::Assertion,
                     ) {
-                        self.report_redundant_condition(&condition);
+                        if let Some(mut diagnostic) = self.report_redundant_condition(&condition)
+                            && condition.expression.range() == assert_statement.test.range()
+                        {
+                            self.add_secondary_annotations_for_redundant_assert(
+                                &condition,
+                                &mut diagnostic,
+                                &suite[i + 1..],
+                            );
+                        }
                     }
                 }
                 ast::Stmt::While(while_statement) => {
@@ -496,7 +541,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         },
                         RedundantConditionContext::Standalone,
                     ) {
-                        self.report_redundant_condition(&condition);
+                        if let Some(mut diagnostic) = self.report_redundant_condition(&condition)
+                            && condition.expression.range() == while_statement.test.range()
+                        {
+                            self.add_secondary_annotations_for_redundant_while(
+                                &condition,
+                                &mut diagnostic,
+                                &while_statement.body,
+                                &suite[i + 1..],
+                            );
+                        }
                     }
                 }
                 _ => continue,
@@ -977,6 +1031,8 @@ fn suite_ends_with_exit(
 
 /// Return `true` if `stmt` is a "trivial statement"
 /// that has no effect nor side effect at runtime.
+///
+/// Statements considered trivial are `pass`, `...`, and string-literal statements.
 fn is_trivial_statement(stmt: &ast::Stmt) -> bool {
     match stmt {
         ast::Stmt::Pass(_) => true,

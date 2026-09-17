@@ -345,7 +345,7 @@ mod tests {
 
         let subtypes = test.subtypes();
         insta::assert_snapshot!(snapshot(&test.db, &subtypes), @"
-        vendored://stdlib/email/headerregistry.pyi:703:713 BaseHeader :: email.headerregistry
+        vendored://stdlib/email/headerregistry.pyi:731:741 BaseHeader :: email.headerregistry
         vendored://stdlib/enum.pyi:18344:18351 StrEnum :: enum
         vendored://stdlib/pdb.pyi:38720:38725 _rstr :: pdb
         vendored://stdlib/xxlimited.pyi:103:106 Str :: xxlimited
@@ -377,7 +377,7 @@ mod tests {
 
         let subtypes = test.subtypes();
         insta::assert_snapshot!(snapshot(&test.db, &subtypes), @"
-        vendored://stdlib/email/headerregistry.pyi:703:713 BaseHeader :: email.headerregistry
+        vendored://stdlib/email/headerregistry.pyi:731:741 BaseHeader :: email.headerregistry
         vendored://stdlib/enum.pyi:18344:18351 StrEnum :: enum
         /main.py:77:89 MyEventTypeA :: main
         vendored://stdlib/pdb.pyi:38720:38725 _rstr :: pdb

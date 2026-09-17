@@ -179,7 +179,7 @@ fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> String {
     let call = ast::ExprCall {
         func: Box::new(name.into()),
         arguments: ast::Arguments {
-            args: Box::from([]),
+            args: [].into(),
             keywords: open.keywords.iter().copied().cloned().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,

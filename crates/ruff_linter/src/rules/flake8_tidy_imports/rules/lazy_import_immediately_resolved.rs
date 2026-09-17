@@ -3,7 +3,7 @@ use ruff_python_ast::{
     ExprName, PySourceType, PythonVersion, Stmt, StmtImport, StmtImportFrom, helpers,
     token::{TokenKind, Tokens},
 };
-use ruff_python_semantic::{Binding, BindingKind, GeneratorKind, ScopeKind, SemanticModel};
+use ruff_python_semantic::{GeneratorKind, ScopeKind, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -23,6 +23,12 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// lazy. This is commonly caused by using a lazily imported module in a module
 /// global or in a top-level class definition.
 ///
+/// The rule also recognizes imports made lazy by a literal `__lazy_modules__`
+/// declaration, even when the target version is older than Python 3.15.
+/// Such imports remain eager on older Python versions. Dynamic assignments
+/// to `__lazy_modules__` (e.g. `__lazy_modules__ = non_literal()`) are ignored,
+/// as their effects cannot be determined statically.
+///
 /// ## Example
 /// ```python
 /// lazy import foo
@@ -39,14 +45,16 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// class Bar(foo.Foo): ...
 /// ```
 ///
+/// ## Fix availability
+/// The fix is only available when the lazy import statement imports a single
+/// member, since removing `lazy` from a multi-member import would make every
+/// imported member eager, including names that may not be resolved immediately.
+/// Fixes are unavailable for imports governed by a `__lazy_modules__` declaration.
+///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe because converting a lazy import to an
 /// eager import changes when the imported module is executed, which can change
 /// runtime behavior if the module has import-time side effects.
-///
-/// The fix is only available when the lazy import statement imports a single
-/// member, since removing `lazy` from a multi-member import would make every
-/// imported member eager, including names that may not be resolved immediately.
 ///
 /// ## Options
 ///
@@ -78,10 +86,6 @@ impl Violation for LazyImportImmediatelyResolved {
 /// TID255
 /// Check whether a name load forces a lazy import during module import execution.
 pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprName) {
-    if checker.target_version() < PythonVersion::PY315 {
-        return;
-    }
-
     let semantic = checker.semantic();
 
     if !is_immediate_resolution_context(semantic, checker.source_type) {
@@ -93,9 +97,21 @@ pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprNam
     };
 
     let binding = semantic.binding(binding_id);
-    let Some(import) = lazy_import_statement(binding, semantic) else {
+    if !binding.is_lazy() {
+        return;
+    }
+    let Some(import) = binding.statement(semantic) else {
         return;
     };
+    if checker.target_version() < PythonVersion::PY315
+        && matches!(
+            import,
+            Stmt::Import(StmtImport { is_lazy: true, .. })
+                | Stmt::ImportFrom(StmtImportFrom { is_lazy: true, .. })
+        )
+    {
+        return;
+    }
 
     // Ignore imports that are required to be lazy.
     let require_lazy = &checker.settings().flake8_tidy_imports.require_lazy;
@@ -110,7 +126,7 @@ pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprNam
         }
     }
 
-    let fix_range = if is_single_member_import(import) {
+    let fix_range = if is_single_member_import(import) && semantic.lazy_modules.is_none() {
         lazy_import_prefix_range(import, checker.source_tokens())
     } else {
         None
@@ -128,26 +144,8 @@ pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprNam
     }
 }
 
-/// Return the import statement if the binding was created by a `lazy import`.
-fn lazy_import_statement<'a>(binding: &Binding, semantic: &SemanticModel<'a>) -> Option<&'a Stmt> {
-    if !matches!(
-        binding.kind,
-        BindingKind::Import(_) | BindingKind::SubmoduleImport(_) | BindingKind::FromImport(_)
-    ) {
-        return None;
-    }
-
-    let stmt = binding.statement(semantic)?;
-    matches!(
-        stmt,
-        Stmt::Import(StmtImport { is_lazy: true, .. })
-            | Stmt::ImportFrom(StmtImportFrom { is_lazy: true, .. })
-    )
-    .then_some(stmt)
-}
-
 /// Return `true` if changing `lazy` affects only one imported name.
-pub(super) fn is_single_member_import(stmt: &Stmt) -> bool {
+fn is_single_member_import(stmt: &Stmt) -> bool {
     match stmt {
         Stmt::Import(StmtImport { names, .. }) | Stmt::ImportFrom(StmtImportFrom { names, .. }) => {
             names.len() == 1

@@ -7,14 +7,21 @@ use std::ops::{ControlFlow, Range};
 
 use indexmap::map::Entry;
 use itertools::Itertools;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::types::constraints::sequents::{Sequent, SequentMap};
+use ruff_index::{IndexVec, newtype_index};
+
+use crate::types::constraints::sequents::{Sequent, SequentGroup, SequentMap};
+use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
     ConstraintAssignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor,
     SourceOrderId, TypeVarId,
 };
 use crate::{Db, FxIndexMap, ProgramEnvironment};
+
+/// The position of an assignment in insertion order.
+#[newtype_index]
+struct AssignmentIndex;
 
 /// The collection of constraints that we know to be true or false at a certain point when
 /// traversing a BDD.
@@ -45,15 +52,16 @@ use crate::{Db, FxIndexMap, ProgramEnvironment};
 #[derive(Debug)]
 pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
-    sequents: Vec<Sequent>,
-    /// Each assignment's source constraint and the first per-path fuel value with which it was
-    /// derived.
+    sequents: Vec<Sequent<ConstraintId, u16>>,
+    /// Each assignment's source constraint and greatest remaining per-path fuel.
     pub(super) assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
-    /// Additional per-path fuel values that can derive an assignment, keyed by its index in
-    /// `assignments`. These are stored separately so that branch-local additions can be rolled
-    /// back by truncating the set. Only the greatest fuel value participates in further
-    /// derivation.
-    additional_fuels: Vec<(usize, u16)>,
+    /// Positions in `assignments`, cleared when their branch is left. Fuel stays in the map so
+    /// replenishment and rollback do not need to update these indices.
+    positive_assignment_indices: IndexVec<ConstraintId, Option<AssignmentIndex>>,
+    negative_assignment_indices: IndexVec<ConstraintId, Option<AssignmentIndex>>,
+    /// Previous fuel values, keyed by assignment index, for rolling back replenishments when
+    /// leaving a BDD branch. Keeping the maximum in `assignments` makes fuel lookups constant-time.
+    fuel_undo: Vec<(usize, u16)>,
     /// The amount of global fuel that remains across all assignments and paths.
     remaining_overall_fuel: u16,
     /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
@@ -62,6 +70,10 @@ pub(crate) struct PathAssignments {
     discovered: FxIndexMap<ConstraintId, bool>,
     /// Constraint pairs that we have already checked and added to `sequents`.
     elaborated_pairs: FxHashSet<(ConstraintId, ConstraintId)>,
+
+    /// Consequents grouped by the discovery call that introduced their sequents.
+    single_replay_consequents: FxHashMap<ConstraintId, Vec<ConstraintId>>,
+    pair_replay_consequents: FxHashMap<(ConstraintId, ConstraintId), Vec<ConstraintId>>,
 
     /// Type variables that only involve concrete constraints and so do not participate in sequent
     /// discovery.
@@ -155,13 +167,15 @@ impl PathAssignments {
         while !emitted.is_subset(&ordered)
             && let Some(constraint) = ordered.get_index(index).copied()
         {
-            if self.discovered.get(&constraint) == Some(&true)
-                && let Some(map) = storage.single_sequent_cache.get(&constraint)
-            {
-                ordered.extend(
-                    map.consequents()
-                        .filter(|constraint| self.discovered.contains_key(constraint)),
-                );
+            if self.discovered.get(&constraint) == Some(&true) {
+                if let Some(consequents) = self.single_replay_consequents.get(&constraint) {
+                    ordered.extend(
+                        consequents
+                            .iter()
+                            .copied()
+                            .filter(|constraint| self.discovered.contains_key(constraint)),
+                    );
+                }
             }
             for earlier_index in 0..index {
                 let earlier = ordered[earlier_index];
@@ -170,9 +184,13 @@ impl PathAssignments {
                 let pair = [(earlier, constraint), (constraint, earlier)]
                     .into_iter()
                     .find(|pair| self.elaborated_pairs.contains(pair));
-                if let Some(map) = pair.and_then(|pair| storage.pair_sequent_cache.get(&pair)) {
+                if let Some(consequents) =
+                    pair.and_then(|pair| self.pair_replay_consequents.get(&pair))
+                {
                     ordered.extend(
-                        map.consequents()
+                        consequents
+                            .iter()
+                            .copied()
                             .filter(|constraint| self.discovered.contains_key(constraint)),
                     );
                 }
@@ -200,9 +218,13 @@ impl PathAssignments {
         Self {
             sequents: Vec::default(),
             assignments: FxIndexMap::default(),
-            additional_fuels: Vec::default(),
+            positive_assignment_indices: IndexVec::default(),
+            negative_assignment_indices: IndexVec::default(),
+            fuel_undo: Vec::default(),
             discovered,
             elaborated_pairs: FxHashSet::default(),
+            single_replay_consequents: FxHashMap::default(),
+            pair_replay_consequents: FxHashMap::default(),
             independent_typevars,
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
             assignment_queue: VecDeque::default(),
@@ -406,7 +428,7 @@ impl PathAssignments {
         // pass along the range of which assignments are new, and so that we can reset back to this
         // point before returning.
         let start = self.assignments.len();
-        let additional_fuels_start = self.additional_fuels.len();
+        let fuel_undo_start = self.fuel_undo.len();
         let previous_remaining_overall_fuel = self.remaining_overall_fuel;
 
         // Add the new assignment and anything we can derive from it.
@@ -451,8 +473,23 @@ impl PathAssignments {
         // Reset back to where we were before following this edge, so that the caller can reuse a
         // single instance for the entire BDD traversal.
         self.assignment_queue.clear();
+        // A branch can replenish an assignment more than once. Restore in reverse order while
+        // every referenced assignment still exists.
+        for (index, previous_fuel) in self.fuel_undo.drain(fuel_undo_start..).rev() {
+            self.assignments[index].1 = previous_fuel;
+        }
+        for assignment in self.assignments[start..].keys() {
+            match *assignment {
+                ConstraintAssignment::Positive(constraint) => {
+                    self.positive_assignment_indices[constraint] = None;
+                }
+                ConstraintAssignment::Negative(constraint) => {
+                    self.negative_assignment_indices[constraint] = None;
+                }
+                ConstraintAssignment::Unconstrained(_) => {}
+            }
+        }
         self.assignments.truncate(start);
-        self.additional_fuels.truncate(additional_fuels_start);
         self.remaining_overall_fuel = previous_remaining_overall_fuel;
         result
     }
@@ -471,7 +508,35 @@ impl PathAssignments {
     }
 
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
-        self.assignments.contains_key(&assignment)
+        self.assignment_index(assignment).is_some()
+    }
+
+    fn assignment_index(&self, assignment: ConstraintAssignment) -> Option<usize> {
+        let indices = match assignment {
+            ConstraintAssignment::Positive(_) => &self.positive_assignment_indices,
+            ConstraintAssignment::Negative(_) => &self.negative_assignment_indices,
+            ConstraintAssignment::Unconstrained(_) => {
+                return self.assignments.get_index_of(&assignment);
+            }
+        };
+        indices
+            .get(assignment.constraint())
+            .copied()
+            .flatten()
+            .map(AssignmentIndex::as_usize)
+    }
+
+    fn record_assignment_index(&mut self, assignment: ConstraintAssignment, index: usize) {
+        let indices = match assignment {
+            ConstraintAssignment::Positive(_) => &mut self.positive_assignment_indices,
+            ConstraintAssignment::Negative(_) => &mut self.negative_assignment_indices,
+            ConstraintAssignment::Unconstrained(_) => return,
+        };
+        let constraint = assignment.constraint();
+        if indices.len() <= constraint.as_usize() {
+            indices.resize(constraint.as_usize() + 1, None);
+        }
+        indices[constraint] = Some(AssignmentIndex::from_usize(index));
     }
 
     fn contains_constraint(&self, constraint: ConstraintId) -> bool {
@@ -482,14 +547,104 @@ impl PathAssignments {
 
     /// Returns the greatest remaining fuel for any derivation of `assignment` on this path.
     fn max_remaining_fuel_for(&self, assignment: ConstraintAssignment) -> Option<u16> {
-        let (index, _, (_, first_fuel)) = self.assignments.get_full(&assignment)?;
-        let max_fuel = self
-            .additional_fuels
-            .iter()
-            .filter(|(fuel_index, _)| *fuel_index == index)
-            .map(|(_, fuel)| *fuel)
-            .fold(*first_fuel, u16::max);
-        Some(max_fuel)
+        self.assignment_index(assignment)
+            .map(|index| self.assignments[index].1)
+    }
+
+    fn add_sequents<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        map: &SequentMap<'db>,
+    ) -> Range<usize> {
+        fn intern_sequents<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            storage: &mut ConstraintSetStorage<'db>,
+            sequents: &[Sequent<Constraint<'db>>],
+            dest: &mut Vec<Sequent<ConstraintId, u16>>,
+        ) {
+            let sequents = sequents.iter().map(|sequent| match sequent {
+                Sequent::SingleTautology { ante } => {
+                    let ante = storage.intern_constraint(db, env, *ante);
+                    Sequent::SingleTautology { ante }
+                }
+                Sequent::PairImpossibility { ante1, ante2 } => {
+                    let ante1 = storage.intern_constraint(db, env, *ante1);
+                    let ante2 = storage.intern_constraint(db, env, *ante2);
+                    Sequent::PairImpossibility { ante1, ante2 }
+                }
+                Sequent::TripleImpossibility {
+                    ante1,
+                    ante2,
+                    ante3,
+                } => {
+                    let ante1 = storage.intern_constraint(db, env, *ante1);
+                    let ante2 = storage.intern_constraint(db, env, *ante2);
+                    let ante3 = storage.intern_constraint(db, env, *ante3);
+                    Sequent::TripleImpossibility {
+                        ante1,
+                        ante2,
+                        ante3,
+                    }
+                }
+                Sequent::PairImplication {
+                    ante1, ante2, post, ..
+                } => {
+                    let ante1 = storage.intern_constraint(db, env, *ante1);
+                    let ante2 = storage.intern_constraint(db, env, *ante2);
+                    let post = storage.intern_constraint(db, env, *post);
+                    let (ante1_depth, _) = storage.cached_constraint_bound_depth(db, env, ante1);
+                    let (ante2_depth, _) = storage.cached_constraint_bound_depth(db, env, ante2);
+                    let fuel_cost =
+                        storage.sequent_fuel_cost(db, env, post, ante1_depth.max(ante2_depth));
+                    Sequent::PairImplication {
+                        ante1,
+                        ante2,
+                        post,
+                        fuel_cost,
+                    }
+                }
+                Sequent::SingleImplication { ante, post, .. } => {
+                    let ante = storage.intern_constraint(db, env, *ante);
+                    let post = storage.intern_constraint(db, env, *post);
+                    let (ante_depth, _) = storage.cached_constraint_bound_depth(db, env, ante);
+                    let fuel_cost = storage.sequent_fuel_cost(db, env, post, ante_depth);
+                    Sequent::SingleImplication {
+                        ante,
+                        post,
+                        fuel_cost,
+                    }
+                }
+            });
+            dest.extend(sequents);
+        }
+
+        let start = self.sequents.len();
+        for group in &map.sequents {
+            match group {
+                SequentGroup::Ungrouped(sequents) => {
+                    intern_sequents(db, env, storage, sequents, &mut self.sequents);
+                }
+                SequentGroup::Grouped {
+                    equivalence,
+                    leftwards,
+                    rightwards,
+                } => {
+                    let (first, _) = equivalence.in_builder(db, storage);
+                    let (first, second) = if first.is_same_typevar_as(db, equivalence.left) {
+                        (leftwards, rightwards)
+                    } else {
+                        (rightwards, leftwards)
+                    };
+                    intern_sequents(db, env, storage, first, &mut self.sequents);
+                    intern_sequents(db, env, storage, second, &mut self.sequents);
+                }
+            }
+        }
+        let end = self.sequents.len();
+        start..end
     }
 
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
@@ -511,14 +666,36 @@ impl PathAssignments {
             return;
         }
 
-        let single_map = SequentMap::for_constraint(db, env, storage, constraint);
-        self.sequents.extend_from_slice(&single_map.sequents);
+        let constraint_data = storage.constraint_data(constraint);
+        let map = SequentMap::for_constraint(db, env, constraint_data);
+        let added = self.add_sequents(db, env, storage, map);
 
-        for (existing_index, (existing, _)) in self.discovered.iter().enumerate() {
+        // `projection_source_order` depends on knowing the order that sequents were discovered for
+        // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
+        // access to that in ConstraintSetStorage, so we need to maintain a local view of that
+        // information here.
+        self.single_replay_consequents.insert(
+            constraint,
+            self.sequents[added]
+                .iter()
+                .filter_map(|sequent| match sequent {
+                    Sequent::SingleImplication { post, .. }
+                    | Sequent::PairImplication { post, .. } => Some(*post),
+                    _ => None,
+                })
+                .collect(),
+        );
+
+        for existing_index in 0..self.discovered.len() {
+            let (existing, _) = self
+                .discovered
+                .get_index(existing_index)
+                .expect("element should be present");
             if *existing == constraint {
                 continue;
             }
 
+            let existing_data = storage.constraint_data(*existing);
             let existing_support = storage.constraint_support(*existing);
             let constraint_support = storage.constraint_support(constraint);
 
@@ -535,22 +712,38 @@ impl PathAssignments {
                 continue;
             }
 
-            if SequentMap::pair_cannot_produce_sequents(db, env, storage, *existing, constraint) {
+            if SequentMap::pair_cannot_produce_sequents(db, env, existing_data, constraint_data) {
                 continue;
             }
 
-            let (a, b) = if existing_index < constraint_index {
-                (*existing, constraint)
+            let (a, a_data, b, b_data) = if existing_index < constraint_index {
+                (*existing, existing_data, constraint, constraint_data)
             } else {
-                (constraint, *existing)
+                (constraint, constraint_data, *existing, existing_data)
             };
             if !self.elaborated_pairs.insert((a, b)) {
                 // We've already elaborated this pair of constraints.
                 continue;
             }
 
-            let pair_map = SequentMap::for_constraint_pair(db, env, storage, a, b);
-            self.sequents.extend_from_slice(&pair_map.sequents);
+            let map = SequentMap::for_constraint_pair(db, env, a_data, b_data);
+            let added = self.add_sequents(db, env, storage, map);
+
+            // `projection_source_order` depends on knowing the order that sequents were discovered for
+            // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
+            // access to that in ConstraintSetStorage, so we need to maintain a local view of that
+            // information here.
+            self.pair_replay_consequents.insert(
+                (a, b),
+                self.sequents[added]
+                    .iter()
+                    .filter_map(|sequent| match sequent {
+                        Sequent::SingleImplication { post, .. }
+                        | Sequent::PairImplication { post, .. } => Some(*post),
+                        _ => None,
+                    })
+                    .collect(),
+            );
         }
     }
 
@@ -597,7 +790,7 @@ impl PathAssignments {
         }
 
         // First add this assignment. If it causes a conflict, return that as an error.
-        if self.assignments.contains_key(&assignment.negated()) {
+        if self.assignment_holds(assignment.negated()) {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
                 assignment = %assignment.display(db, env, storage),
@@ -621,7 +814,9 @@ impl PathAssignments {
                             None => return Ok(()),
                         };
                 }
+                let index = entry.index();
                 entry.insert((source_constraint, fuel.remaining));
+                self.record_assignment_index(assignment, index);
             }
 
             Entry::Occupied(mut entry) => {
@@ -647,20 +842,12 @@ impl PathAssignments {
                 // There is another derivation of this assignment that already provides at least as
                 // much fuel as this constraint. That means replenishing the fuel won't have any
                 // effect.
-                if *existing_fuel >= fuel.remaining
-                    || self
-                        .additional_fuels
-                        .iter()
-                        .any(|(fuel_index, existing_fuel)| {
-                            *fuel_index == index && *existing_fuel >= fuel.remaining
-                        })
-                {
+                if *existing_fuel >= fuel.remaining {
                     return Ok(());
                 }
 
-                // Record the replenished fuel separately so that `walk_edge` can restore the
-                // parent branch by truncating `additional_fuels`.
-                self.additional_fuels.push((index, fuel.remaining));
+                self.fuel_undo.push((index, *existing_fuel));
+                *existing_fuel = fuel.remaining;
             }
         }
 
@@ -699,7 +886,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        sequent: Sequent,
+        sequent: Sequent<ConstraintId, u16>,
     ) -> Result<(), PathAssignmentConflict> {
         match sequent {
             Sequent::SingleTautology { ante } => {
@@ -708,12 +895,26 @@ impl PathAssignments {
             Sequent::PairImpossibility { ante1, ante2 } => {
                 self.check_pair_impossibility(db, env, storage, ante1, ante2)
             }
-            Sequent::PairImplication { ante1, ante2, post } => {
-                self.check_pair_implication(db, env, storage, ante1, ante2, post);
+            Sequent::TripleImpossibility {
+                ante1,
+                ante2,
+                ante3,
+            } => self.check_triple_impossibility(db, env, storage, ante1, ante2, ante3),
+            Sequent::PairImplication {
+                ante1,
+                ante2,
+                post,
+                fuel_cost,
+            } => {
+                self.check_pair_implication(db, storage, ante1, ante2, post, fuel_cost);
                 Ok(())
             }
-            Sequent::SingleImplication { ante, post } => {
-                self.check_single_implication(db, env, storage, ante, post);
+            Sequent::SingleImplication {
+                ante,
+                post,
+                fuel_cost,
+            } => {
+                self.check_single_implication(db, storage, ante, post, fuel_cost);
                 Ok(())
             }
         }
@@ -775,15 +976,55 @@ impl PathAssignments {
         Ok(())
     }
 
-    fn check_pair_implication<'db>(
+    fn check_triple_impossibility<'db>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         ante1: ConstraintId,
         ante2: ConstraintId,
+        ante3: ConstraintId,
+    ) -> Result<(), PathAssignmentConflict> {
+        if self.assignment_holds(ante1.when_true())
+            && self.assignment_holds(ante2.when_true())
+            && self.assignment_holds(ante3.when_true())
+        {
+            // The sequent map says (ante1 ∧ ante2 ∧ ante3) is an impossible combination, and the
+            // current path asserts that all three are true.
+            tracing::trace!(
+                target: "ty_python_semantic::types::constraints::PathAssignment",
+                ante1 = %ante1.display(db, env, storage),
+                ante2 = %ante2.display(db, env, storage),
+                ante3 = %ante3.display(db, env, storage),
+                facts = %format_args!(
+                    "[{}]",
+                    self.assignments.iter().map(|(assignment, _)| {
+                        assignment.display(db, env, storage)
+                    }).format(", "),
+                ),
+                "found contradiction",
+            );
+            return Err(PathAssignmentConflict);
+        }
+
+        Ok(())
+    }
+
+    fn check_pair_implication<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        storage: &ConstraintSetStorage<'db>,
+        ante1: ConstraintId,
+        ante2: ConstraintId,
         post: ConstraintId,
+        fuel_cost: u16,
     ) {
+        if storage
+            .constraint_data(post)
+            .is_reflexive_typevar_relation(db)
+        {
+            return;
+        }
         let Some(ante1_fuel) = self.max_remaining_fuel_for(ante1.when_true()) else {
             return;
         };
@@ -791,10 +1032,6 @@ impl PathAssignments {
             return;
         };
         let available_fuel = ante1_fuel.min(ante2_fuel);
-        let (ante1_constructor_depth, _) = storage.cached_constraint_bound_depth(db, env, ante1);
-        let (ante2_constructor_depth, _) = storage.cached_constraint_bound_depth(db, env, ante2);
-        let antecedent_constructor_depth = ante1_constructor_depth.max(ante2_constructor_depth);
-        let fuel_cost = storage.sequent_fuel_cost(db, env, post, antecedent_constructor_depth);
         if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
             self.enqueue_assignment(
                 post.when_true(),
@@ -806,22 +1043,19 @@ impl PathAssignments {
     fn check_single_implication<'db>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
+        storage: &ConstraintSetStorage<'db>,
         ante: ConstraintId,
         post: ConstraintId,
+        fuel_cost: u16,
     ) {
+        if storage
+            .constraint_data(post)
+            .is_reflexive_typevar_relation(db)
+        {
+            return;
+        }
         let Some(available_fuel) = self.max_remaining_fuel_for(ante.when_true()) else {
             return;
-        };
-        let ante_data = storage.constraint_data(ante);
-        let (antecedent_constructor_depth, _) =
-            storage.cached_constraint_bound_depth(db, env, ante);
-        let post_data = storage.constraint_data(post);
-        let fuel_cost = if post_data.is_bound_projection_of(db, ante_data) {
-            1
-        } else {
-            storage.sequent_fuel_cost(db, env, post, antecedent_constructor_depth)
         };
         if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
             self.enqueue_assignment(
@@ -861,7 +1095,7 @@ mod tests {
     ) -> ConstraintSet<'db, 'c> {
         let env = db.program_environment();
         let ty = bound.to_instance(db, &env);
-        ConstraintSet::constrain_typevar(db, &env, builder, bound_typevar, ty, ty)
+        ConstraintSet::constrain_typevar_equivalence_bound(db, &env, builder, bound_typevar, ty)
     }
 
     #[test]

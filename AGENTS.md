@@ -10,6 +10,10 @@ request already addresses the issue, do not submit a competing one without maint
 
 ## Code Review Rules
 
+For security reviews of Ruff and ty runtime changes, use the
+[threat models](agents/references/threat-models.md) to assess trust boundaries and
+calibrate severity.
+
 When reviewing a branch or pull request, be deliberately nitpicky. Report not
 only bugs and regressions, but also architectural and maintenance risks, weak
 test coverage, unclear code, unnecessary complexity, and meaningful style or
@@ -21,6 +25,10 @@ During code review, check the proposed changes against all applicable code, test
 documentation, and architectural conventions in this `AGENTS.md`. Report
 meaningful violations introduced by the changes; do not apply agent-only workflow
 instructions to PR authors or flag unrelated pre-existing issues.
+
+For security reviews of repository, CI, and release changes, use the
+[repository threat model](agents/references/repository-threat-model.md) to assess
+trust boundaries and calibrate severity.
 
 ## Writing for human readers
 
@@ -97,6 +105,7 @@ Never edit snapshot files or inline snapshot bodies manually. Regenerate them by
 - Minimize regression examples to the behavior under test. When adapting real-world code or an issue reproducer, remove incidental types, methods, type parameters, imports, and domain-specific details. Preserve complexity only when necessary to reproduce the regression or distinguish the intended behavior, and reuse nearby fixtures or simple built-in types when doing so keeps the test easy to understand.
 - Prefer a minimal, purpose-built custom type over a standard-library type when a regression depends on particular attributes, methods, bounds, or constraints. Define the relevant behavior in the test so readers do not need to look up the standard-library type to understand the scenario. For commonly used standard-library types, consider adding a separate regression using the real type to protect against changes in typeshed.
 - Place each mdtest in a file for the behavior it actually tests, and assert that behavior directly. Prefer an existing file when one already covers that behavior; create a new file when no existing file is a good fit. Do not choose a file solely because its directive or helper can express the assertion.
+- When testing generic behavior supported by both legacy and PEP 695 syntax, add equivalent cases under `generics/legacy/` and `generics/pep695/`.
 
 ## Running Clippy
 
