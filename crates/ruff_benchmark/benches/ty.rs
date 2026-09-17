@@ -1479,6 +1479,38 @@ fn benchmark_gradual_literal_union_equality(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4541>.
+///
+/// Negating a compound gradual intersection can repeatedly introduce equivalent alternatives.
+/// Keeping the expression inline forces immediate evaluation of the negation.
+fn benchmark_gradual_intersection_negation(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from typing import Any, Callable
+from ty_extensions import Intersection, Not
+
+class A: ...
+
+x: Not[
+    Intersection[
+        Any | type[A] | str,
+        Callable[..., object],
+        Not[Callable[..., object]],
+        Not[Intersection[A, type[str], Any, Not[type[Any]]]],
+    ]
+]
+"#;
+
+    criterion.bench_function("ty_micro[gradual_intersection_negation]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/3880>.
 ///
 /// Reachability analysis for a large literal OR pattern on `Any` used to rebuild the remaining
@@ -1924,6 +1956,7 @@ criterion_group!(
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_gradual_literal_union_equality,
+    benchmark_gradual_intersection_negation,
     benchmark_literal_or_pattern_reachability,
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,
