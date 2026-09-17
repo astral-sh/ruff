@@ -289,6 +289,16 @@ impl<'db> RecursiveType<'db> {
             .name()
     }
 
+    /// The source alias's definition and name, if this binder comes from an alias.
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Keep alias metadata optional for inferred recursive types"
+    )]
+    pub(super) fn alias(self, db: &'db dyn Db) -> Option<(Definition<'db>, &'db str)> {
+        // Only implicit alias inference constructs recursive types at present.
+        Some((self.definition(db), self.name(db)))
+    }
+
     /// Restore the formal arguments and remove materialization for constructor analysis.
     pub(super) fn constructor(self, db: &'db dyn Db) -> Self {
         // Like an unspecialized PEP 695 alias, parameter-flow analysis must not
