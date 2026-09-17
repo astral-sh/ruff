@@ -1928,6 +1928,12 @@ fn has_reflexive_equality_semantics<'db>(
     evaluator: &ComparisonEvaluator<'db>,
     ty: Type<'db>,
 ) -> bool {
+    if let Type::Union(union) = ty.resolve_type_alias(evaluator.db) {
+        return union
+            .elements(evaluator.db)
+            .iter()
+            .all(|element| has_reflexive_equality_semantics(evaluator, *element));
+    }
     evaluator
         .comparison_semantics(ty, ComparisonOperator::Equality)
         .is_some()

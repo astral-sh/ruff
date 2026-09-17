@@ -1,9 +1,9 @@
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::{
-    AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
-    LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionType,
+    AwaitError, Bindings, CallArguments, CallDunderError, ClassBase, KnownClass,
+    LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
+    TypeVarBoundOrConstraints, UnionType,
     call::CallErrorKind,
     context::InferContext,
     diagnostic::NOT_ITERABLE,
@@ -14,6 +14,47 @@ use compact_str::ToCompactString;
 use ruff_python_ast as ast;
 use std::borrow::Cow;
 use ty_python_core::EvaluationMode;
+
+/// Precise contents of a container display consumed before it can be aliased or mutated.
+///
+/// The ordinary inferred container type remains unchanged. These elements describe the values
+/// supplied by the display, rather than just the container's homogeneous element type.
+pub(super) enum LiteralContainerElements<'db> {
+    Sequence(Box<[Type<'db>]>),
+    /// Set construction can remove duplicates, so these elements do not describe an iteration
+    /// order or an exact length. Membership evaluation must account for hashing and equality:
+    /// custom equality could discard an element that would compare differently with the needle.
+    Set(Box<[Type<'db>]>),
+}
+
+impl<'db> LiteralContainerElements<'db> {
+    pub(super) fn from_expression(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        expression: &ast::Expr,
+        expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+    ) -> Option<Self> {
+        match expression {
+            ast::Expr::List(_) => {
+                extract_fixed_length_iterable_element_types(db, env, expression, expression_type)
+                    .map(Self::Sequence)
+            }
+            ast::Expr::Set(set) => {
+                if set.elts.iter().any(ast::Expr::is_starred_expr) {
+                    return None;
+                }
+                Some(Self::Set(set.elts.iter().map(expression_type).collect()))
+            }
+            _ => None,
+        }
+    }
+
+    pub(super) fn elements(&self) -> &[Type<'db>] {
+        match self {
+            Self::Sequence(elements) | Self::Set(elements) => elements,
+        }
+    }
+}
 
 /// Extract the element types from an expression with a statically known fixed-length iteration.
 ///
@@ -119,7 +160,35 @@ impl<'db> Type<'db> {
                 Type::RecursiveVar(_) => {
                     unreachable!("semantic operation on an unbound recursive variable")
                 }
-                Type::NominalInstance(nominal) => nominal.tuple_spec(db, env),
+                Type::NominalInstance(nominal) => {
+                    let spec = nominal.tuple_spec(db, env)?;
+                    if nominal.has_known_class(db, KnownClass::Tuple)
+                        || nominal.is_sys_version_info()
+                    {
+                        return Some(spec);
+                    }
+
+                    // A tuple subclass can yield different elements through an overridden
+                    // `__iter__`. Its stored positions describe iteration only when it inherits
+                    // the builtin implementation.
+                    for base in nominal.class(db, env).iter_mro(db) {
+                        let class = match base {
+                            ClassBase::Class(class) => class,
+                            ClassBase::Generic | ClassBase::Protocol => continue,
+                            _ => return None,
+                        };
+                        if class.known(db) == Some(KnownClass::Tuple) {
+                            return Some(spec);
+                        }
+                        if !class
+                            .own_class_member(db, env, None, "__iter__")
+                            .is_undefined()
+                        {
+                            return None;
+                        }
+                    }
+                    None
+                }
                 Type::NewTypeInstance(newtype) => {
                     non_async_special_case(db, env, newtype.concrete_base_type(db))
                 }
