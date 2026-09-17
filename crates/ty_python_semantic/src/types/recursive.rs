@@ -1,17 +1,45 @@
-//! Binding and capture-avoiding substitution for structural recursive types.
+//! Structural recursive types and their binding and substitution operations.
 //!
-//! An *open body* contains `RecursiveVar` references to an enclosing recursive binder.
-//! These variables are syntax, with no standalone type semantics. Only structural
-//! substitutions may inspect an open body. Ordinary type operations receive a *closed*
-//! type, where every recursive variable remains inside the body of its own binder,
-//! including during intermediate normalization steps.
+//! A structural recursive type describes recursion within the type itself.
+//! We write `μa. B` for a recursive type with body `B`, where occurrences of the recursive
+//! variable `a` refer to the whole type. The `μa` is called a binder: it determines
+//! what `a` refers to within `B`. For example:
 //!
-//! Substitution is *capture-avoiding*: it replaces references to the target binder
-//! without changing which binder owns any other variable. A nested binder with the
-//! same identity shadows the target in its body, but not in its arguments.
+//! ```text
+//! R = μa. tuple[int, a | None]
+//! ```
 //!
-//! For example, with type variable `T`, the alias
-//! `Tree = tuple[T, "Tree[list[T]] | None"]` has the recursive constructor:
+//! Such a recursive type is constructed, for example,
+//! from the implicit type alias `R = tuple[int, "R | None"]`.
+//!
+//! A type is *closed* if every recursive variable is bound within that type;
+//! otherwise, it is *open* (there is a dangling reference).
+//! All types exposed to ordinary type operations must be closed, including during
+//! intermediate normalization steps. The binding and substitution operations
+//! in this module must maintain that invariant: an open body cannot be passed
+//! directly to operations such as assignability checking.
+//!
+//! Substitution replaces occurrences of a variable with a type. It is
+//! *capture-avoiding* when it preserves which binder every remaining variable refers
+//! to, including variables in the inserted expression. We write `B[a := R]` for this
+//! substitution of `R` for `a` in `B`. Unfolding exposes one layer of a recursive type
+//! by substituting the whole type for its bound references:
+//!
+//! ```text
+//! unfold(μa. B) = B[a := μa. B]
+//! unfold(R) = tuple[int, R | None]
+//! ```
+//!
+//! The result is closed, so ordinary type operations can inspect it. Binding works in
+//! the other direction: it replaces applications of a recursive type with variables
+//! and encloses the resulting open body in a `RecursiveType`. Both operations respect
+//! nested binders. A variable refers to the nearest enclosing binder with the same
+//! `RecursiveCycle`; substitution does not enter that binder's body when it binds the
+//! target variable. The binder's arguments are outside its scope and are still substituted.
+//!
+//! A *type constructor* takes type arguments and produces a type. Recursive types can
+//! also be parameterized this way. With type variable `T`, the alias
+//! `Tree = tuple[T, "Tree[list[T]] | None"]` has the recursive type constructor:
 //!
 //! ```text
 //! μF. λT. tuple[T, F[list[T]] | None]
@@ -21,15 +49,8 @@
 //! The occurrence `F[list[T]]` is stored as `RecursiveVar` with the constructor's
 //! `RecursiveCycle` and unspecialized arguments `[list[T]]`.
 //!
-//! To infer the container subscript `x[1]` for `x: Tree[int]`, first unfold `x`'s type.
-//! Unfolding replaces references to the recursive binder with the recursive type
-//! itself. Writing `B[a := R]` for capture-avoiding substitution of `R` for `a` in `B`:
-//!
-//! ```text
-//! unfold(μa. B) = B[a := μa. B]
-//! ```
-//!
-//! For `Tree[int]`, substitute the constructor for `F`, then apply `T := int`:
+//! To infer `x[1]` for `x: Tree[int]`, first unfold `x`'s type: substitute the constructor
+//! for `F`, then apply `T := int`. This order closes the body before specializing it:
 //!
 //! ```text
 //! unfold((μF. λT. tuple[T, F[list[T]] | None])[int])
