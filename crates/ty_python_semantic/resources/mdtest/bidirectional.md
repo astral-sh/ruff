@@ -506,6 +506,9 @@ x5: dict[str, int] = {**42}
 
 ### Collection unions
 
+When a collection literal is inferred against a union type context, the union is narrowed to the
+first compatible element, with inference attempts performed in source-order.
+
 ```py
 from collections.abc import Mapping, Sequence
 from typing import Literal
@@ -543,6 +546,17 @@ type NestedOp[T] = T | Ops[T]
 
 x9: NestedOp[str] = {"$in": ["a", "b"]}
 reveal_type(x9)  # revealed: dict[Literal["$in", "$nin"], list[str]]
+```
+
+Tuple literals perform narrowing similarly.
+
+```py
+def _(key: str):
+    x10: tuple[int, list[str]] | tuple[str, list[int]] = (key, [True])
+    reveal_type(x10)  # revealed: tuple[str, list[int]]
+
+    x11: tuple[int, list[int]] | tuple[str, list[str]] = (key, [])
+    reveal_type(x11)  # revealed: tuple[str, list[str]]
 ```
 
 ### Binary operations
