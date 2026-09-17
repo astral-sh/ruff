@@ -57,6 +57,29 @@ def _(x: Literal[1, "a"], y: Literal[1, "a", b"b"]):
         reveal_type(y)  # revealed: Literal["a", b"b"]
 ```
 
+## A tuple of classes covers a recursive union
+
+A fixed tuple of classes can cover every alternative in a recursive union. Such an `isinstance`
+check is always true; omitting one of those classes leaves the result uncertain.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+Implicit = int | list["Implicit"]
+type Explicit = int | list[Explicit]
+
+def implicit(value: Implicit):
+    reveal_type(isinstance(value, (int, list)))  # revealed: Literal[True]
+    reveal_type(isinstance(value, (int, str)))  # revealed: bool
+
+def explicit(value: Explicit):
+    reveal_type(isinstance(value, (int, list)))  # revealed: Literal[True]
+    reveal_type(isinstance(value, (int, str)))  # revealed: bool
+```
+
 ## `classinfo` is a nested tuple of types
 
 ```py
