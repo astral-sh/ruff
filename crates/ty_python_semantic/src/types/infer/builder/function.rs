@@ -609,12 +609,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     _ => {}
                 }
             }
+            let decorated_ty = inferred_ty;
             inferred_ty = self.apply_decorator(
                 *decorator_ty,
                 inferred_ty,
                 decorator_node,
                 (!is_decorated_overload_implementation).then_some(function),
             );
+            if let Type::PropertyInstance(property) = inferred_ty {
+                inferred_ty = Type::PropertyInstance(property.with_accessor_definition(
+                    db,
+                    *decorator_ty,
+                    decorated_ty,
+                    definition,
+                ));
+            }
         }
 
         if is_decorated_overload_implementation {
