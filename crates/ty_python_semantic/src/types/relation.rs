@@ -3534,6 +3534,23 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }),
 
+            (
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(left_partial)),
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(right_partial)),
+            )
+            | (
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(left_partial)),
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(right_partial)),
+            ) => nontrivial_check(self, || {
+                self.with_recursion_guard(db, left, right, || {
+                    self.check_type_pair(
+                        db,
+                        left_partial.wrapped(db).inner(db),
+                        right_partial.wrapped(db).inner(db),
+                    )
+                })
+            }),
+
             // These types are disjoint whenever their represented objects differ.
             (
                 // `LiteralString` can represent different strings and is handled above.
