@@ -11,7 +11,7 @@ use crate::Program;
 use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_index::{FrozenIndexVec, Idx, IndexVec};
-use ruff_python_ast::{Singleton, name::Name};
+use ruff_python_ast::{self as ast, Singleton, name::Name};
 
 use crate::ProgramFile;
 use crate::ast_ids::ExpressionNodeKey;
@@ -102,14 +102,60 @@ impl PredicateOrLiteral<'_> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+/// A stable key for call-completion queries. Creating it while building predicates lets cached
+/// queries use its ID directly, without looking up its components in Salsa's intern table again.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct CallableAndCallExpr<'db> {
+    #[returns(copy)]
     pub callable: Expression<'db>,
+    #[returns(copy)]
     pub call_expr: Expression<'db>,
     /// Whether the call is wrapped in an `await` expression. If `true`, `call_expr` refers to the
     /// `await` expression rather than the call itself. This is used to detect terminal `await`s of
     /// async functions that return `Never`.
+    #[returns(copy)]
     pub is_await: bool,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for CallableAndCallExpr<'_> {}
+
+/// A call whose completion determines whether an expression statement can continue.
+#[derive(Debug)]
+pub struct StatementCall<'ast> {
+    pub call: &'ast ast::ExprCall,
+    pub is_await: bool,
+}
+
+impl<'ast> StatementCall<'ast> {
+    /// Extracts a direct or awaited call for checking whether an expression statement can return.
+    ///
+    /// Callers pass the value of an expression statement, such as `sys.exit()` or `await stop()`.
+    /// The semantic-index builder uses the returned call to record a reachability constraint:
+    /// if the call returns `Never`, subsequent statements are unreachable. The
+    /// `redundant-condition-strict` rule uses the same extraction when recognizing defensive exits.
+    ///
+    /// The `is_await` flag matters for async functions returning `Never`: calling one creates a
+    /// coroutine, while awaiting it prevents execution from continuing.
+    ///
+    /// Calls inside larger expressions, such as `1 + sys.exit()`, are deliberately excluded.
+    /// Tracking their termination would require many more reachability constraints and degrade
+    /// analysis performance.
+    pub fn from_expression(expression: &'ast ast::Expr) -> Option<Self> {
+        match expression {
+            ast::Expr::Call(call) => Some(Self {
+                call,
+                is_await: false,
+            }),
+            ast::Expr::Await(ast::ExprAwait { value, .. }) => {
+                value.as_call_expr().map(|call| Self {
+                    call,
+                    is_await: true,
+                })
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]

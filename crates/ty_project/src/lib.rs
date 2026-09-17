@@ -35,7 +35,9 @@ pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::dependency::{DependencyMetadata, DependencyProjectKind};
 use ty_python_semantic::lint::RuleSelection;
 use uv::DependencyMetadataError;
-pub use uv::{ScriptEnvironmentAvailability, UseUv, UvEnvironments, UvSyncChanges};
+pub use uv::{
+    ScriptEnvironmentAvailability, UseUv, UvEnvironments, UvSyncChanges, uv_test_env_vars,
+};
 
 mod db;
 mod files;

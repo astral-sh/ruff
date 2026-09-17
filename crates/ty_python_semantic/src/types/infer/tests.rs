@@ -3,14 +3,16 @@ use std::fmt::Write;
 
 use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
+use crate::lint::{LintSource, RuleSelection};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
 use crate::types::{KnownClass, KnownInstanceType, check_types};
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 use ruff_python_ast::PythonVersion;
+use salsa::Database as _;
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
 use ty_python_core::program::{Program, ProgramSettings};
@@ -336,7 +338,14 @@ fn not_literal_string() -> anyhow::Result<()> {
     );
     db.write_dedented("src/a.py", &content)?;
 
-    assert_file_diagnostics(&db, "src/a.py", &[]);
+    assert_file_diagnostics(
+        &db,
+        "src/a.py",
+        &[
+            "An empty string is always falsy",
+            "An empty string is always falsy",
+        ],
+    );
 
     Ok(())
 }
@@ -520,7 +529,8 @@ fn simple_assignment_does_not_enter_salsa_cycle() {
     assert_eq!(cycles, Vec::<String>::new());
 }
 
-/// Checks widening when a comparison truthiness override is present in only one iteration.
+/// Comparison truthiness widens consistently in expression, statement, and definition inference
+/// when an override is present in only one iteration.
 ///
 /// A missing override falls back to the expression type's truthiness. Widening must compare the
 /// effective truthiness from both iterations, including this fallback. Discarding an override from
@@ -542,47 +552,217 @@ fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<
     let expression = ExpressionNodeKey::from(statement.value.as_ref());
     let scope = global_scope(&db, file);
     let env = ProgramEnvironment::from_scope(scope);
-    let inference = |ty, truthiness: Option<Truthiness>| ExpressionInference {
-        expressions: [(expression, ty)].into_iter().collect(),
-        extra: truthiness.map(|truthiness| {
-            Box::new(ExpressionInferenceExtra {
-                comparison_truthiness: [(expression, truthiness)].into_iter().collect(),
-                ..ExpressionInferenceExtra::default()
-            })
-        }),
-        #[cfg(debug_assertions)]
-        scope,
+    let inference = |ty, truthiness: Option<Truthiness>| {
+        (
+            ExpressionInference {
+                expressions: [(expression, ty)].into_iter().collect(),
+                extra: truthiness.map(|truthiness| {
+                    Box::new(ExpressionInferenceExtra {
+                        comparison_truthiness: [(expression, truthiness)].into_iter().collect(),
+                        ..ExpressionInferenceExtra::default()
+                    })
+                }),
+                #[cfg(debug_assertions)]
+                scope,
+            },
+            StatementInferenceInner {
+                expressions: [(expression, ty)].into_iter().collect(),
+                bindings: Box::default(),
+                declarations: Box::default(),
+                extra: truthiness.map(|truthiness| {
+                    Box::new(StatementInferenceInnerExtra {
+                        comparison_truthiness: [(expression, truthiness)].into_iter().collect(),
+                        ..StatementInferenceInnerExtra::default()
+                    })
+                }),
+                #[cfg(debug_assertions)]
+                scope,
+            },
+            DefinitionInference {
+                expressions: [(expression, ty)].into_iter().collect(),
+                types: DefinitionTypes::Empty,
+                extra: truthiness.map(|truthiness| {
+                    Box::new(DefinitionInferenceExtra::Other(Box::new(
+                        OtherDefinitionInferenceExtra {
+                            comparison_truthiness: [(expression, truthiness)].into_iter().collect(),
+                            ..OtherDefinitionInferenceExtra::default()
+                        },
+                    )))
+                }),
+                #[cfg(debug_assertions)]
+                scope,
+            },
+        )
     };
 
-    // A previously widened condition stays ambiguous even when the new result omits its
-    // override and has a definite value-type fallback.
-    let previous = inference(Type::bool_literal(false), Some(Truthiness::Ambiguous));
-    let mut current = inference(Type::bool_literal(false), None);
-    current.widen_comparison_truthiness(&db, &env, &previous);
-    assert_eq!(
-        current.comparison_truthiness(expression),
-        Some(Truthiness::Ambiguous)
-    );
+    for (previous, current, expected) in [
+        // A previously widened condition stays ambiguous even when the new result omits its
+        // override and has a definite value-type fallback.
+        (
+            (Type::bool_literal(false), Some(Truthiness::Ambiguous)),
+            (Type::bool_literal(false), None),
+            Truthiness::Ambiguous,
+        ),
+        // A new override is compared with the previous result's value-type fallback.
+        (
+            (Type::bool_literal(true), None),
+            (Type::unknown(), Some(Truthiness::AlwaysFalse)),
+            Truthiness::Ambiguous,
+        ),
+        // Matching effective truthiness stays precise. Keep the override even though it agrees
+        // with the current type: subsequent type widening can make that fallback ambiguous again.
+        (
+            (Type::unknown(), Some(Truthiness::AlwaysFalse)),
+            (Type::bool_literal(false), None),
+            Truthiness::AlwaysFalse,
+        ),
+    ] {
+        let (previous_expression, previous_statement, previous_definition) =
+            inference(previous.0, previous.1);
+        let (mut current_expression, mut current_statement, mut current_definition) =
+            inference(current.0, current.1);
+        current_expression.widen_comparison_truthiness(&db, &env, &previous_expression);
+        current_statement.widen_comparison_truthiness(&db, &env, &previous_statement);
+        current_definition.widen_comparison_truthiness(&db, &env, &previous_definition);
+        assert_eq!(
+            current_expression.comparison_truthiness(expression),
+            Some(expected)
+        );
+        assert_eq!(
+            current_statement
+                .extra
+                .as_deref()
+                .and_then(|extra| extra.comparison_truthiness.get(&expression))
+                .copied(),
+            Some(expected)
+        );
+        assert_eq!(
+            current_definition
+                .extra
+                .as_deref()
+                .and_then(DefinitionInferenceExtra::comparison_truthiness)
+                .and_then(|overrides| overrides.get(&expression))
+                .copied(),
+            Some(expected)
+        );
+    }
 
-    // A new override is compared with the previous result's value-type fallback.
-    let previous = inference(Type::bool_literal(true), None);
-    let mut current = inference(Type::unknown(), Some(Truthiness::AlwaysFalse));
-    current.widen_comparison_truthiness(&db, &env, &previous);
-    assert_eq!(
-        current.comparison_truthiness(expression),
-        Some(Truthiness::Ambiguous)
-    );
+    Ok(())
+}
 
-    // Matching effective truthiness stays precise. Keep the override even though it agrees with
-    // the current type: subsequent type widening can make that fallback ambiguous again.
-    let previous = inference(Type::unknown(), Some(Truthiness::AlwaysFalse));
-    let mut current = inference(Type::bool_literal(false), None);
-    current.widen_comparison_truthiness(&db, &env, &previous);
-    assert_eq!(
-        current.comparison_truthiness(expression),
-        Some(Truthiness::AlwaysFalse)
-    );
+/// Resolving environment-guard provenance must not re-enter inference of the scope being checked.
+/// This lookup runs during scope inference; asking for completed use-site types would create a
+/// Salsa cycle. Cycle recovery can hide that mistake in the final diagnostics, so inspect Salsa's
+/// events as well as checking that each condition produces a diagnostic.
+#[test]
+fn redundant_condition_lookup_does_not_reenter_scope_inference() -> anyhow::Result<()> {
+    // Cover builtin names, including the numeric-compatibility special cases for `float` and
+    // `complex`, and attribute lookup using an already-inferred receiver type.
+    for source in [
+        "if isinstance({}, dict):\n    pass\n",
+        "if isinstance(1.0, float):\n    pass\n",
+        "if isinstance(1j, complex):\n    pass\n",
+        "class C:\n    flag = (1, 2)\n\nif C.flag:\n    pass\n",
+    ] {
+        let registry = crate::default_lint_registry();
+        let mut rules = RuleSelection::from_registry(registry);
+        rules.enable(
+            registry.get("redundant-condition-strict")?,
+            Severity::Warning,
+            LintSource::File,
+        );
+        let mut db = TestDbBuilder::new()
+            .with_file("/src/main.py", source)
+            .with_rule_selection(rules)
+            .build()?;
+        let file = system_path_to_file(&db, "/src/main.py")?;
+        let diagnostics = check_types(&db, program_file(&db, file));
+        // Require the diagnostic so the cycle check cannot pass merely because the redundant
+        // condition was never checked.
+        assert_eq!(diagnostics.len(), 1, "{source}\n{diagnostics:#?}");
 
+        let events = db.take_salsa_events();
+        let scope_cycles = salsa::attach(&db, || {
+            events
+                .iter()
+                .filter_map(|event| match event.kind {
+                    salsa::EventKind::WillIterateCycle { database_key, .. } => {
+                        Some(format!("{database_key:?}"))
+                    }
+                    _ => None,
+                })
+                .filter(|query| query.starts_with("infer_scope_types_impl("))
+                .collect::<Vec<_>>()
+        });
+        assert!(scope_cycles.is_empty(), "{source}\n{scope_cycles:#?}");
+    }
+    Ok(())
+}
+
+/// Repeated conditions on the same name or attribute share one cached definition summary.
+/// The first two fixtures combine many assignments to one place with many conditions that test it.
+/// Each lookup can inspect every assignment, so repeating it for every condition would make
+/// these examples quadratic even if their diagnostics were unchanged.
+/// Conditions on distinct names also share the reachability summaries for preceding calls,
+/// rather than traversing an increasingly long call prefix for each name.
+#[test]
+fn repeated_tuple_conditions_share_provenance() -> anyhow::Result<()> {
+    let repetitions = 100;
+    let names = "value = (1,)\nif value:\n    pass\n".repeat(repetitions);
+    let attributes = format!(
+        "class C:\n{}\n{}",
+        "    value = (1,)\n".repeat(repetitions),
+        "if C.value:\n    pass\n".repeat(repetitions),
+    );
+    let mut calls = String::from(
+        "def noop() -> None: ...
+",
+    );
+    for index in 0..repetitions {
+        writeln!(
+            calls,
+            "noop()
+value_{index} = (1,)
+if value_{index}:
+    pass"
+        )?;
+    }
+
+    for (source, query_name, max_queries) in [
+        (names, "name_condition_definition_info", 1),
+        (attributes, "attribute_condition_definition_info", 1),
+        (
+            calls,
+            "reachability_contains_special_cased_condition",
+            3 * repetitions,
+        ),
+    ] {
+        let mut db = TestDbBuilder::new()
+            .with_file("/src/main.py", &source)
+            .build()?;
+        let file = system_path_to_file(&db, "/src/main.py")?;
+        let diagnostics = check_types(&db, program_file(&db, file));
+        // Sharing the definition lookup must still leave a diagnostic on every condition.
+        assert_eq!(diagnostics.len(), repetitions);
+
+        // Count actual query executions, excluding cache hits. This checks reuse deterministically
+        // without a timing threshold, which would depend on the machine running the test.
+        let events = db.take_salsa_events();
+        let lookups = events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event.kind,
+                    salsa::EventKind::WillExecute { database_key }
+                        if db.ingredient_debug_name(database_key.ingredient_index()) == query_name
+                )
+            })
+            .count();
+        assert!(
+            (1..=max_queries).contains(&lookups),
+            "{query_name} should be shared across conditions; executed {lookups} queries"
+        );
+    }
     Ok(())
 }
 
@@ -891,6 +1071,125 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
         "bool"
     );
 
+    Ok(())
+}
+
+#[test]
+fn undefined_reveal_fix_updates_after_source_changes() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY311)
+        .build()?;
+
+    // Recheck the same file after changing its imports and line endings. Both function
+    // scopes should use the current file's import locations and formatting.
+    for (prefix, line_ending, fixed_prefix) in [
+        (
+            "from typing import Any\n\n",
+            "\n",
+            "from typing import Any, reveal_type\n\n",
+        ),
+        (
+            "from __future__ import annotations\r\n\r\n",
+            "\r\n",
+            "from __future__ import annotations\r\nfrom typing import reveal_type\r\n\r\n",
+        ),
+        ("", "\n", "from typing import reveal_type\n"),
+    ] {
+        let body = "def f():\n    reveal_type(1)\ndef g():\n    reveal_type(2)\n"
+            .replace('\n', line_ending);
+        let source = format!("{prefix}{body}");
+        db.write_file("/src/main.py", &source)?;
+        let file = system_path_to_file(&db, "/src/main.py")?;
+        let diagnostics = check_types(&db, program_file(&db, file));
+        let fixes: Vec<_> = diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.id() == DiagnosticId::lint("undefined-reveal"))
+            .filter_map(Diagnostic::fix)
+            .collect();
+        assert_eq!(fixes.len(), 2);
+        for fix in fixes {
+            let [edit] = fix.edits() else {
+                anyhow::bail!("expected a single import edit");
+            };
+            let mut fixed = source.clone();
+            fixed.replace_range(edit.range().to_std_range(), edit.content().unwrap_or(""));
+            assert_eq!(fixed, format!("{fixed_prefix}{body}"));
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn redundant_elif_fix_preserves_line_endings_and_checks_cleanly() -> anyhow::Result<()> {
+    let registry = crate::default_lint_registry();
+    let mut rules = RuleSelection::from_registry(registry);
+    rules.enable(
+        registry.get("redundant-condition-strict")?,
+        Severity::Warning,
+        LintSource::File,
+    );
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY311)
+        .with_rule_selection(rules)
+        .build()?;
+
+    // Reuse the file to check that edits use the current imports and source style.
+    for (newline, indent, trailing_newline, existing_import) in [
+        ("\n", "    ", true, false),
+        ("\r\n", "\t", false, true),
+        ("\r", "  ", false, false),
+    ] {
+        let mut source = format!(
+            "def f(value: str | int):\n\
+            {indent}if isinstance(value, str):\n\
+            {indent}{indent}print(value)\n\
+            {indent}elif isinstance(value, int):\n\
+            {indent}{indent}print(value)  # Inline comment.\n\
+            {indent}{indent}# Trailing comment."
+        )
+        .replace('\n', newline);
+        let (import, name) = if existing_import {
+            (
+                "from typing import assert_never as unreachable",
+                "unreachable",
+            )
+        } else {
+            ("from typing import assert_never", "assert_never")
+        };
+        if existing_import {
+            source = format!("{import}{newline}{source}");
+        }
+        if trailing_newline {
+            source.push_str(newline);
+        }
+        db.write_file("/src/main.py", &source)?;
+        let file = system_path_to_file(&db, "/src/main.py")?;
+        let diagnostics = check_types(&db, program_file(&db, file));
+        let [diagnostic] = diagnostics.as_slice() else {
+            anyhow::bail!("expected one diagnostic: {diagnostics:#?}");
+        };
+        let fix = diagnostic
+            .fix()
+            .ok_or_else(|| anyhow::anyhow!("expected an autofix"))?;
+        let mut fixed = source.clone();
+        for edit in fix.edits().iter().rev() {
+            fixed.replace_range(edit.range().to_std_range(), edit.content().unwrap_or(""));
+        }
+        let prefix = if existing_import {
+            String::new()
+        } else {
+            format!("{import}{newline}")
+        };
+        let separator = if trailing_newline { "" } else { newline };
+        assert_eq!(
+            fixed,
+            format!(
+                "{prefix}{source}{separator}{indent}else:{newline}{indent}{indent}{name}(value){newline}"
+            )
+        );
+        db.write_file("/src/main.py", fixed)?;
+        assert_file_diagnostics(&db, "/src/main.py", &[]);
+    }
     Ok(())
 }
 

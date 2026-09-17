@@ -1127,7 +1127,8 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             && setting.formatter.indent_style.is_tab()
         {
             warn_user_once!(
-                "The `format.indent-style=\"tab\"` option is incompatible with `W191`, which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`."
+                "The `format.indent-style=\"tab\"` option is incompatible with {tab_indent:#}, which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`.",
+                tab_indent = Rule::TabIndentation.name_and_code()
             );
         }
 
@@ -1142,7 +1143,9 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             && !setting.linter.flake8_implicit_str_concat.allow_multiline
         {
             warn_user_once!(
-                "The `lint.flake8-implicit-str-concat.allow-multiline = false` option is incompatible with the formatter unless `ISC001` is enabled. We recommend enabling `ISC001` or setting `allow-multiline=true`."
+                "The `lint.flake8-implicit-str-concat.allow-multiline = false` option is incompatible with the formatter unless {implicit_string_concat:#} is enabled. We recommend enabling {implicit_string_concat:#} or setting `allow-multiline=true`.",
+                implicit_string_concat =
+                    Rule::SingleLineImplicitStringConcatenation.name_and_code()
             );
         }
 
@@ -1151,7 +1154,8 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             && setting.formatter.indent_style.is_tab()
         {
             warn_user_once!(
-                "The `format.indent-style=\"tab\"` option is incompatible with `D206`, with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`."
+                "The `format.indent-style=\"tab\"` option is incompatible with {docstring_tab_indent:#}, with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`.",
+                docstring_tab_indent = Rule::DocstringTabIndentation.name_and_code()
             );
         }
 
@@ -1162,7 +1166,10 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
         ]) && setting.formatter.indent_width.value() != 4
         {
             warn_user_once!(
-                "The `format.indent-width` option with a value other than 4 is incompatible with `E111` and `E114`. We recommend disabling these rules when using the formatter, which enforces a consistent indentation width. Alternatively, set the `format.indent-width` option to `4`."
+                "The `format.indent-width` option with a value other than 4 is incompatible with {invalid_indent:#} and {invalid_comment_indent:#}. We recommend disabling these rules when using the formatter, which enforces a consistent indentation width. Alternatively, set the `format.indent-width` option to `4`.",
+                invalid_indent = Rule::IndentationWithInvalidMultiple.name_and_code(),
+                invalid_comment_indent =
+                    Rule::IndentationWithInvalidMultipleComment.name_and_code()
             );
         }
 
@@ -1178,12 +1185,16 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             ) {
                 (Quote::Double, QuoteStyle::Single) => {
                     warn_user_once!(
-                        "The `flake8-quotes.inline-quotes=\"double\"` option is incompatible with the formatter's `format.quote-style=\"single\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`."
+                        "The `flake8-quotes.inline-quotes=\"double\"` option is incompatible with the formatter's `format.quote-style=\"single\"`. We recommend disabling {bad_quotes_inline:#} and {avoidable_escaped_quote:#} when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`.",
+                        bad_quotes_inline = Rule::BadQuotesInlineString.name_and_code(),
+                        avoidable_escaped_quote = Rule::AvoidableEscapedQuote.name_and_code()
                     );
                 }
                 (Quote::Single, QuoteStyle::Double) => {
                     warn_user_once!(
-                        "The `flake8-quotes.inline-quotes=\"single\"` option is incompatible with the formatter's `format.quote-style=\"double\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`."
+                        "The `flake8-quotes.inline-quotes=\"single\"` option is incompatible with the formatter's `format.quote-style=\"double\"`. We recommend disabling {bad_quotes_inline:#} and {avoidable_escaped_quote:#} when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`.",
+                        bad_quotes_inline = Rule::BadQuotesInlineString.name_and_code(),
+                        avoidable_escaped_quote = Rule::AvoidableEscapedQuote.name_and_code()
                     );
                 }
                 _ => {}
@@ -1198,7 +1209,8 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             )
         {
             warn_user_once!(
-                "The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `\"double\"`.`"
+                "The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling {bad_quotes_multiline:#} when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `\"double\"`.`",
+                bad_quotes_multiline = Rule::BadQuotesMultilineString.name_and_code()
             );
         }
 
@@ -1210,7 +1222,8 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             )
         {
             warn_user_once!(
-                "The `flake8-quotes.docstring-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `\"double\"`.`"
+                "The `flake8-quotes.docstring-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling {bad_quotes_docstring:#} when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `\"double\"`.`",
+                bad_quotes_docstring = Rule::BadQuotesDocstring.name_and_code()
             );
         }
 

@@ -12,11 +12,12 @@ use crate::types::diagnostic::{
 };
 use crate::types::function::OverloadLiteral;
 use crate::types::set_theoretic::RecursivelyDefined;
+use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
     DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
-    UnionTypeInstance,
+    UnionType, UnionTypeInstance,
 };
 
 enum BinaryExpressionOperandTypes<'db> {
@@ -27,11 +28,110 @@ enum BinaryExpressionOperandTypes<'db> {
 type BinaryExpressionVisitor<'db> =
     CycleDetector<'db, ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
 
-/// Diagnostic state shared across the alternatives of one binary or augmented operation.
+/// Repeated conditional concatenation can double the number of tuple alternatives at each step.
+const MAX_TUPLE_ADDITION_ALTERNATIVES: usize = 32;
+/// Repeated doubling (`x = x + x`) can grow a single tuple without introducing any union.
+const MAX_TUPLE_ADDITION_ELEMENTS: usize = 4096;
+
+/// State shared across the alternatives of one binary or augmented operation.
 #[derive(Default)]
 pub(super) struct BinaryInferenceState<'db> {
-    pub(super) emitted_division_by_zero_diagnostic: bool,
+    emitted_division_by_zero_diagnostic: bool,
     pub(super) deprecated_functions: Vec<OverloadLiteral<'db>>,
+    used_tuple_addition: bool,
+}
+
+impl<'db> BinaryInferenceState<'db> {
+    fn tuple_alternative_count(db: &'db dyn Db, ty: Type<'db>) -> usize {
+        match ty {
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .map(|ty| Self::tuple_alternative_count(db, *ty))
+                .sum(),
+            // Adding an alias can expose more tuples, so check the expanded result.
+            Type::TypeAlias(_) => MAX_TUPLE_ADDITION_ALTERNATIVES,
+            _ => usize::from(ty.exact_tuple_instance_spec(db).is_some()),
+        }
+    }
+
+    /// Limit intermediate unions as well as the final result: waiting until all operands
+    /// have been expanded can first construct an exponentially large union of tuples.
+    pub(super) fn try_map_union<E>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        union: UnionType<'db>,
+        mut transform: impl FnMut(Type<'db>, &mut Self) -> Result<Type<'db>, E>,
+    ) -> Result<Type<'db>, E> {
+        let mut result = UnionBuilder::new(db, env);
+        let mut tuple_alternatives = 0;
+        for element in union.elements(db) {
+            let mapped = transform(*element, self)?;
+            tuple_alternatives += Self::tuple_alternative_count(db, mapped);
+            result.add_in_place(mapped);
+            // This count can include redundant alternatives. Rebuild only when widening
+            // might be needed, so unrelated custom-operator results accumulate normally.
+            if self.used_tuple_addition && tuple_alternatives >= MAX_TUPLE_ADDITION_ALTERNATIVES {
+                let limited = self.limit_tuple_addition_result(db, env, result.build());
+                tuple_alternatives = Self::tuple_alternative_count(db, limited);
+                result = UnionBuilder::new(db, env).add(limited);
+            }
+        }
+        Ok(result
+            .or_recursively_defined(union.recursively_defined(db))
+            .build())
+    }
+
+    /// Bound tuple alternatives produced by addition while preserving other operator results.
+    fn limit_tuple_addition_result(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        if !self.used_tuple_addition {
+            return ty;
+        }
+        let Some(union) = ty.as_union() else {
+            return ty;
+        };
+        if union.elements(db).len() < MAX_TUPLE_ADDITION_ALTERNATIVES
+            || union
+                .elements(db)
+                .iter()
+                .filter(|ty| ty.exact_tuple_instance_spec(db).is_some())
+                .count()
+                < MAX_TUPLE_ADDITION_ALTERNATIVES
+        {
+            return ty;
+        }
+
+        let mut elements = UnionBuilder::new(db, env).unpack_aliases(false);
+        let mut result = UnionBuilder::new(db, env)
+            .unpack_aliases(false)
+            .or_recursively_defined(union.recursively_defined(db));
+        for alternative in union.elements(db) {
+            if let Some(tuple) = alternative.exact_tuple_instance_spec(db) {
+                for element in tuple.iter_element_types(db) {
+                    elements.add_in_place(element);
+                }
+            } else {
+                result.add_in_place(*alternative);
+            }
+        }
+        let elements = elements.build();
+        // A fixed tuple containing Never can be inhabited by a subclass. Widening must not
+        // turn a nonempty tuple into `tuple[()]`, as `tuple[Never, ...]` would do.
+        let elements = if elements.is_never() {
+            Type::object()
+        } else {
+            elements
+        };
+        result
+            .add(Type::homogeneous_tuple(db, env, elements))
+            .build()
+    }
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -326,14 +426,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         op: ast::Operator,
         state: &mut BinaryInferenceState<'db>,
     ) -> Option<Type<'db>> {
-        self.infer_binary_expression_type_impl(
+        let result = self.infer_binary_expression_type_impl(
             node,
             left_ty,
             right_ty,
             op,
             &BinaryExpressionVisitor::new(Some(Type::Never)),
             state,
-        )
+        )?;
+        Some(state.limit_tuple_addition_result(self.db(), self.program_environment(), result))
     }
 
     fn infer_binary_expression_type_impl(
@@ -364,12 +465,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         match (left_ty, right_ty, op) {
-            (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, env, |lhs_element| {
-                self.infer_binary_expression_type_impl(node, *lhs_element, rhs, op, visitor, state)
-            }),
-            (lhs, Type::Union(rhs_union), _) => rhs_union.try_map(db, env, |rhs_element| {
-                self.infer_binary_expression_type_impl(node, lhs, *rhs_element, op, visitor, state)
-            }),
+            (Type::Union(lhs_union), rhs, _) => state
+                .try_map_union(db, env, lhs_union, |lhs_element, state| {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        lhs_element,
+                        rhs,
+                        op,
+                        visitor,
+                        state,
+                    )
+                    .ok_or(())
+                })
+                .ok(),
+            (lhs, Type::Union(rhs_union), _) => state
+                .try_map_union(db, env, rhs_union, |rhs_element, state| {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        lhs,
+                        rhs_element,
+                        op,
+                        visitor,
+                        state,
+                    )
+                    .ok_or(())
+                })
+                .ok(),
 
             (Type::TypeAlias(alias), rhs, _) => visitor.visit(db, (left_ty, op, right_ty), || {
                 self.infer_binary_expression_type_impl(
@@ -557,6 +678,40 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             (todo @ Type::Dynamic(DynamicType::Todo(_)), _, _)
             | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
+
+            (left, right, ast::Operator::Add)
+                if let Some(left_tuple) = left.exact_tuple_instance_spec(db)
+                    && let Some(right_tuple) = right.exact_tuple_instance_spec(db) =>
+            {
+                state.used_tuple_addition = true;
+                // As with tuple slicing and iteration, assume that values typed as `tuple`
+                // have the usual behavior even though they could be subclass instances.
+                // Explicitly known subclasses still use their operator methods below.
+                if left_tuple
+                    .len()
+                    .minimum()
+                    .saturating_add(right_tuple.len().minimum())
+                    > MAX_TUPLE_ADDITION_ELEMENTS
+                {
+                    let elements = UnionType::from_elements_leave_aliases(
+                        db,
+                        env,
+                        left_tuple
+                            .iter_element_types(db)
+                            .chain(right_tuple.iter_element_types(db)),
+                    );
+                    let elements = if elements.is_never() {
+                        Type::object()
+                    } else {
+                        elements
+                    };
+                    return Some(Type::homogeneous_tuple(db, env, elements));
+                }
+                let tuple = TupleSpecBuilder::from(left_tuple.as_ref())
+                    .concat(db, env, right_tuple.as_ref())
+                    .build();
+                Some(Type::tuple(TupleType::new(db, env, &tuple)))
+            }
 
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 

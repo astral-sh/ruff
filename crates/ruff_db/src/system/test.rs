@@ -1,16 +1,17 @@
 use ruff_notebook::{Notebook, NotebookError};
-use rustc_hash::FxHashMap;
 use std::panic::RefUnwindSafe;
+use std::process::Output;
 use std::sync::{Arc, Mutex};
 
 use crate::Db;
 use crate::files::File;
 use crate::system::{
-    CommandExecutor, DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath,
-    SystemPathBuf, SystemVirtualPath, WhichError, WhichResult,
+    Command, CommandExecutor, DirectoryEntry, MemoryFileSystem, Metadata, Result, System,
+    SystemPath, SystemPathBuf, SystemVirtualPath, WhichError, WhichResult,
 };
 
 use super::WritableSystem;
+use super::command::CommandEnv;
 use super::walk_directory::WalkDirectoryBuilder;
 
 /// System implementation intended for testing.
@@ -23,16 +24,15 @@ use super::walk_directory::WalkDirectoryBuilder;
 #[derive(Debug)]
 pub struct TestSystem {
     inner: Arc<dyn WritableSystem + RefUnwindSafe + Send + Sync>,
-    /// Environment variable overrides. If a key is present here, it takes precedence
-    /// over the inner system's environment variables.
-    env_overrides: Arc<Mutex<FxHashMap<String, Option<String>>>>,
+    /// Environment changes shared by system lookups and cloned command executors.
+    environment: Arc<Mutex<CommandEnv>>,
 }
 
 impl Clone for TestSystem {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            env_overrides: self.env_overrides.clone(),
+            environment: self.environment.clone(),
         }
     }
 }
@@ -41,21 +41,36 @@ impl TestSystem {
     pub fn new(inner: impl WritableSystem + RefUnwindSafe + Send + Sync + 'static) -> Self {
         Self {
             inner: Arc::new(inner),
-            env_overrides: Arc::new(Mutex::new(FxHashMap::default())),
+            environment: Arc::new(Mutex::new(CommandEnv::default())),
         }
+    }
+
+    /// Clears the inherited environment and any previously set variables.
+    pub fn clear_env_vars(&self) {
+        self.environment.lock().unwrap().clear();
     }
 
     /// Sets an environment variable override. This takes precedence over the inner system.
     pub fn set_env_var(&self, name: impl Into<String>, value: impl Into<String>) {
-        self.env_overrides
-            .lock()
-            .unwrap()
-            .insert(name.into(), Some(value.into()));
+        self.environment.lock().unwrap().set(name, value);
+    }
+
+    /// Sets multiple environment variable overrides.
+    pub fn set_env_vars<I, K, V>(&self, variables: I)
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        let mut environment = self.environment.lock().unwrap();
+        for (name, value) in variables {
+            environment.set(name, value);
+        }
     }
 
     /// Removes an environment variable override, making it appear as not set.
     pub fn remove_env_var(&self, name: impl Into<String>) {
-        self.env_overrides.lock().unwrap().insert(name.into(), None);
+        self.environment.lock().unwrap().remove(name);
     }
 
     /// Returns the [`InMemorySystem`].
@@ -140,8 +155,20 @@ impl System for TestSystem {
         Err(WhichError::CannotFindBinaryPath)
     }
 
+    fn run_command(&self, mut command: Command) -> Result<Output> {
+        let system = self.system();
+        let Some(executor) = system.command_executor() else {
+            return system.run_command(command);
+        };
+
+        command.env_merge(&self.environment.lock().unwrap());
+
+        executor.execute(command)
+    }
+
     fn command_executor(&self) -> Option<&dyn CommandExecutor> {
-        self.system().command_executor()
+        self.system().command_executor()?;
+        Some(self)
     }
 
     fn read_directory<'a>(
@@ -168,18 +195,29 @@ impl System for TestSystem {
     }
 
     fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
-        // Check overrides first
-        if let Some(override_value) = self.env_overrides.lock().unwrap().get(name) {
-            return match override_value {
-                Some(value) => Ok(value.clone()),
-                None => Err(std::env::VarError::NotPresent),
-            };
+        let (value, clear) = {
+            let environment = self.environment.lock().unwrap();
+            (environment.get(name).cloned(), environment.get_clear())
+        };
+        match value {
+            Some(Some(value)) => Ok(value),
+            Some(None) => Err(std::env::VarError::NotPresent),
+            None if clear => Err(std::env::VarError::NotPresent),
+            None => self.system().env_var(name),
         }
-        // Fall back to inner system
-        self.system().env_var(name)
     }
 
     fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
+    }
+}
+
+impl CommandExecutor for TestSystem {
+    fn execute(&self, command: Command) -> Result<Output> {
+        self.run_command(command)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn CommandExecutor> {
         Box::new(self.clone())
     }
 }
@@ -208,31 +246,30 @@ impl WritableSystem for TestSystem {
     }
 }
 
-/// Extension trait for databases that use a [`WritableSystem`].
+/// File-writing helpers for databases, intended for tests.
 ///
-/// Provides various helper function that ease testing.
+/// Writes return an error when the database's system does not support writing.
 pub trait DbWithWritableSystem: Db + Sized {
-    type System: WritableSystem;
-
-    fn writable_system(&self) -> &Self::System;
+    /// Returns the writable system, or an error if writing is unsupported.
+    fn writable_system(&self) -> Result<&dyn WritableSystem>;
 
     /// Writes the content of the given file and notifies the Db about the change.
     fn write_file(&mut self, path: impl AsRef<SystemPath>, content: impl AsRef<str>) -> Result<()> {
         let path = path.as_ref();
-        match self.writable_system().write_file(path, content.as_ref()) {
+        match self.writable_system()?.write_file(path, content.as_ref()) {
             Ok(()) => {
                 File::sync_path(self, path);
                 Ok(())
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 if let Some(parent) = path.parent() {
-                    self.writable_system().create_directory_all(parent)?;
+                    self.writable_system()?.create_directory_all(parent)?;
 
                     for ancestor in parent.ancestors() {
                         File::sync_path(self, ancestor);
                     }
 
-                    self.writable_system().write_file(path, content.as_ref())?;
+                    self.writable_system()?.write_file(path, content.as_ref())?;
                     File::sync_path(self, path);
 
                     Ok(())
@@ -313,10 +350,8 @@ impl<T> DbWithWritableSystem for T
 where
     T: DbWithTestSystem,
 {
-    type System = TestSystem;
-
-    fn writable_system(&self) -> &Self::System {
-        self.test_system()
+    fn writable_system(&self) -> Result<&dyn WritableSystem> {
+        Ok(self.test_system())
     }
 }
 

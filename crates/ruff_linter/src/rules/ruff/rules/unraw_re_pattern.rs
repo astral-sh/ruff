@@ -18,7 +18,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// their first arguments are not raw strings:
 ///
 /// - For `regex` and `re`: `compile`, `findall`, `finditer`,
-///   `fullmatch`, `match`, `search`, `split`, `sub`, `subn`.
+///   `fullmatch`, `match`, `prefixmatch`, `search`, `split`, `sub`, `subn`.
 /// - `regex`-specific: `splititer`, `subf`, `subfn`, `template`.
 ///
 /// ## Why is this bad?
@@ -97,8 +97,8 @@ enum RegexModule {
 impl RegexModule {
     fn is_function_taking_pattern(self, name: &str) -> bool {
         match name {
-            "compile" | "findall" | "finditer" | "fullmatch" | "match" | "search" | "split"
-            | "sub" | "subn" => true,
+            "compile" | "findall" | "finditer" | "fullmatch" | "match" | "prefixmatch"
+            | "search" | "split" | "sub" | "subn" => true,
             "splititer" | "subf" | "subfn" | "template" => self == Self::Regex,
             _ => false,
         }

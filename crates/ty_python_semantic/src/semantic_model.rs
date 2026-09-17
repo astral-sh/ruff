@@ -128,7 +128,7 @@ impl<'db> SemanticModel<'db> {
     ///
     /// The symbols are the symbols in scope at the given
     /// AST node.
-    pub fn members_in_scope_at(
+    pub(crate) fn members_in_scope_at(
         &self,
         node: ast::AnyNodeRef<'_>,
     ) -> FxHashMap<Name, MemberDefinition<'db>> {
@@ -702,9 +702,9 @@ impl<'db> SemanticModel<'db> {
 
 /// The type and definition of a symbol.
 #[derive(Clone, Debug)]
-pub struct MemberDefinition<'db> {
-    pub ty: Type<'db>,
-    pub first_reachable_definition: Definition<'db>,
+pub(crate) struct MemberDefinition<'db> {
+    pub(crate) ty: Type<'db>,
+    pub(crate) first_reachable_definition: Definition<'db>,
 }
 
 /// A classification of symbol names.

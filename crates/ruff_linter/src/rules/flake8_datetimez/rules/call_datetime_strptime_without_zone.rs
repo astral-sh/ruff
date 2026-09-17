@@ -120,12 +120,12 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &Checker, call: &ast:
             Expr::FString(ast::ExprFString { value, .. }) => {
                 for f_string_part in value {
                     match f_string_part {
-                        ast::FStringPart::Literal(string) => {
+                        ast::FStringPartRef::Literal(string) => {
                             if string.contains("%z") {
                                 return;
                             }
                         }
-                        ast::FStringPart::FString(f_string) => {
+                        ast::FStringPartRef::FString(f_string) => {
                             if f_string
                                 .elements
                                 .literals()

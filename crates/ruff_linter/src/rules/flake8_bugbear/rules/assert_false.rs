@@ -64,9 +64,9 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
             })),
             arguments: Arguments {
                 args: if let Some(msg) = msg {
-                    Box::from([msg.clone()])
+                    [msg.clone()].into()
                 } else {
-                    Box::from([])
+                    [].into()
                 },
                 keywords: std::iter::empty().collect(),
                 range: TextRange::default(),

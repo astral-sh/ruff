@@ -578,6 +578,52 @@ def unions_are_different(t1: int | str, t2: int | str) -> int | str:
     return t1 + t2
 ```
 
+## Equality with constrained typevars
+
+`False` compares equal to `0` without belonging to `Literal[0]`. Comparing it with a constrained
+type variable therefore does not imply that it has the same type as that variable:
+
+```py
+from typing import Literal, TypedDict, TypeVar
+
+T = TypeVar("T", Literal[0], Literal[2])
+
+def equal_values(value: Literal[False, 2], other: T):
+    if value == other:
+        reveal_type(value)  # revealed: Literal[False, 2]
+```
+
+Both tuple tags can match one of the type variable's constraints, so equality preserves both tuples.
+The same applies when an inequality comparison is false:
+
+```py
+def equal_tuple_tags(value: tuple[Literal[False], str] | tuple[Literal[2], int], other: T):
+    if value[0] == other:
+        reveal_type(value)  # revealed: tuple[Literal[False], str] | tuple[Literal[2], int]
+
+    if value[0] != other:
+        reveal_type(value)  # revealed: tuple[Literal[False], str] | tuple[Literal[2], int]
+    else:
+        reveal_type(value)  # revealed: tuple[Literal[False], str] | tuple[Literal[2], int]
+```
+
+Equality likewise preserves both `TypedDict` variants. Since `FalseTag` can match when `other` is
+`0`, the comparison does not make a field exclusive to `TwoTag` available:
+
+```py
+class FalseTag(TypedDict):
+    tag: Literal[False]
+
+class TwoTag(TypedDict):
+    tag: Literal[2]
+    two_only: int
+
+def equal_dictionary_tags(value: FalseTag | TwoTag, other: T):
+    if value["tag"] == other:
+        reveal_type(value)  # revealed: FalseTag | TwoTag
+        value["two_only"]  # error: [invalid-key] "Unknown key "two_only" for TypedDict `FalseTag`"
+```
+
 ## Constraints containing `Any`
 
 A heterogeneous collection can infer a union of tuple types. If every member of that union is

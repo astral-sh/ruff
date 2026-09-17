@@ -733,6 +733,7 @@ fn apply_sync_result(
         // previous metadata was cleared along with its virtual-environment path.
         //
         // FIXME: This is overbroad. A file watcher can tell us precisely what changed.
+        // Remove this fallback once the language server also watches script environments.
         // Changes inside virtual environments should instead be watched and processed through `ProjectDatabase::apply_changes`.
         // Using a file watcher also ensures that virtual environment changes in
         // scripts without using uv are detected.
@@ -960,7 +961,7 @@ mod tests {
 
         use super::super::{ScriptEnvironmentAvailability, UvSyncChanges, script_environment};
         use crate::db::testing::TestDb;
-        use crate::{Db as _, ProjectMetadata, UseUv};
+        use crate::{Db as _, ProjectMetadata, UseUv, uv_test_env_vars};
 
         #[test]
         fn newer_project_refresh_discards_old_metadata() -> anyhow::Result<()> {
@@ -1248,6 +1249,8 @@ mod tests {
 
             fn sync_workspace(&self) -> anyhow::Result<()> {
                 let output = Command::new(self.db.test_system().env_var(EnvVars::UV)?)
+                    .env_clear()
+                    .envs(uv_test_env_vars())
                     .current_dir(self.db.project().root(&self.db))
                     .args(["sync", "--offline"])
                     .output()?;
@@ -1277,6 +1280,8 @@ mod tests {
                     root.join("bin/python")
                 };
                 let output = Command::new(python.as_std_path())
+                    .env_clear()
+                    .envs(uv_test_env_vars())
                     .args(["-c", &format!("import {module}")])
                     .output()?;
 
@@ -1298,18 +1303,11 @@ mod tests {
                 let metadata = ProjectMetadata::new("test", root.clone()).with_use_uv(use_uv);
                 let mut db = TestDb::new(metadata);
                 db.use_system(OsSystem::new(&root));
+                db.test_system().clear_env_vars();
+                db.test_system().set_env_vars(uv_test_env_vars());
 
                 let uv = OsSystem::default().which("uv")?;
                 db.test_system().set_env_var(EnvVars::UV, uv.as_str());
-                for name in [
-                    EnvVars::VIRTUAL_ENV,
-                    EnvVars::CONDA_PREFIX,
-                    EnvVars::CONDA_DEFAULT_ENV,
-                    EnvVars::CONDA_ROOT,
-                    EnvVars::PYTHONPATH,
-                ] {
-                    db.test_system().remove_env_var(name);
-                }
 
                 let path = root.join(file_name);
                 db.write_dedented(path.as_str(), source)?;

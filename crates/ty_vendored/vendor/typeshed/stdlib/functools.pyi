@@ -329,6 +329,13 @@ class partial(Generic[_T]):
     def __call__(self, /, *args: Any, **kwargs: Any) -> _T:
         """Call self as a function."""
 
+    if sys.version_info >= (3, 14):
+        @overload
+        def __get__(self, instance: None, owner: type[Any] | None = None, /) -> Self:
+            """Return an attribute of instance, which is of type owner."""
+        @overload
+        def __get__(self, instance: object, owner: type[Any] | None = None, /) -> Callable[..., _T]: ...
+
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """partial is generic over the wrapped function's return type"""
 

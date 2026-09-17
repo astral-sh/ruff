@@ -209,9 +209,9 @@ a = A(x=B(x=C(x=A(x=None))))
 reveal_type(a.x)  # revealed: B | None
 
 if a.x:
-    reveal_type(a.x and a.x.x)  # revealed: C
-    reveal_type(a.x and a.x.x.x)  # revealed: A
-    reveal_type(a.x and a.x.x.x.x)  # revealed: B | None
+    reveal_type(a.x.x)  # revealed: C
+    reveal_type(a.x.x.x)  # revealed: A
+    reveal_type(a.x.x.x.x)  # revealed: B | None
 
 A(x=42)  # error: [invalid-argument-type]
 
@@ -1515,7 +1515,7 @@ def expects_named_tuple(x: typing.NamedTuple):
     reveal_type(x.__iter__)
 
 def _(y: type[typing.NamedTuple]):
-    reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
+    reveal_type(y)  # revealed: type[tuple[object, ...]] & type[NamedTupleLike]
 
 # error: [invalid-type-form] "Special form `typing.NamedTuple` expected no type parameter"
 def _(z: typing.NamedTuple[int]): ...

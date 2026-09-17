@@ -65,7 +65,7 @@ jobs:
   # Push the changes to a new branch on the upstream repository.
   sync:
     name: Sync typeshed
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     timeout-minutes: 20
     # Don't run the cron job on forks:
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
@@ -87,9 +87,11 @@ jobs:
         run: |
           git config --global user.name typeshedbot
           git config --global user.email '<>'
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
-          version: "0.12.9"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
       - name: Sync typeshed stubs
         run: |
           rm -rf "ruff/${VENDORED_TYPESHED}"
@@ -143,9 +145,11 @@ jobs:
         with:
           persist-credentials: true
           ref: ${{ env.UPSTREAM_BRANCH}}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
-          version: "0.12.9"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.11"
+          checksum: "e94225dea91e051472847bd6d146d7d66c4f54ffcd1f106678866a99580845f9"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -185,9 +189,11 @@ jobs:
         with:
           persist-credentials: true
           ref: ${{ env.UPSTREAM_BRANCH}}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
-          version: "0.12.9"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.11"
+          checksum: "e01b69ee15e81918d5e8fc9cf39b3db7f59c5576e5e306cd9b7aeb2c7b7321c3"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -269,9 +275,11 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
-          version: "0.12.9"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
       - name: Update snapshots
         # Snapshot failures are force-passed by cargo-insta, but other tests might still fail
         # in this test, causing the step overall to fail. We want to continue to later steps
@@ -296,7 +304,7 @@ jobs:
   # Publish the required changes even if the best-effort snapshot update failed or timed out.
   create-pr:
     name: Create PR
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     timeout-minutes: 5
     needs: [sync, docstrings-windows, docstrings-macos, update-snapshots]
 
@@ -314,7 +322,7 @@ jobs:
 
   create-issue-on-failure:
     name: Create an issue if the typeshed sync failed
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     needs: [sync, docstrings-windows, docstrings-macos, create-pr]
 
     # update-snapshots is deliberately NOT included here: it shouldn't block PR creation if it fails or times out,

@@ -939,9 +939,22 @@ mod tests {
 
     use crate::db::tests::setup_db;
     use crate::place::global_symbol;
-    use crate::types::{DynamicType, SpecialFormType, Type};
+    use crate::types::{DynamicType, Parameter, Parameters, SpecialFormType, Type};
 
-    use super::{CollectedTypes, materialization_is_noop};
+    use super::{CollectedTypes, dynamic_content, materialization_is_noop};
+
+    #[test]
+    fn fully_static_paramspec_value_has_no_dynamic_content() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let paramspec_value = Type::paramspec_value_callable(
+            &db,
+            Parameters::standard([
+                Parameter::positional_only(None).with_annotated_type(Type::object())
+            ]),
+        );
+        assert!(dynamic_content(&db, &env, paramspec_value).is_absent());
+    }
 
     #[test]
     fn materialization_noop_checks_hidden_function_types() -> anyhow::Result<()> {

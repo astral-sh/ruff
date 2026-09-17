@@ -506,6 +506,9 @@ x5: dict[str, int] = {**42}
 
 ### Collection unions
 
+When a collection literal is inferred against a union type context, the union is narrowed to the
+first compatible element, with inference attempts performed in source-order.
+
 ```py
 from collections.abc import Mapping, Sequence
 from typing import Literal
@@ -543,6 +546,17 @@ type NestedOp[T] = T | Ops[T]
 
 x9: NestedOp[str] = {"$in": ["a", "b"]}
 reveal_type(x9)  # revealed: dict[Literal["$in", "$nin"], list[str]]
+```
+
+Tuple literals perform narrowing similarly.
+
+```py
+def _(key: str):
+    x10: tuple[int, list[str]] | tuple[str, list[int]] = (key, [True])
+    reveal_type(x10)  # revealed: tuple[str, list[int]]
+
+    x11: tuple[int, list[int]] | tuple[str, list[str]] = (key, [])
+    reveal_type(x11)  # revealed: tuple[str, list[str]]
 ```
 
 ### Binary operations
@@ -1614,9 +1628,7 @@ def _(flag: bool):
     def _(c: C):
         c.x = reveal_type([1])  # revealed: list[int]
 
-        # TODO: Use the parameter type of `__set__` as type context to avoid this error.
-        # error: [invalid-assignment]
-        C.x = [1]
+        C.x = reveal_type([1])  # revealed: list[Literal[1]]
 ```
 
 For union targets, each element of the union is considered as a separate type context:
@@ -1901,6 +1913,51 @@ def use_sort(value: Mapping[Path, Literal[1, -1]]) -> None: ...
 params: SortParams[Path] | None = None
 sort = build_sort_spec(params) or {"name": -1}
 use_sort(sort)
+```
+
+An unspecialized collection parameter is not useful type context for a collection literal. The other
+operand of a conditional or boolean expression can supply it instead:
+
+```py
+def f[T](values: list[T]) -> list[T]:
+    return values
+
+def _(values: list[object], flag: bool):
+    reveal_type(f(values if flag else [1]))  # revealed: list[object]
+    reveal_type(f([1] if flag else values))  # revealed: list[object]
+    reveal_type(f(values or [1]))  # revealed: list[object]
+    reveal_type(f(values and [1]))  # revealed: list[object]
+```
+
+The same applies to set literals:
+
+```py
+def g[T](values: set[T]) -> set[T]:
+    return values
+
+def _(values: set[object], flag: bool):
+    reveal_type(g(values if flag else {1}))  # revealed: set[object]
+    reveal_type(g({1} if flag else values))  # revealed: set[object]
+    reveal_type(g(values or {1}))  # revealed: set[object]
+```
+
+As well as generic constructors:
+
+```py
+def _(values: dict[str | None, object], flag: bool):
+    reveal_type(dict(values if flag else {None: None}))  # revealed: dict[str | None, object]
+    reveal_type(dict({None: None} if flag else values))  # revealed: dict[str | None, object]
+    reveal_type(dict(values or {None: None}))  # revealed: dict[str | None, object]
+```
+
+Explicit gradual element types remain preferred over the other operand's specialization:
+
+```py
+from typing import Any
+
+def _(values: list[int], flag: bool):
+    x: list[Any] = values if flag else reveal_type([])  # revealed: list[Any]
+    reveal_type(x)  # revealed: list[Any]
 ```
 
 ## Lambda expressions
@@ -2750,6 +2807,15 @@ def _() -> list[int | None]:
 def _() -> int:
     invalid_x6 = []
     return invalid_x6  # error: [invalid-return-type]
+```
+
+A return annotation can provide a union of fixed-length tuple element types. Inferring an empty list
+from this context doesn't wrongly widen the type of `result` to a list of variable-length tuples:
+
+```py
+def tuples() -> list[tuple[()] | tuple[int]]:
+    result = []
+    return result
 ```
 
 ```py
