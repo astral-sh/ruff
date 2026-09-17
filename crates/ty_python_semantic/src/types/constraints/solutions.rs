@@ -356,12 +356,34 @@ impl<'db> SolutionWalker<'db> {
         // want to report separate tightened solutions for each declared constraint. Rather, we
         // want to report the dynamic type or typevar itself as the solution.
 
-        // First determine which declared constraints are satisfied by this solution.
-        let previously_pending = self.pending.len();
-        let mut constraint_solutions = SmallVec::<[Range<usize>; 4]>::default();
-        for declared_constraint in &constrained_typevar.declared_constraints {
-            let start = self.pending.len();
-            if let Some(constraints) = declared_constraint.constraints.as_deref() {
+        // First see if we should return a "family" solution. If _every_ declared constraint is
+        // satisfied, _and_ the solution is either dynamic or another typevar, then we can consider
+        // using the solution as-is, rather than trying to force it to be exactly equal to one of
+        // the declared constraints. (We call this a "family" solution since it's a single solution
+        // that satisfies the entire family of declared constraints.)
+        let has_non_concrete_evidence = path
+            .positive_constraints()
+            .map(|(constraint, _)| storage.constraint_data(constraint))
+            .filter(|constraint| {
+                // Constraints involving other typevars are not relevant
+                constraint.provides_bound_for(db, bound_typevar)
+            })
+            .all(|constraint| {
+                // None means the typevar is constrained by another typevar; otherwise check if
+                // the concrete constraint is dynamic
+                constraint
+                    .as_concrete()
+                    .is_none_or(|(_, constrained_ty)| !constrained_ty.is_fully_static(db, env))
+            });
+        if has_non_concrete_evidence {
+            let mut any_trivial_failures = false;
+            for declared_constraint in &constrained_typevar.declared_constraints {
+                let Some(constraints) = declared_constraint.constraints.as_deref() else {
+                    any_trivial_failures = true;
+                    break;
+                };
+
+                let mut satisfied = false;
                 self.visit_constraints_and_then(
                     db,
                     env,
@@ -369,64 +391,27 @@ impl<'db> SolutionWalker<'db> {
                     limits,
                     path,
                     constraints,
-                    &mut |this, storage, limits, path| {
-                        // The candidate solution satisfies this declared constraint, but we still
-                        // need to check any remaining constrained typevars.
-                        this.validate_constrained_and_then(
-                            db,
-                            env,
-                            storage,
-                            limits,
-                            path,
-                            constrained,
-                            process_satisfied,
-                        )
+                    &mut |_this, _storage, _limits, _path| {
+                        // We don't need to use pending_candidate_solution here to verify that the
+                        // solution is actually valid, because we can accept false positives. We
+                        // will catch the failure when we fall through to the full family solution
+                        // check below.
+                        satisfied = true;
+                        ControlFlow::Continue(())
                     },
                 )?;
+
+                if !satisfied {
+                    any_trivial_failures = true;
+                    break;
+                }
             }
-            let end = self.pending.len();
-            constraint_solutions.push(start..end);
-        }
 
-        // Fast path: If exactly one constraint was satisfied, we can return its solutions
-        // immediately. If _no_ constraints were satisfied, we can return its _lack_ of solutions
-        // immediately.
-        let satisfied_constraint_count = constraint_solutions
-            .iter()
-            .filter(|range| !range.is_empty())
-            .count();
-        if satisfied_constraint_count <= 1 {
-            return ControlFlow::Continue(());
-        }
-
-        // If _every_ declared constraint was satisfied, _and_ the solution is either dynamic or
-        // another typevar, then we can consider using the solution as-is, rather than trying to
-        // force it to be exactly equal to one of the declared constraints. (We call this a
-        // "family" solution since it's a single solution that satisfies the entire family of
-        // declared constraints.)
-        let all_constraints_satisfied =
-            satisfied_constraint_count == constrained_typevar.declared_constraints.len();
-        if all_constraints_satisfied {
-            let has_non_concrete_evidence = path
-                .positive_constraints()
-                .map(|(constraint, _)| storage.constraint_data(constraint))
-                .filter(|constraint| {
-                    // Constraints involving other typevars are not relevant
-                    constraint.provides_bound_for(db, bound_typevar)
-                })
-                .all(|constraint| {
-                    // None means the typevar is constrained by another typevar; otherwise check if
-                    // the concrete constraint is dynamic
-                    constraint
-                        .as_concrete()
-                        .is_none_or(|(_, constrained_ty)| !constrained_ty.is_fully_static(db, env))
-                });
-
-            if has_non_concrete_evidence {
-                // We're _eligible_ to return the family solution, but first we should make sure
-                // that it's actually compatible. First check any remaining constrained typevars
-                // with _no_ validity assignment for this typevar.
-                let pending_before_family_solution = self.pending.len();
+            if !any_trivial_failures {
+                // We're eligible to return a family solution, but first we need to find it! First
+                // check any remaining constrained typevars with _no_ validity assignment for this
+                // typevar.
+                let start = self.pending.len();
                 self.validate_constrained_and_then(
                     db,
                     env,
@@ -475,18 +460,58 @@ impl<'db> SolutionWalker<'db> {
                         process_satisfied(this, storage, limits, path)
                     },
                 )?;
-                let pending_after_family_solution = self.pending.len();
-                let family_solution_is_valid =
-                    pending_before_family_solution != pending_after_family_solution;
+                let end = self.pending.len();
+                let family_solution_is_valid = start != end;
 
-                // If the family solution is valid, _replace_ all of the per-declared-constraint
-                // solutions with it.
+                // If the family solution is valid, go ahead and return it.
                 if family_solution_is_valid {
-                    self.pending
-                        .drain(previously_pending..pending_before_family_solution);
                     return ControlFlow::Continue(());
                 }
             }
+        }
+
+        // The family solution isn't valid, so we have to see which individual declared constraints
+        // we can use as in the solution.
+        let previously_pending = self.pending.len();
+        let mut constraint_solutions = SmallVec::<[Range<usize>; 4]>::default();
+        for declared_constraint in &constrained_typevar.declared_constraints {
+            let start = self.pending.len();
+            if let Some(constraints) = declared_constraint.constraints.as_deref() {
+                self.visit_constraints_and_then(
+                    db,
+                    env,
+                    storage,
+                    limits,
+                    path,
+                    constraints,
+                    &mut |this, storage, limits, path| {
+                        // The candidate solution satisfies this declared constraint, but we still
+                        // need to check any remaining constrained typevars.
+                        this.validate_constrained_and_then(
+                            db,
+                            env,
+                            storage,
+                            limits,
+                            path,
+                            constrained,
+                            process_satisfied,
+                        )
+                    },
+                )?;
+            }
+            let end = self.pending.len();
+            constraint_solutions.push(start..end);
+        }
+
+        // Fast path: If exactly one constraint was satisfied, we can return its solutions
+        // immediately. If _no_ constraints were satisfied, we can return its _lack_ of solutions
+        // immediately.
+        let satisfied_constraint_count = constraint_solutions
+            .iter()
+            .filter(|range| !range.is_empty())
+            .count();
+        if satisfied_constraint_count <= 1 {
+            return ControlFlow::Continue(());
         }
 
         // At this point, we know that more than one constraint was satisfied. Check to see if any
@@ -545,7 +570,8 @@ impl<'db> SolutionWalker<'db> {
         }
 
         // If there was a single "best" constraint, remove the solutions from the other
-        // constraints.
+        // constraints. Otherwise keep them all, and let the caller decide how to handle the
+        // ambiguity.
         if let Some(best) = current_best {
             let solutions = &constraint_solutions[best];
             self.pending.truncate(solutions.end);
