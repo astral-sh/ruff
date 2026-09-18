@@ -31,7 +31,6 @@
       };
     });
 
-    const linters = new Set(rows.map((row) => row.linter));
     const search = form.elements.namedItem("rule-search");
     const count = form.querySelector(".rule-filters__count");
     const empty = form.querySelector(".rule-filters__empty");
@@ -252,15 +251,6 @@
         fragment = decodeURIComponent(url.hash.slice(1));
       } catch {
         fragment = "";
-      }
-
-      // Former linter heading links now open the corresponding filtered view.
-      if (linters.has(fragment)) {
-        clearFilters();
-        filters
-          .find((filter) => filter.name === "linter")
-          .setValues([fragment]);
-        updateURL();
       }
 
       filter();
