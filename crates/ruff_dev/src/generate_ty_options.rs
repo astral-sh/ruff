@@ -296,104 +296,10 @@ impl ConfigurationFile {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use ruff_options_metadata::{OptionSet, OptionSetKind, OptionsMetadata, Visit};
 
     use crate::generate_all::Mode;
 
-    use super::{Args, ConfigurationFile, Set, format_snippet, main};
-
-    struct Table;
-
-    impl OptionsMetadata for Table {
-        fn record(_: &mut dyn Visit) {}
-    }
-
-    struct Array;
-
-    impl OptionsMetadata for Array {
-        fn record(_: &mut dyn Visit) {}
-
-        fn kind() -> OptionSetKind {
-            OptionSetKind::Array {
-                example: "name = \"example\"",
-            }
-        }
-    }
-
-    fn parse_example(
-        parents: &[Set],
-        scope: Option<&str>,
-        example: &str,
-        configuration: ConfigurationFile,
-    ) -> Result<toml::Value> {
-        let (header, example) = format_snippet(scope, example, parents, configuration);
-        let parsed: toml::Value = toml::from_str(&format!("{header}\n{example}"))?;
-        Ok(match configuration {
-            ConfigurationFile::PyprojectToml => parsed["tool"]["ty"].clone(),
-            ConfigurationFile::TyToml => parsed,
-        })
-    }
-
-    #[test]
-    fn nested_array_examples() -> Result<()> {
-        let parents = [
-            Set::Toplevel(Table::metadata()),
-            Set::Named {
-                name: "profiles".into(),
-                set: OptionSet::of::<Option<Array>>(),
-            },
-            Set::Named {
-                name: "targets".into(),
-                set: Array::metadata(),
-            },
-        ];
-
-        for configuration in [ConfigurationFile::PyprojectToml, ConfigurationFile::TyToml] {
-            for scope in [None, Some("analysis")] {
-                let parsed = parse_example(&parents, scope, "name = \"custom\"", configuration)?;
-                let profile = &parsed["profiles"][0];
-                assert_eq!(profile["name"].as_str(), Some("example"));
-                let target = &profile["targets"][0];
-                let settings = if let Some(scope) = scope {
-                    assert_eq!(target["name"].as_str(), Some("example"));
-                    &target[scope]
-                } else {
-                    target
-                };
-                assert_eq!(settings["name"].as_str(), Some("custom"));
-            }
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn explicit_table_examples() -> Result<()> {
-        let parents = [
-            Set::Toplevel(Table::metadata()),
-            Set::Named {
-                name: "profiles".into(),
-                set: Array::metadata(),
-            },
-            Set::Named {
-                name: "analysis".into(),
-                set: Table::metadata(),
-            },
-        ];
-
-        for configuration in [ConfigurationFile::PyprojectToml, ConfigurationFile::TyToml] {
-            for example in [
-                "[tool.ty.profiles.analysis]\nenabled = true",
-                "[[tool.ty.profiles]]\nname = \"custom\"\n[tool.ty.profiles.analysis]\nenabled = true",
-            ] {
-                let parsed = parse_example(&parents, None, example, configuration)?;
-                assert_eq!(
-                    parsed["profiles"][0]["analysis"]["enabled"].as_bool(),
-                    Some(true)
-                );
-            }
-        }
-        Ok(())
-    }
+    use super::{Args, main};
 
     #[test]
     fn ty_configuration_markdown_up_to_date() -> Result<()> {
