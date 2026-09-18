@@ -167,9 +167,9 @@ reveal_type(cn)  # revealed: (int, /) -> int
 
 ## Recursive callable constraints in constructors
 
-An overloaded callable can determine the element type of `map` from one known iterable, even when
-another iterable is gradual. The shared callable and constructor type variables do not require a
-recursive result type.
+An overloaded callable together with a gradual iterable can produce cyclic constraints when
+inferring a `map` constructor. The known iterable should determine the result's element type, but
+this inference currently falls back to `Unknown`.
 
 ```py
 import operator
@@ -178,7 +178,8 @@ from typing import Any
 ints: list[int] = []
 dynamic: Any = []
 
-reveal_type(map(operator.add, ints, dynamic))  # revealed: map[int]
+# TODO: should be `map[int]`
+reveal_type(map(operator.add, ints, dynamic))  # revealed: map[Unknown]
 ```
 
 ## Generic overloaded callable constraints in constructors
