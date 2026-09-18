@@ -126,28 +126,15 @@ struct RecursiveVar<'db> {
 This variable refers to the whole recursive type bound by the nearest enclosing `RecursiveType`
 with the matching `cycle` ID.
 
-So the `body` of a `RecursiveType` should be an open type with one or more occurrences of a
-`RecursiveVar` with the same `cycle` ID. The `RecursiveType` itself can be a closed type: it binds
-the recursive variables within it. It is semantically meaningful and can be used anywhere.
-
-This means that `Type` can now represent both open and closed types. That is, we now have a `Type`
-variant, `RecursiveVar`, which has no type semantics of its own. It represents only a recursive
-reference to a wrapping `RecursiveType`. It is an error for any semantic type operation to ever be
-exposed to an open type / a `RecursiveVar`.
-
-It is up to us to maintain the invariant that semantic operations see only closed types; the Rust
-type system does not help us here.
-
-The practical consequence is that you'll now see this in almost every exhaustive `Type`
-match:
+`Type` can represent both open and closed types, so Rust does not enforce this boundary for us.
+Semantic operations assert that no free `RecursiveVar` reaches them, which is why you'll see this
+arm in almost every exhaustive `Type` match:
 
 ```rust
 Type::RecursiveVar(_) => {
     unreachable!("semantic operation on an unbound recursive variable")
 }
 ```
-
-If one of these arms is reached, it means we somehow broke the key invariant.
 
 [Representation and invariant][recursive-source]
 
@@ -368,8 +355,7 @@ At the leaf, `"leaf"` is neither an `int` nor a one-element tuple, so we reject 
 The implementation carries these recursive types through subscripting, member lookup, calls,
 assignability, narrowing, and other type operations.
 
-The landed PR just adds the `RecursiveType/RecursiveVar` machinery, and uses it for recursive
-implicit and PEP 613 (`TypeAlias`) aliases.
+This PR applies the new representation to recursive implicit and PEP 613 (`TypeAlias`) aliases.
 
 PEP 695 aliases don't yet use this new approach; they still use `Type::TypeAlias` with implicit
 recursive nesting. This mostly works fine but sometimes collapses to `Divergent`. A future PR should
@@ -397,8 +383,8 @@ ______________________________________________________________________
 
 ### Mutual recursion
 
-For mutual recursion, cycle identities distinguish the binders. These aliases alternate the accepted
-leaf type at each tuple layer:
+Mutual recursion does not necessarily require one binder per alias. These two aliases alternate the
+accepted leaf type at each tuple layer:
 
 ```python
 Even = int | tuple["Odd"]
@@ -411,17 +397,17 @@ def invalid_even() -> Even:
     return (("leaf",),)  # error: invalid-return-type
 ```
 
-The way this falls out in the implementation is interesting. Even though you could reasonably say
-both of these aliases are equally recursive, in type checking the `infer_implicit_alias_type` query
-for `Even` is where we encounter the cycle: inferring the RHS of `Even` requires inferring the RHS
-of `Odd`, which then requires the type of `Even` -- and that's where we hit the cycle. The result is
-that we still only have one `RecursiveType` and one cycle identity here; `Odd` is just a normal type
-alias which references `Even`, and the body of `Even` inlines the definition of `Odd`:
+When inference starts with `Even`, its `infer_implicit_alias_type` query needs the type of `Odd`,
+which in turn needs `Even`. That second request for `Even` encounters the query cycle. With this
+inference order, we end up with one `RecursiveType` and one cycle identity: `Odd` refers to `Even`,
+while the body of `Even` inlines the definition of `Odd`:
 
 ```text
 Even = μe. (int | tuple[str | tuple[e]])
 Odd  = str | tuple[Even]
 ```
+
+Starting inference with `Odd` reverses these roles.
 
 [Mutual recursion test][mutual-test]
 
