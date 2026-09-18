@@ -3863,12 +3863,12 @@ pub struct RuffOptions {
     )]
     allowed_markup_calls: Option<Vec<String>>,
     /// Whether to require `__init__.py` files to contain no code at all, including imports and
-    /// docstrings (see `RUF067`).
+    /// `__all__` assignments (see `RUF067`). Module and attribute docstrings are still allowed.
     #[option(
         default = r#"false"#,
         value_type = "bool",
         example = r#"
-        # Make it a violation to include any code, including imports and docstrings in `__init__.py`
+        # Make it a violation to include any code, including imports, in `__init__.py`
         strictly-empty-init-modules = true
         "#
     )]
