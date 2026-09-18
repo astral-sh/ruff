@@ -401,13 +401,13 @@ reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionT
 ```
 
 The following alias is invalid because its cycle passes through no containing type. It falls back to
-`Unknown` when used in an annotation.
+`Divergent` when used in an annotation.
 
 ```py
 Unguarded: TypeAlias = "int | Unguarded"  # error: [cyclic-type-alias-definition]
 
 def unguarded(value: Unguarded):
-    reveal_type(value)  # revealed: Unknown
+    reveal_type(value)  # revealed: Divergent
 
 def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
     reveal_type(classinfo)  # revealed: ClassInfo
@@ -477,24 +477,24 @@ Itself: TypeAlias = "Itself"  # error: [cyclic-type-alias-definition] "Cyclic de
 IntOr: TypeAlias = Union[int, "IntOr"]  # error: [cyclic-type-alias-definition] "Cyclic definition of `IntOr`"
 ```
 
-Both direct cycles and unions recover as `Unknown` in annotations.
+Both direct cycles and unions use a divergent type for recovery in annotations.
 
 ```py
 def inspect(itself: Itself, int_or: IntOr):
-    reveal_type(itself)  # revealed: Unknown
-    reveal_type(int_or)  # revealed: Unknown
+    reveal_type(itself)  # revealed: Divergent
+    reveal_type(int_or)  # revealed: Divergent
 ```
 
 Mutually recursive aliases are also invalid when their cycle passes through no containing type. Each
-alias in the cycle receives a diagnostic and recovers as `Unknown` in annotations.
+alias in the cycle receives a diagnostic.
 
 ```py
 First: TypeAlias = Union[int, "Second"]  # error: [cyclic-type-alias-definition] "Cyclic definition of `First`"
 Second: TypeAlias = Union[str, "First"]  # error: [cyclic-type-alias-definition] "Cyclic definition of `Second`"
 
 def inspect_mutual(first: First, second: Second):
-    reveal_type(first)  # revealed: Unknown
-    reveal_type(second)  # revealed: Unknown
+    reveal_type(first)  # revealed: Divergent
+    reveal_type(second)  # revealed: str | Divergent
 ```
 
 ## Invalid generic cycles
@@ -511,13 +511,13 @@ Growing: TypeAlias = "T | Growing[list[T]]"  # error: [cyclic-type-alias-definit
 reveal_type(Growing)  # revealed: str
 ```
 
-Invalid generic aliases recover as `Unknown` with or without type arguments.
+Invalid generic aliases use a divergent type for recovery with or without type arguments.
 
 ```py
 def inspect(bare: Alias, specialized: Alias[int], growing: Growing[int]):
-    reveal_type(bare)  # revealed: Unknown
-    reveal_type(specialized)  # revealed: Unknown
-    reveal_type(growing)  # revealed: Unknown
+    reveal_type(bare)  # revealed: Divergent
+    reveal_type(specialized)  # revealed: Divergent
+    reveal_type(growing)  # revealed: Divergent
 ```
 
 The same restriction applies when generic aliases refer to each other, even when neither is used in

@@ -2367,7 +2367,7 @@ impl<'db> StatementInferenceInner<'db> {
 
 bitflags::bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub(crate) struct InferenceFlags: u32 {
+    pub(crate) struct InferenceFlags: u16 {
         /// Whether to allow `ParamSpec` in type expressions.
         ///
         /// In most contexts inside type expressions, bare `ParamSpec`s are not allowed.
@@ -2422,10 +2422,6 @@ bitflags::bitflags! {
 
         /// Whether the visitor is currently visiting an explicit `__init__` receiver annotation.
         const IN_INIT_RECEIVER_ANNOTATION = 1 << 15;
-
-        /// Whether we are inferring the runtime value of a PEP 613 alias. Cycle recovery must
-        /// preserve provisional types here; annotation uses can instead recover as `Unknown`.
-        const IN_PEP_613_ALIAS_RUNTIME_VALUE = 1 << 16;
     }
 }
 
