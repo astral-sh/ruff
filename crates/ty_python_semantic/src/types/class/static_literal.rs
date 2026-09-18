@@ -1590,16 +1590,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
         });
 
-        // The inherited `object.__dict__` annotation already describes dictionary access. A
-        // synthesized slot descriptor would incorrectly replace the class's own namespace.
-        if name != "__dict__"
-            && self
-                .slot_names(db)
-                .is_some_and(|slots| slots.iter().any(|slot| slot == name))
-            && (self.has_generated_slots(db)
-                || !self.has_own_class_binding(db, name)
-                || self.file(db).is_stub(db) && self.has_instance_slot(db, name))
-        {
+        if self.has_own_slot_descriptor(db, name) {
             return Member::definitely_declared(self.own_slot_descriptor(
                 db,
                 env,
