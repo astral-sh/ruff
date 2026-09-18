@@ -164,21 +164,22 @@ fn merge_disjoint_exclusions<'db>(
         return None;
     }
 
-    // Leave redundant operands to the usual union simplification, which preserves their order.
-    if left_negative.iter().all(|ty| right_negative.contains(ty))
-        || right_negative.iter().all(|ty| left_negative.contains(ty))
-    {
+    let (common_negative, left_only): (SmallVec<[_; 2]>, SmallVec<[_; 2]>) = left_negative
+        .iter()
+        .copied()
+        .partition(|ty| right_negative.contains(ty));
+
+    // Leave trivially redundant operands to the usual union simplification, which preserves
+    // their order. This only checks exact containment, not redundancy through subtyping.
+    if left_only.is_empty() || common_negative.len() == right_negative.len() {
         return None;
     }
 
-    for left_exclusion in left_negative
+    for right_exclusion in right_negative
         .iter()
-        .filter(|ty| !right_negative.contains(ty))
+        .filter(|ty| !left_negative.contains(ty))
     {
-        for right_exclusion in right_negative
-            .iter()
-            .filter(|ty| !left_negative.contains(ty))
-        {
+        for left_exclusion in &left_only {
             if simplify_intersection_pair(
                 db,
                 env,
@@ -194,10 +195,8 @@ fn merge_disjoint_exclusions<'db>(
 
     let mut common =
         IntersectionBuilder::new(db, env).positive_elements(left_positive.iter().copied());
-    for negative in left_negative {
-        if right_negative.contains(negative) {
-            common.add_negative_in_place(*negative);
-        }
+    for negative in common_negative {
+        common.add_negative_in_place(negative);
     }
     Some(common.build())
 }

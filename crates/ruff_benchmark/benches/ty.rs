@@ -1451,50 +1451,115 @@ fn benchmark_literal_equality_fallthrough_guarded_any(criterion: &mut Criterion)
 /// Each failed comparison against a union of enum members introduces two disjoint exclusions.
 /// Without simplifying their union, successive comparisons double the number of alternatives.
 fn benchmark_enum_union_equality(criterion: &mut Criterion) {
-    let mut code = String::from("from enum import Enum\n\n");
-    for name in ["First", "Second"] {
-        writeln!(&mut code, "class {name}(Enum):").ok();
-        for index in 0..10 {
-            writeln!(&mut code, "    m{index} = {index}").ok();
-        }
-        code.push('\n');
-    }
-    code.push_str(
-        "def check(value, choice: bool) -> None:\n    enum = First if choice else Second\n    if isinstance(value, str):\n        return\n",
-    );
-    for index in 0..10 {
-        let keyword = if index == 0 { "if" } else { "elif" };
-        writeln!(
-            &mut code,
-            "    {keyword} value == enum.m{index}:\n        pass"
-        )
-        .ok();
-    }
-    code.push_str("    else:\n        repr(value)\n");
+    let code = r#"
+from enum import Enum
 
-    benchmark_literal_fallthrough(criterion, "ty_micro[enum_union_equality]", &code);
+class First(Enum):
+    m0 = 0
+    m1 = 1
+    m2 = 2
+    m3 = 3
+    m4 = 4
+    m5 = 5
+    m6 = 6
+    m7 = 7
+    m8 = 8
+    m9 = 9
+
+class Second(Enum):
+    m0 = 0
+    m1 = 1
+    m2 = 2
+    m3 = 3
+    m4 = 4
+    m5 = 5
+    m6 = 6
+    m7 = 7
+    m8 = 8
+    m9 = 9
+
+def check(value, choice: bool) -> None:
+    enum = First if choice else Second
+    if isinstance(value, str):
+        return
+    if value == enum.m0:
+        pass
+    elif value == enum.m1:
+        pass
+    elif value == enum.m2:
+        pass
+    elif value == enum.m3:
+        pass
+    elif value == enum.m4:
+        pass
+    elif value == enum.m5:
+        pass
+    elif value == enum.m6:
+        pass
+    elif value == enum.m7:
+        pass
+    elif value == enum.m8:
+        pass
+    elif value == enum.m9:
+        pass
+    else:
+        repr(value)
+"#;
+
+    benchmark_literal_fallthrough(criterion, "ty_micro[enum_union_equality]", code);
 }
 
 /// Each condition introduces alternatives with several disjoint exclusions, which must be
 /// simplified before the next condition to avoid multiplying the number of alternatives.
 fn benchmark_disjoint_membership_exclusions(criterion: &mut Criterion) {
-    let mut code = String::from(
-        "def check(value) -> None:\n    if isinstance(value, bytes):\n        return\n",
-    );
-    for index in 0..10 {
-        let start = 10 + index * 4;
-        writeln!(
-            &mut code,
-            "    if value not in ({start}, {}) or value not in ({}, {}):\n        pass\n    else:\n        return",
-            start + 1,
-            start + 2,
-            start + 3,
-        )
-        .ok();
-    }
-    code.push_str("    repr(value)\n");
+    let code = r#"
+def check(value) -> None:
+    if isinstance(value, bytes):
+        return
+    if value not in (10, 11) or value not in (12, 13):
+        pass
+    else:
+        return
+    if value not in (14, 15) or value not in (16, 17):
+        pass
+    else:
+        return
+    if value not in (18, 19) or value not in (20, 21):
+        pass
+    else:
+        return
+    if value not in (22, 23) or value not in (24, 25):
+        pass
+    else:
+        return
+    if value not in (26, 27) or value not in (28, 29):
+        pass
+    else:
+        return
+    if value not in (30, 31) or value not in (32, 33):
+        pass
+    else:
+        return
+    if value not in (34, 35) or value not in (36, 37):
+        pass
+    else:
+        return
+    if value not in (38, 39) or value not in (40, 41):
+        pass
+    else:
+        return
+    if value not in (42, 43) or value not in (44, 45):
+        pass
+    else:
+        return
+    if value not in (46, 47) or value not in (48, 49):
+        pass
+    else:
+        return
+    repr(value)
+"#;
 
-    benchmark_literal_fallthrough(criterion, "ty_micro[disjoint_membership_exclusions]", &code);
+    benchmark_literal_fallthrough(criterion, "ty_micro[disjoint_membership_exclusions]", code);
 }
 
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/4256>.
