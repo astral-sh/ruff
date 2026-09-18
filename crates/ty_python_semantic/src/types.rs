@@ -15,7 +15,7 @@ use call::{CallDunderError, CallError, CallErrorKind};
 use context::InferContext;
 pub use context::ProgramEnvironment;
 use ruff_db::Instant;
-use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span, UnifiedFile};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -37,11 +37,13 @@ pub use self::dedicated::pytest::{
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
-use self::infer::infer_function_default_types;
 pub(crate) use self::infer::{
     InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
     infer_definition_types, infer_expression_type, infer_expression_types,
     infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
+};
+use self::infer::{
+    implicit_alias_parameters, infer_function_default_types, infer_implicit_alias_type,
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
@@ -199,6 +201,7 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
 
     let index = semantic_index(db, file);
     let mut diagnostics = TypeCheckDiagnostics::default();
+    let mut implicit_aliases = Vec::new();
 
     for scope_id in index.scope_ids() {
         // Scopes that may require type context are inferred during the inference of
@@ -212,6 +215,43 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
         if let Some(scope_diagnostics) = result.diagnostics() {
             diagnostics.extend(scope_diagnostics);
         }
+        implicit_aliases.extend_from_slice(result.implicit_aliases());
+    }
+
+    // Aliases can be referenced repeatedly, across scopes, or through mutually recursive
+    // aliases. Collect their diagnostics once, outside the recursive inference queries.
+    let mut checked_aliases = FxHashSet::default();
+    let diagnostic_key = |diagnostic: &Diagnostic| {
+        let span = diagnostic.primary_span()?;
+        (span.file() == &UnifiedFile::Ty(source_file)).then_some((diagnostic.id(), span.range()))
+    };
+    let mut reported = if implicit_aliases.is_empty() {
+        FxHashSet::default()
+    } else {
+        (&diagnostics)
+            .into_iter()
+            .filter_map(diagnostic_key)
+            .collect()
+    };
+    while let Some(definition) = implicit_aliases.pop() {
+        if !checked_aliases.insert(definition) {
+            continue;
+        }
+        let inference =
+            infer_implicit_alias_type(db, definition, implicit_alias_parameters(db, definition));
+        // Runtime-value inference can report the same error with different wording for its
+        // expression context. Keep that diagnostic when the rule and source location match.
+        // Compare with earlier inference results only: one alias can produce distinct errors
+        // for the same rule and location.
+        diagnostics.extend_filtered(&inference.diagnostics, |diagnostic| {
+            diagnostic_key(diagnostic).is_none_or(|key| !reported.contains(&key))
+        });
+        reported.extend(
+            (&inference.diagnostics)
+                .into_iter()
+                .filter_map(diagnostic_key),
+        );
+        implicit_aliases.extend_from_slice(&inference.implicit_aliases);
     }
 
     diagnostics.extend_diagnostics(

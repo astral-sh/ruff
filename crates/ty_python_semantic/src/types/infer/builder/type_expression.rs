@@ -20,7 +20,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{
-    InferenceFlags, TypeExpressionFlags, implicit_alias_parameters, infer_implicit_alias_type,
+    ImplicitAliasInference, InferenceFlags, TypeExpressionFlags, implicit_alias_parameters,
+    infer_implicit_alias_type,
 };
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
@@ -42,7 +43,7 @@ use crate::{FxOrderSet, SemanticModel, add_inferred_python_version_hint_to_diagn
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
     fn recursive_implicit_alias_reference(
-        &self,
+        &mut self,
         value_ty: Type<'db>,
         definition: Option<Definition<'db>>,
     ) -> Option<(Type<'db>, Option<GenericContext<'db>>)> {
@@ -107,23 +108,35 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             _ => return None,
         }
         let parameters = implicit_alias_parameters(db, definition);
-        let ty = infer_implicit_alias_type(db, definition, parameters);
-        any_over_type(db, self.program_environment(), ty, false, |ty| {
+        let ty = infer_implicit_alias_type(db, definition, parameters).ty;
+        if !any_over_type(db, self.program_environment(), ty, false, |ty| {
             matches!(ty, Type::Recursive(_))
-        })
-        .then_some((ty, parameters))
+        }) {
+            return None;
+        }
+
+        // Diagnostics and suppression usage belong to the file defining the alias.
+        if definition.program_file(db) == self.program_file()
+            && self.context.should_collect_diagnostics()
+        {
+            self.implicit_aliases.insert(definition);
+        }
+        Some((ty, parameters))
     }
 
     pub(in crate::types::infer) fn finish_implicit_alias_type(
         mut self,
         definition: Definition<'db>,
         value: &ast::Expr,
-    ) -> Type<'db> {
+    ) -> ImplicitAliasInference<'db> {
         self.typevar_binding_context = Some(definition);
         self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
         let ty = self.infer_type_expression(value);
-        let _diagnostics = self.context.finish();
-        ty
+        ImplicitAliasInference {
+            ty,
+            diagnostics: self.context.finish(),
+            implicit_aliases: self.implicit_aliases.into_iter().collect(),
+        }
     }
 
     const fn type_expression_context(&self) -> &'static str {

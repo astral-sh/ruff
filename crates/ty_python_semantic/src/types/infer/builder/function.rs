@@ -434,6 +434,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.bindings.extend(decorator_inference.bindings());
             self.called_functions
                 .extend(decorator_inference.called_functions().iter().copied());
+            self.implicit_aliases
+                .extend(decorator_inference.implicit_aliases().iter().copied());
         }
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());

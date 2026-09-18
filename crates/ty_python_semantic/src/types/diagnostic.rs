@@ -1439,6 +1439,21 @@ impl TypeCheckDiagnostics {
         self.used_suppressions.extend(&other.used_suppressions);
     }
 
+    /// Extend with selected diagnostics while retaining all used suppressions.
+    pub(super) fn extend_filtered(
+        &mut self,
+        other: &TypeCheckDiagnostics,
+        mut include: impl FnMut(&Diagnostic) -> bool,
+    ) {
+        self.diagnostics.extend(
+            other
+                .iter()
+                .filter(|diagnostic| include(diagnostic))
+                .cloned(),
+        );
+        self.used_suppressions.extend(&other.used_suppressions);
+    }
+
     pub(super) fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
         self.diagnostics.extend(diagnostics);
     }

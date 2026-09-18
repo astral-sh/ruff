@@ -594,6 +594,15 @@ BadTypeAlias15: TypeAlias = Literal[-3.14]
 BadTypeAlias16: TypeAlias = list["int" | "str"]
 ```
 
+A tuple alias reports both a misplaced ellipsis and multiple unpacked variadic tuples, even though
+both errors point to the same specialization.
+
+```py
+# error: [invalid-type-form] "`...` can only be used as the second element"
+# error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed"
+BadTuple: TypeAlias = tuple[int, ..., *tuple[str, ...], *tuple[bytes, ...]]
+```
+
 ## No type qualifiers
 
 The right-hand side of a type alias definition is a [type expression], not an annotation expression.
@@ -649,6 +658,18 @@ class C:
     Stringified: TypeAlias = "tuple[Self]"
 
     Metadata: TypeAlias = Annotated[int, cast(Self, object())]
+```
+
+The restriction also applies to recursive aliases. Using an invalid alias more than once does not
+repeat its diagnostic.
+
+```py
+class Node:
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Tree: TypeAlias = tuple[Self, "Node.Tree"]
+
+def first(value: Node.Tree): ...
+def second(value: Node.Tree): ...
 ```
 
 ## Disabled `invalid-type-form` `Self` fallback

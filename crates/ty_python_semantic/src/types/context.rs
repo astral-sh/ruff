@@ -240,6 +240,13 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.diagnostics.get_mut().extend(other);
     }
 
+    /// Whether diagnostics inferred separately for a referenced alias should be collected.
+    pub(super) fn should_collect_diagnostics(&self) -> bool {
+        !self.diagnostics_suppressed
+            && self.db().should_check_file(self.file())
+            && !self.is_in_no_type_check()
+    }
+
     pub(super) fn has_diagnostics(&self) -> bool {
         !self.diagnostics.borrow().is_empty()
     }
@@ -627,8 +634,8 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         let lint_id = LintId::of(lint);
 
         // Suppress all `invalid-type-form` errors during the first pass of
-        // inferring a PEP-613 type alias. These errors are emitted during the
-        // second pass, post-inference.
+        // inferring a PEP-613 type alias. These errors are emitted by the alias's
+        // type-expression inference instead.
         if (lint_id == LintId::of(&INVALID_TYPE_FORM)
             || lint_id == LintId::of(&UNBOUND_TYPE_VARIABLE))
             && ctx
