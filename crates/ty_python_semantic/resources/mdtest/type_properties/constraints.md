@@ -1645,6 +1645,27 @@ def parameter_kinds[**P]() -> None:
     static_assert(positional == ConstraintSet.never())
 ```
 
+### Equality between captured generic parameter lists
+
+These captures impose different constraints, but both can hold when `T = U`.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, RegularCallableTypeOf
+
+def left[T](value: T, /) -> T:
+    return value
+
+def right[U](value: U, /) -> U:
+    return value
+
+def check[**P]() -> None:
+    left_constraints = ConstraintSet.equality(P, RegularCallableTypeOf[left])
+    right_constraints = ConstraintSet.equality(P, RegularCallableTypeOf[right])
+    static_assert(left_constraints != right_constraints)
+    static_assert(left_constraints & right_constraints != ConstraintSet.never())
+```
+
 ### Gradual parameter lists
 
 An empty parameter list is compatible with ellipsis, but not with one required `Any` parameter.

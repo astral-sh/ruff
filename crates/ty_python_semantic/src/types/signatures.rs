@@ -2531,13 +2531,22 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
+        // In lazy comparisons, a captured parameter list refers to typevars owned by the
+        // surrounding call inference. Preserve constraints on those variables instead of
+        // freshening and quantifying them as callable-local variables. Eager comparisons still
+        // use the stored generic context to simplify bounds for compatibility inference.
+        let signature_context = |signature: &Signature<'db>| {
+            signature.generic_context.filter(|_| {
+                !signature.is_paramspec_value || self.typevar_evaluation != TypeVarEvaluation::Lazy
+            })
+        };
         // If either signature is generic, freshen that signature's typevars before considering
         // them inferable for this relation. The relation only needs to find one specialization of
         // each generic callable that causes the check to succeed, but those callable-local
         // specializations must not collide with any same-source typevars in the other signature.
         let freshened_source;
-        let source = if source.generic_context != target.generic_context
-            && let Some(generic_context) = source.generic_context
+        let source = if signature_context(source) != signature_context(target)
+            && let Some(generic_context) = signature_context(source)
             && let Some(delta) = target
                 .max_typevar_freshness_matching_generic_context(db, generic_context)
                 .map(|freshness| freshness.increment().value())
@@ -2549,7 +2558,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
 
         let freshened_target;
-        let target = if let Some(generic_context) = target.generic_context
+        let target = if let Some(generic_context) = signature_context(target)
             && let Some(delta) = source
                 .max_typevar_freshness_matching_generic_context(db, generic_context)
                 .map(|freshness| freshness.increment().value())
@@ -2561,8 +2570,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
 
         let signature_typevars = |signature: &Signature<'db>| {
-            signature
-                .generic_context
+            signature_context(signature)
                 .map_or(TypeVarSet::None, |context| context.inferable_typevars(db))
         };
         let source_inferable = signature_typevars(source);
