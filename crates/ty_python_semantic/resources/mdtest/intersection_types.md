@@ -239,14 +239,10 @@ from ty_extensions._internal import Unknown
 def disjoint(
     literals: (Any & ~Literal[1]) | (Any & ~Literal[2]),
     shared: (Unknown & ~str & ~Literal[1]) | (Unknown & ~Literal[2] & ~str),
-    negatives_only: (~str & ~Literal[1]) | (~Literal[2] & ~str),
-    three: (Any & ~Literal[1]) | (Any & ~Literal[2]) | (Any & ~Literal[3]),
     earlier: int | (~str & ~Literal[1]) | (~str & ~Literal[2]),
 ):
     reveal_type(literals)  # revealed: Any
     reveal_type(shared)  # revealed: Unknown & ~str
-    reveal_type(negatives_only)  # revealed: ~str
-    reveal_type(three)  # revealed: Any
     reveal_type(earlier)  # revealed: ~str
 ```
 

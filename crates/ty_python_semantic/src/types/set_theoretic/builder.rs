@@ -43,6 +43,8 @@ use std::convert::Infallible;
 use std::hint::cold_path;
 use std::ops::ControlFlow;
 
+use itertools::Itertools;
+
 use super::RecursivelyDefined;
 use super::generic_gradual_intersections::{GenericIntersection, generic_gradual_intersection};
 use crate::types::enums::EnumComplement;
@@ -155,25 +157,18 @@ fn merge_disjoint_exclusions<'db>(
         return None;
     };
     let left_positive = left.positive(db);
-    let right_positive = right.positive(db);
     let left_negative = left.negative(db);
     let right_negative = right.negative(db);
 
-    if left_negative.is_empty()
-        || left_negative.len() != right_negative.len()
-        || left_positive.len() != right_positive.len()
-        || !left_positive.iter().all(|ty| right_positive.contains(ty))
-    {
+    if left_negative.len() != right_negative.len() || !left_positive.set_eq(right.positive(db)) {
         return None;
     }
 
-    let mut left_only = left_negative
+    let left_exclusion = *left_negative
         .iter()
-        .filter(|ty| !right_negative.contains(ty));
-    let left_exclusion = *left_only.next()?;
-    if left_only.next().is_some() {
-        return None;
-    }
+        .filter(|ty| !right_negative.contains(ty))
+        .exactly_one()
+        .ok()?;
     let right_exclusion = *right_negative
         .iter()
         .find(|ty| !left_negative.contains(ty))?;
@@ -189,10 +184,8 @@ fn merge_disjoint_exclusions<'db>(
         return None;
     }
 
-    let mut common = IntersectionBuilder::new(db, env);
-    for positive in left_positive {
-        common.add_positive_in_place(*positive);
-    }
+    let mut common =
+        IntersectionBuilder::new(db, env).positive_elements(left_positive.iter().copied());
     for negative in left_negative {
         if *negative != left_exclusion {
             common.add_negative_in_place(*negative);
@@ -1061,7 +1054,6 @@ impl<'db> UnionBuilder<'db> {
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
-        let mut merged_exclusions = None;
 
         for (i, element) in self.elements.iter_mut().enumerate() {
             let element_type = match element.try_reduce(db, &self.env, ty, self.cycle_recovery) {
@@ -1151,8 +1143,12 @@ impl<'db> UnionBuilder<'db> {
                 }
                 if let Some(merged) = merge_disjoint_exclusions(db, &self.env, ty, element_type) {
                     to_remove.push(i);
-                    merged_exclusions = Some(merged);
-                    break;
+                    for index in to_remove.into_iter().rev() {
+                        self.elements.swap_remove(index);
+                    }
+                    // The common part can also subsume elements we already visited.
+                    self.add_in_place_impl(merged, seen_aliases);
+                    return;
                 }
                 if ty.is_redundant_with(db, &self.env, element_type) {
                     return;
@@ -1177,15 +1173,6 @@ impl<'db> UnionBuilder<'db> {
                     return;
                 }
             }
-        }
-
-        if let Some(merged) = merged_exclusions {
-            for index in to_remove.into_iter().rev() {
-                self.elements.swap_remove(index);
-            }
-            // The common part can also subsume elements we already visited.
-            self.add_in_place_impl(merged, seen_aliases);
-            return;
         }
 
         let mut to_remove = to_remove.into_iter();
