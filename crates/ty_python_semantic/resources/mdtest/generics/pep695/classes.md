@@ -791,8 +791,8 @@ python-version = "3.13"
 from __future__ import annotations
 
 class Swapped[T, U]:
-    # error: [invalid-init-type-variable] "class-scoped type variable `U`"
-    # error: [invalid-init-type-variable] "class-scoped type variable `T`"
+    # error: [invalid-init-type-variable] "`__init__`'s first parameter cannot use the class's type variable `U`"
+    # error: [invalid-init-type-variable] "`__init__`'s first parameter cannot use the class's type variable `T`"
     def __init__(self: Swapped[U, T]) -> None: ...
 
 class Identity[T]:
@@ -800,8 +800,27 @@ class Identity[T]:
     def method(self: Identity[T]) -> None: ...
 
 class Nested[T]:
-    def __init__(self: Nested[list[T]]) -> None: ...  # error: [invalid-init-type-variable]
+    # snapshot: invalid-init-type-variable
+    def __init__(self: Nested[list[T]]) -> None: ...
+```
 
+```snapshot
+error[invalid-init-type-variable]: `__init__`'s first parameter cannot use the class's type variable `T`
+  --> src/mdtest_snippet.py:14:36
+   |
+12 | class Nested[T]:
+   |       ------ `T` is a type parameter of this class
+13 |     # snapshot: invalid-init-type-variable
+14 |     def __init__(self: Nested[list[T]]) -> None: ...
+   |                                    ^
+info: Using a class's type variables here can make the constructed type ambiguous
+help: Use a new type variable, or omit the first parameter's annotation
+info: See https://typing.python.org/en/latest/spec/constructors.html#init-method
+```
+
+The same restriction applies through a type alias.
+
+```py
 type Alias[T] = T
 
 class Aliased[T]:

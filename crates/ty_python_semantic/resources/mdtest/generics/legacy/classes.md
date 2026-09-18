@@ -1150,8 +1150,8 @@ U = TypeVar("U")
 V = TypeVar("V")
 
 class Swapped(Generic[T, U]):
-    # error: [invalid-init-type-variable] "class-scoped type variable `U`"
-    # error: [invalid-init-type-variable] "class-scoped type variable `T`"
+    # error: [invalid-init-type-variable] "`__init__`'s first parameter cannot use the class's type variable `U`"
+    # error: [invalid-init-type-variable] "`__init__`'s first parameter cannot use the class's type variable `T`"
     def __init__(self: "Swapped[U, T]") -> None: ...
 
 class Identity(Generic[T]):
@@ -1159,7 +1159,22 @@ class Identity(Generic[T]):
     def method(self: "Identity[T]") -> None: ...
 
 class Nested(Generic[T]):
-    def __init__(self: "Nested[list[T]]") -> None: ...  # error: [invalid-init-type-variable]
+    # snapshot: invalid-init-type-variable
+    def __init__(self: "Nested[list[T]]") -> None: ...
+```
+
+```snapshot
+error[invalid-init-type-variable]: `__init__`'s first parameter cannot use the class's type variable `T`
+  --> src/mdtest_snippet.py:18:37
+   |
+16 | class Nested(Generic[T]):
+   |       ------------------ `T` is a type parameter of this class
+17 |     # snapshot: invalid-init-type-variable
+18 |     def __init__(self: "Nested[list[T]]") -> None: ...
+   |                                     ^
+info: Using a class's type variables here can make the constructed type ambiguous
+help: Use a new type variable, or omit the first parameter's annotation
+info: See https://typing.python.org/en/latest/spec/constructors.html#init-method
 ```
 
 Reporting the diagnostic does not change the inferred type.

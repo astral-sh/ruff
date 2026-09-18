@@ -1,4 +1,5 @@
 use itertools::Either;
+use ruff_db::diagnostic::Annotation;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
@@ -36,7 +37,7 @@ use crate::types::{
     IntersectionType, InvalidTypeExpression, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeContext, TypeFormType,
     TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type,
-    todo_type,
+    binding_type, todo_type,
 };
 use crate::{FxOrderSet, SemanticModel, add_inferred_python_version_hint_to_diagnostic};
 
@@ -3383,10 +3384,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .context
                 .report_lint(&INVALID_INIT_TYPE_VARIABLE, expression)
         {
-            builder.into_diagnostic(format_args!(
-                "`__init__` receiver cannot use class-scoped type variable `{}`",
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "`__init__`'s first parameter cannot use the class's type variable `{}`",
                 typevar.name(db)
             ));
+            if let Type::ClassLiteral(class) = binding_type(db, owner) {
+                diagnostic.annotate(Annotation::secondary(class.header_span(db)).message(
+                    format_args!("`{}` is a type parameter of this class", typevar.name(db)),
+                ));
+            }
+            diagnostic.info(
+                "Using a class's type variables here can make the constructed type ambiguous",
+            );
+            diagnostic.help("Use a new type variable, or omit the first parameter's annotation");
+            diagnostic
+                .info("See https://typing.python.org/en/latest/spec/constructors.html#init-method");
         }
 
         // Legacy aliases introduce independent type parameters. PEP 695 aliases can instead
