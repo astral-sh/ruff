@@ -7,6 +7,7 @@ use crate::fix;
 use crate::preview::is_pyi048_fix_enabled;
 use crate::rules::flake8_pie::rules::Placeholder;
 use crate::{Applicability, Fix, FixAvailability, Violation};
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for functions in stub (`.pyi`) files that contain multiple
@@ -53,7 +54,7 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// [PIE790]: https://docs.astral.sh/ruff/rules/unnecessary-placeholder/
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Correctness)]
 pub(crate) struct StubBodyMultipleStatements;
 
 impl Violation for StubBodyMultipleStatements {

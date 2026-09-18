@@ -52,16 +52,26 @@ python-platform = \"linux\"
     let (before_structs, salsa_structs) = response
         .split_once("=======SALSA STRUCTS=======\n")
         .context("debug response missing Salsa structs section")?;
-    let (salsa_structs, after_structs) = salsa_structs
+    let (salsa_structs, salsa_queries) = salsa_structs
         .split_once("=======SALSA QUERIES=======\n")
         .context("debug response missing Salsa queries section")?;
+    let (salsa_queries, summary) = salsa_queries
+        .split_once("=======SALSA SUMMARY=======\n")
+        .context("debug response missing Salsa summary section")?;
 
-    // The production report orders structs by memory usage, which varies between platforms.
+    // Memory usage varies between platforms and build profiles. Sort entries by name instead.
     let mut salsa_structs = salsa_structs.lines().collect::<Vec<_>>();
     salsa_structs.sort_unstable();
+    let query_lines = salsa_queries.lines().collect::<Vec<_>>();
+    let mut salsa_queries = query_lines
+        .chunks(2)
+        .map(|query| query.join("\n"))
+        .collect::<Vec<_>>();
+    salsa_queries.sort_unstable();
     let response = format!(
-        "{before_structs}=======SALSA STRUCTS=======\n{}\n=======SALSA QUERIES=======\n{after_structs}",
-        salsa_structs.join("\n")
+        "{before_structs}=======SALSA STRUCTS=======\n{}\n=======SALSA QUERIES=======\n{}\n=======SALSA SUMMARY=======\n{summary}",
+        salsa_structs.join("\n"),
+        salsa_queries.join("\n")
     );
 
     let mut settings = insta::Settings::clone_current();

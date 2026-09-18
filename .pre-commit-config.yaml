@@ -69,9 +69,14 @@ repos:
         priority: 0
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 6b63472e72e1a91ed8a2f6d483790dfb644fa1d3 # frozen: 0.37.4
+    rev: 12e63946db2c5cfcc9030fac21c3883ba88c6ed8 # frozen: 0.38.0
     hooks:
       - id: check-github-workflows
+        # The bundled schema predates GitHub's cache-mode feature. Use a pinned
+        # upstream schema until check-jsonschema includes it in a release.
+        entry: >-
+          check-jsonschema --schemafile
+          https://raw.githubusercontent.com/SchemaStore/schemastore/a1bfb2b17627062b6a938153c065cb58baef6fe7/src/schemas/json/github-workflow.json
         priority: 0
 
   # `actionlint` hook, for verifying correct syntax in GitHub Actions workflows.
@@ -113,21 +118,23 @@ repos:
         priority: 0
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 8d582f54b8e4cc5a61a85eeed1f54bbdb1e294fc # frozen: 0.12.3
+    rev: eec2b3c4f52295313b08b04f928ab2479e468b5c # frozen: 0.12.15
     hooks:
       - id: uv-lock
         priority: 0
+        args: [--default-index=https://pypi.org/simple, --check, --refresh]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 7c55798a78262d14b2074abf623d8a992ebb70d4 # frozen: v0.16.2
+    rev: e8f7d69b957a30acb2c875078d5fd012de24b64c # frozen: v0.16.7
     hooks:
       - id: ruff-format
+        types_or: [python, pyi, jupyter]
         exclude: crates/ty_python_semantic/resources/corpus/
         priority: 0
 
   # Priority 1: Second-pass fixers (e.g., markdownlint-fix runs after mdformat).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 7c55798a78262d14b2074abf623d8a992ebb70d4 # frozen: v0.16.2
+    rev: e8f7d69b957a30acb2c875078d5fd012de24b64c # frozen: v0.16.7
     hooks:
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
@@ -150,7 +157,7 @@ repos:
 
   # Priority 2: ruffen-docs runs after markdownlint-fix (both modify markdown).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 7c55798a78262d14b2074abf623d8a992ebb70d4 # frozen: v0.16.2
+    rev: e8f7d69b957a30acb2c875078d5fd012de24b64c # frozen: v0.16.7
     hooks:
       - id: ruff-format
         name: mdtest format

@@ -1,0 +1,77 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 2
+Added: 2
+
+--- Removed ---
+PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+ --> PT020_1.py:5:1
+  |
+5 | @yield_fixture()
+  | ^^^^^^^^^^^^^^^^
+6 | def error_member_import():
+7 |     return 0
+  |
+help: Replace with `pytest.fixture`
+
+
+PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+  --> PT020_1.py:10:1
+   |
+10 | @aliased()
+   | ^^^^^^^^^^
+11 | def error_aliased_member_import():
+12 |     return 0
+   |
+help: Replace with `pytest.fixture`
+
+
+
+--- Added ---
+PT020 [*] `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+ --> PT020_1.py:5:1
+  |
+5 | @yield_fixture()
+  | ^^^^^^^^^^^^^^^^
+6 | def error_member_import():
+7 |     return 0
+  |
+help: Replace with `pytest.fixture`
+  |
+1 | from pytest import yield_fixture
+  - from pytest import yield_fixture as aliased
+2 + from pytest import yield_fixture as aliased, fixture
+3 |
+4 |
+  - @yield_fixture()
+5 + @fixture()
+6 | def error_member_import():
+  |
+
+
+PT020 [*] `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+  --> PT020_1.py:10:1
+   |
+10 | @aliased()
+   | ^^^^^^^^^^
+11 | def error_aliased_member_import():
+12 |     return 0
+   |
+help: Replace with `pytest.fixture`
+   |
+1  | from pytest import yield_fixture
+   - from pytest import yield_fixture as aliased
+2  + from pytest import yield_fixture as aliased, fixture
+3  |
+--------------------------------------------------------------------------------
+9  |
+   - @aliased()
+10 + @fixture()
+11 | def error_aliased_member_import():
+   |

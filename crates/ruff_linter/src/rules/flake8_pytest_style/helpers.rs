@@ -141,8 +141,8 @@ pub(super) fn is_empty_or_null_string(expr: &Expr) -> bool {
         Expr::NoneLiteral(_) => true,
         Expr::FString(ast::ExprFString { value, .. }) => {
             value.iter().all(|f_string_part| match f_string_part {
-                ast::FStringPart::Literal(literal) => literal.is_empty(),
-                ast::FStringPart::FString(f_string) => f_string
+                ast::FStringPartRef::Literal(literal) => literal.is_empty(),
+                ast::FStringPartRef::FString(f_string) => f_string
                     .elements
                     .iter()
                     .all(is_empty_or_null_interpolated_string_element),

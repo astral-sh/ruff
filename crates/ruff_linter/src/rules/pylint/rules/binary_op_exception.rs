@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum BoolOp {
@@ -47,7 +48,7 @@ impl From<&ast::BoolOp> for BoolOp {
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Suspicious)]
 pub(crate) struct BinaryOpException {
     op: BoolOp,
 }

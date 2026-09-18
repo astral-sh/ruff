@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for multiple usage of the generator returned from
@@ -34,7 +35,7 @@ use crate::checkers::ast::Checker;
 ///         do_something_with_the_group(values)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.260")]
+#[violation_metadata(stable_since = "v0.0.260", category = Category::Suspicious)]
 pub(crate) struct ReuseOfGroupbyGenerator;
 
 impl Violation for ReuseOfGroupbyGenerator {
@@ -158,13 +159,16 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 range: _,
                 node_index: _,
             }) => {
+                // Visit the test before pushing the branch counters as it
+                // is evaluated unconditionally.
+                self.visit_expr(test);
+
                 // base if plus branches
                 let mut if_stack = Vec::with_capacity(1 + elif_else_clauses.len());
                 // Initialize the vector with the count for the if branch.
                 if_stack.push(0);
                 self.counter_stack.push(if_stack);
 
-                self.visit_expr(test);
                 self.visit_body(body);
 
                 for clause in elif_else_clauses {
@@ -185,8 +189,10 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 range: _,
                 node_index: _,
             }) => {
-                self.counter_stack.push(Vec::with_capacity(cases.len()));
+                // Visit the subject before pushing the branch counters as it
+                // is evaluated unconditionally.
                 self.visit_expr(subject);
+                self.counter_stack.push(Vec::with_capacity(cases.len()));
                 for match_case in cases {
                     self.counter_stack.last_mut().unwrap().push(0);
                     self.visit_match_case(match_case);

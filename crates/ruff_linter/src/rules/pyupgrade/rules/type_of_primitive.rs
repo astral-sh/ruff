@@ -3,6 +3,7 @@ use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -30,7 +31,7 @@ use crate::rules::pyupgrade::types::Primitive;
 /// - [Python documentation: `type()`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Built-in types](https://docs.python.org/3/library/stdtypes.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Style)]
 pub(crate) struct TypeOfPrimitive {
     primitive: Primitive,
 }

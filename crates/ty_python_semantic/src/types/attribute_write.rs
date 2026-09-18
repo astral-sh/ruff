@@ -1,4 +1,4 @@
-//! Attribute-write resolution shared by assignment inference and protocol compatibility.
+//! Attribute-write resolution shared by assignment inference, protocol compatibility, and variance.
 //!
 //! This module resolves the Python lookup semantics for `object.attribute = value` into an
 //! [`AttributeWriteRequirement`]. The requirement retains alternatives such as union elements,
@@ -9,12 +9,18 @@
 
 use crate::Db;
 use ty_module_resolver::KnownModule;
-use ty_python_core::use_def_map;
+use ty_python_core::{definition::Definition, use_def_map};
 
-use super::call::CallArguments;
+use super::call::{Bindings, CallArguments, CallDunderError};
 use super::callable::CallableTypeKind;
+use super::class::FrozenDataclassDispatch;
+use super::constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension};
+use super::dedicated::pydantic;
+use super::relation::TypeRelationChecker;
 use super::{
-    IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Type, TypeQualifiers,
+    BindingContext, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter,
+    PropertyInstanceType, SelfBinding, Signature, Type, TypeContext, TypeMapping, TypeQualifiers,
+    TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::ProgramEnvironment;
 use crate::place::{
@@ -40,7 +46,7 @@ pub(super) enum AttributeWriteRequirement<'db> {
     },
     /// A value may be assigned without an attribute-specific constraint.
     Unconstrained,
-    /// The object type does not permit writes at all.
+    /// The attribute cannot be assigned.
     CannotAssign,
     /// A module symbol, with its declared type when the symbol is known.
     ///
@@ -105,6 +111,49 @@ pub(super) enum InstanceAttributeWriteMember<'db> {
     SetAttr,
 }
 
+/// Resolve attribute-specific dispatch through inherited frozen-dataclass setters.
+pub(super) fn instance_setattr_dispatch<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    object_ty: Type<'db>,
+    attribute: &str,
+) -> Option<FrozenDataclassDispatch<'db>> {
+    object_ty
+        .nominal_class(db, env)
+        .and_then(|class| class.static_class_literal(db))
+        .and_then(|(class, specialization)| {
+            class.inherited_frozen_dataclass_dispatch(db, specialization, "__setattr__", attribute)
+        })
+}
+
+/// Whether or not an attribute write is blocked by the receiver's `__setattr__` method.
+pub(super) fn instance_attribute_write_is_blocked<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    object_ty: Type<'db>,
+    member: &InstanceAttributeWriteMember<'_>,
+    attribute: &str,
+    setattr_result: &Result<Bindings<'db>, CallDunderError<'db>>,
+    frozen_dataclass_dispatch: Option<FrozenDataclassDispatch<'db>>,
+) -> bool {
+    match pydantic::setattr_behavior(db, env, object_ty) {
+        Some(pydantic::SetAttrBehavior::Frozen) => {
+            !(matches!(member, InstanceAttributeWriteMember::Explicit { .. })
+                && pydantic::is_private_attribute(attribute))
+        }
+        Some(pydantic::SetAttrBehavior::NonFrozen) => false,
+        Some(pydantic::SetAttrBehavior::CustomSetAttr) | None => {
+            matches!(
+                frozen_dataclass_dispatch,
+                Some(FrozenDataclassDispatch::FrozenField)
+            ) || match setattr_result {
+                Ok(bindings) => bindings.return_type(db, env).is_never(),
+                Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
+            }
+        }
+    }
+}
+
 /// The member that governs a write through a class object.
 ///
 /// A data descriptor on the metaclass takes precedence over the class object's own attributes,
@@ -129,12 +178,8 @@ pub(super) enum ClassAttributeWriteMember<'db> {
 /// How an explicitly resolved member accepts a write.
 pub(super) enum ExplicitAttributeWriteRequirement<'db> {
     /// Invoke a concrete descriptor's `__set__` method.
-    ///
-    /// `setter_ty` is the unbound method and is called with `descriptor_ty`, the object, and the
-    /// assigned value.
     Descriptor {
         descriptor_ty: Type<'db>,
-        setter_ty: Type<'db>,
         qualifiers: TypeQualifiers,
     },
     /// Check the assigned value directly against the member's effective write type.
@@ -233,6 +278,9 @@ pub(super) fn attribute_write_requirement<'db>(
     attribute: &str,
 ) -> AttributeWriteRequirement<'db> {
     match object_ty {
+        Type::RecursiveVar(_) => {
+            unreachable!("semantic operation on an unbound recursive variable")
+        }
         Type::Union(union) => AttributeWriteRequirement::All {
             object_ty,
             element_tys: union.elements(db),
@@ -256,6 +304,12 @@ pub(super) fn attribute_write_requirement<'db>(
         Type::TypeAlias(alias) => {
             attribute_write_requirement(db, env, alias.value_type(db), attribute)
         }
+        Type::Recursive(recursive) => recursive.map_or(
+            db,
+            env,
+            AttributeWriteRequirement::Unconstrained,
+            |unfolded| attribute_write_requirement(db, env, unfolded, attribute),
+        ),
 
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
             AttributeWriteRequirement::CannotAssign
@@ -282,6 +336,7 @@ pub(super) fn attribute_write_requirement<'db>(
         | Type::SpecialForm(..)
         | Type::KnownInstance(..)
         | Type::PropertyInstance(..)
+        | Type::SlotDescriptor(..)
         | Type::FunctionLiteral(..)
         | Type::Callable(..)
         | Type::BoundMethod(_)
@@ -322,7 +377,9 @@ pub(super) fn attribute_write_requirement<'db>(
             {
                 builtins_symbol(db, env, attribute)
             } else {
-                module.static_member(db, env, attribute)
+                module
+                    .static_member(db, env, attribute)
+                    .map_or_else(|_| Place::Undefined.into(), |member| member.member(db))
             };
             AttributeWriteRequirement::Module(match symbol.place {
                 Place::Defined(DefinedPlace { ty, .. }) => Some(ty),
@@ -375,19 +432,37 @@ fn instance_attribute_write_member_requirement<'db>(
         PlaceAndQualifiers {
             place: Place::Defined(DefinedPlace { ty, .. }),
             qualifiers,
-        } => InstanceAttributeWriteMember::Explicit {
-            member: explicit_attribute_write_requirement(
+        } => {
+            let member = explicit_attribute_write_requirement(
                 db,
                 env,
                 object_ty,
                 attribute,
                 ty.bind_self_typevars(db, env, object_ty),
                 qualifiers,
-            ),
-            fallback: receiver_fallback.map(|fallback| {
-                instance_fallback_write_requirement(db, env, object_ty, attribute, fallback)
-            }),
-        },
+            );
+
+            // Built-in classes can expose writable C-level descriptors that their stubs model as
+            // plain annotations. Only a known slot layout rules out that additional storage.
+            if matches!(
+                member,
+                ExplicitAttributeWriteRequirement::AssignableTo { .. }
+            ) && ty.is_definitely_non_data_descriptor(db, env)
+                && object_ty
+                    .nominal_class(db, env)
+                    .and_then(|class| class.static_class_literal(db))
+                    .is_some_and(|(class, _)| class.lacks_instance_storage(db, attribute))
+            {
+                return InstanceAttributeWriteMember::SetAttr;
+            }
+
+            InstanceAttributeWriteMember::Explicit {
+                member,
+                fallback: receiver_fallback.map(|fallback| {
+                    instance_fallback_write_requirement(db, env, object_ty, attribute, fallback)
+                }),
+            }
+        }
         PlaceAndQualifiers {
             place: Place::Undefined,
             ..
@@ -415,6 +490,12 @@ fn class_attribute_write_requirement<'db>(
     object_ty: Type<'db>,
     attribute: &str,
 ) -> AttributeWriteRequirement<'db> {
+    if object_ty
+        .find_name_in_mro(db, env, attribute)
+        .is_some_and(|member| member.is_read_only())
+    {
+        return AttributeWriteRequirement::CannotAssign;
+    }
     let Some(members) = assignment_attribute_members(db, env, object_ty, attribute) else {
         return AttributeWriteRequirement::Unconstrained;
     };
@@ -540,6 +621,9 @@ fn possible_class_attribute_descriptor<'db>(
 
 /// Convert an explicitly resolved member into either a descriptor call or a direct type check.
 ///
+/// A slot descriptor writes directly to instance storage, so the receiver's instance declaration
+/// determines its write type even when a subclass overrides the slot owner's annotation.
+///
 /// Descriptor behavior is used only when `__set__` is found with
 /// [`MemberLookupPolicy::REQUIRE_CONCRETE`]. An `Any` or `Unknown` base therefore does not cause an
 /// ordinary attribute to be treated as a data descriptor.
@@ -551,13 +635,30 @@ fn explicit_attribute_write_requirement<'db>(
     attr_ty: Type<'db>,
     qualifiers: TypeQualifiers,
 ) -> ExplicitAttributeWriteRequirement<'db> {
-    if let Place::Defined(DefinedPlace { ty: setter_ty, .. }) = attr_ty
+    if matches!(attr_ty, Type::SlotDescriptor(_))
+        && let PlaceAndQualifiers {
+            place: Place::Defined(DefinedPlace { ty, .. }),
+            qualifiers: storage_qualifiers,
+        } = object_ty.instance_member(db, env, attribute)
+    {
+        return ExplicitAttributeWriteRequirement::AssignableTo {
+            ty: effective_write_type(
+                db,
+                env,
+                object_ty,
+                attribute,
+                ty.bind_self_typevars(db, env, object_ty),
+            ),
+            qualifiers: qualifiers.union(storage_qualifiers),
+        };
+    }
+
+    if let Place::Defined(_) = attr_ty
         .class_member_with_policy(db, env, "__set__", MemberLookupPolicy::REQUIRE_CONCRETE)
         .place
     {
         ExplicitAttributeWriteRequirement::Descriptor {
             descriptor_ty: attr_ty,
-            setter_ty,
             qualifiers,
         }
     } else {
@@ -641,6 +742,12 @@ fn effective_write_type<'db>(
     attribute: &str,
     attr_ty: Type<'db>,
 ) -> Type<'db> {
+    // An instance shadows a staticmethod with the function returned by its getter.
+    if matches!(object_ty, Type::NominalInstance(_))
+        && attr_ty.function_like_kind(db) == Some(CallableTypeKind::StaticMethodLike)
+    {
+        return attr_ty.underlying_function(db);
+    }
     if let Type::NominalInstance(instance) = object_ty
         && let Some(converter_ty) = instance
             .class(db, env)
@@ -781,12 +888,16 @@ pub(super) fn assignment_attribute_members<'db>(
     );
     let receiver_fallback = if needs_receiver_fallback {
         Some(match object_ty {
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
             | Type::LiteralValue(..)
             | Type::SpecialForm(..)
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
+            | Type::SlotDescriptor(..)
             | Type::FunctionLiteral(..)
             | Type::Callable(..)
             | Type::BoundMethod(_)
@@ -809,6 +920,7 @@ pub(super) fn assignment_attribute_members<'db>(
             Type::Union(..)
             | Type::Intersection(..)
             | Type::TypeAlias(..)
+            | Type::Recursive(_)
             | Type::Dynamic(..)
             | Type::Divergent(_)
             | Type::Never
@@ -822,4 +934,609 @@ pub(super) fn assignment_attribute_members<'db>(
         member: type_member,
         receiver_fallback,
     })
+}
+
+fn descriptor_setter<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    descriptor_ty: Type<'db>,
+) -> Place<'db> {
+    descriptor_ty
+        .member_lookup_with_policy(
+            db,
+            env,
+            "__set__",
+            MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+        )
+        .place
+}
+
+/// The values accepted by a descriptor setter, when representable as a single type.
+#[derive(Copy, Clone)]
+pub(super) enum DescriptorSetterDomain<'db> {
+    Missing,
+    Known(Type<'db>),
+    Deferred,
+}
+
+/// Derive the values accepted by every possible descriptor setter when they fit in [`Type`].
+pub(super) fn descriptor_setter_domain<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    descriptor_ty: Type<'db>,
+    receiver_ty: Type<'db>,
+) -> DescriptorSetterDomain<'db> {
+    let descriptor_ty = descriptor_ty.resolve_type_alias(db);
+    match descriptor_ty {
+        Type::Union(union) => {
+            let mut write_types = Vec::with_capacity(union.elements(db).len());
+            for descriptor_ty in union.elements(db) {
+                match single_descriptor_setter_domain(db, env, *descriptor_ty, receiver_ty) {
+                    DescriptorSetterDomain::Missing => return DescriptorSetterDomain::Missing,
+                    DescriptorSetterDomain::Known(write_ty) => write_types.push(write_ty),
+                    DescriptorSetterDomain::Deferred => return DescriptorSetterDomain::Deferred,
+                }
+            }
+            IntersectionType::bounded_from_elements(db, env, write_types).map_or(
+                DescriptorSetterDomain::Deferred,
+                DescriptorSetterDomain::Known,
+            )
+        }
+        _ => single_descriptor_setter_domain(db, env, descriptor_ty, receiver_ty),
+    }
+}
+
+/// Derive the values accepted by one possible runtime descriptor.
+fn single_descriptor_setter_domain<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    descriptor_ty: Type<'db>,
+    receiver_ty: Type<'db>,
+) -> DescriptorSetterDomain<'db> {
+    let (setter_ty, self_ty) = if let Type::PropertyInstance(property) = descriptor_ty {
+        // The synthesized `property.__set__` signature accepts `object`, but the property's
+        // setter provides the actual value type. An owner method's `Self` refers to that owner.
+        let Some(setter_ty) = property.setter(db) else {
+            return DescriptorSetterDomain::Missing;
+        };
+        (setter_ty, receiver_ty)
+    } else {
+        let Place::Defined(DefinedPlace {
+            ty: setter_ty,
+            definedness: Definedness::AlwaysDefined,
+            ..
+        }) = descriptor_setter(db, env, descriptor_ty)
+        else {
+            return DescriptorSetterDomain::Missing;
+        };
+        (setter_ty, descriptor_ty)
+    };
+
+    let Some(callables) = setter_ty.try_upcast_to_callable(db, env) else {
+        return DescriptorSetterDomain::Deferred;
+    };
+    let mut callable_domains = Vec::with_capacity(callables.iter().len());
+    for callable in &callables {
+        let mut write_types = Vec::new();
+        for signature in callable.signatures(db) {
+            match descriptor_setter_signature_domain(db, env, signature, self_ty, receiver_ty) {
+                DescriptorSetterSignatureDomain::Inapplicable => {}
+                DescriptorSetterSignatureDomain::Known(write_ty) => write_types.push(write_ty),
+                DescriptorSetterSignatureDomain::Deferred => {
+                    return DescriptorSetterDomain::Deferred;
+                }
+            }
+        }
+        callable_domains.push(UnionType::from_elements(db, env, write_types));
+    }
+    IntersectionType::bounded_from_elements(db, env, callable_domains).map_or(
+        DescriptorSetterDomain::Deferred,
+        DescriptorSetterDomain::Known,
+    )
+}
+
+enum DescriptorSetterSignatureDomain<'db> {
+    Inapplicable,
+    Known(Type<'db>),
+    Deferred,
+}
+
+/// Derive the values accepted by one setter overload when they fit in [`Type`].
+fn descriptor_setter_signature_domain<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    signature: &Signature<'db>,
+    self_ty: Type<'db>,
+    receiver_ty: Type<'db>,
+) -> DescriptorSetterSignatureDomain<'db> {
+    let parameters = signature.parameters();
+    let missing_required_parameter = || {
+        if parameters.is_gradual() || parameters.as_slice().iter().any(Parameter::is_variadic) {
+            DescriptorSetterSignatureDomain::Deferred
+        } else {
+            DescriptorSetterSignatureDomain::Inapplicable
+        }
+    };
+    let Some(trailing_parameters) = parameters.as_slice().get(2..) else {
+        return missing_required_parameter();
+    };
+    if !trailing_parameters.iter().all(|parameter| {
+        parameter.has_default()
+            || ((parameters.is_standard() || parameters.is_gradual())
+                && (parameter.is_variadic() || parameter.is_keyword_variadic()))
+    }) {
+        return DescriptorSetterSignatureDomain::Inapplicable;
+    }
+
+    let Some(receiver_parameter) = parameters.get_positional(0) else {
+        return missing_required_parameter();
+    };
+    let receiver_parameter = receiver_parameter
+        .annotated_type()
+        .bind_self_typevars(db, env, self_ty);
+    if contains_signature_typevar(db, env, signature, receiver_parameter) {
+        return DescriptorSetterSignatureDomain::Deferred;
+    }
+    if !receiver_ty.is_assignable_to(db, env, receiver_parameter) {
+        return DescriptorSetterSignatureDomain::Inapplicable;
+    }
+
+    let Some(write_parameter) = parameters.get_positional(1) else {
+        return missing_required_parameter();
+    };
+    let write_ty = write_parameter
+        .annotated_type()
+        .bind_self_typevars(db, env, self_ty);
+    if !contains_signature_typevar(db, env, signature, write_ty) {
+        return DescriptorSetterSignatureDomain::Known(write_ty);
+    }
+
+    let Type::TypeVar(typevar) = write_ty else {
+        return DescriptorSetterSignatureDomain::Deferred;
+    };
+    let Some(generic_context) = signature.generic_context else {
+        return DescriptorSetterSignatureDomain::Deferred;
+    };
+    if !generic_context.contains(db, typevar.identity(db))
+        || !typevar
+            .binding_context(db)
+            .definition()
+            .is_some_and(|definition| definition.kind(db).is_function_def())
+    {
+        return DescriptorSetterSignatureDomain::Deferred;
+    }
+
+    match typevar.require_bound_or_constraints(db, env) {
+        TypeVarBoundOrConstraints::UpperBound(bound) => {
+            DescriptorSetterSignatureDomain::Known(bound.bind_self_typevars(db, env, self_ty))
+        }
+        TypeVarBoundOrConstraints::Constraints(_) => DescriptorSetterSignatureDomain::Deferred,
+    }
+}
+
+fn contains_signature_typevar<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    signature: &Signature<'db>,
+    ty: Type<'db>,
+) -> bool {
+    signature.generic_context.is_some_and(|generic_context| {
+        super::visitor::any_over_type(db, env, ty, true, |ty| {
+            matches!(ty, Type::TypeVar(typevar) if generic_context.contains(db, typevar.identity(db)))
+        })
+    })
+}
+
+/// Union the value parameter types accepted by a property's setter overloads.
+///
+/// Keep the first available signature definition so callers can bind `Self` in the
+/// setter's defining context. Return `None` if the setter is not callable or a signature
+/// has no positional value parameter.
+///
+/// ```python
+/// from typing import Self
+///
+/// class Node:
+///     @property
+///     def next(self) -> Self: ...
+///
+///     @next.setter
+///     def next(self, value: Self) -> None: ...
+/// ```
+///
+/// This returns the unbound `Self` and the setter definition; callers choose its receiver.
+pub(super) fn property_setter_value_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    setter: Type<'db>,
+) -> Option<(Type<'db>, Option<Definition<'db>>)> {
+    let mut set_types = Vec::new();
+    let mut definition = None;
+    for callable in &setter.try_upcast_to_callable(db, env)? {
+        for signature in callable.signatures(db) {
+            set_types.push(signature.parameters().get_positional(1)?.annotated_type());
+            definition = definition.or(signature.definition());
+        }
+    }
+    Some((UnionType::from_elements(db, env, set_types), definition))
+}
+
+/// Bind the setter's accepted value type to the receiver used for this write.
+/// The setter definition retained by [`property_setter_value_type`] identifies which
+/// `Self` variables belong to the property, including when the property is inherited.
+fn property_set_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    property: PropertyInstanceType<'db>,
+    receiver_ty: Type<'db>,
+) -> Option<Type<'db>> {
+    let (ty, definition) = property_setter_value_type(db, env, property.setter(db)?)?;
+    if !ty.contains_self(db, env) {
+        return Some(ty);
+    }
+    Some(ty.apply_type_mapping(
+        db,
+        env,
+        &TypeMapping::BindSelf(SelfBinding::new(
+            db,
+            env,
+            receiver_ty,
+            definition.map(BindingContext::Definition),
+        )),
+        TypeContext::default(),
+    ))
+}
+
+impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// Checks a required attribute write using normal attribute-assignment lookup.
+    ///
+    /// Resolution is shared with real assignments, but this path evaluates the result using the
+    /// active type relation and constraints instead of inferring an expression or emitting an
+    /// assignment diagnostic.
+    pub(super) fn check_attribute_write(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        member_name: &str,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
+        let requirement = attribute_write_requirement(db, env, ty, member_name);
+        self.check_attribute_write_requirement(db, &requirement, member_name, value_ty)
+    }
+
+    fn check_attribute_write_requirement(
+        &self,
+        db: &'db dyn Db,
+        requirement: &AttributeWriteRequirement<'db>,
+        member_name: &str,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match requirement {
+            AttributeWriteRequirement::All { element_tys, .. } => {
+                let env = self.env;
+                let mut result = self.always();
+                for element_ty in *element_tys {
+                    let requirement =
+                        attribute_write_requirement(db, env, *element_ty, member_name);
+                    let element_result = self.check_attribute_write_requirement(
+                        db,
+                        &requirement,
+                        member_name,
+                        value_ty,
+                    );
+                    result = result.and(db, self.constraints, || element_result);
+                    if result.is_trivially_never_satisfied() {
+                        break;
+                    }
+                }
+                result
+            }
+            AttributeWriteRequirement::Any { intersection, .. } => {
+                let env = self.env;
+                let mut result = self.never();
+                for element_ty in intersection.positive(db) {
+                    let requirement =
+                        attribute_write_requirement(db, env, *element_ty, member_name);
+                    let element_result = self.check_attribute_write_requirement(
+                        db,
+                        &requirement,
+                        member_name,
+                        value_ty,
+                    );
+                    result = result.or(db, self.constraints, || element_result);
+                    if result.is_trivially_always_satisfied() {
+                        break;
+                    }
+                }
+                result
+            }
+            AttributeWriteRequirement::Unconstrained => self.always(),
+            AttributeWriteRequirement::CannotAssign => self.never(),
+            AttributeWriteRequirement::Module(Some(write_ty)) => {
+                self.check_type_pair(db, value_ty, *write_ty)
+            }
+            AttributeWriteRequirement::ProtocolMember {
+                write: Some(ProtocolMemberWriteRequirement::AssignableTo(write_ty)),
+                ..
+            } => self.check_type_pair(db, value_ty, *write_ty),
+            AttributeWriteRequirement::ProtocolMember {
+                write: Some(ProtocolMemberWriteRequirement::Descriptor { domain, .. }),
+                ..
+            } => self.check_type_pair(db, value_ty, domain.unwrap_or_else(Type::unknown)),
+            AttributeWriteRequirement::Module(None)
+            | AttributeWriteRequirement::ProtocolMember { write: None, .. } => self.never(),
+            AttributeWriteRequirement::Instance { object_ty, member } => {
+                self.check_instance_attribute_write(db, *object_ty, member, member_name, value_ty)
+            }
+            AttributeWriteRequirement::Class { object_ty, member } => {
+                self.check_class_attribute_write(db, *object_ty, member, value_ty)
+            }
+        }
+    }
+
+    fn check_instance_attribute_write(
+        &self,
+        db: &'db dyn Db,
+        object_ty: Type<'db>,
+        member: &InstanceAttributeWriteMember<'db>,
+        member_name: &str,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
+        let frozen_dataclass_dispatch = instance_setattr_dispatch(db, env, object_ty, member_name);
+        let setattr_receiver = frozen_dataclass_dispatch
+            .map_or(object_ty, |dispatch| dispatch.receiver(db, env, object_ty));
+        let mut arguments =
+            CallArguments::positional([Type::string_literal(db, member_name), value_ty]);
+        let setattr_result = if matches!(
+            frozen_dataclass_dispatch,
+            Some(FrozenDataclassDispatch::Delegate(_))
+        ) {
+            // The generated setter explicitly calls `super(...).__setattr__`, so lookup must
+            // follow the bound super's MRO rather than treating it as an implicit dunder call.
+            setattr_receiver.try_call_dunder_on_class(
+                db,
+                env,
+                "__setattr__",
+                &arguments,
+                TypeContext::default(),
+            )
+        } else {
+            setattr_receiver.try_call_dunder_with_policy(
+                db,
+                env,
+                "__setattr__",
+                &mut arguments,
+                TypeContext::default(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+            )
+        };
+        if instance_attribute_write_is_blocked(
+            db,
+            env,
+            object_ty,
+            member,
+            member_name,
+            &setattr_result,
+            frozen_dataclass_dispatch,
+        ) {
+            return self.never();
+        }
+
+        match member {
+            InstanceAttributeWriteMember::ClassVar => self.never(),
+            InstanceAttributeWriteMember::Explicit { member, fallback } => {
+                let member_result =
+                    self.check_explicit_attribute_write(db, object_ty, member, value_ty);
+                if let Some(fallback) = fallback {
+                    let fallback_result =
+                        self.check_fallback_attribute_write(db, fallback, value_ty);
+                    member_result.and(db, self.constraints, || fallback_result)
+                } else {
+                    member_result
+                }
+            }
+            InstanceAttributeWriteMember::Instance(fallback) => {
+                self.check_fallback_attribute_write(db, fallback, value_ty)
+            }
+            InstanceAttributeWriteMember::SetAttr => {
+                if !matches!(
+                    setattr_result,
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. })
+                ) {
+                    return self.never();
+                }
+                self.check_setattr_attribute_write(db, object_ty, value_ty)
+            }
+        }
+    }
+
+    fn check_class_attribute_write(
+        &self,
+        db: &'db dyn Db,
+        object_ty: Type<'db>,
+        member: &ClassAttributeWriteMember<'db>,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match member {
+            ClassAttributeWriteMember::Explicit { member, fallback } => {
+                let member_result =
+                    self.check_explicit_attribute_write(db, object_ty, member, value_ty);
+                if member_result.is_trivially_never_satisfied() {
+                    return member_result;
+                }
+                if let Some(fallback) = fallback {
+                    let fallback_result =
+                        self.check_fallback_attribute_write(db, fallback, value_ty);
+                    member_result.and(db, self.constraints, || fallback_result)
+                } else {
+                    member_result
+                }
+            }
+            ClassAttributeWriteMember::ClassAttribute(fallback) => {
+                self.check_fallback_attribute_write(db, fallback, value_ty)
+            }
+            ClassAttributeWriteMember::Unresolved { .. } => self.never(),
+        }
+    }
+
+    fn check_explicit_attribute_write(
+        &self,
+        db: &'db dyn Db,
+        object_ty: Type<'db>,
+        requirement: &ExplicitAttributeWriteRequirement<'db>,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if requirement.qualifiers().contains(TypeQualifiers::FINAL) {
+            return self.never();
+        }
+        match requirement {
+            ExplicitAttributeWriteRequirement::Descriptor { descriptor_ty, .. } => {
+                if let Some(property) = descriptor_ty.as_property_instance()
+                    && let Some(set_type) = property_set_type(db, self.env, property, object_ty)
+                {
+                    return self.check_type_pair(db, value_ty, set_type);
+                }
+                self.check_descriptor_attribute_write(db, *descriptor_ty, object_ty, value_ty)
+            }
+            ExplicitAttributeWriteRequirement::AssignableTo { ty, .. } => {
+                self.check_type_pair(db, value_ty, *ty)
+            }
+        }
+    }
+
+    fn check_descriptor_attribute_write(
+        &self,
+        db: &'db dyn Db,
+        descriptor_ty: Type<'db>,
+        object_ty: Type<'db>,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
+        let descriptor_ty = descriptor_ty.resolve_type_alias(db);
+        if let Type::Union(union) = descriptor_ty {
+            return union
+                .elements(db)
+                .iter()
+                .when_all(db, self.constraints, |descriptor_ty| {
+                    self.check_descriptor_attribute_write(db, *descriptor_ty, object_ty, value_ty)
+                });
+        }
+        if matches!(
+            descriptor_ty.try_call_dunder_with_policy(
+                db,
+                env,
+                "__set__",
+                &mut CallArguments::positional([object_ty, Type::unknown()]),
+                TypeContext::default(),
+                MemberLookupPolicy::REQUIRE_CONCRETE,
+            ),
+            Err(CallDunderError::CallError(..) | CallDunderError::MethodNotAvailable)
+        ) {
+            return self.never();
+        }
+        let Place::Defined(DefinedPlace { ty: setter_ty, .. }) =
+            descriptor_setter(db, env, descriptor_ty)
+        else {
+            return self.never();
+        };
+
+        self.check_callable_write_parameter(db, setter_ty, 1, descriptor_ty, value_ty)
+    }
+
+    fn check_setattr_attribute_write(
+        &self,
+        db: &'db dyn Db,
+        object_ty: Type<'db>,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
+        let Place::Defined(DefinedPlace { ty: setattr_ty, .. }) = object_ty
+            .member_lookup_with_policy(
+                db,
+                env,
+                "__setattr__",
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                    | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
+            .place
+        else {
+            return self.never();
+        };
+
+        self.check_callable_write_parameter(db, setattr_ty, 1, object_ty, value_ty)
+    }
+
+    fn check_callable_write_parameter(
+        &self,
+        db: &'db dyn Db,
+        callable_ty: Type<'db>,
+        parameter_index: usize,
+        self_ty: Type<'db>,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if let Type::Union(union) = value_ty {
+            return union
+                .elements(db)
+                .iter()
+                .when_all(db, self.constraints, |value_ty| {
+                    self.check_callable_write_parameter(
+                        db,
+                        callable_ty,
+                        parameter_index,
+                        self_ty,
+                        *value_ty,
+                    )
+                });
+        }
+
+        let env = self.env;
+        callable_ty
+            .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
+            .when_some_and(db, self.constraints, |callables| {
+                callables.iter().when_all(db, self.constraints, |callable| {
+                    callable.signatures(db).into_iter().when_any(
+                        db,
+                        self.constraints,
+                        |signature| {
+                            let parameters = signature.parameters();
+                            parameters
+                                .get_positional(parameter_index)
+                                .or_else(|| {
+                                    parameters.variadic().and_then(|(index, parameter)| {
+                                        (index <= parameter_index).then_some(parameter)
+                                    })
+                                })
+                                .map(|parameter| {
+                                    parameter
+                                        .annotated_type()
+                                        .bind_self_typevars(db, env, self_ty)
+                                })
+                                .when_some_and(db, self.constraints, |write_ty| {
+                                    self.check_type_pair(db, value_ty, write_ty)
+                                })
+                        },
+                    )
+                })
+            })
+    }
+
+    fn check_fallback_attribute_write(
+        &self,
+        db: &'db dyn Db,
+        requirement: &FallbackAttributeWriteRequirement<'db>,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match requirement {
+            FallbackAttributeWriteRequirement::AssignableTo { ty, qualifiers, .. } => {
+                if qualifiers.contains(TypeQualifiers::FINAL) {
+                    self.never()
+                } else {
+                    self.check_type_pair(db, value_ty, *ty)
+                }
+            }
+            FallbackAttributeWriteRequirement::PossiblyMissing => self.always(),
+        }
+    }
 }

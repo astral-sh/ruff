@@ -423,6 +423,12 @@ class DocTestRunner:
         more information.
         """
 
+    if sys.version_info >= (3, 15):
+        def report_skip(self, out: _Out, test: DocTest, example: Example) -> None:
+            """
+            Report that the given example was skipped.
+            """
+
     def report_start(self, out: _Out, test: DocTest, example: Example) -> None:
         """
         Report that the test runner is about to process the given

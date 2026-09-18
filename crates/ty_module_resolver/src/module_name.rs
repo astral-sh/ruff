@@ -312,7 +312,7 @@ impl ModuleName {
     pub fn from_import_statement<'db>(
         db: &'db dyn Db,
         importing_file: ImportingFile<'db>,
-        node: &'db ast::StmtImportFrom,
+        node: &ast::StmtImportFrom,
     ) -> Result<Self, ModuleNameResolutionError> {
         let ast::StmtImportFrom {
             module,
@@ -507,7 +507,7 @@ impl<'db> ImportingFile<'db> {
         }
     }
 
-    pub fn resolver_environment(self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
+    pub(crate) fn resolver_environment(self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
         match self {
             Self::ResolverFile(file) => file.environment(db),
             Self::File(_, resolver_environment) => resolver_environment,

@@ -9,6 +9,7 @@ use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::settings::LinterSettings;
 
 /// ## What it does
@@ -53,7 +54,7 @@ use crate::settings::LinterSettings;
 /// - `lint.flake8-builtins.allowed-modules`
 /// - `lint.flake8-builtins.strict-checking`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.9.0")]
+#[violation_metadata(stable_since = "0.9.0", category = Category::Pedantic)]
 pub(crate) struct StdlibModuleShadowing {
     name: String,
 }

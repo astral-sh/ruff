@@ -181,6 +181,7 @@ class AlwaysTrue:
 ```py
 from module import AlwaysTrue
 
+# error: [redundant-condition] "always truthy"
 if AlwaysTrue():
     yes = True
 else:

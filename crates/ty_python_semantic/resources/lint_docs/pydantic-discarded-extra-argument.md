@@ -22,5 +22,5 @@ class User(BaseModel):
 user = User(name="Alice", admni=True)  # error: [pydantic-discarded-extra-argument]
 ```
 
-If the field name has been misspelled, fix the typo. Otherwise, consider removing the extra argument,
-or explicitly configure the model with `extra="allow"`.
+If the field name has been misspelled, fix the typo. Otherwise, consider removing the extra
+argument, or explicitly configure the model with `extra="allow"`.

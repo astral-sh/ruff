@@ -19,7 +19,7 @@ use ruff_db::files::{File, FileRange};
 use ruff_db::source::source_text;
 use ruff_db::system::SystemPathBuf;
 use serde::{Deserialize, Serialize};
-use ty_project::{Db as _, ProjectDatabase, SemanticDb as _};
+use ty_project::{Db as _, ProjectDatabase};
 
 use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::{FileRangeExt, ToRangeExt};
@@ -197,18 +197,21 @@ pub(super) enum LspDiagnostics {
 }
 
 impl LspDiagnostics {
-    /// Returns the diagnostics for a text document.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the diagnostics are for a notebook document.
-    pub(super) fn expect_text_document(self) -> Vec<Diagnostic> {
+    /// Returns the diagnostics for the text document or notebook cell at `uri`.
+    pub(super) fn into_document_diagnostics(self, uri: &Uri) -> Vec<Diagnostic> {
         match self {
             LspDiagnostics::TextDocument(diagnostics) => diagnostics,
-            LspDiagnostics::NotebookDocument(_) => {
-                panic!("Expected a text document diagnostics, but got notebook diagnostics")
+            LspDiagnostics::NotebookDocument(mut diagnostics) => {
+                diagnostics.remove(uri).unwrap_or_default()
             }
         }
+    }
+}
+
+/// Publishes diagnostics for all open files that need push diagnostics.
+pub(crate) fn publish_all_document_diagnostics(session: &Session, client: &Client) {
+    for document in session.file_document_handles() {
+        publish_diagnostics_if_needed(&document, session, client);
     }
 }
 
@@ -220,7 +223,7 @@ impl LspDiagnostics {
 /// does not support pull diagnostics for notebooks or cells (as of 2025-11-12).
 ///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
-pub(super) fn publish_diagnostics_if_needed(
+pub(crate) fn publish_diagnostics_if_needed(
     document: &DocumentHandle,
     session: &Session,
     client: &Client,
@@ -400,8 +403,15 @@ pub(super) fn compute_diagnostics(
         return None;
     };
 
+    // The first uv result supplies the module paths needed for correct diagnostics. Do not analyze
+    // the script until that result is available. Waiting would not help: publishing the environment
+    // advances the database revision and cancels this snapshot, so the request must retry anyway.
+    if db.uv_environments().is_initialization_pending(db, file) {
+        return None;
+    }
+
     let diagnostics = db.check_file(file);
-    let unnecessary_hints = hints(db, db.program_file(file));
+    let unnecessary_hints = hints(db, file);
 
     Some(Diagnostics {
         items: diagnostics,
@@ -647,6 +657,7 @@ pub(crate) struct FullDiagnosticData {
 pub(crate) struct DiagnosticFixData {
     pub(crate) fix_title: String,
     pub(crate) edits: HashMap<Uri, Vec<lsp_types::TextEdit>>,
+    pub(crate) preferred: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -722,6 +733,7 @@ impl DiagnosticData {
                 .map(ToString::to_string)
                 .unwrap_or_else(|| format!("Fix {}", diagnostic.id())),
             edits: lsp_edits,
+            preferred: fix.applies(Applicability::Safe),
         })
     }
 }

@@ -152,6 +152,7 @@ fn quick_fix(
                 data: Some(
                     serde_json::to_value(document_uri).expect("document uri should serialize"),
                 ),
+                is_preferred: fix.is_preferred,
                 ..Default::default()
             }))
         })

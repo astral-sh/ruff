@@ -6,6 +6,7 @@ use ruff_python_semantic::analyze::typing::is_set;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -46,7 +47,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.5")]
+#[violation_metadata(preview_since = "v0.3.5", category = Category::Suspicious)]
 pub(crate) struct ModifiedIteratingSet {
     name: Name,
 }

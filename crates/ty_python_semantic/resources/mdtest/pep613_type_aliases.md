@@ -183,6 +183,62 @@ def takes_list(value: ListAlias) -> None:
 takes_list([1])
 ```
 
+## Class-scoped type variables
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A legacy generic alias binds its own type variables and cannot capture a type variable already bound
+to its enclosing class. The restriction also applies to stringified aliases.
+
+```py
+from typing import Generic, TypeAlias, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Box(Generic[T]):
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Items: TypeAlias = list[T]
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Quoted: TypeAlias = "list[T]"
+
+    Independent: TypeAlias = list[S]
+    Concrete: TypeAlias = list[int]
+
+reveal_type(Box.Independent[str]())  # revealed: list[str]
+reveal_type(Box.Concrete())  # revealed: list[int]
+```
+
+PEP 695 `type` statements can capture the enclosing class's type parameters, but using `TypeAlias`
+inside a PEP 695 class still follows the legacy alias rules.
+
+```py
+class Modern[T]:
+    type Items = list[T]
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Legacy: TypeAlias = list[T]
+```
+
+The same restriction applies to class-scoped `ParamSpec` and `TypeVarTuple` parameters.
+
+```py
+from typing import Callable, ParamSpec, TypeVarTuple
+
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+
+class Callbacks(Generic[P]):
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `P`"
+    Callback: TypeAlias = Callable[P, None]
+
+class Tuples(Generic[*Ts]):
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `Ts`"
+    Items: TypeAlias = tuple[*Ts]
+```
+
 ## Subscripted generic alias in union
 
 ```py
@@ -333,21 +389,28 @@ from types import UnionType
 RecursiveTuple: TypeAlias = tuple["int | RecursiveTuple", str]
 
 def _(rec: RecursiveTuple):
-    # TODO should be `tuple[int | RecursiveTuple, str]`
-    reveal_type(rec)  # revealed: tuple[Divergent, str]
+    reveal_type(rec)  # revealed: RecursiveTuple
 
 RecursiveHomogeneousTuple: TypeAlias = tuple["int | RecursiveHomogeneousTuple", ...]
 
 def _(rec: RecursiveHomogeneousTuple):
-    # TODO should be `tuple[int | RecursiveHomogeneousTuple, ...]`
-    reveal_type(rec)  # revealed: tuple[Divergent, ...]
+    reveal_type(rec)  # revealed: RecursiveHomogeneousTuple
 
 ClassInfo: TypeAlias = type | UnionType | tuple["ClassInfo", ...]
-reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[Divergent, ...]'>
+reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[ClassInfo, ...]'>
+```
+
+TODO: The following alias is invalid because its cycle passes through no containing type. Until it
+is diagnosed, it falls back to `Divergent` so it cannot produce a usable recursive definition.
+
+```py
+Unguarded: TypeAlias = "int | Unguarded"
+
+def unguarded(value: Unguarded):
+    reveal_type(value)  # revealed: Divergent
 
 def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
-    # TODO should be `type | UnionType | tuple[ClassInfo, ...]`
-    reveal_type(classinfo)  # revealed: type | UnionType | tuple[Divergent, ...]
+    reveal_type(classinfo)  # revealed: ClassInfo
     return isinstance(obj, classinfo)
 
 K = TypeVar("K")
@@ -355,8 +418,14 @@ V = TypeVar("V")
 NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
 
 def _(nested: NestedDict[str, int]):
-    # TODO should be `dict[str, int | NestedDict[str, int]]`
-    reveal_type(nested)  # revealed: dict[@Todo(specialized recursive generic type alias), Divergent]
+    reveal_type(nested)  # revealed: NestedDict[str, int]
+
+T = TypeVar("T")
+Even: TypeAlias = T | list["Odd[T]"]
+Odd: TypeAlias = T | tuple["Even[T]"]
+
+def invalid_even() -> Even[int]:
+    return [("bad",)]  # error: [invalid-return-type]
 
 my_isinstance(1, int)
 my_isinstance(1, int | str)
@@ -365,8 +434,29 @@ my_isinstance(1, (int, (str, float)))
 my_isinstance(1, (int, (str | float)))
 # error: [invalid-argument-type]
 my_isinstance(1, 1)
-# TODO should be an invalid-argument-type error
+# error: [invalid-argument-type]
 my_isinstance(1, (int, (str, 1)))
+```
+
+## Type parameters used only in recursive references
+
+A PEP 613 alias remains generic when its type variable appears only in a recursive reference.
+Specialized variable annotations still reject invalid nested values.
+
+```py
+from __future__ import annotations
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+NestedDict: TypeAlias = dict[str, "NestedDict[T]"]
+
+valid: NestedDict[int] = {"nested": {}}
+invalid: NestedDict[int] = {"nested": b"wrong"}  # error: [invalid-assignment]
+
+def inspect(value: NestedDict[int]):
+    local: NestedDict[int] = value
+    reveal_type(local["nested"])  # revealed: NestedDict[int]
+    invalid_local: NestedDict[int] = {"nested": {"leaf": 1}}  # error: [invalid-assignment]
 ```
 
 ## Materialization of self-referential generic PEP 613 type aliases

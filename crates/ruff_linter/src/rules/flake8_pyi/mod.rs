@@ -129,7 +129,7 @@ mod tests {
     #[test_case(Rule::RedundantNoneLiteral, Path::new("PYI061.py"))]
     #[test_case(Rule::RedundantNoneLiteral, Path::new("PYI061.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
@@ -145,11 +145,7 @@ mod tests {
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_4.py"))]
     #[test_case(Rule::LegacyTypeComment, Path::new("PYI033.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview_{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview_{}_{}", rule_code.name(), path.to_string_lossy());
         assert_diagnostics_diff!(
             snapshot,
             Path::new("flake8_pyi").join(path).as_path(),
@@ -163,7 +159,7 @@ mod tests {
     #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_0.pyi"))]
     #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_1.pyi"))]
     fn custom_classmethod_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings {
@@ -183,7 +179,7 @@ mod tests {
     #[test_case(Rule::RedundantNoneLiteral, Path::new("PYI061.py"))]
     #[test_case(Rule::RedundantNoneLiteral, Path::new("PYI061.pyi"))]
     fn py38(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("py38_{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("py38_{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY38),

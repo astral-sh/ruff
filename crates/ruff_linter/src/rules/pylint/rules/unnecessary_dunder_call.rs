@@ -4,6 +4,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::rules::pylint::helpers::is_known_dunder_method;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -64,7 +65,7 @@ use ruff_python_ast::PythonVersion;
 ///     return x > 2
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.12")]
+#[violation_metadata(preview_since = "v0.1.12", category = Category::Complexity)]
 pub(crate) struct UnnecessaryDunderCall {
     method: String,
     replacement: Option<String>,

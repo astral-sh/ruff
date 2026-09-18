@@ -1,4 +1,4 @@
-# ruff: noqa: PYI021
+# ruff: file-ignore[docstring-in-stub]
 """
 Internal-only symbols for special forms and type-system tests.
 
@@ -10,7 +10,8 @@ import types
 from enum import Enum
 from typing import Any, Protocol, _SpecialForm
 
-from typing_extensions import LiteralString, Self, TypeForm  # noqa: UP035
+# ruff: ignore[deprecated-import]
+from typing_extensions import LiteralString, Self, TypeForm
 
 # -------------
 # Special forms

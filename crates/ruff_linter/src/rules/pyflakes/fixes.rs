@@ -1,3 +1,5 @@
+use std::debug_assert_matches;
+
 use anyhow::{Context, Ok, Result};
 
 use ruff_python_ast as ast;
@@ -125,7 +127,7 @@ pub(crate) fn remove_exception_handler_assignment(
     let preceding = tokenizer
         .next()
         .context("expected the exception name to be preceded by `as`")?;
-    debug_assert!(matches!(preceding.kind, SimpleTokenKind::As));
+    debug_assert_matches!(preceding.kind, SimpleTokenKind::As);
 
     // Lex to the end of the preceding token, which should be the exception value.
     let preceding = tokenizer
@@ -137,7 +139,7 @@ pub(crate) fn remove_exception_handler_assignment(
         .skip_trivia()
         .next()
         .context("expected the exception name to be followed by a colon")?;
-    debug_assert!(matches!(following.kind, SimpleTokenKind::Colon));
+    debug_assert_matches!(following.kind, SimpleTokenKind::Colon);
 
     Ok(Edit::deletion(preceding.end(), following.start()))
 }
