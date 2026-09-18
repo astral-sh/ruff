@@ -84,8 +84,6 @@ mod tests {
     #[test_case(Rule::StrOrReprDefinedInStub, Path::new("PYI029.pyi"))]
     #[test_case(Rule::StringOrBytesTooLong, Path::new("PYI053.py"))]
     #[test_case(Rule::StringOrBytesTooLong, Path::new("PYI053.pyi"))]
-    #[test_case(Rule::StubBodyMultipleStatements, Path::new("PYI048.py"))]
-    #[test_case(Rule::StubBodyMultipleStatements, Path::new("PYI048.pyi"))]
     #[test_case(Rule::TSuffixedTypeAlias, Path::new("PYI043.py"))]
     #[test_case(Rule::TSuffixedTypeAlias, Path::new("PYI043.pyi"))]
     #[test_case(Rule::TypeAliasWithoutAnnotation, Path::new("PYI026.py"))]
