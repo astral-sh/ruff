@@ -686,12 +686,18 @@ impl<'a> ItemLine<'a> {
         item_indent: TextSize,
     ) -> bool {
         // More deeply indented lines are unambiguously part of the current item.
-        line_indent > item_indent
-            // Although the style guide suggests indenting continuation lines,
-            // aligned parameter prose is common in practice.
-            || (line_indent == item_indent && section_kind.is_parameter_section())
-            // Aligned URLs and paths are continuations despite resembling item headers.
-            || (line_indent == item_indent && self.is_item_like_continuation)
+        if line_indent > item_indent {
+            return true;
+        }
+
+        // Although the style guide suggests indenting continuation lines,
+        // aligned parameter prose is common in practice.
+        if line_indent == item_indent && section_kind.is_parameter_section() {
+            return true;
+        }
+
+        // Aligned URLs and paths are continuations despite resembling item headers.
+        line_indent == item_indent && self.is_item_like_continuation
     }
 
     fn classify(

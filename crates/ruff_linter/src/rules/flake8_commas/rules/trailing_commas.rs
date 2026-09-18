@@ -5,6 +5,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Violation};
 use crate::{Edit, Fix};
 
@@ -58,7 +59,7 @@ impl SimpleToken {
 impl From<(TokenKind, TextRange)> for SimpleToken {
     fn from((tok, range): (TokenKind, TextRange)) -> Self {
         let ty = match tok {
-            TokenKind::Name => TokenType::Named,
+            TokenKind::Identifier => TokenType::Named,
             TokenKind::String => TokenType::String,
             TokenKind::Newline => TokenType::Newline,
             TokenKind::NonLogicalNewline => TokenType::NonLogicalNewline,
@@ -153,7 +154,7 @@ impl Context {
 ///
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.223")]
+#[violation_metadata(stable_since = "v0.0.223", category = Category::Formatting)]
 pub(crate) struct MissingTrailingComma;
 
 impl AlwaysFixableViolation for MissingTrailingComma {
@@ -199,7 +200,7 @@ impl AlwaysFixableViolation for MissingTrailingComma {
 /// foo = (json.dumps({"bar": 1}),)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.223")]
+#[violation_metadata(stable_since = "v0.0.223", category = Category::Suspicious)]
 pub(crate) struct TrailingCommaOnBareTuple;
 
 impl Violation for TrailingCommaOnBareTuple {
@@ -235,7 +236,7 @@ impl Violation for TrailingCommaOnBareTuple {
 ///
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.223")]
+#[violation_metadata(stable_since = "v0.0.223", category = Category::Formatting)]
 pub(crate) struct ProhibitedTrailingComma;
 
 impl AlwaysFixableViolation for ProhibitedTrailingComma {

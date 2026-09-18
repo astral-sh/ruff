@@ -14,47 +14,46 @@ pub(crate) fn order_imports<'a>(
 ) -> Vec<EitherImport<'a>> {
     let straight_imports = block.import.into_iter();
 
-    let from_imports =
-        // Include all non-re-exports.
-        block
-            .import_from
-            .into_iter()
-            .chain(
-                // Include all re-exports.
-                block
-                    .import_from_as
-                    .into_iter()
-                    .map(|((import_from, ..), body)| (import_from, body)),
-            )
-            .chain(
-                // Include all star imports.
-                block.import_from_star,
-            )
-            .map(
-                |(
-                    import_from,
-                    ImportFromStatement {
-                        first_index,
-                        comments,
-                        aliases,
-                        trailing_comma,
-                    },
-                )| {
-                    // Within each `Stmt::ImportFrom`, sort the members.
-                    (
-                        import_from,
-                        first_index.unwrap_or_default(),
-                        comments,
-                        trailing_comma,
-                        aliases
-                            .into_iter()
-                            .sorted_by_cached_key(|(alias, _)| {
-                                MemberKey::from_member(alias.name, alias.asname, settings)
-                            })
-                            .collect::<Vec<(AliasData, ImportFromCommentSet)>>(),
-                    )
+    // Include all non-re-exports.
+    let from_imports = block
+        .import_from
+        .into_iter()
+        .chain(
+            // Include all re-exports.
+            block
+                .import_from_as
+                .into_iter()
+                .map(|((import_from, ..), body)| (import_from, body)),
+        )
+        .chain(
+            // Include all star imports.
+            block.import_from_star,
+        )
+        .map(
+            |(
+                import_from,
+                ImportFromStatement {
+                    first_index,
+                    comments,
+                    aliases,
+                    trailing_comma,
                 },
-            );
+            )| {
+                // Within each `Stmt::ImportFrom`, sort the members.
+                (
+                    import_from,
+                    first_index.unwrap_or_default(),
+                    comments,
+                    trailing_comma,
+                    aliases
+                        .into_iter()
+                        .sorted_by_cached_key(|(alias, _)| {
+                            MemberKey::from_member(alias.name, alias.asname, settings)
+                        })
+                        .collect::<Vec<(AliasData, ImportFromCommentSet)>>(),
+                )
+            },
+        );
 
     if matches!(section, ImportSection::Known(ImportType::Future)) {
         let ordered_from_imports = from_imports

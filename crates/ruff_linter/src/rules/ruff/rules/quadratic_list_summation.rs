@@ -8,6 +8,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -69,7 +70,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [microbenchmarks]: https://github.com/astral-sh/ruff/issues/5073#issuecomment-1591836349
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.285")]
+#[violation_metadata(stable_since = "v0.0.285", category = Category::Performance)]
 pub(crate) struct QuadraticListSummation {
     fix_style: QuadraticListSummationFixStyle,
 }
@@ -113,7 +114,7 @@ pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) 
     let ast::ExprCall {
         func,
         arguments,
-        range,
+        range_start: _,
         node_index: _,
     } = call;
 
@@ -132,7 +133,8 @@ pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) 
     }
 
     let fix_style = QuadraticListSummationFixStyle::from_target_version(checker.target_version());
-    let mut diagnostic = checker.report_diagnostic(QuadraticListSummation { fix_style }, *range);
+    let mut diagnostic =
+        checker.report_diagnostic(QuadraticListSummation { fix_style }, call.range());
     diagnostic.try_set_fix(|| convert_to_fix(iterable, call, checker, fix_style));
 }
 

@@ -3,6 +3,7 @@ use ruff_python_ast::Stmt;
 use ruff_python_ast::identifier::Identifier;
 
 use crate::Violation;
+use crate::codes::Category;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::num_statements;
@@ -49,7 +50,7 @@ use crate::rules::pylint::helpers::num_statements;
 /// ## Options
 /// - `lint.pylint.max-statements`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.240")]
+#[violation_metadata(stable_since = "v0.0.240", category = Category::Pedantic)]
 pub(crate) struct TooManyStatements {
     statements: usize,
     max_statements: usize,

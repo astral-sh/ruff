@@ -45,7 +45,7 @@ _CM_EF = TypeVar("_CM_EF", bound=AbstractContextManager[Any, Any] | _ExitFunc)
 # At runtime it inherits from ABC and is not a Protocol, but it is on the
 # allowlist for use as a Protocol.
 @runtime_checkable
-class AbstractContextManager(ABC, Protocol[_T_co, _ExitT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-protocol]
+class AbstractContextManager(ABC, Protocol[_T_co, _ExitT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-protocol]  # pyrefly: ignore [invalid-inheritance]
     """An abstract base class for context managers."""
 
     __slots__ = ()
@@ -62,7 +62,7 @@ class AbstractContextManager(ABC, Protocol[_T_co, _ExitT_co]):  # type: ignore[m
 # At runtime it inherits from ABC and is not a Protocol, but it is on the
 # allowlist for use as a Protocol.
 @runtime_checkable
-class AbstractAsyncContextManager(ABC, Protocol[_T_co, _ExitT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-protocol]
+class AbstractAsyncContextManager(ABC, Protocol[_T_co, _ExitT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-protocol]  # pyrefly: ignore [invalid-inheritance]
     """An abstract base class for asynchronous context managers."""
 
     __slots__ = ()

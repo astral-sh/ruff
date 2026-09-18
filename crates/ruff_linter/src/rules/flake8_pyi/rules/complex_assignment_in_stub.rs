@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for assignments with multiple or non-name targets in stub files.
@@ -42,7 +43,7 @@ use crate::checkers::ast::Checker;
 ///     X: TypeAlias = int
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.279")]
+#[violation_metadata(stable_since = "v0.0.279", category = Category::Suspicious)]
 pub(crate) struct ComplexAssignmentInStub;
 
 impl Violation for ComplexAssignmentInStub {

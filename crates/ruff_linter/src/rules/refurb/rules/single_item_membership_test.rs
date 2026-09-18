@@ -5,6 +5,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -42,7 +43,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Complexity)]
 pub(crate) struct SingleItemMembershipTest {
     membership_test: MembershipTest,
 }
@@ -65,14 +66,8 @@ impl Violation for SingleItemMembershipTest {
 }
 
 /// FURB171
-pub(crate) fn single_item_membership_test(
-    checker: &Checker,
-    expr: &Expr,
-    left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-) {
-    let ([op], [right]) = (ops, comparators) else {
+pub(crate) fn single_item_membership_test(checker: &Checker, compare: &ast::ExprCompare) {
+    let Some((left, op, right)) = compare.as_single() else {
         return;
     };
 
@@ -94,21 +89,24 @@ pub(crate) fn single_item_membership_test(
                 left,
                 &[membership_test.replacement_op()],
                 std::slice::from_ref(item),
-                expr.into(),
+                compare.into(),
                 checker.tokens(),
                 checker.source(),
             ),
-            expr.range(),
+            compare.range(),
             checker.locator(),
         ),
-        expr.range(),
+        compare.range(),
     );
 
     // All supported cases can change runtime behavior; mark as unsafe.
     let fix = Fix::unsafe_edit(edit);
 
     checker
-        .report_diagnostic(SingleItemMembershipTest { membership_test }, expr.range())
+        .report_diagnostic(
+            SingleItemMembershipTest { membership_test },
+            compare.range(),
+        )
         .set_fix(fix);
 }
 
@@ -126,7 +124,7 @@ fn single_item<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Ex
         Expr::Call(ast::ExprCall {
             func,
             arguments,
-            range: _,
+            range_start: _,
             node_index: _,
         }) => {
             if arguments.len() != 1 || !is_set_method(func, semantic) {

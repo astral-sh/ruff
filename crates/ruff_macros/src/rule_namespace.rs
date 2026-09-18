@@ -34,18 +34,44 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
             .iter()
             .filter(|attr| attr.path().is_ident("prefix"))
             .map(|attr| {
-                let Meta::NameValue(MetaNameValue{value: syn::Expr::Lit (ExprLit { lit: Lit::Str(lit), ..}), ..}) = &attr.meta else {
-                    return Err(Error::new(attr.span(), r#"expected attribute to be in the form of [#prefix = "..."]"#));
+                let Meta::NameValue(MetaNameValue {
+                    value:
+                        syn::Expr::Lit(ExprLit {
+                            lit: Lit::Str(lit), ..
+                        }),
+                    ..
+                }) = &attr.meta
+                else {
+                    return Err(Error::new(
+                        attr.span(),
+                        r#"expected attribute to be in the form of [#prefix = "..."]"#,
+                    ));
                 };
                 let str = lit.value();
                 match str.chars().next() {
-                    None => return Err(Error::new(lit.span(), "expected prefix string to be non-empty")),
-                    Some(c) => if !first_chars.insert(c) {
-                        return Err(Error::new(lit.span(), format!("this variant already has another prefix starting with the character '{c}'")))
+                    None => {
+                        return Err(Error::new(
+                            lit.span(),
+                            "expected prefix string to be non-empty",
+                        ));
+                    }
+                    Some(c) => {
+                        if !first_chars.insert(c) {
+                            return Err(Error::new(
+                                lit.span(),
+                                format!(
+                                    "this variant already has another prefix \
+                                    starting with the character '{c}'"
+                                ),
+                            ));
+                        }
                     }
                 }
                 if !all_prefixes.insert(str.clone()) {
-                    return Err(Error::new(lit.span(), "prefix has already been defined before"));
+                    return Err(Error::new(
+                        lit.span(),
+                        "prefix has already been defined before",
+                    ));
                 }
                 Ok(str)
             })
@@ -155,7 +181,8 @@ fn parse_doc_attr(doc_attr: &Attribute) -> syn::Result<(String, String)> {
         .ok_or_else(|| {
             Error::new(
                 doc_lit.span(),
-                "expected doc comment to be in the form of `/// [name](https://example.com/)`",
+                "expected doc comment to be in the form of \
+                `/// [name](https://example.com/)`",
             )
         })
 }

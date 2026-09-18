@@ -7,6 +7,7 @@ use ruff_source_file::find_newline;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -141,7 +142,7 @@ impl fmt::Display for LiteralType {
 /// - [Python documentation: `bool`](https://docs.python.org/3/library/functions.html#bool)
 /// - [Python documentation: `complex`](https://docs.python.org/3/library/functions.html#complex)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.193")]
+#[violation_metadata(stable_since = "v0.0.193", category = Category::Style)]
 pub(crate) struct NativeLiterals {
     literal_type: LiteralType,
 }
@@ -196,7 +197,7 @@ pub(crate) fn native_literals(
                 range: _,
                 node_index: _,
             },
-        range: call_range,
+        range_start: _,
         node_index: _,
     } = call;
 
@@ -289,7 +290,8 @@ pub(crate) fn native_literals(
             // Ex) `bool(True)and None` no space between `)` and the keyword `and`.
             //
             // Subtract 1 from the end of the range to include `Rpar` token in the slice.
-            if let [paren_token, next_token, ..] = tokens.after(call_range.sub_end(1.into()).end())
+            if let [paren_token, next_token, ..] =
+                tokens.after(call.range().sub_end(1.into()).end())
             {
                 needs_space = next_token.kind().is_keyword()
                     && paren_token.range().end() == next_token.range().start();
@@ -328,7 +330,7 @@ pub(crate) fn native_literals(
                 content.push(' ');
             }
 
-            let applicability = if checker.comment_ranges().intersects(call.range) {
+            let applicability = if checker.comment_ranges().intersects(call.range()) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe

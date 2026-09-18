@@ -151,6 +151,33 @@ match obj:
         pass
 ```
 
+## Duplicate keyword arguments
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def f(x: int) -> None: ...
+
+# error: [invalid-syntax] "Duplicate keyword argument `x`"
+f(x=1, x=2)
+
+# error: [parameter-already-assigned] "Multiple values provided for parameter `x` of function `f`"
+f(1, x=2)
+```
+
+Duplicate keywords are also invalid in class definitions:
+
+```py
+# error: [invalid-syntax] "Duplicate keyword argument `metaclass`"
+class C(metaclass=type, metaclass=type): ...
+
+# error: [invalid-syntax] "Duplicate keyword argument `metaclass`"
+class Generic[T](metaclass=type, metaclass=type): ...
+```
+
 ## `return`, `yield`, `yield from`, and `await` outside function
 
 ```py
@@ -602,4 +629,60 @@ error[invalid-syntax]: name `a` cannot refer to a parameter and a global variabl
    |
 27 |     global a  # snapshot: invalid-syntax
    |            ^
+```
+
+## name cannot refer to a parameter and a nonlocal variable
+
+```py
+a = None
+
+def outer():
+    a = None
+    def f(a):
+        nonlocal a  # snapshot: invalid-syntax
+
+def outer():
+    a = None
+    def g(a):
+        if True:
+            nonlocal a  # error: [invalid-syntax]
+
+def h(a):
+    def inner():
+        nonlocal a
+
+def outer():
+    a = None
+    def i(a):
+        try:
+            nonlocal a  # error: [invalid-syntax]
+        except Exception:
+            pass
+
+def outer():
+    a = None
+    def f(a):
+        a = 1
+        a = 2
+        nonlocal a  # error: [invalid-syntax]
+
+def f(a):
+    class Inner:
+        nonlocal a
+
+def f(a):
+    def inner(a):
+        nonlocal a  # error: [invalid-syntax]
+
+def f(a=1):
+    def inner():
+        nonlocal a
+```
+
+```snapshot
+error[invalid-syntax]: name `a` cannot refer to a parameter and a nonlocal variable
+ --> src/mdtest_snippet.py:6:18
+  |
+6 |         nonlocal a  # snapshot: invalid-syntax
+  |                  ^
 ```

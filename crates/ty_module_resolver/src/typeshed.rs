@@ -370,7 +370,12 @@ mod tests {
 
             let relative_path = absolute_path
                 .strip_prefix(&stdlib_stubs_path)
-                .unwrap_or_else(|_| panic!("Expected path to be a child of {stdlib_stubs_path:?} but found {absolute_path:?}"));
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "Expected path to be a child of {stdlib_stubs_path:?} \
+                        but found {absolute_path:?}"
+                    )
+                });
 
             let relative_path_str = relative_path.as_os_str().to_str().unwrap_or_else(|| {
                 panic!("Expected all typeshed paths to be valid UTF-8; got {relative_path:?}")
@@ -381,15 +386,22 @@ mod tests {
 
             let top_level_module = if let Some(extension) = relative_path.extension() {
                 // It was a file; strip off the file extension to get the module name:
-                let extension = extension
-                    .to_str()
-                    .unwrap_or_else(||panic!("Expected all file extensions to be UTF-8; was not true for {relative_path:?}"));
+                let extension = extension.to_str().unwrap_or_else(|| {
+                    panic!(
+                        "Expected all file extensions to be UTF-8; \
+                        was not true for {relative_path:?}"
+                    )
+                });
 
                 relative_path_str
                     .strip_suffix(extension)
-                    .and_then(|string| string.strip_suffix('.')).unwrap_or_else(|| {
-                        panic!("Expected path {relative_path_str:?} to end with computed extension {extension:?}")
-                })
+                    .and_then(|string| string.strip_suffix('.'))
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Expected path {relative_path_str:?} to end \
+                            with computed extension {extension:?}"
+                        )
+                    })
             } else {
                 // It was a directory; no need to do anything to get the module name
                 relative_path_str

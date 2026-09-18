@@ -59,7 +59,7 @@ fn empty_config() {
         "if (1, 2):\n    pass",
         r#"{}"#,
         [ExpandedMessage {
-            code: Rule::IfTuple.noqa_code().to_string(),
+            code: Rule::IfTuple.noqa_code().unwrap().to_string(),
             message: "If test is a tuple, which is always `True`".to_string(),
             tags: vec![],
             annotations: vec![primary_annotation(

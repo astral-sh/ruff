@@ -5,6 +5,7 @@ use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -36,10 +37,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// This rule's fix is marked as safe, unless the expression contains comments.
 ///
 /// ## References
-/// - [Python documentation: `min`](https://docs.python.org/3.11/library/functions.html#min)
-/// - [Python documentation: `max`](https://docs.python.org/3.11/library/functions.html#max)
+/// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
+/// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Complexity)]
 pub(crate) struct IfExprMinMax {
     min_max: MinMax,
     expression: SourceCodeSnippet,
@@ -86,18 +87,12 @@ impl Violation for IfExprMinMax {
 
 /// FURB136
 pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
-    let Expr::Compare(ast::ExprCompare {
-        left,
-        ops,
-        comparators,
-        ..
-    }) = if_exp.test.as_ref()
-    else {
+    let Expr::Compare(compare) = if_exp.test.as_ref() else {
         return;
     };
 
     // Ignore, e.g., `foo < bar < baz`.
-    let [op] = &**ops else {
+    let Some((left, op, right)) = compare.as_single() else {
         return;
     };
 
@@ -109,10 +104,6 @@ pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
         CmpOp::Lt => (MinMax::Min, true),
         CmpOp::LtE => (MinMax::Min, false),
         _ => return,
-    };
-
-    let [right] = &**comparators else {
-        return;
     };
 
     let body_cmp = ComparableExpr::from(if_exp.body.as_ref());
@@ -128,9 +119,9 @@ pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
     }
 
     let (arg1, arg2) = if flip_args {
-        (right, left.as_ref())
+        (right, left)
     } else {
-        (left.as_ref(), right)
+        (left, right)
     };
 
     let replacement = format!(

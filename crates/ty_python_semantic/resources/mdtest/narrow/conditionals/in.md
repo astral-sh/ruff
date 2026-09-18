@@ -2,10 +2,13 @@
 
 ## `in` for tuples
 
+Broad integer subjects narrow to the integer literals present in the tuple. By default, equality
+narrowing does not add the boolean literals that also compare equal to `0` or `1`.
+
 ```py
 def _(x: int):
     if x in (1, 2, 3):
-        reveal_type(x)  # revealed: Literal[1, 2, 3, True]
+        reveal_type(x)  # revealed: Literal[1, 2, 3]
     else:
         reveal_type(x)  # revealed: int & ~Literal[1] & ~Literal[True] & ~Literal[2] & ~Literal[3]
 ```
@@ -116,6 +119,14 @@ def inline_set(value: Choice):
         reveal_type(value)  # revealed: Literal["c"]
     else:
         reveal_type(value)  # revealed: Literal["a", "b"]
+
+def integer_list(value: int):
+    assert value in [1, 2]
+    reveal_type(value)  # revealed: Literal[1, 2]
+
+def integer_set(value: int):
+    assert value in {0, 2}
+    reveal_type(value)  # revealed: Literal[0, 2]
 
 def literal_locals(value: Choice):
     a = "a"
@@ -251,6 +262,10 @@ def inline_set(x: str):
         reveal_type(x)  # revealed: str
     else:
         reveal_type(x)  # revealed: str & ~Literal["a"] & ~Literal["b"]
+
+def integer_list(x: int):
+    if x in [1, 2]:
+        reveal_type(x)  # revealed: int
 
 class Bar: ...
 
@@ -752,7 +767,7 @@ def default_equality(x: Token | Literal[1]):
 
 def overlapping_union_member(x: int | Literal["missing"]):
     if x in ("missing", 1):
-        reveal_type(x)  # revealed: Literal[1, True, "missing"]
+        reveal_type(x)  # revealed: Literal[1, "missing"]
 
 def custom_equality(x: AlwaysEqual | Literal[1]):
     if x in (1,):
@@ -1281,8 +1296,12 @@ def _(x: bool | str):
 
 ## LiteralString
 
+Known literal-origin strings can safely narrow to the matching members of a literal tuple.
+
 ```py
+from typing import Literal
 from typing_extensions import LiteralString
+from ty_extensions import Intersection, Not
 
 def _(x: LiteralString):
     if x in ("a", "b", "c"):
@@ -1295,6 +1314,24 @@ def _(x: LiteralString | int):
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
         reveal_type(x)  # revealed: (LiteralString & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]) | int
+```
+
+A string without literal origin can match a tuple member without gaining that member's origin.
+
+```py
+def without_literal_origin(value: Intersection[str, Not[LiteralString]]) -> None:
+    if value in ("hello",):
+        reveal_type(value)  # revealed: str & ~LiteralString
+```
+
+An excluded value cannot appear in a tuple when the candidate already has known literal origin.
+
+```py
+def trusted_value_is_excluded(value: Intersection[LiteralString, Not[Literal["hello"]]]) -> None:
+    reveal_type(value in ("hello",))  # revealed: Literal[False]
+
+    if value in ("hello",):
+        reveal_type(value)  # revealed: Never
 ```
 
 ## enums

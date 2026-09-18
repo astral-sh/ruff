@@ -109,8 +109,8 @@ impl Index {
                 )
             });
 
-        tracing::info!(
-            "version: {}, new_version: {}",
+        tracing::debug!(
+            "Updating notebook document from version {} to version {}",
             notebook.version(),
             new_version
         );

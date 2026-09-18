@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -34,7 +35,7 @@ use ruff_python_ast::PythonVersion;
 ///     y: float
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.9.0")]
+#[violation_metadata(preview_since = "0.9.0", category = Category::Pedantic)]
 pub(crate) struct ClassAsDataStructure;
 
 impl Violation for ClassAsDataStructure {
@@ -79,13 +80,13 @@ pub(crate) fn class_as_data_structure(checker: &Checker, class_def: &ast::StmtCl
                         // skip `self`
                         .skip(1)
                         .all(|param| param.annotation().is_some() && !param.is_variadic())
-                    && (func_def.parameters.kwonlyargs.is_empty() || checker.target_version() >= PythonVersion::PY310)
-                    // `__init__` should not have complicated logic in it
-                    // only assignments
-                    && func_def
-                        .body
-                        .iter()
-                        .all(is_simple_assignment_to_attribute)
+                    && (func_def.parameters.kwonlyargs.is_empty()
+                        || checker.target_version() >= PythonVersion::PY310)
+                    && (
+                        // `__init__` should not have complicated logic in it
+                        // only assignments
+                        func_def.body.iter().all(is_simple_assignment_to_attribute)
+                    )
                 {
                     has_dunder_init = true;
                 }
@@ -94,8 +95,8 @@ pub(crate) fn class_as_data_structure(checker: &Checker, class_def: &ast::StmtCl
                 }
             }
             // Ignore class variables
-            ast::Stmt::Assign(_) | ast::Stmt::AnnAssign(_) |
-            // and expressions (e.g. string literals)
+            ast::Stmt::Assign(_) | ast::Stmt::AnnAssign(_) => {}
+            // Ignore expressions (e.g. string literals)
             ast::Stmt::Expr(_) => {}
             _ => {
                 // Bail for anything else - e.g. nested classes

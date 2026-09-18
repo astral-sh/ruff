@@ -1,8 +1,5 @@
-use super::variance::VarianceInferable;
-use super::{
-    BoundTypeVarIdentity, CycleDetector, IntersectionType, Type, TypeVarVariance, UnionType,
-    visitor,
-};
+use super::variance::{VarianceInferable, VarianceTerm};
+use super::{BoundTypeVarIdentity, CycleDetector, IntersectionType, Type, UnionType, visitor};
 use crate::Db;
 use crate::ProgramEnvironment;
 
@@ -57,6 +54,10 @@ impl<'db> Type<'db> {
                 Type::TypeAlias(alias) => {
                     visitor.visit(db, ty, || project(db, env, alias.value_type(db), visitor))
                 }
+                // Recursive bodies can contain type forms; unfold them under the same guard.
+                Type::Recursive(recursive) => visitor.visit(db, ty, || {
+                    project(db, env, recursive.unfold(db, env), visitor)
+                }),
                 Type::Union(union) => {
                     let mut elements = union
                         .elements(db)
@@ -103,7 +104,7 @@ impl<'db> VarianceInferable<'db> for TypeFormType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         self.type_argument(db).variance_of(db, env, typevar)
     }
 }

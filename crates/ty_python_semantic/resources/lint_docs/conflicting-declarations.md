@@ -4,9 +4,8 @@ Checks whether a variable has been declared as two conflicting types.
 
 ## Why is this bad
 
-A variable with two conflicting declarations likely indicates a mistake.
-Moreover, it could lead to incorrect or ill-defined type inference for
-other code that relies on these variables.
+A variable with two conflicting declarations likely indicates a mistake. Moreover, it could lead to
+incorrect or ill-defined type inference for other code that relies on these variables.
 
 ## Examples
 

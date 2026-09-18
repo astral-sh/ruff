@@ -11,17 +11,18 @@ use ruff_db::{
 };
 use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_python_stdlib::identifiers::is_mangled_private;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     Db, ProgramEnvironment,
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
-    reachability::ReachabilityConstraintsExtension,
     types::{
-        CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass, Parameter,
-        Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass,
+        MemberLookupPolicy, Parameter, Parameters, Signature, StaticClassLiteral, Type,
+        TypeContext, TypeQualifiers,
         call::CallArguments,
+        callable::CallableTypeKind,
         class::{CodeGeneratorKind, FieldKind, MethodDecorator},
         constraints::ConstraintSetBuilder,
         context::InferContext,
@@ -35,8 +36,10 @@ use crate::{
         },
         enums::{EnumMetadata, enum_metadata, is_enum_class_by_inheritance},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
-        infer::infer_definition_types,
-        list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
+        list_members::{
+            Member, MemberWithDefinition, all_end_of_scope_members, extract_underlying_functions,
+        },
+        signatures::CallableSignature,
         tuple::Tuple,
     },
 };
@@ -87,6 +90,31 @@ pub(super) fn check_class<'db>(
     }
     let enum_info = enum_metadata(db, class.into());
 
+    let mut bases: Vec<_> = class_specialized.iter_mro(db).skip(1).collect();
+    if configuration.check_method_liskov_violations() {
+        let generic_bases: FxHashMap<_, _> = bases
+            .iter()
+            .filter_map(|base| base.into_class()?.into_generic_alias())
+            .map(|base| (base.origin(db), base))
+            .collect();
+        if !generic_bases.is_empty() {
+            // Overrides must respect every inherited specialization. Keep the MRO's bases first
+            // so the selected inherited method is unchanged.
+            let env = &context.program_environment();
+            bases.extend(
+                class_specialized
+                    .iter_explicit_ancestors(db, env)
+                    .filter_map(ClassType::into_generic_alias)
+                    .filter(|ancestor| {
+                        generic_bases
+                            .get(&ancestor.origin(db))
+                            .is_some_and(|base| base != ancestor)
+                    })
+                    .map(|ancestor| ClassBase::Class(ClassType::Generic(ancestor))),
+            );
+        }
+    }
+
     #[expect(
         clippy::iter_over_hash_type,
         reason = "each class member is checked independently"
@@ -98,6 +126,7 @@ pub(super) fn check_class<'db>(
             enum_info,
             class_specialized,
             scope,
+            &bases,
             &member,
         );
     }
@@ -438,6 +467,7 @@ fn check_class_declaration<'db>(
     enum_info: Option<&EnumMetadata<'db>>,
     class: ClassType<'db>,
     class_scope: ScopeId<'db>,
+    bases: &[ClassBase<'db>],
     member: &MemberWithDefinition<'db>,
 ) {
     let db = context.db();
@@ -450,7 +480,7 @@ fn check_class_declaration<'db>(
 
     let instance_of_class = Type::instance(db, env, class);
 
-    let subclass_instance_member = instance_of_class.member(db, env, &member.name);
+    let subclass_instance_member = lookup_override_member(db, env, class, &member.name);
     let Place::Defined(DefinedPlace {
         ty: type_on_subclass_instance,
         ..
@@ -623,14 +653,13 @@ fn check_class_declaration<'db>(
     let is_private_member = is_mangled_private(member.name.as_str());
     let mut subclass_variable_kind: Option<Option<VariableKind>> = None;
 
-    // Track the first superclass that defines this method (the "immediate parent" for this method).
-    // We need this to check if parent itself already has an LSP violation with an ancestor.
-    // If so, we shouldn't report the same violation for the child class.
-    let mut immediate_parent_method: Option<(ClassType<'db>, Type<'db>)> = None;
+    // Track the first superclass that defines this method so we can distinguish inherited
+    // conflicts from violations introduced by the child.
+    let mut inherited_method_owner = None;
     let mut immediate_parent_variable_kind: Option<(ClassType<'db>, VariableKind)> = None;
 
     if !is_private_member {
-        for class_base in class.iter_mro(db).skip(1) {
+        for &class_base in bases {
             let superclass = match class_base {
                 ClassBase::Protocol | ClassBase::Generic => continue,
                 ClassBase::Any | ClassBase::Dynamic(_) => {
@@ -648,37 +677,54 @@ fn check_class_declaration<'db>(
                 ClassBase::Class(class) => class,
             };
 
-            let Some((superclass_literal, superclass_specialization)) =
-                superclass.static_class_literal(db)
-            else {
-                continue;
-            };
-            let superclass_scope = superclass_literal.body_scope(db);
-            let superclass_symbol_table = place_table(db, superclass_scope);
-            let superclass_symbol_id = superclass_symbol_table.symbol_id(&member.name);
-
-            let mut method_kind = MethodKind::default();
-
-            // If the member is not defined on the class itself, skip it
-            if let Some(id) = superclass_symbol_id {
-                let superclass_symbol = superclass_symbol_table.symbol(id);
-                if !(superclass_symbol.is_bound() || superclass_symbol.is_declared()) {
-                    continue;
-                }
-            } else {
-                if superclass_literal
-                    .own_synthesized_member(db, env, superclass_specialization, None, &member.name)
-                    .is_none()
+            // If the member is not defined on the class itself, skip it. Functional named tuples
+            // have synthesized members but no class body in which to look up their definitions.
+            let (superclass_symbol, method_kind) =
+                if let Some((superclass_literal, superclass_specialization)) =
+                    superclass.static_class_literal(db)
                 {
+                    let superclass_scope = superclass_literal.body_scope(db);
+                    let superclass_symbol_table = place_table(db, superclass_scope);
+                    if let Some(id) = superclass_symbol_table.symbol_id(&member.name) {
+                        let superclass_symbol = superclass_symbol_table.symbol(id);
+                        if !(superclass_symbol.is_bound() || superclass_symbol.is_declared()) {
+                            continue;
+                        }
+                        (Some((superclass_scope, id)), MethodKind::default())
+                    } else {
+                        if superclass_literal
+                            .own_synthesized_member(
+                                db,
+                                env,
+                                superclass_specialization,
+                                None,
+                                &member.name,
+                            )
+                            .is_none()
+                        {
+                            continue;
+                        }
+                        (
+                            None,
+                            CodeGeneratorKind::from_class(db, superclass_literal.into())
+                                .map(MethodKind::Synthesized)
+                                .unwrap_or_default(),
+                        )
+                    }
+                } else if matches!(
+                    superclass.class_literal(db),
+                    ClassLiteral::DynamicNamedTuple(_)
+                ) && !superclass
+                    .own_class_member(db, env, None, &member.name)
+                    .is_undefined()
+                {
+                    (None, MethodKind::Synthesized(CodeGeneratorKind::NamedTuple))
+                } else {
                     continue;
-                }
-                method_kind = CodeGeneratorKind::from_class(db, superclass_literal.into())
-                    .map(MethodKind::Synthesized)
-                    .unwrap_or_default();
-            }
+                };
 
             let superclass_instance_member =
-                Type::instance(db, env, superclass).member(db, env, &member.name);
+                lookup_override_member(db, env, superclass, &member.name);
             let Place::Defined(DefinedPlace {
                 ty: superclass_type,
                 ..
@@ -700,15 +746,11 @@ fn check_class_declaration<'db>(
                 missing_override_target = Some(MissingOverrideTarget::for_superclass(
                     db,
                     superclass,
-                    superclass_scope,
-                    superclass_symbol_id,
+                    superclass_symbol,
                 ));
             }
 
-            // Record the first superclass that defines this method as the "immediate parent method"
-            if immediate_parent_method.is_none() {
-                immediate_parent_method = Some((superclass, superclass_type));
-            }
+            inherited_method_owner.get_or_insert(superclass);
 
             if (configuration.check_final_method_overridden() && overridden_final_method.is_none())
                 || (configuration.check_final_variable_overridden()
@@ -718,7 +760,7 @@ fn check_class_declaration<'db>(
 
                 if configuration.check_final_method_overridden() {
                     overridden_final_method = overridden_final_method.or_else(|| {
-                        let superclass_symbol_id = superclass_symbol_id?;
+                        let (superclass_scope, superclass_symbol_id) = superclass_symbol?;
 
                         // TODO: `@final` should be more like a type qualifier:
                         // we should also recognise `@final`-decorated methods that don't end up
@@ -751,8 +793,8 @@ fn check_class_declaration<'db>(
 
                         // Find the declaration definition in the superclass for the secondary
                         // annotation.
-                        let superclass_definition = superclass_symbol_id.and_then(|id| {
-                            use_def_map(db, superclass_scope)
+                        let superclass_definition = superclass_symbol.and_then(|(scope, id)| {
+                            use_def_map(db, scope)
                                 .end_of_scope_symbol_declarations(id)
                                 .find_map(|decl| decl.declaration.definition())
                         });
@@ -822,8 +864,8 @@ fn check_class_declaration<'db>(
                             continue;
                         }
 
-                        let superclass_definition = superclass_symbol_id
-                            .and_then(|id| symbol_definition(db, superclass_scope, id));
+                        let superclass_definition = superclass_symbol
+                            .and_then(|(scope, id)| symbol_definition(db, scope, id));
                         report_invalid_attribute_override(
                             context,
                             &member.name,
@@ -847,8 +889,10 @@ fn check_class_declaration<'db>(
                 continue;
             };
 
-            // Constructor methods are not checked for Liskov compliance
-            if is_constructor_like_method(&member.name) {
+            // Constructor signatures may differ unless `@override` requests compatibility.
+            if is_constructor_like_method(&member.name)
+                && !subclass_function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
+            {
                 continue;
             }
 
@@ -859,9 +903,12 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let Some((subclass_override_type, superclass_override_type)) =
-                method_override_types(db, env, type_on_subclass_instance, superclass_type)
-            else {
+            let Some((subclass_override_type, superclass_override_type)) = method_override_types(
+                db,
+                env,
+                bind_new_for_override(db, env, class, &member.name, type_on_subclass_instance),
+                bind_new_for_override(db, env, class, &member.name, superclass_type),
+            ) else {
                 continue;
             };
 
@@ -869,27 +916,21 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            // If this superclass is not the immediate parent for this method,
-            // check if the immediate parent itself already has an LSP violation with this ancestor.
-            // If so, don't report the same violation for the child class -- it would be a false positive
-            // since the child cannot fix the violation without contradicting its immediate parent's contract.
+            // Do not repeat a violation that already exists in the parent's hierarchy.
             // See: https://github.com/astral-sh/ty/issues/2000
-            if let Some((immediate_parent, immediate_parent_type)) = immediate_parent_method {
-                if immediate_parent != superclass {
-                    // The immediate parent already defines this method and is different from the
-                    // current ancestor we're checking. Check if the immediate parent's method
-                    // is also incompatible with this ancestor.
-                    if !is_assignable_method_override(
-                        db,
-                        env,
-                        immediate_parent_type,
-                        superclass_type,
-                    ) {
-                        // The immediate parent already has an LSP violation with this ancestor.
-                        // Don't report the same violation for the child.
-                        continue;
-                    }
-                }
+            if let Some(method_owner) = inherited_method_owner
+                && method_owner != superclass
+                && is_inherited_method_violation(
+                    db,
+                    env,
+                    bases,
+                    method_owner,
+                    superclass,
+                    superclass_type,
+                    &member.name,
+                )
+            {
+                continue;
             }
 
             report_invalid_method_override(
@@ -944,9 +985,11 @@ fn check_class_declaration<'db>(
 
     if !subclass_overrides_superclass_declaration
         && !has_dynamic_superclass
-        // accessing `.kind()` here is fine as `definition`
-        // will always be a definition in the file currently being checked
-        && first_reachable_definition.kind(db).is_function_def()
+        && (
+            // accessing `.kind()` here is fine as `definition`
+            // will always be a definition in the file currently being checked
+            first_reachable_definition.kind(db).is_function_def()
+        )
     {
         check_explicit_overrides(context, member, class_scope, class);
     }
@@ -973,6 +1016,138 @@ fn check_class_declaration<'db>(
             superclass_definition,
         );
     }
+}
+
+/// Look up `__new__` on the class so generated and decorated callables retain `cls`
+/// until they are bound for the override comparison.
+fn lookup_override_member<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassType<'db>,
+    name: &Name,
+) -> PlaceAndQualifiers<'db> {
+    if name == "__new__" {
+        class.class_member(db, env, name, MemberLookupPolicy::default())
+    } else {
+        Type::instance(db, env, class).member(db, env, name)
+    }
+}
+
+/// Resolve `__new__` descriptors and normalize callable objects before binding the
+/// constructor's implicit `cls`. This consumes a classmethod's bound `cls` or a
+/// callable instance's `__call__` receiver first, as for constructor calls.
+fn bind_new_for_override<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassType<'db>,
+    name: &Name,
+    ty: Type<'db>,
+) -> Type<'db> {
+    if name != "__new__" {
+        return ty;
+    }
+    let receiver = Type::from(class);
+    let instance_of_class = Type::instance(db, env, class);
+    let Some(callables) = Place::bound(ty)
+        .try_call_dunder_get(db, env, receiver)
+        .ignore_possibly_undefined()
+        .and_then(|ty| ty.try_upcast_to_callable(db, env))
+    else {
+        return ty;
+    };
+    callables
+        .map(|callable| {
+            let signature = callable.signatures(db);
+            let bound_signature = if signature.overloads.len() > 1
+                && signature
+                    .overloads
+                    .iter()
+                    .any(Signature::has_explicit_positional_receiver_annotation)
+            {
+                // Overloads specialized for other subclasses do not constrain this override.
+                CallableSignature::from_overloads(
+                    signature
+                        .overloads
+                        .iter()
+                        .filter_map(|signature| {
+                            signature.bind_self_if_compatible(db, env, receiver, instance_of_class)
+                        })
+                        .flat_map(|signature| signature.overloads),
+                )
+            } else {
+                signature.bind_self_with_receiver(db, env, Some(receiver), Some(instance_of_class))
+            };
+            CallableType::new(
+                db,
+                bound_signature,
+                // Compare call signatures independently of descriptor behavior.
+                CallableTypeKind::Regular,
+            )
+        })
+        .into_type(db, env)
+}
+
+/// Returns whether the selected inherited method already violates this ancestor's contract.
+///
+/// The parent can inherit the method without defining an override. Its hierarchy may already
+/// combine conflicting contracts that are absent from the method-defining class's hierarchy.
+fn is_inherited_method_violation<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    bases: &[ClassBase<'db>],
+    method_owner: ClassType<'db>,
+    superclass: ClassType<'db>,
+    superclass_type: Type<'db>,
+    name: &Name,
+) -> bool {
+    // An earlier MRO entry can select a different method in its own hierarchy. Check each
+    // ancestor that inherits the method actually selected by the child's MRO.
+    bases
+        .iter()
+        .filter_map(|base| base.into_class())
+        .filter(|parent| {
+            parent
+                .iter_mro(db)
+                .any(|base| base == ClassBase::Class(method_owner))
+        })
+        .any(|parent| {
+            let Place::Defined(DefinedPlace {
+                ty: parent_type, ..
+            }) = lookup_override_member(db, env, parent, name).place
+            else {
+                return false;
+            };
+            // An inherited violation belongs to the parent's own receiver domain.
+            let parent_type = bind_new_for_override(db, env, parent, name, parent_type);
+            let superclass_type = bind_new_for_override(db, env, parent, name, superclass_type);
+            if is_assignable_method_override(db, env, parent_type, superclass_type) {
+                return false;
+            }
+
+            // Check the parent's own specializations: a valid override of `Base[Any]` can become
+            // invalid when the child also inherits `Base[int]`. Include implicit ancestors such
+            // as `object` and explicit inheritance paths for specializations omitted from the MRO.
+            parent
+                .iter_mro(db)
+                .skip(1)
+                .filter_map(ClassBase::into_class)
+                .chain(parent.iter_explicit_ancestors(db, env).skip(1))
+                .filter(|ancestor| ancestor.class_literal(db) == superclass.class_literal(db))
+                .any(|ancestor| {
+                    let Place::Defined(DefinedPlace {
+                        ty: ancestor_type, ..
+                    }) = lookup_override_member(db, env, ancestor, name).place
+                    else {
+                        return false;
+                    };
+                    !is_assignable_method_override(
+                        db,
+                        env,
+                        parent_type,
+                        bind_new_for_override(db, env, parent, name, ancestor_type),
+                    )
+                })
+        })
 }
 
 /// Checks whether a method override preserves its superclass method's callable domain.
@@ -1010,9 +1185,13 @@ fn method_override_types<'db>(
     superclass_type: Type<'db>,
 ) -> Option<(Type<'db>, Type<'db>)> {
     let (subclass_type, superclass_type) = match (subclass_type, superclass_type) {
-        (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method)) => {
-            let superclass_signature = superclass_method.function(db).signature(db);
-            let receiver = match superclass_signature.overloads.as_slice() {
+        (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method))
+            if matches!(
+                subclass_method.func(db),
+                Type::FunctionLiteral(_) | Type::Callable(_)
+            ) && let Some(superclass_signature) = superclass_method.unbound_signatures(db) =>
+        {
+            let explicit_receiver = match superclass_signature.overloads.as_slice() {
                 [signature] => signature
                     .parameters()
                     .get(0)
@@ -1024,33 +1203,39 @@ fn method_override_types<'db>(
                 _ => None,
             };
 
-            receiver.map_or((subclass_type, superclass_type), |receiver| {
-                let typing_self_type = subclass_method.typing_self_type(db);
-                let receiver = receiver.bind_self_typevars(db, env, typing_self_type);
-                let receiver = IntersectionType::from_elements(
+            let typing_self_type = subclass_method.typing_self_type(db);
+            let receiver =
+                explicit_receiver.map_or(subclass_method.self_instance(db), |receiver| {
+                    let receiver = receiver.bind_self_typevars(db, env, typing_self_type);
+                    IntersectionType::from_elements(
+                        db,
+                        env,
+                        [subclass_method.self_instance(db), receiver],
+                    )
+                });
+
+            // Both signatures describe calls on the subclass. In particular, inherited `Self`
+            // annotations refer to the subclass even when the receiver is implicitly annotated.
+            (
+                Type::Callable(subclass_method.into_callable_type_with_receiver(
                     db,
                     env,
-                    [subclass_method.self_instance(db), receiver],
-                );
-                (
-                    Type::Callable(subclass_method.into_callable_type_with_receiver(
-                        db,
-                        env,
-                        receiver,
-                        typing_self_type,
-                    )),
-                    Type::Callable(superclass_method.into_callable_type_with_receiver(
-                        db,
-                        env,
-                        receiver,
-                        typing_self_type,
-                    )),
-                )
-            })
+                    receiver,
+                    typing_self_type,
+                )?),
+                Type::Callable(superclass_method.into_callable_type_with_receiver(
+                    db,
+                    env,
+                    receiver,
+                    typing_self_type,
+                )?),
+            )
         }
         _ => (subclass_type, superclass_type),
     };
-    let superclass_callable = superclass_type.try_upcast_to_callable(db, env)?;
+    let superclass_callable = superclass_type
+        .try_upcast_to_callable(db, env)?
+        .map(|callable| callable.into_regular(db));
 
     Some((subclass_type, superclass_callable.into_type(db, env)))
 }
@@ -1072,34 +1257,6 @@ impl VariableKind {
             VariableKind::Instance => "instance variable",
         }
     }
-}
-
-/// Returns the variable kind for a superclass member.
-fn superclass_variable_kind<'db>(
-    db: &'db dyn Db,
-    superclass_scope: ScopeId<'db>,
-    superclass_symbol_id: Option<ScopedSymbolId>,
-    class_member: PlaceAndQualifiers<'db>,
-    instance_member: PlaceAndQualifiers<'db>,
-) -> Option<VariableKind> {
-    // Method definitions and properties are not instance-variable declarations. Check the symbol
-    // definition before class/instance member lookup can erase that distinction. For example,
-    // resolving an abstract `@property def f(self) -> int` through instance-member lookup would
-    // make it look like an instance variable of type `int`, causing this rule to report
-    // `f: ClassVar[int]` as an invalid attribute override even though the superclass member is not
-    // an instance-attribute declaration.
-    if superclass_symbol_id.is_some_and(|id| is_function_definition(db, superclass_scope, id)) {
-        return None;
-    }
-
-    // Final attributes have their own override rule and diagnostic. Treating them as class
-    // variables here would report both diagnostics for the same override.
-    if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
-        return None;
-    }
-
-    let env = ProgramEnvironment::from_scope(superclass_scope);
-    variable_kind(db, &env, class_member, instance_member)
 }
 
 /// Returns the variable kind for a superclass member, preserving inherited `ClassVar` declarations
@@ -1151,11 +1308,28 @@ pub(super) fn effective_superclass_variable_kind<'db>(
     };
 
     if has_own_member {
-        let superclass_variable_kind = superclass_variable_kind(
+        // Method definitions and properties are not instance-variable declarations. Check the symbol
+        // definition before class/instance member lookup can erase that distinction. For example,
+        // resolving an abstract `@property def f(self) -> int` through instance-member lookup would
+        // make it look like an instance variable of type `int`, causing this rule to report
+        // `f: ClassVar[int]` as an invalid attribute override even though the superclass member is not
+        // an instance-attribute declaration.
+        if superclass_symbol_id.is_some_and(|id| is_function_definition(db, superclass_scope, id)) {
+            return inherited_variable_kind();
+        }
+
+        let class_member = superclass.own_class_member(db, env, None, &name).inner;
+
+        // Final attributes have their own override rule and diagnostic. Treating them as class
+        // variables here would report both diagnostics for the same override.
+        if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
+            return inherited_variable_kind();
+        }
+
+        let superclass_variable_kind = variable_kind(
             db,
-            superclass_scope,
-            superclass_symbol_id,
-            superclass.own_class_member(db, env, None, &name).inner,
+            env,
+            class_member,
             superclass.own_instance_member(db, env, &name).inner,
         );
 
@@ -1545,11 +1719,9 @@ impl<'db> MissingOverrideTarget<'db> {
     fn for_superclass(
         db: &'db dyn Db,
         superclass: ClassType<'db>,
-        superclass_scope: ScopeId<'db>,
-        superclass_symbol_id: Option<ScopedSymbolId>,
+        superclass_symbol: Option<(ScopeId<'db>, ScopedSymbolId)>,
     ) -> Self {
-        let definition =
-            superclass_symbol_id.and_then(|id| symbol_definition(db, superclass_scope, id));
+        let definition = superclass_symbol.and_then(|(scope, id)| symbol_definition(db, scope, id));
 
         Self {
             superclass,
@@ -1627,141 +1799,23 @@ fn missing_override_definition<'db>(
         .find(|definition| !definition.focus_definition_has_override_decorator)
 }
 
-/// Extract function definitions that can carry an `@override` decorator for the class member
-/// currently being checked.
-///
-/// Use functions recovered from the member type when possible, because this preserves overload and
-/// property accessor handling. If decorators replaced some subclass definitions with functions from
-/// another class or file, recover the local function type from the binding definition so overload
-/// metadata is still preserved.
 fn extract_local_override_definitions<'db>(
     context: &InferContext<'db, '_>,
     member: &Member<'db>,
     subclass_scope: ScopeId<'db>,
 ) -> smallvec::SmallVec<[LocalOverrideDefinition; 1]> {
-    let db = context.db();
-    let in_stub = context.in_stub();
-    let module = context.module();
-    let member_functions =
-        extract_member_functions_from_type(db, member.ty, &member.name, subclass_scope);
-    let mut candidates = smallvec::smallvec![];
-    let mut seen_function_types = smallvec::SmallVec::<[FunctionType<'db>; 1]>::new();
-    for definition in end_of_scope_function_definitions(db, subclass_scope, &member.name) {
-        let function = member_functions
-            .iter()
-            .copied()
-            .find(|function| function.contains_definition(db, definition))
-            .or_else(|| infer_definition_types(db, definition).function_type(definition));
-
-        let Some(function) = function else {
-            continue;
-        };
-
-        if seen_function_types.contains(&function) {
-            continue;
-        }
-        candidates.push(LocalOverrideDefinition::from_function(
-            db, function, in_stub, module,
-        ));
-        seen_function_types.push(function);
-    }
-
-    // A property with a setter can keep the getter in the member type even though the setter is the
-    // end-of-scope binding. Preserve any type-derived functions that the syntactic pass did not see.
-    for function in member_functions {
-        if !seen_function_types.contains(&function) {
-            candidates.push(LocalOverrideDefinition::from_function(
-                db, function, in_stub, module,
-            ));
-        }
-    }
-
-    candidates
-}
-
-/// Return reachable function definitions that bind `member_name` at the end of `subclass_scope`.
-fn end_of_scope_function_definitions<'db>(
-    db: &'db dyn Db,
-    subclass_scope: ScopeId<'db>,
-    member_name: &Name,
-) -> smallvec::SmallVec<[Definition<'db>; 1]> {
-    let table = place_table(db, subclass_scope);
-    let Some(symbol_id) = table.symbol_id(member_name) else {
-        return smallvec::smallvec![];
-    };
-
-    let use_def = use_def_map(db, subclass_scope);
-    let predicates = use_def.predicates();
-    let reachability_constraints = use_def.reachability_constraints();
-    use_def
-        .end_of_scope_symbol_bindings(symbol_id)
-        .filter_map(|binding| {
-            let definition = binding.binding.definition()?;
-            let reachability =
-                reachability_constraints.evaluate(db, predicates, binding.reachability_constraint);
-            if reachability.is_always_false() || !definition.kind(db).is_function_def() {
-                return None;
-            }
-
-            Some(definition)
+    member
+        .local_functions(context.db(), subclass_scope)
+        .into_iter()
+        .map(|function| {
+            LocalOverrideDefinition::from_function(
+                context.db(),
+                function,
+                context.in_stub(),
+                context.module(),
+            )
         })
         .collect()
-}
-
-/// Extract functions represented by a member type that belong to the member currently being
-/// checked. Decorators can replace a function with a function from another class or file, so
-/// callers must not use unfiltered functions as diagnostic anchors.
-///
-/// The same is true for property accessors: a setter or deleter can reuse a getter defined by
-/// another class, but override diagnostics should only point at accessors defined by the subclass
-/// member under analysis.
-fn extract_member_functions_from_type<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    member_name: &Name,
-    member_scope: ScopeId<'db>,
-) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
-    let mut functions = smallvec::SmallVec::<[FunctionType<'db>; 1]>::new();
-    let mut types: smallvec::SmallVec<[Type<'db>; 1]> = smallvec::smallvec![ty];
-    let mut index = 0;
-
-    while let Some(ty) = types.get(index).copied() {
-        index += 1;
-        match ty {
-            Type::PropertyInstance(property) => {
-                for accessor in [
-                    property.getter(db),
-                    property.setter(db),
-                    property.deleter(db),
-                ]
-                .into_iter()
-                .flatten()
-                {
-                    functions.extend(extract_underlying_functions(db, accessor));
-                }
-            }
-            Type::Union(union) => {
-                types.extend(union.elements(db).iter().copied());
-            }
-            _ => functions.extend(extract_underlying_functions(db, ty)),
-        }
-    }
-
-    functions
-        .into_iter()
-        .filter(|function| is_local_member_function(db, *function, member_name, member_scope))
-        .collect()
-}
-
-fn is_local_member_function<'db>(
-    db: &'db dyn Db,
-    function: FunctionType<'db>,
-    member_name: &Name,
-    member_scope: ScopeId<'db>,
-) -> bool {
-    function.python_file(db) == member_scope.python_file(db)
-        && function.definition(db).scope(db) == member_scope
-        && function.name(db) == member_name
 }
 
 fn overriding_definition<'db>(
@@ -1774,30 +1828,6 @@ fn overriding_definition<'db>(
         implementation
     } else {
         function.first_overload_or_implementation(db)
-    }
-}
-
-/// Extract callable functions represented by a type.
-/// These may be defined in files other than the one being checked.
-fn extract_underlying_functions<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
-    match ty {
-        Type::FunctionLiteral(function) => smallvec::smallvec_inline![function],
-        Type::BoundMethod(method) => smallvec::smallvec_inline![method.function(db)],
-        Type::PropertyInstance(property) => property.getter(db).map_or_else(
-            || smallvec::smallvec![],
-            |getter| extract_underlying_functions(db, getter),
-        ),
-        Type::Union(union) => {
-            let mut functions = smallvec::smallvec![];
-            for member in union.elements(db) {
-                functions.extend(extract_underlying_functions(db, *member));
-            }
-            functions
-        }
-        _ => smallvec::smallvec![],
     }
 }
 

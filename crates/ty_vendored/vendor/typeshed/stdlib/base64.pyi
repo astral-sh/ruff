@@ -241,7 +241,7 @@ else:
         Optional casefold is a flag specifying whether a lowercase alphabet is
         acceptable as input.  For security purposes, the default is False.
 
-        RFC 3548 allows for optional mapping of the digit 0 (zero) to the
+        RFC 4648 allows for optional mapping of the digit 0 (zero) to the
         letter O (oh), and for optional mapping of the digit 1 (one) to
         either the letter I (eye) or letter L (el).  The optional argument
         map01 when not None, specifies which letter the digit 1 should be

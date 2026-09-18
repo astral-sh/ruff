@@ -13,6 +13,7 @@ use rustc_hash::FxHashMap;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
@@ -64,7 +65,7 @@ use crate::rules::pydocstyle::settings::Convention;
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.1")]
+#[violation_metadata(preview_since = "0.14.1", category = Category::Pedantic)]
 pub(crate) struct DocstringExtraneousParameter {
     id: String,
 }
@@ -125,7 +126,7 @@ impl Violation for DocstringExtraneousParameter {
 /// - `lint.pydocstyle.convention`
 /// - `lint.pydocstyle.property-decorators`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.5.6")]
+#[violation_metadata(preview_since = "0.5.6", category = Category::Pedantic)]
 pub(crate) struct DocstringMissingReturns;
 
 impl Violation for DocstringMissingReturns {
@@ -182,7 +183,7 @@ impl Violation for DocstringMissingReturns {
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.5.6")]
+#[violation_metadata(preview_since = "0.5.6", category = Category::Pedantic)]
 pub(crate) struct DocstringExtraneousReturns;
 
 impl Violation for DocstringExtraneousReturns {
@@ -240,7 +241,7 @@ impl Violation for DocstringExtraneousReturns {
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.5.7")]
+#[violation_metadata(preview_since = "0.5.7", category = Category::Pedantic)]
 pub(crate) struct DocstringMissingYields;
 
 impl Violation for DocstringMissingYields {
@@ -297,7 +298,7 @@ impl Violation for DocstringMissingYields {
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.5.7")]
+#[violation_metadata(preview_since = "0.5.7", category = Category::Pedantic)]
 pub(crate) struct DocstringExtraneousYields;
 
 impl Violation for DocstringExtraneousYields {
@@ -374,7 +375,7 @@ impl Violation for DocstringExtraneousYields {
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.5.5")]
+#[violation_metadata(preview_since = "0.5.5", category = Category::Pedantic)]
 pub(crate) struct DocstringMissingException {
     id: String,
 }
@@ -447,7 +448,7 @@ impl Violation for DocstringMissingException {
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.5.5")]
+#[violation_metadata(preview_since = "0.5.5", category = Category::Pedantic)]
 pub(crate) struct DocstringExtraneousException {
     ids: Vec<String>,
 }
@@ -1277,20 +1278,19 @@ pub(crate) fn check_docstring(
             if !definition.is_property(extra_property_decorators, semantic) {
                 if !body_entries.returns.is_empty() {
                     match function_def.returns.as_deref() {
+                        // Ignore it if it's annotated as returning `None`
+                        // or it's a generator function annotated as returning `None`,
+                        // i.e. any of `-> None`, `-> Iterator[...]` or `-> Generator[..., ..., None]`
                         Some(returns)
-                            // Ignore it if it's annotated as returning `None`
-                            // or it's a generator function annotated as returning `None`,
-                            // i.e. any of `-> None`, `-> Iterator[...]` or `-> Generator[..., ..., None]`
                             if !returns.is_none_literal_expr()
                                 && !is_generator_function_annotated_as_returning_none(
                                     &body_entries,
                                     returns,
                                     semantic,
-                                )
-                            => {
-                                checker
-                                    .report_diagnostic(DocstringMissingReturns, docstring.range());
-                            }
+                                ) =>
+                        {
+                            checker.report_diagnostic(DocstringMissingReturns, docstring.range());
+                        }
                         None if body_entries
                             .returns
                             .iter()

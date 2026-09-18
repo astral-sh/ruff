@@ -167,11 +167,9 @@ class DatagramProtocol(BaseProtocol):
         When the connection is closed, connection_lost() is called.
         """
 
-    # addr can be a tuple[int, int] for some unusual protocols like socket.AF_NETLINK.
-    # Use tuple[str | Any, int] to not cause typechecking issues on most usual cases.
-    # This could be improved by using tuple[AnyOf[str, int], int] if the AnyOf feature is accepted.
-    # See https://github.com/python/typing/issues/566
-    def datagram_received(self, data: bytes, addr: tuple[str | Any, int]) -> None:
+    # addr is a tuple[str, int] for IPv4 or tuple[str, int, int, int] for IPv6.
+    # It can also be a tuple[int, int] for unusual protocols like socket.AF_NETLINK.
+    def datagram_received(self, data: bytes, addr: tuple[Any, ...]) -> None:
         """Called when some datagram is received."""
 
     def error_received(self, exc: Exception) -> None:

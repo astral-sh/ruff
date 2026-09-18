@@ -1,4 +1,4 @@
-# ruff: noqa: PYI021
+# ruff: file-ignore[docstring-in-stub]
 """
 Internal-only symbols for special forms and type-system tests.
 
@@ -10,7 +10,8 @@ import types
 from enum import Enum
 from typing import Any, Protocol, _SpecialForm
 
-from typing_extensions import LiteralString, Self, TypeForm  # noqa: UP035
+# ruff: ignore[deprecated-import]
+from typing_extensions import LiteralString, Self, TypeForm
 
 # -------------
 # Special forms
@@ -162,16 +163,6 @@ class ConstraintSet:
     def for_all(self, typevars: TypeForm[tuple[object, ...]]) -> Self:
         """
         Universally abstracts the given type variables from this constraint set.
-        """
-
-    def satisfied_by_all_typevars(
-        self, *, inferable: TypeForm[tuple[object, ...]] | None = None
-    ) -> bool:
-        """
-        Returns whether this constraint set is satisfied by all of the typevars
-        that it mentions. You must provide a tuple of the typevars that should
-        be considered `inferable`. All other typevars mentioned in the
-        constraint set will be considered non-inferable.
         """
 
     def solutions_for(

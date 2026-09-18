@@ -5,11 +5,10 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::bail;
-use pretty_assertions::StrComparison;
 
 use ty_static::EnvVars;
 
-use crate::generate_all::Mode;
+use crate::generate_all::{Mode, generated_file_diff};
 
 #[derive(clap::Args)]
 pub(crate) struct Args {
@@ -39,7 +38,7 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<()> {
                 if current == reference_string {
                     println!("Up-to-date: {filename}");
                 } else {
-                    let comparison = StrComparison::new(&current, &reference_string);
+                    let comparison = generated_file_diff(&current, &reference_string);
                     bail!(
                         "{filename} changed, please run `cargo dev generate-ty-env-vars-reference`:\n{comparison}"
                     );

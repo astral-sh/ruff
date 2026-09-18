@@ -9,6 +9,7 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::comments::shebang::ShebangDirective;
 use crate::fs;
 use crate::package::PackageRoot;
@@ -32,7 +33,7 @@ use crate::package::PackageRoot;
 /// ## Options
 /// - `namespace-packages`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.225")]
+#[violation_metadata(stable_since = "v0.0.225", category = Category::Pedantic)]
 pub(crate) struct ImplicitNamespacePackage {
     filename: String,
     parent: Option<String>,

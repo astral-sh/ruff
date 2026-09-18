@@ -404,7 +404,9 @@ where
 fn debug_assert_no_newlines(text: &str) {
     debug_assert!(
         !text.contains('\r'),
-        "The content '{text}' contains an unsupported '\\r' line terminator character but text must only use line feeds '\\n' as line separator. Use '\\n' instead of '\\r' and '\\r\\n' to insert a line break in strings."
+        "The content '{text}' contains an unsupported '\\r' line terminator character \
+        but text must only use line feeds '\\n' as line separator. \
+        Use '\\n' instead of '\\r' and '\\r\\n' to insert a line break in strings."
     );
 }
 
@@ -2412,7 +2414,11 @@ where
 {
     #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        let formatter = self.formatter.take().expect("Tried to format a `format_once` at least twice. This is not allowed. You may want to use `format_with` or `format.memoized` instead.");
+        let formatter = self.formatter.take().expect(
+            "Tried to format a `format_once` at least twice. \
+            This is not allowed. \
+            You may want to use `format_with` or `format.memoized` instead.",
+        );
 
         (formatter)(f)
     }

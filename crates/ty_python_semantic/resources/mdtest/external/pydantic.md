@@ -152,6 +152,7 @@ Scalar types follow the Python-input conversions in Pydantic's [conversion table
 import re
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from fractions import Fraction
 from ipaddress import (
     IPv4Address,
     IPv4Interface,
@@ -174,6 +175,7 @@ LaxBool(value=1.0)
 LaxBool(value=1)
 LaxBool(value=Decimal(1))
 LaxBool(value="true")
+LaxBool(value=b"true")
 LaxBool(value=[True])  # error: [invalid-argument-type]
 
 class LaxBytes(BaseModel):
@@ -217,6 +219,7 @@ LaxFloat(value=True)
 LaxFloat(value=b"1.0")
 LaxFloat(value="1.0")
 LaxFloat(value=Decimal("1.0"))
+LaxFloat(value=Fraction(1, 2))
 LaxFloat(value=(1, 0))  # error: [invalid-argument-type]
 
 class LaxInt(BaseModel):
@@ -228,6 +231,7 @@ LaxInt(value=b"1")
 LaxInt(value=1.0)
 LaxInt(value="1")
 LaxInt(value=Decimal(1))
+LaxInt(value=Fraction(2, 1))
 LaxInt(value=(1,))  # error: [invalid-argument-type]
 
 class LaxStr(BaseModel):
@@ -711,6 +715,31 @@ LaxNestedList(value=1)  # error: [invalid-argument-type]
 LaxNestedList(value=[1, [2, None]])
 ```
 
+Implicit recursive aliases also retain their outer input requirements in lax mode, including when
+recursive specializations grow. As with PEP 695 aliases above, nested recursive values are currently
+approximated by `Any` during input conversion.
+
+```py
+from typing import TypeVar
+
+Tree = int | list["Tree"]
+T = TypeVar("T")
+Growing = T | list["Growing[list[T]]"]
+
+class LaxTree(BaseModel):
+    value: Tree
+
+class LaxGrowing(BaseModel):
+    value: Growing[int]
+
+LaxTree(value="1")
+LaxTree(value=["1", [2]])
+LaxTree(value=object())  # error: [invalid-argument-type]
+LaxGrowing(value="1")
+LaxGrowing(value=[[1]])
+LaxGrowing(value=object())  # error: [invalid-argument-type]
+```
+
 We support validation of `JsonValue` fields in lax mode:
 
 ```py
@@ -736,6 +765,101 @@ JsonValueModel(value=SomethingElse())  # error: [invalid-argument-type]
 
 # TODO: this should be an error once we support recursive types
 JsonValueModel(value={"outer": [1, {"inner": SomethingElse()}]})
+```
+
+### Enum values for string fields
+
+In lax mode, Pydantic converts enum members to strings regardless of the member's underlying value.
+
+```py
+from enum import Enum
+
+from pydantic import BaseModel, ConfigDict, Field
+
+class StringEnum(Enum):
+    VALUE = "value"
+
+class IntegerEnum(Enum):
+    VALUE = 1
+
+class LaxModel(BaseModel):
+    value: str
+
+LaxModel(value=StringEnum.VALUE)
+LaxModel(value=IntegerEnum.VALUE)
+```
+
+Strict models and fields reject ordinary enum members because they are not strings.
+
+```py
+class StrictModel(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    value: str
+
+class StrictFieldModel(BaseModel):
+    value: str = Field(strict=True)
+
+StrictModel(value=StringEnum.VALUE)  # error: [invalid-argument-type]
+StrictModel(value=IntegerEnum.VALUE)  # error: [invalid-argument-type]
+StrictFieldModel(value=StringEnum.VALUE)  # error: [invalid-argument-type]
+StrictFieldModel(value=IntegerEnum.VALUE)  # error: [invalid-argument-type]
+```
+
+A field that opts out of model-wide strict mode accepts enum members again.
+
+```py
+class LaxFieldModel(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    value: str = Field(strict=False)
+
+LaxFieldModel(value=StringEnum.VALUE)
+LaxFieldModel(value=IntegerEnum.VALUE)
+```
+
+### Enum values for integer fields
+
+In lax mode, Pydantic accepts enum members as integers by using their underlying values.
+
+```py
+from enum import Enum
+
+from pydantic import BaseModel, ConfigDict, Field
+
+class IntegerEnum(Enum):
+    VALUE = 1
+
+class LaxModel(BaseModel):
+    value: int
+
+LaxModel(value=IntegerEnum.VALUE)
+```
+
+Strict models and fields reject ordinary enum members because they are not integers.
+
+```py
+class StrictModel(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    value: int
+
+class StrictFieldModel(BaseModel):
+    value: int = Field(strict=True)
+
+StrictModel(value=IntegerEnum.VALUE)  # error: [invalid-argument-type]
+StrictFieldModel(value=IntegerEnum.VALUE)  # error: [invalid-argument-type]
+```
+
+A field that opts out of model-wide strict mode accepts enum members again.
+
+```py
+class LaxFieldModel(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    value: int = Field(strict=False)
+
+LaxFieldModel(value=IntegerEnum.VALUE)
 ```
 
 ### Changing a specific field
@@ -1178,6 +1302,69 @@ derived = Derived(value=1)
 derived.value = 2  # error: [invalid-assignment]
 ```
 
+Pydantic allows a frozen model to be subclassed and then made mutable again. This is generally
+unsound (a violation of the Liskov substitution principle), but we currently support it without
+emitting any errors:
+
+```py
+class MutableChildOfFrozenBase(Base):
+    model_config = ConfigDict(frozen=False)
+
+mutable = MutableChildOfFrozenBase(value=1)
+mutable.value = 2
+```
+
+Subclasses of the mutable child (with unspecified `frozen`) are also mutable:
+
+```py
+class GrandChild(MutableChildOfFrozenBase):
+    text: str
+
+grandchild = GrandChild(value=1, text="before")
+grandchild.value = 2
+grandchild.text = "after"
+```
+
+Freezing the model again makes both fields read-only:
+
+```py
+class FrozenAgain(GrandChild):
+    model_config = ConfigDict(frozen=True)
+
+frozen_again = FrozenAgain(value=1, text="before")
+frozen_again.value = 2  # error: [invalid-assignment]
+frozen_again.text = "after"  # error: [invalid-assignment]
+```
+
+If there is a custom `__setattr__` method on a frozen model, we allow mutation, unless that
+`__setattr__` return `Never`:
+
+```py
+from typing_extensions import Never
+
+class FrozenWithCustomSetattr(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    value: int
+
+    def __setattr__(self, name, value):
+        object.__setattr__(self, name, value)
+
+frozen_custom = FrozenWithCustomSetattr(value=1)
+frozen_custom.value = 2
+
+class FrozenWithCustomSetattrNever(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    value: int
+
+    def __setattr__(self, name, value) -> Never:
+        raise AttributeError(name)
+
+frozen_custom_never = FrozenWithCustomSetattrNever(value=1)
+frozen_custom_never.value = 2  # error: [invalid-assignment]
+```
+
 Private attributes on models with `frozen=True` can be mutated:
 
 ```py
@@ -1193,6 +1380,40 @@ person = FrozenPerson()
 person._implicit_private = 2
 person._private_with_default = 2
 person._explicit_private = 2
+```
+
+## Frozen models and protocols
+
+Frozen models cannot satisfy a protocol that requires a writable field, but can satisfy one that
+only requires reading it:
+
+```py
+from typing import Protocol
+from pydantic import BaseModel, ConfigDict
+
+class Frozen(BaseModel, frozen=True):
+    value: int
+
+class Mutable(Frozen):
+    model_config = ConfigDict(frozen=False)
+
+class Writable(Protocol):
+    value: int
+
+class Readable(Protocol):
+    @property
+    def value(self) -> int: ...
+
+def update(model: Writable) -> None:
+    model.value = 2
+
+def read(model: Readable) -> int:
+    return model.value
+
+update(Frozen(value=1))  # error: [invalid-argument-type]
+update(Mutable(value=1))
+read(Frozen(value=1))
+read(Mutable(value=1))
 ```
 
 ## Validation of default values
@@ -1341,6 +1562,39 @@ HasGenericRoot(root=GenericRoot("1"))
 
 # This would ideally be an error, but we currently do not attempt to detect this:
 HasGenericRoot(root=GenericRoot(None))
+```
+
+## Generic models
+
+Generic models inherit model configuration with both PEP 695 and legacy generic syntax. An explicit
+`Generic[T]` base does not override the inherited configuration.
+
+```py
+from typing import Generic, TypeVar
+
+from pydantic import BaseModel, ConfigDict
+
+class ForbidExtras(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+class Model[T](ForbidExtras):
+    value: T
+
+Model[int](value=1)
+Model[int](value=1, something_else=7)  # error: [unknown-argument]
+
+T = TypeVar("T")
+
+class LegacyModel(ForbidExtras, Generic[T]):
+    value: T
+
+LegacyModel[int](value=1)
+LegacyModel[int](value=1, something_else=7)  # error: [unknown-argument]
+
+class InheritsLegacyModel(LegacyModel[int]): ...
+
+InheritsLegacyModel(value=1)
+InheritsLegacyModel(value=1, something_else=7)  # error: [unknown-argument]
 ```
 
 ## Model configuration
