@@ -716,6 +716,37 @@ reveal_type(C(1))  # revealed: C[int]
 wrong_innards: C[int] = C("five")
 ```
 
+### Constructor arguments referencing `Self`
+
+`Self` in a constructor parameter refers to the class being constructed, including its inferred type
+arguments:
+
+```pyi
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class Container(Generic[T]):
+    value: T
+
+    def __new__(cls, value: T, other: Self) -> Self: ...
+
+def _(other: Container[int]):
+    reveal_type(Container(1, other))  # revealed: Container[int]
+    Container[str]("", other)  # error: [invalid-argument-type]
+```
+
+Inherited constructors retain the subclass:
+
+```pyi
+class Child(Container[int]): ...
+
+def _(other: Child):
+    reveal_type(Child(1, other))  # revealed: Child
+    Child("", other)  # error: [invalid-argument-type]
+```
+
 ### `__init__` only
 
 ```py

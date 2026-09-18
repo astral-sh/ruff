@@ -106,6 +106,7 @@ use ty_static::EnvVars;
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
+use crate::types::generics::ApplySpecialization;
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, TypeVarSet};
 use crate::types::visitor::{
     NonAtomicType, TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type,
@@ -776,48 +777,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        fn rebuild_node(
-            storage: &mut ConstraintSetStorage<'_>,
-            old_node: NodeId,
-            mapped_constraints: &FxHashMap<ConstraintId, (NodeId, Option<SourceOrderId>)>,
-            mapped_nodes: &mut FxHashMap<NodeId, NodeId>,
-        ) -> NodeId {
-            if old_node.is_terminal() {
-                return old_node;
-            }
-            if let Some(mapped) = mapped_nodes.get(&old_node) {
-                return *mapped;
-            }
-
-            let old_interior = storage.interior_node_data(old_node);
-            let (condition, _) = mapped_constraints[&old_interior.constraint];
-            let if_true = rebuild_node(
-                storage,
-                old_interior.if_true,
-                mapped_constraints,
-                mapped_nodes,
-            );
-            let if_uncertain = rebuild_node(
-                storage,
-                old_interior.if_uncertain,
-                mapped_constraints,
-                mapped_nodes,
-            );
-            let if_false = rebuild_node(
-                storage,
-                old_interior.if_false,
-                mapped_constraints,
-                mapped_nodes,
-            );
-            let mapped = condition.ite_uncertain(storage, if_true, if_uncertain, if_false);
-            mapped_nodes.insert(old_node, mapped);
-            mapped
-        }
-
-        // We have to collect this into a temporary vec since we can't hold an open borrow on the
-        // storage during the apply_type_mapping calls below, since they also need to borrow the
-        // storage.
-        let storage = self.builder.storage.borrow();
+        // Mapping can create constraints, so collect the input before modifying storage.
+        let mut storage = self.builder.storage.borrow_mut();
         let mut constraints = SmallVec::<[_; 8]>::new();
         self.node
             .for_each_unique_constraint(&storage, &mut |constraint_id| {
@@ -828,19 +789,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         // letting the old diagram's variable order determine the rebuilt diagram's ordering.
         let source_orders = storage.calculate_source_orders(self.source_order);
         constraints.sort_unstable_by_key(|(constraint, _)| source_orders.get_index_of(constraint));
-        drop(storage);
 
         let mut mapped_constraints = FxHashMap::default();
         for (constraint_id, constraint) in constraints {
-            if mapped_constraints.contains_key(&constraint_id) {
-                continue;
-            }
             let mapped =
-                constraint.apply_type_mapping_impl(db, self.builder, type_mapping, tcx, visitor);
+                constraint.apply_type_mapping_impl(db, &mut storage, type_mapping, tcx, visitor);
             mapped_constraints.insert(constraint_id, mapped);
         }
 
-        let mut storage = self.builder.storage.borrow_mut();
         let source_order = source_orders
             .into_iter()
             .fold(None, |source_order, constraint| {
@@ -853,12 +809,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             });
         Self::from_node(
             self.builder,
-            rebuild_node(
-                &mut storage,
-                self.node,
-                &mapped_constraints,
-                &mut FxHashMap::default(),
-            ),
+            self.node
+                .map_constraints(&mut storage, &mapped_constraints, &mut FxHashMap::default()),
             source_order,
         )
     }
@@ -2330,6 +2282,215 @@ impl NodeId {
         self.0 >= SMALLEST_TERMINAL.0
     }
 
+    /// Rebuilds the diagram after replacing each constraint, preserving all three branches.
+    fn map_constraints(
+        self,
+        storage: &mut ConstraintSetStorage<'_>,
+        constraints: &FxHashMap<ConstraintId, (NodeId, Option<SourceOrderId>)>,
+        cache: &mut FxHashMap<NodeId, NodeId>,
+    ) -> Self {
+        if self.is_terminal() {
+            return self;
+        }
+        if let Some(mapped) = cache.get(&self) {
+            return *mapped;
+        }
+
+        let interior = storage.interior_node_data(self);
+        let (condition, _) = constraints[&interior.constraint];
+        let if_true = interior
+            .if_true
+            .map_constraints(storage, constraints, cache);
+        let if_uncertain = interior
+            .if_uncertain
+            .map_constraints(storage, constraints, cache);
+        let if_false = interior
+            .if_false
+            .map_constraints(storage, constraints, cache);
+        let mapped = condition.ite_uncertain(storage, if_true, if_uncertain, if_false);
+        cache.insert(self, mapped);
+        mapped
+    }
+
+    /// Finds positive constraints shared by every reachable path, without deriving sequents.
+    fn required_constraints<L: SolutionLimits>(
+        self,
+        storage: &mut ConstraintSetStorage<'_>,
+        cache: &mut FxHashMap<NodeId, FxHashSet<ConstraintId>>,
+        limits: &mut L,
+    ) -> ControlFlow<L::Break, FxHashSet<ConstraintId>> {
+        let mut required = FxHashSet::default();
+        let mut node = self;
+        loop {
+            limits.visit_node()?;
+            if let Some(cached) = cache.get(&node) {
+                required.extend(cached);
+                break;
+            }
+            if node.is_terminal() {
+                break;
+            }
+
+            let interior = storage.interior_node_data(node);
+            let mut branches = [
+                (interior.if_true, true),
+                (interior.if_uncertain, false),
+                (interior.if_false, false),
+            ]
+            .into_iter()
+            .filter(|(child, _)| *child != ALWAYS_FALSE);
+            let Some((child, positive)) = branches.next() else {
+                break;
+            };
+
+            // Walk conjunctions without copying the growing set at every node.
+            if branches.clone().next().is_none() {
+                if positive {
+                    required.insert(interior.constraint);
+                }
+                node = child;
+                continue;
+            }
+
+            let mut common = child.required_constraints(storage, cache, limits)?;
+            if positive {
+                common.insert(interior.constraint);
+            }
+            for (child, _) in branches {
+                let child_required = child.required_constraints(storage, cache, limits)?;
+                common.retain(|constraint| child_required.contains(constraint));
+            }
+            required.extend(common);
+            break;
+        }
+
+        cache.insert(self, required.clone());
+        ControlFlow::Continue(required)
+    }
+
+    /// Substitutes one fully constrained variable, retaining its bounds for solution selection.
+    ///
+    /// For example, `C[T] <= S <= C[T]` fixes `S` to `C[T]`, even while `T` is still inferable.
+    /// Substituting `S` before sequent analysis avoids deriving every partial specialization of
+    /// its bounds.
+    fn substitute_fully_constrained_typevar<'db, L: SolutionLimits>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
+        source_orders: &FxIndexSet<ConstraintId>,
+        limits: &mut L,
+    ) -> ControlFlow<L::Break, Option<TypeVarSubstitution<'db>>> {
+        let required = self.required_constraints(storage, &mut FxHashMap::default(), limits)?;
+        if required.is_empty() {
+            return ControlFlow::Continue(None);
+        }
+
+        let mut live = FxHashSet::default();
+        self.for_each_unique_constraint(storage, &mut |constraint| {
+            live.insert(constraint);
+        });
+        let mut conditional_typevars = FxHashSet::default();
+        let mut dependent_typevars = FxHashSet::default();
+        for constraint in source_orders
+            .iter()
+            .filter(|constraint| live.contains(constraint))
+        {
+            let data = storage.constraint_data(*constraint);
+            if !required.contains(constraint) {
+                for ty in data.types() {
+                    if let Type::TypeVar(typevar) = ty {
+                        conditional_typevars.insert(typevar.identity(db));
+                    }
+                }
+            }
+            if data.as_concrete(db, env).is_none() {
+                dependent_typevars.extend(
+                    storage
+                        .constraint_support(*constraint)
+                        .iter()
+                        .map(|typevar| storage.typevar_data(typevar).identity(db)),
+                );
+            }
+        }
+
+        // Retaining branch-local bounds would require reconstructing the variable separately on
+        // each path. Only substitute variables whose bounds apply to every path.
+        dependent_typevars.retain(|typevar| !conditional_typevars.contains(typevar));
+        let required: Vec<_> = source_orders
+            .iter()
+            .filter(|constraint| required.contains(constraint))
+            .map(|constraint| storage.constraint_data(*constraint))
+            .collect();
+
+        // Retain dependent bindings before substituting their concrete dependencies. This keeps
+        // `S = list[T]` intact when `T` also has a concrete solution.
+        let mut candidates = required
+            .iter()
+            .filter(|constraint| constraint.types().skip(1).any(|ty| ty.has_typevar(db, env)))
+            .chain(required.iter().filter(|constraint| {
+                !constraint.types().skip(1).any(|ty| ty.has_typevar(db, env))
+            }));
+        let Some((typevar, bound, bounds)) = candidates.find_map(|constraint| {
+            fully_constrained_typevar(
+                db,
+                env,
+                *constraint,
+                &required,
+                &dependent_typevars,
+                inferable,
+            )
+        }) else {
+            return ControlFlow::Continue(None);
+        };
+
+        let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Single(typevar, bound));
+        let visitor = ApplyTypeMappingVisitor::new(env);
+        let mut mapped = FxHashMap::default();
+        let mut source_order = None;
+        for constraint in source_orders {
+            if !live.contains(constraint) {
+                continue;
+            }
+            limits.visit_node()?;
+            let mut data = storage.constraint_data(*constraint);
+
+            // Only constraints changed by the substitution inherit its evidence.
+            if data.types().any(|ty| {
+                ty.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor) != ty
+            }) {
+                data = data.with_provenance(ConstraintProvenance::Evidence);
+            }
+            let replacement = data.apply_type_mapping_impl(
+                db,
+                storage,
+                &mapping,
+                TypeContext::default(),
+                &visitor,
+            );
+            source_order = storage.ordered_source_order(source_order, replacement.1);
+            mapped.insert(*constraint, replacement);
+        }
+
+        let node = self.map_constraints(storage, &mapped, &mut FxHashMap::default());
+
+        // Specialization can retain captured variables. Leave those to the full solver.
+        if storage.node_support(node).is_some_and(|support| {
+            support
+                .iter()
+                .any(|id| storage.typevar_data(id).is_same_typevar_as(db, typevar))
+        }) {
+            return ControlFlow::Continue(None);
+        }
+
+        ControlFlow::Continue(Some(TypeVarSubstitution {
+            node,
+            source_order,
+            bounds,
+        }))
+    }
+
     /// Returns the BDD variable of the root node of this BDD, or `None` if this BDD is a terminal
     /// node.
     fn root_constraint(self, storage: &ConstraintSetStorage<'_>) -> Option<ConstraintId> {
@@ -3018,6 +3179,54 @@ struct PathBoundBuilder<'db> {
 }
 
 impl<'db> PathBoundBuilder<'db> {
+    /// Adds the bounds that `constraint` places on `typevar`.
+    fn add_constraint(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        constraint: Constraint<'db>,
+    ) {
+        let matches = |subject: BoundTypeVarInstance<'db>| {
+            subject == typevar || subject.is_same_typevar_as(db, typevar)
+        };
+
+        match constraint {
+            Constraint::ConcreteLower(lower) if matches(lower.typevar) => {
+                self.add_lower(db, env, lower.provenance, lower.bound);
+            }
+            Constraint::ConcreteUpper(upper) if matches(upper.typevar) => {
+                self.add_upper(db, env, upper.provenance, upper.bound);
+            }
+            Constraint::ConcreteEquivalence(bound) if matches(bound.typevar) => {
+                self.add_lower(db, env, bound.provenance, bound.bound);
+                self.add_upper(db, env, bound.provenance, bound.bound);
+            }
+            Constraint::TypeVarRange(bound) => {
+                if matches(bound.left) {
+                    self.add_upper(db, env, bound.provenance, Type::TypeVar(bound.right));
+                }
+                if matches(bound.right) {
+                    self.add_lower(db, env, bound.provenance, Type::TypeVar(bound.left));
+                }
+            }
+            Constraint::TypeVarEquivalence(bound) => {
+                let other = if matches(bound.left) {
+                    Some(bound.right)
+                } else if matches(bound.right) {
+                    Some(bound.left)
+                } else {
+                    None
+                };
+                if let Some(other) = other {
+                    self.add_lower(db, env, bound.provenance, Type::TypeVar(other));
+                    self.add_upper(db, env, bound.provenance, Type::TypeVar(other));
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn classify_evidence(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
         if ty.has_unspecialized_type_var(db, env) {
             return;
@@ -3349,6 +3558,12 @@ pub(crate) struct CandidateSolution<'db> {
     typevars: Box<[PathBound<'db>]>,
 }
 
+struct TypeVarSubstitution<'db> {
+    node: NodeId,
+    source_order: Option<SourceOrderId>,
+    bounds: PathBound<'db>,
+}
+
 /// Limits shared by the preprocessing and collection walks used to extract solutions.
 trait SolutionLimits {
     type Break;
@@ -3454,47 +3669,84 @@ impl<'db> CandidateSolutions<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        node: NodeId,
+        mut node: NodeId,
         inferable: TypeVarSet<'db>,
-        source_order: Option<SourceOrderId>,
+        mut source_order: Option<SourceOrderId>,
         limits: &mut L,
     ) -> ControlFlow<L::Break, Self> {
         let mut source_orders = storage.calculate_source_orders(source_order);
-        if let Some(path_bounds) = Self::compute_simple_bound_conjunction(
-            db,
-            env,
-            storage,
-            &source_orders,
-            node,
-            inferable,
-            limits,
-        )? {
-            return ControlFlow::Continue(path_bounds);
-        }
+        let mut eliminated = Vec::new();
+        let mut typevar_order = FxIndexSet::default();
 
-        let (node, derived_source_order) =
-            node.remove_noninferable(db, env, storage, inferable, source_order, limits)?;
-        source_orders.extend(storage.calculate_source_orders(derived_source_order));
-        let interior = match node.node() {
-            Node::AlwaysTrue => {
-                limits.visit_node()?;
-                return ControlFlow::Continue(CandidateSolutions::Unconstrained);
+        // Substitution can leave a concrete conjunction that needs no sequent analysis. Try that
+        // shortcut after each reduction, leaving alternatives and unresolved dependencies intact.
+        let candidates = loop {
+            if let Some(candidates) = Self::compute_simple_bound_conjunction(
+                db,
+                env,
+                storage,
+                &source_orders,
+                node,
+                inferable,
+                limits,
+            )? {
+                break candidates;
             }
-            Node::AlwaysFalse => {
-                limits.visit_node()?;
-                return ControlFlow::Continue(CandidateSolutions::Unsatisfiable);
+
+            if let Some(substitution) = node.substitute_fully_constrained_typevar(
+                db,
+                env,
+                storage,
+                inferable,
+                &source_orders,
+                limits,
+            )? {
+                // Preserve the original binding order before substitutions remove their constraints.
+                if eliminated.is_empty() {
+                    for constraint in &source_orders {
+                        typevar_order.extend(
+                            storage
+                                .constraint_data(*constraint)
+                                .constrained_typevars(db, storage)
+                                .map(|typevar| typevar.identity(db)),
+                        );
+                    }
+                }
+
+                eliminated.push(substitution.bounds);
+                node = substitution.node;
+                source_order = substitution.source_order;
+                source_orders = storage.calculate_source_orders(source_order);
+                continue;
             }
-            Node::Interior(interior) => interior,
+
+            let (node, derived_source_order) =
+                node.remove_noninferable(db, env, storage, inferable, source_order, limits)?;
+            source_orders.extend(storage.calculate_source_orders(derived_source_order));
+            break match node.node() {
+                Node::AlwaysTrue => {
+                    limits.visit_node()?;
+                    Self::Unconstrained
+                }
+                Node::AlwaysFalse => {
+                    limits.visit_node()?;
+                    Self::Unsatisfiable
+                }
+                Node::Interior(interior) => {
+                    let mut walker = SolutionWalker::new(source_orders);
+                    // Sequent discovery must also happen in source order. Sorting the collected
+                    // paths is too late: sequent pairs are not commutative, and TDD traversal order
+                    // can otherwise discard gradual evidence before solution extraction.
+                    let path_source_order =
+                        storage.ordered_source_order(source_order, derived_source_order);
+                    let mut path = interior.path_assignments(db, env, storage, path_source_order);
+                    walker.visit_node(db, env, storage, &mut path, node, limits)?;
+                    walker.finish(db, env, storage)
+                }
+            };
         };
 
-        let mut walker = SolutionWalker::new(source_orders);
-        // Sequent discovery must also happen in source order. Sorting the collected paths is
-        // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
-        // discard gradual evidence before solution extraction.
-        let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
-        let mut path = interior.path_assignments(db, env, storage, path_source_order);
-        walker.visit_node(db, env, storage, &mut path, node, limits)?;
-        ControlFlow::Continue(walker.finish(db, env, storage))
+        candidates.restore_eliminated_bindings(db, &eliminated, &typevar_order, limits)
     }
 
     /// Accumulates a conjunction of concrete bound constraints without constructing a
@@ -3538,63 +3790,27 @@ impl<'db> CandidateSolutions<'db> {
                     }
 
                     let constraint = storage.constraint_data(interior.constraint);
-                    match constraint {
-                        Constraint::ConcreteLower(lower) => {
-                            if !lower.typevar.is_inferable(db, inferable) {
-                                return ControlFlow::Continue(None);
-                            }
-                            if lower.bound.has_typevar(db, env)
-                                || lower.bound.has_provisional_marker(db, env)
-                            {
-                                return ControlFlow::Continue(None);
-                            }
-                            constraints.push((
-                                constraint,
-                                source_orders
-                                    .get_index_of(&interior.constraint)
-                                    .expect("every TDD constraint should have a source order"),
-                            ));
-                        }
-
-                        Constraint::ConcreteUpper(upper) => {
-                            if !upper.typevar.is_inferable(db, inferable) {
-                                return ControlFlow::Continue(None);
-                            }
-                            if upper.bound.has_typevar(db, env)
-                                || upper.bound.has_provisional_marker(db, env)
-                            {
-                                return ControlFlow::Continue(None);
-                            }
-                            constraints.push((
-                                constraint,
-                                source_orders
-                                    .get_index_of(&interior.constraint)
-                                    .expect("every TDD constraint should have a source order"),
-                            ));
-                        }
-
-                        Constraint::ConcreteEquivalence(equivalence) => {
-                            if !equivalence.typevar.is_inferable(db, inferable) {
-                                return ControlFlow::Continue(None);
-                            }
-                            if equivalence.bound.has_typevar(db, env)
-                                || equivalence.bound.has_provisional_marker(db, env)
-                            {
-                                return ControlFlow::Continue(None);
-                            }
-                            constraints.push((
-                                constraint,
-                                source_orders
-                                    .get_index_of(&interior.constraint)
-                                    .expect("every TDD constraint should have a source order"),
-                            ));
-                        }
-
+                    let (typevar, bound) = match constraint {
+                        Constraint::ConcreteLower(bound) => (bound.typevar, bound.bound),
+                        Constraint::ConcreteUpper(bound) => (bound.typevar, bound.bound),
+                        Constraint::ConcreteEquivalence(bound) => (bound.typevar, bound.bound),
                         Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => {
                             return ControlFlow::Continue(None);
                         }
+                    };
+                    if !typevar.is_inferable(db, inferable)
+                        || bound.has_typevar(db, env)
+                        || bound.has_provisional_marker(db, env)
+                    {
+                        return ControlFlow::Continue(None);
                     }
 
+                    constraints.push((
+                        constraint,
+                        source_orders
+                            .get_index_of(&interior.constraint)
+                            .expect("every TDD constraint should have a source order"),
+                    ));
                     current = interior.if_true;
                 }
             }
@@ -3604,23 +3820,11 @@ impl<'db> CandidateSolutions<'db> {
             FxIndexMap::default();
         constraints.sort_by_key(|(_, source_order)| *source_order);
         for (constraint, _) in constraints {
-            match constraint {
-                Constraint::ConcreteLower(lower) => {
-                    let bounds = mappings.entry(lower.typevar).or_default();
-                    bounds.add_lower(db, env, lower.provenance, lower.bound);
-                }
-                Constraint::ConcreteUpper(upper) => {
-                    let bounds = mappings.entry(upper.typevar).or_default();
-                    bounds.add_upper(db, env, upper.provenance, upper.bound);
-                }
-                Constraint::ConcreteEquivalence(equivalence) => {
-                    let bounds = mappings.entry(equivalence.typevar).or_default();
-                    bounds.add_lower(db, env, equivalence.provenance, equivalence.bound);
-                    bounds.add_upper(db, env, equivalence.provenance, equivalence.bound);
-                }
-                Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => {
-                    panic!("typevar constraint should have been filtered out");
-                }
+            for typevar in constraint.constrained_typevars(db, storage) {
+                mappings
+                    .entry(typevar)
+                    .or_default()
+                    .add_constraint(db, env, typevar, constraint);
             }
         }
 
@@ -3630,6 +3834,37 @@ impl<'db> CandidateSolutions<'db> {
             .collect();
         let candidate = CandidateSolution { typevars };
         ControlFlow::Continue(Some(CandidateSolutions::Constrained(Box::new([candidate]))))
+    }
+
+    /// Restores the bounds retained before substitution to each remaining solution alternative.
+    fn restore_eliminated_bindings<L: SolutionLimits>(
+        self,
+        db: &'db dyn Db,
+        eliminated: &[PathBound<'db>],
+        typevar_order: &FxIndexSet<BoundTypeVarIdentity<'db>>,
+        limits: &mut L,
+    ) -> ControlFlow<L::Break, Self> {
+        if eliminated.is_empty() {
+            return ControlFlow::Continue(self);
+        }
+
+        let mut paths = match self {
+            Self::Unsatisfiable => return ControlFlow::Continue(Self::Unsatisfiable),
+            Self::Unconstrained => {
+                limits.satisfied_path()?;
+                Box::new([CandidateSolution {
+                    typevars: Box::default(),
+                }])
+            }
+            Self::Constrained(paths) => paths,
+        };
+
+        for path in &mut paths {
+            path.typevars = path.typevars.iter().chain(eliminated).cloned().collect();
+            path.typevars
+                .sort_by_key(|bound| typevar_order.get_index_of(&bound.bound_typevar.identity(db)));
+        }
+        ControlFlow::Continue(Self::Constrained(paths))
     }
 
     pub(crate) fn solve(
@@ -3993,6 +4228,78 @@ impl<'db> CandidateSolutions<'db> {
             }
         }
     }
+}
+
+/// Finds matching lower and upper bounds, using the sequent map's range-to-equivalence rule.
+fn fully_constrained_typevar<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    constraint: Constraint<'db>,
+    required: &[Constraint<'db>],
+    dependent_typevars: &FxHashSet<BoundTypeVarIdentity<'db>>,
+    inferable: TypeVarSet<'db>,
+) -> Option<(BoundTypeVarInstance<'db>, Type<'db>, PathBound<'db>)> {
+    let (typevar, lower, lower_provenance) = match constraint {
+        Constraint::ConcreteLower(lower) => (lower.typevar, lower.bound, lower.provenance),
+        Constraint::ConcreteEquivalence(bound) => (bound.typevar, bound.bound, bound.provenance),
+        _ => return None,
+    };
+
+    if !dependent_typevars.contains(&typevar.identity(db))
+        || !typevar.is_inferable(db, inferable)
+        || typevar.is_paramspec(db)
+        || typevar.is_typevartuple(db)
+        || lower.has_provisional_marker(db, env)
+        || lower.has_unspecialized_type_var(db, env)
+        || lower.references_typevar_through_aliases(db, env, typevar.typevar(db).identity(db))
+    {
+        return None;
+    }
+
+    // `Any <= T <= Any` does not fix T to Any.
+    let bound = lower.bottom_materialization(db, env);
+    if bound != lower.top_materialization(db, env) {
+        return None;
+    }
+
+    let (upper, upper_provenance) = required
+        .iter()
+        .find_map(|constraint| {
+            let (subject, upper, provenance) = match constraint {
+                Constraint::ConcreteUpper(upper) => (upper.typevar, upper.bound, upper.provenance),
+                Constraint::ConcreteEquivalence(upper) => {
+                    (upper.typevar, upper.bound, upper.provenance)
+                }
+                _ => return None,
+            };
+            (subject.is_same_typevar_as(db, typevar) && upper.top_materialization(db, env) == bound)
+                .then_some((upper, provenance))
+        })
+        .or_else(|| {
+            typevar
+                .typevar(db)
+                .upper_bound(db, env)
+                .filter(|upper| upper.top_materialization(db, env) == bound)
+                .map(|upper| (upper, ConstraintProvenance::Validity))
+        })?;
+
+    // Validity bounds restrict solutions, but do not provide inference evidence.
+    if ConstraintProvenance::derived(lower_provenance, upper_provenance)
+        == ConstraintProvenance::Validity
+    {
+        return None;
+    }
+
+    // Retain all evidence, not just the bounds that establish the equality. In particular,
+    // other gradual bounds can still affect solution selection.
+    let mut bounds = PathBoundBuilder::default();
+    for constraint in required {
+        bounds.add_constraint(db, env, typevar, *constraint);
+    }
+    if upper_provenance == ConstraintProvenance::Validity {
+        bounds.add_upper(db, env, upper_provenance, upper);
+    }
+    Some((typevar, bound, bounds.finish(db, env, typevar)))
 }
 
 impl InteriorNode {
