@@ -12,15 +12,21 @@ reveal_type(get_int())  # revealed: int
 ## Gradual variadic parameters
 
 ```py
-from typing import Any
+from typing import Any, TypeVar
+
+T = TypeVar("T")
 
 def accepts_anything(first: int, *args: Any, **kwargs: Any) -> None: ...
 def accepts_only_gradual(*args: Any, **kwargs: Any) -> None: ...
+def preserves_first(first: T, *args: Any, **kwargs: Any) -> T:
+    return first
 
 accepts_anything(1, "one", object(), keyword=object())
 accepts_anything("not an int")  # error: [invalid-argument-type]
 accepts_only_gradual(1, "one", keyword=object())
 accepts_only_gradual(**{1: "one"})  # error: [invalid-argument-type]
+
+reveal_type(preserves_first(1, "other", keyword=object()))  # revealed: Literal[1]
 ```
 
 ## Object variadic parameters
@@ -89,6 +95,41 @@ def get_int[T]() -> int:
 reveal_type(get_int())  # revealed: int
 ```
 
+## Generic call with independent and dependent arguments
+
+Concrete arguments must not erase a type variable inferred from another argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+class Invariant[T]:
+    item: T
+
+class Bounded[T: int]:
+    item: T
+
+def combine[A, B, U](first: Invariant[A], second: Invariant[B], dependent: Invariant[U]) -> tuple[A, B, U]:
+    raise NotImplementedError
+
+class Constructed[T]:
+    def __new__[A, B, U](cls, first: Invariant[A], second: Invariant[B], dependent: Invariant[U]) -> Constructed[tuple[A, B, U]]:
+        raise NotImplementedError
+
+def infer[T](dependent: Invariant[T]) -> None:
+    concrete = Invariant[int]()
+    reveal_type(combine(concrete, concrete, dependent))  # revealed: tuple[int, int, T@infer]
+    reveal_type(Constructed(concrete, concrete, dependent))  # revealed: Constructed[tuple[int, int, T@infer]]
+
+    bounded = Invariant[Bounded[int]]()
+    reveal_type(combine(bounded, bounded, dependent))  # revealed: tuple[Bounded[int], Bounded[int], T@infer]
+    reveal_type(Constructed(bounded, bounded, dependent))  # revealed: Constructed[tuple[Bounded[int], Bounded[int], T@infer]]
+```
+
 ## Generic callable chains
 
 Inferring a chain of generic callable parameters should discard internal typevar artifacts from
@@ -138,6 +179,30 @@ ints: list[int] = []
 dynamic: Any = []
 
 reveal_type(map(operator.add, ints, dynamic))  # revealed: map[Unknown]
+```
+
+## Generic overloaded callable constraints in constructors
+
+An overloaded callback can have a type variable of its own. An overload rejected by the constructor
+must not leave a mapping for that variable that causes the accepted overload to be rejected.
+
+```py
+from typing import Generic, TypeVar, overload
+
+T = TypeVar("T", str, bytes)
+
+class Result(Generic[T]): ...
+
+@overload
+def convert(value: T) -> Result[T]: ...
+@overload
+def convert(value: Result[T]) -> Result[T]: ...
+def convert(value: T | Result[T]) -> Result[T]:
+    raise NotImplementedError
+
+# TODO: Preserve correlated overloaded-callback solutions (astral-sh/ty#2799) to infer
+# `map[Result[str]]`.
+reveal_type(map(convert, ["a"]))  # revealed: map[Unknown]
 ```
 
 ## Decorated
@@ -1335,8 +1400,9 @@ with_default(1, 2)
 
 ### Unpacked variadic elements preserve generic bounds
 
-Ordinary type variables are inferred from individual unpacked elements, even beside an unresolved
-type-variable tuple. Their upper bounds remain enforced.
+Ordinary type variables are inferred from individual unpacked elements in homogeneous or
+heterogeneous tuples, even beside an unresolved type-variable tuple. Their upper bounds remain
+enforced.
 
 ```toml
 [environment]
@@ -1355,6 +1421,19 @@ fixed(1)  # error: [invalid-argument-type]
 
 reveal_type(suffix("prefix", "valid"))  # revealed: Literal["valid"]
 suffix("prefix", 1)  # error: [invalid-argument-type]
+
+def homogeneous[T: str](*args: *tuple[T, ...]) -> T:
+    return args[0]
+
+reveal_type(homogeneous("first", "second"))  # revealed: Literal["first", "second"]
+homogeneous("valid", 1)  # error: [invalid-argument-type]
+
+def heterogeneous[T: str](*args: *tuple[int, T]) -> T:
+    return args[1]
+
+def _(valid: tuple[int, str], invalid: tuple[int, int]) -> None:
+    reveal_type(heterogeneous(*valid))  # revealed: str
+    heterogeneous(*invalid)  # error: [invalid-argument-type]
 ```
 
 ### Callable protocols enforce unpacked variadic requirements
@@ -1556,6 +1635,29 @@ def _(kwargs: dict[str, int]) -> None:
 f(**{"a": 1, "b": 2})
 f(**dict(a=1, b=2))
 f(**Foo(a=1, b=2))
+```
+
+### Unpacked keyword values retain their individual generic types
+
+Each named value in an unpacked `TypedDict` must be related to its own generic parameter instead of
+using the type of the complete mapping.
+
+```py
+from typing_extensions import TypedDict, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Values(TypedDict, closed=True):
+    first: int
+    second: str
+
+def combine(*, first: T, second: U) -> tuple[T, U]:
+    return first, second
+
+values: Values = {"first": 1, "second": "value"}
+
+reveal_type(combine(**values))  # revealed: tuple[int, str]
 ```
 
 ### Keyword-only parameters

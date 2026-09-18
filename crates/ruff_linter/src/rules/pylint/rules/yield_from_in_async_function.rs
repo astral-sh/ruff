@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of `yield from` in async functions.
@@ -24,7 +25,7 @@ use crate::Violation;
 ///         yield number
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Correctness)]
 pub(crate) struct YieldFromInAsyncFunction;
 
 impl Violation for YieldFromInAsyncFunction {

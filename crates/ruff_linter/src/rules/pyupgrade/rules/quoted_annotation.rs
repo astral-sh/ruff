@@ -6,6 +6,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -87,7 +88,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [TC008]: https://docs.astral.sh/ruff/rules/quoted-type-alias/
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.242")]
+#[violation_metadata(stable_since = "v0.0.242", category = Category::Correctness)]
 pub(crate) struct QuotedAnnotation;
 
 impl AlwaysFixableViolation for QuotedAnnotation {

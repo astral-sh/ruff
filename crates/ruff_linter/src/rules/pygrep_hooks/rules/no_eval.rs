@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
+use crate::codes::Category;
 
 /// ## Removed
 /// This rule is identical to [S307] which should be used instead.
@@ -31,7 +32,7 @@ use crate::Violation;
 ///
 /// [S307]: https://docs.astral.sh/ruff/rules/suspicious-eval-usage/
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "v0.2.0")]
+#[violation_metadata(removed_since = "v0.2.0", category = Category::Security)]
 pub(crate) struct Eval;
 
 /// PGH001

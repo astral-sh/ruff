@@ -516,6 +516,13 @@ pub struct Options {
     pub analyze: Option<AnalyzeOptions>,
 }
 
+impl Options {
+    /// Deserialize inline configuration in one crate, avoiding repeated code generation.
+    pub fn from_toml_table(table: toml::Table) -> Result<Self, toml::de::Error> {
+        table.try_into()
+    }
+}
+
 /// Configures how Ruff checks your code.
 ///
 /// Options specified in the `lint` section take precedence over the deprecated top-level settings.
@@ -812,13 +819,16 @@ pub struct LintCommonOptions {
     pub fixable: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to ignore. Prefixes can specify exact
-    /// rules (like `F841`), entire categories (like `F`), or anything in
+    /// rules (like `F841`), entire groups (like `F`), or anything in
     /// between.
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes. `ignore` takes precedence over `select` if the same
     /// prefix appears in both.
+    ///
+    /// In preview, categories like `correctness` and `suspicious` can be used
+    /// in addition to rule codes and linter group prefixes.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -902,13 +912,16 @@ pub struct LintCommonOptions {
     pub logger_objects: Option<Vec<String>>,
 
     /// A list of rule codes or prefixes to enable. Prefixes can specify exact
-    /// rules (like `F841`), entire categories (like `F`), or anything in
+    /// rules (like `F841`), entire groups (like `F`), or anything in
     /// between.
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes. `ignore` takes precedence over `select` if the
     /// same prefix appears in both.
+    ///
+    /// In preview, categories like `correctness` and `suspicious` can be used
+    /// in addition to rule codes and linter group prefixes.
     #[option(
         default = r#"See https://docs.astral.sh/ruff/default-rules/ or run `ruff check --show-settings --isolated`"#,
         value_type = "list[RuleSelector]",
@@ -1079,6 +1092,8 @@ pub struct LintCommonOptions {
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, when considering any matching files. An initial '!' negates
     /// the file pattern.
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
@@ -1089,6 +1104,8 @@ pub struct LintCommonOptions {
             "path/to/file.py" = ["E402"]
             # Ignore `D` rules everywhere except for the `src/` directory.
             "!src/**.py" = ["D"]
+            # Ignore check for packages that are missing an `__init__.py` file.
+            "{benchmark,scripts,.github/action-name/}/*.py" = ["INP001"]
         "#
     )]
     pub per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
@@ -2138,6 +2155,9 @@ pub struct Flake8TidyImportsOptions {
     ban_relative_imports: Option<Strictness>,
 
     /// Specific modules or module members that may not be imported or accessed.
+    /// These can be extended by the
+    /// [`extend-banned-api`](#lint_flake8-tidy-imports_extend-banned-api) option.
+    ///
     /// Note that this rule is only meant to flag accidental uses,
     /// and can be circumvented via `eval` or `importlib`.
     #[option(
@@ -2150,6 +2170,20 @@ pub struct Flake8TidyImportsOptions {
         "#
     )]
     banned_api: Option<FxHashMap<String, ApiBan>>,
+
+    /// Additional modules or module members that may not be imported or accessed.
+    /// These entries will be added to the
+    /// [`banned-api`](#lint_flake8-tidy-imports_banned-api) mapping and will override
+    /// any existing entries if the two settings overlap.
+    #[option(
+        default = r#"{}"#,
+        value_type = r#"dict[str, { "msg": str }]"#,
+        scope = "extend-banned-api",
+        example = r#"
+            "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+        "#
+    )]
+    extend_banned_api: Option<FxHashMap<String, ApiBan>>,
 
     /// List of specific modules that may not be imported at module level, and should instead be
     /// imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:`
@@ -2203,6 +2237,11 @@ pub struct Flake8TidyImportsOptions {
 
 impl Flake8TidyImportsOptions {
     pub(crate) fn try_into_settings(self) -> Result<flake8_tidy_imports::settings::Settings> {
+        let mut banned_api = self.banned_api.unwrap_or_default();
+        if let Some(extend_banned_api) = self.extend_banned_api {
+            banned_api.extend(extend_banned_api);
+        }
+
         let require_lazy = self.require_lazy.unwrap_or_default();
         let ban_lazy = self.ban_lazy.unwrap_or_default();
 
@@ -2214,7 +2253,7 @@ impl Flake8TidyImportsOptions {
 
         Ok(flake8_tidy_imports::settings::Settings {
             ban_relative_imports: self.ban_relative_imports.unwrap_or(Strictness::Parents),
-            banned_api: self.banned_api.unwrap_or_default(),
+            banned_api,
             banned_module_level_imports: self.banned_module_level_imports.unwrap_or_default(),
             require_lazy,
             ban_lazy,

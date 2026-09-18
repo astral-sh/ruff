@@ -16,7 +16,7 @@ expression: diagnostics
           "character": 12
         }
       },
-      "severity": 1,
+      "severity": 2,
       "code": "unresolved-reference",
       "codeDescription": {
         "href": "https://ty.dev/rules#unresolved-reference"

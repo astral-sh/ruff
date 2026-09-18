@@ -35,7 +35,7 @@ class InvalidStateError(Error):
 
 class BrokenExecutor(RuntimeError):
     """
-    Raised when a executor has become non-functional after a severe failure.
+    Raised when an executor has become non-functional after a severe failure.
     """
 
 _T = TypeVar("_T")

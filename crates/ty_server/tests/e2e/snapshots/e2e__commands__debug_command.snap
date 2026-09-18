@@ -182,14 +182,21 @@ Settings: Settings {
 Memory report:
 =======SALSA STRUCTS=======
 `FileRoot`                                         metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`File`                                             metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `ModuleResolveModeIngredient`                      metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `Program`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `Project`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `ResolverEnvironment`                              metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 =======SALSA QUERIES=======
-`dynamic_resolution_paths -> alloc::vec::Vec<ty_module_resolver::path::SearchPath>`
-    metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `Project::program_ -> ty_python_core::program::Program<'_>`
+    metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`dynamic_resolution_paths -> alloc::boxed::Box<[ty_module_resolver::path::SearchPath]>`
+    metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`script_tag -> core::option::Option<alloc::boxed::Box<ruff_python_ast::script::ScriptTag>>`
+    metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`site_packages_editables -> alloc::boxed::Box<[ty_module_resolver::resolve::SitePackagesEditables]>`
+    metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`source_text -> ruff_db::source::SourceText`
     metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 =======SALSA SUMMARY=======
 TOTAL MEMORY USAGE: [X.XXMB]

@@ -18,6 +18,243 @@ async def test():
         reveal_type(f)  # revealed: Target
 ```
 
+## Exception-suppressing async context managers and union aliases
+
+An asynchronous context manager can suppress exceptions if its `__aexit__` method returns `bool`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+class Suppresses:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+async def may_raise() -> str:
+    raise ValueError
+
+async def preserved_binding() -> None:
+    result = None
+    async with Suppresses():
+        result = await may_raise()
+    reveal_type(result)  # revealed: None | str
+```
+
+If an exception interrupts an assignment to a new name, that name may remain undefined:
+
+```py
+async def missing_binding() -> None:
+    async with Suppresses():
+        value = await may_raise()
+    # error: [possibly-unresolved-reference]
+    reveal_type(value)  # revealed: str
+```
+
+An `__aexit__` return type of `None` does not suppress exceptions:
+
+```py
+class Propagates:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> None: ...
+
+async def propagating_exit() -> None:
+    result = None
+    async with Propagates():
+        result = await may_raise()
+    reveal_type(result)  # revealed: str
+```
+
+[The typing specification](https://typing.python.org/en/latest/spec/exceptions.html#context-managers)
+treats an awaited `Literal[True] | None` return type as non-suppressing, even though a truthy return
+value would suppress an exception at runtime:
+
+```py
+class OptionalTrueExit:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
+        return True
+
+async def optional_true_exit() -> None:
+    result = None
+    async with OptionalTrueExit():
+        result = await may_raise()
+    reveal_type(result)  # revealed: str
+```
+
+A PEP 695 alias does not prevent a suppressing union member from preserving an earlier binding:
+
+```py
+type Managers = Suppresses | Propagates
+
+async def preserved_union_binding(manager: Managers) -> None:
+    result = None
+    async with manager:
+        result = await may_raise()
+    reveal_type(result)  # revealed: None | str
+```
+
+A suppressed exception can also leave a new binding undefined:
+
+```py
+async def missing_union_binding(manager: Managers) -> None:
+    async with manager:
+        result = await may_raise()
+    # error: [possibly-unresolved-reference]
+    reveal_type(result)  # revealed: str
+```
+
+## Earlier async context managers can suppress later entry failures
+
+If an earlier async context manager suppresses an exception while a later manager enters, the later
+manager's target may never be assigned:
+
+```py
+class Suppresses:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+class EnterFails:
+    async def __aenter__(self) -> str:
+        raise ValueError
+
+    async def __aexit__(self, exc_type, exc_value, traceback) -> None: ...
+
+async def later_entry_fails() -> None:
+    async with Suppresses(), EnterFails() as target:
+        pass
+    # error: [possibly-unresolved-reference]
+    reveal_type(target)  # revealed: str
+```
+
+## Returning from an exception-suppressing async context manager
+
+A context manager cannot suppress a return statement:
+
+```py
+class Suppresses:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+async def bare_return() -> str:
+    async with Suppresses():
+        return "finished"
+```
+
+An exception raised while evaluating an awaited return expression can be suppressed instead:
+
+```py
+async def may_raise() -> str:
+    raise ValueError
+
+async def interrupted_return() -> str:  # error: [invalid-return-type]
+    async with Suppresses():
+        return await may_raise()
+```
+
+## Overloaded async context manager exit methods
+
+An overloaded async exit method can distinguish normal exits from exceptions:
+
+```py
+from typing import Awaitable, Literal, overload
+from typing_extensions import Never
+
+async def may_raise() -> str:
+    raise ValueError
+```
+
+An overload returning `True` only on a normal exit cannot suppress an exception:
+
+```py
+class NormalExitOnly:
+    async def __aenter__(self) -> None: ...
+    @overload
+    async def __aexit__(self, exc_type: None, exc_value, traceback) -> Literal[True]: ...
+    @overload
+    async def __aexit__(self, exc_type: type[BaseException], exc_value, traceback) -> Literal[False]: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return exc_type is None
+
+async def normal_exit_only() -> None:
+    result = None
+    async with NormalExitOnly():
+        result = await may_raise()
+    reveal_type(result)  # revealed: str
+```
+
+Of the following three overloads, the second applies when an exception is raised, and the third
+applies when the suite exits without an exception. The first overload never applies because its
+exception argument is `Never`:
+
+```py
+class NeverExit:
+    async def __aenter__(self) -> None: ...
+    @overload
+    async def __aexit__(self, exc_type: Never, exc_value, traceback) -> Literal[True]: ...
+    @overload
+    async def __aexit__(self, exc_type: type[BaseException], exc_value, traceback) -> Literal[False]: ...
+    @overload
+    async def __aexit__(self, exc_type: None, exc_value, traceback) -> Literal[False]: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return False
+
+async def impossible_exit() -> None:
+    result = None
+    async with NeverExit():
+        result = await may_raise()
+    reveal_type(result)  # revealed: str
+```
+
+An exceptional overload can suppress its exception even if another exceptional overload cannot:
+
+```py
+class SuppressesValueError:
+    async def __aenter__(self) -> None: ...
+    @overload
+    async def __aexit__(self, exc_type: type[ValueError], exc_value: ValueError, traceback: object) -> Literal[True]: ...
+    @overload
+    async def __aexit__(self, exc_type: type[TypeError], exc_value: TypeError, traceback: object) -> None: ...
+    @overload
+    async def __aexit__(self, exc_type: None, exc_value: None, traceback: None) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
+        return True if exc_type is ValueError else None
+
+async def mixed_exceptional_exits() -> None:
+    result = None
+    async with SuppressesValueError():
+        result = await may_raise()
+    reveal_type(result)  # revealed: None | str
+```
+
+An exceptional overload that returns a non-awaitable does not prevent a later awaitable overload
+from suppressing a different exception:
+
+```py
+class SuppressesAfterNonAwaitable:
+    async def __aenter__(self) -> None: ...
+    @overload
+    def __aexit__(self, exc_type: type[TypeError], exc_value: TypeError, traceback: object) -> bool: ...
+    @overload
+    def __aexit__(self, exc_type: type[ValueError], exc_value: ValueError, traceback: object) -> Awaitable[Literal[True]]: ...
+    @overload
+    def __aexit__(self, exc_type: None, exc_value: None, traceback: None) -> Awaitable[None]: ...
+    def __aexit__(self, exc_type, exc_value, traceback) -> bool | Awaitable[Literal[True]] | Awaitable[None]:
+        raise NotImplementedError
+
+async def suppresses_after_non_awaitable() -> None:
+    result = None
+    async with SuppressesAfterNonAwaitable():
+        result = await may_raise()
+    reveal_type(result)  # revealed: None | str
+```
+
 ## Multiple targets
 
 ```py

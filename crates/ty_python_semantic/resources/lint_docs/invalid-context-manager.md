@@ -1,7 +1,6 @@
 ## What it does
 
-Checks for expressions used in `with` statements
-that do not implement the context manager protocol.
+Checks for expressions used in `with` statements that do not implement the context manager protocol.
 
 ## Why is this bad?
 

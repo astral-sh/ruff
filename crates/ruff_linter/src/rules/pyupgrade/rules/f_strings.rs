@@ -16,6 +16,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::{curly_escape, curly_unescape};
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -40,7 +41,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.224")]
+#[violation_metadata(stable_since = "v0.0.224", category = Category::Complexity)]
 pub(crate) struct FString;
 
 impl Violation for FString {

@@ -559,6 +559,51 @@ f(x, x, x, x, x, x, x, x, x, x)
         );
     });
 }
+
+fn benchmark_mixed_many_invariant_typevars(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from __future__ import annotations
+
+class Invariant[T]:
+    x: T
+
+class Constructed[T]:
+    def __new__[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, U](
+        cls,
+        box1: Invariant[T1],
+        box2: Invariant[T2],
+        box3: Invariant[T3],
+        box4: Invariant[T4],
+        box5: Invariant[T5],
+        box6: Invariant[T6],
+        box7: Invariant[T7],
+        box8: Invariant[T8],
+        box9: Invariant[T9],
+        box10: Invariant[T10],
+        box11: Invariant[U],
+    ) -> Constructed[tuple[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, U]]:
+        raise NotImplementedError
+
+def f[T](y: Invariant[T]) -> None:
+    x = Invariant[int]()
+    Constructed(x, x, x, x, x, x, x, x, x, x, y)
+"#;
+
+    criterion.bench_function("ty_micro[mixed_many_invariant_typevars]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
     const NUM_CORE_SCHEMA_VARIANTS: usize = 24;
 
@@ -620,6 +665,7 @@ criterion_group!(
     benchmark_sequence_literal_union_access,
     benchmark_invariant_generic_union_bound,
     benchmark_many_invariant_typevars,
+    benchmark_mixed_many_invariant_typevars,
     benchmark_pydantic_core_schema_dict,
 );
 criterion_main!(constraint_set);

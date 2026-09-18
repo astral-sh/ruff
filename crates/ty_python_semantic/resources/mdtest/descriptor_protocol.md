@@ -890,6 +890,30 @@ c.name = None
 c.name = 42
 ```
 
+### Writing to a property's documentation
+
+A property stores its documentation in a writable descriptor even though property instances do not
+have an instance dictionary.
+
+```py
+class Example:
+    @property
+    def value(self) -> int:
+        return 1
+
+    value.__doc__ = "Updated documentation"
+```
+
+A property created directly has the same writable `__doc__` attribute. Assignments must still
+respect its `str | None` annotation, and arbitrary instance attributes remain unsupported.
+
+```py
+descriptor = property(lambda instance: 1)
+descriptor.__doc__ = None
+descriptor.__doc__ = 1  # error: [invalid-assignment]
+descriptor.extra = 1  # error: [unresolved-attribute]
+```
+
 ### Overriding properties in subclasses
 
 When a subclass overrides a property, accessing other inherited properties from within the
@@ -1195,7 +1219,7 @@ python-version = "3.12"
 ```
 
 ```py
-type Recursive = int | Recursive
+type Recursive = int | Recursive  # error: [cyclic-type-alias-definition]
 
 class C:
     value: Recursive = 1
@@ -1203,10 +1227,85 @@ class C:
 C().value
 ```
 
-### Property getters reject invalid receiver specializations
+### Recursive metaclass declarations containing dynamic types
 
-A property getter checks the same specialized receiver as an ordinary method. A generic alias with
-alternatives that impose different type-variable bounds can produce an invalid property access.
+A recursive declaration containing `Any` can describe a data descriptor. Assignments to a class
+attribute must still satisfy the setter stored on its metaclass.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> str:
+        return "value"
+
+    def __set__(self, instance: object, value: int) -> None: ...
+
+Implicit = Any | list["Implicit"]
+type Explicit = Any | list[Explicit]
+
+class ImplicitMeta(type):
+    value: Implicit = Descriptor()
+
+class ExplicitMeta(type):
+    value: Explicit = Descriptor()
+
+class ImplicitOwner(metaclass=ImplicitMeta):
+    value: str = ""
+
+class ExplicitOwner(metaclass=ExplicitMeta):
+    value: str = ""
+
+ImplicitOwner.value = "bad"  # error: [invalid-assignment] "Expected `int`"
+ExplicitOwner.value = "bad"  # error: [invalid-assignment] "Expected `int`"
+```
+
+### Recursive metaclass declarations containing non-descriptors
+
+A recursive union can contain both descriptors and ordinary values. A valid assignment is checked
+against the descriptor actually stored on the metaclass, even when the class has an attribute with
+the same name.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> str:
+        return "value"
+
+    def __set__(self, instance: object, value: str) -> None: ...
+
+Implicit = Descriptor | list["Implicit"]
+type Explicit = Descriptor | list[Explicit]
+
+class ImplicitMeta(type):
+    value: Implicit = Descriptor()
+
+class ExplicitMeta(type):
+    value: Explicit = Descriptor()
+
+class ImplicitOwner(metaclass=ImplicitMeta):
+    value: str = ""
+
+class ExplicitOwner(metaclass=ExplicitMeta):
+    value: str = ""
+
+ImplicitOwner.value = "accepted"
+ExplicitOwner.value = "accepted"
+```
+
+### Property getters do not infer fixed owner type variables
+
+A property getter treats type variables fixed by the owner specialization as evidence, not as
+inference targets.
 
 ```py
 from collections.abc import Callable
@@ -1229,9 +1328,11 @@ AnyCallback = TypeVar("AnyCallback", bound=Callable[..., str])
 Command = A[AnyCallback] | B[AnyCallback]
 Callback = TypeVar("Callback", bound=Callable[[int], str])
 
+# TODO: `Command[Callback]` produces `B[Callback]`, but `Callback` does not satisfy `BItem`'s
+# upper bound. Report this at `Command[Callback]` once specialization validation can prove that
+# every possible specialization of a symbolic assignment satisfies the destination domain.
 def access(value: Callback | Command[Callback]) -> None:
     if isinstance(value, A | B):
-        # error: [invalid-attribute-access]
         value.callback
 ```
 
@@ -1356,6 +1457,37 @@ def descriptor_value(descriptor: Descriptor) -> None:
 
         # error: [invalid-attribute-access]
         C().value
+```
+
+### Intersection receivers preserve their complete owner type
+
+A descriptor can require its owner to satisfy both classes in an intersection.
+
+```py
+from __future__ import annotations
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type[Left] & type[Right]) -> int:
+        return 1
+
+class Left:
+    value = Descriptor()
+
+class Right: ...
+
+def receiver(value: Left & Right) -> None:
+    # Only `Left` supplies the descriptor, but its owner must retain `Right` too.
+    # Passing `type[Left]` instead of `type[Left] & type[Right]` would cause an
+    # `invalid-attribute-access` error.
+    reveal_type(value.value)  # revealed: int
+```
+
+A receiver known only to be `Left` does not satisfy the descriptor's owner type.
+
+```py
+def incomplete_owner(value: Left) -> None:
+    # error: [invalid-attribute-access] "Expected `type[Left] & type[Right]`, found `type[Left]`"
+    value.value
 ```
 
 ### Every `__get__` definition must accept the call
@@ -1862,6 +1994,54 @@ class Example:
     @wrapper
     def __call__(self) -> None:
         pass
+```
+
+An invalid descriptor receiver must not discard the inferred `ParamSpec` for its bound callable.
+Even though `Concatenate` makes the receiver positional-only, the remaining parameters still retain
+their precise types.
+
+```py
+class Decorator(Generic[P]):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+    def __get__(self: "Decorator[Concatenate[Any, P2]]", instance: Any, owner: Any) -> "Decorator[P2]":
+        raise NotImplementedError
+
+def decorate(fn: Callable[P, Any]) -> Decorator[P]:
+    raise NotImplementedError
+
+class Decorated:
+    @decorate
+    def method(self, value: str) -> None: ...
+
+# error: [invalid-attribute-access]
+bound = Decorated().method
+reveal_type(bound)  # revealed: Decorator[(value: str)]
+bound(1)  # error: [invalid-argument-type]
+```
+
+### Static getters, setters and deleters
+
+```py
+class Descriptor:
+    @staticmethod
+    def __get__(descriptor: object, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    @staticmethod
+    def __set__(instance: object, value: int) -> None: ...
+    @staticmethod
+    def __delete__(instance: object) -> None: ...
+
+class Owner:
+    value = Descriptor()
+
+owner = Owner()
+reveal_type(owner.value)  # revealed: int
+reveal_type(Owner.value)  # revealed: int
+owner.value = 1
+del owner.value
+
+owner.value = "wrong"  # error: [invalid-assignment] "Expected `int`, found `Literal["wrong"]`"
 ```
 
 [descriptors]: https://docs.python.org/3/howto/descriptor.html

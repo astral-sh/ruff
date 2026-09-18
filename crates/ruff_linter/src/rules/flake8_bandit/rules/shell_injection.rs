@@ -7,6 +7,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
+use crate::codes::Category;
 use crate::{
     checkers::ast::Checker, registry::Rule, rules::flake8_bandit::helpers::string_literal,
 };
@@ -37,7 +38,7 @@ use crate::{
 /// - [Python documentation: `subprocess` — Subprocess management](https://docs.python.org/3/library/subprocess.html)
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Security)]
 pub(crate) struct SubprocessPopenWithShellEqualsTrue {
     safety: Safety,
     is_exact: bool,
@@ -88,7 +89,7 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
 ///
 /// [#4045]: https://github.com/astral-sh/ruff/issues/4045
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Security)]
 pub(crate) struct SubprocessWithoutShellEqualsTrue;
 
 impl Violation for SubprocessWithoutShellEqualsTrue {
@@ -127,7 +128,7 @@ impl Violation for SubprocessWithoutShellEqualsTrue {
 /// ## References
 /// - [Python documentation: Security Considerations](https://docs.python.org/3/library/subprocess.html#security-considerations)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Security)]
 pub(crate) struct CallWithShellEqualsTrue {
     is_exact: bool,
 }
@@ -180,7 +181,7 @@ impl Violation for CallWithShellEqualsTrue {
 /// ## References
 /// - [Python documentation: `subprocess`](https://docs.python.org/3/library/subprocess.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Security)]
 pub(crate) struct StartProcessWithAShell {
     safety: Safety,
 }
@@ -226,7 +227,7 @@ impl Violation for StartProcessWithAShell {
 ///
 /// [S605]: https://docs.astral.sh/ruff/rules/start-process-with-a-shell
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Security)]
 pub(crate) struct StartProcessWithNoShell;
 
 impl Violation for StartProcessWithNoShell {
@@ -262,7 +263,7 @@ impl Violation for StartProcessWithNoShell {
 /// - [Python documentation: `subprocess.Popen()`](https://docs.python.org/3/library/subprocess.html#subprocess.Popen)
 /// - [Common Weakness Enumeration: CWE-426](https://cwe.mitre.org/data/definitions/426.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Security)]
 pub(crate) struct StartProcessWithPartialPath;
 
 impl Violation for StartProcessWithPartialPath {
@@ -296,7 +297,7 @@ impl Violation for StartProcessWithPartialPath {
 /// ## References
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Security)]
 pub(crate) struct UnixCommandWildcardInjection;
 
 impl Violation for UnixCommandWildcardInjection {
@@ -334,9 +335,14 @@ fn is_trusted_input(arg: &Expr, semantic: &SemanticModel) -> bool {
 pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     let call_kind = get_call_kind(&call.func, checker.semantic());
     let shell_keyword = find_shell_keyword(&call.arguments, checker.semantic());
+    let command_argument = match call_kind {
+        Some(CallKind::Subprocess) => find_subprocess_argument(&call.arguments),
+        Some(CallKind::Shell | CallKind::NoShell) => call.arguments.args.first(),
+        None => None,
+    };
 
     if matches!(call_kind, Some(CallKind::Subprocess)) {
-        if let Some(arg) = call.arguments.args.first() {
+        if let Some(arg) = command_argument {
             match shell_keyword {
                 // S602
                 Some(ShellKeyword {
@@ -397,11 +403,9 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
 
     // S607
     if checker.is_rule_enabled(Rule::StartProcessWithPartialPath) {
-        if call_kind.is_some() {
-            if let Some(arg) = call.arguments.args.first() {
-                if is_partial_path(arg) {
-                    checker.report_diagnostic(StartProcessWithPartialPath, arg.range());
-                }
+        if let Some(arg) = command_argument {
+            if is_partial_path(arg) {
+                checker.report_diagnostic(StartProcessWithPartialPath, arg.range());
             }
         }
     }
@@ -419,13 +423,25 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 )
             )
         {
-            if let Some(arg) = call.arguments.args.first() {
+            if let Some(arg) = command_argument {
                 if is_wildcard_command(arg) {
                     checker.report_diagnostic(UnixCommandWildcardInjection, arg.range());
                 }
             }
         }
     }
+}
+
+/// Return the command argument to a `subprocess` call.
+fn find_subprocess_argument(arguments: &Arguments) -> Option<&Expr> {
+    arguments.find_argument_value("args", 0).or_else(|| {
+        // A starred first argument (`subprocess.run(*cmd)`) prevents us from locating the
+        // command with `find_argument_value`; treat it as untrusted input.
+        arguments
+            .args
+            .first()
+            .filter(|argument| argument.is_starred_expr())
+    })
 }
 
 #[derive(Copy, Clone, Debug)]

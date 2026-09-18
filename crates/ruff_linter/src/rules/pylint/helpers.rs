@@ -1,5 +1,6 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::ExceptHandler;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Arguments, Expr, Stmt, visitor};
 use ruff_python_semantic::analyze::function_type;
@@ -7,6 +8,12 @@ use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::TextRange;
 
 use crate::settings::LinterSettings;
+
+/// Returns `true` if a module member is public despite having an
+/// underscore-prefixed name.
+pub(crate) fn is_underscore_prefixed_public_member(qualified_name: &QualifiedName) -> bool {
+    matches!(qualified_name.segments(), ["os", "_exit"])
+}
 
 /// Returns the value of the `name` parameter to, e.g., a `TypeVar` constructor.
 pub(super) fn type_param_name(arguments: &Arguments) -> Option<&str> {

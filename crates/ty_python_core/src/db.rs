@@ -23,7 +23,7 @@ pub trait TestProgramDb: Db {
     {
         #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
         fn program_inner(db: &dyn TestProgramDb) -> Program<'_> {
-            Program::from_settings(db, db.program_settings().clone())
+            Program::from_settings(db, db.program_settings())
         }
 
         program_inner(self)

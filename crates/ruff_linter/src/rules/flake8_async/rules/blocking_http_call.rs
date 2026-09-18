@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks that async functions do not contain blocking HTTP calls.
@@ -38,7 +39,7 @@ use crate::checkers::ast::Checker;
 ///             ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Suspicious)]
 pub(crate) struct BlockingHttpCallInAsyncFunction;
 
 impl Violation for BlockingHttpCallInAsyncFunction {
@@ -55,7 +56,8 @@ fn is_blocking_http_call(qualified_name: &QualifiedName) -> bool {
             | ["urllib3", "request"]
             | [
                 "httpx" | "requests",
-                "get"
+                "request"
+                    | "get"
                     | "post"
                     | "delete"
                     | "patch"

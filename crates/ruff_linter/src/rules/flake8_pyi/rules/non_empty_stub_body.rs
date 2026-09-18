@@ -4,6 +4,7 @@ use ruff_python_trivia::has_leading_content;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::delete_stmt;
 use crate::preview::is_non_empty_stub_body_multiple_statements_enabled;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
@@ -64,7 +65,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// [PYI021]: https://docs.astral.sh/ruff/rules/docstring-in-stub/
 /// [PYI048]: https://docs.astral.sh/ruff/rules/stub-body-multiple-statements/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.253")]
+#[violation_metadata(stable_since = "v0.0.253", category = Category::Correctness)]
 pub(crate) struct NonEmptyStubBody {
     fix_kind: FixKind,
 }

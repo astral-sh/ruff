@@ -15,6 +15,9 @@ pub enum PythonVersionSource {
     /// Value loaded from a project's configuration file.
     ConfigFile(PythonVersionFileSource),
 
+    /// Value configured in a standalone script's inline metadata.
+    ScriptMetadata(Span),
+
     /// Value loaded from the `pyvenv.cfg` file of the virtual environment.
     /// The virtual environment might have been configured, activated or inferred.
     PyvenvCfgFile(PythonVersionFileSource),
@@ -38,9 +41,6 @@ pub enum PythonVersionSource {
     /// or if the value was auto-discovered by the editor
     /// (e.g., the Python environment)
     Editor,
-
-    /// The value was provided by `uv workspace metadata`.
-    UvWorkspace,
 
     /// We fell back to a default value because the value was not specified via the CLI or a config file.
     #[default]

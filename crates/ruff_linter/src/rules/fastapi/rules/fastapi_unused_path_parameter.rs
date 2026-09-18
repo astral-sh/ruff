@@ -12,6 +12,7 @@ use ruff_text_size::{Ranged, TextSize};
 
 use crate::Fix;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::add_parameter;
 use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 use crate::{FixAvailability, Violation};
@@ -64,7 +65,7 @@ use crate::{FixAvailability, Violation};
 /// This rule's fix is marked as unsafe, as modifying a function signature can
 /// change the behavior of the code.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Suspicious)]
 pub(crate) struct FastApiUnusedPathParameter {
     arg_name: String,
     function_name: String,

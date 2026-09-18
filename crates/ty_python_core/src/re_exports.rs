@@ -28,7 +28,7 @@ use ruff_python_ast::{
     visitor::{Visitor, walk_expr, walk_pattern, walk_stmt},
 };
 use rustc_hash::FxHashMap;
-use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
+use ty_module_resolver::{ImportingFile, resolve_module_for_import_from};
 
 use crate::{Db, ProgramFile};
 
@@ -253,19 +253,11 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                             let program_file = self.program_file;
                             let file = program_file.file(db);
                             let resolver_environment = program_file.resolver_environment(db);
-                            for export in ModuleName::from_import_statement(
+                            for export in resolve_module_for_import_from(
                                 db,
                                 ImportingFile::File(file, resolver_environment),
                                 node,
                             )
-                            .ok()
-                            .and_then(|module_name| {
-                                resolve_module(
-                                    db,
-                                    ImportingFile::File(file, resolver_environment),
-                                    &module_name,
-                                )
-                            })
                             .iter()
                             .flat_map(|module| {
                                 module

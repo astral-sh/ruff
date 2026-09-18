@@ -2,10 +2,13 @@
 
 ## `in` for tuples
 
+Broad integer subjects narrow to the integer literals present in the tuple. By default, equality
+narrowing does not add the boolean literals that also compare equal to `0` or `1`.
+
 ```py
 def _(x: int):
     if x in (1, 2, 3):
-        reveal_type(x)  # revealed: Literal[1, 2, 3, True]
+        reveal_type(x)  # revealed: Literal[1, 2, 3]
     else:
         reveal_type(x)  # revealed: int & ~Literal[1] & ~Literal[True] & ~Literal[2] & ~Literal[3]
 ```
@@ -116,6 +119,14 @@ def inline_set(value: Choice):
         reveal_type(value)  # revealed: Literal["c"]
     else:
         reveal_type(value)  # revealed: Literal["a", "b"]
+
+def integer_list(value: int):
+    assert value in [1, 2]
+    reveal_type(value)  # revealed: Literal[1, 2]
+
+def integer_set(value: int):
+    assert value in {0, 2}
+    reveal_type(value)  # revealed: Literal[0, 2]
 
 def literal_locals(value: Choice):
     a = "a"
@@ -251,6 +262,10 @@ def inline_set(x: str):
         reveal_type(x)  # revealed: str
     else:
         reveal_type(x)  # revealed: str & ~Literal["a"] & ~Literal["b"]
+
+def integer_list(x: int):
+    if x in [1, 2]:
+        reveal_type(x)  # revealed: int
 
 class Bar: ...
 
@@ -656,6 +671,47 @@ def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
         reveal_type(x)  # revealed: str | None
 ```
 
+## Combining `not in` conditions
+
+When either of two membership exclusions can hold, only the values excluded by both conditions
+remain excluded. The earlier `bytes` exclusion is preserved:
+
+```py
+def disjoint_groups(value):
+    if isinstance(value, bytes):
+        return
+    if value not in (10, 11) or value not in (20, 21):
+        reveal_type(value)  # revealed: Unknown & ~bytes
+
+def overlapping_groups(value):
+    if isinstance(value, bytes):
+        return
+    if value not in (10, 11) or value not in (11, 12, 13):
+        reveal_type(value)  # revealed: Unknown & ~bytes & ~Literal[11]
+```
+
+Conjoining several disjoint groups still retains only the original `bytes` exclusion, without
+multiplying the redundant alternatives at each condition:
+
+```py
+def repeated_groups(value):
+    if isinstance(value, bytes):
+        return
+    if (
+        (value not in (10, 11) or value not in (12, 13))
+        and (value not in (14, 15) or value not in (16, 17))
+        and (value not in (18, 19) or value not in (20, 21))
+        and (value not in (22, 23) or value not in (24, 25))
+        and (value not in (26, 27) or value not in (28, 29))
+        and (value not in (30, 31) or value not in (32, 33))
+        and (value not in (34, 35) or value not in (36, 37))
+        and (value not in (38, 39) or value not in (40, 41))
+        and (value not in (42, 43) or value not in (44, 45))
+        and (value not in (46, 47) or value not in (48, 49))
+    ):
+        reveal_type(value)  # revealed: Unknown & ~bytes
+```
+
 ## Recursive tuple slots
 
 ```toml
@@ -752,7 +808,7 @@ def default_equality(x: Token | Literal[1]):
 
 def overlapping_union_member(x: int | Literal["missing"]):
     if x in ("missing", 1):
-        reveal_type(x)  # revealed: Literal[1, True, "missing"]
+        reveal_type(x)  # revealed: Literal[1, "missing"]
 
 def custom_equality(x: AlwaysEqual | Literal[1]):
     if x in (1,):

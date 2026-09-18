@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of `subprocess.Popen` with a `preexec_fn` argument.
@@ -40,7 +41,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [targeted for deprecation]: https://github.com/python/cpython/issues/82616
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.281")]
+#[violation_metadata(stable_since = "v0.0.281", category = Category::Suspicious)]
 pub(crate) struct SubprocessPopenPreexecFn;
 
 impl Violation for SubprocessPopenPreexecFn {

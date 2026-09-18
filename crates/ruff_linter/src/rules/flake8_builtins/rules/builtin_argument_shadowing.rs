@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
@@ -54,7 +55,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 /// [overload]: https://docs.python.org/3/library/typing.html#typing.overload
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.48")]
+#[violation_metadata(stable_since = "v0.0.48", category = Category::Pedantic)]
 pub(crate) struct BuiltinArgumentShadowing {
     name: String,
 }

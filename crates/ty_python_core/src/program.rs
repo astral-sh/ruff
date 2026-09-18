@@ -25,7 +25,7 @@ impl get_size2::GetSize for Program<'_> {}
 
 impl<'db> Program<'db> {
     /// Creates a program from settings whose search roots have already been registered.
-    pub fn from_settings(db: &'db dyn Db, settings: ProgramSettings) -> Self {
+    pub fn from_settings(db: &'db dyn Db, settings: &ProgramSettings) -> Self {
         let ProgramSettings {
             python_version,
             python_platform,
@@ -33,7 +33,7 @@ impl<'db> Program<'db> {
         } = settings;
 
         let resolver_environment =
-            ResolverEnvironment::new(db, python_version.version, &search_paths);
+            ResolverEnvironment::new(db, python_version.version, search_paths);
         Program::new(db, python_platform, resolver_environment)
     }
 

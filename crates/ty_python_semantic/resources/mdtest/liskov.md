@@ -106,6 +106,28 @@ class DataArrayCoordinates[T_DataArray: DataArray](Coordinates):
     def __getitem__(self, key: object) -> T_DataArray: ...
 ```
 
+## Specialized receiver types
+
+An overriding method must accept every receiver accepted by the inherited method. A method that is
+only available on one specialization of the subclass is incompatible with an inherited method that
+is available on every specialization.
+
+```pyi
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Element(Generic[T]): ...
+
+class Base(Generic[T]):
+    def method(self) -> "Derived[Any]": ...
+
+class Derived(Base[T], Generic[T]):
+    # error: [invalid-method-override]
+    def method(self: "Derived[Element[S]]") -> "Derived[S]": ...
+```
+
 ## Method parameters
 
 A subclass method may provide a different parameter list to the superclass method, but all
@@ -979,7 +1001,7 @@ class ReturnsInt:
 class Compatible(SatisfiesBoth, ReturnsStr, ReturnsInt): ...
 ```
 
-### A compatible subclass override satisfies both contracts
+### Subclass overrides must satisfy both contracts
 
 A subclass can provide an implementation that satisfies otherwise-incompatible base definitions.
 
@@ -1003,6 +1025,17 @@ class AcceptsInt:
 
 class CompatibleParameter(AcceptsStr, AcceptsInt):
     def accepts(self, value: str | int) -> None: ...
+```
+
+Matching the first base's signature does not satisfy an incompatible contract from an unrelated
+base. The conflict is introduced by the subclass, so it is reported on the override.
+
+```pyi
+class IncompatibleReturn(ReturnsStr, ReturnsInt):
+    def method(self) -> str: ...  # error: [invalid-method-override]
+
+class IncompatibleParameter(AcceptsStr, AcceptsInt):
+    def accepts(self, value: str) -> None: ...  # error: [invalid-method-override]
 ```
 
 ### An intermediate `Any` does not hide a conflict
@@ -1540,6 +1573,121 @@ class C(list[int]):
     def __getitem__(self, key): ...
 ```
 
+An invalid override of a method inherited implicitly from `object` is also reported only on the
+parent. Preserving that signature does not produce another diagnostic on the child.
+
+`object.pyi`:
+
+```pyi
+class InvalidStr:
+    def __str__(self) -> int: ...  # error: [invalid-method-override]
+
+class PreservesInvalidStr(InvalidStr):
+    def __str__(self) -> int: ...
+```
+
+## Conflicts inherited through an intermediate base
+
+A parent can inherit incompatible method signatures without defining its own override. A child that
+preserves the selected signature does not repeat that conflict. An override that changes the
+selected signature still receives an error.
+
+```pyi
+class Left:
+    def method(self, left): ...
+
+class Right:
+    def method(self, right): ...
+
+class Parent(Left, Right): ...  # error: [invalid-method-override]
+
+class Child(Parent):
+    def method(self, left): ...
+
+class ChangesSignature(Parent):
+    # error: [invalid-method-override] "Definition is incompatible with `Left.method`"
+    def method(self, right): ...
+```
+
+A base that inherits the selected method without the conflicting contract does not make the conflict
+new. The conflict remains reported only on `Parent`, regardless of the child's base order.
+
+```pyi
+class Independent(Left): ...
+
+class IndependentFirst(Independent, Parent):
+    def method(self, left): ...
+
+class ParentFirst(Parent, Independent):
+    def method(self, left): ...
+```
+
+The existing conflict does not hide an incompatible contract introduced by another base of the
+child.
+
+```pyi
+class RequiresExtra:
+    def method(self, left, extra): ...
+
+class AddsContract(Parent, RequiresExtra):
+    # error: [invalid-method-override] "Definition is incompatible with `RequiresExtra.method`"
+    def method(self, left): ...
+```
+
+The same suppression applies when one of the inherited contracts is a static method with an optional
+argument.
+
+```pyi
+class Static:
+    @staticmethod
+    def method(left=None): ...
+
+class StaticParent(Left, Static): ...  # error: [invalid-method-override]
+
+class StaticChild(StaticParent):
+    def method(self, left): ...
+```
+
+## An earlier base can be bypassed when resolving an inherited method
+
+The first direct base need not supply the selected method. Here, `Child` uses `Override.method`
+ahead of `Base.method`, even though `Inherited` on its own uses `Base.method`. The existing
+violation on `Override` does not need another diagnostic on `Child`.
+
+```pyi
+class Base:
+    def method(self, value: int): ...
+
+class Inherited(Base): ...
+
+class Override(Base):
+    def method(self, value: str): ...  # error: [invalid-method-override]
+
+class Child(Inherited, Override):
+    def method(self, value: str): ...
+```
+
+## Inherited conflicts bind `Self` to the parent
+
+An inherited method's `Self` annotation refers to the parent whose hierarchy is being checked.
+`Parent.method` only accepts `Parent` instances, conflicting with `AcceptsBase.method`, which
+accepts any `Base` instance. Preserving that signature on `Child` does not repeat the conflict.
+
+```pyi
+from typing_extensions import Self
+
+class Base:
+    def method(self, other: Self): ...
+
+class AcceptsBase:
+    def method(self, other: Base): ...
+
+class Parent(Base, AcceptsBase): ...  # error: [invalid-method-override]
+
+class Child(Parent):
+    def method(self, other: Parent): ...
+```
+
 ## Non-generic methods on generic classes work as expected
 
 ```toml
@@ -1673,6 +1821,120 @@ class B4(A4):
     # but this is not necessarily true for `B4.method`: if passed a `bool`,
     # it could return a non-`bool` `int`!
     def method(self, x: int) -> int: ...
+```
+
+## Overrides with `Self` return types
+
+An inherited `Self` return type refers to the subclass on which the method is called. An override
+can preserve that return type regardless of whether either method explicitly annotates `self`:
+
+```pyi
+from typing_extensions import Self
+
+class Base:
+    def implicit(self) -> Self: ...
+    def explicit(self: Self) -> Self: ...
+
+class PreservesSelf(Base):
+    def implicit(self) -> Self: ...
+    def explicit(self: Self) -> Self: ...
+
+class ChangesReceiverAnnotation(Base):
+    def implicit(self: Self) -> Self: ...
+    def explicit(self) -> Self: ...
+```
+
+Returning the superclass is incompatible: it does not satisfy the inherited promise to return an
+instance of the subclass. Adding or omitting `self: Self` does not change this:
+
+```pyi
+class ReturnsBase(Base):
+    def implicit(self) -> Base: ...  # snapshot: invalid-method-override
+    def explicit(self: Self) -> Base: ...  # error: [invalid-method-override]
+
+class ReturnsBaseWithChangedAnnotation(Base):
+    def implicit(self: Self) -> Base: ...  # error: [invalid-method-override]
+    def explicit(self) -> Base: ...  # error: [invalid-method-override]
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `implicit`
+  --> src/mdtest_snippet.pyi:15:9
+   |
+15 |     def implicit(self) -> Base: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Base.implicit`
+   |
+  ::: src/mdtest_snippet.pyi:4:9
+   |
+ 4 |     def implicit(self) -> Self: ...
+   |         ---------------------- `Base.implicit` defined here
+info: incompatible return types: `Base` is not assignable to `ReturnsBase`
+info: This violates the Liskov Substitution Principle
+```
+
+Repeating an already invalid override does not produce another diagnostic on a subclass:
+
+```pyi
+class RepeatsInvalidOverride(ReturnsBase):
+    def implicit(self) -> Base: ...
+    def explicit(self: Self) -> Base: ...
+```
+
+## Overrides with `Self` parameters
+
+Repeating `other: Self` in an override narrows the parameter's bound from the base class to the
+subclass. A call through a base-class reference can pass a base-class instance that the override
+does not accept. We currently miss this violation for both implicit and explicit receiver
+annotations. This is a known limitation tracked in
+[#2255](https://github.com/astral-sh/ty/issues/2255), related to the broader
+[generic override limitation](https://github.com/astral-sh/ty/issues/4133):
+
+```pyi
+from typing_extensions import Self
+
+class Base:
+    def implicit(self, other: Self) -> None: ...
+    def explicit(self: Self, other: Self) -> None: ...
+
+class PreservesSelf(Base):
+    # TODO: Emit `invalid-method-override` for narrowing `other`.
+    def implicit(self, other: Self) -> None: ...
+    # TODO: Emit `invalid-method-override` for narrowing `other`.
+    def explicit(self: Self, other: Self) -> None: ...
+
+class ChangesReceiverAnnotation(Base):
+    # TODO: Emit `invalid-method-override` for narrowing `other`.
+    def implicit(self: Self, other: Self) -> None: ...
+    # TODO: Emit `invalid-method-override` for narrowing `other`.
+    def explicit(self, other: Self) -> None: ...
+```
+
+An override cannot replace the `Self` parameter with an unrelated type:
+
+```pyi
+class Incompatible(Base):
+    def implicit(self, other: int) -> None: ...  # error: [invalid-method-override]
+    def explicit(self: Self, other: int) -> None: ...  # error: [invalid-method-override]
+```
+
+For generic superclasses, we use the inherited specialization of the class's type parameters, but
+still miss the narrowing of `other: Self`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+class GenericBase[T]:
+    def method(self, other: Self, value: T) -> Self: ...
+
+class Specialized(GenericBase[int]):
+    # TODO: Emit `invalid-method-override` for narrowing `other`.
+    def method(self, other: Self, value: int) -> Self: ...
+
+class IncompatibleSpecialization(GenericBase[int]):
+    def method(self, other: Self, value: str) -> Self: ...  # error: [invalid-method-override]
 ```
 
 ## Protocol annotations on mixin receivers
@@ -2011,9 +2273,9 @@ error[invalid-method-override]: Invalid override of method `__eq__`
   3 |     def __eq__(self, other: "Bad") -> bool:  # snapshot: invalid-method-override
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `object.__eq__`
     |
-   ::: stdlib/builtins.pyi:137:9
+   ::: stdlib/builtins.pyi:136:9
     |
-137 |     def __eq__(self, value: object, /) -> bool: ...
+136 |     def __eq__(self, value: object, /) -> bool: ...
     |         -------------------------------------- `object.__eq__` defined here
 info: parameter `value` has an incompatible type: `object` is not assignable to `Bad`
 info: This violates the Liskov Substitution Principle
@@ -2177,115 +2439,57 @@ info: incompatible return types: `object` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 
-Overwriting an instance method with a staticmethod, or vice versa, is an error:
+We explicitly allow overwriting between instance methods, staticmethods and classmethods, as long as
+the "bound" signatures (when accessed on an instance) are compatible. See
+<https://github.com/astral-sh/ty/issues/4341> for why this is not sound in all cases. In the future,
+we might want to consider adding a new (strict) rule to disallow overwriting of instance methods
+with classmethod/staticmethods, and vice-versa, in particular.
 
 ```pyi
-class BadChild1A(Parent):
+class GoodChild3A(Parent):
+    @staticmethod
+    def instance_method(x: int) -> int: ...
+
+class GoodChild3B(Parent):
+    @classmethod
+    def instance_method(cls, x: int) -> int: ...
+
+class GoodChild3C(Parent):
+    def class_method(self, x: int) -> int: ...
+
+class GoodChild3D(Parent):
+    @staticmethod
+    def class_method(x: int) -> int: ...
+
+class GoodChild3E(Parent):
+    def static_method(self, x: int) -> int: ...
+
+class GoodChild3F(Parent):
+    @classmethod
+    def static_method(cls, x: int) -> int: ...
+```
+
+However, if the signature does not match, we emit a useful error message:
+
+```pyi
+class BadSignature1(Parent):
     @staticmethod
     def instance_method(self, x: int) -> int: ...  # snapshot: invalid-method-override
 ```
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `instance_method`
-  --> src/mdtest_snippet.pyi:27:9
+  --> src/mdtest_snippet.pyi:48:9
    |
-27 |     def instance_method(self, x: int) -> int: ...  # snapshot: invalid-method-override
+48 |     def instance_method(self, x: int) -> int: ...  # snapshot: invalid-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.instance_method`
    |
   ::: src/mdtest_snippet.pyi:2:9
    |
  2 |     def instance_method(self, x: int) -> int: ...
    |         ------------------------------------ `Parent.instance_method` defined here
-info: `BadChild1A.instance_method` is a staticmethod but `Parent.instance_method` is an instance method
-info: This violates the Liskov Substitution Principle
-```
-
-```pyi
-class BadChild1B(Parent):
-    def static_method(x: int) -> int: ...  # snapshot: invalid-method-override
-```
-
-```snapshot
-error[invalid-method-override]: Invalid override of method `static_method`
-  --> src/mdtest_snippet.pyi:29:9
-   |
-29 |     def static_method(x: int) -> int: ...  # snapshot: invalid-method-override
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.static_method`
-   |
-  ::: src/mdtest_snippet.pyi:6:9
-   |
- 6 |     def static_method(x: int) -> int: ...
-   |         ---------------------------- `Parent.static_method` defined here
-info: `BadChild1B.static_method` is an instance method but `Parent.static_method` is a staticmethod
-info: This violates the Liskov Substitution Principle
-```
-
-Overwriting a classmethod with an instance method is also an error: Although the method has the same
-signature as `Parent.class_method` when accessed on instances, it does not have the same signature
-as `Parent.class_method` when accessed on the class object itself:
-
-```pyi
-class BadChild2A(Parent):
-    # TODO: we should emit `invalid-method-override` here.
-    def class_method(cls, x: int) -> int: ...
-```
-
-Conversely, overwriting an instance method with a classmethod is also an error: Although the method
-has the same signature as `Parent.class_method` when accessed on instances, it does not have the
-same signature as `Parent.class_method` when accessed on the class object itself.
-
-Note that whereas `BadChild2A.class_method` is reported as a Liskov violation by mypy, pyright and
-pyrefly, pyright is the only one of those three to report a Liskov violation on this method as of
-2025-11-23.
-
-```pyi
-class BadChild2B(Parent):
-    # TODO: we should emit `invalid-method-override` here.
-    @classmethod
-    def instance_method(self, x: int) -> int: ...
-```
-
-Overwriting a classmethod with a staticmethod, or vice versa, is also an error:
-
-```pyi
-class BadChild3A(Parent):
-    @staticmethod
-    def class_method(cls, x: int) -> int: ...  # snapshot: invalid-method-override
-```
-
-```snapshot
-error[invalid-method-override]: Invalid override of method `class_method`
-  --> src/mdtest_snippet.pyi:39:9
-   |
-39 |     def class_method(cls, x: int) -> int: ...  # snapshot: invalid-method-override
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.class_method`
-   |
-  ::: src/mdtest_snippet.pyi:4:9
-   |
- 4 |     def class_method(cls, x: int) -> int: ...
-   |         -------------------------------- `Parent.class_method` defined here
-info: `BadChild3A.class_method` is a staticmethod but `Parent.class_method` is a classmethod
-info: This violates the Liskov Substitution Principle
-```
-
-```pyi
-class BadChild3B(Parent):
-    @classmethod
-    def static_method(x: int) -> int: ...  # snapshot: invalid-method-override
-```
-
-```snapshot
-error[invalid-method-override]: Invalid override of method `static_method`
-  --> src/mdtest_snippet.pyi:42:9
-   |
-42 |     def static_method(x: int) -> int: ...  # snapshot: invalid-method-override
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.static_method`
-   |
-  ::: src/mdtest_snippet.pyi:6:9
-   |
- 6 |     def static_method(x: int) -> int: ...
-   |         ---------------------------- `Parent.static_method` defined here
-info: `BadChild3B.static_method` is a classmethod but `Parent.static_method` is a staticmethod
+info: `BadSignature1.instance_method` is a staticmethod but `Parent.instance_method` is an instance method
+info: the parameter named `self` does not match `x` (and can be used as a keyword parameter)
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -2363,6 +2567,41 @@ class InvalidSwapEvent(Event):
     def deserialize(cls: type[InvalidSwapEvent], data: dict[str, int]) -> InvalidSwapEvent: ...
 ```
 
+## Classmethod overrides with `Self`
+
+In a class method, `Self` refers to an instance, while `cls` is a class object. A caller with a
+`type[Base]` reference can pass a `Base` instance as `other`, so narrowing that parameter to the
+subclass's `Self` is invalid. We currently miss this violation with or without an explicit
+`cls: type[Self]` annotation:
+
+```pyi
+from typing_extensions import Self
+
+class Base:
+    @classmethod
+    def compare(cls, other: Self) -> None: ...
+    @classmethod
+    def copy(cls) -> Self: ...
+
+class ImplicitReceiver(Base):
+    @classmethod
+    # TODO: Emit `invalid-method-override` for narrowing `other`.
+    def compare(cls, other: Self) -> None: ...
+
+class ExplicitReceiver(Base):
+    @classmethod
+    # TODO: Emit `invalid-method-override` for narrowing `other`.
+    def compare(cls: type[Self], other: Self) -> None: ...
+```
+
+An override that returns the superclass does not satisfy the inherited `Self` return type:
+
+```pyi
+class ReturnsBase(Base):
+    @classmethod
+    def copy(cls) -> Base: ...  # error: [invalid-method-override]
+```
+
 ## Overloaded methods with positional-only parameters with defaults
 
 When a base class has an overloaded method where one overload accepts only keyword arguments
@@ -2398,6 +2637,7 @@ have bigger problems:
 from __future__ import annotations
 
 class MaybeEqWhile:
+    # error: [redundant-condition] "always truthy"
     while ...:
         def __eq__(self, other: MaybeEqWhile) -> bool:
             return True
