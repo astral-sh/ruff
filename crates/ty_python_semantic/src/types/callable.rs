@@ -245,9 +245,9 @@ impl<'db> Type<'db> {
                         .visit(
                             db,
                             env,
-                            self,
+                            (self, place.ty),
                             || None,
-                            |callable| Some(CallableTypes::one(callable)),
+                            || Some(CallableTypes::one(CallableType::unknown(db))),
                             || {
                                 place.ty.try_upcast_to_callable_with_policy_and_context(
                                     db, env, policy, context,

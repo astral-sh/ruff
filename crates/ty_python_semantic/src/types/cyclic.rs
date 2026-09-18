@@ -36,12 +36,12 @@ use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::known_instance::MethodWrapperKind;
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, walk_type_with_recursion_guard,
+    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, CallableType, KnownBoundMethodType,
-    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameters, ProtocolInstanceType,
-    RecursiveType, Signature, StaticClassLiteral, Type, TypeAliasType, TypedDictType, UnionType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, KnownBoundMethodType, KnownInstanceType,
+    LiteralValueTypeKind, MemberLookupPolicy, Parameter, ProtocolInstanceType, RecursiveType,
+    StaticClassLiteral, Type, TypeAliasType, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -229,8 +229,8 @@ struct SpecializationFlowGraph<'db> {
     inconclusive_definitions: FxHashSet<Definition<'db>>,
     /// Whether a definition body or its formal parameters could not be inspected.
     inconclusive: bool,
-    /// Terminal signatures reached while following callable expansion.
-    callables: Vec<CallableType<'db>>,
+    /// Descriptor parameter annotations used to measure progress during callable expansion.
+    callable_patterns: Vec<Type<'db>>,
 }
 
 /// Walks one identity-specialized definition body and records references as graph edges.
@@ -244,7 +244,7 @@ struct SpecializationFlowVisitor<'db> {
     edges: RefCell<Vec<FlowEdge<'db>>>,
     referenced_definitions: RefCell<Vec<RecursiveDefinition<'db>>>,
     inconclusive: Cell<bool>,
-    callables: RefCell<Vec<CallableType<'db>>>,
+    callable_patterns: RefCell<Vec<Type<'db>>>,
 }
 
 /// Finds which parameters of the current source definition occur in one actual argument.
@@ -407,11 +407,43 @@ impl<'db> RecursiveDefinition<'db> {
         may_have_unbounded_specialization_inner(db, self, ())
     }
 
+    /// The finite type patterns inspected by descriptor overloads in a potentially growing
+    /// callable expansion. Their nested types distinguish intermediate specializations, such as
+    /// `list[int]` on the way from `int` to an overload accepting `list[list[int]]`.
+    fn callable_patterns(self, db: &'db dyn Db) -> Option<&'db [Type<'db>]> {
+        #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, ()| Some(Box::default()), heap_size=ruff_memory_usage::heap_size)]
+        fn callable_patterns_inner<'db>(
+            db: &'db dyn Db,
+            root: RecursiveDefinition<'db>,
+            _: (),
+        ) -> Option<Box<[Type<'db>]>> {
+            let graph = SpecializationFlowGraph::build(db, root);
+            if !graph.root_may_have_unbounded_specialization(db, root) {
+                return None;
+            }
+            let env = ProgramEnvironment::from_definition(root.definition(db));
+            let patterns = RefCell::new(FxHashSet::default());
+            for pattern in graph.callable_patterns {
+                any_over_type(db, &env, pattern, false, |ty| {
+                    patterns.borrow_mut().insert(ty);
+                    false
+                });
+            }
+            Some(patterns.into_inner().into_iter().collect())
+        }
+        callable_patterns_inner(db, self, ()).as_deref()
+    }
+
     /// Returns the possible expansion steps with each formal parameter mapped to itself.
     /// Classes contribute their bound `__call__` attribute, including all descriptor overload
     /// results; aliases and structural recursive types contribute their bodies.
     /// Missing attributes and definitions used only for structural checks contribute no steps.
-    fn callable_body(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Vec<Type<'db>> {
+    fn callable_body(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        patterns: &mut Vec<Type<'db>>,
+    ) -> Vec<Type<'db>> {
         match self {
             Self::Callable(origin) => {
                 let Some(instance) = Type::from(origin.identity_specialization(db))
@@ -426,7 +458,7 @@ impl<'db> RecursiveDefinition<'db> {
                 else {
                     return Vec::new();
                 };
-                callable_attribute_types(db, env, attribute).unwrap_or_else(|| {
+                callable_attribute_types(db, env, attribute, patterns).unwrap_or_else(|| {
                     instance
                         .member_lookup_with_policy(
                             db,
@@ -444,79 +476,6 @@ impl<'db> RecursiveDefinition<'db> {
             Self::Structural(recursive) => vec![recursive.unfold(db, env)],
             Self::Protocol(_) | Self::TypedDict(_) => Vec::new(),
         }
-    }
-
-    /// Returns a signature approximation if callable expansion can keep growing.
-    ///
-    /// The graph follows every descriptor overload, rather than selecting one for the identity
-    /// specialization. Independent return types form an upper bound on terminating calls; for
-    /// example, a descriptor chain with only `Callable[[], str]` exits still returns `str`.
-    /// Preserve parameters when all exits agree and their annotations are independent of type
-    /// variables. Otherwise use unknown parameters, and replace dependent return types with
-    /// `Unknown`. No reachable signature also falls back to `Unknown`.
-    ///
-    /// `None` means specialization cannot grow indefinitely and exact expansion can continue.
-    fn callable_approximation(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
-        #[salsa::tracked(returns(copy), cycle_initial=|db, _, _, ()| Some(CallableType::unknown(db)), heap_size=ruff_memory_usage::heap_size)]
-        fn callable_approximation_inner<'db>(
-            db: &'db dyn Db,
-            root: RecursiveDefinition<'db>,
-            _: (),
-        ) -> Option<CallableType<'db>> {
-            let graph = SpecializationFlowGraph::build(db, root);
-            if !graph.root_may_have_unbounded_specialization(db, root) {
-                return None;
-            }
-            let env = ProgramEnvironment::from_definition(root.definition(db));
-            if graph.inconclusive
-                || !graph.inconclusive_definitions.is_empty()
-                || !root.callable_parameters(db).is_empty()
-                || graph.callables.is_empty()
-            {
-                return Some(CallableType::unknown(db));
-            }
-            let independent = |ty| {
-                !any_over_type_expanding_aliases(db, &env, ty, |ty| matches!(ty, Type::TypeVar(_)))
-            };
-            let mut parameters = None;
-            let mut matching_parameters = true;
-            let mut return_types = Vec::new();
-            for callable in graph.callables {
-                for signature in callable.signatures(db) {
-                    let signature_parameters = signature.parameters();
-                    if !signature_parameters
-                        .iter()
-                        .all(|parameter| independent(parameter.annotated_type()))
-                    {
-                        matching_parameters = false;
-                    }
-                    if let Some(previous) = &parameters {
-                        matching_parameters &= previous == signature_parameters;
-                    } else {
-                        parameters = Some(signature_parameters.clone());
-                    }
-                    return_types.push(if independent(signature.return_ty) {
-                        signature.return_ty
-                    } else {
-                        Type::unknown()
-                    });
-                }
-            }
-            if return_types.is_empty() {
-                return Some(CallableType::unknown(db));
-            }
-            let parameters = if matching_parameters {
-                parameters.unwrap_or_else(Parameters::unknown)
-            } else {
-                Parameters::unknown()
-            };
-            let return_type = UnionType::from_elements(db, &env, return_types);
-            Some(CallableType::single(
-                db,
-                Signature::new(parameters, return_type),
-            ))
-        }
-        callable_approximation_inner(db, self, ())
     }
 
     /// Returns, in declaration order, parameters that can become the next callable in an expansion.
@@ -545,7 +504,7 @@ impl<'db> RecursiveDefinition<'db> {
                 env: ProgramEnvironment::from_definition(source.definition(db)),
                 found: RefCell::default(),
             };
-            for body in source.callable_body(db, &visitor.env) {
+            for body in source.callable_body(db, &visitor.env, &mut Vec::new()) {
                 visitor.visit_type(db, body);
             }
             let found = visitor.found.into_inner();
@@ -561,20 +520,31 @@ impl<'db> RecursiveDefinition<'db> {
 impl<'db> DefinitionUse<'db> {
     /// Visits actual arguments whose formal parameters can be exposed by callable expansion.
     /// See [`RecursiveDefinition::callable_parameters`] for why other arguments are skipped.
-    fn walk_callable_arguments(self, db: &'db dyn Db, visitor: &impl TypeVisitor<'db>) {
+    /// Returns parameter annotations from descriptors encountered while binding these arguments.
+    fn walk_callable_arguments(
+        self,
+        db: &'db dyn Db,
+        visitor: &impl TypeVisitor<'db>,
+    ) -> Vec<Type<'db>> {
+        let mut patterns = Vec::new();
         if let Some(specialization) = self.specialization {
             let exposed = self.target.callable_parameters(db);
             for (parameter, argument) in self.target.parameters(db).zip(specialization.types(db)) {
                 if exposed.contains(&parameter) {
-                    for argument in
-                        callable_attribute_types(db, visitor.program_environment(), *argument)
-                            .unwrap_or_else(|| vec![*argument])
+                    for argument in callable_attribute_types(
+                        db,
+                        visitor.program_environment(),
+                        *argument,
+                        &mut patterns,
+                    )
+                    .unwrap_or_else(|| vec![*argument])
                     {
                         visitor.visit_type(db, argument);
                     }
                 }
             }
         }
+        patterns
     }
 
     fn walk_arguments(self, db: &'db dyn Db, visitor: &impl TypeVisitor<'db>) {
@@ -609,8 +579,8 @@ impl<'db> SpecializationFlowGraph<'db> {
                 graph.inconclusive = true;
             }
             graph
-                .callables
-                .extend(visitor.callables.borrow().iter().copied());
+                .callable_patterns
+                .extend(visitor.callable_patterns.borrow().iter().copied());
             let (edges, referenced_definitions, inconclusive) = visitor.finish();
             graph.edges.extend(edges);
             if inconclusive {
@@ -792,7 +762,7 @@ impl<'db> SpecializationFlowVisitor<'db> {
             edges: RefCell::default(),
             referenced_definitions: RefCell::default(),
             inconclusive: Cell::default(),
-            callables: RefCell::default(),
+            callable_patterns: RefCell::default(),
         })
     }
 
@@ -810,7 +780,8 @@ impl<'db> SpecializationFlowVisitor<'db> {
             RecursiveDefinition::Callable(_)
             | RecursiveDefinition::TypeAlias(_)
             | RecursiveDefinition::Structural(_) => {
-                let bodies = source.callable_body(db, &self.env);
+                let bodies =
+                    source.callable_body(db, &self.env, &mut self.callable_patterns.borrow_mut());
                 if bodies.is_empty() {
                     return false;
                 }
@@ -907,36 +878,15 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
         }
 
         if self.callable {
-            let callable = match ty {
-                Type::Callable(callable) => Some(callable),
-                Type::FunctionLiteral(function) => Some(function.into_callable_type(db)),
-                Type::BoundMethod(method) => method.into_callable_type(db),
-                _ => None,
-            };
-            if let Some(callable) = callable {
-                self.callables.borrow_mut().push(callable.into_regular(db));
+            if matches!(ty, Type::Callable(_) | Type::FunctionLiteral(_))
+                || matches!(ty, Type::BoundMethod(method) if method.into_callable_type(db).is_some())
+            {
                 return;
-            }
-            if matches!(ty, Type::BoundMethod(_)) {
-                // Binding an instance can remove parameters each time the cycle is traversed.
-                self.inconclusive.set(true);
-            }
-            if matches!(
-                ty,
-                Type::Dynamic(_)
-                    | Type::Divergent(_)
-                    | Type::ClassLiteral(_)
-                    | Type::GenericAlias(_)
-                    | Type::SubclassOf(_)
-            ) {
-                self.callables.borrow_mut().push(CallableType::unknown(db));
-                if matches!(ty, Type::Dynamic(_) | Type::Divergent(_)) {
-                    self.inconclusive.set(true);
-                }
             }
             if let Some(reference) = RecursiveDefinition::from_callable_type(db, &self.env, ty) {
                 self.record_reference(db, reference);
-                reference.walk_callable_arguments(db, self);
+                let patterns = reference.walk_callable_arguments(db, self);
+                self.callable_patterns.borrow_mut().extend(patterns);
             } else if !walk_callable_expansion(db, ty, self) {
                 self.inconclusive.set(true);
             }
@@ -993,10 +943,12 @@ impl<'db> TypeVisitor<'db> for CallableParameterCollector<'db> {
 /// `__get__` return type, since different specializations can select different overloads.
 /// Keep these alternatives separate: normalizing their union could compare their callability
 /// and discard a recursive alternative before the growth analysis has recorded its edges.
+/// Descriptor parameter annotations are recorded separately as progress measures.
 fn callable_attribute_types<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     attribute: Type<'db>,
+    patterns: &mut Vec<Type<'db>>,
 ) -> Option<Vec<Type<'db>>> {
     if let Type::Union(union) = attribute {
         return Some(
@@ -1004,7 +956,8 @@ fn callable_attribute_types<'db>(
                 .elements(db)
                 .iter()
                 .flat_map(|&element| {
-                    callable_attribute_types(db, env, element).unwrap_or_else(|| vec![element])
+                    callable_attribute_types(db, env, element, patterns)
+                        .unwrap_or_else(|| vec![element])
                 })
                 .collect(),
         );
@@ -1034,6 +987,9 @@ fn callable_attribute_types<'db>(
     Some(signatures.map_or_else(
         || vec![Type::unknown()],
         |signatures| {
+            for signature in signatures {
+                patterns.extend(signature.parameters().iter().map(Parameter::annotated_type));
+            }
             signatures
                 .iter()
                 .map(|signature| signature.return_ty)
@@ -1590,12 +1546,22 @@ impl<T, R> CycleDetectorCache<T, R> {
 
 /// Distinguishes exact callable cycles from potentially growing specializations.
 ///
-/// Exact repetition provides no new signature. Revisiting a class with different arguments can
-/// still terminate, so only potentially unbounded parameter flow uses a signature approximation.
-/// Finite specialization patterns retain their exact types and have no expansion limit.
+/// Classes with bounded parameter flow use exact type identities alone. For potentially growing
+/// classes, measure the receiver and its arguments against descriptor parameter annotations and
+/// the initial arguments. A new visit continues only if, for each earlier active visit, some
+/// measure has decreased. Repeated type variables in an annotation also measure how far two
+/// actual arguments are from agreeing, even when both arguments grow.
+///
+/// The measures form a fixed-length vector of nonnegative integers. Every infinite sequence of
+/// such vectors contains a componentwise nondecreasing pair (Dickson's lemma), so this guard
+/// eventually stops an unbounded expansion without a depth limit. Stopping is conservative: it
+/// yields `Unknown`, not a proof that the receiver is non-callable. Signatures are always obtained
+/// by ordinary member lookup and call resolution on the exact receiver.
 #[derive(Debug, Default)]
 pub(super) struct CallableRecursionDetector<'db> {
     active: ActiveRecursionDetector<Type<'db>>,
+    growing: ActiveRecursionDetector<(RecursiveDefinition<'db>, Box<[usize]>)>,
+    patterns: RefCell<FxHashMap<RecursiveDefinition<'db>, CallableProgress<'db>>>,
 }
 
 impl<'db> CallableRecursionDetector<'db> {
@@ -1603,26 +1569,362 @@ impl<'db> CallableRecursionDetector<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        ty: Type<'db>,
+        (ty, callable): (Type<'db>, Type<'db>),
         on_cycle: impl FnOnce() -> R,
-        on_growth: impl FnOnce(CallableType<'db>) -> R,
+        on_growth: impl FnOnce() -> R,
         func: impl FnOnce() -> R,
     ) -> R {
+        // A resolved signature does not expand another instance, even if reaching it required
+        // revisiting a potentially growing class.
+        if matches!(
+            callable,
+            Type::Callable(_)
+                | Type::FunctionLiteral(_)
+                | Type::Dynamic(_)
+                | Type::Divergent(_)
+                | Type::Never
+        ) || matches!(callable, Type::BoundMethod(method) if method.into_callable_type(db).is_some())
+        {
+            return func();
+        }
         self.active.visit(&ty, on_cycle, || {
             let Some(reference) = RecursiveDefinition::from_callable_type(db, env, ty) else {
                 return func();
             };
-            let repeated = self.active.seen.borrow().iter().any(|&active| {
-                active != ty
-                    && RecursiveDefinition::from_callable_type(db, env, active)
-                        .is_some_and(|previous| previous.target == reference.target)
+            let previous = self.active.seen.borrow().iter().find_map(|&active| {
+                if active == ty {
+                    return None;
+                }
+                RecursiveDefinition::from_callable_type(db, env, active)
+                    .filter(|previous| previous.target == reference.target)
             });
-            if repeated && let Some(callable) = reference.target.callable_approximation(db) {
-                on_growth(callable)
+            let Some(previous) = previous else {
+                let _guard = CallableProgressGuard {
+                    patterns: &self.patterns,
+                    target: reference.target,
+                };
+                return func();
+            };
+            let Some(declared_patterns) = reference.target.callable_patterns(db) else {
+                return func();
+            };
+            let key = {
+                let mut patterns = self.patterns.borrow_mut();
+                let progress = patterns
+                    .entry(reference.target)
+                    .or_insert_with(|| CallableProgress::new(db, env, declared_patterns, previous));
+                (reference.target, progress.measure(db, env, ty, reference))
+            };
+            if self.growing.seen.borrow().iter().any(|(target, previous)| {
+                *target == key.0
+                    && previous
+                        .iter()
+                        .zip(&key.1)
+                        .all(|(previous, current)| previous <= current)
+            }) {
+                on_growth()
             } else {
-                func()
+                self.growing.visit(&key, on_growth, func)
             }
         })
+    }
+}
+
+#[derive(Debug)]
+struct CallableProgress<'db> {
+    patterns: Box<[Type<'db>]>,
+    initial_sizes: Box<[usize]>,
+}
+
+impl<'db> CallableProgress<'db> {
+    /// Keep this set fixed for the active expansion. Initial arguments preserve progress in a
+    /// finite chain that unwraps a callable supplied by the caller rather than by a declaration.
+    fn new(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        declared: &[Type<'db>],
+        initial: DefinitionUse<'db>,
+    ) -> Self {
+        let patterns = RefCell::new(declared.iter().copied().collect::<FxHashSet<_>>());
+        initial.walk_arguments(
+            db,
+            &CallablePatternCollector {
+                env,
+                patterns: &patterns,
+                visited: TypeCollector::default(),
+            },
+        );
+        let sizes = CallableTypeSize::new(env);
+        let initial_sizes = initial
+            .specialization
+            .into_iter()
+            .flat_map(|specialization| specialization.types(db))
+            .map(|&ty| sizes.size(db, ty))
+            .collect();
+        Self {
+            patterns: patterns.into_inner().into_iter().collect(),
+            initial_sizes,
+        }
+    }
+
+    /// Measure progress toward descriptor patterns and preserve changes in the relative sizes of
+    /// arguments. The latter distinguish alternating steps when a recursive annotation rotates
+    /// its parameters, such as `C[T, S].__call__: C[list[S], list[list[T]]]`.
+    fn measure(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        reference: DefinitionUse<'db>,
+    ) -> Box<[usize]> {
+        let sizes = CallableTypeSize::new(env);
+        let arguments = std::iter::once(ty).chain(
+            reference
+                .specialization
+                .into_iter()
+                .flat_map(|specialization| specialization.types(db).iter().copied()),
+        );
+        let mut distances = arguments
+            .flat_map(|actual| {
+                let sizes = &sizes;
+                self.patterns.iter().map(move |&pattern| {
+                    CallablePatternDistance {
+                        env,
+                        sizes,
+                        variables: RefCell::default(),
+                        active: ActiveRecursionDetector::default(),
+                        cache: RefCell::default(),
+                    }
+                    .distance(db, actual, pattern, true)
+                })
+            })
+            .collect::<Vec<_>>();
+        let current_sizes: Vec<_> = reference
+            .specialization
+            .into_iter()
+            .flat_map(|specialization| specialization.types(db))
+            .map(|&ty| sizes.size(db, ty))
+            .collect();
+        for (i, (&current, &initial)) in current_sizes.iter().zip(&self.initial_sizes).enumerate() {
+            for (&other_current, &other_initial) in current_sizes[i + 1..]
+                .iter()
+                .zip(&self.initial_sizes[i + 1..])
+            {
+                // |(current - other_current) - (initial - other_initial)|, without signed
+                // subtraction or overflow when a compact type contains many repeated subtypes.
+                distances.push(
+                    current
+                        .saturating_add(other_initial)
+                        .abs_diff(other_current.saturating_add(initial)),
+                );
+            }
+        }
+        distances.into_boxed_slice()
+    }
+}
+
+/// Seed measures belong to one active expansion, not to completed sibling branches of a union.
+struct CallableProgressGuard<'a, 'db> {
+    patterns: &'a RefCell<FxHashMap<RecursiveDefinition<'db>, CallableProgress<'db>>>,
+    target: RecursiveDefinition<'db>,
+}
+
+impl Drop for CallableProgressGuard<'_, '_> {
+    fn drop(&mut self) {
+        self.patterns.borrow_mut().remove(&self.target);
+    }
+}
+
+struct CallablePatternCollector<'a, 'db> {
+    env: &'a ProgramEnvironment<'db>,
+    patterns: &'a RefCell<FxHashSet<Type<'db>>>,
+    visited: TypeCollector<'db>,
+}
+
+impl<'db> TypeVisitor<'db> for CallablePatternCollector<'_, 'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        self.env
+    }
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        self.patterns.borrow_mut().insert(ty);
+        walk_type_with_recursion_guard(db, ty, self, &self.visited);
+    }
+}
+
+/// A structural distance to an annotation, including equalities between repeated type variables.
+/// This measure controls expansion only; ordinary call resolution determines overload selection.
+struct CallablePatternDistance<'a, 'db> {
+    env: &'a ProgramEnvironment<'db>,
+    sizes: &'a CallableTypeSize<'a, 'db>,
+    variables: RefCell<FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>>,
+    active: ActiveRecursionDetector<(TypeIdentity<'db>, TypeIdentity<'db>)>,
+    cache: RefCell<FxHashMap<(Type<'db>, Type<'db>, bool, usize), usize>>,
+}
+
+impl<'db> CallablePatternDistance<'_, 'db> {
+    fn distance(
+        &self,
+        db: &'db dyn Db,
+        actual: Type<'db>,
+        pattern: Type<'db>,
+        bind_variables: bool,
+    ) -> usize {
+        let key = (
+            actual,
+            pattern,
+            bind_variables,
+            self.variables.borrow().len(),
+        );
+        if let Some(distance) = self.cache.borrow().get(&key) {
+            return *distance;
+        }
+        let distance = self.active.visit(
+            &(actual.to_type_identity(db), pattern.to_type_identity(db)),
+            || 0,
+            || {
+                if bind_variables && let Type::TypeVar(variable) = pattern {
+                    let previous = *self
+                        .variables
+                        .borrow_mut()
+                        .entry(variable.identity(db))
+                        .or_insert(actual);
+                    return self.distance(db, actual, previous, false);
+                }
+                if actual == pattern || matches!(pattern, Type::Dynamic(_)) {
+                    return 0;
+                }
+                if let Type::TypeAlias(alias) = actual {
+                    return self.distance(db, alias.value_type(db), pattern, bind_variables);
+                }
+                if let Type::TypeAlias(alias) = pattern {
+                    return self.distance(db, actual, alias.value_type(db), bind_variables);
+                }
+                if let (Some(actual), Some(pattern)) = (
+                    actual.tuple_instance_spec(db, self.env),
+                    pattern.tuple_instance_spec(db, self.env),
+                ) && let (Some(actual), Some(pattern)) =
+                    (actual.as_fixed_length(), pattern.as_fixed_length())
+                {
+                    return actual
+                        .iter_all_elements()
+                        .zip(pattern.iter_all_elements())
+                        .fold(
+                            actual.len().abs_diff(pattern.len()),
+                            |distance, (actual, pattern)| {
+                                distance.saturating_add(self.distance(
+                                    db,
+                                    actual,
+                                    pattern,
+                                    bind_variables,
+                                ))
+                            },
+                        );
+                }
+                let class = |ty| match ty {
+                    Type::NominalInstance(instance) => Some(instance.class(db, self.env)),
+                    Type::ProtocolInstance(protocol) => {
+                        protocol.class_origin(db).map(|origin| *origin)
+                    }
+                    _ => None,
+                };
+                if let (Some(actual_class), Some(pattern_class)) = (class(actual), class(pattern))
+                    && let (
+                        Some((actual_origin, Some(actual))),
+                        Some((pattern_origin, Some(pattern))),
+                    ) = (
+                        actual_class.static_class_literal(db),
+                        pattern_class.static_class_literal(db),
+                    )
+                    && actual_origin == pattern_origin
+                {
+                    let actual = actual.types(db);
+                    let pattern = pattern.types(db);
+                    return actual.iter().zip(pattern).fold(
+                        actual.len().abs_diff(pattern.len()),
+                        |distance, (&actual, &pattern)| {
+                            distance.saturating_add(self.distance(
+                                db,
+                                actual,
+                                pattern,
+                                bind_variables,
+                            ))
+                        },
+                    );
+                }
+                self.sizes
+                    .size(db, actual)
+                    .saturating_add(self.sizes.size(db, pattern))
+                    .saturating_add(1)
+            },
+        );
+        // Bindings only accumulate during one comparison, so their count identifies the current
+        // environment. Reuse a result only after its bindings have also been established.
+        self.cache.borrow_mut().insert(
+            (
+                actual,
+                pattern,
+                bind_variables,
+                self.variables.borrow().len(),
+            ),
+            distance,
+        );
+        distance
+    }
+}
+
+/// Counts type structure without expanding recursive definitions indefinitely or counting DAG
+/// sharing as a smaller type. Saturation keeps this termination measure bounded by `usize`.
+struct CallableTypeSize<'a, 'db> {
+    env: &'a ProgramEnvironment<'db>,
+    total: Cell<usize>,
+    cache: RefCell<FxHashMap<Type<'db>, usize>>,
+    active: ActiveRecursionDetector<TypeIdentity<'db>>,
+}
+
+impl<'a, 'db> CallableTypeSize<'a, 'db> {
+    fn new(env: &'a ProgramEnvironment<'db>) -> Self {
+        Self {
+            env,
+            total: Cell::default(),
+            cache: RefCell::default(),
+            active: ActiveRecursionDetector::default(),
+        }
+    }
+
+    fn size(&self, db: &'db dyn Db, ty: Type<'db>) -> usize {
+        if let Some(size) = self.cache.borrow().get(&ty) {
+            return *size;
+        }
+        self.active.visit(
+            &ty.to_type_identity(db),
+            || 1,
+            || {
+                let previous = self.total.replace(1);
+                match ty {
+                    Type::TypeAlias(alias) => self.visit_type(db, alias.value_type(db)),
+                    _ => walk_type_with_recursion_guard(db, ty, self, &TypeCollector::default()),
+                }
+                let size = self.total.replace(previous);
+                self.cache.borrow_mut().insert(ty, size);
+                size
+            },
+        )
+    }
+}
+
+impl<'db> TypeVisitor<'db> for CallableTypeSize<'_, 'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        self.env
+    }
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        let size = self.size(db, ty);
+        self.total.set(self.total.get().saturating_add(size));
     }
 }
 

@@ -6950,15 +6950,9 @@ impl<'db> Type<'db> {
                         let mut bindings = recursion_guard.instances.visit(
                             db,
                             env,
-                            self,
+                            (self, dunder_callable),
                             || CallableBinding::not_callable(self).into(),
-                            |callable| {
-                                CallableBinding::from_overloads(
-                                    self,
-                                    callable.signatures(db).iter().cloned(),
-                                )
-                                .into()
-                            },
+                            || Binding::single(self, Signature::dynamic(Type::unknown())).into(),
                             || dunder_callable.bindings_impl(db, env, recursion_guard),
                         );
                         bindings.replace_callable_type(dunder_callable, self);
