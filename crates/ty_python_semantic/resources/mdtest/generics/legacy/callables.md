@@ -1077,3 +1077,84 @@ def check(wrapper: Wrapper[Wrapper[Callable[[], int]]]):
     reveal_type(wrapper())  # revealed: int
     callback: Callable[[], int] = wrapper
 ```
+
+## Growing callable specializations
+
+Wrapping a type argument in `list` on every step produces infinitely many specializations without
+ever reaching a signature. This is not callable, whether the annotation belongs to a nominal class
+or a protocol.
+
+```py
+from typing import Callable, Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Growing(Generic[T]):
+    __call__: "Growing[list[T]]"
+
+T_co = TypeVar("T_co", covariant=True)
+
+class GrowingProtocol(Protocol[T_co]):
+    __call__: "GrowingProtocol[list[T_co]]"
+
+def check(c: Growing[int], p: GrowingProtocol[int]):
+    c()  # error: [call-non-callable]
+    p()  # error: [call-non-callable]
+    f: Callable[[], int] = c  # error: [invalid-assignment]
+    g: Callable[[], int] = p  # error: [invalid-assignment]
+```
+
+Growth can also pass through another class's type parameter before returning to the original class.
+
+```py
+class Wrapper(Generic[T]):
+    __call__: T
+
+class Indirect(Generic[T]):
+    __call__: "Wrapper[Indirect[list[T]]]"
+
+def check_indirect(c: Indirect[int]):
+    c()  # error: [call-non-callable]
+    callback: Callable[[], int] = c  # error: [invalid-assignment]
+```
+
+## Callable specialization resets
+
+A recursive reference with a fixed type argument eventually repeats an exact specialization. We
+retain the signatures encountered before that repetition, including the signature in the reset
+argument.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Reset(Generic[T]):
+    __call__: "Reset[Callable[[], str]] | T"
+
+def check(c: Reset[Callable[[], int]]):
+    # error: [call-non-callable]
+    reveal_type(c())  # revealed: Unknown | str | int
+```
+
+## Unused callable type arguments
+
+Only type arguments exposed by `__call__` participate in callable expansion. The unused second
+argument of `First` refers to a growing specialization, but the first argument leads to a signature.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class First(Generic[T, U]):
+    __call__: T
+
+class Outer(Generic[T]):
+    __call__: "First[T, Outer[list[T]]]"
+
+def check(c: Outer[Outer[Callable[[], int]]]):
+    reveal_type(c())  # revealed: int
+    callback: Callable[[], int] = c
+```

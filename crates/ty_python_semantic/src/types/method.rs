@@ -233,17 +233,7 @@ impl<'db> BoundMethodType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<CallableTypes<'db>> {
-        if let Some(callable) = self.into_callable_type(db) {
-            Some(CallableTypes::one(callable))
-        } else {
-            self.func(db)
-                .try_upcast_to_callable(db, env)
-                .map(|callables| {
-                    callables.map(|callable| {
-                        callable.bind_self(db, env, Some(self.signature_receiver(db)))
-                    })
-                })
-        }
+        Type::BoundMethod(self).try_upcast_to_callable(db, env)
     }
 
     /// Converts an actual or synthesized function into a callable with its receiver bound

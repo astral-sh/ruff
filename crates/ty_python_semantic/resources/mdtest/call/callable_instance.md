@@ -121,6 +121,22 @@ def check(c: C, p: P):
     p()  # error: [call-non-callable]
 ```
 
+## Recursive `__call__` through a classmethod
+
+Binding a classmethod does not break a cycle through the wrapped instance's `__call__`. Both calling
+the instance and checking its compatibility with `Callable` report errors.
+
+```py
+from typing import Callable, cast
+
+class C:
+    __call__ = classmethod(cast("C", object()))  # error: [invalid-argument-type]
+
+def check(c: C):
+    c()  # error: [call-non-callable]
+    callback: Callable[[], int] = c  # error: [invalid-assignment]
+```
+
 ## Recursive `__call__` through an enum intersection
 
 Excluding one enum member does not break a recursive `__call__` annotation: the remaining members

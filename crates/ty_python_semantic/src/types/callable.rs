@@ -11,7 +11,7 @@ use crate::{
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
-        cyclic::ActiveRecursionDetector,
+        cyclic::{ActiveRecursionDetector, TypeIdentity},
         function::OverloadLiteral,
         known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
         relation::{TypeRelation, TypeRelationChecker},
@@ -213,7 +213,24 @@ impl<'db> Type<'db> {
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
-            Type::BoundMethod(bound_method) => bound_method.callables(db, env),
+            Type::BoundMethod(bound_method) => {
+                if let Some(callable) = bound_method.into_callable_type(db) {
+                    Some(CallableTypes::one(callable))
+                } else {
+                    bound_method
+                        .func(db)
+                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)
+                        .map(|callables| {
+                            callables.map(|callable| {
+                                callable.bind_self(
+                                    db,
+                                    env,
+                                    Some(bound_method.signature_receiver(db)),
+                                )
+                            })
+                        })
+                }
+            }
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
@@ -231,7 +248,7 @@ impl<'db> Type<'db> {
                     context
                         .active_instances
                         .visit(
-                            &self,
+                            &self.callable_recursion_identity(db, env),
                             || None,
                             || {
                                 place.ty.try_upcast_to_callable_with_policy_and_context(
@@ -386,7 +403,12 @@ impl<'db> Type<'db> {
             ) => Some(CallableTypes::one(partial.partial(db))),
 
             Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
-                wrapper.callables(db, env)
+                match wrapper.kind(db) {
+                    MethodWrapperKind::Staticmethod => wrapper
+                        .wrapped(db)
+                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context),
+                    MethodWrapperKind::Classmethod => None,
+                }
             }
 
             Type::Intersection(intersection) => intersection
@@ -416,7 +438,7 @@ impl<'db> Type<'db> {
 #[derive(Debug, Default)]
 struct CallableUpcastContext<'db> {
     recursive_definition: Option<Definition<'db>>,
-    active_instances: ActiveRecursionDetector<Type<'db>>,
+    active_instances: ActiveRecursionDetector<TypeIdentity<'db>>,
 }
 
 impl<'db> CallableUpcastContext<'db> {

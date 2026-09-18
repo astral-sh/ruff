@@ -169,10 +169,7 @@ impl<'db> MethodWrapper<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<CallableTypes<'db>> {
-        match self.kind(db) {
-            MethodWrapperKind::Staticmethod => self.wrapped(db).try_upcast_to_callable(db, env),
-            MethodWrapperKind::Classmethod => None,
-        }
+        Type::KnownInstance(KnownInstanceType::MethodWrapper(self)).try_upcast_to_callable(db, env)
     }
 
     fn recursive_type_normalized_impl(

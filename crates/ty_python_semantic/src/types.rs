@@ -431,7 +431,7 @@ struct TypeRecursionContext<'db> {
 /// retain a nominal return type, whereas a pure instance cycle provides no callable signature.
 struct BindingsRecursionContext<'a, 'db> {
     constructors: &'a ActiveRecursionDetector<Type<'db>>,
-    instances: ActiveRecursionDetector<Type<'db>>,
+    instances: ActiveRecursionDetector<TypeIdentity<'db>>,
 }
 
 impl<'a, 'db> BindingsRecursionContext<'a, 'db> {
@@ -6943,11 +6943,10 @@ impl<'db> Type<'db> {
                         definedness: boundness,
                         ..
                     }) => {
-                        // A recursive `__call__` annotation can lead back to the same instance
-                        // without reaching a signature. Keep specializations distinct so finite
-                        // chains such as `Wrapper[Wrapper[Callable[[], int]]]` can still resolve.
+                        // A recursive `__call__` annotation can keep expanding without reaching
+                        // a signature, even if its specialization changes at each step.
                         let mut bindings = recursion_guard.instances.visit(
-                            &self,
+                            &self.callable_recursion_identity(db, env),
                             || CallableBinding::not_callable(self).into(),
                             || dunder_callable.bindings_impl(db, env, recursion_guard),
                         );
