@@ -814,6 +814,16 @@
             }
           ]
         },
+        "invalid-init-type-variable": {
+          "title": "detects class-scoped type variables in `__init__` receiver annotations",
+          "description": "## What it does\n\nChecks for class-scoped type variables in an explicit annotation of the `self` parameter of\n`__init__`.\n\n## Why is this bad?\n\nAn explicit `self` annotation on `__init__` can determine the type arguments of the constructed\nclass. Referring to the class's own type variables in this annotation can make their meaning\nambiguous. The typing specification requires function-scoped type variables instead.\n\n## Example\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nclass Container[T]:\n    # error: [invalid-init-type-variable]\n    def __init__(self: \"Container[list[T]]\", value: T) -> None: ...\n```\n\nUse a function-scoped type variable instead:\n\n```python\nclass ListContainer[T]:\n    def __init__[U](self: \"ListContainer[list[U]]\", value: U) -> None: ...\n```\n\nIf the receiver annotation does not change the class's type arguments, it can be omitted:\n\n```python\nclass Box[T]:\n    def __init__(self, value: T) -> None: ...\n```\n\n## Default level\n\nThis rule is disabled by default because existing code often uses class-scoped type variables to\npartially specialize a constructor's receiver. Enabling the rule enforces the typing specification's\nrestriction without changing the inferred types.\n\n## References\n\n- [Typing specification: `__init__` method](https://typing.python.org/en/latest/spec/constructors.html#init-method)",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-key": {
           "title": "detects invalid subscript accesses or TypedDict literal keys",
           "description": "## What it does\n\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an unknown key.\n\n## Why is this bad?\n\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is `closed=true`\nit also violates the expectations of the type.\n\n## Examples\n\n```python\nfrom typing import TypedDict\nfrom typing_extensions import NotRequired\n\n\nclass Person(TypedDict):\n    name: NotRequired[str]\n    age: NotRequired[int]\n\n\nalice = Person(name=\"Alice\", age=30)\n# KeyError: 'height'\nalice[\"height\"]  # error\n\n# error\nbob: Person = {\"nickname\": \"Bob\", \"age\": 30}  # typo!\n\n# error\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n```",

@@ -778,40 +778,53 @@ wrong_innards: C[int] = C("five", 1)
 
 ### Class-scoped type variables in `__init__` receiver annotations
 
-An explicit `__init__` receiver can determine the constructed class's type arguments. Using the
-class's own type variables in that annotation creates an ambiguous dependency and is rejected,
-including when the variables occur inside another type. Ordinary methods can use those variables in
-their receiver annotations.
+The opt-in `invalid-init-type-variable` rule rejects class-scoped type variables in explicit
+`__init__` receiver annotations, including when the variables occur inside another type. Ordinary
+methods can use those variables in their receiver annotations.
+
+```toml
+[environment]
+python-version = "3.13"
+
+[rules]
+invalid-init-type-variable = "error"
+```
 
 ```py
 from __future__ import annotations
 
 class Swapped[T, U]:
-    # error: [invalid-type-form] "class-scoped type variable `U`"
-    # error: [invalid-type-form] "class-scoped type variable `T`"
+    # error: [invalid-init-type-variable] "class-scoped type variable `U`"
+    # error: [invalid-init-type-variable] "class-scoped type variable `T`"
     def __init__(self: Swapped[U, T]) -> None: ...
 
 class Identity[T]:
-    def __init__(self: Identity[T]) -> None: ...  # error: [invalid-type-form]
+    def __init__(self: Identity[T], value: T) -> None: ...  # error: [invalid-init-type-variable]
     def method(self: Identity[T]) -> None: ...
 
 class Nested[T]:
-    def __init__(self: Nested[list[T]]) -> None: ...  # error: [invalid-type-form]
+    def __init__(self: Nested[list[T]]) -> None: ...  # error: [invalid-init-type-variable]
 
 type Alias[T] = T
 
 class Aliased[T]:
-    def __init__(self: Alias[Aliased[T]]) -> None: ...  # error: [invalid-type-form]
+    def __init__(self: Alias[Aliased[T]]) -> None: ...  # error: [invalid-init-type-variable]
+```
+
+Reporting the diagnostic does not change the inferred type.
+
+```py
+reveal_type(Identity(1))  # revealed: Identity[Literal[1]]
 ```
 
 The restriction also applies to `ParamSpec` and `TypeVarTuple` parameters.
 
 ```py
 class WithParamSpec[**P]:
-    def __init__(self: WithParamSpec[P]) -> None: ...  # error: [invalid-type-form]
+    def __init__(self: WithParamSpec[P]) -> None: ...  # error: [invalid-init-type-variable]
 
 class WithTuple[*Ts]:
-    def __init__(self: WithTuple[*Ts]) -> None: ...  # error: [invalid-type-form]
+    def __init__(self: WithTuple[*Ts]) -> None: ...  # error: [invalid-init-type-variable]
 ```
 
 Function-scoped type variables can determine the constructed type without referencing the class's
@@ -825,6 +838,17 @@ reveal_type(Remapped(1))  # revealed: Remapped[list[Literal[1]]]
 ```
 
 ### Some `__init__` overloads only apply to certain specializations
+
+With `invalid-init-type-variable` disabled (the default), an overload can partially specialize the
+receiver while retaining other class-scoped type variables.
+
+```toml
+[environment]
+python-version = "3.13"
+
+[rules]
+invalid-init-type-variable = "ignore"
+```
 
 ```py
 from __future__ import annotations
@@ -869,14 +893,14 @@ C[None](12)
 
 class D[T, U]:
     @overload
-    def __init__[V](self: "D[str, V]", u: V) -> None: ...
+    def __init__(self: "D[str, U]", u: U) -> None: ...
     @overload
     def __init__(self, t: T, u: U) -> None: ...
     def __init__(self, *args) -> None: ...
 
 # revealed: ty_extensions._internal.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
-# revealed: ty_extensions._internal.GenericContext[T@D, U@D, V@__init__] | ty_extensions._internal.GenericContext[T@D, U@D]
+# revealed: ty_extensions._internal.GenericContext[T@D, U@D]
 reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(D("string"))  # revealed: D[str, Literal["string"]]

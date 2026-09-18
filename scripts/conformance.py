@@ -523,6 +523,7 @@ def collect_ty_diagnostics(
             "--ignore=assert-type-unspellable-subtype",
             "--error=ambiguous-protocol-member",
             "--error=invalid-enum-member-annotation",
+            "--error=invalid-init-type-variable",
             "--error=invalid-legacy-positional-parameter",
             "--error=mismatched-type-name",
             "--error=invalid-named-tuple-override",

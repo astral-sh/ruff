@@ -13,8 +13,8 @@ use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
 use crate::types::definition_resolution::{ImportAliasResolution, resolve_definition};
 use crate::types::diagnostic::{
-    self, EXPERIMENTAL_SYNTAX, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE,
-    UNSUPPORTED_OPERATOR, report_invalid_argument_number_to_special_form,
+    self, EXPERIMENTAL_SYNTAX, INVALID_INIT_TYPE_VARIABLE, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE,
+    UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
     report_missing_type_arguments, report_unsupported_binary_operation,
 };
@@ -3379,14 +3379,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .contains(InferenceFlags::IN_INIT_RECEIVER_ANNOTATION)
             && let Some(owner) = typevar.binding_context(db).definition()
             && matches!(owner.kind(db), DefinitionKind::Class(_))
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_INIT_TYPE_VARIABLE, expression)
         {
-            self.report_invalid_type_expression(
-                expression,
-                format_args!(
-                    "`__init__` receiver cannot use class-scoped type variable `{}`",
-                    typevar.name(db)
-                ),
-            );
+            builder.into_diagnostic(format_args!(
+                "`__init__` receiver cannot use class-scoped type variable `{}`",
+                typevar.name(db)
+            ));
         }
 
         // Legacy aliases introduce independent type parameters. PEP 695 aliases can instead
