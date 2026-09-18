@@ -479,6 +479,21 @@ class Factory:
 reveal_type(C())  # revealed: C
 ```
 
+### An instance cycle inside a constructor
+
+An instance whose `__call__` only refers back to itself cannot serve as `__new__`. This cycle does
+not return to a constructor, so it provides no callable signature.
+
+```py
+class Loop:
+    __call__: "Loop"
+
+class C:
+    __new__: Loop
+
+C()  # error: [call-non-callable]
+```
+
 ### A metaclass bypassing a recursive `__new__`
 
 A metaclass `__call__` that returns an unrelated type bypasses `__new__`. A recursive signature in

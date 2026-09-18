@@ -58,6 +58,89 @@ a = NonCallable()
 reveal_type(a())  # revealed: Unknown
 ```
 
+## Recursive `__call__`
+
+An annotation that refers back to the same instance never reaches a callable signature. Calling the
+instance reports an error instead of repeatedly expanding `__call__`.
+
+```py
+class C:
+    __call__: "C"
+
+C()()  # error: [call-non-callable] "Object of type `C` is not callable"
+```
+
+## Mutually recursive `__call__`
+
+Following `__call__` through several classes can also return to the original instance type without
+finding a signature.
+
+```py
+class A:
+    __call__: "B"
+
+class B:
+    __call__: A
+
+A()()  # error: [call-non-callable] "Object of type `A` is not callable"
+B()()  # error: [call-non-callable] "Object of type `B` is not callable"
+```
+
+## Recursive `__call__` in a union
+
+A callable alternative in a union still contributes its return type, but does not make the recursive
+alternative callable.
+
+```py
+from typing import Callable
+
+class C:
+    __call__: "C | Callable[[], int]"
+
+# error: [call-non-callable]
+reveal_type(C()())  # revealed: Unknown | int
+```
+
+## Recursive `__call__` compatibility
+
+Checking compatibility with `Callable` also follows `__call__`, even without a call expression. A
+recursive annotation provides no callable signature, including when it belongs to a protocol.
+
+```py
+from typing import Callable, Protocol
+
+class C:
+    __call__: "C"
+
+class P(Protocol):
+    __call__: "P"
+
+def check(c: C, p: P):
+    f: Callable[[], int] = c  # error: [invalid-assignment]
+    g: Callable[[], int] = p  # error: [invalid-assignment]
+    p()  # error: [call-non-callable]
+```
+
+## Recursive `__call__` through an enum intersection
+
+Excluding one enum member does not break a recursive `__call__` annotation: the remaining members
+still have the enum's instance type when looking up their call signature.
+
+```py
+from enum import Enum
+from typing import Callable, Literal
+from ty_extensions import Intersection, Not
+
+class C(Enum):
+    A = 1
+    B = 2
+    __call__: "Intersection[C, Not[Literal[C.A]]]"
+
+def check(c: C):
+    callback: Callable[[], int] = c  # error: [invalid-assignment]
+    c()  # error: [call-non-callable]
+```
+
 ## Possibly non-callable `__call__`
 
 ```py

@@ -1161,3 +1161,35 @@ callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
+
+## Recursive callable instances
+
+A `__call__` annotation that refers to the same specialization does not provide a callable
+signature.
+
+```py
+from typing import Callable
+
+class Loop[T]:
+    __call__: "Loop[T]"
+
+def check(loop: Loop[int]):
+    loop()  # error: [call-non-callable]
+    callback: Callable[[], int] = loop  # error: [invalid-assignment]
+```
+
+## Finite chains of callable instances
+
+Revisiting a generic class with a different specialization can reach a callable signature. Each
+specialization needs to be expanded before deciding whether the instance is callable.
+
+```py
+from typing import Callable
+
+class Wrapper[T]:
+    __call__: T
+
+def check(wrapper: Wrapper[Wrapper[Callable[[], int]]]):
+    reveal_type(wrapper())  # revealed: int
+    callback: Callable[[], int] = wrapper
+```
