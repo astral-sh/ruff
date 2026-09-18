@@ -94,8 +94,8 @@ variable `r`.
 Enclosing it in its binder (`μr.`) makes it **closed**: now there are no free recursive variables,
 all are bound.
 
-An open type is not semantically meaningful; a closed one is. So a key invariant of this
-implementation is that **semantic type operations can only ever see closed types**.
+An open type cannot be interpreted as a standalone type. A key invariant of this implementation is
+that **semantic type operations can only ever see closed types**.
 
 Let's look at the Rust-level implementation. We have two new `Type` variants, `Type::Recursive`
 and `Type::RecursiveVar`.
@@ -199,8 +199,9 @@ would repeat the same call forever. Instead, `|| Ok(value_ty)` returns the origi
 the provisional subscript result. It just preserves the recursive reference while inference is still
 resolving the cycle.
 
-In general, we ensure the invariant that semantic operations never encounter open types by having
-`RecursiveType` match arms always use unfolding operations like `RecursiveType::map_or_else`.
+Semantic operations that need the recursive body's structure unfold it first, exposing a closed type
+instead of the stored open body. This maintains the key invariant. (Some operations that only
+inspect metadata, such as the alias's name, don't need to unfold.)
 
 Callers can also request the unfolded type directly:
 
@@ -321,8 +322,8 @@ lists, so `[int]` means `T := int`):
 
 The stored body of a `RecursiveType` is kept unspecialized! So for `Tree[int]`, the body is still
 just `T | tuple[F[list[T]]]` (where `F[list[T]]` represents a `RecursiveVar` with
-`arguments: list[T]`). The fact that we've specialized it to `int` is stored only in the `arguments` of the
-outer `RecursiveType`. This avoids an infinitely-growing eager expansion.
+`arguments: [list[T]]`). The fact that we've specialized it to `int` is stored only in the
+`arguments` of the outer `RecursiveType`. This avoids an infinitely-growing eager expansion.
 
 We don't actually apply the specialization until we unfold:
 
