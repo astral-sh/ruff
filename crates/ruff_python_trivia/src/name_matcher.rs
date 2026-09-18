@@ -19,6 +19,8 @@ pub struct NameMatcher<'a> {
 
 impl<'a> NameMatcher<'a> {
     /// Creates an identifier matcher that borrows `name` without allocating.
+    ///
+    /// The identifier `name` is expected to be NFKC-normalized.
     pub fn new(name: &'a str) -> Self {
         Self {
             finder: Finder::new(name),
