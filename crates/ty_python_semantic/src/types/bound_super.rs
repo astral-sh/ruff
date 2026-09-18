@@ -651,16 +651,12 @@ impl<'db> BoundSuperType<'db> {
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
             Type::Divergent(divergent) => SuperOwnerKind::Divergent(divergent),
             Type::Recursive(recursive) => {
-                return recursive.map_or_else(
-                    db,
-                    env,
-                    || {
-                        Err(BoundSuperError::AbstractOwnerType {
-                            owner_type,
-                            pivot_class: pivot_class_type,
-                            typevar_context: None,
-                        })
-                    },
+                return recursive.unfold(db, env).map_or(
+                    Err(BoundSuperError::AbstractOwnerType {
+                        owner_type,
+                        pivot_class: pivot_class_type,
+                        typevar_context: None,
+                    }),
                     delegate_to,
                 );
             }

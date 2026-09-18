@@ -574,7 +574,7 @@ impl<'db> TypeVarInstance<'db> {
                     }
                     type_is_self_referential_impl(
                         state,
-                        recursive.unfold(db, state.env),
+                        recursive.unfold(db, state.env).into_type(),
                         self_identity,
                     )
                 }

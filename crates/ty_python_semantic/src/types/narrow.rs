@@ -549,7 +549,7 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
             }
             Type::TypeAlias(alias) => self.generate(db, alias.value_type(db)),
             Type::Recursive(recursive) => {
-                recursive.map_or_else(db, env, || None, |unfolded| self.generate(db, unfolded))
+                self.generate(db, recursive.unfold(db, env).into_unfolded()?)
             }
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
@@ -5279,11 +5279,9 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
             .iter()
             .any(|union_member_ty| is_or_contains_typeddict(db, *union_member_ty)),
         Type::TypeAlias(alias) => is_or_contains_typeddict(db, alias.value_type(db)),
-        Type::Recursive(recursive) => {
-            recursive.map_or(db, &recursive.environment(db), false, |unfolded| {
-                is_or_contains_typeddict(db, unfolded)
-            })
-        }
+        Type::Recursive(recursive) => recursive
+            .unfold(db, &recursive.environment(db))
+            .is_unfolded_and(|unfolded| is_or_contains_typeddict(db, unfolded)),
 
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -5428,14 +5426,10 @@ fn visit_matching_typeddict_field_types<'db>(
             );
         }
         Type::Recursive(recursive) => {
-            return recursive.map_or_else(
-                db,
-                env,
-                || (),
-                |unfolded| {
-                    visit_matching_typeddict_field_types(db, env, unfolded, field_name, visit);
-                },
-            );
+            if let Some(unfolded) = recursive.unfold(db, env).into_unfolded() {
+                visit_matching_typeddict_field_types(db, env, unfolded, field_name, visit);
+            }
+            return;
         }
         Type::Union(union) => Either::Left(union.elements(db).iter()),
         Type::Intersection(intersection) => Either::Right(intersection.positive(db).iter()),

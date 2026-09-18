@@ -258,12 +258,11 @@ impl<'db> Type<'db> {
             | Type::TypeGuard(_)
             | Type::TypeForm(_) => Truthiness::Ambiguous,
 
-            Type::Recursive(recursive) => recursive.map_or_else(
-                db,
-                env,
-                || Ok(Truthiness::Ambiguous),
-                |unfolded| unfolded.try_bool_impl(db, env, allow_short_circuit, visitor),
-            )?,
+            Type::Recursive(recursive) => recursive
+                .unfold(db, env)
+                .map_or(Ok(Truthiness::Ambiguous), |unfolded| {
+                    unfolded.try_bool_impl(db, env, allow_short_circuit, visitor)
+                })?,
 
             Type::TypedDict(td) => {
                 if td.items(db).values().any(TypedDictField::is_required) {

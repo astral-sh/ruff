@@ -10143,7 +10143,7 @@ impl<'db> ClassInfoValidator<'_, 'db> {
             Type::SpecialForm(special) if special.is_valid_isinstance_target() => true,
             Type::Union(union) => union.elements(db).iter().copied().all(validate),
             Type::TypeAlias(alias) => validate(alias.value_type(db)),
-            Type::Recursive(recursive) => recursive.map_or(db, self.env, false, validate),
+            Type::Recursive(recursive) => recursive.unfold(db, self.env).is_unfolded_and(validate),
             _ => {
                 if let Some(tuple) = ty.tuple_instance_spec(db, self.env) {
                     tuple.iter_element_types(db).all(validate)

@@ -1783,15 +1783,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         self.never()
                     };
                     by_arguments.or(db, self.constraints, || {
-                        source_recursive.map_or_else(
-                            db,
-                            self.env,
-                            || {
-                                ConstraintSet::from_bool(
-                                    self.constraints,
-                                    self.relation.is_assignability(),
-                                )
-                            },
+                        source_recursive.unfold(db, self.env).map_or(
+                            ConstraintSet::from_bool(
+                                self.constraints,
+                                self.relation.is_assignability(),
+                            ),
                             |source_unfolded| self.check_type_pair(db, source_unfolded, target),
                         )
                     })
@@ -1800,15 +1796,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::Recursive(target_recursive)) => {
                 self.with_recursion_guard(db, source, target, || {
-                    target_recursive.map_or_else(
-                        db,
-                        self.env,
-                        || {
-                            ConstraintSet::from_bool(
-                                self.constraints,
-                                self.relation.is_assignability(),
-                            )
-                        },
+                    target_recursive.unfold(db, self.env).map_or(
+                        ConstraintSet::from_bool(
+                            self.constraints,
+                            self.relation.is_assignability(),
+                        ),
                         |target_unfolded| self.check_type_pair(db, source, target_unfolded),
                     )
                 })
@@ -3346,27 +3338,25 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
 
-            (Type::Recursive(left_recursive), _) => left_recursive.map_or_else(
-                db,
-                env,
-                || self.never(),
-                |left_unfolded| {
-                    self.with_recursion_guard(db, left, right, || {
-                        self.check_type_pair(db, left_unfolded, right)
+            (Type::Recursive(left_recursive), _) => {
+                left_recursive
+                    .unfold(db, env)
+                    .map_or(self.never(), |left_unfolded| {
+                        self.with_recursion_guard(db, left, right, || {
+                            self.check_type_pair(db, left_unfolded, right)
+                        })
                     })
-                },
-            ),
+            }
 
-            (_, Type::Recursive(right_recursive)) => right_recursive.map_or_else(
-                db,
-                env,
-                || self.never(),
-                |right_unfolded| {
-                    self.with_recursion_guard(db, left, right, || {
-                        self.check_type_pair(db, left, right_unfolded)
+            (_, Type::Recursive(right_recursive)) => {
+                right_recursive
+                    .unfold(db, env)
+                    .map_or(self.never(), |right_unfolded| {
+                        self.with_recursion_guard(db, left, right, || {
+                            self.check_type_pair(db, left, right_unfolded)
+                        })
                     })
-                },
-            ),
+            }
 
             (Type::TypeAlias(alias), _) => nontrivial_check(self, || {
                 let left_alias_ty = alias.value_type(db);

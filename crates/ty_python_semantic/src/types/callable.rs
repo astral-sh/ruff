@@ -186,15 +186,10 @@ impl<'db> Type<'db> {
                 Signature::dynamic(self),
             ))),
 
-            Type::Recursive(recursive) => recursive.map_or_else(
-                db,
-                env,
-                || None,
-                |unfolded| {
-                    unfolded
-                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)
-                },
-            ),
+            Type::Recursive(recursive) => recursive
+                .unfold(db, env)
+                .into_unfolded()?
+                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context),
 
             Type::FunctionLiteral(function_literal)
                 if context.is_recursive_reference(db, function_literal) =>

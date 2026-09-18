@@ -810,7 +810,7 @@ impl<'db> GenericContext<'db> {
                 self.active_aliases.visit(
                     &Type::Recursive(recursive).to_type_identity(db),
                     || (),
-                    || self.visit_type(db, recursive.unfold(db, self.env)),
+                    || self.visit_type(db, recursive.unfold(db, self.env).into_type()),
                 );
             }
 
@@ -4023,7 +4023,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
             (Type::Recursive(recursive), _) => {
                 return self.infer_map_impl(
-                    recursive.unfold(db, self.env),
+                    recursive.unfold(db, self.env).into_type(),
                     actual,
                     polarity,
                     visitor,
@@ -4736,7 +4736,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (formal, Type::Recursive(recursive)) => {
                 return self.infer_map_impl(
                     formal,
-                    recursive.unfold(db, self.env),
+                    recursive.unfold(db, self.env).into_type(),
                     polarity,
                     visitor,
                 );

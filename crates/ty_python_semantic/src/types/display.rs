@@ -981,7 +981,7 @@ impl<'db> Type<'db> {
                     definition,
                     name,
                     constructor.parameters(db),
-                    constructor.unfold(db, env),
+                    constructor.unfold(db, env).into_type(),
                 )
             }
             _ => return None,

@@ -164,7 +164,7 @@ mod overrides;
 mod protocol_class;
 mod recursive;
 pub(crate) use recursive::RecursiveMapping;
-pub use recursive::{RecursiveType, RecursiveVar};
+pub use recursive::{RecursiveType, RecursiveVar, UnfoldResult};
 pub(crate) mod relation;
 mod relation_error;
 mod set_theoretic;
@@ -2788,7 +2788,7 @@ impl<'db> Type<'db> {
                 }
                 Type::Recursive(recursive) => {
                     seen.push(ty);
-                    ty = recursive.unfold(db, &recursive.environment(db));
+                    ty = recursive.unfold(db, &recursive.environment(db)).into_type();
                 }
                 Type::RecursiveVar(_) => {
                     unreachable!("semantic operation on an unbound recursive variable")
@@ -3123,9 +3123,7 @@ impl<'db> Type<'db> {
                 .negated_divergent()
                 .expect("matched `Type::Divergent` above"),
 
-            Type::Recursive(recursive) => recursive.map_or_else(
-                db,
-                env,
+            Type::Recursive(recursive) => recursive.unfold(db, env).map_or_else(
                 || {
                     Type::Intersection(IntersectionType::new(
                         db,
@@ -3684,14 +3682,11 @@ impl<'db> Type<'db> {
                     Type::TypeAlias(alias) => alias
                         .value_type(db)
                         .visit_specialization_impl(db, env, polarity, f, visitor),
-                    Type::Recursive(recursive) => recursive.map_or_else(
-                        db,
-                        env,
-                        || (),
-                        |unfolded| {
+                    Type::Recursive(recursive) => {
+                        if let Some(unfolded) = recursive.unfold(db, env).into_unfolded() {
                             unfolded.visit_specialization_impl(db, env, polarity, f, visitor);
-                        },
-                    ),
+                        }
+                    }
                     Type::Callable(callable) => {
                         for signature in callable.signatures(db) {
                             for parameter in signature.parameters() {
@@ -3735,9 +3730,9 @@ impl<'db> Type<'db> {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
-            Type::Recursive(recursive) => {
-                recursive.map_or_else(db, env, || false, |unfolded| unfolded.is_singleton(db, env))
-            }
+            Type::Recursive(recursive) => recursive
+                .unfold(db, env)
+                .is_unfolded_and(|unfolded| unfolded.is_singleton(db, env)),
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(..)
@@ -3898,12 +3893,11 @@ impl<'db> Type<'db> {
                 Some(Place::Undefined.into())
             }
 
-            Type::Recursive(recursive) => recursive.map_or_else(
-                db,
-                env,
-                || Some(Place::bound(self).into()),
-                |unfolded| unfolded.find_name_in_mro_with_policy(db, env, name, policy),
-            ),
+            Type::Recursive(recursive) => recursive
+                .unfold(db, env)
+                .map_or(Some(Place::bound(self).into()), |unfolded| {
+                    unfolded.find_name_in_mro_with_policy(db, env, name, policy)
+                }),
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
 
@@ -4499,12 +4493,11 @@ impl<'db> Type<'db> {
                 enums::instance_member_for_enum_complement(db, env, *complement, name)
             }
 
-            Type::Recursive(recursive) => recursive.map_or_else(
-                db,
-                env,
-                || Place::bound(self).into(),
-                |unfolded| unfolded.instance_member(db, env, name),
-            ),
+            Type::Recursive(recursive) => recursive
+                .unfold(db, env)
+                .map_or(Place::bound(self).into(), |unfolded| {
+                    unfolded.instance_member(db, env, name)
+                }),
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
 
@@ -5159,7 +5152,7 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => alias
                 .value_type(db)
                 .is_definitely_non_data_descriptor_impl(db, program),
-            Type::Recursive(recursive) => recursive.map_or(db, env, true, |unfolded| {
+            Type::Recursive(recursive) => recursive.unfold(db, env).map_or(true, |unfolded| {
                 unfolded.is_definitely_non_data_descriptor_impl(db, program)
             }),
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
@@ -5204,9 +5197,11 @@ impl<'db> Type<'db> {
                     .value_type(db)
                     .is_data_descriptor_impl(db, program, any_of_union)
             }
-            Type::Recursive(recursive) => recursive.map_or(db, env, !any_of_union, |unfolded| {
-                unfolded.is_data_descriptor_impl(db, program, any_of_union)
-            }),
+            Type::Recursive(recursive) => {
+                recursive.unfold(db, env).map_or(!any_of_union, |unfolded| {
+                    unfolded.is_data_descriptor_impl(db, program, any_of_union)
+                })
+            }
             _ => {
                 !self
                     .class_member_with_policy(
@@ -5693,10 +5688,8 @@ impl<'db> Type<'db> {
             }
 
             match this {
-                Type::Recursive(recursive) => recursive.map_or_else(
-                    db,
-                    env,
-                    || Place::bound(Type::unknown()).into(),
+                Type::Recursive(recursive) => recursive.unfold(db, env).map_or(
+                    Place::bound(Type::unknown()).into(),
                     |unfolded| {
                         unfolded.member_lookup_with_policy_and_receiver(
                             db, env, name_str, policy, receiver,
@@ -6541,9 +6534,7 @@ impl<'db> Type<'db> {
         }
 
         match self {
-            Type::Recursive(recursive) => recursive.map_or_else(
-                db,
-                env,
+            Type::Recursive(recursive) => recursive.unfold(db, env).map_or_else(
                 || CallableBinding::not_callable(self).into(),
                 |unfolded| unfolded.bindings_impl(db, env, recursion_guard),
             ),
@@ -8172,9 +8163,10 @@ impl<'db> Type<'db> {
                 }),
             Type::TypeAlias(alias) => alias.value_type(db).generator_types(db, env, mode),
             // A provisional recursive body may unfold to itself without exposing a generator.
-            Type::Recursive(recursive) => recursive.map_or(db, env, None, |unfolded| {
-                unfolded.generator_types(db, env, mode)
-            }),
+            Type::Recursive(recursive) => recursive
+                .unfold(db, env)
+                .into_unfolded()?
+                .generator_types(db, env, mode),
             Type::Union(union) => {
                 let mut yield_builder = Some(UnionBuilder::new(db, env));
                 let mut send_builder = Some(UnionBuilder::new(db, env));
@@ -8336,11 +8328,11 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Option<InstanceProjection<Type<'db>>> {
         match self {
-            Type::Recursive(recursive) => {
-                recursive.map_or(db, env, Some(InstanceProjection::Exact(self)), |unfolded| {
+            Type::Recursive(recursive) => recursive
+                .unfold(db, env)
+                .map_or(Some(InstanceProjection::Exact(self)), |unfolded| {
                     unfolded.to_instance(db, env)
-                })
-            }
+                }),
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
@@ -8430,7 +8422,7 @@ impl<'db> Type<'db> {
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         let env = &ProgramEnvironment::from_scope(scope_id);
         match self {
-            Type::Recursive(recursive) => recursive.map_or(db, env, Ok(*self), |unfolded| {
+            Type::Recursive(recursive) => recursive.unfold(db, env).map_or(Ok(*self), |unfolded| {
                 unfolded.in_type_expression_impl(
                     db,
                     scope_id,
@@ -8716,9 +8708,9 @@ impl<'db> Type<'db> {
             visitor: &ActiveRecursionDetector<TypeAliasType<'db>>,
         ) -> Type<'db> {
             match ty {
-                Type::Recursive(recursive) => recursive.map_type(db, env, |unfolded| {
-                    to_meta_type_inner(db, env, unfolded, context, visitor)
-                }),
+                Type::Recursive(recursive) => recursive
+                    .unfold(db, env)
+                    .map(|unfolded| to_meta_type_inner(db, env, unfolded, context, visitor)),
                 Type::RecursiveVar(_) => {
                     unreachable!("semantic operation on an unbound recursive variable")
                 }
@@ -9597,20 +9589,9 @@ impl<'db> Type<'db> {
                         visitor,
                     );
                 }
-                recursive.map_or_else(
-                    db,
-                    env,
-                    || (),
-                    |unfolded| {
-                        unfolded.find_legacy_typevars_impl(
-                            db,
-                            env,
-                            binding_context,
-                            typevars,
-                            visitor,
-                        );
-                    },
-                );
+                if let Some(unfolded) = recursive.unfold(db, env).into_unfolded() {
+                    unfolded.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
+                }
             }),
 
             Type::FunctionLiteral(function) => {
@@ -10068,9 +10049,10 @@ impl<'db> Type<'db> {
             },
 
             Self::TypeAlias(alias) => alias.value_type(db).definition(db, env),
-            Self::Recursive(recursive) => {
-                recursive.map_or_else(db, env, || None, |unfolded| unfolded.definition(db, env))
-            }
+            Self::Recursive(recursive) => recursive
+                .unfold(db, env)
+                .into_unfolded()?
+                .definition(db, env),
             Self::NewTypeInstance(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
 
             Self::PropertyInstance(property) => property
