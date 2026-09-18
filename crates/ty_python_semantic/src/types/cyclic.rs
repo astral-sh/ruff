@@ -32,7 +32,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
-use crate::place::Place;
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::known_instance::MethodWrapperKind;
@@ -61,6 +60,17 @@ pub enum TypeIdentity<'db> {
 impl<'db> Type<'db> {
     /// Uses definition identity only when expanding `__call__` can grow the specialization.
     /// Finite chains such as `Wrapper[Wrapper[Callable[[], int]]]` retain exact identities.
+    ///
+    /// ```python
+    /// class Growing[T]:
+    ///     __call__: "Growing[list[T]]"
+    ///
+    /// class Wrapper[T]:
+    ///     __call__: T
+    /// ```
+    ///
+    /// The specializations of `Growing` share an identity so expansion terminates. Distinct
+    /// specializations of `Wrapper` can lead to different signatures and must remain separate.
     pub(super) fn callable_recursion_identity(
         self,
         db: &'db dyn Db,
@@ -272,6 +282,8 @@ struct SourceParameterCollector<'a, 'db> {
 }
 
 impl<'db> RecursiveDefinition<'db> {
+    /// Identifies a definition followed during callable expansion, retaining its specialization
+    /// for parameter-flow edges. Protocols contribute only `__call__`, not their full interface.
     fn from_callable_type(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -419,35 +431,38 @@ impl<'db> RecursiveDefinition<'db> {
         may_have_unbounded_specialization_inner(db, self, ())
     }
 
-    fn walk_callable_body(self, db: &'db dyn Db, visitor: &impl TypeVisitor<'db>) {
+    /// Returns the type to expand with each formal parameter mapped to itself. Classes contribute
+    /// their `__call__` attribute; aliases and structural recursive types contribute their bodies.
+    /// Missing `__call__` attributes and definitions used only for structural checks return `None`.
+    fn callable_body(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Type<'db>> {
         match self {
-            Self::Callable(origin) => {
-                let env = visitor.program_environment();
-                if let Some(instance) = Type::from(origin.identity_specialization(db))
-                    .to_instance_approximation(db, env)
-                    && let Place::Defined(place) = instance
-                        .member_lookup_with_policy(
-                            db,
-                            env,
-                            "__call__",
-                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                        )
-                        .place
-                {
-                    visitor.visit_type(db, place.ty);
-                }
-            }
-            Self::TypeAlias(alias) => visitor.visit_type(db, alias.raw_value_type(db)),
-            Self::Structural(recursive) => {
-                visitor.visit_type(db, recursive.unfold(db, visitor.program_environment()));
-            }
-            Self::Protocol(_) | Self::TypedDict(_) => {}
+            Self::Callable(origin) => Type::from(origin.identity_specialization(db))
+                .to_instance_approximation(db, env)?
+                .member_lookup_with_policy(
+                    db,
+                    env,
+                    "__call__",
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+                .ignore_possibly_undefined(),
+            Self::TypeAlias(alias) => Some(alias.raw_value_type(db)),
+            Self::Structural(recursive) => Some(recursive.unfold(db, env)),
+            Self::Protocol(_) | Self::TypedDict(_) => None,
         }
     }
 
-    /// Parameters that can themselves become the next callable in an expansion.
-    /// For `class Wrapper[T]: __call__: T`, this is `T`. Parameters used only in a
-    /// signature or in an ignored type argument do not expose their own `__call__`.
+    /// Returns, in declaration order, parameters that can become the next callable in an expansion.
+    /// Parameters used only in a signature or in an ignored type argument are excluded.
+    ///
+    /// ```python
+    /// class First[T, U]:
+    ///     __call__: T
+    /// ```
+    ///
+    /// Only `T` is exposed, so expanding `First[Callback, Recursive]` follows `Callback` alone.
+    /// Cyclic definitions start with no exposed parameters and accumulate those reached along
+    /// finite paths through their bodies.
     fn callable_parameters(self, db: &'db dyn Db) -> &'db [BoundTypeVarIdentity<'db>] {
         #[salsa::tracked(
             returns(deref),
@@ -463,7 +478,9 @@ impl<'db> RecursiveDefinition<'db> {
                 env: ProgramEnvironment::from_definition(source.definition(db)),
                 found: RefCell::default(),
             };
-            source.walk_callable_body(db, &visitor);
+            if let Some(body) = source.callable_body(db, &visitor.env) {
+                visitor.visit_type(db, body);
+            }
             let found = visitor.found.into_inner();
             source
                 .parameters(db)
@@ -475,6 +492,8 @@ impl<'db> RecursiveDefinition<'db> {
 }
 
 impl<'db> DefinitionUse<'db> {
+    /// Visits actual arguments whose formal parameters can be exposed by callable expansion.
+    /// See [`RecursiveDefinition::callable_parameters`] for why other arguments are skipped.
     fn walk_callable_arguments(self, db: &'db dyn Db, visitor: &impl TypeVisitor<'db>) {
         if let Some(specialization) = self.specialization {
             let exposed = self.target.callable_parameters(db);
@@ -711,17 +730,13 @@ impl<'db> SpecializationFlowVisitor<'db> {
 
     /// Visits the definition with each formal parameter mapped to itself.
     fn visit_definition_body(&self, db: &'db dyn Db, source: RecursiveDefinition<'db>) -> bool {
-        if self.callable {
-            source.walk_callable_body(db, self);
-            return true;
-        }
         match source {
-            RecursiveDefinition::Callable(_) => source.walk_callable_body(db, self),
-            RecursiveDefinition::Structural(recursive) => {
-                self.visit_type(db, recursive.unfold(db, &self.env));
-            }
-            RecursiveDefinition::TypeAlias(alias) => {
-                self.visit_type(db, alias.raw_value_type(db));
+            RecursiveDefinition::Callable(_)
+            | RecursiveDefinition::TypeAlias(_)
+            | RecursiveDefinition::Structural(_) => {
+                if let Some(body) = source.callable_body(db, &self.env) {
+                    self.visit_type(db, body);
+                }
             }
             RecursiveDefinition::Protocol(origin) => {
                 let Some(protocol) = origin.identity_specialization(db).into_protocol_class(db)
@@ -809,7 +824,7 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
                 self.record_reference(db, reference);
                 reference.walk_callable_arguments(db, self);
             } else {
-                walk_callable_type(db, ty, self);
+                walk_callable_expansion(db, ty, self);
             }
             return;
         }
@@ -853,20 +868,17 @@ impl<'db> TypeVisitor<'db> for CallableParameterCollector<'db> {
         } else if let Some(reference) = RecursiveDefinition::from_callable_type(db, &self.env, ty) {
             reference.walk_callable_arguments(db, self);
         } else {
-            walk_callable_type(db, ty, self);
+            walk_callable_expansion(db, ty, self);
         }
     }
 }
 
 /// Walks the types that callable expansion follows, stopping at signatures and constructors.
 /// In particular, a callable's parameter and return types do not affect its own callability.
-fn walk_callable_type<'db>(db: &'db dyn Db, ty: Type<'db>, visitor: &impl TypeVisitor<'db>) {
+/// The visitor handles definition references and type variables before calling this helper.
+fn walk_callable_expansion<'db>(db: &'db dyn Db, ty: Type<'db>, visitor: &impl TypeVisitor<'db>) {
     match ty {
-        Type::Union(union) => {
-            for element in union.elements(db) {
-                visitor.visit_type(db, *element);
-            }
-        }
+        Type::Union(union) => visitor.visit_union_type(db, union),
         Type::Intersection(intersection) => {
             for element in intersection.positive(db) {
                 visitor.visit_type(db, *element);

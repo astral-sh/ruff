@@ -435,6 +435,8 @@ struct BindingsRecursionContext<'a, 'db> {
 }
 
 impl<'a, 'db> BindingsRecursionContext<'a, 'db> {
+    /// Starts a fresh instance expansion while retaining the active constructor path, so a cycle
+    /// crossing a constructor uses the constructor fallback instead of rejecting the instance.
     fn new(constructors: &'a ActiveRecursionDetector<Type<'db>>) -> Self {
         Self {
             constructors,

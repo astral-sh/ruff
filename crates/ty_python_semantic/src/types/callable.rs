@@ -213,24 +213,19 @@ impl<'db> Type<'db> {
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
-            Type::BoundMethod(bound_method) => {
-                if let Some(callable) = bound_method.into_callable_type(db) {
-                    Some(CallableTypes::one(callable))
-                } else {
-                    bound_method
-                        .func(db)
-                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)
-                        .map(|callables| {
-                            callables.map(|callable| {
-                                callable.bind_self(
-                                    db,
-                                    env,
-                                    Some(bound_method.signature_receiver(db)),
-                                )
-                            })
-                        })
-                }
+            Type::BoundMethod(bound_method)
+                if let Some(callable) = bound_method.into_callable_type(db) =>
+            {
+                Some(CallableTypes::one(callable))
             }
+            Type::BoundMethod(bound_method) => bound_method
+                .func(db)
+                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)
+                .map(|callables| {
+                    callables.map(|callable| {
+                        callable.bind_self(db, env, Some(bound_method.signature_receiver(db)))
+                    })
+                }),
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self

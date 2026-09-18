@@ -228,20 +228,12 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    pub(crate) fn callables(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<CallableTypes<'db>> {
-        Type::BoundMethod(self).try_upcast_to_callable(db, env)
-    }
-
     /// Converts an actual or synthesized function into a callable with its receiver bound
     /// and `typing.Self` substituted.
     ///
     /// Returns `None` for other wrapped types, which require resolving their call interface
     /// and may have multiple callable alternatives that a single [`CallableType`] cannot
-    /// represent. Use [`Self::callables`] to handle those types.
+    /// represent. Use [`Type::try_upcast_to_callable`] to handle those types.
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|db, _, _| Some(CallableType::bottom(db)),
@@ -393,8 +385,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             })
             .and(db, self.constraints, || {
                 let (Some(source), Some(target)) = (
-                    source.callables(db, self.env),
-                    target.callables(db, self.env),
+                    Type::BoundMethod(source).try_upcast_to_callable(db, self.env),
+                    Type::BoundMethod(target).try_upcast_to_callable(db, self.env),
                 ) else {
                     return self.never();
                 };
