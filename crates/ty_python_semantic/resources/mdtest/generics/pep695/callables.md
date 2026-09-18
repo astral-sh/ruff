@@ -736,14 +736,31 @@ A declared type-variable bound also participates when selecting a type that sati
 union upper bound.
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
 def infer_str[T: str](consumer: Callable[[T], None]) -> T:
     raise NotImplementedError
 
 def consume_int_or_str(value: int | str) -> None: ...
 
-reveal_type(infer_str(consume_int_or_str))  # revealed: str
+# revealed: str
+reveal_type(infer_str(consume_int_or_str))
+```
+
+A gradual declared bound restricts which specializations are valid without becoming part of a
+concrete specialization that already satisfies it:
+
+```py
+class GenericBase[T]: ...
+class Child(GenericBase[int]): ...
+
+def infer_child[T: GenericBase[Any]](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume_child(value: Child) -> None: ...
+
+# revealed: Child
+reveal_type(infer_child(consume_child))
 ```
 
 ## Gradual class parameters

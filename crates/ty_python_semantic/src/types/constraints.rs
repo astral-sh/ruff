@@ -1391,12 +1391,11 @@ impl<'db> ConstraintSetStorage<'db> {
         env: &ProgramEnvironment<'db>,
         data: Constraint<'db>,
     ) -> ConstraintId {
-        let support = self.intern_constraint_typevars(db, env, data);
-
         self.ensure_overlay_identity_caches();
         if let Some(id) = self.constraint_cache.get(&data) {
             return *id;
         }
+        let support = self.intern_constraint_typevars(db, env, data);
         let support_id = self.intern_support(support);
         let id = self.constraints.push(data);
         self.constraint_supports.push(support_id);
@@ -2842,6 +2841,19 @@ impl NodeId {
         searcher.clauses
     }
 
+    fn path_assignments<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        source_order: Option<SourceOrderId>,
+    ) -> PathAssignments {
+        match self.node() {
+            Node::AlwaysFalse | Node::AlwaysTrue => PathAssignments::default(),
+            Node::Interior(interior) => interior.path_assignments(db, env, storage, source_order),
+        }
+    }
+
     fn display<'db, 'a>(
         self,
         db: &'db dyn Db,
@@ -3105,8 +3117,6 @@ pub(crate) enum PathBoundSolution<'db> {
     Unsolved,
     /// The path's lower and upper bounds cannot be satisfied together
     Unsatisfiable,
-    /// The path does not satisfy the typevar's declared upper bound
-    ViolatesDeclaredUpperBound,
     /// The path does not satisfy the typevar's declared constraints
     ViolatesDeclaredConstraints,
     /// Computing the solution exceeded the type-construction budget. A previously known type
@@ -3124,10 +3134,7 @@ impl<'db> PathBoundSolution<'db> {
             Self::BudgetExceeded { fallback } => Self::BudgetExceeded {
                 fallback: fallback.map(f),
             },
-            Self::Unsolved
-            | Self::Unsatisfiable
-            | Self::ViolatesDeclaredUpperBound
-            | Self::ViolatesDeclaredConstraints => self,
+            Self::Unsolved | Self::Unsatisfiable | Self::ViolatesDeclaredConstraints => self,
         }
     }
 
@@ -3136,10 +3143,7 @@ impl<'db> PathBoundSolution<'db> {
     pub(crate) fn as_type(self) -> Option<Type<'db>> {
         match self {
             Self::Solved(ty) => Some(ty),
-            Self::Unsolved
-            | Self::Unsatisfiable
-            | Self::ViolatesDeclaredUpperBound
-            | Self::ViolatesDeclaredConstraints => None,
+            Self::Unsolved | Self::Unsatisfiable | Self::ViolatesDeclaredConstraints => None,
             Self::BudgetExceeded { fallback } => fallback,
         }
     }
@@ -3347,6 +3351,7 @@ pub(crate) enum CandidateSolutions<'db> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct CandidateSolution<'db> {
     typevars: Box<[PathBound<'db>]>,
+    validity: SolutionValidity<'db>,
 }
 
 /// Limits shared by the preprocessing and collection walks used to extract solutions.
@@ -3472,37 +3477,38 @@ impl<'db> CandidateSolutions<'db> {
             return ControlFlow::Continue(path_bounds);
         }
 
+        let node_support = storage.node_support(node).cloned();
         let (node, derived_source_order) =
             node.remove_noninferable(db, env, storage, inferable, source_order, limits)?;
         source_orders.extend(storage.calculate_source_orders(derived_source_order));
-        let interior = match node.node() {
-            Node::AlwaysTrue => {
-                limits.visit_node()?;
-                return ControlFlow::Continue(CandidateSolutions::Unconstrained);
-            }
-            Node::AlwaysFalse => {
-                limits.visit_node()?;
-                return ControlFlow::Continue(CandidateSolutions::Unsatisfiable);
-            }
-            Node::Interior(interior) => interior,
-        };
 
         let mut walker = SolutionWalker::new(source_orders);
         // Sequent discovery must also happen in source order. Sorting the collected paths is
         // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
         let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
-        let mut path = interior.path_assignments(db, env, storage, path_source_order);
-        walker.visit_node(db, env, storage, &mut path, node, limits)?;
-        ControlFlow::Continue(walker.finish(db, env, storage))
+        let mut path = node.path_assignments(db, env, storage, path_source_order);
+        walker.visit_node(
+            db,
+            env,
+            storage,
+            limits,
+            &mut path,
+            node_support.as_ref(),
+            node,
+        )?;
+        ControlFlow::Continue(walker.finish())
     }
 
-    /// Accumulates a conjunction of concrete bound constraints without constructing a
-    /// [`PathAssignments`] or its sequent map.
+    /// Solves a constraint set when it represents a _simple conjunction_: it can be expressed as a
+    /// single conjunction of constraints, and the lower/upper bounds of those constraints do not
+    /// mention any other typevars. That lets us use a fast path that doesn't require constructing
+    /// a [`PathAssignments`] or its sequent map.
     ///
-    /// There are no relationships to derive between these constraints, as the upper and lower
-    /// bounds do not contain typevars. The normal solution-selection logic still validates each
-    /// accumulated bound against the typevar's declared bound or constraints.
+    /// We do still have to consider the declared upper bound/constraints of the typevars in the
+    /// constraint set. To be eligible for this fast path, the solution cannot mention any
+    /// _constrained_ typevars, since those introduce a disjunction. And like the constraints in
+    /// the BDD itself, the declared upper bound of each type cannot mention any other typevars.
     fn compute_simple_bound_conjunction<L: SolutionLimits>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -3512,6 +3518,9 @@ impl<'db> CandidateSolutions<'db> {
         inferable: TypeVarSet<'db>,
         limits: &mut L,
     ) -> ControlFlow<L::Break, Option<Self>> {
+        let bound_is_ineligible =
+            |ty: Type<'db>| ty.has_typevar(db, env) || ty.has_provisional_marker(db, env);
+
         let mut constraints = Vec::default();
         let mut current = node;
         loop {
@@ -3521,7 +3530,6 @@ impl<'db> CandidateSolutions<'db> {
                     if constraints.is_empty() {
                         return ControlFlow::Continue(Some(CandidateSolutions::Unconstrained));
                     }
-                    limits.satisfied_path()?;
                     break;
                 }
                 Node::AlwaysFalse => {
@@ -3543,9 +3551,7 @@ impl<'db> CandidateSolutions<'db> {
                             if !lower.typevar.is_inferable(db, inferable) {
                                 return ControlFlow::Continue(None);
                             }
-                            if lower.bound.has_typevar(db, env)
-                                || lower.bound.has_provisional_marker(db, env)
-                            {
+                            if bound_is_ineligible(lower.bound) {
                                 return ControlFlow::Continue(None);
                             }
                             constraints.push((
@@ -3560,9 +3566,7 @@ impl<'db> CandidateSolutions<'db> {
                             if !upper.typevar.is_inferable(db, inferable) {
                                 return ControlFlow::Continue(None);
                             }
-                            if upper.bound.has_typevar(db, env)
-                                || upper.bound.has_provisional_marker(db, env)
-                            {
+                            if bound_is_ineligible(upper.bound) {
                                 return ControlFlow::Continue(None);
                             }
                             constraints.push((
@@ -3577,9 +3581,7 @@ impl<'db> CandidateSolutions<'db> {
                             if !equivalence.typevar.is_inferable(db, inferable) {
                                 return ControlFlow::Continue(None);
                             }
-                            if equivalence.bound.has_typevar(db, env)
-                                || equivalence.bound.has_provisional_marker(db, env)
-                            {
+                            if bound_is_ineligible(equivalence.bound) {
                                 return ControlFlow::Continue(None);
                             }
                             constraints.push((
@@ -3624,11 +3626,62 @@ impl<'db> CandidateSolutions<'db> {
             }
         }
 
+        // Add the declared upper bounds of each typevar in this fast-path solution. This fast path
+        // only engages for _simple conjunctions_. That means we should give up if we find any
+        // _constrained_ typevars, since those introduce a disjunction into the solution.
+        //
+        // Unlike the more general `SolutionWalker`, here we only have to consider the typevars
+        // that are actually mentioned in the solution we found, rather than incorporating the
+        // validity constraints of _every_ typevar. For this fast path, we have already ensured
+        // that the solution does not depend on any cross-typevar relationships, so the validity
+        // bounds of unmentioned typevars cannot affect the solution of the typevars we have
+        // evidence for.
+        for (bound_typevar, bounds) in &mut mappings {
+            let bound = match bound_typevar.typevar(db).bound_or_constraints(db, env) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
+                // A constrained typevar introduces a disjunction over its declared constraints,
+                // which means we can't engage this fast path.
+                Some(TypeVarBoundOrConstraints::Constraints(_)) => {
+                    return ControlFlow::Continue(None);
+                }
+                // An unconstrained typevar does not add any additional constraints on its
+                // solutions, other than the evidence we already have in the BDD.
+                None => continue,
+            };
+
+            if bound_is_ineligible(bound) {
+                // If this declared upper bound mentions other typevars, we don't have a simple
+                // conjunction that's eligible for this fast path.
+                return ControlFlow::Continue(None);
+            }
+
+            bounds.add_upper(db, env, ConstraintProvenance::Validity, bound);
+        }
+
+        limits.satisfied_path()?;
+        let mut any_unsatisfied = false;
         let typevars = mappings
             .drain(..)
-            .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
+            .map(|(bound_typevar, bounds)| {
+                let path_bound = bounds.finish(db, env, bound_typevar);
+                let lower = path_bound.effective_lower(db, env);
+                if !path_bound.upper.is_satisfied_by(db, env, lower) {
+                    any_unsatisfied = true;
+                }
+                path_bound
+            })
             .collect();
-        let candidate = CandidateSolution { typevars };
+        if any_unsatisfied {
+            // If any of the typevars doesn't have a solution (either because the constraint set is
+            // overly restrictive, or because a candidate solution doesn't satisfy the declared
+            // upper bounds), fall back on the slow path to construct useful diagnostics.
+            return ControlFlow::Continue(None);
+        }
+
+        let candidate = CandidateSolution {
+            typevars,
+            validity: SolutionValidity::Valid,
+        };
         ControlFlow::Continue(Some(CandidateSolutions::Constrained(Box::new([candidate]))))
     }
 
@@ -3709,22 +3762,16 @@ impl<'db> CandidateSolutions<'db> {
         choose: &mut impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
     ) -> Option<(Solution<'db>, bool)> {
         let mut solved_typevars = Vec::with_capacity(candidate.typevars.len());
-        let mut violations = Vec::new();
+        let mut violations = match &candidate.validity {
+            SolutionValidity::Valid => Vec::new(),
+            SolutionValidity::Invalid(violations) => violations.clone().into_vec(),
+        };
         let mut exceeded_budget = false;
         for path_bound in &candidate.typevars {
             let ty = match choose(path_bound.variance(), path_bound) {
                 PathBoundSolution::Solved(ty) => Some(ty),
                 PathBoundSolution::Unsolved => None,
                 PathBoundSolution::Unsatisfiable => return None,
-                PathBoundSolution::ViolatesDeclaredUpperBound => {
-                    violations.push(SolutionViolation {
-                        bound_typevar: path_bound.bound_typevar,
-                        argument: path_bound.evidence_lower(),
-                        variance: path_bound.variance(),
-                        kind: SolutionViolationKind::UpperBound,
-                    });
-                    None
-                }
                 PathBoundSolution::ViolatesDeclaredConstraints => {
                     violations.push(SolutionViolation {
                         bound_typevar: path_bound.bound_typevar,
@@ -3802,29 +3849,17 @@ impl<'db> CandidateSolutions<'db> {
     ) -> PathBoundSolution<'db> {
         // Choose a solution type that satisfies the constraints on this path, as well as any upper
         // bound or constraints of the typevar itself.
-        // TODO: Handle the upper bound/constraints by conjoining them with the constraint set
-        // before solving.
+        // TODO: Handle the constraints by conjoining them with the constraint set before solving.
 
         let bound_typevar = path_bound.bound_typevar;
         let lower = path_bound.effective_lower(db, env);
 
         match bound_typevar.require_bound_or_constraints(db, env) {
-            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                let declared_upper = bound.top_materialization(db, env);
-
+            TypeVarBoundOrConstraints::UpperBound(_) => {
                 // Prefer the lower bound (often the concrete actual type seen) over the
                 // upper bound (which may include TypeVar bounds/constraints). The upper bound
                 // should only be used as a fallback when no concrete type was inferred.
                 if path_bound.evidence_lower.is_some() {
-                    if !is_possibly_constraint_set_assignable(
-                        db,
-                        TypePair::new(db, env.program(db), lower, declared_upper),
-                    ) {
-                        // Prefer a declared-bound violation when the inferred bounds are also
-                        // contradictory, so callers can report the more specific cause.
-                        return PathBoundSolution::ViolatesDeclaredUpperBound;
-                    }
-
                     if !path_bound.upper.is_satisfied_by(db, env, lower) {
                         let mut storage = builder.storage.borrow_mut();
                         let (when_upper, source_order) =
@@ -3842,12 +3877,17 @@ impl<'db> CandidateSolutions<'db> {
                 }
 
                 if path_bound.has_upper_evidence() {
-                    return IntersectionType::bounded_from_elements(
-                        db,
-                        env,
-                        iter::chain(path_bound.upper.iter_clauses(), [declared_upper]),
-                    )
-                    .map_or(
+                    // Evidence determines whether to infer a solution, while validity restricts
+                    // which evidence-compatible solution is permitted. Top-materialize validity
+                    // bounds so that their gradual elements do not become part of the result.
+                    let upper_bounds = std::iter::chain(
+                        path_bound.upper.iter_evidence(),
+                        path_bound
+                            .upper
+                            .iter_validity()
+                            .map(|bound| bound.top_materialization(db, env)),
+                    );
+                    return IntersectionType::bounded_from_elements(db, env, upper_bounds).map_or(
                         PathBoundSolution::BudgetExceeded { fallback: None },
                         PathBoundSolution::Solved,
                     );
@@ -5214,6 +5254,38 @@ mod tests {
     }
 
     #[test]
+    fn validity_closes_over_typevars_in_declared_upper_bounds() {
+        // Both evidence paths violate `T ≤ U ≤ int`. `U` occurs only in `T`'s declared upper bound,
+        // so rejecting them requires validity traversal to add `U` to its worklist.
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(db, &env);
+        let u = create_typevar(db, "U")
+            .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(int)));
+        let t = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+            Some(TypeVarBoundOrConstraints::UpperBound(Type::TypeVar(u)))
+        });
+        let builder = ConstraintSetBuilder::new();
+        let set = create_constraint(db, &builder, t, KnownClass::Str).or(db, &builder, || {
+            create_constraint(db, &builder, t, KnownClass::Bytes)
+        });
+        let inferable = TypeVarSet::from_typevars(db, [t]);
+
+        assert_eq!(
+            CandidateSolutions::compute(
+                db,
+                &env,
+                &mut builder.storage.borrow_mut(),
+                set.node,
+                inferable,
+                set.source_order,
+            ),
+            CandidateSolutions::Unsatisfiable
+        );
+    }
+
+    #[test]
     fn type_mapping_evaluates_mapped_subjects() {
         // ((T = int) ∧ ¬(T = str))[T ↦ int] = true
         let db = setup_db();
@@ -5561,7 +5633,8 @@ mod tests {
         assert_eq!(PathBoundSolution::Unsolved.as_type(), None);
         assert_eq!(
             CandidateSolutions::Constrained(Box::new([CandidateSolution {
-                typevars: Box::new([path_bound])
+                typevars: Box::new([path_bound]),
+                validity: SolutionValidity::Valid,
             }]))
             .solve(db, &env, &builder, inferable),
             Solutions::Constrained(SolutionPaths::Complete(vec![solution([])]))
@@ -5810,9 +5883,11 @@ class E: ...
                     CandidateSolution {
                         typevars: vec![exhausted.clone(), PathBound::exact(u, str)]
                             .into_boxed_slice(),
+                        validity: SolutionValidity::Valid,
                     },
                     CandidateSolution {
                         typevars: vec![PathBound::exact(t, int)].into_boxed_slice(),
+                        validity: SolutionValidity::Valid,
                     },
                 ];
                 let mut recovered = lower
@@ -5845,9 +5920,11 @@ class E: ...
                 let paths = CandidateSolutions::Constrained(Box::new([
                     CandidateSolution {
                         typevars: rejected.into_boxed_slice(),
+                        validity: SolutionValidity::Valid,
                     },
                     CandidateSolution {
                         typevars: Box::new([PathBound::exact(t, int)]),
+                        validity: SolutionValidity::Valid,
                     },
                 ]));
                 assert_eq!(

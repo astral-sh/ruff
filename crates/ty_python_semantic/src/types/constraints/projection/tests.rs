@@ -633,6 +633,7 @@ class E: ...
             alternatives
                 .map(|ty| CandidateSolution {
                     typevars: Box::new([PathBound::exact(t, ty)]) as Box<[_]>,
+                    validity: SolutionValidity::Valid,
                 })
                 .into(),
         );
