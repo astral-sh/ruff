@@ -6,7 +6,7 @@ use crate::types::{
     UnionType,
     call::CallErrorKind,
     context::InferContext,
-    diagnostic::NOT_ITERABLE,
+    diagnostic::{ASYNC_GENERATOR_STUB_HELP, NOT_ITERABLE},
     todo_type,
     tuple::{TupleSpec, TupleSpecBuilder},
 };
@@ -68,6 +68,31 @@ pub(crate) fn extract_fixed_length_iterable_element_types<'db>(
 }
 
 impl<'db> Type<'db> {
+    /// Recognizes coroutines whose results can be iterated over asynchronously.
+    ///
+    /// These can arise from async generator stubs that omit `yield`, or from
+    /// coroutine functions whose results need to be awaited before iteration.
+    pub(super) fn coroutine_returning_async_iterable(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        let Type::NominalInstance(instance) = self else {
+            return None;
+        };
+        if !instance.has_known_class(db, KnownClass::CoroutineType) {
+            return None;
+        }
+        let result = self.try_await(db, env).ok()?;
+        if result.is_dynamic() || result.is_never() {
+            return None;
+        }
+        result
+            .try_iterate_with_mode(db, env, EvaluationMode::Async)
+            .ok()?;
+        Some(result)
+    }
+
     /// Returns a tuple spec describing the elements that are produced when iterating over `self`.
     ///
     /// This method should only be used outside of type checking because it omits any errors.
@@ -1070,7 +1095,15 @@ impl<'db> IterationError<'db> {
             },
 
             IterationError::UnboundAiterError => {
-                reporter.is_not("It has no `__aiter__` method", ErrorContext::Disabled);
+                let mut diagnostic =
+                    reporter.is_not("It has no `__aiter__` method", ErrorContext::Disabled);
+                if iterable_type
+                    .coroutine_returning_async_iterable(db, env)
+                    .is_some()
+                {
+                    diagnostic.help("Await the coroutine before iterating over its result");
+                    diagnostic.help(ASYNC_GENERATOR_STUB_HELP);
+                }
             }
         }
     }

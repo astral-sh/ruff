@@ -67,6 +67,9 @@ use ty_python_core::{ProgramFile, global_scope, place_table, use_def_map};
 const RUNTIME_CHECKABLE_DOCS_URL: &str =
     "https://docs.python.org/3/library/typing.html#typing.runtime_checkable";
 
+pub(super) const ASYNC_GENERATOR_STUB_HELP: &str = "To declare an async generator in a stub, use `def` instead of `async def`, \
+     or add a `yield` expression to the body";
+
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&AMBIGUOUS_PROTOCOL_MEMBER);

@@ -9,6 +9,7 @@ use ruff_python_ast::name::Name;
 use ty_python_core::semantic_index;
 
 use crate::types::context::LintDiagnosticGuard;
+use crate::types::diagnostic::ASYNC_GENERATOR_STUB_HELP;
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::tuple::TupleLength;
 use crate::types::{DisplaySettings, Type, TypedDictType};
@@ -528,12 +529,23 @@ impl<'db> ErrorContext<'db> {
                     target = target.display(db, env)
                 )
             }
-            Self::IncompatibleReturnTypes { source, target } => format!(
-                "incompatible return types: `{source}` is not {relation} `{target}`",
-                source = source.display(db, env),
-                relation = relation.description(),
-                target = target.display(db, env),
-            ),
+            Self::IncompatibleReturnTypes { source, target } => {
+                if source
+                    .coroutine_returning_async_iterable(db, env)
+                    .is_some_and(|result| result.is_assignable_to(db, env, *target))
+                    || target
+                        .coroutine_returning_async_iterable(db, env)
+                        .is_some_and(|result| source.is_assignable_to(db, env, result))
+                {
+                    help_messages.insert(HelpMessages::AsyncGeneratorStub);
+                }
+                format!(
+                    "incompatible return types: `{source}` is not {relation} `{target}`",
+                    source = source.display(db, env),
+                    relation = relation.description(),
+                    target = target.display(db, env),
+                )
+            }
             Self::IncompatibleParameterTypes {
                 source,
                 target,
@@ -685,6 +697,7 @@ impl<'db> ErrorContext<'db> {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum HelpMessages<'db> {
+    AsyncGeneratorStub,
     RequiredFieldCouldBeRemoved,
     TypedDictNotAssignableToDict(ErrorRelation),
     ConsiderUsingMappingInsteadOfDict,
@@ -717,6 +730,7 @@ impl<'db> HelpMessages<'db> {
         relation: ErrorRelation,
     ) -> impl std::fmt::Display {
         std::fmt::from_fn(move |f| match self {
+            HelpMessages::AsyncGeneratorStub => f.write_str(ASYNC_GENERATOR_STUB_HELP),
             HelpMessages::RequiredFieldCouldBeRemoved => f.write_str(
                 "The required field could be removed through a destructive operation \
                 like `del` on the target",
