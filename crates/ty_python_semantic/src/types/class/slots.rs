@@ -220,7 +220,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Returns whether a binding for this name reaches the end of the class body.
-    pub(super) fn has_own_class_binding(self, db: &'db dyn Db, name: &str) -> bool {
+    fn has_own_class_binding(self, db: &'db dyn Db, name: &str) -> bool {
         let scope = self.body_scope(db);
         place_table(db, scope)
             .symbol_id(name)
@@ -524,6 +524,19 @@ impl<'db> StaticClassLiteral<'db> {
         self.slot_names(db).is_some()
             && !self.has_instance_slot(db, name)
             && !self.has_instance_dictionary(db)
+    }
+
+    /// Whether this class creates a descriptor for `name` in its own namespace.
+    pub(in crate::types) fn has_own_slot_descriptor(self, db: &'db dyn Db, name: &str) -> bool {
+        // The inherited `object.__dict__` annotation already describes dictionary access. A
+        // synthesized slot descriptor would incorrectly replace the class's own namespace.
+        name != "__dict__"
+            && self
+                .slot_names(db)
+                .is_some_and(|slots| slots.iter().any(|slot| slot == name))
+            && (self.has_generated_slots(db)
+                || !self.has_own_class_binding(db, name)
+                || self.file(db).is_stub(db) && self.has_instance_slot(db, name))
     }
 
     /// Synthesizes the class descriptor created for an instance slot.
