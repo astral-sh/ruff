@@ -26,11 +26,67 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 
 impl<'db> Type<'db> {
-    /// Returns whether expanding aliases and unions can return to the same alias without entering
-    /// another type. For example, `type A = int | A` is invalid, but
+    /// Returns whether expanding aliases, unions, and intersections can return to the same alias
+    /// without entering another type. For example, `type A = int | A` is invalid, but
     /// `type A = int | list[A]` is a valid recursive alias.
     pub(super) fn has_unguarded_alias_cycle(self, db: &'db dyn Db) -> bool {
         AliasCycleSummary::from_type(db, self).cycle.is_some()
+    }
+
+    /// The type variables that occur outside of every type constructor, such as `T` but not `U`
+    /// in `T | list[U]`.
+    pub(super) fn unguarded_typevars(self, db: &'db dyn Db) -> Box<[BoundTypeVarInstance<'db>]> {
+        AliasCycleSummary::from_type(db, self).typevars
+    }
+
+    /// Substitutes types for the unguarded occurrences of type variables. Returns `None` if
+    /// one occurs where it cannot be replaced in place: in a type alias, whose definition is
+    /// fixed, or negated in an intersection.
+    pub(super) fn replace_unguarded_typevars(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        replacements: &[(BoundTypeVarInstance<'db>, Type<'db>)],
+    ) -> Option<Type<'db>> {
+        let exposes_replaced = |ty: Type<'db>| {
+            ty.unguarded_typevars(db).iter().any(|exposed| {
+                replacements
+                    .iter()
+                    .any(|(variable, _)| variable.is_same_typevar_as(db, *exposed))
+            })
+        };
+        match self {
+            _ if replacements.is_empty() => Some(self),
+            Type::TypeVar(exposed) => Some(
+                replacements
+                    .iter()
+                    .find(|(variable, _)| variable.is_same_typevar_as(db, exposed))
+                    .map_or(self, |(_, replacement)| *replacement),
+            ),
+            Type::Union(union) => {
+                let elements: Option<Vec<_>> = union
+                    .elements(db)
+                    .iter()
+                    .map(|element| element.replace_unguarded_typevars(db, env, replacements))
+                    .collect();
+                Some(UnionType::from_elements(db, env, elements?))
+            }
+            Type::Intersection(intersection) => {
+                if intersection.iter_negative(db).any(exposes_replaced) {
+                    return None;
+                }
+                let positive: Option<Vec<_>> = intersection
+                    .iter_positive(db)
+                    .map(|element| element.replace_unguarded_typevars(db, env, replacements))
+                    .collect();
+                let mut positive = positive?.into_iter();
+                Some(
+                    intersection
+                        .map_positive(db, env, |_| positive.next().unwrap_or_else(Type::object)),
+                )
+            }
+            _ => (!exposes_replaced(self)).then_some(self),
+        }
     }
 }
 
@@ -92,6 +148,12 @@ impl<'db> AliasCycleSummary<'db> {
                 .elements(db)
                 .iter()
                 .find_map(|&element| Self::collect(db, element, typevars)),
+            // An intersection is not a type constructor either: unfolding `μa. a & tuple[a]`
+            // exposes the same intersection again.
+            Type::Intersection(intersection) => intersection
+                .iter_positive(db)
+                .chain(intersection.iter_negative(db))
+                .find_map(|element| Self::collect(db, element, typevars)),
             _ => ty.is_divergent().then_some(ty),
         }
     }

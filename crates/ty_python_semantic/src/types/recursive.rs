@@ -37,6 +37,19 @@
 //! `RecursiveCycle`; substitution does not enter that binder's body when it binds the
 //! target variable. The binder's arguments are outside its scope and are still substituted.
 //!
+//! A binder can also bind several bodies at once, as the solution of mutually recursive
+//! constraints such as `T = tuple[U]` and `U = list[T]`:
+//!
+//! ```text
+//! μ(a, b). (tuple[b], list[a])
+//! ```
+//!
+//! Each of `T` and `U` is an *entry* of that binder, and unfolding an entry substitutes
+//! entries for the variables of its body. Sharing one binder keeps the solution as large as
+//! its equations; nesting one binder per variable would instead copy each body into the
+//! others. Its variables are named by position. Such a binder is always closed as a whole, so
+//! one never occurs open inside another, and a positional variable refers to the nearest one.
+//!
 //! A *type constructor* takes type arguments and produces a type. Recursive types can
 //! also be parameterized this way. With type variable `T`, the alias
 //! `Tree = tuple[T, "Tree[list[T]] | None"]` has the recursive type constructor:
@@ -60,27 +73,31 @@
 //!
 //! Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
 
+use std::cell::{Cell, RefCell};
+use std::iter;
+
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use super::generics::{ApplySpecialization, Specialization};
+use super::generics::{ApplySpecialization, Specialization, walk_specialization_types};
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
+use super::visitor::{TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard};
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind, Type,
-    TypeContext, TypeMapping, VarianceTerm,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, GenericContext,
+    MaterializationKind, Type, TypeContext, TypeMapping, UnionType, VarianceTerm,
 };
-use crate::{Db, ProgramEnvironment};
+use crate::{Db, FxIndexSet, Program, ProgramEnvironment};
 
-/// A recursive variable named by its binder's query cycle.
+/// A recursive variable, named by an alias's query cycle or by its position in a solution.
 /// An escaping reference has no type semantics; in particular, it is neither a
 /// gradual type nor an assignability operand.
 /// Only recursive-type binding and substitution operations may construct or operate on recursive variables.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveVar<'db> {
-    /// Refers to the nearest enclosing recursive binder with this cycle identity.
+    /// Refers to the nearest enclosing recursive binder of this kind.
     #[returns(copy)]
     cycle: RecursiveCycle,
     /// The unspecialized arguments of this occurrence, in the alias definition's scope.
@@ -106,9 +123,12 @@ impl<'db> RecursiveVar<'db> {
         match mapping {
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Unfold(recursive),
-            )) if self.cycle(db) == recursive.cycle(db) => {
-                Type::Recursive(recursive.with_arguments(db, arguments))
-            }
+            )) if self.cycle(db).binds_in(db, *recursive) => match self.cycle(db) {
+                RecursiveCycle::Alias(_) => {
+                    Type::Recursive(recursive.with_arguments(db, arguments))
+                }
+                RecursiveCycle::Equation(entry) => Type::Recursive(recursive.at(db, entry)),
+            },
             TypeMapping::ApplyRecursiveSubstitution(_) => {
                 Type::RecursiveVar(Self::new_internal(db, self.cycle(db), arguments))
             }
@@ -128,23 +148,82 @@ enum RecursiveSubstitution<'db> {
     Unfold(RecursiveType<'db>),
     /// Replace applications of the target binder with variables to form an open body.
     /// In the module example, this replaces `Tree[list[T]]` with `F[list[T]]`.
-    Bind(RecursiveCycle),
+    Bind(#[get_size(ignore)] salsa::Id),
+    /// Replace each placeholder of a solution with the variable of its equation.
+    BindSolution(RecursiveEquations<'db>),
 }
 
-impl RecursiveSubstitution<'_> {
-    fn cycle(self, db: &dyn Db) -> RecursiveCycle {
-        match self {
-            Self::Unfold(recursive) => recursive.cycle(db),
-            Self::Bind(cycle) => cycle,
+impl<'db> RecursiveSubstitution<'db> {
+    /// Whether this substitution replaces the variables that `binder` binds in its own bodies,
+    /// which must therefore be left alone.
+    fn is_shadowed_by(self, db: &'db dyn Db, binder: RecursiveType<'db>) -> bool {
+        let target = match self {
+            Self::Unfold(recursive) => recursive.origin(db),
+            Self::Bind(cycle) => return binder.origin(db).alias_cycle() == Some(cycle),
+            Self::BindSolution(_) => return true,
+        };
+        match target {
+            RecursiveOrigin::Alias { cycle, .. } => binder.origin(db).alias_cycle() == Some(cycle),
+            // A solution is closed when it is created, and an alias's body is fixed by its
+            // definition. Neither contains a variable or placeholder of another solution.
+            RecursiveOrigin::Solution(_) => true,
         }
     }
 }
 
-/// Identifies an alias query and names its recursive binder and variables.
+/// Names a recursive variable and the binder that it refers to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct RecursiveCycle(salsa::Id);
+pub enum RecursiveCycle {
+    /// An alias query. Its identity is stable across the iterations of that query.
+    Alias(salsa::Id),
+    /// The equation at this position of the nearest enclosing solution.
+    Equation(usize),
+}
 
 impl get_size2::GetSize for RecursiveCycle {}
+
+impl RecursiveCycle {
+    fn binds_in<'db>(self, db: &'db dyn Db, binder: RecursiveType<'db>) -> bool {
+        match (self, binder.origin(db)) {
+            (Self::Alias(variable), RecursiveOrigin::Alias { cycle, .. }) => variable == cycle,
+            (Self::Equation(_), RecursiveOrigin::Solution(_)) => true,
+            _ => false,
+        }
+    }
+}
+
+/// Where a recursive binder was constructed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
+pub enum RecursiveOrigin<'db> {
+    Alias {
+        /// The defining symbol of the implicit alias, including for qualified references.
+        definition: Definition<'db>,
+        /// Names the binder and distinguishes provisional types of different alias queries.
+        cycle: salsa::Id,
+    },
+    /// The solution of recursive type constraints, which has no defining symbol.
+    Solution(Program<'db>),
+}
+
+impl get_size2::GetSize for RecursiveOrigin<'_> {}
+
+impl RecursiveOrigin<'_> {
+    fn alias_cycle(self) -> Option<salsa::Id> {
+        match self {
+            Self::Alias { cycle, .. } => Some(cycle),
+            Self::Solution(_) => None,
+        }
+    }
+}
+
+/// The bodies that one binder binds together. Entries of the same binder share them.
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+pub struct RecursiveEquations<'db> {
+    #[returns(deref)]
+    bodies: Box<[Type<'db>]>,
+}
+
+impl get_size2::GetSize for RecursiveEquations<'_> {}
 
 /// An application of a structural recursive type constructor.
 /// The private body remains unspecialized; `arguments` records this application's
@@ -154,14 +233,13 @@ impl get_size2::GetSize for RecursiveCycle {}
 /// Use the binding operations in this module to construct recursive types.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
-    /// The defining symbol of the implicit alias, including for qualified references.
     #[returns(copy)]
-    pub(super) definition: Definition<'db>,
-    /// Names the binder and distinguishes provisional types of different alias queries.
+    origin: RecursiveOrigin<'db>,
     #[returns(copy)]
-    cycle: RecursiveCycle,
+    equations: RecursiveEquations<'db>,
+    /// The equation whose body this type unfolds to. An alias binds a single body.
     #[returns(copy)]
-    body: Type<'db>,
+    entry: usize,
     /// The actual arguments for this application, which may themselves contain type variables.
     /// They are applied when unfolding; the stored body remains unspecialized.
     #[returns(copy)]
@@ -190,8 +268,11 @@ impl<'db> RecursiveType<'db> {
             let mut summary = AliasCycleSummary::from_type(db, recursive.body(db));
             // Nested bodies can refer to an enclosing binder. Close only the cycle marker,
             // so recovery never exposes an unbound variable as a standalone type.
-            if let Some(Type::RecursiveVar(variable)) = summary.cycle {
-                summary.cycle = Some(Type::divergent(variable.cycle(db).0));
+            // A solution guards every variable, so only an alias's can be exposed.
+            if let Some(Type::RecursiveVar(variable)) = summary.cycle
+                && let RecursiveCycle::Alias(cycle) = variable.cycle(db)
+            {
+                summary.cycle = Some(Type::divergent(cycle));
             }
             summary
         }
@@ -206,15 +287,31 @@ impl<'db> RecursiveType<'db> {
         cycle: salsa::Id,
         parameters: Option<GenericContext<'db>>,
     ) -> Self {
-        let cycle = RecursiveCycle(cycle);
         let arguments = parameters.map(|parameters| parameters.identity_specialization(db));
+        let variable = RecursiveVar::new_internal(db, RecursiveCycle::Alias(cycle), arguments);
         Self::new_internal(
             db,
-            definition,
-            cycle,
-            Type::RecursiveVar(RecursiveVar::new_internal(db, cycle, arguments)),
+            RecursiveOrigin::Alias { definition, cycle },
+            RecursiveEquations::new_internal(db, Box::from([Type::RecursiveVar(variable)])),
+            0,
             arguments,
             None,
+        )
+    }
+
+    fn body(self, db: &'db dyn Db) -> Type<'db> {
+        self.equations(db).bodies(db)[self.entry(db)]
+    }
+
+    /// Another entry of this solution's binder.
+    fn at(self, db: &'db dyn Db, entry: usize) -> Self {
+        Self::new_internal(
+            db,
+            self.origin(db),
+            self.equations(db),
+            entry,
+            None,
+            self.materialization_kind(db),
         )
     }
 
@@ -233,6 +330,7 @@ impl<'db> RecursiveType<'db> {
             db,
             &ProgramEnvironment::from_definition(definition),
             result,
+            cycle,
         )
     }
 
@@ -243,27 +341,28 @@ impl<'db> RecursiveType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         original: Type<'db>,
+        cycle: salsa::Id,
     ) -> Type<'db> {
         let body = original.apply_type_mapping_impl(
             db,
             &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
-                RecursiveSubstitution::Bind(self.cycle(db)),
+                RecursiveSubstitution::Bind(cycle),
             )),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
         );
         // Alias arguments can expose a reference without introducing a container.
         if body.has_unguarded_alias_cycle(db) {
-            Type::divergent(self.cycle(db).0)
+            Type::divergent(cycle)
         } else if body == original {
             // Binding changes a closed type only by introducing references to this binder.
             body
         } else {
             Type::Recursive(Self::new_internal(
                 db,
-                self.definition(db),
-                self.cycle(db),
-                body,
+                self.origin(db),
+                RecursiveEquations::new_internal(db, Box::from([body])),
+                0,
                 self.arguments(db),
                 None,
             ))
@@ -273,9 +372,9 @@ impl<'db> RecursiveType<'db> {
     fn with_arguments(self, db: &'db dyn Db, arguments: Option<Specialization<'db>>) -> Self {
         Self::new_internal(
             db,
-            self.definition(db),
-            self.cycle(db),
-            self.body(db),
+            self.origin(db),
+            self.equations(db),
+            self.entry(db),
             arguments,
             self.materialization_kind(db),
         )
@@ -288,9 +387,9 @@ impl<'db> RecursiveType<'db> {
     ) -> Self {
         Self::new_internal(
             db,
-            self.definition(db),
-            self.cycle(db),
-            self.body(db),
+            self.origin(db),
+            self.equations(db),
+            self.entry(db),
             self.arguments(db),
             materialization,
         )
@@ -302,23 +401,23 @@ impl<'db> RecursiveType<'db> {
             .map(|arguments| arguments.generic_context(db))
     }
 
-    /// The declared alias name, shared by all specializations of this constructor.
-    pub(super) fn name(self, db: &'db dyn Db) -> &'db str {
-        let definition = self.definition(db);
-        // Qualified uses retain the original declaration's symbol, not the access expression.
-        place_table(db, definition.scope(db))
-            .symbol(definition.place(db).expect_symbol())
-            .name()
+    /// The defining symbol of the source alias. The solution of recursive constraints has none.
+    pub(super) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        match self.origin(db) {
+            RecursiveOrigin::Alias { definition, .. } => Some(definition),
+            RecursiveOrigin::Solution(_) => None,
+        }
     }
 
-    /// The source alias's definition and name, if this binder comes from an alias.
-    #[expect(
-        clippy::unnecessary_wraps,
-        reason = "Keep alias metadata optional for inferred recursive types"
-    )]
+    /// The source alias's definition and its declared name, which all specializations of this
+    /// constructor share.
     pub(super) fn alias(self, db: &'db dyn Db) -> Option<(Definition<'db>, &'db str)> {
-        // Only implicit alias inference constructs recursive types at present.
-        Some((self.definition(db), self.name(db)))
+        let definition = self.definition(db)?;
+        // Qualified uses retain the original declaration's symbol, not the access expression.
+        let name = place_table(db, definition.scope(db))
+            .symbol(definition.place(db).expect_symbol())
+            .name();
+        Some((definition, name))
     }
 
     /// Restore the formal arguments and remove materialization for constructor analysis.
@@ -334,7 +433,12 @@ impl<'db> RecursiveType<'db> {
 
     /// The program in which the recursive type's body was constructed.
     pub fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
-        ProgramEnvironment::from_definition(self.definition(db))
+        match self.origin(db) {
+            RecursiveOrigin::Alias { definition, .. } => {
+                ProgramEnvironment::from_definition(definition)
+            }
+            RecursiveOrigin::Solution(program) => ProgramEnvironment::from_program(program),
+        }
     }
 
     /// Substitute closed types for references before exposing the body.
@@ -405,31 +509,62 @@ impl<'db> RecursiveType<'db> {
         match mapping {
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Bind(cycle),
-            )) if self.cycle(db) == *cycle && self.materialization_kind(db).is_none() => {
+            )) if matches!(self.origin(db), RecursiveOrigin::Alias { cycle: own, .. } if own == *cycle)
+                && self.materialization_kind(db).is_none() =>
+            {
                 let arguments = self
                     .arguments(db)
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
-                Type::RecursiveVar(RecursiveVar::new_internal(db, self.cycle(db), arguments))
+                Type::RecursiveVar(RecursiveVar::new_internal(
+                    db,
+                    RecursiveCycle::Alias(*cycle),
+                    arguments,
+                ))
+            }
+            TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::BindSolution(placeholders),
+            )) if self.equations(db) == *placeholders && self.is_placeholder(db) => {
+                Type::RecursiveVar(RecursiveVar::new_internal(
+                    db,
+                    RecursiveCycle::Equation(self.entry(db)),
+                    None,
+                ))
             }
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(substitution)) => {
-                // This binder shadows the target in its body, but not in its arguments.
-                let body = if self.cycle(db) == substitution.cycle(db) {
-                    self.body(db)
+                // This binder shadows the target in its bodies, but not in its arguments.
+                let equations = if substitution.is_shadowed_by(db, self) {
+                    self.equations(db)
                 } else {
-                    self.body(db)
-                        .apply_type_mapping_impl(db, mapping, tcx, visitor)
+                    let bodies = self.equations(db).bodies(db).iter();
+                    RecursiveEquations::new_internal(
+                        db,
+                        bodies
+                            .map(|body| body.apply_type_mapping_impl(db, mapping, tcx, visitor))
+                            .collect::<Box<[_]>>(),
+                    )
                 };
                 let arguments = self
                     .arguments(db)
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
                 Type::Recursive(Self::new_internal(
                     db,
-                    self.definition(db),
-                    self.cycle(db),
-                    body,
+                    self.origin(db),
+                    equations,
+                    self.entry(db),
                     arguments,
                     self.materialization_kind(db),
                 ))
+            }
+            TypeMapping::ApplySpecialization(_)
+            | TypeMapping::ApplySpecializationWithMaterialization { .. }
+            | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::FreshenBoundTypeVars { .. }
+            | TypeMapping::BindSelf(_)
+            | TypeMapping::ReplaceSelf { .. }
+                if matches!(self.origin(db), RecursiveOrigin::Solution(_)) =>
+            {
+                // A solution has no parameters: free variables occur in its bodies instead.
+                self.map_solution(db, mapping, tcx, visitor)
             }
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::ApplySpecializationWithMaterialization { .. }
@@ -501,6 +636,258 @@ impl<'db> RecursiveType<'db> {
                     .into_type()
             }),
         }
+    }
+
+    /// A closed stand-in for the entry at the same position of a solution being formed. Ordinary
+    /// type operations can inspect the types that contain it, and `BindSolution` then replaces
+    /// it with that entry's variable. It unfolds to itself, like the `μa. a` of an alias query.
+    fn placeholders(db: &'db dyn Db, program: Program<'db>, len: usize) -> Self {
+        let variables = (0..len).map(|entry| {
+            Type::RecursiveVar(RecursiveVar::new_internal(
+                db,
+                RecursiveCycle::Equation(entry),
+                None,
+            ))
+        });
+        Self::new_internal(
+            db,
+            RecursiveOrigin::Solution(program),
+            RecursiveEquations::new_internal(db, variables.collect::<Box<[_]>>()),
+            0,
+            None,
+            None,
+        )
+    }
+
+    fn is_placeholder(self, db: &'db dyn Db) -> bool {
+        self.arguments(db).is_none()
+            && self.materialization_kind(db).is_none()
+            && matches!(self.body(db), Type::RecursiveVar(variable)
+                if variable.cycle(db) == RecursiveCycle::Equation(self.entry(db)))
+    }
+
+    /// Binds the placeholders in `bodies` under one binder, and returns its entries.
+    fn bind_solution(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        placeholders: Self,
+        bodies: impl Iterator<Item = Type<'db>>,
+    ) -> impl Iterator<Item = Self> {
+        let mapping = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+            RecursiveSubstitution::BindSolution(placeholders.equations(db)),
+        ));
+        let visitor = ApplyTypeMappingVisitor::new(env);
+        let bodies: Box<[_]> = bodies
+            .map(|body| {
+                body.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor)
+            })
+            .collect();
+        let equations = RecursiveEquations::new_internal(db, bodies);
+        (0..equations.bodies(db).len()).map(move |entry| {
+            Self::new_internal(db, placeholders.origin(db), equations, entry, None, None)
+        })
+    }
+
+    /// Closes the equations `variable = body`, whose bodies refer to each other's variables,
+    /// into recursive types. Returns `None` if some reference is not guarded by a type
+    /// constructor, as in `T = T | int`: unfolding it would never reach a type to inspect.
+    pub(super) fn from_equations(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        equations: &[(BoundTypeVarInstance<'db>, Type<'db>)],
+    ) -> Option<Vec<Type<'db>>> {
+        let bodies = Self::inline_unguarded_references(db, env, equations)?;
+        let variables: Vec<_> = equations.iter().map(|(variable, _)| *variable).collect();
+
+        // The bounds of a variable include those that transitivity derives by replacing other
+        // variables with their own bounds: `A ≤ tuple[B]` and `B ≤ list[A]` also give
+        // `A ≤ tuple[list[A]]`. Each of them denotes the same solution, so the least unrolled
+        // one is sufficient, while keeping all of them would multiply the size of the solution.
+        // Bounds that differ in any other way fail the verification of the smaller solution.
+        let least_unrolled: Vec<_> = bodies
+            .iter()
+            .map(|body| body.least_unrolled(db, env, &variables))
+            .collect();
+        if least_unrolled != bodies
+            && let Some(solution) = Self::close(db, env, &variables, &least_unrolled, &bodies)
+        {
+            return Some(solution);
+        }
+        Self::close(db, env, &variables, &bodies, &bodies)
+    }
+
+    /// Closes `variables[i] = bodies[i]` into recursive types, and returns them if they solve
+    /// `variables[i] = equations[i]`.
+    fn close(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        variables: &[BoundTypeVarInstance<'db>],
+        bodies: &[Type<'db>],
+        equations: &[Type<'db>],
+    ) -> Option<Vec<Type<'db>>> {
+        let placeholders = Self::placeholders(db, env.program(db), variables.len());
+        let context = GenericContext::from_typevar_instances(db, env, variables.iter().copied());
+        let entries: Vec<_> = (0..variables.len())
+            .map(|entry| Type::Recursive(placeholders.at(db, entry)))
+            .collect();
+        let substitution = TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
+            generic_context: context,
+            types: &entries,
+            skip: None,
+        });
+        let closed = bodies
+            .iter()
+            .map(|body| body.apply_type_mapping(db, env, &substitution, TypeContext::default()));
+        let solution: Vec<_> = Self::bind_solution(db, env, placeholders, closed).collect();
+        // An alias can still expose one of its arguments without a constructor.
+        if solution
+            .iter()
+            .any(|recursive| recursive.body(db).has_unguarded_alias_cycle(db))
+        {
+            return None;
+        }
+
+        // Substituting a type is not always structural: `type[T]` becomes the meta-type of what
+        // replaces `T`, which is meaningless for a placeholder. Such an equation is not solved
+        // by the types above. They solve it if each of them is the body of its equation with
+        // the solution substituted for the variables. Normalization can write that body
+        // differently from the unfolding, as for the intersection in `T = tuple[T & ~E]`.
+        let types: Vec<_> = solution.iter().copied().map(Type::Recursive).collect();
+        let substitution = TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
+            generic_context: context,
+            types: &types,
+            skip: None,
+        });
+        equations
+            .iter()
+            .zip(&solution)
+            .all(|(equation, recursive)| {
+                let substituted =
+                    equation.apply_type_mapping(db, env, &substitution, TypeContext::default());
+                substituted == recursive.unfold(db, env).into_type()
+                    || substituted.is_equivalent_to(db, env, Type::Recursive(*recursive))
+            })
+            .then_some(types)
+    }
+
+    /// Replaces each variable that a body exposes outside a type constructor, as `U` in
+    /// `T = U | int`, with the body of its equation. Every remaining reference is then guarded.
+    /// Returns `None` if such references form a cycle, or pass through a type alias.
+    fn inline_unguarded_references(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        equations: &[(BoundTypeVarInstance<'db>, Type<'db>)],
+    ) -> Option<Vec<Type<'db>>> {
+        fn inline<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            equations: &[(BoundTypeVarInstance<'db>, Type<'db>)],
+            bodies: &mut [Option<Type<'db>>],
+            active: &mut Vec<usize>,
+            entry: usize,
+        ) -> Option<Type<'db>> {
+            if let Some(body) = bodies[entry] {
+                return Some(body);
+            }
+            if active.contains(&entry) {
+                return None;
+            }
+            active.push(entry);
+            let body = equations[entry].1;
+            let exposed = body.unguarded_typevars(db);
+            let mut replacements = Vec::new();
+            for variable in exposed {
+                let position = equations
+                    .iter()
+                    .position(|(other, _)| other.is_same_typevar_as(db, variable));
+                if let Some(position) = position {
+                    let replacement = inline(db, env, equations, bodies, active, position)?;
+                    replacements.push((variable, replacement));
+                }
+            }
+            active.pop();
+            let body = body.replace_unguarded_typevars(db, env, &replacements)?;
+            bodies[entry] = Some(body);
+            Some(body)
+        }
+
+        let mut bodies = vec![None; equations.len()];
+        (0..equations.len())
+            .map(|entry| inline(db, env, equations, &mut bodies, &mut Vec::new(), entry))
+            .collect()
+    }
+
+    /// This solution, followed by every other recursive solution that its unfolding refers to,
+    /// directly or through those solutions, in the order in which they are first reached.
+    ///
+    /// Displaying each of them once keeps the display as large as the equations. Writing a
+    /// solution out at every reference would instead repeat it for each path that leads there,
+    /// which is exponential for `A = tuple[A, B, B]`, `B = tuple[B, C, C]`, and so on.
+    pub(super) fn members(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> FxIndexSet<Self> {
+        let mut members = FxIndexSet::from_iter([self]);
+        let mut next = 0;
+        while let Some(member) = members.get_index(next).copied() {
+            let references = SolutionReferences {
+                env,
+                references: RefCell::default(),
+                seen: TypeCollector::default(),
+            };
+            references.visit_type(db, member.unfold(db, env).into_type());
+            members.extend(references.references.into_inner());
+            next += 1;
+        }
+        members
+    }
+
+    /// Maps the free variables of a solution, which occur in its bodies. The bodies are closed
+    /// with placeholders while they are mapped, and bound again afterwards.
+    fn map_solution(
+        self,
+        db: &'db dyn Db,
+        mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        if self.is_placeholder(db) {
+            return Type::Recursive(self);
+        }
+        visitor.visit(db, Type::Recursive(self), mapping, || {
+            let RecursiveOrigin::Solution(program) = self.origin(db) else {
+                return Type::Recursive(self);
+            };
+            let bodies = self.equations(db).bodies(db);
+            let placeholders = Self::placeholders(db, program, bodies.len());
+            let close = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Unfold(placeholders),
+            ));
+            let mut changed = false;
+            let mapped: Vec<_> = bodies
+                .iter()
+                .map(|body| {
+                    let closed = body.apply_type_mapping_impl(
+                        db,
+                        &close,
+                        TypeContext::default(),
+                        &ApplyTypeMappingVisitor::new(visitor.env),
+                    );
+                    let mapped = closed.apply_type_mapping_impl(db, mapping, tcx, visitor);
+                    changed |= mapped != closed;
+                    mapped
+                })
+                .collect();
+            if !changed {
+                return Type::Recursive(self);
+            }
+            let entry = Self::bind_solution(db, visitor.env, placeholders, mapped.into_iter())
+                .nth(self.entry(db));
+            entry.map_or(Type::Recursive(self), |entry| {
+                Type::Recursive(entry.with_materialization(db, self.materialization_kind(db)))
+            })
+        })
     }
 
     pub(in crate::types) fn variance_equation(
@@ -736,6 +1123,105 @@ impl<'db> VarianceInferable<'db> for RecursiveType<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         VarianceTerm::variable(db, VarianceOrigin::Recursive(self), typevar)
+    }
+}
+
+/// Collects the recursive solutions that a type refers to, without entering them.
+struct SolutionReferences<'env, 'db> {
+    env: &'env ProgramEnvironment<'db>,
+    references: RefCell<Vec<RecursiveType<'db>>>,
+    seen: TypeCollector<'db>,
+}
+
+impl<'db> TypeVisitor<'db> for SolutionReferences<'_, 'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        self.env
+    }
+
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        walk_type_with_recursion_guard(db, ty, self, &self.seen);
+    }
+
+    fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+        if recursive.definition(db).is_none() {
+            self.references.borrow_mut().push(recursive);
+        } else if let Some(arguments) = recursive.arguments(db) {
+            // An alias is displayed by its name and arguments.
+            walk_specialization_types(db, arguments, self);
+        }
+    }
+}
+
+impl<'db> Type<'db> {
+    /// Drops the bounds in the body of an equation that can be unrollings of another bound.
+    ///
+    /// Among the elements of a union, or the positive elements of an intersection, that mention
+    /// one of `variables`, only the smallest is retained: an unrolling replaces a variable with
+    /// a larger type, so it is larger than the bound it was derived from.
+    fn least_unrolled(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        variables: &[BoundTypeVarInstance<'db>],
+    ) -> Type<'db> {
+        // The number of types nested in `ty`, if one of them is one of the variables.
+        let recursive_size = |ty: &Type<'db>| {
+            let size = Cell::new(0usize);
+            let is_recursive = Cell::new(false);
+            any_over_type(db, env, *ty, false, |nested| {
+                size.set(size.get() + 1);
+                if let Some(typevar) = nested.as_typevar()
+                    && variables
+                        .iter()
+                        .any(|variable| variable.is_same_typevar_as(db, typevar))
+                {
+                    is_recursive.set(true);
+                }
+                false
+            });
+            is_recursive.get().then_some(size.get())
+        };
+        let retained = |elements: &[Type<'db>]| {
+            let sizes: Vec<_> = elements.iter().map(recursive_size).collect();
+            let smallest = sizes.iter().flatten().min().copied();
+            let least_unrolled = sizes
+                .iter()
+                .position(|size| size.is_some() && *size == smallest);
+            (0..sizes.len())
+                .map(move |index| sizes[index].is_none() || Some(index) == least_unrolled)
+        };
+        match self {
+            Type::Union(union) => {
+                let elements: Vec<_> = union
+                    .elements(db)
+                    .iter()
+                    .map(|element| element.least_unrolled(db, env, variables))
+                    .collect();
+                let retained = retained(&elements);
+                UnionType::from_elements(
+                    db,
+                    env,
+                    iter::zip(&elements, retained)
+                        .filter_map(|(element, retained)| retained.then_some(*element)),
+                )
+            }
+            Type::Intersection(intersection) => {
+                let positive: Vec<_> = intersection.iter_positive(db).collect();
+                let mut retained = retained(&positive);
+                intersection.map_positive(db, env, |element| {
+                    if retained.next() == Some(true) {
+                        *element
+                    } else {
+                        Type::object()
+                    }
+                })
+            }
+            _ => self,
+        }
     }
 }
 

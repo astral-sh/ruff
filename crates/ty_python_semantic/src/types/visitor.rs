@@ -148,7 +148,9 @@ pub(crate) trait TypeVisitor<'db> {
     }
 
     fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-        if self.should_visit_lazy_type_attributes() {
+        // The solution of recursive constraints has no separate definition: its bodies are part
+        // of the type, including any type variables that occur in them.
+        if self.should_visit_lazy_type_attributes() || recursive.definition(db).is_none() {
             self.visit_type(
                 db,
                 recursive.unfold(db, self.program_environment()).into_type(),
@@ -842,7 +844,9 @@ where
             if self.mode.should_visit_alias_arguments() {
                 let arguments = match ty {
                     Type::TypeAlias(alias) => Some(alias.specialization(db)),
-                    Type::Recursive(recursive) => Some(recursive.arguments(db)),
+                    Type::Recursive(recursive) if recursive.definition(db).is_some() => {
+                        Some(recursive.arguments(db))
+                    }
                     _ => None,
                 };
                 if let Some(arguments) = arguments {

@@ -1945,3 +1945,142 @@ def grandchild_value(value: Levels[object, object, U]) -> U:
 def probe(value: Levels[int, str, bytes]):
     reveal_type(grandchild_value(value))  # revealed: bytes
 ```
+
+## Inferring recursive callback solutions
+
+Passing the identity function relates the argument and return types of the callback. The inferred
+result is an integer or a tuple containing another such value. In the display, `μ$0. ...` binds `$0`
+to the whole type. Subscripting the tuple recovers that same recursive type, and the result cannot
+be assigned to `str`.
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def fixed(callback: Callable[[T], tuple[T] | int]) -> T:
+    raise NotImplementedError
+
+def identity(value: U) -> U:
+    return value
+
+root = fixed(identity)
+reveal_type(root)  # revealed: μ$0. tuple[$0] | int
+if isinstance(root, tuple):
+    reveal_type(root)  # revealed: tuple[μ$0. tuple[$0] | int]
+    reveal_type(root[0])  # revealed: μ$0. tuple[$0] | int
+wrong: str = root  # error: [invalid-assignment]
+```
+
+The body of `μ` extends as far to the right as possible, so the recursive type is parenthesized when
+it is an element of a union.
+
+```py
+def either(flag: bool):
+    reveal_type(root if flag else None)  # revealed: (μ$0. tuple[$0] | int) | None
+```
+
+## Mutually recursive callback solutions
+
+Each callback relates its parameter to a type that mentions the other type variable, so the two are
+solved together. `μ{$0; $1 = …}. body` names the displayed type `$0` and the other type that it
+refers to.
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+def identity(value: V) -> V:
+    return value
+
+def fixed_pair(first: Callable[[T], tuple[U] | int], second: Callable[[U], list[T]]) -> tuple[T, U]:
+    raise NotImplementedError
+
+# revealed: tuple[μ{$0; $1 = list[$0]}. tuple[$1] | int, μ{$0; $1 = tuple[$0] | int}. list[$1]]
+reveal_type(fixed_pair(identity, identity))
+```
+
+The bound `A ≤ tuple[int, B, C]` and the bound of `B` also imply
+`A ≤ tuple[int, tuple[str, C, D], C]`, and so on for every variable and every depth. All of these
+bounds describe the same solution, which is formed from the bounds that are not unrolled.
+
+```py
+A = TypeVar("A")
+B = TypeVar("B")
+C = TypeVar("C")
+D = TypeVar("D")
+
+def fixed_cycle(
+    first: Callable[[A], tuple[int, B, C]],
+    second: Callable[[B], tuple[str, C, D]],
+    third: Callable[[C], tuple[bytes, D, A]],
+    fourth: Callable[[D], tuple[None, A, B]],
+) -> A:
+    raise NotImplementedError
+
+# revealed: μ{$0; $1 = tuple[str, $2, $3]; $2 = tuple[bytes, $3, $0]; $3 = tuple[None, $0, $1]}. tuple[int, $1, $2]
+reveal_type(fixed_cycle(identity, identity, identity, identity))
+```
+
+## Recursive callback solutions through implicit aliases
+
+The callback's return type contains an implicit recursive alias whose argument refers to the
+inferred result. The outer tuple guards that reference, so the result is a recursive type that
+contains the alias.
+
+```py
+from typing import Callable, TypeAlias, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+Repeated: TypeAlias = V | tuple["Repeated[V]"]
+
+def fixed(callback: Callable[[T], tuple[Repeated[T]] | int]) -> T:
+    raise NotImplementedError
+
+def identity(value: U) -> U:
+    return value
+
+root = fixed(identity)
+reveal_type(root)  # revealed: μ$0. tuple[Repeated[$0]] | int
+if isinstance(root, tuple):
+    reveal_type(root[0])  # revealed: Repeated[μ$0. tuple[Repeated[$0]] | int]
+```
+
+## Specializing inferred recursive values
+
+The inferred recursive attribute retains the class's type parameter. Access through a specialized
+instance substitutes that parameter throughout the recursive type, including after subscripting. The
+two specializations remain independent.
+
+```py
+from typing import Callable, Generic, TypeVar, cast
+
+T = TypeVar("T")
+E = TypeVar("E")
+U = TypeVar("U")
+
+def labelled(callback: Callable[[T], tuple[T, E] | None], label: E) -> T:
+    raise NotImplementedError
+
+def identity(value: U) -> U:
+    return value
+
+class Tree(Generic[E]):
+    node = labelled(identity, cast(E, None))
+    reveal_type(node)  # revealed: μ$0. tuple[$0, E@Tree] | None
+
+first = Tree[int]().node
+second = Tree[str]().node
+reveal_type(first)  # revealed: μ$0. tuple[$0, int] | None
+reveal_type(second)  # revealed: μ$0. tuple[$0, str] | None
+if first is not None:
+    reveal_type(first[0])  # revealed: μ$0. tuple[$0, int] | None
+    reveal_type(first[1])  # revealed: int
+wrong: str = first  # error: [invalid-assignment]
+```

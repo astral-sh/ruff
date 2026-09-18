@@ -105,6 +105,7 @@ use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
+use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, TypeVarSet};
 use crate::types::visitor::{
@@ -4548,6 +4549,26 @@ impl<'db> Solution<'db> {
             SolutionValidity::Valid => &[],
             SolutionValidity::Invalid(violations) => violations,
         }
+    }
+
+    /// The selected solutions with their dependencies on each other resolved. A solution whose
+    /// dependencies cannot be resolved is retained as it was selected.
+    pub(crate) fn resolved_typevars(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> impl Iterator<Item = TypeVarSolution<'db>> {
+        let resolved = resolve_solution(db, env, inferable, &self.solved_typevars).types;
+        self.solved_typevars
+            .iter()
+            .zip(resolved)
+            .map(|(binding, resolved)| TypeVarSolution {
+                bound_typevar: binding.bound_typevar,
+                solution: match resolved {
+                    SolutionType::Resolved(ty) | SolutionType::Unresolved(ty) => ty,
+                },
+            })
     }
 }
 
