@@ -7,13 +7,106 @@ use crate::types::{
     call::CallErrorKind,
     context::InferContext,
     diagnostic::NOT_ITERABLE,
+    function::function_has_stub_body,
+    infer::infer_expression_types,
     todo_type,
     tuple::{TupleSpec, TupleSpecBuilder},
 };
 use compact_str::ToCompactString;
+use ruff_db::diagnostic::{Annotation, Span};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
+use ruff_python_ast::token::TokenKind;
+use ruff_text_size::{Ranged, TextRange};
 use std::borrow::Cow;
-use ty_python_core::EvaluationMode;
+use ty_module_resolver::{SearchPath, file_to_module};
+use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::{EvaluationMode, semantic_index};
+
+/// Points to a coroutine declaration that may have been intended to describe an async generator.
+pub(super) fn add_async_generator_stub_help<'db>(
+    db: &'db dyn Db,
+    diagnostic: &mut LintDiagnosticGuard<'_, '_>,
+    definition: Definition<'db>,
+) {
+    let Some((span, name)) = async_generator_stub_declaration(db, definition) else {
+        return;
+    };
+    let is_first_party = diagnostic
+        .primary_span()
+        .is_some_and(|primary| primary.file() == span.file())
+        || file_to_module(db, definition.program_file(db).resolver_file(db))
+            .and_then(|module| module.search_path(db))
+            .is_some_and(SearchPath::is_first_party);
+
+    diagnostic.annotate(
+        Annotation::secondary(span.clone())
+            .message("Without `yield` in the function body this function returns a coroutine"),
+    );
+    if is_first_party {
+        diagnostic.help(format_args!(
+            "To declare `{name}` as an async generator, use `def` rather than `async def` or add `yield` to the body"
+        ));
+    } else {
+        diagnostic.help(
+            "If an async generator was intended, report this stub to the library maintainers",
+        );
+    }
+}
+
+/// Only stub-like bodies warrant advice about changing the declaration. A coroutine with an
+/// implementation can intentionally return an async iterator, which its caller must await.
+#[salsa::tracked]
+fn async_generator_stub_declaration<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<(Span, Name)> {
+    let DefinitionKind::Function(function) = definition.kind(db) else {
+        return None;
+    };
+    let module = parsed_module(db, definition.program_file(db).python_file(db)).load(db);
+    let node = function.node(&module);
+    if !node.is_async || !function_has_stub_body(node) {
+        return None;
+    }
+    // Start at `async`, excluding any decorators from the declaration's range.
+    let start = module
+        .tokens()
+        .in_range(TextRange::new(node.start(), node.name.start()))
+        .iter()
+        .rfind(|token| token.kind() == TokenKind::Async)?
+        .start();
+    let end = node
+        .returns
+        .as_ref()
+        .map_or(node.parameters.end(), |returns| returns.end());
+    Some((
+        Span::from(definition.file(db)).with_range(TextRange::new(start, end)),
+        node.name.id.clone(),
+    ))
+}
+
+/// Finds the declaration for a directly called, non-overloaded iterable factory.
+///
+/// The iterable has already been inferred as a standalone expression. Reuse that result rather
+/// than inferring its enclosing scope while that scope's diagnostics are still being collected.
+fn iterable_factory_definition<'db>(
+    context: &InferContext<'db, '_>,
+    iterable_node: ast::AnyNodeRef,
+) -> Option<Definition<'db>> {
+    let call = *iterable_node.as_expr_call()?;
+    let db = context.db();
+    let expression = semantic_index(db, context.program_file()).try_expression(call)?;
+    let inference = infer_expression_types(db, expression, TypeContext::default());
+    let bindings = inference
+        .expression_type(call.func.as_ref())
+        .bindings(db, context.program_environment());
+    let [overload] = bindings.single_element()?.overloads() else {
+        return None;
+    };
+    overload.signature.definition()
+}
 
 /// Extract the element types from an expression with a statically known fixed-length iteration.
 ///
@@ -68,6 +161,31 @@ pub(crate) fn extract_fixed_length_iterable_element_types<'db>(
 }
 
 impl<'db> Type<'db> {
+    /// Recognizes coroutines whose results can be iterated over asynchronously.
+    ///
+    /// These can arise from async generator stubs that omit `yield`, or from
+    /// coroutine functions whose results need to be awaited before iteration.
+    pub(super) fn coroutine_returning_async_iterable(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        let Type::NominalInstance(instance) = self else {
+            return None;
+        };
+        if !instance.has_known_class(db, KnownClass::CoroutineType) {
+            return None;
+        }
+        let result = self.try_await(db, env).ok()?;
+        if result.is_dynamic() || result.is_never() {
+            return None;
+        }
+        result
+            .try_iterate_with_mode(db, env, EvaluationMode::Async)
+            .ok()?;
+        Some(result)
+    }
+
     /// Returns a tuple spec describing the elements that are produced when iterating over `self`.
     ///
     /// This method should only be used outside of type checking because it omits any errors.
@@ -168,12 +286,9 @@ impl<'db> Type<'db> {
                     Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
                 }
                 Type::TypeAlias(alias) => non_async_special_case(db, env, alias.value_type(db)),
-                Type::Recursive(recursive) => recursive.map_or_else(
-                    db,
-                    env,
-                    || None,
-                    |unfolded| non_async_special_case(db, env, unfolded),
-                ),
+                Type::Recursive(recursive) => {
+                    non_async_special_case(db, env, recursive.unfold(db, env).into_unfolded()?)
+                }
                 Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db, env)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
                         non_async_special_case(db, env, bound)
@@ -1070,7 +1185,17 @@ impl<'db> IterationError<'db> {
             },
 
             IterationError::UnboundAiterError => {
-                reporter.is_not("It has no `__aiter__` method", ErrorContext::Disabled);
+                let mut diagnostic =
+                    reporter.is_not("It has no `__aiter__` method", ErrorContext::Disabled);
+                if iterable_type
+                    .coroutine_returning_async_iterable(db, env)
+                    .is_some()
+                {
+                    diagnostic.help("`await` the coroutine before iterating over its result");
+                    if let Some(definition) = iterable_factory_definition(context, iterable_node) {
+                        add_async_generator_stub_help(db, &mut diagnostic, definition);
+                    }
+                }
             }
         }
     }

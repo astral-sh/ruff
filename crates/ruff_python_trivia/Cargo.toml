@@ -20,6 +20,7 @@ itertools = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
 unicode-ident = { workspace = true }
+unicode-normalization = { workspace = true }
 
 [lints]
 workspace = true

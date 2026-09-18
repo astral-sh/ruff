@@ -2185,6 +2185,88 @@ def gradual_enum_union_inequality(value: Color | Any, other: Color):
         reveal_type(value)  # revealed: Color | Any
 ```
 
+## Chained comparisons against distinct enum alternatives
+
+The enum class can be one of two unrelated classes, so each comparison can fail even if `item` is
+one of the two members being compared. Successive failed comparisons add no exclusions to the
+unknown type; the earlier `str` exclusion still applies. In particular, the number of alternatives
+does not grow with each branch:
+
+```py
+from enum import Enum
+
+class First(Enum):
+    A = 1
+    B = 2
+    C = 3
+    D = 4
+    E = 5
+    F = 6
+    G = 7
+    H = 8
+    I = 9
+    J = 10
+
+class Second(Enum):
+    A = 1
+    B = 2
+    C = 3
+    D = 4
+    E = 5
+    F = 6
+    G = 7
+    H = 8
+    I = 9
+    J = 10
+
+def describe(item, choice: bool):
+    enum = First if choice else Second
+    if isinstance(item, str):
+        return item
+
+    if item == enum.A:
+        name = "a"
+    elif item == enum.B:
+        name = "b"
+    elif item == enum.C:
+        name = "c"
+    elif item == enum.D:
+        name = "d"
+    elif item == enum.E:
+        name = "e"
+    elif item == enum.F:
+        name = "f"
+    elif item == enum.G:
+        name = "g"
+    elif item == enum.H:
+        name = "h"
+    elif item == enum.I:
+        name = "i"
+    elif item == enum.J:
+        name = "j"
+    else:
+        reveal_type(item)  # revealed: Unknown & ~str
+        raise ValueError(item)
+
+    return name
+```
+
+The true branch of `!=` keeps the same type. Comparing with one known member, however, still
+excludes that specific member:
+
+```py
+def exclusions(item, choice: bool):
+    enum = First if choice else Second
+    if isinstance(item, str):
+        return
+
+    if item != enum.A:
+        reveal_type(item)  # revealed: Unknown & ~str
+
+    if item != First.A:
+        reveal_type(item)  # revealed: Unknown & ~str & ~Literal[First.A]
+```
+
 ## Unions of gradual string literals
 
 Comparing a union of string literals intersected with `Any` keeps the matching alternative for

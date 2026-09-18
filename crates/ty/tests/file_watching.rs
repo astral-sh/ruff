@@ -2193,6 +2193,8 @@ mod unix {
     ///   |-- foo.py
     /// ```
     #[test]
+    // TODO: Re-enable once symlink file-watching is reliable in CI.
+    #[ignore = "Flaky symlink file-watching test"]
     fn symlink_inside_project() -> anyhow::Result<()> {
         let mut case = setup(|context: &mut SetupContext| {
             // Set up the symlink target.

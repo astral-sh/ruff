@@ -114,7 +114,7 @@ impl<'db> TypeExpander<'_, 'db> {
                 .visitor
                 .visit(db, ty, || self.expand(alias.value_type(db))),
             Type::Recursive(recursive) => self.visitor.visit(db, ty, || {
-                recursive.map_or(db, env, None, |unfolded| self.expand(unfolded))
+                self.expand(recursive.unfold(db, env).into_unfolded()?)
             }),
             // We don't handle `type[A | B]` here because it's already stored in the expanded form
             // i.e., `type[A] | type[B]` which is handled by the `Type::Union` case.

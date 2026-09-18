@@ -3694,6 +3694,7 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash",
  "unicode-ident",
+ "unicode-normalization",
 ]
 
 [[package]]
