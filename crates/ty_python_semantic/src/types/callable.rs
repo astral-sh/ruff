@@ -11,6 +11,7 @@ use crate::{
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
+        cyclic::{ActiveRecursionDetector, TypeIdentity},
         function::OverloadLiteral,
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
@@ -60,8 +61,9 @@ impl<'db> Type<'db> {
             db,
             env,
             UpcastPolicy::default(),
-            CallableUpcastContext {
+            &CallableUpcastContext {
                 recursive_definition,
+                ..CallableUpcastContext::default()
             },
         )
     }
@@ -76,7 +78,7 @@ impl<'db> Type<'db> {
             db,
             env,
             policy,
-            CallableUpcastContext::default(),
+            &CallableUpcastContext::default(),
         )
     }
 
@@ -85,7 +87,21 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         policy: UpcastPolicy,
-        context: CallableUpcastContext<'db>,
+        context: &CallableUpcastContext<'db>,
+    ) -> Option<CallableTypes<'db>> {
+        context.active.visit(
+            &self.to_callable_type_identity(db, env),
+            || None,
+            || self.try_upcast_to_callable_impl(db, env, policy, context),
+        )
+    }
+
+    fn try_upcast_to_callable_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        policy: UpcastPolicy,
+        context: &CallableUpcastContext<'db>,
     ) -> Option<CallableTypes<'db>> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
             return fallback
@@ -308,7 +324,8 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => intersection
                 .finite_alternative_union(db, env)
                 .and_then(|alternatives| {
-                    alternatives.try_upcast_to_callable_with_policy(db, env, policy)
+                    alternatives
+                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)
                 }),
 
             Type::EnumComplement(complement) => complement
@@ -328,13 +345,14 @@ impl<'db> Type<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Debug, Default)]
 struct CallableUpcastContext<'db> {
     recursive_definition: Option<Definition<'db>>,
+    active: ActiveRecursionDetector<TypeIdentity<'db>>,
 }
 
 impl<'db> CallableUpcastContext<'db> {
-    fn is_recursive_reference(self, db: &'db dyn Db, function: FunctionType<'db>) -> bool {
+    fn is_recursive_reference(&self, db: &'db dyn Db, function: FunctionType<'db>) -> bool {
         self.recursive_definition
             .is_some_and(|definition| function.contains_definition(db, definition))
     }

@@ -706,6 +706,184 @@ assert_type(infer_return((callback, callback, callback), 0), Unknown)
 assert_type(infer_return(default=0, callback=(callback, callback, callback)), Unknown)
 ```
 
+## Recursive callable instances
+
+A recursive `__call__` attribute that never resolves to a callable type is not traversed infinitely
+during callable inference:
+
+```py
+from typing import Callable, TypeVar
+from ty_extensions._internal import CallableTypeOf, RegularCallableTypeOf
+
+class Recursive:
+    __call__: "Recursive"
+
+def _(callback: Recursive):
+    x: Callable[[int], str] = callback  # error: [invalid-assignment]
+
+    x1: CallableTypeOf[callback]  # error: [invalid-type-form]
+    x2: RegularCallableTypeOf[callback]  # error: [invalid-type-form]
+```
+
+Expanding a recursive protocol can change its specialization without reaching a callable signature:
+
+```py
+from typing import Protocol
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Growing(Protocol[T_co]):
+    @property
+    def __call__(self) -> "Growing[list[T_co]]": ...
+
+def _(callback: Growing[int]):
+    x: CallableTypeOf[callback]  # error: [invalid-type-form]
+```
+
+The same applies to nominal classes whose `__call__` values grow recursively:
+
+```py
+from typing import Generic
+
+T = TypeVar("T")
+
+class GrowingInstance(Generic[T]):
+    @property
+    def __call__(self) -> "GrowingInstance[list[T]]":
+        raise NotImplementedError
+
+def _(callback: GrowingInstance[int]):
+    x: CallableTypeOf[callback]  # error: [invalid-type-form]
+```
+
+The growing reference can pass through another class:
+
+```py
+class First(Generic[T]):
+    @property
+    def __call__(self) -> "Second[list[T]]":
+        raise NotImplementedError
+
+class Second(Generic[T]):
+    @property
+    def __call__(self) -> First[T]:
+        raise NotImplementedError
+
+def _(callback: First[int]):
+    x: CallableTypeOf[callback]  # error: [invalid-type-form]
+```
+
+However, different specializations of the same class can lead to a concrete signature:
+
+```py
+class Wrapper(Generic[T]):
+    @property
+    def __call__(self) -> T:
+        raise NotImplementedError
+
+def apply(callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+def _(callback: Wrapper[Wrapper[Callable[[int], str]]]):
+    reveal_type(apply(callback))  # revealed: str
+```
+
+Recursive members other than `__call__` do not prevent conversion, even if their specializations
+grow:
+
+```py
+class ProtocolWrapper(Protocol[T]):
+    @property
+    def __call__(self) -> T: ...
+    @property
+    def unrelated(self) -> "ProtocolWrapper[list[T]]": ...
+
+def _(callback: ProtocolWrapper[ProtocolWrapper[Callable[[int], str]]]):
+    reveal_type(apply(callback))  # revealed: str
+
+    x: Callable[[int], str] = callback
+```
+
+Recursion in the signature itself does not prevent callable conversion. We do not follow the return
+type's `__call__`:
+
+```py
+class RecursiveSignature(Generic[T]):
+    def __call__(self, value: int) -> "RecursiveSignature[list[T]]":
+        raise NotImplementedError
+
+def _(callback: RecursiveSignature[int]):
+    reveal_type(apply(callback))  # revealed: RecursiveSignature[list[int]]
+```
+
+## Aliases in recursive callable instances
+
+Aliases in a finite callable wrapper chain preserve its signature, even when unrelated members
+recursively refer to the alias:
+
+```py
+from typing import Callable, Protocol, TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+
+class Wrapper(Protocol[T]):
+    @property
+    def __call__(self) -> T: ...
+    @property
+    def unrelated(self) -> "Alias[list[T]]": ...
+
+Alias = TypeAliasType("Alias", Wrapper[T], type_params=(T,))
+
+def apply(callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+def _(callback: Alias[Alias[Callable[[int], str]]]):
+    reveal_type(apply(callback))  # revealed: str
+
+    x: int = apply(callback)  # error: [invalid-assignment]
+```
+
+An alias whose `__call__` chain grows without reaching a signature cannot be converted to a
+callable:
+
+```py
+from ty_extensions._internal import CallableTypeOf
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Growing(Protocol[T_co]):
+    @property
+    def __call__(self) -> "GrowingAlias[list[T_co]]": ...
+
+GrowingAlias = TypeAliasType("GrowingAlias", Growing[T_co], type_params=(T_co,))
+
+def _(callback: GrowingAlias[int]):
+    x: CallableTypeOf[callback]  # error: [invalid-type-form]
+```
+
+## Unused type parameters in callable instances
+
+`Recursive[T]` reaches `T` through `Wrapper.__call__`. The reference to `Recursive[list[T]]` is
+passed to an unused parameter, so it does not make this callable chain infinite:
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Wrapper(Generic[T, U]):
+    __call__: T
+
+class Recursive(Generic[T]):
+    __call__: "Wrapper[T, Recursive[list[T]]]"
+
+def _(callback: Recursive[Recursive[Callable[[], int]]]):
+    # TODO: This should not error.
+    x: Callable[[], int] = callback  # error: [invalid-assignment]
+```
+
 ## Multiple occurrences of a higher-order generic callable
 
 If a generic callable is used more than once in a higher-order call, each occurrence should get its
