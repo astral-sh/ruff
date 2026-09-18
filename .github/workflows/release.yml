@@ -132,6 +132,8 @@ jobs:
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit # zizmor: ignore[secrets-inherit]
+    permissions:
+      "contents": "read"
 
   custom-build-docker:
     needs:
@@ -156,6 +158,8 @@ jobs:
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit # zizmor: ignore[secrets-inherit]
+    permissions:
+      "contents": "read"
 
   # The custom binary jobs produce checksum sidecars outside cargo-dist.
   # Include them in a local manifest before generating the installers.
@@ -471,6 +475,8 @@ jobs:
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit # zizmor: ignore[secrets-inherit]
+    permissions:
+      "contents": "read"
 
   custom-publish-versions:
     needs:
@@ -480,6 +486,8 @@ jobs:
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit # zizmor: ignore[secrets-inherit]
+    permissions:
+      "contents": "read"
 
   custom-publish-mirror:
     needs:
