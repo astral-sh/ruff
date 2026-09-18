@@ -13,3 +13,51 @@ Iterating over an object that is not iterable will raise a `TypeError` at runtim
 for i in 34:  # error
     pass
 ```
+
+## Common issues
+
+### Async generator stubs
+
+Calling an `async def` function whose body contains `yield` produces an async iterator, which can be
+consumed with `async for`. Without `yield`, calling the function produces a coroutine, and its
+return annotation describes the result of awaiting that coroutine.
+
+This distinction matters in stub files, where replacing the implementation with `...` removes the
+`yield`. For example, this stub describes a coroutine function, even though its return annotation is
+`AsyncIterator[int]`:
+
+```pyi
+# stubs.pyi
+from collections.abc import AsyncIterator
+
+async def values() -> AsyncIterator[int]: ...
+```
+
+Iterating over the coroutine is an error. An `async for` loop awaits each next item; it does not
+automatically await a coroutine to obtain the iterator:
+
+```python
+from stubs import values
+
+
+async def consume() -> None:
+    async for value in values():  # error
+        print(value)
+```
+
+To declare a function that directly produces an async iterator, use `def` in the stub:
+
+```pyi
+def values() -> AsyncIterator[int]: ...
+```
+
+This describes what callers receive. The implementation can still use `async def` and `yield`.
+Alternatively, keep `async def` and include a `yield` expression in the stub body:
+
+```pyi
+async def values() -> AsyncIterator[int]:
+    yield 1
+```
+
+If the function intentionally returns a coroutine that produces an async iterator, await it before
+iterating: `async for value in await values(): ...`.
