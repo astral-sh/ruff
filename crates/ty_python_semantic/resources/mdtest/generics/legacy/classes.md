@@ -1136,7 +1136,82 @@ reveal_type(C(1, True))  # revealed: C[int]
 wrong_innards: C[int] = C("five", 1)
 ```
 
+### Class-scoped type variables in `__init__` receiver annotations
+
+The `invalid-init-type-variable` rule rejects class-scoped type variables in explicit `__init__`
+receiver annotations, including when the variables occur inside another type. Ordinary methods can
+use those variables in their receiver annotations.
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+class Swapped(Generic[T, U]):
+    # error: [invalid-init-type-variable] "First parameter of `__init__` cannot use the class's type variable `U`"
+    # error: [invalid-init-type-variable] "First parameter of `__init__` cannot use the class's type variable `T`"
+    def __init__(self: "Swapped[U, T]") -> None: ...
+
+class Identity(Generic[T]):
+    def __init__(self: "Identity[T]", value: T) -> None: ...  # error: [invalid-init-type-variable]
+    def method(self: "Identity[T]") -> None: ...
+
+class Nested(Generic[T]):
+    # snapshot: invalid-init-type-variable
+    def __init__(self: "Nested[list[T]]") -> None: ...
+```
+
+```snapshot
+error[invalid-init-type-variable]: First parameter of `__init__` cannot use the class's type variable `T`
+  --> src/mdtest_snippet.py:18:37
+   |
+16 | class Nested(Generic[T]):
+   |       ------------------ `T` is a type parameter of this class
+17 |     # snapshot: invalid-init-type-variable
+18 |     def __init__(self: "Nested[list[T]]") -> None: ...
+   |                                     ^ `T` used in the first parameter's annotation here
+info: Using a class's type variables here can make the constructed type ambiguous
+help: Use a new type variable, or omit the first parameter's annotation
+info: See https://typing.python.org/en/latest/spec/constructors.html#init-method
+```
+
+Reporting the diagnostic does not change the inferred type.
+
+```py
+reveal_type(Identity(1))  # revealed: Identity[int]
+```
+
+The restriction also applies to `ParamSpec` and `TypeVarTuple` parameters.
+
+```py
+from typing_extensions import ParamSpec, TypeVarTuple, Unpack
+
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+
+class WithParamSpec(Generic[P]):
+    def __init__(self: "WithParamSpec[P]") -> None: ...  # error: [invalid-init-type-variable]
+
+class WithTuple(Generic[Unpack[Ts]]):
+    def __init__(self: "WithTuple[Unpack[Ts]]") -> None: ...  # error: [invalid-init-type-variable]
+```
+
+Function-scoped type variables can determine the constructed type without referencing the class's
+own type variables.
+
+```py
+class Remapped(Generic[T]):
+    def __init__(self: "Remapped[list[V]]", value: V) -> None: ...
+
+reveal_type(Remapped(1))  # revealed: Remapped[list[Literal[1]]]
+```
+
 ### Some `__init__` overloads only apply to certain specializations
+
+An overload can specialize the receiver. Retaining other class-scoped type variables is rejected,
+but the receiver annotation still participates in overload resolution.
 
 ```py
 from typing_extensions import overload, Generic, TypeVar
@@ -1183,6 +1258,7 @@ C[None](12)
 
 class D(Generic[T, U]):
     @overload
+    # error: [invalid-init-type-variable]
     def __init__(self: "D[str, U]", u: U) -> None: ...
     @overload
     def __init__(self, t: T, u: U) -> None: ...

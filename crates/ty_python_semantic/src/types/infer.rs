@@ -2404,6 +2404,9 @@ bitflags::bitflags! {
 
         /// Whether the current method's explicit receiver annotation is incompatible with `Self`.
         const HAS_INCOMPATIBLE_SELF_RECEIVER = 1 << 14;
+
+        /// Whether the visitor is currently visiting an explicit `__init__` receiver annotation.
+        const IN_INIT_RECEIVER_ANNOTATION = 1 << 15;
     }
 }
 

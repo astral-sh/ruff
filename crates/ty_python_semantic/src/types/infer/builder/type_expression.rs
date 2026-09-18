@@ -1,4 +1,5 @@
 use itertools::Either;
+use ruff_db::diagnostic::Annotation;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
@@ -13,8 +14,8 @@ use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
 use crate::types::definition_resolution::{ImportAliasResolution, resolve_definition};
 use crate::types::diagnostic::{
-    self, EXPERIMENTAL_SYNTAX, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE,
-    UNSUPPORTED_OPERATOR, report_invalid_argument_number_to_special_form,
+    self, EXPERIMENTAL_SYNTAX, INVALID_INIT_TYPE_VARIABLE, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE,
+    UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
     report_missing_type_arguments, report_unsupported_binary_operation,
 };
@@ -36,7 +37,7 @@ use crate::types::{
     IntersectionType, InvalidTypeExpression, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeContext, TypeFormType,
     TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type,
-    todo_type,
+    binding_type, todo_type,
 };
 use crate::{FxOrderSet, SemanticModel, add_inferred_python_version_hint_to_diagnostic};
 
@@ -3376,6 +3377,42 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// invalid scope does not also make `Callable[P, R]` or `tuple[*Ts]` appear malformed.
     fn check_type_variable_scope(&self, expression: &ast::Expr, ty: Type<'db>) -> Type<'db> {
         let db = self.db();
+        if let Type::TypeVar(typevar) = ty
+            && !typevar.typevar(db).is_self(db)
+            && self
+                .inference_flags()
+                .contains(InferenceFlags::IN_INIT_RECEIVER_ANNOTATION)
+            && let Some(owner) = typevar.binding_context(db).definition()
+            && matches!(owner.kind(db), DefinitionKind::Class(_))
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_INIT_TYPE_VARIABLE, expression)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "First parameter of `__init__` cannot use the class's type variable `{}`",
+                typevar.name(db)
+            ));
+            diagnostic.set_concise_message(format_args!(
+                "First parameter of `__init__` cannot use the class's type variable `{}`",
+                typevar.name(db)
+            ));
+            diagnostic.set_primary_annotation_message(format_args!(
+                "`{}` used in the first parameter's annotation here",
+                typevar.name(db)
+            ));
+            if let Type::ClassLiteral(class) = binding_type(db, owner) {
+                diagnostic.annotate(Annotation::secondary(class.header_span(db)).message(
+                    format_args!("`{}` is a type parameter of this class", typevar.name(db)),
+                ));
+            }
+            diagnostic.info(
+                "Using a class's type variables here can make the constructed type ambiguous",
+            );
+            diagnostic.help("Use a new type variable, or omit the first parameter's annotation");
+            diagnostic
+                .info("See https://typing.python.org/en/latest/spec/constructors.html#init-method");
+        }
+
         // Legacy aliases introduce independent type parameters. PEP 695 aliases can instead
         // capture their enclosing class's parameters.
         if let Type::TypeVar(typevar) = ty
