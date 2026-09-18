@@ -716,6 +716,18 @@ reveal_type(C(1))  # revealed: C[int]
 wrong_innards: C[int] = C("five")
 ```
 
+An explicit `cls: type[Self]` annotation does not affect the inferred type:
+
+```py
+from typing_extensions import Self
+
+class Explicit(Generic[T]):
+    def __new__(cls: type[Self], x: T) -> "Explicit[T]":
+        return object.__new__(cls)
+
+reveal_type(Explicit(1))  # revealed: Explicit[int]
+```
+
 ### `__init__` only
 
 ```py
@@ -736,6 +748,17 @@ reveal_type(C(1))  # revealed: C[int]
 
 # error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
+```
+
+An explicit `self: Self` annotation does not affect the inferred type:
+
+```py
+from typing_extensions import Self
+
+class Explicit(Generic[T]):
+    def __init__(self: Self, x: T) -> None: ...
+
+reveal_type(Explicit(1))  # revealed: Explicit[int]
 ```
 
 ### Constructing the class from its own type variable

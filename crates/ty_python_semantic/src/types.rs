@@ -7451,6 +7451,7 @@ impl<'db> Type<'db> {
             env: &ProgramEnvironment<'db>,
             bindings: Bindings<'db>,
             self_type: Type<'db>,
+            instance_type: Type<'db>,
         ) -> Bindings<'db> {
             bindings.map(|binding| {
                 let mut binding = binding;
@@ -7459,7 +7460,8 @@ impl<'db> Type<'db> {
                 // Note: This intentionally preserves `type.__call__` behavior for `@classmethod __new__`,
                 // which receives an extra implicit `cls` and errors at call sites.
                 binding.bake_bound_type_into_overloads(db, env);
-                binding.bound_type = Some(self_type);
+                binding = binding.with_bound_type(self_type);
+                binding.bind_unused_self(db, env, instance_type);
                 binding
             })
         }
@@ -7586,12 +7588,18 @@ impl<'db> Type<'db> {
                 Some(place) => match resolve_dunder_new_callable(db, env, self_type, place) {
                     Some((new_callable, definedness)) => {
                         let bindings = new_callable.bindings_impl(db, env, recursion_guard);
-                        let mut bindings = bind_constructor_new(db, env, bindings, self_type)
-                            .into_constructor_bindings(
-                                constructor_instance_ty,
-                                ConstructorCallableKind::New,
-                            )
-                            .with_constructed_instance_type(db, constructor_instance_ty);
+                        let mut bindings = bind_constructor_new(
+                            db,
+                            env,
+                            bindings,
+                            self_type,
+                            constructor_instance_ty,
+                        )
+                        .into_constructor_bindings(
+                            constructor_instance_ty,
+                            ConstructorCallableKind::New,
+                        )
+                        .with_constructed_instance_type(db, constructor_instance_ty);
                         if definedness == Definedness::PossiblyUndefined {
                             bindings.set_implicit_dunder_new_is_possibly_unbound();
                         }
@@ -7674,7 +7682,15 @@ impl<'db> Type<'db> {
                     }
                 }
                 (Place::Undefined, true) => None,
-            };
+            }
+            .map(|mut bindings| {
+                for binding in bindings.iter_flat_mut() {
+                    if let Some(self_type) = binding.typing_self_type(db) {
+                        binding.bind_unused_self(db, env, self_type);
+                    }
+                }
+                bindings
+            });
 
             let constructor_bindings = if let Some(mut new_bindings) = new_bindings {
                 // Preserve the full `__new__` signature and defer `__init__` validation until we know
