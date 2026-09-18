@@ -141,6 +141,66 @@ fn merge_truthiness_guarded_pair<'db>(
     }
 }
 
+/// Fold `(T & ~A) | (T & ~B)` to `T` when `A` and `B` are disjoint.
+///
+/// The common part can itself contain exclusions. For example,
+/// `(Unknown & ~str & ~A) | (Unknown & ~str & ~B)` simplifies to `Unknown & ~str`.
+fn merge_disjoint_exclusions<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> Option<Type<'db>> {
+    let (Type::Intersection(left), Type::Intersection(right)) = (left, right) else {
+        return None;
+    };
+    let left_positive = left.positive(db);
+    let right_positive = right.positive(db);
+    let left_negative = left.negative(db);
+    let right_negative = right.negative(db);
+
+    if left_negative.is_empty()
+        || left_negative.len() != right_negative.len()
+        || left_positive.len() != right_positive.len()
+        || !left_positive.iter().all(|ty| right_positive.contains(ty))
+    {
+        return None;
+    }
+
+    let mut left_only = left_negative
+        .iter()
+        .filter(|ty| !right_negative.contains(ty));
+    let left_exclusion = *left_only.next()?;
+    if left_only.next().is_some() {
+        return None;
+    }
+    let right_exclusion = *right_negative
+        .iter()
+        .find(|ty| !left_negative.contains(ty))?;
+
+    if simplify_intersection_pair(
+        db,
+        env,
+        left_exclusion,
+        right_exclusion,
+        IntersectionPolarity::Positive,
+    ) != IntersectionSimplification::Disjoint
+    {
+        return None;
+    }
+
+    let mut common = IntersectionBuilder::new(db, env);
+    for positive in left_positive {
+        common.add_positive_in_place(*positive);
+    }
+    for negative in left_negative {
+        if *negative != left_exclusion {
+            common.add_negative_in_place(*negative);
+        }
+    }
+    Some(common.build())
+}
+
 /// Return `true` if union simplification should preserve this pair because one element is
 /// `Hashable` and the other is a non-final nominal instance.
 ///
@@ -1001,6 +1061,7 @@ impl<'db> UnionBuilder<'db> {
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
+        let mut merged_exclusions = None;
 
         for (i, element) in self.elements.iter_mut().enumerate() {
             let element_type = match element.try_reduce(db, &self.env, ty, self.cycle_recovery) {
@@ -1088,6 +1149,11 @@ impl<'db> UnionBuilder<'db> {
                 {
                     continue;
                 }
+                if let Some(merged) = merge_disjoint_exclusions(db, &self.env, ty, element_type) {
+                    to_remove.push(i);
+                    merged_exclusions = Some(merged);
+                    break;
+                }
                 if ty.is_redundant_with(db, &self.env, element_type) {
                     return;
                 }
@@ -1111,6 +1177,15 @@ impl<'db> UnionBuilder<'db> {
                     return;
                 }
             }
+        }
+
+        if let Some(merged) = merged_exclusions {
+            for index in to_remove.into_iter().rev() {
+                self.elements.swap_remove(index);
+            }
+            // The common part can also subsume elements we already visited.
+            self.add_in_place_impl(merged, seen_aliases);
+            return;
         }
 
         let mut to_remove = to_remove.into_iter();
