@@ -924,6 +924,13 @@ impl SearchPaths {
             .filter_map(SearchPath::as_system_path)
     }
 
+    /// Returns the site-packages directories used for module resolution.
+    pub fn site_packages_paths(&self) -> impl Iterator<Item = &SystemPath> {
+        self.site_packages
+            .iter()
+            .filter_map(SearchPath::as_system_path)
+    }
+
     /// Registers file roots for all non-dynamically discovered search paths.
     pub fn try_register_static_roots(&self, db: &dyn Db) {
         let files = db.files();

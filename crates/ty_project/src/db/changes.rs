@@ -9,6 +9,7 @@ use ruff_db::Db as _;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
+use ty_module_resolver::SearchPaths;
 use ty_python_core::program::FallibleStrategy;
 use ty_python_semantic::PythonEnvironment;
 
@@ -141,13 +142,21 @@ impl ProjectDatabase {
         for change in changes {
             tracing::debug!("Handling file watcher change event: {:?}", change);
 
-            refresh_program_settings |= affects_python_environment(
+            let search_paths = project.program(self).search_paths(self);
+            let environment_changed = affects_python_environment(
                 change,
                 virtual_environment.as_deref(),
                 python_path.as_deref(),
+                search_paths,
             );
+            refresh_program_settings |= environment_changed;
 
-            if uv_enabled && !reload_project && affects_uv_metadata(change) {
+            // Recreating an environment can change uv's reported interpreter and installed
+            // module ownership without changing the lockfile.
+            if uv_enabled
+                && !reload_project
+                && (environment_changed || affects_uv_metadata(change, search_paths))
+            {
                 reload_project = true;
             }
 
@@ -512,8 +521,9 @@ fn is_ignore_file(path: &SystemPath) -> bool {
 /// uv writes `pyvenv.cfg` before creating `site-packages`. If these events arrive in separate
 /// batches, creating `site-packages` must retry resolution. A watcher may only report the creation
 /// of the `site-packages` parent `lib` or `lib/pythonX.Y` directory, so we also handle those
-/// directories (`lib64` on some Unix systems, `Lib` on Windows). We match `site-packages` by name;
-/// an unrelated directory only causes an extra refresh of the same settings.
+/// directories (`lib64` on some Unix systems, `Lib` on Windows). Until environment resolution
+/// succeeds, match these directories against the candidate environment's layout. Existing
+/// site-packages paths can also lie outside the environment, so match those paths directly.
 ///
 /// Similar to `site-packages`, renaming a directory to `.venv` can change the inferred virtual
 /// environment without an event for `pyvenv.cfg`. That's why we need to rediscover the virtual
@@ -522,6 +532,7 @@ fn affects_python_environment(
     change: &ChangeEvent,
     virtual_environment: Option<&SystemPath>,
     python_path: Option<&SystemPath>,
+    search_paths: &SearchPaths,
 ) -> bool {
     let may_be_environment_root = |path: &SystemPath| {
         virtual_environment == Some(path)
@@ -551,14 +562,25 @@ fn affects_python_environment(
             path,
             kind: DeletedKind::Directory | DeletedKind::Any,
         } => {
-            if path.file_name() == Some("site-packages") {
+            if search_paths
+                .site_packages_paths()
+                .any(|root| root == path.as_path())
+            {
                 return true;
             }
 
+            let path = if path.file_name() == Some("site-packages") {
+                let Some(parent) = path.parent() else {
+                    return false;
+                };
+                parent
+            } else {
+                path.as_path()
+            };
             let is_library =
                 |path: &SystemPath| matches!(path.file_name(), Some("lib" | "lib64" | "Lib"));
             let library = if is_library(path) {
-                Some(path.as_path())
+                Some(path)
             } else {
                 path.parent().filter(|parent| is_library(parent))
             };
@@ -570,7 +592,7 @@ fn affects_python_environment(
     }
 }
 
-fn affects_uv_metadata(change: &ChangeEvent) -> bool {
+fn affects_uv_metadata(change: &ChangeEvent, search_paths: &SearchPaths) -> bool {
     // `uv workspace metadata` checks and may update the lockfile before exporting it. It also
     // reads the selected environment:
     // - `pyproject.toml` defines workspace membership and dependencies, which affect
@@ -588,14 +610,35 @@ fn affects_uv_metadata(change: &ChangeEvent) -> bool {
     // A matching name in an unrelated watched path may also trigger a refresh. The event path is
     // not passed to uv, so it cannot make ty use the other project's metadata. If this project's
     // metadata and settings are unchanged, the false positive only costs a no-op uv workspace metadata call.
-    matches!(
-        change,
+    match change {
         ChangeEvent::Created { path, .. }
         | ChangeEvent::Changed { path, .. }
         | ChangeEvent::Deleted { path, .. }
             if matches!(
                 path.file_name(),
                 Some("pyproject.toml" | "uv.lock" | "uv.toml" | ".python-version")
-            )
-    )
+            ) =>
+        {
+            true
+        }
+
+        // uv derives `module_owners` from installed distributions in `site-packages`, not just the
+        // lockfile. `uv pip uninstall` or `uv sync --frozen` can remove or create a `.dist-info`
+        // directory without updating `uv.lock`. Use the project's site-packages paths so changes
+        // to unrelated environments do not request new metadata.
+        ChangeEvent::Created { path, .. } | ChangeEvent::Deleted { path, .. }
+            if path
+                .file_name()
+                .is_some_and(|name| name.ends_with(".dist-info"))
+                && path.parent().is_some_and(|parent| {
+                    search_paths
+                        .site_packages_paths()
+                        .any(|root| root == parent)
+                }) =>
+        {
+            true
+        }
+
+        _ => false,
+    }
 }
