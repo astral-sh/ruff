@@ -277,6 +277,160 @@ def _[T]() -> None:
     static_assert(negated_type != negated_constraint)
 ```
 
+## Fully constrained type variables
+
+Matching lower and upper bounds fix `S` to `list[T]`, even when `T` is still inferable. Both
+bindings are retained in the solution:
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def _[S, T]() -> None:
+    constraints = ConstraintSet.range(list[T], S, list[T]) & ConstraintSet.lower_bound(int, T)
+    # revealed: tuple[Solution[S=list[T@_], T=int]]
+    reveal_type(constraints.solutions(inferable=tuple[S, T]))
+```
+
+When the constraints on `T` allow several solutions, each retains its own binding for `T`:
+
+```py
+def _[S, T]() -> None:
+    constraints = ConstraintSet.range(list[T], S, list[T]) & (ConstraintSet.equality(T, int) | ConstraintSet.equality(T, str))
+    # revealed: tuple[Solution[S=list[T@_], T=int], Solution[S=list[T@_], T=str]]
+    reveal_type(constraints.solutions(inferable=tuple[S, T]))
+```
+
+Additional bounds on `S` must still hold. Here `S` cannot specialize to `list[int]` while also being
+assignable to `list[str]`:
+
+```py
+def _[S, T]() -> None:
+    constraints = (
+        ConstraintSet.range(list[T], S, list[T]) & ConstraintSet.equality(T, int) & ConstraintSet.upper_bound(S, list[str])
+    )
+    reveal_type(constraints.solutions(inferable=tuple[S, T]))  # revealed: None
+```
+
+However, matching bounds in separate alternatives do not fix `S` to `list[T]`:
+
+```py
+def _[S, T]() -> None:
+    constraints = (ConstraintSet.lower_bound(list[T], S) | ConstraintSet.upper_bound(S, list[T])) & ConstraintSet.equality(T, int)
+    # revealed: tuple[Solution[S=list[int], T=int], Solution[S=list[int], T=int]]
+    reveal_type(constraints.solutions(inferable=tuple[S, T]))
+```
+
+Nor does a negated upper bound. `S` can specialize to `list[int] | bytes`, which satisfies the lower
+bounds but is not assignable to `list[T]`:
+
+```py
+def _[S, T]() -> None:
+    constraints = (
+        ConstraintSet.lower_bound(list[T], S)
+        & ~ConstraintSet.upper_bound(S, list[T])
+        & ConstraintSet.lower_bound(bytes, S)
+        & ConstraintSet.equality(T, int)
+    )
+    static_assert(constraints.solutions(inferable=tuple[S, T]) is not None)
+```
+
+## Dependencies between fully constrained type variables
+
+Fully constrained variables can depend on one another. Here `S` retains its reference to `T`, and
+`T` retains its reference to `U`:
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def _[S, T, U]() -> None:
+    constraints = ConstraintSet.equality(S, list[T]) & ConstraintSet.equality(T, tuple[U]) & ConstraintSet.equality(U, int)
+    # revealed: tuple[Solution[S=list[T@_], T=tuple[U@_], U=int]]
+    reveal_type(constraints.solutions(inferable=tuple[S, T, U]))
+```
+
+Alternatives for `U` retain the same dependent bindings for `S` and `T`:
+
+```py
+def _[S, T, U]() -> None:
+    constraints = (
+        ConstraintSet.equality(S, list[T])
+        & ConstraintSet.equality(T, tuple[U])
+        & (ConstraintSet.equality(U, int) | ConstraintSet.equality(U, str))
+    )
+    # revealed: tuple[Solution[S=list[T@_], T=tuple[U@_], U=int], Solution[S=list[T@_], T=tuple[U@_], U=str]]
+    reveal_type(constraints.solutions(inferable=tuple[S, T, U]))
+```
+
+## Concrete solutions in dependent bounds
+
+A concrete solution can constrain another variable through a generic bound. Both bindings remain
+available in the solution:
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def _[S, T]() -> None:
+    constraints = ConstraintSet.equality(T, int) & ConstraintSet.lower_bound(list[T], S)
+    # revealed: tuple[Solution[T=int, S=list[int]]]
+    reveal_type(constraints.solutions(inferable=tuple[S, T]))
+
+    constraints &= ConstraintSet.upper_bound(S, list[str])
+    reveal_type(constraints.solutions(inferable=tuple[S, T]))  # revealed: None
+```
+
+Matching dependent bounds retain their original type-variable reference:
+
+```py
+def _[S, T]() -> None:
+    constraints = ConstraintSet.equality(T, int) & ConstraintSet.equality(S, list[T])
+    # revealed: tuple[Solution[T=int, S=list[T@_]]]
+    reveal_type(constraints.solutions(inferable=tuple[S, T]))
+```
+
+When a concrete solution is shared by several alternatives, it constrains each one separately:
+
+```py
+def _[S, T]() -> None:
+    constraints = ConstraintSet.equality(T, int) & (ConstraintSet.equality(S, list[T]) | ConstraintSet.equality(S, tuple[T]))
+    # revealed: tuple[Solution[T=int, S=list[int]], Solution[T=int, S=tuple[int]]]
+    reveal_type(constraints.solutions(inferable=tuple[S, T]))
+```
+
+## Independent gradual bounds
+
+A gradual bound on one variable does not constrain variables that it does not reference. `T` retains
+its `Any` solution while `U` depends on the unconstrained `V`:
+
+```py
+from typing import Any
+from ty_extensions._internal import ConstraintSet
+
+def _[T, U, V]() -> None:
+    constraints = ConstraintSet.lower_bound(Any, T) & ConstraintSet.lower_bound(list[V], U)
+    # revealed: tuple[Solution[T=Any, U=list[V@_]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
+```
+
+## Binding order for fully constrained type variables
+
+Bindings follow the order in which variables appear in the constraints, even when matching bounds
+are separated by another variable's constraints:
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def _[U]() -> None:
+    def _[S, T]() -> None:
+        constraints = (
+            ConstraintSet.upper_bound(S, list[U])
+            & ConstraintSet.range(tuple[U], T, tuple[U])
+            & ConstraintSet.lower_bound(list[U], S)
+        )
+        # revealed: tuple[Solution[S=list[U@_], T=tuple[U@_]]]
+        reveal_type(constraints.solutions(inferable=tuple[S, T]))
+```
+
 ## Constraints from bound methods
 
 A bound method's captured receiver and specialized signature both constrain generic target types.

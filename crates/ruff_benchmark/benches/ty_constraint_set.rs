@@ -651,6 +651,63 @@ fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
     });
 }
 
+/// The equalities fix `S = Product[T]` and `T = tuple[T0, ...]`. Substituting them before sequent
+/// discovery avoids deriving partial specializations for each combination of the `Ti` bounds.
+fn benchmark_fully_constrained_typevars(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for width in [4, 8, 12] {
+        let variables = (0..width)
+            .map(|i| format!("T{i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut code = format!(
+            "\
+from typing import Protocol
+from ty_extensions._internal import ConstraintSet
+
+class Hashable(Protocol):
+    def __hash__(self) -> int: ...
+
+type Label = Hashable | tuple[Label, ...]
+
+class Product[T]: ...
+
+def _[S, T, {variables}]():
+    constraints = (
+        ConstraintSet.range(Product[T], S, Product[T])
+        & ConstraintSet.range(tuple[{variables}], T, tuple[{variables}])
+"
+        );
+        for i in 0..width {
+            writeln!(
+                &mut code,
+                "        & ConstraintSet.lower_bound(Label, T{i})"
+            )
+            .ok();
+        }
+        writeln!(
+            &mut code,
+            "    )\n    constraints.solutions(inferable=tuple[S, T, {variables}])"
+        )
+        .ok();
+
+        criterion.bench_function(
+            &format!("ty_micro[fully_constrained_typevars_{width}]"),
+            |b| {
+                b.iter_batched_ref(
+                    || setup_micro_case(&code),
+                    |case| {
+                        let Case { db } = case;
+                        assert_eq!(db.check().len(), 0);
+                    },
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+}
+
 criterion_group!(
     constraint_set,
     benchmark_typevar_mapping_large_accumulation,
@@ -667,5 +724,6 @@ criterion_group!(
     benchmark_many_invariant_typevars,
     benchmark_mixed_many_invariant_typevars,
     benchmark_pydantic_core_schema_dict,
+    benchmark_fully_constrained_typevars,
 );
 criterion_main!(constraint_set);

@@ -1,13 +1,12 @@
 use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
+use crate::types::BoundTypeVarInstance;
 use crate::types::constraints::paths::PathAssignments;
-use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, ConstraintId,
     ConstraintSetStorage, NodeId, PathBoundBuilder, SolutionLimits,
 };
-use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
 pub(super) struct SolutionWalker<'db> {
@@ -114,35 +113,11 @@ impl<'db> SolutionWalker<'db> {
             mappings.clear();
             for (constraint, _) in path {
                 let constraint = storage.constraint_data(constraint);
-                match constraint {
-                    Constraint::ConcreteLower(lower) => {
-                        let bounds = mappings.entry(lower.typevar).or_default();
-                        bounds.add_lower(db, env, lower.provenance, lower.bound);
-                    }
-                    Constraint::ConcreteUpper(upper) => {
-                        let bounds = mappings.entry(upper.typevar).or_default();
-                        bounds.add_upper(db, env, upper.provenance, upper.bound);
-                    }
-                    Constraint::ConcreteEquivalence(equivalence) => {
-                        let bounds = mappings.entry(equivalence.typevar).or_default();
-                        bounds.add_lower(db, env, equivalence.provenance, equivalence.bound);
-                        bounds.add_upper(db, env, equivalence.provenance, equivalence.bound);
-                    }
-                    Constraint::TypeVarRange(bound) => {
-                        let bounds = mappings.entry(bound.left).or_default();
-                        bounds.add_upper(db, env, bound.provenance, Type::TypeVar(bound.right));
-                        let bounds = mappings.entry(bound.right).or_default();
-                        bounds.add_lower(db, env, bound.provenance, Type::TypeVar(bound.left));
-                    }
-                    Constraint::TypeVarEquivalence(bound) => {
-                        let (left, right) = bound.in_builder(db, storage);
-                        let bounds = mappings.entry(left).or_default();
-                        bounds.add_lower(db, env, bound.provenance, Type::TypeVar(right));
-                        bounds.add_upper(db, env, bound.provenance, Type::TypeVar(right));
-                        let bounds = mappings.entry(right).or_default();
-                        bounds.add_lower(db, env, bound.provenance, Type::TypeVar(left));
-                        bounds.add_upper(db, env, bound.provenance, Type::TypeVar(left));
-                    }
+                for typevar in constraint.constrained_typevars(db, storage) {
+                    mappings
+                        .entry(typevar)
+                        .or_default()
+                        .add_constraint(db, env, typevar, constraint);
                 }
             }
 
