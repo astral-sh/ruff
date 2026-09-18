@@ -1676,7 +1676,7 @@ impl<'db> Bindings<'db> {
                         function,
                     )) => {
                         if let [Some(instance), owner] = overload.parameter_types()
-                            && let Some(result) = function.inner(db).function_like_descriptor_get(
+                            && let Some(result) = function.inner(db).function_like_dunder_get(
                                 db,
                                 env,
                                 (!instance.is_none(db)).then_some(*instance),
@@ -1689,7 +1689,7 @@ impl<'db> Bindings<'db> {
 
                     Type::WrapperDescriptor(WrapperDescriptorKind::FunctionTypeDunderGet) => {
                         if let [Some(function), Some(instance), owner] = overload.parameter_types()
-                            && let Some(result) = function.function_like_descriptor_get(
+                            && let Some(result) = function.function_like_dunder_get(
                                 db,
                                 env,
                                 (!instance.is_none(db)).then_some(*instance),

@@ -53,8 +53,12 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Shared by implicit descriptor access and explicit `__get__` calls.
-    pub(super) fn function_like_descriptor_get(
+    /// Model the effect of `__get__` on functions, staticmethods, and
+    /// classmethods.
+    ///
+    /// See [`Self::try_call_dunder_get`] for general descriptor access, including user-defined
+    /// `__get__` methods.
+    pub(super) fn function_like_dunder_get(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -65,13 +69,13 @@ impl<'db> Type<'db> {
         match self {
             Type::Union(union) => {
                 return union.try_map(db, env, |alternative| {
-                    alternative.function_like_descriptor_get(db, env, instance, owner)
+                    alternative.function_like_dunder_get(db, env, instance, owner)
                 });
             }
             Type::TypeAlias(alias) => {
                 return alias
                     .value_type(db)
-                    .function_like_descriptor_get(db, env, instance, owner);
+                    .function_like_dunder_get(db, env, instance, owner);
             }
             _ => {}
         }

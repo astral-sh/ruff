@@ -4883,8 +4883,7 @@ impl<'db> Type<'db> {
         // Bind known callable descriptors outside the tracked lookup. Checking a protocol
         // receiver can recursively access this method; the lookup's `None` cycle value would
         // leave it unbound and falsely reject the protocol match.
-        if let Some(return_type) = self.function_like_descriptor_get(db, env, instance, Some(owner))
-        {
+        if let Some(return_type) = self.function_like_dunder_get(db, env, instance, Some(owner)) {
             return Ok(Some(DescriptorGetResult {
                 return_type,
                 kind: AttributeKind::NormalOrNonDataDescriptor,
