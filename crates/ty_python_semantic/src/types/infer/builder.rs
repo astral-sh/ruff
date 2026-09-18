@@ -4749,11 +4749,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // We defer the r.h.s. of PEP-613 `TypeAlias` assignments in stub files.
             let previous_deferred_state = self.deferred_state;
 
-            if is_pep_613_type_alias {
-                self.context.inference_flags |= InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS;
-                if self.in_stub() {
-                    self.replace_deferred_state(DeferredExpressionState::Deferred);
-                }
+            if is_pep_613_type_alias && self.in_stub() {
+                self.replace_deferred_state(DeferredExpressionState::Deferred);
             }
 
             // This might be a PEP-613 type alias (`OptionalList: TypeAlias = list[T] | None`). Use
@@ -4766,7 +4763,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 TypeContext::new(Some(declared.inner_type())),
             );
             let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
-                // Alias type inference emits the diagnostic, but this first-pass value is
+                // Alias type inference emits the diagnostic, but this runtime value is
                 // retained as the alias binding.
                 match inferred_ty {
                     Type::SpecialForm(SpecialFormType::TypingSelf) => {
@@ -4789,9 +4786,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.typevar_binding_context = previous_typevar_binding_context;
             self.deferred_state = previous_deferred_state;
             self.dataclass_field_specifiers.clear();
-            self.context
-                .inference_flags
-                .remove(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS);
 
             let inferred_ty = if target
                 .as_name_expr()

@@ -2382,34 +2382,28 @@ bitflags::bitflags! {
         /// Whether we are currently in a context where `Concatenate` can be legal
         const IN_VALID_CONCATENATE_CONTEXT = 1 << 6;
 
-        /// Whether we're in the first pass of inferring a PEP-613 type alias.
-        ///
-        /// During this pass, `invalid-type-form` diagnostics are suppressed;
-        /// these are emitted by the alias's type-expression inference instead.
-        const IN_PEP_613_ALIAS_FIRST_PASS = 1 << 7;
-
-        const IN_NO_TYPE_CHECK = 1 << 8;
+        const IN_NO_TYPE_CHECK = 1 << 7;
 
         /// Whether the visitor is currently visiting a `**kwargs` annotation.
-        const IN_KWARG_ANNOTATION = 1 << 9;
+        const IN_KWARG_ANNOTATION = 1 << 8;
 
         /// Whether we're in a context where `Unpack` can be legal.
-        const IN_VALID_UNPACK_CONTEXT = 1 << 10;
+        const IN_VALID_UNPACK_CONTEXT = 1 << 9;
 
         /// Whether to disable the `int`/`float` special case in a type expression.
-        const DISABLE_INT_FLOAT_SPECIAL_CASE = 1 << 11;
+        const DISABLE_INT_FLOAT_SPECIAL_CASE = 1 << 10;
 
         /// Whether the visitor is currently visiting a type expression.
-        const IN_TYPE_EXPRESSION = 1 << 12;
+        const IN_TYPE_EXPRESSION = 1 << 11;
 
         /// Whether the visitor is currently visiting a nested position in a type expression.
-        const IN_NESTED_TYPE_EXPRESSION = 1 << 13;
+        const IN_NESTED_TYPE_EXPRESSION = 1 << 12;
 
         /// Whether the visitor is currently visiting the argument to `Unpack[...]` or `*`.
-        const IN_UNPACK_TYPE_ARGUMENT = 1 << 14;
+        const IN_UNPACK_TYPE_ARGUMENT = 1 << 13;
 
         /// Whether the current method's explicit receiver annotation is incompatible with `Self`.
-        const HAS_INCOMPATIBLE_SELF_RECEIVER = 1 << 15;
+        const HAS_INCOMPATIBLE_SELF_RECEIVER = 1 << 14;
     }
 }
 

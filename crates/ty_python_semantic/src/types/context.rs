@@ -18,7 +18,6 @@ use crate::diagnostic::DiagnosticGuard;
 use crate::importer::Importer;
 use crate::lint::LintSource;
 use crate::reachability::is_range_reachable;
-use crate::types::diagnostic::{INVALID_TYPE_FORM, UNBOUND_TYPE_VARIABLE};
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::InferenceFlags;
 use crate::{
@@ -632,18 +631,6 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         range: TextRange,
     ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
         let lint_id = LintId::of(lint);
-
-        // Suppress all `invalid-type-form` errors during the first pass of
-        // inferring a PEP-613 type alias. These errors are emitted by the alias's
-        // type-expression inference instead.
-        if (lint_id == LintId::of(&INVALID_TYPE_FORM)
-            || lint_id == LintId::of(&UNBOUND_TYPE_VARIABLE))
-            && ctx
-                .inference_flags
-                .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
-        {
-            return None;
-        }
 
         let (severity, source) = Self::severity_and_source(ctx, lint_id)?;
 

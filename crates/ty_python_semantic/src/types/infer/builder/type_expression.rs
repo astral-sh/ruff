@@ -279,9 +279,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             builder.deferred_state.is_deferred()
                 || builder.in_stub()
                 || builder.is_in_type_checking_block(builder.scope(), expression)
-                || builder
-                    .inference_flags()
-                    .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
         };
         let ignore_experimental_runtime_errors = |builder: &Self| {
             ignore_runtime_errors(builder)
