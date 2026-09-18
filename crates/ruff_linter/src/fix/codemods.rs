@@ -4,8 +4,8 @@ use std::borrow::Cow;
 
 use anyhow::{Result, bail};
 use libcst_native::{
-    Codegen, CodegenState, Expression, ImportNames, NameOrAttribute, ParenthesizableWhitespace,
-    SmallStatement, Statement,
+    Codegen, CodegenState, Expression, Import, ImportFrom, ImportNames, LazyImport, LazyImportFrom,
+    NameOrAttribute, ParenthesizableWhitespace, SmallStatement, Statement,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec};
@@ -53,11 +53,17 @@ pub(crate) fn remove_imports<'a>(
     };
 
     let aliases = match body.body.first_mut() {
-        Some(SmallStatement::Import(import_body)) => &mut import_body.names,
-        Some(SmallStatement::ImportFrom(import_body)) => {
-            if let ImportNames::Aliases(names) = &mut import_body.names {
-                names
-            } else if let ImportNames::Star(..) = &import_body.names {
+        Some(
+            SmallStatement::Import(Import { names, .. })
+            | SmallStatement::LazyImport(LazyImport { names, .. }),
+        ) => names,
+        Some(
+            SmallStatement::ImportFrom(ImportFrom { names, .. })
+            | SmallStatement::LazyImportFrom(LazyImportFrom { names, .. }),
+        ) => {
+            if let ImportNames::Aliases(aliases) = names {
+                aliases
+            } else if let ImportNames::Star(..) = names {
                 // Special-case: if the import is a `from ... import *`, then we delete the
                 // entire statement.
                 let mut found_star = false;
@@ -76,7 +82,7 @@ pub(crate) fn remove_imports<'a>(
                 bail!("Expected: ImportNames::Aliases | ImportNames::Star");
             }
         }
-        _ => bail!("Expected: SmallStatement::ImportFrom | SmallStatement::Import"),
+        _ => bail!("Expected import statement"),
     };
 
     // Preserve the trailing comma (or not) from the last entry.
@@ -139,15 +145,21 @@ pub(crate) fn retain_imports(
     };
 
     let aliases = match body.body.first_mut() {
-        Some(SmallStatement::Import(import_body)) => &mut import_body.names,
-        Some(SmallStatement::ImportFrom(import_body)) => {
-            if let ImportNames::Aliases(names) = &mut import_body.names {
-                names
+        Some(
+            SmallStatement::Import(Import { names, .. })
+            | SmallStatement::LazyImport(LazyImport { names, .. }),
+        ) => names,
+        Some(
+            SmallStatement::ImportFrom(ImportFrom { names, .. })
+            | SmallStatement::LazyImportFrom(LazyImportFrom { names, .. }),
+        ) => {
+            if let ImportNames::Aliases(aliases) = names {
+                aliases
             } else {
                 bail!("Expected: ImportNames::Aliases");
             }
         }
-        _ => bail!("Expected: SmallStatement::ImportFrom | SmallStatement::Import"),
+        _ => bail!("Expected import statement"),
     };
 
     // Preserve the trailing comma (or not) from the last entry.

@@ -4300,6 +4300,58 @@ type AliasNodeChild[T] = AliasNode[T] | None
 reveal_type(AliasNode(child=AliasNode(value=1)))  # revealed: AliasNode[Unknown]
 ```
 
+### Constructor inference through recursive aliases
+
+A generic `TypedDict` inside a recursive alias does not acquire an incompatible type argument from
+another constructor field. Both alias syntaxes preserve the unresolved outer type argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict, TypeVar
+
+T = TypeVar("T")
+
+class Item[T](TypedDict):
+    value: T
+
+Tree = Item[T] | list["Tree[T]"]
+type ExplicitTree[T] = Item[T] | list[ExplicitTree[T]]
+
+class Box[T](TypedDict):
+    data: Tree[T]
+    marker: T
+
+class ExplicitBox[T](TypedDict):
+    data: ExplicitTree[T]
+    marker: T
+
+reveal_type(Box(data={"value": 1}, marker="x"))  # revealed: Box[Unknown]
+reveal_type(ExplicitBox(data={"value": 1}, marker="x"))  # revealed: ExplicitBox[Unknown]
+reveal_type(Box(data=Item(value=1), marker="x"))  # revealed: Box[Unknown]
+reveal_type(ExplicitBox(data=Item(value=1), marker="x"))  # revealed: ExplicitBox[Unknown]
+```
+
+Aliases whose type arguments change at every recursive step also keep constructor inference
+conservative.
+
+```py
+Growing = tuple[T, "Growing[list[T]] | None"]
+type ExplicitGrowing[T] = tuple[T, ExplicitGrowing[list[T]] | None]
+
+class GrowingBox[T](TypedDict):
+    data: Growing[T]
+
+class ExplicitGrowingBox[T](TypedDict):
+    data: ExplicitGrowing[T]
+
+reveal_type(GrowingBox(data=(1, None)))  # revealed: GrowingBox[Unknown]
+reveal_type(ExplicitGrowingBox(data=(1, None)))  # revealed: ExplicitGrowingBox[Unknown]
+```
+
 ### Constructor inference from nested values
 
 Nested `TypedDict` fields do not yet contribute constraints to the outer constructor.

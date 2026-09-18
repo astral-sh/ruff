@@ -971,6 +971,153 @@ static_assert(not is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
 ```
 
+### Replaced methods and retained aliases
+
+Only the final interface constrains variance. An overwritten method no longer consumes `T`, so the
+unused parameter falls back to covariance.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Overwritten[T]:
+    def method(self, value: T) -> None: ...
+    def method(self, value: object) -> None: ...
+
+static_assert(is_subtype_of(Overwritten[int], Overwritten[object]))
+static_assert(not is_subtype_of(Overwritten[object], Overwritten[int]))
+```
+
+An alias retains the original method's input, making the class contravariant.
+
+```py
+class Aliased[T]:
+    def method(self, value: T) -> None: ...
+    alias = method
+    def method(self, value: object) -> None: ...
+
+static_assert(is_subtype_of(Aliased[object], Aliased[int]))
+static_assert(not is_subtype_of(Aliased[int], Aliased[object]))
+```
+
+### Decorated methods
+
+A decorator that replaces a method with `int` removes the original signature's variance
+requirements, just as it does when validating declared variance.
+
+```py
+from typing import Callable
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+def replace(func: object) -> int:
+    return 1
+
+class Replaced[T]:
+    @replace
+    def method(self, value: T) -> None: ...
+
+static_assert(is_subtype_of(Replaced[int], Replaced[object]))
+static_assert(not is_subtype_of(Replaced[object], Replaced[int]))
+```
+
+A public `Callable` attribute is writable. Unlike declared-method validation, inferred variance also
+accounts for replacing this attribute, making `Preserved` invariant even though calling the
+attribute only produces `T`.
+
+```py
+def preserve[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+class Preserved[T]:
+    @preserve
+    def method(self) -> T:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Preserved[int], Preserved[object]))
+static_assert(not is_subtype_of(Preserved[object], Preserved[int]))
+```
+
+A decorator returning a mutable `list[T]` also makes its owner invariant, independently of the
+original method's covariant return annotation.
+
+```py
+def mutable[R](func: Callable[..., R]) -> list[R]:
+    raise NotImplementedError
+
+class Mutable[T]:
+    @mutable
+    def value(self) -> T:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Mutable[int], Mutable[object]))
+static_assert(not is_subtype_of(Mutable[object], Mutable[int]))
+```
+
+### Descriptor read and write types
+
+Descriptor access determines the member's variance. A getter returning `T` and a setter accepting
+any `object` permit covariance, even when the descriptor's own type parameter is declared invariant.
+
+```py
+from typing import Callable, Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+R = TypeVar("R")
+
+class Permissive(Generic[R]):
+    def __init__(self, func: Callable[..., R]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> R:
+        raise NotImplementedError
+    def __set__(self, instance: object, value: object) -> None: ...
+
+class Covariant[T]:
+    @Permissive
+    def value(self) -> T:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Covariant[int], Covariant[object]))
+static_assert(not is_subtype_of(Covariant[object], Covariant[int]))
+```
+
+If the setter accepts `T`, it adds a contravariant contribution and the owner is invariant.
+
+```py
+class Writable(Generic[R]):
+    def __init__(self, func: Callable[..., R]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> R:
+        raise NotImplementedError
+    def __set__(self, instance: object, value: R) -> None: ...
+
+class Invariant[T]:
+    @Writable
+    def value(self) -> T:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Invariant[int], Invariant[object]))
+static_assert(not is_subtype_of(Invariant[object], Invariant[int]))
+```
+
+An unresolved write domain retains the descriptor's ordinary variance contribution. Knowing the read
+type alone does not establish covariance when inferring variance.
+
+```py
+class Deferred(Generic[R]):
+    def __init__(self, func: Callable[..., R]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> R:
+        raise NotImplementedError
+    def __set__(self, *args: object) -> None: ...
+
+class Unresolved[T]:
+    @Deferred
+    def value(self) -> T:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Unresolved[int], Unresolved[object]))
+static_assert(not is_subtype_of(Unresolved[object], Unresolved[int]))
+```
+
 ### Properties
 
 Properties constrain to covariance if they are get-only and invariant if they are get-set:
@@ -999,6 +1146,38 @@ static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
 static_assert(not is_subtype_of(D[B], D[A]))
 static_assert(not is_subtype_of(D[A], D[B]))
+```
+
+### Decorated property accessors
+
+A property's exposed getter return type constrains variance even when a decorator returns a callable
+wrapper. The receiver does not constrain variance.
+
+```py
+from functools import cache
+from typing import Callable
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+def preserve[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+class Preserved[T]:
+    @property
+    @preserve
+    def value(self: "Preserved[T]") -> T:
+        raise NotImplementedError
+
+class Cached[T]:
+    @property
+    @cache
+    def value(self) -> T:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Preserved[int], Preserved[object]))
+static_assert(not is_subtype_of(Preserved[object], Preserved[int]))
+static_assert(is_subtype_of(Cached[int], Cached[object]))
+static_assert(not is_subtype_of(Cached[object], Cached[int]))
 ```
 
 ### Property subclasses
@@ -1087,6 +1266,43 @@ class D[T]:
 
 static_assert(is_subtype_of(D[B], D[A]))
 static_assert(not is_subtype_of(D[A], D[B]))
+```
+
+## Variance in composed return types
+
+A mutable member makes a union or intersection return type invariant.
+
+```py
+from typing import Callable
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Marker: ...
+
+class UnionReturn[T]:
+    def value(self) -> list[T] | tuple[T, ...]:
+        raise NotImplementedError
+
+class IntersectionReturn[T]:
+    def value(self) -> Intersection[list[T], Marker]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(UnionReturn[int], UnionReturn[object]))
+static_assert(not is_subtype_of(UnionReturn[object], UnionReturn[int]))
+static_assert(not is_subtype_of(IntersectionReturn[int], IntersectionReturn[object]))
+static_assert(not is_subtype_of(IntersectionReturn[object], IntersectionReturn[int]))
+```
+
+Returning a tuple of consumers requires contravariance: tuples preserve the variance of their
+elements, and the callables consume `T`.
+
+```py
+class Callbacks[T]:
+    def callbacks(self) -> tuple[Callable[[T], None], ...]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Callbacks[object], Callbacks[int]))
+static_assert(not is_subtype_of(Callbacks[int], Callbacks[object]))
 ```
 
 ## Tuple elements
@@ -2089,14 +2305,14 @@ class B(A):
     pass
 
 class C[T]:
-    def f() -> T | None:
+    def f(self) -> T | None:
         pass
 
 static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
 
 class D[T](C[T]):
-    def g(x: T) -> None:
+    def g(self, x: T) -> None:
         pass
 
 static_assert(not is_subtype_of(D[B], D[A]))

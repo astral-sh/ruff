@@ -34,10 +34,11 @@
 
 use std::cmp::Ordering;
 
-use ruff_index::{Idx, IndexVec};
+use ruff_index::Idx;
 use rustc_hash::FxHashMap;
 
 use crate::ast_ids::ScopedUseId;
+use crate::interned_nodes::InternedNodes;
 use crate::predicate::ScopedPredicateId;
 use crate::rank::{RankBitBox, RankBitBoxVec};
 use crate::scope::FileScopeId;
@@ -128,11 +129,10 @@ impl NarrowingConstraints {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default)]
 pub struct NarrowingConstraintsBuilder {
-    interiors: IndexVec<ScopedNarrowingConstraint, InteriorNode>,
+    interiors: InternedNodes<ScopedNarrowingConstraint, InteriorNode>,
     interior_used: RankBitBoxVec,
-    interior_cache: FxHashMap<InteriorNode, ScopedNarrowingConstraint>,
     and_cache: FxHashMap<
         (ScopedNarrowingConstraint, ScopedNarrowingConstraint),
         ScopedNarrowingConstraint,
@@ -147,13 +147,13 @@ impl NarrowingConstraintsBuilder {
     pub(crate) fn build(self) -> NarrowingConstraints {
         if self.interior_used.first_zero().is_none() {
             NarrowingConstraints {
-                used_interiors: self.interiors.raw.into_boxed_slice(),
+                used_interiors: self.interiors.into_nodes_boxed_slice(),
                 used_indices: None,
             }
         } else {
             let used_interiors = self
                 .interiors
-                .into_iter()
+                .into_node_iterator()
                 .zip(&self.interior_used)
                 .filter_map(|(interior, used)| used.then_some(interior))
                 .collect();
@@ -228,10 +228,11 @@ impl NarrowingConstraintsBuilder {
             });
         }
 
-        *self.interior_cache.entry(node).or_insert_with(|| {
+        let (id, inserted) = self.interiors.intern(node);
+        if inserted {
             self.interior_used.push(false);
-            self.interiors.push(node)
-        })
+        }
+        id
     }
 
     pub(crate) fn add_atom(&mut self, predicate: ScopedPredicateId) -> ScopedNarrowingConstraint {
@@ -280,8 +281,8 @@ impl NarrowingConstraintsBuilder {
             if_uncertain: ALWAYS_FALSE,
             if_false,
         };
-        if let Some(cached) = self.interior_cache.get(&node) {
-            return *cached;
+        if let Some(cached) = self.interiors.find(&node) {
+            return cached;
         }
         if self.interiors.len() >= MAX_INTERIOR_NODES {
             return ALWAYS_TRUE;

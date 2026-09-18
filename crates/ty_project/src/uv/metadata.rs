@@ -2,13 +2,9 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use char_str::CharStr;
-use pep440_rs::Version;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::Deserialize;
 use thiserror::Error;
-
-use crate::metadata::python_version::SupportedPythonVersion;
 
 mod dependencies;
 mod string_interner;
@@ -20,7 +16,6 @@ pub(crate) struct UvMetadata {
     workspace_root: SystemPathBuf,
     members: Box<[WorkspaceMember]>,
     environment: Option<SystemPathBuf>,
-    python_version: Option<RangedValue<SupportedPythonVersion>>,
     schema: Schema,
     workspace: Option<NodeReference>,
     script: Option<PathNodeReference>,
@@ -43,10 +38,6 @@ impl UvMetadata {
         self.environment.as_deref()
     }
 
-    pub(crate) fn python_version(&self) -> Option<&RangedValue<SupportedPythonVersion>> {
-        self.python_version.as_ref()
-    }
-
     pub(crate) fn from_metadata(
         metadata: &[u8],
         system: &dyn System,
@@ -58,23 +49,19 @@ impl UvMetadata {
 
         let workspace_root = existing_directory(metadata.workspace_root, "workspace root", system)?;
 
-        let (environment, python_version) = match metadata.environment {
-            Some(environment) => (
-                Some(existing_directory(
-                    environment.root,
-                    "environment root",
-                    system,
-                )?),
-                Some(resolve_python_version(&environment.python.version)?),
-            ),
-            None => (None, None),
+        let environment = match metadata.environment {
+            Some(environment) => Some(existing_directory(
+                environment.root,
+                "environment root",
+                system,
+            )?),
+            None => None,
         };
 
         Ok(Self {
             workspace_root,
             members: metadata.members,
             environment,
-            python_version,
             schema: metadata.schema,
             workspace: metadata.workspace,
             script: metadata.script,
@@ -107,9 +94,6 @@ pub(crate) enum UvMetadataError {
     #[error("invalid `uv workspace metadata` JSON: {0}")]
     InvalidMetadata(serde_json::Error),
 
-    #[error("unsupported Python version `{0}` returned by `uv workspace metadata`")]
-    InvalidPythonVersion(Version),
-
     #[error("non-Unicode {description} returned by `uv workspace metadata`: `{path}`", path = path.display())]
     NonUnicodePath {
         description: &'static str,
@@ -139,19 +123,6 @@ fn existing_directory(
     Ok(path)
 }
 
-fn resolve_python_version(
-    version: &Version,
-) -> Result<RangedValue<SupportedPythonVersion>, UvMetadataError> {
-    let [major, minor, ..] = version.release() else {
-        return Err(UvMetadataError::InvalidPythonVersion(version.clone()));
-    };
-    let version = format!("{major}.{minor}")
-        .parse::<SupportedPythonVersion>()
-        .map_err(|_| UvMetadataError::InvalidPythonVersion(version.clone()))?;
-
-    Ok(RangedValue::new(version, ValueSource::UvMetadata))
-}
-
 /// The uv metadata used to discover the workspace and check imports against its dependencies.
 ///
 /// See uv's [schema documentation] and [serialization types] for the upstream format.
@@ -176,12 +147,6 @@ struct WorkspaceMetadata {
 #[derive(Deserialize)]
 struct WorkspaceEnvironment {
     root: PathBuf,
-    python: WorkspacePython,
-}
-
-#[derive(Deserialize)]
-struct WorkspacePython {
-    version: Version,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
@@ -251,7 +216,7 @@ mod tests {
 
     use anyhow::Context;
     use char_str::CharStr;
-    use ruff_db::system::{SystemPath, TestSystem};
+    use ruff_db::system::TestSystem;
     use serde_json::json;
 
     use super::{UvMetadata, UvMetadataError};
@@ -280,36 +245,8 @@ mod tests {
         let workspace = UvMetadata::from_metadata(metadata, &system)?;
 
         assert!(workspace.environment().is_none());
-        assert!(workspace.python_version().is_none());
         assert!(workspace.members().is_empty());
         assert!(workspace.dependency_metadata().is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn uses_environment_python_version() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        system.memory_file_system().write_files_all([
-            ("/app/pyproject.toml", "[tool.uv.workspace]"),
-            ("/env/marker", ""),
-        ])?;
-        let metadata = br#"{
-            "schema": {"version": "preview"},
-            "workspace_root": "/app",
-            "environment": {
-                "root": "/env",
-                "python": { "version": "3.13.5" }
-            }
-        }"#;
-
-        let workspace = UvMetadata::from_metadata(metadata, &system)?;
-
-        assert_eq!(workspace.environment(), Some(SystemPath::new("/env")));
-        assert_eq!(
-            workspace.python_version().map(ToString::to_string),
-            Some("3.13".to_string())
-        );
 
         Ok(())
     }
@@ -370,30 +307,6 @@ mod tests {
                 .context("expected a direct dependency")?,
         );
         assert_shared(module_name, &dependencies.distributions[dependency_id].name);
-
-        Ok(())
-    }
-
-    #[test]
-    fn rejects_unsupported_environment_python_version() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        system.memory_file_system().write_files_all([
-            ("/app/pyproject.toml", "[tool.uv.workspace]"),
-            ("/env/marker", ""),
-        ])?;
-        let metadata = br#"{
-            "schema": {"version": "preview"},
-            "workspace_root": "/app",
-            "environment": {
-                "root": "/env",
-                "python": { "version": "3.16.0" }
-            }
-        }"#;
-
-        assert_matches!(
-            UvMetadata::from_metadata(metadata, &system),
-            Err(UvMetadataError::InvalidPythonVersion(_))
-        );
 
         Ok(())
     }

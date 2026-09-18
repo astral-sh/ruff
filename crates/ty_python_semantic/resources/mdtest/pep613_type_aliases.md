@@ -397,9 +397,7 @@ def _(rec: RecursiveHomogeneousTuple):
     reveal_type(rec)  # revealed: RecursiveHomogeneousTuple
 
 ClassInfo: TypeAlias = type | UnionType | tuple["ClassInfo", ...]
-# fmt: off
 reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[ClassInfo, ...]'>
-# fmt: on
 ```
 
 TODO: The following alias is invalid because its cycle passes through no containing type. Until it

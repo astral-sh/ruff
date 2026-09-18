@@ -1468,7 +1468,7 @@
           ]
         },
         "banned-api": {
-          "description": "Specific modules or module members that may not be imported or accessed.\nNote that this rule is only meant to flag accidental uses,\nand can be circumvented via `eval` or `importlib`.",
+          "description": "Specific modules or module members that may not be imported or accessed.\nThese can be extended by the\n[`extend-banned-api`](#lint_flake8-tidy-imports_extend-banned-api) option.\n\nNote that this rule is only meant to flag accidental uses,\nand can be circumvented via `eval` or `importlib`.",
           "type": [
             "object",
             "null"
@@ -1485,6 +1485,16 @@
           ],
           "items": {
             "type": "string"
+          }
+        },
+        "extend-banned-api": {
+          "description": "Additional modules or module members that may not be imported or accessed.\nThese entries will be added to the\n[`banned-api`](#lint_flake8-tidy-imports_banned-api) mapping and will override\nany existing entries if the two settings overlap.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/definitions/ApiBan"
           }
         },
         "require-lazy": {

@@ -131,3 +131,36 @@ def _(a_and_b: AAndB, not_a: NotA, quoted: Quoted, nested: Nested, generic: BoxG
     reveal_type(nested)  # revealed: Box[A & B]
     reveal_type(generic)  # revealed: Box[A & B]
 ```
+
+## Intersections inside `type[...]`
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Annotated
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+type Alias = A & B
+type AnnotatedAlias = Annotated[A & B, "metadata"]
+
+def _(
+    ampersand: type[A & B],
+    intersection: type[Intersection[A, B]],
+    alias: type[Alias],
+    annotated_ampersand: type[Annotated[A & B, "metadata"]],
+    annotated_intersection: type[Annotated[Intersection[A, B], "metadata"]],
+    annotated_alias: type[AnnotatedAlias],
+):
+    reveal_type(ampersand)  # revealed: type[A] & type[B]
+    reveal_type(intersection)  # revealed: type[A] & type[B]
+    reveal_type(alias)  # revealed: type[A] & type[B]
+    reveal_type(annotated_ampersand)  # revealed: type[A] & type[B]
+    reveal_type(annotated_intersection)  # revealed: type[A] & type[B]
+    reveal_type(annotated_alias)  # revealed: type[A] & type[B]
+```

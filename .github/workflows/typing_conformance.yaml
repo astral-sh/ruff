@@ -1,6 +1,7 @@
 name: Run typing conformance
 
-permissions: {}
+permissions:
+  contents: read
 
 on:
   pull_request:

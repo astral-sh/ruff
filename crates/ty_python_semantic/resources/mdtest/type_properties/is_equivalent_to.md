@@ -264,6 +264,7 @@ between the prefix and suffix does not change the type when every element has th
 The type of the leaves still distinguishes integer trees from string trees.
 
 ```py
+from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to
 
 type A = int | tuple[*tuple[A, ...], B]
@@ -271,10 +272,10 @@ type B = int | tuple[*tuple[B, ...], A]
 type Prefix = int | tuple[Prefix, *tuple[Prefix, ...]]
 type Strings = str | tuple[*tuple[Strings, ...], Strings]
 
-reveal_type(is_equivalent_to(A, B))  # revealed: ConstraintSet[Literal[True]]
-reveal_type(is_equivalent_to(B, A))  # revealed: ConstraintSet[Literal[True]]
-reveal_type(is_equivalent_to(A, Prefix))  # revealed: ConstraintSet[Literal[True]]
-reveal_type(is_equivalent_to(A, Strings))  # revealed: ConstraintSet[Literal[False]]
+static_assert(is_equivalent_to(A, B))
+static_assert(is_equivalent_to(B, A))
+static_assert(is_equivalent_to(A, Prefix))
+static_assert(not is_equivalent_to(A, Strings))
 ```
 
 ## Implicit recursive tuples with fixed ends
@@ -288,6 +289,7 @@ Implicit aliases describe the same nonempty trees regardless of whether the requ
 at the start or end of the tuple. Integer and string leaves still distinguish different tree types.
 
 ```py
+from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to
 
 A = int | tuple[*tuple["A", ...], "B"]
@@ -295,10 +297,10 @@ B = int | tuple[*tuple["B", ...], "A"]
 Prefix = int | tuple["Prefix", *tuple["Prefix", ...]]
 Strings = str | tuple[*tuple["Strings", ...], "Strings"]
 
-reveal_type(is_equivalent_to(A, B))  # revealed: ConstraintSet[Literal[True]]
-reveal_type(is_equivalent_to(B, A))  # revealed: ConstraintSet[Literal[True]]
-reveal_type(is_equivalent_to(A, Prefix))  # revealed: ConstraintSet[Literal[True]]
-reveal_type(is_equivalent_to(A, Strings))  # revealed: ConstraintSet[Literal[False]]
+static_assert(is_equivalent_to(A, B))
+static_assert(is_equivalent_to(B, A))
+static_assert(is_equivalent_to(A, Prefix))
+static_assert(not is_equivalent_to(A, Strings))
 ```
 
 ## Tuples containing equivalent but differently ordered unions/intersections are equivalent

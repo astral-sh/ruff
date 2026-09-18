@@ -184,6 +184,113 @@ struct BooleanTest<'ast, 'db> {
     evaluation: ExpressionContext,
 }
 
+impl BooleanTest<'_, '_> {
+    /// Determine whether a redundant-condition diagnostic can also explain why some code is
+    /// unreachable.
+    ///
+    /// The expression we warn about can be just one subexpression of an `if` condition, loop
+    /// condition, `assert` test, or `match` guard. Before adding a secondary annotation to a
+    /// diagnostic that warns that the always-truthy or always-falsy condition makes some other
+    /// code unreachable, we check whether the truthiness of the particular (sub)expression
+    /// the diagnostic is being emitted on is enough to determine the outcome of the entire
+    /// enclosing condition.
+    ///
+    /// For example, we warn that `nonempty` is always truthy here:
+    ///
+    /// ```python
+    /// nonempty = (1, 2)
+    /// assert not nonempty
+    /// print("unreachable")
+    /// ```
+    ///
+    /// `nonempty` is only a subexpression of the overall `assert` test (`not nonempty`), but
+    /// the overall test must also be false as a result of the subexpression being always truthy.
+    /// This method therefore returns `AlwaysFalse`, allowing the diagnostic on `nonempty` to also
+    /// point out that the `print` call below the assertion is unreachable.
+    ///
+    /// Similarly, in this example, knowing that `nonempty` is truthy tells us that the
+    /// `if` body is always entered, whatever the value of `flag`:
+    ///
+    /// ```py
+    /// nonempty = (1, 2)
+    ///
+    /// def _(flag: bool):
+    ///     if nonempty or flag:
+    ///         print("reachable")
+    ///     else:
+    ///         print("unreachable")
+    /// ```
+    ///
+    /// In this situation, if the diagnostic is emitted on the `nonempty` subexpression, this method
+    /// returns `AlwaysTrue` to indicate that the truthiness of this subexpression is sufficient to
+    /// make the overall condition always-truthy, thus allowing us to note in the diagnostic that the
+    /// `else` branch is unreachable.
+    ///
+    /// In this last example, however, whether we enter the body also depends on `flag`:
+    ///
+    /// ```py
+    /// nonempty = (1, 2)
+    ///
+    /// def _(flag: bool):
+    ///     if nonempty and flag:
+    ///         print("reachable")
+    ///     else:
+    ///         print("unreachable")
+    /// ```
+    ///
+    /// If a diagnostic is emitted on the `nonempty` subexpression, this method will return `Ambiguous`
+    /// because the truthiness of `nonempty` does not settle the question of whether the overall
+    /// condition will be always-truthy or always-falsy. This is true even if type inference has
+    /// separately established that `flag` is always truthy: explaining why the `else` branch is
+    /// unreachable would then require facts about both operands, so we should not attach that
+    /// explanation to a diagnostic that only points to `nonempty`.
+    ///
+    /// To make this distinction, `truthiness_from_condition` evaluates `and`, `or`, and `not` using the
+    /// known truthiness of `condition.expression`, but treats every other operand as potentially truthy
+    /// or falsy.
+    fn truthiness_implied_by(self, condition: &RedundantCondition<'_, '_>) -> Truthiness {
+        fn truthiness_from_condition(
+            expression: &ast::Expr,
+            condition: &RedundantCondition<'_, '_>,
+        ) -> Truthiness {
+            if expression.range() == condition.expression.range() {
+                return Truthiness::from(condition.is_truthy);
+            }
+
+            match expression {
+                ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
+                    values
+                        .iter()
+                        .fold(Truthiness::from(op.is_and()), |result, value| match op {
+                            ast::BoolOp::Or => {
+                                result.or_else(|| truthiness_from_condition(value, condition))
+                            }
+                            ast::BoolOp::And => {
+                                result.and_then(|| truthiness_from_condition(value, condition))
+                            }
+                        })
+                }
+                ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    operand,
+                    ..
+                }) => truthiness_from_condition(operand, condition).negate(),
+                _ => Truthiness::Ambiguous,
+            }
+        }
+
+        if self.truthiness.is_ambiguous() {
+            return Truthiness::Ambiguous;
+        }
+
+        if truthiness_from_condition(self.expression, condition) == self.truthiness {
+            self.truthiness
+        } else {
+            Truthiness::Ambiguous
+        }
+    }
+}
+
 /// A condition with known truthiness, and the rule category needed to report it.
 ///
 /// We may or may not eventually report a diagnostic for this condition! A condition is classified
@@ -382,8 +489,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    /// Sweep over an entire suite of statements to examine if any direct `if`-statement conditions,
-    /// `elif`-statement conditions or `assert`-statement conditionsin that suite are redundant.
+    /// Sweep over an entire suite of statements to examine if any direct `if`, `elif`, `assert`,
+    /// or `while` conditions or `match` guards in that suite are redundant.
     ///
     /// We suppress conditions in [`ConditionKind::Boolean`] and [`ConditionKind::ShortCircuit`] when
     /// the code they make unreachable is a "defensive exit". See the doc-comment for
@@ -391,7 +498,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// All types in the suite must already be inferred before this method is called. This is so we
     /// can recognize terminal statements from their types, including calls returning `Never` and
-    /// `return NotImplemented` statements.
+    /// `return NotImplemented` statements. Reachability annotations can also require types from
+    /// patterns and guards in later `match` cases.
     ///
     /// ## Assertions
     ///
@@ -452,51 +560,78 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             &suite[i + 1..],
                         );
 
-                        for condition in self.redundant_conditions(
-                            self.boolean_test(test, ExpressionContext::Condition),
-                            context,
-                        ) {
+                        let boolean_test = self.boolean_test(test, ExpressionContext::Condition);
+                        for condition in self.redundant_conditions(boolean_test, context) {
                             if let Some(mut diagnostic) =
                                 self.report_redundant_condition(&condition)
-                                && condition.expression.range() == test.range()
                             {
-                                self.annotate_redundant_if_or_elif(
+                                // An operand's truthiness can differ from the full condition's,
+                                // so use the latter to determine which branch is unreachable.
+                                self.add_secondary_annotations_for_redundant_if_or_elif(
                                     &condition,
                                     &mut diagnostic,
+                                    boolean_test.truthiness_implied_by(&condition),
                                     if_stmt,
+                                    branch_index,
+                                    &suite[i + 1..],
                                 );
                             }
                         }
                     }
                 }
                 ast::Stmt::Assert(assert_statement) => {
-                    let test_type = self.expression_type(&assert_statement.test);
-                    let truthiness = self.condition_truthiness(&assert_statement.test);
-                    for condition in self.redundant_conditions(
-                        BooleanTest {
-                            expression: &assert_statement.test,
-                            value_type: test_type,
-                            truthiness,
-                            evaluation: ExpressionContext::Condition,
-                        },
-                        RedundantConditionContext::Assertion,
-                    ) {
-                        self.report_redundant_condition(&condition);
+                    let boolean_test =
+                        self.boolean_test(&assert_statement.test, ExpressionContext::Condition);
+                    for condition in self
+                        .redundant_conditions(boolean_test, RedundantConditionContext::Assertion)
+                    {
+                        if let Some(mut diagnostic) = self.report_redundant_condition(&condition) {
+                            self.add_secondary_annotations_for_redundant_assert(
+                                &mut diagnostic,
+                                boolean_test.truthiness_implied_by(&condition),
+                                &suite[i + 1..],
+                            );
+                        }
                     }
                 }
                 ast::Stmt::While(while_statement) => {
-                    let test_type = self.expression_type(&while_statement.test);
-                    let truthiness = self.condition_truthiness(&while_statement.test);
-                    for condition in self.redundant_conditions(
-                        BooleanTest {
-                            expression: &while_statement.test,
-                            value_type: test_type,
-                            truthiness,
-                            evaluation: ExpressionContext::Condition,
-                        },
-                        RedundantConditionContext::Standalone,
-                    ) {
-                        self.report_redundant_condition(&condition);
+                    let boolean_test =
+                        self.boolean_test(&while_statement.test, ExpressionContext::Condition);
+                    for condition in self
+                        .redundant_conditions(boolean_test, RedundantConditionContext::Standalone)
+                    {
+                        if let Some(mut diagnostic) = self.report_redundant_condition(&condition) {
+                            self.add_secondary_annotations_for_redundant_while(
+                                &mut diagnostic,
+                                boolean_test.truthiness_implied_by(&condition),
+                                while_statement,
+                                &suite[i + 1..],
+                            );
+                        }
+                    }
+                }
+                ast::Stmt::Match(match_statement) => {
+                    for (case_index, case) in match_statement.cases.iter().enumerate() {
+                        let Some(guard) = case.guard.as_deref() else {
+                            continue;
+                        };
+
+                        let boolean_test = self.boolean_test(guard, ExpressionContext::Condition);
+                        for condition in self.redundant_conditions(
+                            boolean_test,
+                            RedundantConditionContext::Standalone,
+                        ) {
+                            if let Some(mut diagnostic) =
+                                self.report_redundant_condition(&condition)
+                            {
+                                self.add_secondary_annotations_for_redundant_match(
+                                    &mut diagnostic,
+                                    boolean_test.truthiness_implied_by(&condition),
+                                    case,
+                                    &match_statement.cases[case_index + 1..],
+                                );
+                            }
+                        }
                     }
                 }
                 _ => continue,
@@ -607,7 +742,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// This ensures that the same mistake is not reported twice.
     ///
     /// Callers construct diagnostics for the selected conditions using the [`diagnostic`] module,
-    /// and can add annotations using the surrounding statement context.
+    /// and can add secondary annotations using the surrounding statement context.
     ///
     /// Independent tests within subexpressions are included in the same result.
     ///
@@ -893,7 +1028,7 @@ impl<'ast> Visitor<'ast> for SubexpressionChecker<'_, 'ast, '_> {
 /// Which exits are accepted when checking the final statement of a suite.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SuiteExitKind {
-    /// Accept any return statement, as well as defensive exits.
+    /// Accept any return, break, or continue statement, as well as defensive exits.
     Any,
     /// Only accept exits that can indicate a defensive runtime check.
     Defensive,
@@ -908,7 +1043,7 @@ enum SuiteExitKind {
 /// - or a nested `if` statement with an explicit `else` where every branch of the
 ///   `if`/`elif`/`else` ends in a recognized exit of the requested kind.
 ///
-/// [`SuiteExitKind::Any`] also accepts every `return` statement, while
+/// [`SuiteExitKind::Any`] also accepts every `return`, `break`, and `continue` statement, while
 /// [`SuiteExitKind::Defensive`] only accepts `return NotImplemented`.
 ///
 /// Potentially failing assertions count as exits even when they might succeed. This heuristic
@@ -927,6 +1062,7 @@ fn suite_ends_with_exit(
         .find(|stmt| !is_trivial_statement(stmt))
         .is_some_and(|stmt| match stmt {
             ast::Stmt::Raise(_) => true,
+            ast::Stmt::Break(_) | ast::Stmt::Continue(_) => kind == SuiteExitKind::Any,
             ast::Stmt::Assert(ast::StmtAssert { test, .. }) => {
                 builder.condition_truthiness(test).may_be_false()
             }
@@ -977,6 +1113,8 @@ fn suite_ends_with_exit(
 
 /// Return `true` if `stmt` is a "trivial statement"
 /// that has no effect nor side effect at runtime.
+///
+/// Statements considered trivial are `pass`, `...`, and string-literal statements.
 fn is_trivial_statement(stmt: &ast::Stmt) -> bool {
     match stmt {
         ast::Stmt::Pass(_) => true,

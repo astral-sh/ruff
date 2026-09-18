@@ -2224,6 +2224,26 @@ def assign():
 valid: Tree[int] = [1, [2]]
 ```
 
+### Recursive aliases provide tuple element contexts
+
+A recursive tuple alias supplies the expected types for its elements, including the parameters of a
+lambda expression.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+
+Implicit = tuple[Callable[[int], int], "Implicit | None"]
+type Explicit = tuple[Callable[[int], int], Explicit | None]
+
+implicit: Implicit = (lambda value: reveal_type(value) or value, None)  # revealed: int
+explicit: Explicit = (lambda value: reveal_type(value) or value, None)  # revealed: int
+```
+
 ### Recursive aliases in union contexts
 
 ```toml
@@ -2357,6 +2377,35 @@ def invalid_outer() -> Outer:
 
 def invalid_inner() -> Outer:
     return (1, ("inner", None, (2, None, None)))  # error: [invalid-return-type]
+```
+
+### A recursive union with a self-recursive tuple member
+
+A union can refer to a tuple that recurses both through the union and through itself. These
+references preserve their type arguments when the union is specialized.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar, Union
+
+T = TypeVar("T")
+Tree = Union[int, "Node[T]"]
+Node = tuple[T, "Tree[T]", "Node[T] | None"]
+type ExplicitTree[T] = int | ExplicitNode[T]
+type ExplicitNode[T] = tuple[T, ExplicitTree[T], ExplicitNode[T] | None]
+
+def inspect(value: Tree[int], explicit: ExplicitTree[int]):
+    reveal_type(value)  # revealed: Tree[int]
+    reveal_type(explicit)  # revealed: int | tuple[int, ExplicitTree[int], ExplicitNode[int] | None]
+
+valid: Tree[str] = ("leaf", 1, None)
+invalid: Tree[str] = (1, 1, None)  # error: [invalid-assignment]
+explicit_valid: ExplicitTree[str] = ("leaf", 1, None)
+explicit_invalid: ExplicitTree[str] = (1, 1, None)  # error: [invalid-assignment]
 ```
 
 ### Three mutually recursive generic aliases
@@ -2667,9 +2716,6 @@ def inspect(value: Tree[Tree[int]]):
 A recursive alias can appear inside a generic function's list parameter. Both legacy and PEP 695
 functions infer result types from the elements of the argument list.
 
-TODO: These results still include recursive alternatives instead of inferring only the leaf type.
-Improving these constraint solutions is separate from supporting recursive aliases.
-
 ```toml
 [environment]
 python-version = "3.12"
@@ -2688,11 +2734,15 @@ def first_list(value: list[Tree[W]]) -> W:
 def modern_first_list[W](value: list[Tree[W]]) -> W:
     raise NotImplementedError
 
+# TODO: should be `int`
 reveal_type(first_list([1]))  # revealed: int | tuple[Tree[int]]
+# TODO: should be `int`
 reveal_type(modern_first_list([1]))  # revealed: int | tuple[Tree[int]]
 
+# TODO: should be `int`
 # revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
 reveal_type(first_list([((1,),)]))
+# TODO: should be `int`
 # revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
 reveal_type(modern_first_list([((1,),)]))
 ```
@@ -2727,8 +2777,8 @@ for tree in (legacy(1), modern(1)):
     if isinstance(tree, tuple):
         reveal_type(tree[0])  # revealed: Tree[Literal[1]]
 
-reveal_type([legacy(1)])  # revealed: list[int | tuple[Tree[int]]]
-reveal_type([modern(1)])  # revealed: list[int | tuple[Tree[int]]]
+reveal_type([legacy(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
+reveal_type([modern(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
 take([legacy(1)])
 take([modern(1)])
 annotated: list[Tree[int]] = [legacy(1), modern(1)]
@@ -3037,12 +3087,39 @@ static_assert(is_subtype_of(Bottom[NestedList[str]], Top[NestedList[str]]))
 static_assert(is_subtype_of(Bottom[NestedDict[str, int]], Top[NestedDict[str, int]]))
 ```
 
-Materializations are distinguished from the original alias in the display.
+Materialization preserves aliases whose type arguments and recursive bodies are fully static.
 
 ```py
 def inspect(top: Top[NestedDict[str, int]], bottom: Bottom[NestedDict[str, int]]):
-    reveal_type(top)  # revealed: Top[NestedDict[str, int]]
-    reveal_type(bottom)  # revealed: Bottom[NestedDict[str, int]]
+    reveal_type(top)  # revealed: NestedDict[str, int]
+    reveal_type(bottom)  # revealed: NestedDict[str, int]
+```
+
+### Mutually recursive aliases with growing specializations
+
+The type arguments grow when these aliases refer back to each other. Inferring a list containing one
+of these values preserves the alias without expanding the recursive references indefinitely.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+GrowingA = tuple[T, "GrowingB[T] | None"]
+GrowingB = tuple[T, "GrowingA[list[T]] | None", "GrowingB[T] | None"]
+
+def f(a: GrowingA[int]):
+    reveal_type([a])  # revealed: list[GrowingA[int]]
+```
+
+These aliases contain no dynamic types when specialized with `int`, so both materializations are
+equivalent to the original type.
+
+```py
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+static_assert(is_equivalent_to(GrowingA[int], Top[GrowingA[int]]))
+static_assert(is_equivalent_to(GrowingA[int], Bottom[GrowingA[int]]))
 ```
 
 ### Materialized recursive aliases in collections

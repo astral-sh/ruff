@@ -1,4 +1,6 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use crate::FxIndexSet;
 use crate::place::implicit_builtins_symbol_scope;
@@ -17,6 +19,7 @@ use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
+use ruff_python_trivia::NameMatcher;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{ImportingFile, Module, ResolverFile};
@@ -32,6 +35,9 @@ pub use crate::types::definition_resolution::{ImportAliasResolution, ResolvedDef
 pub use stub_mapping::map_stub_definition;
 pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges};
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
+
+static CLASS_MATCHER: LazyLock<NameMatcher<'static>> =
+    LazyLock::new(|| NameMatcher::keyword("class"));
 
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
@@ -134,30 +140,33 @@ pub fn definitions_for_attribute<'db>(
 ///
 /// Preparing the finder resolves the class roots and the implementations selected for those roots.
 /// Candidate subclasses can then be scanned one file at a time.
-pub struct ImplementationsFinder<'db> {
+pub struct ImplementationsFinder<'a> {
     /// Definitions selected directly for the goto target's roots:
     /// - Root class definitions for a class-family search
     /// - Definitions found through each root's MRO for a member-family search.
-    initial_definitions: Vec<ResolvedDefinition<'db>>,
+    initial_definitions: Vec<ResolvedDefinition<'a>>,
 
     /// Classes whose known subclasses should be scanned for additional implementations.
-    roots: FxHashSet<ClassLiteral<'db>>,
+    roots: FxHashSet<ClassLiteral<'a>>,
+
+    /// Text prefilter for the class keyword or member name, reused across files.
+    name_matcher: Cow<'a, NameMatcher<'a>>,
 
     /// Whether scanning should return subclass definitions or same-named members on subclasses.
-    kind: ImplementationsFinderKind,
+    kind: ImplementationsFinderKind<'a>,
 }
 
-enum ImplementationsFinderKind {
+enum ImplementationsFinderKind<'a> {
     ClassFamily,
     MemberFamily {
-        name: Name,
+        name: &'a str,
         accessor_role: Option<PropertyAccessorRole>,
     },
 }
 
-impl<'db> ImplementationsFinder<'db> {
+impl<'a> ImplementationsFinder<'a> {
     /// Creates a class-family finder from resolved class roots.
-    fn for_class_roots(db: &'db dyn Db, roots: Vec<ClassLiteral<'db>>) -> Self {
+    fn for_class_roots(db: &'a dyn Db, roots: Vec<ClassLiteral<'a>>) -> Self {
         let mut initial_definitions = Vec::new();
         for root in &roots {
             if let Some(definition) = root.definition(db) {
@@ -171,15 +180,16 @@ impl<'db> ImplementationsFinder<'db> {
         Self {
             initial_definitions,
             roots: roots.into_iter().collect(),
+            name_matcher: Cow::Borrowed(&CLASS_MATCHER),
             kind: ImplementationsFinderKind::ClassFamily,
         }
     }
 
     /// Creates a member-family finder for roots that resolve the member through their MRO.
     fn for_member_roots(
-        db: &'db dyn Db,
-        roots: Vec<ClassLiteral<'db>>,
-        member_name: Name,
+        db: &'a dyn Db,
+        roots: Vec<ClassLiteral<'a>>,
+        member_name: &'a str,
         accessor_role: Option<PropertyAccessorRole>,
     ) -> Option<Self> {
         let mut initial_definitions = Vec::new();
@@ -188,7 +198,7 @@ impl<'db> ImplementationsFinder<'db> {
         for root in roots {
             // Avoid scanning every known subclass when the member doesn't resolve on this root.
             let Some(root_definitions) =
-                mro_member_definitions(db, root, member_name.as_str(), accessor_role)
+                mro_member_definitions(db, root, member_name, accessor_role)
             else {
                 continue;
             };
@@ -209,6 +219,7 @@ impl<'db> ImplementationsFinder<'db> {
         Some(Self {
             initial_definitions,
             roots: family_roots,
+            name_matcher: Cow::Owned(NameMatcher::new(member_name)),
             kind: ImplementationsFinderKind::MemberFamily {
                 name: member_name,
                 accessor_role,
@@ -221,11 +232,12 @@ impl<'db> ImplementationsFinder<'db> {
         &'scan self,
         db: &'scan dyn Db,
         file: ProgramFile<'scan>,
-    ) -> Vec<ResolvedDefinition<'scan>>
-    where
-        'db: 'scan,
-    {
-        let roots: &FxHashSet<ClassLiteral<'scan>> = &self.roots;
+    ) -> Vec<ResolvedDefinition<'scan>> {
+        if !self.name_matcher.may_match(&source_text(db, file.file(db))) {
+            return Vec::new();
+        }
+
+        let roots = &self.roots;
         match &self.kind {
             ImplementationsFinderKind::ClassFamily => {
                 class_implementations_for_file(db, file, roots)
@@ -233,12 +245,12 @@ impl<'db> ImplementationsFinder<'db> {
             ImplementationsFinderKind::MemberFamily {
                 name,
                 accessor_role,
-            } => member_implementations_for_file(db, file, roots, name.as_str(), *accessor_role),
+            } => member_implementations_for_file(db, file, roots, name, *accessor_role),
         }
     }
 
     /// Returns the definitions selected directly for the finder's roots.
-    pub fn into_initial_definitions(self) -> Vec<ResolvedDefinition<'db>> {
+    pub fn into_initial_definitions(self) -> Vec<ResolvedDefinition<'a>> {
         self.initial_definitions
     }
 
@@ -259,8 +271,8 @@ impl<'db> ImplementationsFinder<'db> {
     /// declared in the class body (`sound: str = ...`, `sound = ...`, or a bare `sound: str`) or
     /// assigned to `self` in a method body (`self.sound = ...`).
     pub fn for_attribute(
-        model: &SemanticModel<'db>,
-        attribute: &ast::ExprAttribute,
+        model: &SemanticModel<'a>,
+        attribute: &'a ast::ExprAttribute,
     ) -> Option<Self> {
         let db = model.db();
         let lhs_ty = attribute.value.inferred_type(model)?;
@@ -276,7 +288,7 @@ impl<'db> ImplementationsFinder<'db> {
             ast::ExprContext::Invalid => None,
         };
 
-        ImplementationsFinder::for_member_roots(db, roots, attribute.attr.id.clone(), accessor_role)
+        ImplementationsFinder::for_member_roots(db, roots, attribute.attr.as_str(), accessor_role)
     }
 
     /// Creates an `ImplementationsFinder` for a method declaration.
@@ -293,7 +305,10 @@ impl<'db> ImplementationsFinder<'db> {
     /// The containing class is used as the root. The method's implementation, if present, is returned
     /// along with same-named methods defined on known transitive subclasses. This does not walk to
     /// parent classes: on `Dog.speak`, the root is `Dog`, so `Animal.speak` is not included.
-    pub fn for_method(model: &SemanticModel<'db>, function: &ast::StmtFunctionDef) -> Option<Self> {
+    pub fn for_method(
+        model: &SemanticModel<'a>,
+        function: &'a ast::StmtFunctionDef,
+    ) -> Option<Self> {
         let db = model.db();
         let env = model.program_environment();
         let function_definition = function.definition(model);
@@ -315,7 +330,7 @@ impl<'db> ImplementationsFinder<'db> {
         ImplementationsFinder::for_member_roots(
             db,
             vec![root],
-            function.name.id.clone(),
+            function.name.as_str(),
             accessor_role,
         )
     }
@@ -334,7 +349,7 @@ impl<'db> ImplementationsFinder<'db> {
     /// The clicked class is the root and is returned first, followed by its known transitive
     /// subclasses such as `Dog` and `Cat`. This walks down the hierarchy only: clicking a subclass
     /// returns that class and its own subclasses, not its parents.
-    pub fn for_class(model: &SemanticModel<'db>, class: &ast::StmtClassDef) -> Option<Self> {
+    pub fn for_class(model: &SemanticModel<'a>, class: &ast::StmtClassDef) -> Option<Self> {
         let db = model.db();
         let env = model.program_environment();
         let class_definition = class.definition(model);
@@ -368,9 +383,9 @@ impl<'db> ImplementationsFinder<'db> {
     /// object (for example an instance variable or method), so callers can fall back to member
     /// handling.
     pub fn for_class_reference(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        resolved_definitions: &[ResolvedDefinition<'db>],
+        db: &'a dyn Db,
+        env: &ProgramEnvironment<'a>,
+        resolved_definitions: &[ResolvedDefinition<'a>],
     ) -> Option<Self> {
         let mut roots = Vec::new();
         let mut seen = FxHashSet::default();
@@ -423,10 +438,6 @@ fn class_implementations_for_file<'db>(
     file: ProgramFile<'db>,
     roots: &FxHashSet<ClassLiteral<'db>>,
 ) -> Vec<ResolvedDefinition<'db>> {
-    if !contains_identifier(&source_text(db, file.file(db)), "class") {
-        return Vec::new();
-    }
-
     let mut definitions = Vec::new();
 
     for candidate in reachable_class_literals_in_file(db, file) {
@@ -467,10 +478,9 @@ fn member_implementations_for_file<'db>(
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut definitions = Vec::new();
 
-    // A file can only contribute an override if it contains a class and spells the member name,
-    // whether as a method name, a class-body target, or a `self.member` assignment.
+    // The finder already checked for the member name. An override also requires a class.
     let source = source_text(db, file.file(db));
-    if !contains_identifier(&source, "class") || !contains_identifier(&source, member_name) {
+    if !CLASS_MATCHER.may_match(&source) {
         return definitions;
     }
 
@@ -783,36 +793,6 @@ fn is_reachable_implementation_definition<'db>(
         definition.file_scope(db),
         definition.full_range(db, &parsed).range(),
     )
-}
-
-/// Cheap text prefilter for identifier references before AST/semantic validation.
-///
-/// Heuristically matches an ASCII approximation of `\b{name}\b`.
-pub fn contains_identifier(source: &str, name: &str) -> bool {
-    if name.is_empty() {
-        return false;
-    }
-
-    let bytes = source.as_bytes();
-    let needle = name.as_bytes();
-
-    memchr::memmem::find_iter(bytes, needle).any(move |pos| {
-        let after = pos + needle.len();
-
-        // Skip this entry if it is within an identifier. E.g. skip
-        // this entry when searching for `x` and this is a match
-        // within `exclude = 10`.
-        let boundary_before = pos == 0 || !is_ascii_identifier_continue(bytes[pos - 1]);
-        let boundary_after = bytes
-            .get(after)
-            .is_none_or(|byte| !is_ascii_identifier_continue(*byte));
-
-        boundary_before && boundary_after
-    })
-}
-
-fn is_ascii_identifier_continue(byte: u8) -> bool {
-    byte.is_ascii_alphanumeric() || byte == b'_'
 }
 
 pub struct TypedDictKeyHover<'db> {
@@ -1958,6 +1938,7 @@ fn direct_subtypes<'db>(
 ) -> Vec<ClassLiteral<'db>> {
     let target_name = target_class.name(db);
     let target_is_object = target_class.is_known(db, KnownClass::Object);
+    let target_matcher = NameMatcher::new(target_name.as_str());
     let mut subtypes = vec![];
 
     for &module in modules {
@@ -1978,7 +1959,7 @@ fn direct_subtypes<'db>(
         }
 
         let source = source_text(db, file);
-        if !contains_identifier(&source, "class") {
+        if !CLASS_MATCHER.may_match(&source) {
             continue;
         }
 
@@ -1986,10 +1967,7 @@ fn direct_subtypes<'db>(
         // vendored stdlib. First-party modules may inherit through local import aliases, e.g.
         // `from a import Base as B; class Child(B): ...`, so they need semantic analysis even
         // when they do not mention the target class's original name.
-        if is_non_first_party
-            && !target_is_object
-            && !contains_identifier(&source, target_name.as_str())
-        {
+        if is_non_first_party && !target_is_object && !target_matcher.may_match(&source) {
             continue;
         }
 
@@ -2217,8 +2195,7 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
 #[cfg(test)]
 mod tests {
     use super::{
-        CallArgumentForm, ImportAliasResolution, call_argument_forms, contains_identifier,
-        definitions_for_name,
+        CallArgumentForm, ImportAliasResolution, call_argument_forms, definitions_for_name,
     };
     use crate::SemanticModel;
     use crate::db::tests::TestDbBuilder;
@@ -2256,17 +2233,6 @@ mod tests {
         let events = db.take_salsa_events();
         assert_function_query_was_not_run_by_name(&db, "infer_scope_types_impl", None, &events);
         Ok(())
-    }
-
-    #[test]
-    fn source_candidate_prefilters_use_identifier_boundaries() {
-        for (source, name) in [("x = 1", "x"), ("obj.x", "x"), ("x()", "x")] {
-            assert!(contains_identifier(source, name));
-        }
-
-        for (source, name) in [("exclude = 10", "x"), ("Database", "Base"), ("", "x")] {
-            assert!(!contains_identifier(source, name));
-        }
     }
 
     #[test]

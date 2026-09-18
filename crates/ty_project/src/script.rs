@@ -223,7 +223,6 @@ fn resolve_script_options(
 
     let uv_options = uv_metadata.map(|metadata| Options {
         environment: Some(EnvironmentOptions {
-            python_version: metadata.python_version().cloned(),
             python: metadata
                 .environment()
                 .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata)),

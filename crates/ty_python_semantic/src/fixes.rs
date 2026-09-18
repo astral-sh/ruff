@@ -991,7 +991,7 @@ mod tests {
             suppress_all_in(r#"
                 from typing import TypeAlias
 
-                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
                 def get_data() -> dict[str, JsonValue]:
@@ -1006,25 +1006,25 @@ mod tests {
                 "#
         ),
          @r#"
-        Added 5 suppressions
+        Added 7 suppressions
 
         ## Fixed source
 
         ```py
         from typing import TypeAlias
 
-        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
         def get_data() -> dict[str, JsonValue]:
-            return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}  # ty: ignore[invalid-return-type]
+            return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}
 
 
         def f() -> None:
             diag = get_data()
-            diag["home_assistant"]["entities"] = sorted(
+            diag["home_assistant"]["entities"] = sorted(  # ty: ignore[invalid-assignment]
                 diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty: ignore[invalid-argument-type, not-subscriptable]
-            )  # ty: ignore[invalid-assignment, no-matching-overload]
+            )  # ty: ignore[no-matching-overload]
         ```
         "#);
     }
@@ -1035,7 +1035,7 @@ mod tests {
             suppress_all_in(r#"
                 from typing import TypeAlias
 
-                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
                 def get_data() -> dict[str, JsonValue]:
@@ -1049,25 +1049,25 @@ mod tests {
                     ); missing  # ty: ignore[unresolved-reference]
                 "#),
             @r#"
-        Added 5 suppressions
+        Added 7 suppressions
 
         ## Fixed source
 
         ```py
         from typing import TypeAlias
 
-        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
         def get_data() -> dict[str, JsonValue]:
-            return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}  # ty: ignore[invalid-return-type]
+            return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}
 
 
         def f() -> None:
             diag = get_data()
-            diag["home_assistant"]["entities"] = sorted(
+            diag["home_assistant"]["entities"] = sorted(  # ty: ignore[invalid-assignment]
                 diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty: ignore[invalid-argument-type, not-subscriptable]
-            ); missing  # ty: ignore[unresolved-reference, invalid-assignment, no-matching-overload]
+            ); missing  # ty: ignore[unresolved-reference, no-matching-overload]
         ```
         "#
         );

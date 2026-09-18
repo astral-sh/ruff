@@ -249,9 +249,9 @@ impl<'db> InferenceKey<'db> {
             .zip(&variables)
             .map(|(key, variable)| (key.reference(db), Type::TypeVar(*variable)))
             .collect();
-        let mapping = TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Replace(
-            &replacements,
-        )));
+        let mapping = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+            RecursiveSubstitution::Replace(&replacements),
+        ));
         let visitor = ApplyTypeMappingVisitor::new(&env);
         let mut symbolic = Vec::with_capacity(equations.len());
         for (body, variable) in equations.values().zip(&variables) {
@@ -265,7 +265,7 @@ impl<'db> InferenceKey<'db> {
             Ok(Solutions::Constrained(SolutionPaths::Complete(paths)))
                 if let [solution] = paths.as_slice() =>
             {
-                solution.iter().find_map(|binding| {
+                solution.solved_typevars.iter().find_map(|binding| {
                     if binding.bound_typevar == variables[0]
                         && let SolutionType::Resolved { ty, selected } = binding.solution
                     {
@@ -289,9 +289,9 @@ impl<'db> InferenceKey<'db> {
             .collect();
         let unfolded = selected.apply_type_mapping_impl(
             db,
-            &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Replace(
-                &replacements,
-            ))),
+            &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Replace(&replacements),
+            )),
             TypeContext::default(),
             &visitor,
         );

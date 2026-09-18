@@ -1497,6 +1497,35 @@ class C(A, Protocol):
     x = 42  # fine, due to declaration in the base class
 ```
 
+## Imported `Final` values do not declare protocol members
+
+An imported `Final` qualifier does not turn an import into an explicit protocol-member declaration.
+If a real declaration exists, the imported qualifier still makes that protocol member read-only.
+
+`constants.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`main.py`:
+
+```py
+from typing import Protocol
+
+class ImportOnly(Protocol):
+    from constants import VALUE  # error: [ambiguous-protocol-member]
+
+class ExplicitlyDeclared(Protocol):
+    VALUE: int
+    from constants import VALUE
+
+def mutate(value: ExplicitlyDeclared) -> None:
+    value.VALUE = 2  # error: [invalid-assignment]
+```
+
 ## Hashable protocol assignability
 
 An explicitly disabled `__hash__` method makes an object incompatible with the standard-library

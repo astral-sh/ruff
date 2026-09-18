@@ -132,6 +132,47 @@ reveal_type(airflow_version)  # revealed: Literal["3.2.0"]
 reveal_type(amazon_provider_version)  # revealed: Literal["9.15.0"]
 ```
 
+## Normalized module identifiers
+
+Python normalizes identifiers with NFKC, so a namespace declaration can refer to `pkgutil` without
+its ASCII spelling appearing in the source. The namespace still includes modules from both search
+paths.
+
+```toml
+[environment]
+extra-paths = ["/first", "/second"]
+```
+
+`/first/namespace/__init__.py`:
+
+```py
+import ｐｋｇｕｔｉｌ
+
+__path__ = ｐｋｇｕｔｉｌ.extend_path(__path__, __name__)
+```
+
+`/second/namespace/__init__.py`:
+
+```py
+import ｐｋｇｕｔｉｌ
+
+__path__ = ｐｋｇｕｔｉｌ.extend_path(__path__, __name__)
+```
+
+`/second/namespace/child.py`:
+
+```py
+value = 1
+```
+
+`test.py`:
+
+```py
+from namespace.child import value
+
+reveal_type(value)  # revealed: Literal[1]
+```
+
 ## `extend_path` with keyword arguments
 
 ```toml

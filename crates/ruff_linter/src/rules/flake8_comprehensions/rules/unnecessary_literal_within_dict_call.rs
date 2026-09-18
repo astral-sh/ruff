@@ -82,14 +82,6 @@ pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: &ast
         call.range(),
     );
 
-    if matches!(
-        argument,
-        Expr::DictComp(ast::ExprDictComp { key: None, .. })
-    ) {
-        // The LibCST-based fixer does not yet support PEP 798 unpacking comprehensions.
-        return;
-    }
-
     // Convert `dict({"a": 1})` to `{"a": 1}`
     diagnostic.set_fix({
         // Delete from the start of the call to the start of the argument.

@@ -80,9 +80,9 @@ pub(super) enum SequentGroup<'db> {
 }
 
 /// Describes one rule for deriving new implicit constraints from existing constraints in a BDD
-/// path.
+/// path. Fuel costs are filled in when cached sequents are imported into a builder.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) enum Sequent<C> {
+pub(super) enum Sequent<C, FuelCost = ()> {
     /// Sequent of the form `¬C → false`
     ///
     /// This indicates that `C` is always true. Any path that assumes it is false is impossible and
@@ -105,14 +105,23 @@ pub(super) enum Sequent<C> {
     ///
     /// This indicates that `C` on its own is enough to imply `D`. For any path that assumes `C`
     /// holds, we can add `D` to the path even if it doesn't appear in the BDD.
-    SingleImplication { ante: C, post: C },
+    SingleImplication {
+        ante: C,
+        post: C,
+        fuel_cost: FuelCost,
+    },
 
     /// Sequent of the form `C₁ ∧ C₂ → D`
     ///
     /// This indicates that if `C₁` and `C₂` are both true, then `D` is guaranteed to be true as
     /// well. For any path that assumes both `C₁` and `C₂` hold, we can add `D` to the path even if
     /// it doesn't appear in the BDD.
-    PairImplication { ante1: C, ante2: C, post: C },
+    PairImplication {
+        ante1: C,
+        ante2: C,
+        post: C,
+        fuel_cost: FuelCost,
+    },
 }
 
 impl<'db> SequentMap<'db> {
@@ -163,7 +172,9 @@ impl<'db> SequentMap<'db> {
                         )?;
                     }
 
-                    Sequent::PairImplication { ante1, ante2, post } => {
+                    Sequent::PairImplication {
+                        ante1, ante2, post, ..
+                    } => {
                         maybe_write_prefix(f)?;
                         write!(
                             f,
@@ -174,7 +185,7 @@ impl<'db> SequentMap<'db> {
                         )?;
                     }
 
-                    Sequent::SingleImplication { ante, post } => {
+                    Sequent::SingleImplication { ante, post, .. } => {
                         maybe_write_prefix(f)?;
                         write!(
                             f,
@@ -274,12 +285,20 @@ impl<'db> SequentMap<'db> {
         ante2: Constraint<'db>,
         post: Constraint<'db>,
     ) {
-        self.pending
-            .push(Sequent::PairImplication { ante1, ante2, post });
+        self.pending.push(Sequent::PairImplication {
+            ante1,
+            ante2,
+            post,
+            fuel_cost: (),
+        });
     }
 
     fn add_single_implication(&mut self, ante: Constraint<'db>, post: Constraint<'db>) {
-        self.pending.push(Sequent::SingleImplication { ante, post });
+        self.pending.push(Sequent::SingleImplication {
+            ante,
+            post,
+            fuel_cost: (),
+        });
     }
 
     /// Returns a sequent map containing the sequents that we can infer from a single constraint in

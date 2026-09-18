@@ -600,19 +600,24 @@ impl<'a> OptionsContext<'a> {
 fn python_version_from_config(
     ranged_version: &RangedValue<SupportedPythonVersion>,
 ) -> PythonVersionWithSource {
+    let source = match ranged_version.source() {
+        ValueSource::Cli => PythonVersionSource::Cli,
+        ValueSource::File(path) => PythonVersionSource::ConfigFile(PythonVersionFileSource::new(
+            path.clone(),
+            ranged_version.range(),
+        )),
+        ValueSource::ScriptMetadata(file) => PythonVersionSource::ScriptMetadata(
+            Span::from(*file).with_optional_range(ranged_version.range()),
+        ),
+        ValueSource::Editor => PythonVersionSource::Editor,
+        ValueSource::UvMetadata => {
+            unreachable!("uv metadata does not provide a configured Python version")
+        }
+    };
+
     PythonVersionWithSource {
         version: PythonVersion::from(**ranged_version),
-        source: match ranged_version.source() {
-            ValueSource::Cli => PythonVersionSource::Cli,
-            ValueSource::File(path) => PythonVersionSource::ConfigFile(
-                PythonVersionFileSource::new(path.clone(), ranged_version.range()),
-            ),
-            ValueSource::ScriptMetadata(file) => PythonVersionSource::ScriptMetadata(
-                Span::from(*file).with_optional_range(ranged_version.range()),
-            ),
-            ValueSource::Editor => PythonVersionSource::Editor,
-            ValueSource::UvMetadata => PythonVersionSource::UvMetadata,
-        },
+        source,
     }
 }
 
@@ -740,10 +745,6 @@ fn unsupported_inferred_python_version_diagnostic(
         PythonVersionSource::Editor => diagnostic.sub(SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             "The version was inferred from your editor.",
-        )),
-        PythonVersionSource::UvMetadata => diagnostic.sub(SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            "The version was provided by uv metadata.",
         )),
         PythonVersionSource::Default => diagnostic.sub(SubDiagnostic::new(
             SubDiagnosticSeverity::Info,

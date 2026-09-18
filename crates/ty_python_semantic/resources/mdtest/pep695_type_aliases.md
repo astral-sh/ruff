@@ -1083,6 +1083,31 @@ def use(value: Cycle):
     value[0]  # error: [not-subscriptable]
 ```
 
+### Recursive arguments inside implicit containers
+
+An implicit recursive alias can keep an enclosing alias's self-reference inside a container. These
+references are valid even when they occur in the implicit alias's type arguments.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Lists = list["Lists[T]"]
+type Recursive = Lists[Recursive]
+type Nested = list[Lists[Nested]]
+
+recursive: Recursive = []
+nested: Nested = []
+```
+
+The argument can also occur directly as a tuple element: the tuple still separates successive
+recursive references.
+
+```py
+Pairs = tuple[T, list["Pairs[T]"]]
+type RecursivePair = Pairs[RecursivePair]
+```
+
 ### Finite nested applications of recursive aliases
 
 A recursive alias can appear in its own type arguments without creating a cycle in its expansion.
@@ -1113,6 +1138,43 @@ RepeatedFunctional = TypeAliasType("RepeatedFunctional", Functional[Functional[i
 
 functional_value: RepeatedFunctional = 1
 FunctionalCycle = TypeAliasType("FunctionalCycle", Functional["FunctionalCycle"])  # error: [cyclic-type-alias-definition]
+```
+
+### Cycles through implicit recursive alias arguments
+
+A type argument exposed outside containers can close an invalid cycle, even when the wrapper's own
+recursive reference is inside a list. Rejecting that cycle preserves the other union alternatives.
+
+```py
+from typing import TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+Wrapper = T | list["Wrapper[T]"]
+
+type Cycle = Wrapper[Cycle]  # error: [cyclic-type-alias-definition]
+type WithLeaf = int | Wrapper[WithLeaf]  # error: [cyclic-type-alias-definition]
+
+valid: WithLeaf = 1
+invalid: WithLeaf = "wrong"  # error: [invalid-assignment]
+
+FunctionalCycle = TypeAliasType("FunctionalCycle", Wrapper["FunctionalCycle"])  # error: [cyclic-type-alias-definition]
+```
+
+### Finite nested applications of implicit recursive aliases
+
+Nested applications of the same wrapper are finite. Recursion beneath `list` does not make the
+exposed argument recursive, even when successive list elements have different type arguments.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Wrapper = T | list["Wrapper[list[T]]"]
+type Nested = Wrapper[Wrapper[int]]
+
+valid: Nested = 1
+invalid: Nested = "wrong"  # error: [invalid-assignment]
 ```
 
 ### With legacy generic

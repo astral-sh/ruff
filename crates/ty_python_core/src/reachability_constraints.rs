@@ -4,9 +4,10 @@
 
 use std::cmp::Ordering;
 
-use ruff_index::{Idx, IndexVec};
+use ruff_index::Idx;
 use rustc_hash::FxHashMap;
 
+use crate::interned_nodes::InternedNodes;
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
 use crate::predicate::ScopedPredicateId;
 use crate::rank::{RankBitBox, RankBitBoxVec};
@@ -172,11 +173,10 @@ impl ReachabilityConstraints {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default)]
 pub struct ReachabilityConstraintsBuilder {
-    interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
+    interiors: InternedNodes<ScopedReachabilityConstraintId, InteriorNode>,
     interior_used: RankBitBoxVec,
-    interior_cache: FxHashMap<InteriorNode, ScopedReachabilityConstraintId>,
     not_cache: FxHashMap<ScopedReachabilityConstraintId, ScopedReachabilityConstraintId>,
     and_cache: FxHashMap<
         (
@@ -203,11 +203,13 @@ impl ReachabilityConstraintsBuilder {
     pub(crate) fn build(self) -> ReachabilityConstraints {
         if self.interior_used.first_zero().is_none() {
             ReachabilityConstraints {
-                used_interiors: self.interiors.raw.into_boxed_slice(),
+                used_interiors: self.interiors.into_nodes_boxed_slice(),
                 used_indices: None,
             }
         } else {
-            let used_interiors = (self.interiors.into_iter())
+            let used_interiors = self
+                .interiors
+                .into_node_iterator()
                 .zip(&self.interior_used)
                 .filter_map(|(interior, used)| used.then_some(interior))
                 .collect();
@@ -351,10 +353,11 @@ impl ReachabilityConstraintsBuilder {
             return node.if_true;
         }
 
-        *self.interior_cache.entry(node).or_insert_with(|| {
+        let (id, inserted) = self.interiors.intern(node);
+        if inserted {
             self.interior_used.push(false);
-            self.interiors.push(node)
-        })
+        }
+        id
     }
 
     /// Adds a new reachability constraint that checks a single [`super::predicate::Predicate`].

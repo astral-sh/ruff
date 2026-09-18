@@ -916,6 +916,58 @@ reveal_type(X)  # revealed: bool
 reveal_type(Y)  # revealed: Unknown
 ```
 
+### Names excluded from `__all__` do not reassign `Final` symbols
+
+A wildcard import does not bind public or private names that are absent from the exporting module's
+`__all__`, so those names cannot overwrite existing `Final` declarations.
+
+`exporter.py`:
+
+```py
+from typing import Final
+
+EXCLUDED: Final[int] = 1
+_PRIVATE: Final[int] = 2
+
+__all__ = []
+```
+
+`importer.py`:
+
+```py
+from typing import Final
+
+EXCLUDED: Final[int] = 3
+_PRIVATE: Final[int] = 4
+
+from exporter import *
+```
+
+### Names included in `__all__` still reassign `Final` symbols
+
+An explicitly exported name is genuinely imported, so existing `Final` declarations still reject the
+reassignment.
+
+`exporter.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+__all__ = ["VALUE"]
+```
+
+`importer.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 2
+
+# error: [invalid-assignment] "Reassignment of `Final` symbol `VALUE` is not allowed"
+from exporter import *
+```
+
 ### `__all__` with additions later on in the global scope
 
 The

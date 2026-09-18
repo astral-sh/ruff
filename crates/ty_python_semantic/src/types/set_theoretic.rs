@@ -9,7 +9,10 @@ use crate::place::{
 };
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
-use crate::types::{InstanceProjection, Type, TypePair, TypeQualifiers};
+use crate::types::{
+    ApplyTypeMappingVisitor, InstanceProjection, PromotionKind, PromotionMode, Type, TypeContext,
+    TypeMapping, TypePair, TypeQualifiers,
+};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet, Program};
 
@@ -122,9 +125,7 @@ impl<'db> UnionType<'db> {
 
     /// Returns `true` if any direct element of this union is a type alias.
     pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
-        self.elements(db)
-            .iter()
-            .any(|element| matches!(element, Type::TypeAlias(_) | Type::Recursive(_)))
+        self.elements(db).iter().copied().any(Type::is_alias_like)
     }
 
     /// Recursively expands aliases that expose top-level union elements.
@@ -274,6 +275,30 @@ impl<'db> UnionType<'db> {
         Some(builder.build())
     }
 
+    /// Map the union's elements, preserving open bodies during structural substitutions.
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        if type_mapping.is_structural() {
+            Type::Union(UnionType::new(
+                db,
+                self.elements(db)
+                    .iter()
+                    .map(|element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                    .collect::<Box<[_]>>(),
+                self.recursively_defined(db),
+            ))
+        } else {
+            self.map_leave_aliases(db, visitor.env, |element| {
+                element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            })
+        }
+    }
+
     /// Apply a transformation function to all elements of the union,
     /// and create a new union from the resulting set of types.
     pub(crate) fn map(
@@ -289,7 +314,7 @@ impl<'db> UnionType<'db> {
     }
 
     /// A version of [`UnionType::map`] that does not unpack type aliases.
-    pub(crate) fn map_leave_aliases(
+    fn map_leave_aliases(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -876,8 +901,6 @@ impl std::iter::FusedIterator for NegativeIntersectionElementsIterator<'_, '_> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for IntersectionType<'_> {}
 
-const MAX_INTERSECTION_DNF_TERMS: usize = 4;
-
 pub(crate) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     intersection: IntersectionType<'db>,
@@ -985,69 +1008,7 @@ impl<'db> IntersectionType<'db> {
         I::IntoIter: Clone,
         Type<'db>: From<T>,
     {
-        // TODO: Consider folding this logic into IntersectionBuilder itself, and having it check
-        // an optional budget as part of its existing `add_positive` methods.
-
-        let elements = elements.into_iter().map(Type::from);
-        let union_count = elements.clone().filter(|ty| ty.is_union()).count();
-        if union_count <= 1 {
-            // If there are no unions, then all we have to do is check for redundant elements. If
-            // there is a single union, the product of all union counts should be reasonable, even
-            // if it exceeds the budget below. In both cases, just return the precise answer
-            // without considering the budget.
-            return Some(Self::from_elements(db, env, elements));
-        }
-
-        let non_union_elements = elements.clone().filter(|element| !element.is_union());
-        let initial = Self::from_elements(db, env, non_union_elements);
-        let insert_candidate = |candidates: &mut Vec<Type<'db>>,
-                                new_ty: Type<'db>,
-                                check_budget: bool|
-         -> Option<()> {
-            if new_ty.is_never()
-                || candidates
-                    .iter()
-                    .any(|old| new_ty.is_redundant_with(db, env, *old))
-            {
-                return Some(());
-            }
-
-            candidates.retain(|old| !old.is_redundant_with(db, env, new_ty));
-            if check_budget && candidates.len() >= MAX_INTERSECTION_DNF_TERMS {
-                return None;
-            }
-            candidates.push(new_ty);
-            Some(())
-        };
-
-        let mut frontier = Vec::new();
-        let mut next = Vec::new();
-        insert_candidate(&mut frontier, initial, true)?;
-
-        for (idx, clause) in elements.filter_map(Type::as_union).enumerate() {
-            // Don't check the budget for the first union clause. That ensures that we have a
-            // chance for pairs of types to "annihilate" each other without contributing to the
-            // result. For instance, this allows us to return the precise result for
-            // `(A | B | C | D | E) & (A | B | F | G | H)` (in which each class is final), since
-            // most of the pairs are disjoint.
-            let check_budget = idx > 0;
-
-            next.clear();
-            for candidate in &frontier {
-                for alternative in clause.elements(db) {
-                    let refined = Self::from_two_elements(db, env, *candidate, *alternative);
-                    insert_candidate(&mut next, refined, check_budget)?;
-                }
-            }
-
-            if next.is_empty() {
-                return Some(Type::Never);
-            }
-
-            std::mem::swap(&mut frontier, &mut next);
-        }
-
-        Some(UnionType::from_elements(db, env, frontier))
+        IntersectionBuilder::bounded_from_elements(db, env, elements)
     }
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.
@@ -1121,6 +1082,59 @@ impl<'db> IntersectionType<'db> {
             Either::Left(std::iter::once(Type::object()))
         } else {
             Either::Right(positive.iter().copied())
+        }
+    }
+
+    /// Map both signs of the intersection, preserving open bodies during structural substitutions.
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        if type_mapping.is_structural() {
+            let positive = self
+                .positive(db)
+                .iter()
+                .map(|positive| positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                .collect::<FxOrderSet<_>>();
+            let mut negative = NegativeIntersectionElements::default();
+            for element in self.negative(db) {
+                negative.insert(element.apply_type_mapping_impl(
+                    db,
+                    &type_mapping.flip(),
+                    tcx,
+                    visitor,
+                ));
+            }
+            Type::Intersection(IntersectionType::new(db, positive, negative))
+        } else {
+            let mut builder = IntersectionBuilder::new(db, visitor.env);
+            for positive in self.positive(db) {
+                builder.add_positive_in_place(positive.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                ));
+            }
+            // Regular promotion should remove negative contributions from intersections,
+            // so we don't preserve them here when regular promotion is enabled.
+            if !matches!(
+                type_mapping,
+                TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
+            ) {
+                for negative in self.negative(db) {
+                    builder.add_negative_in_place(negative.apply_type_mapping_impl(
+                        db,
+                        &type_mapping.flip(),
+                        tcx,
+                        visitor,
+                    ));
+                }
+            }
+            builder.build()
         }
     }
 

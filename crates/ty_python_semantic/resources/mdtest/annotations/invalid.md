@@ -1353,6 +1353,59 @@ info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
 
+#### Recursive type aliases in collection hints
+
+Collection suggestions preserve the name of a recursive alias, including when it appears in a union.
+Quoted annotations receive the same suggestions.
+
+```py
+Tree = tuple[int, "Tree | None"]
+
+def consume(
+    trees: "[Tree]",  # snapshot: invalid-type-form
+    pair: "(Tree, int)",  # snapshot: invalid-type-form
+    mapping: "{str: Tree}",  # snapshot: invalid-type-form
+    roots: "{Tree | None}",  # snapshot: invalid-type-form
+): ...
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:4:13
+  |
+4 |     trees: "[Tree]",  # snapshot: invalid-type-form
+  |             ^^^^^^ Did you mean `list[Tree]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Tuple literals are not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:5:12
+  |
+5 |     pair: "(Tree, int)",  # snapshot: invalid-type-form
+  |            ^^^^^^^^^^^ Did you mean `tuple[Tree, int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Dict literals are not allowed in parameter annotations
+ --> src/mdtest_snippet.py:6:15
+  |
+6 |     mapping: "{str: Tree}",  # snapshot: invalid-type-form
+  |               ^^^^^^^^^^^ Did you mean `dict[str, Tree]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Set literals are not allowed in parameter annotations
+ --> src/mdtest_snippet.py:7:13
+  |
+7 |     roots: "{Tree | None}",  # snapshot: invalid-type-form
+  |             ^^^^^^^^^^^^^ Did you mean `set[Tree | None]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
 ### Special-cased diagnostic for `callable` used in a type expression
 
 <!-- snapshot-diagnostics -->

@@ -607,6 +607,141 @@ extend = "ruff3.toml"
 }
 
 #[test]
+fn extend_banned_api() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+        [lint]
+        select = ["TID251"]
+
+        [lint.flake8-tidy-imports.extend-banned-api]
+        "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+        "cgi".msg = "Use a supported library instead."
+        "typing.Any".msg = "Use a precise type instead."
+        "#,
+    )?;
+    fixture.write_file(
+        "test.py",
+        "
+        import cgi
+        from typing import TypedDict
+        import typing
+        x: typing.Any
+        ",
+    )?;
+
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:8: TID251 `cgi` is banned: Use a supported library instead.
+    test.py:3:20: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+    test.py:5:4: TID251 `typing.Any` is banned: Use a precise type instead.
+    Found 3 errors.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn extend_banned_api_inherited() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+        [lint]
+        select = ["TID251"]
+
+        [lint.flake8-tidy-imports.banned-api]
+        "cgi".msg = "The cgi module is deprecated."
+        "pipes".msg = "Use shlex instead."
+
+        [lint.flake8-tidy-imports.extend-banned-api]
+        "typing.Any".msg = "Use a precise type instead."
+        "#,
+    )?;
+    fixture.write_file(
+        "child/ruff.toml",
+        r#"
+        extend = "../ruff.toml"
+
+        [lint.flake8-tidy-imports.extend-banned-api]
+        "cgi".msg = "Use a supported library instead."
+        "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+        "#,
+    )?;
+    fixture.write_file(
+        "child/grandchild/ruff.toml",
+        r#"
+        extend = "../ruff.toml"
+        "#,
+    )?;
+    fixture.write_file(
+        "child/grandchild/test.py",
+        "
+        import cgi
+        import pipes
+        from typing import Any, TypedDict
+        ",
+    )?;
+
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    child/grandchild/test.py:2:8: TID251 `cgi` is banned: Use a supported library instead.
+    child/grandchild/test.py:3:8: TID251 `pipes` is banned: Use shlex instead.
+    child/grandchild/test.py:4:25: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+    Found 3 errors.
+
+    ----- stderr -----
+    ");
+
+    // Clear inherited extensions while preserving the inherited base bans.
+    fixture.write_file(
+        "child/grandchild/ruff.toml",
+        r#"
+        extend = "../ruff.toml"
+        [lint.flake8-tidy-imports]
+        extend-banned-api = {}
+        "#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    child/grandchild/test.py:2:8: TID251 `cgi` is banned: The cgi module is deprecated.
+    child/grandchild/test.py:3:8: TID251 `pipes` is banned: Use shlex instead.
+    Found 2 errors.
+
+    ----- stderr -----
+    ");
+
+    // Clear inherited base bans while preserving the inherited extensions.
+    fixture.write_file(
+        "child/grandchild/ruff.toml",
+        r#"
+        extend = "../ruff.toml"
+        [lint.flake8-tidy-imports]
+        banned-api = {}
+        "#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    child/grandchild/test.py:2:8: TID251 `cgi` is banned: Use a supported library instead.
+    child/grandchild/test.py:4:25: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+    Found 2 errors.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
 fn circular_extend() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file(

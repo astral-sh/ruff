@@ -1,0 +1,109 @@
+[bans]
+# Duplicate versions are common in the current dependency graph. Revisit this
+# once enforcing a single version per crate is practical.
+multiple-versions = "allow"
+
+# cargo-deny cannot distinguish defaults requested by workspace manifests from
+# defaults enabled transitively. Check our declarations separately instead.
+# See scripts/check-cargo-bans.py.
+external-default-features = "allow"
+
+[bans.build]
+# Keep this list alphabetically sorted. New external build scripts require
+# explicit review, including dependencies used only on other targets.
+# scripts/check-cargo-bans.py rejects stale entries.
+allow-build-scripts = [
+    "alloca",
+    "anyhow",
+    "camino",
+    "codspeed",
+    "codspeed-criterion-compat",
+    "codspeed-divan-compat",
+    "crc32fast",
+    "crossbeam-utils",
+    "crunchy",
+    "escargot",
+    "fs-err",
+    "generic-array",
+    "getrandom",
+    "iana-time-zone-haiku",
+    "icu_normalizer_data",
+    "icu_properties_data",
+    "libc",
+    "libm",
+    "libmimalloc-sys",
+    "memoffset",
+    "minicov",
+    "nix",
+    "num-traits",
+    "objc2",
+    "object",
+    "parking_lot_core",
+    "paste",
+    "portable-atomic",
+    "portable-atomic-util",
+    "proc-macro2",
+    "psm",
+    "quote",
+    "radium",
+    "rayon-core",
+    "ref-cast",
+    "rustix",
+    "rustversion",
+    "serde",
+    "serde_core",
+    "serde_json",
+    "stacker",
+    "terminfo",
+    "thiserror",
+    "tikv-jemalloc-sys",
+    "typeid",
+    "typenum",
+    "unicode_names2",
+    "wasm-bindgen",
+    "wasm-bindgen-shared",
+    "winapi",
+    "winapi-i686-pc-windows-gnu",
+    "winapi-x86_64-pc-windows-gnu",
+    "windows_aarch64_gnullvm",
+    "windows_aarch64_msvc",
+    "windows_i686_gnu",
+    "windows_i686_gnullvm",
+    "windows_i686_msvc",
+    "windows_x86_64_gnu",
+    "windows_x86_64_gnullvm",
+    "windows_x86_64_msvc",
+    "wit-bindgen",
+    "zerocopy",
+    "zmij",
+    "zstd-safe",
+    "zstd-sys",
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+
+[licenses]
+confidence-threshold = 0.95
+# NOTE: Licenses should only be added to our allow-list
+# after careful human review. All licenses are required
+# to be permissive with respect to redistribution and non-viral.
+allow = [
+    "0BSD",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "PSF-2.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "WTFPL",
+]

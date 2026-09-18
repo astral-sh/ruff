@@ -82,6 +82,12 @@ pub(super) fn uv_sync_command(
     );
 
     let mut command = case.command();
+    set_uv_envs(&mut command, case, virtual_env);
+    Ok(command)
+}
+
+#[cfg(feature = "test-uv")]
+fn set_uv_envs(command: &mut Command, case: &CliTest, virtual_env: Option<&Path>) {
     command
         .envs(uv_test_env_vars())
         .env("TY_UV", "1")
@@ -93,8 +99,6 @@ pub(super) fn uv_sync_command(
     if let Some(virtual_env) = virtual_env {
         command.env("VIRTUAL_ENV", virtual_env);
     }
-
-    Ok(command)
 }
 
 #[cfg(feature = "test-uv")]
@@ -400,33 +404,141 @@ fn uses_uv_workspace_root_without_checking_siblings() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// An explicit file is treated as a script, so workspace discovery stays disabled even when
-/// `TY_UV` is set.
+/// Checking a script uses its own environment; the project's uv metadata
+/// is not queried.
 #[cfg(feature = "test-uv")]
 #[test]
-fn explicit_file_path_disables_uv_workspace_discovery() -> anyhow::Result<()> {
-    let case = workspace_case()?;
+fn explicit_script_path_disables_uv_workspace_discovery() -> anyhow::Result<()> {
+    // uv's formatting of resolution failures varies by version; retain the missing dependency.
+    let case = workspace_case()?
+        .with_filter(r"exit code: 1", "exit status: 1")
+        .with_filter(
+            concat!(
+                r"(?s)[ \t]*(?:×|error:) No solution found when resolving dependencies:?",
+                r".*?missing-workspace-dependency==99\.0\.0",
+                r".*?hint: Packages were unavailable because the network was disabled\.[^\n]*",
+            ),
+            " <missing-workspace-dependency==99.0.0 unavailable offline>",
+        );
+    case.write_file(
+        "packages/member/pyproject.toml",
+        r#"
+        [project]
+        name = "member"
+        version = "0.1.0"
+        requires-python = ">=3.8"
+        dependencies = ["missing-workspace-dependency==99.0.0"]
+        "#,
+    )?;
+
+    let member_directory = case.root().join("packages/member");
+    let mut command = case.command();
+    set_uv_envs(&mut command, &case, None);
+
+    assert_cmd_snapshot!(command.current_dir(&member_directory).arg("member.py"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    member.py:1:14: error[invalid-assignment] Object of type `Literal["selected-member"]` is not assignable to `int`
+    pyproject.toml: warning[uv-metadata] `uv workspace metadata` failed with status exit status: 1: <missing-workspace-dependency==99.0.0 unavailable offline>
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
+
     case.write_file("shared.py", "value: int = 'unselected-workspace-root'")?;
     case.write_file(
         "packages/member/member.py",
-        "import shared\nvalue: int = 'selected-script'",
+        r#"
+        # /// script
+        # dependencies = []
+        # ///
+        import shared
+        value: int = 'selected-script'
+        "#,
     )?;
 
-    let mut command = uv_sync_command(&case, None)?;
-    command
-        .current_dir(case.root().join("packages/member"))
-        .arg("member.py");
+    // Checking a script reports its own diagnostics without querying the project's uv metadata.
+    let mut command = case.command();
+    set_uv_envs(&mut command, &case, None);
+    command.current_dir(&member_directory).arg("member.py");
 
     assert_cmd_snapshot!(command, @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    member.py:1:8: error[unresolved-import] Cannot resolve imported module `shared`
-    member.py:2:14: error[invalid-assignment] Object of type `Literal["selected-script"]` is not assignable to `int`
+    member.py:5:8: error[unresolved-import] Cannot resolve imported module `shared`
+    member.py:6:14: error[invalid-assignment] Object of type `Literal["selected-script"]` is not assignable to `int`
     Found 2 diagnostics
 
     ----- stderr -----
     "#);
+
+    Ok(())
+}
+
+/// Checking an ordinary file in a uv workspace uses the project's uv metadata.
+#[cfg(feature = "test-uv")]
+#[test]
+fn explicit_ordinary_file_uses_uv_workspace_discovery() -> anyhow::Result<()> {
+    let case = dependency_workspace_case()?;
+
+    let mut command = uv_sync_command(&case, None)?;
+    command
+        .current_dir(case.root().join("packages/member"))
+        .args(["member.py", "--error", "missing-direct-dependency"]);
+
+    assert_cmd_snapshot!(command, @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    member.py:3:6: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+    member.py:4:8: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// When ty directly checks a script alongside another file, the other file still gets dependency
+/// diagnostics from uv workspace metadata.
+#[cfg(feature = "test-uv")]
+#[test]
+fn multiple_explicit_files_use_uv_workspace_discovery() -> anyhow::Result<()> {
+    let case = dependency_workspace_case()?;
+    case.write_file(
+        "packages/member/script.py",
+        r#"
+        # /// script
+        # dependencies = []
+        # ///
+        value = 1
+        "#,
+    )?;
+
+    let mut command = uv_sync_command(&case, None)?;
+    command
+        .current_dir(case.root().join("packages/member"))
+        .args([
+            "script.py",
+            "member.py",
+            "--error",
+            "missing-direct-dependency",
+        ]);
+
+    assert_cmd_snapshot!(command, @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    member.py:3:6: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+    member.py:4:8: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -710,6 +822,40 @@ fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// A config outside the selected member controls ty's rules, while uv's selected environment
+/// takes precedence over its Python setting.
+#[cfg(feature = "test-uv")]
+#[test]
+fn explicit_config_file_uses_uv_environment_and_ty_rules() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    case.write_file(
+        "config/ty.toml",
+        r#"
+        [environment]
+        python = "missing-configured-environment"
+
+        [rules]
+        invalid-assignment = "ignore"
+        "#,
+    )?;
+
+    let mut command = uv_sync_command(&case, None)?;
+    command
+        .current_dir(case.root().join("packages/member"))
+        .args(["--config-file", "../../config/ty.toml", "."]);
+
+    assert_cmd_snapshot!(command, @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 /// Workspace discovery can find uv on `PATH` when the `UV` executable override is absent.
 #[cfg(feature = "test-uv")]
 #[test]
@@ -740,30 +886,55 @@ fn finds_uv_on_path_without_uv_environment_variable() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Version-sensitive diagnostics attribute their assumed Python version to workspace metadata,
-/// not to a command-line override.
+/// uv's interpreter version describes the concrete workspace environment, not the project's
+/// minimum supported Python version. The environment supplies packages, while `requires-python`
+/// determines the version that ty checks the project against. This allows ty to detect accidental
+/// use of language or library features unavailable on the minimum supported Python version.
 #[cfg(feature = "test-uv")]
 #[test]
-fn reports_uv_workspace_python_version_source() -> anyhow::Result<()> {
+fn uses_requires_python_with_uv_workspace() -> anyhow::Result<()> {
     let case = workspace_case()?;
-    case.write_file("packages/member/member.py", "frozendict")?;
+    case.write_file(
+        "pyproject.toml",
+        r#"
+[project]
+name = "workspace"
+version = "0.1.0"
+requires-python = ">=3.8"
 
-    for output_format in ["full", "concise"] {
-        let mut command = uv_sync_command(&case, None)?;
-        command
-            .current_dir(case.root().join("packages/member"))
-            .arg(".")
-            .arg("--output-format")
-            .arg(output_format);
+[tool.uv.workspace]
+members = ["packages/*"]
+"#,
+    )?;
+    case.write_file(".python-version", ">=3.12")?;
+    case.write_file("packages/member/member.py", "from typing import override")?;
 
-        let output = command.output()?;
-        let stdout = String::from_utf8(output.stdout)?;
-        assert!(!output.status.success());
-        assert!(!stdout.contains("specified on the command line"));
-        if output_format == "full" {
-            assert!(stdout.contains("provided by uv metadata"));
-        }
-    }
+    let mut command = uv_sync_command(&case, None)?;
+    command
+        .current_dir(case.root().join("packages/member"))
+        .arg(".")
+        .env("TY_OUTPUT_FORMAT", "full");
+
+    assert_cmd_snapshot!(command, @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `typing` has no member `override`
+     --> member.py:1:20
+      |
+    1 | from typing import override
+      |                    ^^^^^^^^
+    info: The member may be available on other Python versions or platforms
+    info: Python 3.8 was assumed when resolving imports
+     --> <temp_dir>/pyproject.toml:5:19
+      |
+    5 | requires-python = ">=3.8"
+      |                   ^^^^^^^ Python version configuration
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
 
     Ok(())
 }

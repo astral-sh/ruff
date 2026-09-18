@@ -2214,10 +2214,10 @@ fn is_instance_tuple_covers<'db>(
     recursion_guard: &ActiveRecursionDetector<Type<'db>>,
 ) -> bool {
     match ty {
-        Type::TypeAlias(alias) => recursion_guard.visit(
+        Type::TypeAlias(_) | Type::Recursive(_) => recursion_guard.visit(
             &ty,
             || true,
-            || is_instance_tuple_covers(db, env, tuple, alias.value_type(db), recursion_guard),
+            || is_instance_tuple_covers(db, env, tuple, ty.resolve_type_alias(db), recursion_guard),
         ),
         Type::Union(union) => union
             .elements(db)
