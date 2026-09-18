@@ -308,7 +308,7 @@ trait Setup {
 }
 
 struct SetupContext<'a> {
-    system: &'a OsSystem,
+    system: &'a TestSystem,
     root_path: &'a SystemPath,
     options: Option<Options>,
     config_file_override: Option<SystemPathBuf>,
@@ -319,8 +319,16 @@ struct SetupContext<'a> {
 }
 
 impl<'a> SetupContext<'a> {
-    fn system(&self) -> &'a OsSystem {
+    fn system(&self) -> &'a TestSystem {
         self.system
+    }
+
+    fn os_system(&self) -> &'a OsSystem {
+        self.system()
+            .system()
+            .as_any()
+            .downcast_ref::<OsSystem>()
+            .expect("Expected an OS system for file-watching tests")
     }
 
     fn join_project_path(&self, relative: impl AsRef<SystemPath>) -> SystemPathBuf {
@@ -452,12 +460,12 @@ where
     // Keep file-watching tests independent from the shell and user config that run the test binary.
     let os_system = OsSystem::new(&project_path);
     let user_config_directory_override = os_system.with_user_config_directory(None);
-    let system = TestSystem::new(os_system.clone());
+    let system = TestSystem::new(os_system);
     system.clear_env_vars();
     configure_system(&system);
 
     let mut setup_context = SetupContext {
-        system: &os_system,
+        system: &system,
         root_path: &root_path,
         options: None,
         config_file_override: None,
@@ -2870,7 +2878,7 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
 
         _config_dir_override = Some(
             context
-                .system()
+                .os_system()
                 .with_user_config_directory(Some(config_directory)),
         );
 
@@ -3222,21 +3230,20 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
 
 #[cfg(feature = "test-uv")]
 mod uv_metadata {
-    use std::process::Command;
     use std::time::Duration;
 
     use anyhow::Context;
     use insta::assert_snapshot;
     use ruff_db::diagnostic::DiagnosticId;
     use ruff_db::files::File;
-    use ruff_db::system::{OsSystem, System as _};
+    use ruff_db::system::{Command, System, SystemPath};
     use ty_module_resolver::system_module_search_paths;
     use ty_project::{Db, ScriptEnvironmentAvailability, UseUv, UvSyncChanges, uv_test_env_vars};
     use ty_python_semantic::Db as _;
     use ty_static::EnvVars;
 
     use super::{
-        ChangeEvent, SetupContext, TestCase, event_for_file, setup_with_system, update_file,
+        ChangeEvent, Setup, SetupContext, TestCase, event_for_file, setup_with_system, update_file,
     };
 
     const MANIFEST: &str = r#"
@@ -3397,7 +3404,7 @@ mod uv_metadata {
             @"script.py:6:6: error[unresolved-import] Cannot resolve imported module `attrs`"
         );
 
-        let synchronized = update_and_synchronize_script(
+        update_and_synchronize_script(
             &mut case,
             r#"
             # /// script
@@ -3407,7 +3414,6 @@ mod uv_metadata {
             from attrs import define
             "#,
         )?;
-        assert!(synchronized);
 
         // Apply the package creation reported by the watcher after uv finishes writing it.
         let changes = case.stop_watch(|event: &ChangeEvent| {
@@ -3472,7 +3478,7 @@ mod uv_metadata {
                 .any(|diagnostic| diagnostic.id() == DiagnosticId::UvMetadata)
         );
 
-        let synchronized = update_and_synchronize_script(
+        update_and_synchronize_script(
             &mut case,
             r#"
             # /// script
@@ -3482,7 +3488,6 @@ mod uv_metadata {
             from attrs import define
             "#,
         )?;
-        assert!(synchronized);
 
         assert_eq!(case.db().check().as_slice(), &[]);
 
@@ -3529,61 +3534,105 @@ mod uv_metadata {
         assert_eq!(case.db().check().as_slice(), &[]);
 
         let dependency = dependencies.join("dependency.py");
-        update_file(&dependency, "value = 2")?;
+        update_file(&dependency, "value = 'wrong'")?;
         let changes = case.stop_watch(event_for_file("dependency.py"));
-        assert!(
-            changes.iter().any(
-                |event| matches!(event, ChangeEvent::Changed { path, .. } if path == &dependency)
-            ),
-            "expected an edit at the new search path: {changes:?}"
+        case.apply_changes(&changes);
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @r#"script.py:7:15: error[invalid-assignment] Object of type `Literal["wrong"]` is not assignable to `int`"#
         );
         Ok(())
     }
 
+    /// Runs uv in `directory` with the system's configured executable and environment.
+    /// Returns an error if uv fails.
+    fn run_uv_with_system(
+        system: &dyn System,
+        directory: &SystemPath,
+        args: &[&str],
+    ) -> anyhow::Result<()> {
+        let mut command = Command::new(system.env_var(EnvVars::UV)?);
+        command.current_dir(directory).args(args.iter().copied());
+        let output = system.run_command(command)?;
+        anyhow::ensure!(
+            output.status.success(),
+            "uv {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        Ok(())
+    }
+
+    /// Writes the fixture files and creates a watched project with the selected uv mode.
+    /// Installs project dependencies for `UseUv::On` and synchronizes discovered scripts.
     fn setup_uv(use_uv: UseUv, files: &[(&str, &str)]) -> anyhow::Result<TestCase> {
-        let uv = OsSystem::default().which("uv")?;
-        let mut case = setup_with_system(
-            |context: &mut SetupContext| {
-                for (path, content) in files {
-                    context.write_project_file(path, content)?;
-                }
-                if use_uv == UseUv::On {
-                    let output = Command::new(uv.as_std_path())
-                        .env_clear()
-                        .envs(uv_test_env_vars())
-                        .current_dir(context.project_path())
-                        .args(["sync", "--offline"])
-                        .output()?;
-                    anyhow::ensure!(
-                        output.status.success(),
-                        "uv sync failed: {}",
-                        String::from_utf8_lossy(&output.stderr)
-                    );
-                }
-                Ok(())
-            },
-            |system| {
-                system.set_env_vars(uv_test_env_vars());
-                system.set_env_var(
-                    EnvVars::TY_UV,
-                    match use_uv {
-                        UseUv::Off => "0",
-                        UseUv::Scripts => "scripts",
-                        UseUv::On => "1",
-                    },
-                );
-                system.set_env_var(EnvVars::UV, uv.as_str());
-            },
-        )?;
+        setup_uv_with(use_uv, files, |_| Ok(()))
+    }
+
+    /// Like [`setup_uv`], but calls `prepare` after writing the files and before running uv.
+    fn setup_uv_with(
+        use_uv: UseUv,
+        files: &[(&str, &str)],
+        prepare: impl FnOnce(&mut SetupContext) -> anyhow::Result<()>,
+    ) -> anyhow::Result<TestCase> {
+        let mut case = setup_uv_with_system(use_uv, |context: &mut SetupContext| {
+            for (path, content) in files {
+                context.write_project_file(path, content)?;
+            }
+            prepare(context)?;
+            if use_uv == UseUv::On {
+                run_uv_with_system(
+                    context.system(),
+                    context.project_path(),
+                    &["sync", "--offline"],
+                )?;
+            }
+            Ok(())
+        })?;
         let scripts: Vec<_> = case.db().project().script_files(case.db()).iter().collect();
         synchronize_scripts(&mut case, &scripts)?;
         Ok(case)
     }
 
-    fn update_and_synchronize_project(case: &mut TestCase, source: &str) -> anyhow::Result<()> {
+    /// Creates a watched project with the selected uv mode and test command environment.
+    /// Lets the test control Python environment creation and synchronization.
+    fn setup_uv_with_system(use_uv: UseUv, setup_files: impl Setup) -> anyhow::Result<TestCase> {
+        setup_with_system(setup_files, |system| {
+            // TestSystem disables executable lookup so tests don't discover the host's Python.
+            // These tests require uv, so resolve it using the wrapped OS system.
+            let uv = system
+                .system()
+                .which("uv")
+                .expect("uv must be installed for uv file-watching tests");
+            system.set_env_vars(uv_test_env_vars());
+            system.set_env_var(
+                EnvVars::TY_UV,
+                match use_uv {
+                    UseUv::Off => "0",
+                    UseUv::Scripts => "scripts",
+                    UseUv::On => "1",
+                },
+            );
+            system.set_env_var(EnvVars::UV, uv.as_str());
+        })
+    }
+
+    /// Updates `pyproject.toml` and processes its watcher events through project synchronization.
+    fn update_and_synchronize_project(
+        case: &mut TestCase,
+        source: &str,
+    ) -> anyhow::Result<UvSyncChanges> {
         update_file(case.project_path("pyproject.toml"), source)?;
         let changes = case.take_watch_changes(event_for_file("pyproject.toml"));
-        let changes = case.apply_changes(&changes);
+        apply_changes_and_synchronize_project(case, &changes)
+    }
+
+    /// Applies watcher events, requests any resulting uv project refresh, and waits for
+    /// pending uv synchronizations to finish.
+    fn apply_changes_and_synchronize_project(
+        case: &mut TestCase,
+        changes: &[ChangeEvent],
+    ) -> anyhow::Result<UvSyncChanges> {
+        let changes = case.apply_changes(changes);
 
         if let Some(project_path) = changes.project_sync_path() {
             case.db()
@@ -3591,8 +3640,7 @@ mod uv_metadata {
                 .request_project_sync(case.db(), project_path, &|_, _| None);
         }
 
-        wait_for_synchronizations(case)?;
-        Ok(())
+        wait_for_synchronizations(case)
     }
 
     fn update_and_synchronize_script(case: &mut TestCase, source: &str) -> anyhow::Result<bool> {
