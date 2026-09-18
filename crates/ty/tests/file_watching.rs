@@ -3234,6 +3234,7 @@ mod uv_metadata {
 
     use anyhow::Context;
     use insta::assert_snapshot;
+    use ruff_db::Db as _;
     use ruff_db::diagnostic::DiagnosticId;
     use ruff_db::files::File;
     use ruff_db::system::{Command, System, SystemPath};
@@ -3311,20 +3312,33 @@ mod uv_metadata {
     }
 
     #[test]
+    fn creating_a_uv_project_clears_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv_with_system(UseUv::On, |context: &mut SetupContext| {
+            context.write_project_file("main.py", "value = 1\n")?;
+            run_uv_with_system(
+                context.system(),
+                context.project_path(),
+                &["venv", "--offline"],
+            )
+        })?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+
+        std::fs::write(case.project_path("pyproject.toml").as_std_path(), MANIFEST)?;
+        let events = case.take_watch_changes(event_for_file("pyproject.toml"));
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
     fn project_refresh_uses_the_returned_workspace_root() -> anyhow::Result<()> {
         let mut case = setup_uv(
             UseUv::On,
-            &[
-                (
-                    "../pyproject.toml",
-                    r#"
-                    [tool.uv.workspace]
-                    members = ["project"]
-                    "#,
-                ),
-                (
-                    "pyproject.toml",
-                    r#"
+            &[(
+                "pyproject.toml",
+                r#"
                     [project]
                     name = "example"
                     version = "0.1.0"
@@ -3332,19 +3346,198 @@ mod uv_metadata {
 
                     [tool.ty]
                     "#,
-                ),
-            ],
+            )],
         )?;
-        let project = case.db().project();
         assert_eq!(
-            project.root(case.db()),
+            case.db().project().root(case.db()),
             case.root_path().join("project").as_path()
         );
 
-        // Without its own ty configuration, the member belongs to the enclosing workspace.
+        // Joining a new enclosing workspace changes the root returned by uv. Removing the
+        // member's ty configuration lets ty use that root.
+        std::fs::write(
+            case.root_path().join("pyproject.toml"),
+            "[tool.uv.workspace]\nmembers = ['project']\n",
+        )?;
         update_and_synchronize_project(&mut case, MANIFEST)?;
-        assert_eq!(case.db().project(), project);
-        assert_eq!(project.root(case.db()), case.root_path());
+        assert_eq!(case.db().project().root(case.db()), case.root_path());
+        Ok(())
+    }
+
+    #[test]
+    fn deleting_an_invalid_workspace_lockfile_clears_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv_workspace_member()?;
+        update_file(case.root_path().join("uv.lock"), "version = -1\n")?;
+        let changed = case.take_watch_changes(event_for_file("uv.lock"));
+        apply_changes_and_synchronize_project(&mut case, &changed)?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+
+        // The lockfile belongs to the workspace, outside the member project's root.
+        std::fs::remove_file(case.root_path().join("uv.lock").as_std_path())?;
+        let deleted = case.take_watch_changes(|event: &ChangeEvent| {
+            event.is_deleted() && event.file_name() == Some("uv.lock")
+        });
+        apply_changes_and_synchronize_project(&mut case, &deleted)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
+    fn creating_an_invalid_workspace_lockfile_reports_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv_workspace_member()?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        // Discard the removal events so only creating the lockfile can request this refresh.
+        std::fs::remove_file(case.root_path().join("uv.lock").as_std_path())?;
+        case.take_watch_changes(|event: &ChangeEvent| {
+            event.is_deleted() && event.file_name() == Some("uv.lock")
+        });
+
+        std::fs::write(case.root_path().join("uv.lock"), "version = -1\n")?;
+        let events = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Created { .. }) && event.file_name() == Some("uv.lock")
+        });
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        Ok(())
+    }
+
+    #[test]
+    fn renaming_a_workspace_member_updates_distribution_metadata() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "pyproject.toml",
+                    r#"
+                    [tool.uv.workspace]
+                    members = ["member"]
+                    "#,
+                ),
+                ("member/pyproject.toml", MANIFEST),
+                ("main.py", ""),
+            ],
+        )?;
+        assert_eq!(
+            case.db().project().root(case.db()),
+            case.root_path().join("project").as_path()
+        );
+        let manifest = case.project_path("member/pyproject.toml");
+
+        // This manifest is below the ty project root, so ty does not read its configuration.
+        update_file(
+            &manifest,
+            &MANIFEST.replace("name = \"example\"", "name = \"renamed\""),
+        )?;
+        let changed = case.take_watch_changes(event_for_file("pyproject.toml"));
+        apply_changes_and_synchronize_project(&mut case, &changed)?;
+        let main = case.system_file(case.project_path("main.py"))?;
+        let metadata = case.db().dependency_metadata(main).context("uv metadata")?;
+        assert_eq!(
+            metadata
+                .distributions
+                .values()
+                .map(|distribution| distribution.name.as_str())
+                .collect::<Vec<_>>(),
+            ["renamed"]
+        );
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
+    fn creating_an_invalid_python_version_file_reports_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv(UseUv::On, &[("pyproject.toml", MANIFEST)])?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        // Invalid UTF-8 makes uv reject the pin even when an environment already exists.
+        std::fs::write(case.project_path(".python-version"), [0xff])?;
+        let events = case.take_watch_changes(event_for_file(".python-version"));
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        Ok(())
+    }
+
+    #[test]
+    fn deleting_an_invalid_python_version_file_clears_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv_with_system(UseUv::On, |context: &mut SetupContext| {
+            context.write_project_file("pyproject.toml", MANIFEST)?;
+            run_uv_with_system(
+                context.system(),
+                context.project_path(),
+                &["venv", "--offline"],
+            )?;
+            std::fs::write(context.join_project_path(".python-version"), [0xff])?;
+            Ok(())
+        })?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+
+        std::fs::remove_file(case.project_path(".python-version").as_std_path())?;
+        let events = case.take_watch_changes(|event: &ChangeEvent| {
+            event.is_deleted() && event.file_name() == Some(".python-version")
+        });
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
+    fn creating_an_invalid_uv_toml_reports_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv(UseUv::On, &[("pyproject.toml", MANIFEST)])?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        std::fs::write(
+            case.project_path("uv.toml").as_std_path(),
+            "no-cache = 'invalid'\n",
+        )?;
+        let events = case.take_watch_changes(event_for_file("uv.toml"));
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        Ok(())
+    }
+
+    #[test]
+    fn deleting_an_invalid_uv_toml_clears_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv_with_system(UseUv::On, |context: &mut SetupContext| {
+            context.write_project_file("pyproject.toml", MANIFEST)?;
+            run_uv_with_system(
+                context.system(),
+                context.project_path(),
+                &["venv", "--offline"],
+            )?;
+            context.write_project_file("uv.toml", "no-cache = 'invalid'\n")?;
+            Ok(())
+        })?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+
+        std::fs::remove_file(case.project_path("uv.toml").as_std_path())?;
+        let events = case.take_watch_changes(|event: &ChangeEvent| {
+            event.is_deleted() && event.file_name() == Some("uv.toml")
+        });
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
+    fn uv_files_do_not_refresh_metadata_when_uv_is_disabled() -> anyhow::Result<()> {
+        let mut case = setup_uv(UseUv::Off, &[("pyproject.toml", MANIFEST)])?;
+        run_uv(&case, &["lock", "--offline"])?;
+
+        let events = case.take_watch_changes(event_for_file("uv.lock"));
+        assert!(case.apply_changes(&events).project_sync_path().is_none());
         Ok(())
     }
 
@@ -3544,6 +3737,11 @@ mod uv_metadata {
         Ok(())
     }
 
+    /// Runs uv in the test's project directory with its configured executable and environment.
+    fn run_uv(case: &TestCase, args: &[&str]) -> anyhow::Result<()> {
+        run_uv_with_system(case.db().system(), &case.project_path(""), args)
+    }
+
     /// Runs uv in `directory` with the system's configured executable and environment.
     /// Returns an error if uv fails.
     fn run_uv_with_system(
@@ -3566,6 +3764,29 @@ mod uv_metadata {
     /// Installs project dependencies for `UseUv::On` and synchronizes discovered scripts.
     fn setup_uv(use_uv: UseUv, files: &[(&str, &str)]) -> anyhow::Result<TestCase> {
         setup_uv_with(use_uv, files, |_| Ok(()))
+    }
+
+    /// Sets up a ty project that is a member of its parent directory's uv workspace.
+    fn setup_uv_workspace_member() -> anyhow::Result<TestCase> {
+        let case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "../pyproject.toml",
+                    r#"
+                    [tool.uv.workspace]
+                    members = ["project"]
+                    "#,
+                ),
+                ("pyproject.toml", MANIFEST),
+                ("ty.toml", ""),
+            ],
+        )?;
+        assert_eq!(
+            case.db().project().root(case.db()),
+            case.root_path().join("project").as_path()
+        );
+        Ok(case)
     }
 
     /// Like [`setup_uv`], but calls `prepare` after writing the files and before running uv.
@@ -3617,10 +3838,7 @@ mod uv_metadata {
     }
 
     /// Updates `pyproject.toml` and processes its watcher events through project synchronization.
-    fn update_and_synchronize_project(
-        case: &mut TestCase,
-        source: &str,
-    ) -> anyhow::Result<UvSyncChanges> {
+    fn update_and_synchronize_project(case: &mut TestCase, source: &str) -> anyhow::Result<()> {
         update_file(case.project_path("pyproject.toml"), source)?;
         let changes = case.take_watch_changes(event_for_file("pyproject.toml"));
         apply_changes_and_synchronize_project(case, &changes)
@@ -3631,7 +3849,7 @@ mod uv_metadata {
     fn apply_changes_and_synchronize_project(
         case: &mut TestCase,
         changes: &[ChangeEvent],
-    ) -> anyhow::Result<UvSyncChanges> {
+    ) -> anyhow::Result<()> {
         let changes = case.apply_changes(changes);
 
         if let Some(project_path) = changes.project_sync_path() {
@@ -3640,7 +3858,8 @@ mod uv_metadata {
                 .request_project_sync(case.db(), project_path, &|_, _| None);
         }
 
-        wait_for_synchronizations(case)
+        wait_for_synchronizations(case)?;
+        Ok(())
     }
 
     fn update_and_synchronize_script(case: &mut TestCase, source: &str) -> anyhow::Result<bool> {

@@ -93,15 +93,15 @@ impl ProjectDatabase {
     pub fn apply_changes(&mut self, changes: &[ChangeEvent]) -> ChangeResult {
         let project = self.project();
         let project_root = project.root(self).to_path_buf();
-        let configuration_paths = ConfigurationPaths::from_metadata(project.metadata(self));
+        let metadata = project.metadata(self);
+        let configuration_paths = ConfigurationPaths::from_metadata(metadata);
+        // The initial uv metadata request may have failed before a workspace could be discovered.
+        let uv_enabled = metadata.use_uv().workspace_discovery_enabled();
         let virtual_environment = project.program_settings(self).virtual_environment.clone();
-        let python_path = project
-            .metadata(self)
-            .configured_python_path(self.system())
-            .or_else(|| {
-                PythonEnvironment::virtual_environment_candidate(Some(&project_root), self.system())
-                    .map(|(path, _)| SystemPath::absolute(path, self.system().current_directory()))
-            });
+        let python_path = metadata.configured_python_path(self.system()).or_else(|| {
+            PythonEnvironment::virtual_environment_candidate(Some(&project_root), self.system())
+                .map(|(path, _)| SystemPath::absolute(path, self.system().current_directory()))
+        });
         let program = self.project().program(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
@@ -147,7 +147,12 @@ impl ProjectDatabase {
                 python_path.as_deref(),
             );
 
+            if uv_enabled && !reload_project && affects_uv_metadata(change) {
+                reload_project = true;
+            }
+
             if let Some(path) = change.system_path() {
+                // Configuration changes can alter ty's settings and project root.
                 if configuration_paths.is_configuration(path, &project_root) {
                     File::sync_path(self, path);
                     reload_project = true;
@@ -563,4 +568,34 @@ fn affects_python_environment(
         }
         _ => false,
     }
+}
+
+fn affects_uv_metadata(change: &ChangeEvent) -> bool {
+    // `uv workspace metadata` checks and may update the lockfile before exporting it. It also
+    // reads the selected environment:
+    // - `pyproject.toml` defines workspace membership and dependencies, which affect
+    //   `workspace_root`, `members`, and `resolution`. A new file can also make this a uv
+    //   project for the first time. uv reads these files even when `--config-file` replaces
+    //   ty's project configuration, or when they belong to nested workspace members.
+    // - `uv.lock` supplies `members` and the dependency `resolution`. For example, `uv add` can
+    //   change the lockfile before the environment is synchronized.
+    // - `uv.toml` supplies resolver settings such as package indexes. If those settings make the
+    //   lockfile stale, the metadata command can resolve again and return a different `resolution`.
+    // - `.python-version` selects the interpreter uv uses to check or update the lockfile.
+    //   When the workspace has no `requires-python`, uv infers a lower bound from that interpreter.
+    //   This can change `resolution`: pinning 3.13 instead of 3.12 can remove dependencies
+    //   guarded by `python_version < '3.13'`.
+    // A matching name in an unrelated watched path may also trigger a refresh. The event path is
+    // not passed to uv, so it cannot make ty use the other project's metadata. If this project's
+    // metadata and settings are unchanged, the false positive only costs a no-op uv workspace metadata call.
+    matches!(
+        change,
+        ChangeEvent::Created { path, .. }
+        | ChangeEvent::Changed { path, .. }
+        | ChangeEvent::Deleted { path, .. }
+            if matches!(
+                path.file_name(),
+                Some("pyproject.toml" | "uv.lock" | "uv.toml" | ".python-version")
+            )
+    )
 }
