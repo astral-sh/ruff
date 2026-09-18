@@ -84,10 +84,13 @@ use super::generics::{ApplySpecialization, Specialization, walk_specialization_t
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
-use super::visitor::{TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard};
+use super::visitor::{
+    TypeCollector, TypeVisitor, any_over_type_including_alias_arguments,
+    walk_type_with_recursion_guard,
+};
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, GenericContext,
-    MaterializationKind, Type, TypeContext, TypeMapping, UnionType, VarianceTerm,
+    MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, UnionType, VarianceTerm,
 };
 use crate::{Db, FxIndexSet, Program, ProgramEnvironment};
 
@@ -268,11 +271,12 @@ impl<'db> RecursiveType<'db> {
             let mut summary = AliasCycleSummary::from_type(db, recursive.body(db));
             // Nested bodies can refer to an enclosing binder. Close only the cycle marker,
             // so recovery never exposes an unbound variable as a standalone type.
-            // A solution guards every variable, so only an alias's can be exposed.
-            if let Some(Type::RecursiveVar(variable)) = summary.cycle
-                && let RecursiveCycle::Alias(cycle) = variable.cycle(db)
-            {
-                summary.cycle = Some(Type::divergent_alias(cycle));
+            // Solution placeholders also need their binder when exposed through an alias.
+            if let Some(Type::RecursiveVar(variable)) = summary.cycle {
+                summary.cycle = Some(match variable.cycle(db) {
+                    RecursiveCycle::Alias(cycle) => Type::divergent_alias(cycle),
+                    RecursiveCycle::Equation(entry) => Type::Recursive(recursive.at(db, entry)),
+                });
             }
             summary
         }
@@ -1276,6 +1280,13 @@ impl<'db> TypeVisitor<'db> for SolutionReferences<'_, 'db> {
         walk_type_with_recursion_guard(db, ty, self, &self.seen);
     }
 
+    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        // The display includes the arguments, not the alias's body.
+        if let Some(arguments) = alias.specialization(db) {
+            walk_specialization_types(db, arguments, self);
+        }
+    }
+
     fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
         if recursive.definition(db).is_none() {
             self.references.borrow_mut().push(recursive);
@@ -1298,11 +1309,11 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         variables: &[BoundTypeVarInstance<'db>],
     ) -> Type<'db> {
-        // The number of types nested in `ty`, if one of them is one of the variables.
+        // Include variables in stored alias arguments when comparing unrollings.
         let recursive_size = |ty: &Type<'db>| {
             let size = Cell::new(0usize);
             let is_recursive = Cell::new(false);
-            any_over_type(db, env, *ty, false, |nested| {
+            any_over_type_including_alias_arguments(db, env, *ty, |nested| {
                 size.set(size.get() + 1);
                 if let Some(typevar) = nested.as_typevar()
                     && variables

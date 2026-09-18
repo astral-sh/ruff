@@ -1309,6 +1309,19 @@ def explicit[T]():
     reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=μ$0. list[Explicit[$0]]]]
 ```
 
+A recursive child named by an alias can also be restricted by an independent type.
+
+```py
+from ty_extensions import Intersection
+
+type Identity[V] = V
+
+def constrained[T, E]():
+    constraints = ConstraintSet.equality(T, Intersection[tuple[Identity[T]], tuple[E]])
+    # revealed: tuple[Solution[T=μ$0. tuple[Identity[$0]] & tuple[E@constrained]]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
 ### Dependencies through implicit recursive aliases
 
 Solving a type variable also specializes its occurrences inside an implicit recursive alias.
