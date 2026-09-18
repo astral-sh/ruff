@@ -3079,7 +3079,7 @@ impl<'db> PathBoundBuilder<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         bound_typevar: BoundTypeVarInstance<'db>,
-    ) -> PathBound<'db> {
+    ) -> CandidateTypeVarSolution<'db> {
         let Self {
             evidence_lower,
             mixed_lower,
@@ -3114,7 +3114,7 @@ impl<'db> PathBoundBuilder<'db> {
             UnionType::from_elements(db, env, validity_lower)
         };
         upper.shrink_to_fit();
-        PathBound {
+        CandidateTypeVarSolution {
             bound_typevar,
             evidence_lower,
             mixed_lower,
@@ -3165,9 +3165,9 @@ impl<'db> PathBoundSolution<'db> {
     }
 }
 
-/// The explicit lower and upper bounds inferred for one typevar on one BDD path.
+/// The range of possible solutions for one of the typevars in a [`CandidateSolution`]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct PathBound<'db> {
+pub(crate) struct CandidateTypeVarSolution<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
     evidence_lower: Option<Type<'db>>,
     mixed_lower: Option<Type<'db>>,
@@ -3179,7 +3179,7 @@ pub(crate) struct PathBound<'db> {
     has_only_gradual_evidence: Option<bool>,
 }
 
-impl<'db> PathBound<'db> {
+impl<'db> CandidateTypeVarSolution<'db> {
     pub(crate) fn exact(bound_typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) -> Self {
         Self {
             bound_typevar,
@@ -3395,7 +3395,7 @@ pub(crate) enum CandidateSolutions<'db> {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct CandidateSolution<'db> {
-    typevars: Box<[PathBound<'db>]>,
+    typevars: Box<[CandidateTypeVarSolution<'db>]>,
     validity: SolutionValidity<'db>,
 }
 
@@ -3750,7 +3750,7 @@ impl<'db> CandidateSolutions<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
+        choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
     ) -> Solutions<'db> {
         let Ok(solutions) = self.try_solve_with(db, env, choose, |_| Ok::<(), Infallible>(()));
         solutions
@@ -3761,7 +3761,10 @@ impl<'db> CandidateSolutions<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        mut choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
+        mut choose: impl FnMut(
+            TypeVarVariance,
+            &CandidateTypeVarSolution<'db>,
+        ) -> PathBoundSolution<'db>,
         mut check_solution: impl FnMut(&Solution<'db>) -> Result<(), E>,
     ) -> Result<Solutions<'db>, E> {
         let paths = match self {
@@ -3811,7 +3814,10 @@ impl<'db> CandidateSolutions<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         candidate: &CandidateSolution<'db>,
-        choose: &mut impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
+        choose: &mut impl FnMut(
+            TypeVarVariance,
+            &CandidateTypeVarSolution<'db>,
+        ) -> PathBoundSolution<'db>,
     ) -> Option<(Solution<'db>, bool)> {
         let mut solved_typevars = Vec::with_capacity(candidate.typevars.len());
         let mut violations = match &candidate.validity {
@@ -3867,7 +3873,7 @@ impl<'db> CandidateSolutions<'db> {
         env: &ProgramEnvironment<'db>,
         builder: &ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
-        path_bound: &PathBound<'db>,
+        path_bound: &CandidateTypeVarSolution<'db>,
     ) -> PathBoundSolution<'db> {
         let preliminary = Self::preliminary_solve(db, env, builder, inferable, path_bound);
         let PathBoundSolution::Solved(solution) = preliminary else {
@@ -3897,7 +3903,7 @@ impl<'db> CandidateSolutions<'db> {
         env: &ProgramEnvironment<'db>,
         builder: &ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
-        path_bound: &PathBound<'db>,
+        path_bound: &CandidateTypeVarSolution<'db>,
     ) -> PathBoundSolution<'db> {
         // Choose a solution type that satisfies the constraints on this path, as well as any upper
         // bound or constraints of the typevar itself.
@@ -5674,7 +5680,7 @@ mod tests {
         let env = db.program_environment();
         let t = create_typevar(db, "T");
         let builder = ConstraintSetBuilder::new();
-        let path_bound = PathBound {
+        let path_bound = CandidateTypeVarSolution {
             bound_typevar: t,
             evidence_lower: None,
             mixed_lower: None,
@@ -5733,7 +5739,7 @@ mod tests {
                 &env,
                 &builder,
                 inferable,
-                &PathBound::exact(t, Type::Never)
+                &CandidateTypeVarSolution::exact(t, Type::Never)
             ),
             PathBoundSolution::Solved(Type::Never)
         );
@@ -5935,12 +5941,12 @@ class E: ...
             for reverse in [false, true] {
                 let mut paths = vec![
                     CandidateSolution {
-                        typevars: vec![exhausted.clone(), PathBound::exact(u, str)]
+                        typevars: vec![exhausted.clone(), CandidateTypeVarSolution::exact(u, str)]
                             .into_boxed_slice(),
                         validity: SolutionValidity::Valid,
                     },
                     CandidateSolution {
-                        typevars: vec![PathBound::exact(t, int)].into_boxed_slice(),
+                        typevars: vec![CandidateTypeVarSolution::exact(t, int)].into_boxed_slice(),
                         validity: SolutionValidity::Valid,
                     },
                 ];
@@ -5977,7 +5983,7 @@ class E: ...
                         validity: SolutionValidity::Valid,
                     },
                     CandidateSolution {
-                        typevars: Box::new([PathBound::exact(t, int)]),
+                        typevars: Box::new([CandidateTypeVarSolution::exact(t, int)]),
                         validity: SolutionValidity::Valid,
                     },
                 ]));
