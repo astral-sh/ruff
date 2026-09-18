@@ -706,6 +706,393 @@ assert_type(infer_return((callback, callback, callback), 0), Unknown)
 assert_type(infer_return(default=0, callback=(callback, callback, callback)), Unknown)
 ```
 
+## Inference from a bounded callable type variable
+
+The upper bound of a bounded type variable is used to infer the signature of a callable type:
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+F = TypeVar("F", bound=Callable[[int], str])
+
+def apply(callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+def _(callback: F):
+    reveal_type(apply(callback))  # revealed: str
+```
+
+If the upper bound is a class type, the signature of the class's `__call__` method is used:
+
+```py
+class Printer:
+    def __call__(self, value: int) -> str:
+        return str(value)
+
+P = TypeVar("P", bound=Printer)
+
+def _(callback: P):
+    reveal_type(apply(callback))  # revealed: str
+
+    x1: Callable[[str], str] = callback  # error: [invalid-assignment]
+    x2: Callable[[int], int] = callback  # error: [invalid-assignment]
+```
+
+If `__call__` returns `Self`, the type variable is preserved as the inferred return type:
+
+```py
+from typing_extensions import Self
+
+class Clone:
+    def __call__(self, value: int) -> Self:
+        return self
+
+C = TypeVar("C", bound=Clone)
+
+def _(callback: C) -> C:
+    reveal_type(apply(callback))  # revealed: C@_
+    return apply(callback)
+```
+
+The type variable is also preserved for class methods that return `Self`:
+
+```py
+class ClassClone:
+    @classmethod
+    def __call__(cls, value: int) -> Self:
+        return cls()
+
+H = TypeVar("H", bound=ClassClone)
+
+def _(callback: H) -> H:
+    reveal_type(apply(callback))  # revealed: H@_
+    return apply(callback)
+```
+
+As well as property methods:
+
+```py
+class PropertyClone:
+    @property
+    def __call__(self) -> Callable[[int], Self]:
+        return lambda _: self
+
+J = TypeVar("J", bound=PropertyClone)
+
+def _(callback: J) -> J:
+    reveal_type(apply(callback))  # revealed: J@_
+    return apply(callback)
+```
+
+## Explicit receivers in callable bounds
+
+The upper bound of a type variable satisfies an explicit receiver annotation with the same type:
+
+```py
+from typing import Callable, TypeVar
+
+class C:
+    def __call__(self: "C", value: int) -> str:
+        return str(value)
+
+def _(callback: C):
+    x: Callable[[int], str] = callback
+
+F = TypeVar("F", bound=C)
+
+def _(callback: F):
+    # TODO: This should not error.
+    x: Callable[[int], str] = callback  # error: [invalid-assignment]
+```
+
+## Bound methods returned by callable descriptors
+
+If a `__call__` property returns a method bound to another object, its `Self` type remains bound to
+that object:
+
+```py
+from typing import Callable, TypeVar
+from typing_extensions import Self
+from ty_extensions._internal import TypeOf
+
+class Other:
+    def method(self, value: int) -> Self:
+        return self
+
+other = Other()
+
+class Wrapper:
+    @property
+    def __call__(self) -> TypeOf[other.method]:
+        return other.method
+
+T = TypeVar("T")
+F = TypeVar("F", bound=Wrapper)
+
+def apply(callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+def _(callback: F) -> Other:
+    reveal_type(apply(callback))  # revealed: Other
+    return apply(callback)
+```
+
+## Constructor bounds in callable inference
+
+A type variable with an upper bound of `type[C]` provides the signature of `C`'s constructor during
+callable inference:
+
+```py
+from typing import Callable, TypeVar
+
+class C:
+    def __init__(self, value: int) -> None: ...
+
+T = TypeVar("T")
+F = TypeVar("F", bound=type[C])
+
+def apply(callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+def _(callback: F):
+    reveal_type(apply(callback))  # revealed: C
+
+    x1: Callable[[int], C] = callback
+    x2: Callable[[str], C] = callback  # error: [invalid-assignment]
+    x3: Callable[[int], str] = callback  # error: [invalid-assignment]
+```
+
+## Recursive callable bounds
+
+Callable inference follows a type variable's upper bound without traversing a recursive `__call__`
+chain indefinitely:
+
+```py
+from typing import Callable, Generic, TypeVar
+from ty_extensions._internal import CallableTypeOf, RegularCallableTypeOf
+
+class Recursive:
+    __call__: "Recursive"
+
+F = TypeVar("F", bound=Recursive)
+
+def _(callback: F):
+    x1: CallableTypeOf[callback]  # error: [invalid-type-form]
+    x2: RegularCallableTypeOf[callback]  # error: [invalid-type-form]
+```
+
+The same applies when the specialization grows on each visit:
+
+```py
+T = TypeVar("T")
+
+class Growing(Generic[T]):
+    @property
+    def __call__(self) -> "Growing[list[T]]":
+        raise NotImplementedError
+
+G = TypeVar("G", bound=Growing[int])
+
+def _(callback: G):
+    x: CallableTypeOf[callback]  # error: [invalid-type-form]
+```
+
+A finite chain of callable wrappers in an upper bound preserves the callable's signature:
+
+```py
+class Wrapper(Generic[T]):
+    @property
+    def __call__(self) -> T:
+        raise NotImplementedError
+
+H = TypeVar("H", bound=Wrapper[Wrapper[Callable[[int], str]]])
+
+def apply(callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+def _(callback: H):
+    reveal_type(apply(callback))  # revealed: str
+```
+
+## Recursive callable instances
+
+A recursive `__call__` attribute that never resolves to a callable type is not traversed infinitely
+during callable inference:
+
+```py
+from typing import Callable, TypeVar
+from ty_extensions._internal import CallableTypeOf, RegularCallableTypeOf
+
+class Recursive:
+    __call__: "Recursive"
+
+def _(callback: Recursive):
+    x: Callable[[int], str] = callback  # error: [invalid-assignment]
+
+    x1: CallableTypeOf[callback]  # error: [invalid-type-form]
+    x2: RegularCallableTypeOf[callback]  # error: [invalid-type-form]
+```
+
+Expanding a recursive protocol can change its specialization without reaching a callable signature:
+
+```py
+from typing import Protocol
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Growing(Protocol[T_co]):
+    @property
+    def __call__(self) -> "Growing[list[T_co]]": ...
+
+def _(callback: Growing[int]):
+    x: CallableTypeOf[callback]  # error: [invalid-type-form]
+```
+
+The same applies to nominal classes whose `__call__` values grow recursively:
+
+```py
+from typing import Generic
+
+T = TypeVar("T")
+
+class GrowingInstance(Generic[T]):
+    @property
+    def __call__(self) -> "GrowingInstance[list[T]]":
+        raise NotImplementedError
+
+def _(callback: GrowingInstance[int]):
+    x: CallableTypeOf[callback]  # error: [invalid-type-form]
+```
+
+The growing reference can pass through another class:
+
+```py
+class First(Generic[T]):
+    @property
+    def __call__(self) -> "Second[list[T]]":
+        raise NotImplementedError
+
+class Second(Generic[T]):
+    @property
+    def __call__(self) -> First[T]:
+        raise NotImplementedError
+
+def _(callback: First[int]):
+    x: CallableTypeOf[callback]  # error: [invalid-type-form]
+```
+
+However, different specializations of the same class can lead to a concrete signature:
+
+```py
+class Wrapper(Generic[T]):
+    @property
+    def __call__(self) -> T:
+        raise NotImplementedError
+
+def apply(callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+def _(callback: Wrapper[Wrapper[Callable[[int], str]]]):
+    reveal_type(apply(callback))  # revealed: str
+```
+
+Recursive members other than `__call__` do not prevent conversion, even if their specializations
+grow:
+
+```py
+class ProtocolWrapper(Protocol[T]):
+    @property
+    def __call__(self) -> T: ...
+    @property
+    def unrelated(self) -> "ProtocolWrapper[list[T]]": ...
+
+def _(callback: ProtocolWrapper[ProtocolWrapper[Callable[[int], str]]]):
+    reveal_type(apply(callback))  # revealed: str
+
+    x: Callable[[int], str] = callback
+```
+
+Recursion in the signature itself does not prevent callable conversion. We do not follow the return
+type's `__call__`:
+
+```py
+class RecursiveSignature(Generic[T]):
+    def __call__(self, value: int) -> "RecursiveSignature[list[T]]":
+        raise NotImplementedError
+
+def _(callback: RecursiveSignature[int]):
+    reveal_type(apply(callback))  # revealed: RecursiveSignature[list[int]]
+```
+
+## Aliases in recursive callable instances
+
+Aliases in a finite callable wrapper chain preserve its signature, even when unrelated members
+recursively refer to the alias:
+
+```py
+from typing import Callable, Protocol, TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+
+class Wrapper(Protocol[T]):
+    @property
+    def __call__(self) -> T: ...
+    @property
+    def unrelated(self) -> "Alias[list[T]]": ...
+
+Alias = TypeAliasType("Alias", Wrapper[T], type_params=(T,))
+
+def apply(callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+def _(callback: Alias[Alias[Callable[[int], str]]]):
+    reveal_type(apply(callback))  # revealed: str
+
+    x: int = apply(callback)  # error: [invalid-assignment]
+```
+
+An alias whose `__call__` chain grows without reaching a signature cannot be converted to a
+callable:
+
+```py
+from ty_extensions._internal import CallableTypeOf
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Growing(Protocol[T_co]):
+    @property
+    def __call__(self) -> "GrowingAlias[list[T_co]]": ...
+
+GrowingAlias = TypeAliasType("GrowingAlias", Growing[T_co], type_params=(T_co,))
+
+def _(callback: GrowingAlias[int]):
+    x: CallableTypeOf[callback]  # error: [invalid-type-form]
+```
+
+## Unused type parameters in callable instances
+
+`Recursive[T]` reaches `T` through `Wrapper.__call__`. The reference to `Recursive[list[T]]` is
+passed to an unused parameter, so it does not make this callable chain infinite:
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Wrapper(Generic[T, U]):
+    __call__: T
+
+class Recursive(Generic[T]):
+    __call__: "Wrapper[T, Recursive[list[T]]]"
+
+def _(callback: Recursive[Recursive[Callable[[], int]]]):
+    # TODO: This should not error.
+    x: Callable[[], int] = callback  # error: [invalid-assignment]
+```
+
 ## Multiple occurrences of a higher-order generic callable
 
 If a generic callable is used more than once in a higher-order call, each occurrence should get its
