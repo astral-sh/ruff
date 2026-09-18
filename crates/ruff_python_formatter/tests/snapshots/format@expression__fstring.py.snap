@@ -1525,7 +1525,7 @@ f'{f"""other " """}'
 f'{1: hy "user"}'
 f'{1:hy "user"}'
 f'{1: abcd "{1}" }'
-f'{1: abcd "{'aa'}" }'
+f'{1: abcd "{"aa"}" }'
 f'{1=: "abcd {'aa'}}'
 f"{x:a{z:hy \"user\"}} '''"
 
@@ -2345,7 +2345,7 @@ f'{f"""other " """}'
 f'{1: hy "user"}'
 f'{1:hy "user"}'
 f'{1: abcd "{1}" }'
-f'{1: abcd "{'aa'}" }'
+f'{1: abcd "{"aa"}" }'
 f'{1=: "abcd {'aa'}}'
 f"{x:a{z:hy \"user\"}} '''"
 

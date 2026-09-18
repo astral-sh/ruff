@@ -10,6 +10,11 @@
 # unsound-yield = "warn"
 # unsupported-dynamic-base = "warn"
 # division-by-zero = "warn"
+# dynamic-function-decorator-return = "warn"
+# unsound-assignment = "warn"
+# redundant-condition-strict = "warn"
+# disjoint-cast = "warn"
+# missing-direct-dependency = "warn"
 #
 # [tool.uv]
 # no-build = true
@@ -81,6 +86,7 @@ def main() -> None:
                 cwd=project_dir,
                 capture_output=True,
                 text=True,
+                check=False,
             )
         except CalledProcessError as e:
             tqdm.write(f"Ruff failed on {project_dir}: {e}")

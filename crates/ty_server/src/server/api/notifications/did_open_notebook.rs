@@ -34,14 +34,14 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
             NotebookDocument::new(notebook_uri, version, cells, metadata.unwrap_or_default())
                 .with_failure_code(ErrorCode::InternalError)?;
 
-        let document = session.open_notebook_document(notebook);
+        let document = session.open_notebook_document(client, notebook);
         let notebook_path = document.notebook_or_file_path();
 
         for cell in params.cell_text_documents {
             let cell_document =
                 TextDocument::new(cell.uri, cell.text, cell.version, cell.language_id)
                     .with_notebook(notebook_path.clone());
-            session.open_text_document(cell_document);
+            session.open_text_document(client, cell_document);
         }
 
         // Always publish diagnostics because notebooks only support publish diagnostics.

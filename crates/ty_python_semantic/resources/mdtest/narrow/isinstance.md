@@ -57,6 +57,29 @@ def _(x: Literal[1, "a"], y: Literal[1, "a", b"b"]):
         reveal_type(y)  # revealed: Literal["a", b"b"]
 ```
 
+## A tuple of classes covers a recursive union
+
+A fixed tuple of classes can cover every alternative in a recursive union. Such an `isinstance`
+check is always true; omitting one of those classes leaves the result uncertain.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+Implicit = int | list["Implicit"]
+type Explicit = int | list[Explicit]
+
+def implicit(value: Implicit):
+    reveal_type(isinstance(value, (int, list)))  # revealed: Literal[True]
+    reveal_type(isinstance(value, (int, str)))  # revealed: bool
+
+def explicit(value: Explicit):
+    reveal_type(isinstance(value, (int, list)))  # revealed: Literal[True]
+    reveal_type(isinstance(value, (int, str)))  # revealed: bool
+```
+
 ## `classinfo` is a nested tuple of types
 
 ```py
@@ -67,6 +90,182 @@ def _(x: Literal[1, "a"]):
         reveal_type(x)  # revealed: Literal[1]
     else:
         reveal_type(x)  # revealed: Literal["a"]
+```
+
+## Recursive tuples as `classinfo`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A recursive tuple of integer classes narrows a successful check to `int`. An unsuccessful check does
+not exclude integers: the tuple can be empty or contain only a subclass of `int`. Implicit and PEP
+695 aliases describe the same class-info values.
+
+```py
+ClassInfo = type[int] | tuple["ClassInfo", ...]
+type ExplicitClassInfo = type[int] | tuple[ExplicitClassInfo, ...]
+
+def implicit(value: object, classes: ClassInfo):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: object
+
+def explicit(value: object, classes: ExplicitClassInfo):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: object
+```
+
+Even when the leaf class is final, a failed check does not exclude its instances: the recursive
+tuple can be empty.
+
+```py
+from typing import final
+
+@final
+class Leaf: ...
+
+FinalClasses = type[Leaf] | tuple["FinalClasses", ...]
+type ExplicitFinalClasses = type[Leaf] | tuple[ExplicitFinalClasses, ...]
+
+def final_classes(value: object, classes: FinalClasses, explicit_classes: ExplicitFinalClasses):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: Leaf
+    else:
+        reveal_type(value)  # revealed: object
+    if isinstance(value, explicit_classes):
+        reveal_type(value)  # revealed: Leaf
+    else:
+        reveal_type(value)  # revealed: object
+```
+
+A tuple tree with no class objects can only make the check fail:
+
+```py
+OnlyTuples = tuple["OnlyTuples", ...]
+type ExplicitOnlyTuples = tuple[ExplicitOnlyTuples, ...]
+
+def only_tuples(value: object, classes: OnlyTuples, explicit_classes: ExplicitOnlyTuples):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: object
+    if isinstance(value, explicit_classes):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: object
+```
+
+## `classinfo` with changing recursive arguments
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Deeper tuples can contain different classes when the recursive type arguments change. The outer
+argument `int` does not describe all the classes tested: `(list,)` is also a valid class-info value.
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+Growing: TypeAlias = type[T] | tuple["Growing[list[T]]", ...]
+type ExplicitGrowing[T] = type[T] | tuple[ExplicitGrowing[list[T]], ...]
+
+classes: Growing[int] = (list,)
+explicit_classes: ExplicitGrowing[int] = (list,)
+
+def implicit(value: object, classes: Growing[int]):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: object
+
+def explicit(value: object, classes: ExplicitGrowing[int]):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: object
+```
+
+## Validating growing recursive tuples
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Changing type arguments does not invalidate a recursive tuple whose leaves are always classes. Both
+`isinstance` and `issubclass` accept these tuples, including classes reached through another alias.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+type Identity[U] = U
+ClassInfo = Identity[type] | tuple["ClassInfo[list[T]]", ...]
+type ExplicitClassInfo[T] = Identity[type] | tuple[ExplicitClassInfo[list[T]], ...]
+
+def valid(classes: ClassInfo[int], explicit_classes: ExplicitClassInfo[int]):
+    isinstance(None, classes)
+    issubclass(int, classes)
+    isinstance(None, explicit_classes)
+    issubclass(int, explicit_classes)
+```
+
+When the argument also supplies the leaf type, a class at the outer level does not guarantee that
+all deeper leaves are classes. These aliases also admit lists, which are invalid class-info values.
+
+```py
+Invalid = T | tuple["Invalid[list[T]]", ...]
+type ExplicitInvalid[T] = T | tuple[ExplicitInvalid[list[T]], ...]
+
+def invalid(classes: Invalid[type], explicit_classes: ExplicitInvalid[type]):
+    isinstance(None, classes)  # error: [invalid-argument-type]
+    issubclass(int, classes)  # error: [invalid-argument-type]
+    isinstance(None, explicit_classes)  # error: [invalid-argument-type]
+    issubclass(int, explicit_classes)  # error: [invalid-argument-type]
+```
+
+A leaf can itself be a recursive tuple with fixed arguments. Those arguments still constrain its
+leaves, even when the enclosing alias has growing arguments.
+
+```py
+U = TypeVar("U")
+Stable = U | tuple["Stable[U]", ...]
+Nested = Stable[type] | tuple["Nested[list[T]]", ...]
+type ExplicitNested[T] = Stable[type] | tuple[ExplicitNested[list[T]], ...]
+
+def nested(classes: Nested[int], explicit_classes: ExplicitNested[int]):
+    isinstance(None, classes)
+    issubclass(int, classes)
+    isinstance(None, explicit_classes)
+    issubclass(int, explicit_classes)
+```
+
+## Recursive tuples with metaclass arguments
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Successive metaclasses are still classes. Starting with `type[int]`, these aliases therefore contain
+only valid class-info values at every depth.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+ClassInfo = T | tuple["ClassInfo[type[T]]", ...]
+type ExplicitClassInfo[T] = T | tuple[ExplicitClassInfo[type[T]], ...]
+
+def valid(classes: ClassInfo[type[int]], explicit_classes: ExplicitClassInfo[type[int]]):
+    isinstance(None, classes)
+    issubclass(int, classes)
+    isinstance(None, explicit_classes)
+    issubclass(int, explicit_classes)
 ```
 
 ## `classinfo` is a PEP-604 union of types
@@ -415,11 +614,11 @@ def _(x: Literal[1, "a"]):
 from typing import Literal
 
 def _(x: Literal[1, "a"]):
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["a"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `_ClassInfo`, found `Literal["a"]"
     if isinstance(x, "a"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["int"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `_ClassInfo`, found `Literal["int"]"
     if isinstance(x, "int"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 ```
@@ -681,7 +880,7 @@ from typing import Any
 
 def excludes_bounded_generic(value: BoundedCovariant[Any] | bool) -> bool:
     if isinstance(value, BoundedCovariant):
-        reveal_type(value)  # revealed: BoundedCovariant[Any]
+        reveal_type(value)  # revealed: BoundedCovariant[int & Any]
         return False
 
     reveal_type(value)  # revealed: bool
@@ -695,7 +894,7 @@ def excludes_bounded_generic_tuple(
     value: BoundedCovariant[Any] | bool | bytes,
 ) -> bool:
     if isinstance(value, (BoundedCovariant, bytes)):
-        reveal_type(value)  # revealed: BoundedCovariant[Any] | bytes
+        reveal_type(value)  # revealed: BoundedCovariant[int & Any] | bytes
         return False
 
     reveal_type(value)  # revealed: bool
@@ -725,6 +924,21 @@ def excludes_constrained_generic(value: ConstrainedCovariant[Any] | bool) -> boo
         return False
 
     reveal_type(value)  # revealed: bool
+    return value
+```
+
+A concrete `ParamSpec` specialization does not affect an `isinstance()` check. Negative narrowing
+therefore excludes that specialization along with every other instance of the generic class.
+
+```py
+from typing import Callable
+
+class ParamSpecBox[**P]:
+    callback: Callable[P, None]
+
+def excludes_paramspec_generic(value: ParamSpecBox[[int]] | int) -> int:
+    if isinstance(value, ParamSpecBox):
+        return 0
     return value
 ```
 
@@ -1084,11 +1298,70 @@ def _(value: Concrete[int]) -> None:
         reveal_type(value.read())  # revealed: int
 ```
 
+## Negative narrowing for protocols with gradual members
+
+Negative narrowing excludes every materialization of a protocol, including when its members are
+gradual. `IntReader` is a subtype of the fully materialized `Reader` protocol, so the negative
+branch retains only `None`:
+
+```py
+from typing import Any, Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader(Protocol):
+    def read(self) -> Any: ...
+
+class IntReader:
+    def read(self) -> int:
+        return 1
+
+def f(reader: IntReader | None):
+    if isinstance(reader, Reader):
+        reveal_type(reader.read())  # revealed: int
+    else:
+        reveal_type(reader)  # revealed: None
+```
+
+## Narrowing iterables to containers and iterators in strict mode
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+Narrowing an `Iterable[T]` to an `Iterator`, or to a container type, retains its element type. See
+`generics/set_theoretic.md` for more details on the assumptions behind this, and for an explanation
+of the behavior of invariant containers:
+
+```py
+from typing import Iterable, Iterator
+
+def f(values: Iterable[int]):
+    if isinstance(values, Iterator):
+        reveal_type(values)  # revealed: Iterator[int]
+        reveal_type(next(values))  # revealed: int
+    if isinstance(values, tuple):
+        reveal_type(values)  # revealed: tuple[int, ...]
+        reveal_type(values[0])  # revealed: int
+    if isinstance(values, frozenset):
+        reveal_type(values)  # revealed: frozenset[int]
+        reveal_type(next(iter(values)))  # revealed: int
+    if isinstance(values, list):
+        reveal_type(values)  # revealed: Top[list[Unknown & int]]
+        reveal_type(values[0])  # revealed: int
+    if isinstance(values, set):
+        reveal_type(values)  # revealed: Top[set[Unknown & int]]
+        reveal_type(next(iter(values)))  # revealed: int
+```
+
 ## Use cases: `isinstance` narrowing and generics
 
 ### Strict mode
 
 ```toml
+[environment]
+python-version = "3.12"
+
 [analysis]
 strict-generic-narrowing = true
 ```
@@ -1196,6 +1469,25 @@ def _(xs: list[str] | set[str]) -> str:
         return "it's a list!"
     elif isinstance(xs, set):
         return "it's a set!"
+```
+
+#### Invariance with bounded type variables
+
+A value of a type variable bounded by `str` can also be an instance of a `Box` specialization
+through multiple inheritance. Checking `isinstance(value, Box)` cannot establish that this
+specialization is `Box[T]`, so the intersection with `T` survives and the return is rejected.
+
+```py
+class Box[T]:
+    value: T
+
+def narrow_box[T: str](value: Box[T] | T) -> Box[T]:
+    if isinstance(value, Box):
+        reveal_type(value)  # revealed: Box[T@narrow_box] | (T@narrow_box & Top[Box[Unknown]])
+        return value  # error: [invalid-return-type]
+
+    reveal_type(value)  # revealed: T@narrow_box & ~Top[Box[Unknown]]
+    raise TypeError
 ```
 
 ### Gradual mode
@@ -1310,6 +1602,25 @@ def _(xs: list[str] | set[str]) -> str:
         return "it's a list!"
     elif isinstance(xs, set):
         return "it's a set!"
+```
+
+#### Invariance with bounded type variables
+
+A value of a type variable bounded by `str` can also be an instance of a `Box` specialization
+through multiple inheritance. In gradual mode, `isinstance(value, Box)` preserves this overlap using
+`Box[Unknown]`, which is assignable to `Box[T]`, so the return statement is (unsoundly) accepted.
+
+```py
+class Box[T]:
+    value: T
+
+def narrow_box[T: str](value: Box[T] | T) -> Box[T]:
+    if isinstance(value, Box):
+        reveal_type(value)  # revealed: Box[T@narrow_box] | (T@narrow_box & Box[Unknown])
+        return value
+
+    reveal_type(value)  # revealed: T@narrow_box & ~Top[Box[Unknown]]
+    raise TypeError
 ```
 
 ## Narrowing recursively bounded generics (strict mode)
@@ -1453,8 +1764,9 @@ Narrowing must therefore preserve the original type argument instead of substitu
 default.
 
 ```py
-from typing import assert_never
+from typing import assert_never, final
 
+@final
 class Box[T: str = str]:
     value: T
 
@@ -1466,7 +1778,7 @@ def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
         return value
 
     if not isinstance(value, Box):
-        reveal_type(value)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
+        reveal_type(value)  # revealed: T@box_with_default
         return Box[T](value)
 
     assert_never(value)
@@ -1491,8 +1803,8 @@ Negative narrowing also excludes gradual specializations of the defaulted tuple 
 ```py
 def excludes_defaulted_tuple(value: DefaultedTuple[Any] | bool) -> bool:
     if isinstance(value, DefaultedTuple):
-        reveal_type(value)  # revealed: DefaultedTuple[Any]
-        reveal_type(value[0])  # revealed: Any
+        reveal_type(value)  # revealed: DefaultedTuple[int & Any]
+        reveal_type(value[0])  # revealed: int & Any
         reveal_type(value[1])  # revealed: str
         return False
 

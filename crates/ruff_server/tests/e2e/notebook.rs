@@ -201,15 +201,14 @@ select = ["F811"]
 
 #[test]
 fn super_resolution_overview() -> Result<()> {
-    let fixture_path = fixture_path(NOTEBOOK_FIXTURE_PATH)?;
-    let workspace_dir = fixture_path
-        .parent()
-        .expect("notebook fixture should have a parent");
+    let fixture = std::fs::read_to_string(fixture_path(NOTEBOOK_FIXTURE_PATH)?)?;
 
     let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_dir)?
+        .with_workspace(".")?
+        .with_file(NOTEBOOK_FIXTURE_PATH, fixture)?
         .build();
 
+    let fixture_path = server.file_path(NOTEBOOK_FIXTURE_PATH);
     let (notebook_document, cell_text_documents) =
         create_lsp_notebook(&fixture_path, fixture_path.clone())?;
     let notebook_uri = notebook_document.uri.clone();
@@ -374,17 +373,17 @@ fn super_resolution_overview() -> Result<()> {
 
 #[test]
 fn notebook_without_ipynb_extension() -> Result<()> {
-    let fixture_path = fixture_path(NOTEBOOK_FIXTURE_PATH)?;
-    let workspace_dir = fixture_path
-        .parent()
-        .expect("notebook fixture should have a parent");
+    let fixture = std::fs::read_to_string(fixture_path(NOTEBOOK_FIXTURE_PATH)?)?;
 
     let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_dir)?
+        .with_workspace(".")?
+        .with_file(NOTEBOOK_FIXTURE_PATH, fixture)?
         .build();
 
-    let (notebook_document, cell_text_documents) =
-        create_lsp_notebook(&fixture_path, workspace_dir.join("notebook.py"))?;
+    let (notebook_document, cell_text_documents) = create_lsp_notebook(
+        &server.file_path(NOTEBOOK_FIXTURE_PATH),
+        server.file_path("notebook.py"),
+    )?;
     let cell_count = cell_text_documents.len();
 
     server.send_notification::<DidOpenNotebookDocumentNotification>(

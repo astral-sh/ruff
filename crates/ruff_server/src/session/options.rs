@@ -491,8 +491,6 @@ impl_noop_combine!(LineLength);
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use insta::assert_debug_snapshot;
     use ruff_linter::settings::types::PreviewMode;
     use ruff_python_formatter::QuoteStyle;
@@ -746,6 +744,8 @@ mod tests {
     #[cfg(not(windows))]
     #[test]
     fn test_vs_code_workspace_settings_resolve() {
+        use std::str::FromStr;
+
         let options = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
         let AllOptions {
             global,

@@ -10,6 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for function calls in default function arguments.
@@ -62,7 +63,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.102")]
+#[violation_metadata(stable_since = "v0.0.102", category = Category::Suspicious)]
 pub(crate) struct FunctionCallInDefaultArgument {
     name: Option<String>,
 }

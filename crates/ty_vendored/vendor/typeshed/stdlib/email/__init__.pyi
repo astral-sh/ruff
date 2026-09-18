@@ -1,10 +1,12 @@
 """A package for parsing, handling, and generating email messages."""
 
+from _typeshed import SupportsRead
 from collections.abc import Callable
 from email._policybase import _MessageT
 from email.message import Message
 from email.policy import Policy
-from typing import IO, TypeAlias, overload
+from io import _WrappedBuffer
+from typing import TypeAlias, overload
 
 # At runtime, listing submodules in __all__ without them being imported is
 # valid, and causes them to be included in a star import. See #6523
@@ -34,7 +36,7 @@ _ParamType: TypeAlias = str | tuple[str | None, str | None, str]  # noqa: Y047
 _ParamsType: TypeAlias = str | None | tuple[str, str | None, str]  # noqa: Y047
 
 @overload
-def message_from_string(s: str) -> Message:
+def message_from_string(s: str) -> Message[str, str]:
     """Parse a string into a Message object model.
 
     Optional _class and strict are passed to the Parser constructor.
@@ -45,7 +47,7 @@ def message_from_string(s: str, _class: Callable[[], _MessageT]) -> _MessageT: .
 def message_from_string(s: str, _class: Callable[[], _MessageT] = ..., *, policy: Policy[_MessageT]) -> _MessageT: ...
 
 @overload
-def message_from_bytes(s: bytes | bytearray) -> Message:
+def message_from_bytes(s: bytes | bytearray) -> Message[str, str]:
     """Parse a bytes string into a Message object model.
 
     Optional _class and strict are passed to the Parser constructor.
@@ -58,23 +60,27 @@ def message_from_bytes(
 ) -> _MessageT: ...
 
 @overload
-def message_from_file(fp: IO[str]) -> Message:
+def message_from_file(fp: SupportsRead[str]) -> Message[str, str]:
     """Read a file and parse its contents into a Message object model.
 
     Optional _class and strict are passed to the Parser constructor.
     """
 @overload
-def message_from_file(fp: IO[str], _class: Callable[[], _MessageT]) -> _MessageT: ...
+def message_from_file(fp: SupportsRead[str], _class: Callable[[], _MessageT]) -> _MessageT: ...
 @overload
-def message_from_file(fp: IO[str], _class: Callable[[], _MessageT] = ..., *, policy: Policy[_MessageT]) -> _MessageT: ...
+def message_from_file(
+    fp: SupportsRead[str], _class: Callable[[], _MessageT] = ..., *, policy: Policy[_MessageT]
+) -> _MessageT: ...
 
 @overload
-def message_from_binary_file(fp: IO[bytes]) -> Message:
+def message_from_binary_file(fp: _WrappedBuffer) -> Message[str, str]:
     """Read a binary file and parse its contents into a Message object model.
 
     Optional _class and strict are passed to the Parser constructor.
     """
 @overload
-def message_from_binary_file(fp: IO[bytes], _class: Callable[[], _MessageT]) -> _MessageT: ...
+def message_from_binary_file(fp: _WrappedBuffer, _class: Callable[[], _MessageT]) -> _MessageT: ...
 @overload
-def message_from_binary_file(fp: IO[bytes], _class: Callable[[], _MessageT] = ..., *, policy: Policy[_MessageT]) -> _MessageT: ...
+def message_from_binary_file(
+    fp: _WrappedBuffer, _class: Callable[[], _MessageT] = ..., *, policy: Policy[_MessageT]
+) -> _MessageT: ...

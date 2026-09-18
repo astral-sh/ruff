@@ -20,11 +20,11 @@ use itertools::{Either, EitherOrBoth, Itertools};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
-use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
+use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
-    PathBounds, Solutions,
+    CandidateSolutions, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    OwnedConstraintSet, Solutions,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -47,7 +47,7 @@ use crate::types::{
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
     MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
     TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
-    VarianceInferable, infer_complete_scope_types, todo_type,
+    VarianceInferable, VarianceTerm, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
@@ -149,8 +149,6 @@ fn merge_receiver_constraints<'db>(
 pub(crate) struct PartialSignatureApplication<'db> {
     signature: Signature<'db>,
     partial_application: PartialApplication<'db>,
-    inference: Option<TypeVarInference<'db>>,
-    unspecialized_return_ty: Type<'db>,
 }
 
 impl<'db> PartialSignatureApplication<'db> {
@@ -158,14 +156,10 @@ impl<'db> PartialSignatureApplication<'db> {
     pub(crate) fn new(
         signature: Signature<'db>,
         partial_application: PartialApplication<'db>,
-        inference: Option<TypeVarInference<'db>>,
-        unspecialized_return_ty: Type<'db>,
     ) -> Self {
         Self {
             signature,
             partial_application,
-            inference,
-            unspecialized_return_ty,
         }
     }
 }
@@ -248,20 +242,15 @@ impl<'db> CallableSignature<'db> {
     /// Returns the reduced overloaded signature exposed by a `functools.partial(...)` object.
     pub(crate) fn partially_apply(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
         overloads: impl IntoIterator<Item = PartialSignatureApplication<'db>>,
     ) -> Option<Self> {
         let mut new_overloads = Vec::new();
         let mut seen_overloads = FxHashSet::default();
 
         for overload in overloads {
-            let signature = overload.signature.partially_apply(
-                db,
-                env,
-                &overload.partial_application,
-                overload.inference,
-                overload.unspecialized_return_ty,
-            );
+            let signature = overload
+                .signature
+                .partially_apply(db, &overload.partial_application);
             let dedup_key = signature
                 .clone()
                 .with_definition(None)
@@ -334,7 +323,7 @@ impl<'db> CallableSignature<'db> {
                         .iter()
                         .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
                         .collect::<Vec<_>>();
-                    let parameters = if prefix_parameters.is_empty() {
+                    let mut parameters = if prefix_parameters.is_empty() {
                         Parameters::paramspec(db, typevar)
                     } else {
                         Parameters::concatenate(
@@ -344,26 +333,38 @@ impl<'db> CallableSignature<'db> {
                         )
                     };
 
+                    // The synthesized ParamSpec parameters still correspond to the original
+                    // `*args` and `**kwargs` annotations. Keep their positions for diagnostics.
+                    for (parameter, source) in Arc::make_mut(&mut parameters.data)
+                        .value
+                        .iter_mut()
+                        .zip(self_signature.parameters.iter())
+                    {
+                        parameter.source_parameter_index = source.source_parameter_index;
+                    }
+
                     let env = visitor.env;
                     Some(CallableSignature::single(Signature {
                         generic_context: self_signature.generic_context.map(|context| {
                             type_mapping.update_signature_generic_context(db, env, context)
                         }),
                         definition: self_signature.definition,
-                        source_overload_index: self_signature.source_overload_index,
-                        receiver_constraints: self_signature.map_receiver_constraints(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
+                        extras: SignatureExtras::new(
+                            self_signature.source_overload_index_raw(),
+                            self_signature.map_receiver_constraints(db, type_mapping, tcx, visitor),
                         ),
                         parameters,
-                        return_ty: self_signature.return_ty.apply_type_mapping_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
-                        ),
+                        return_ty: if self_signature.is_paramspec_value {
+                            self_signature.return_ty
+                        } else {
+                            self_signature.return_ty.apply_type_mapping_impl(
+                                db,
+                                type_mapping,
+                                tcx,
+                                visitor,
+                            )
+                        },
+                        is_paramspec_value: self_signature.is_paramspec_value,
                     }))
                 }
                 Type::Callable(callable)
@@ -379,9 +380,10 @@ impl<'db> CallableSignature<'db> {
                                     type_mapping.update_signature_generic_context(db, env, context)
                                 }),
                             ),
-                            definition: signature.definition,
-                            source_overload_index: signature.source_overload_index,
-                            receiver_constraints: {
+                            // Keep the enclosing method's definition for binding `Self` and
+                            // other receiver type variables after specializing its parameters.
+                            definition: self_signature.definition,
+                            extras: SignatureExtras::new(signature.source_overload_index_raw(), {
                                 let mapped = self_signature.map_receiver_constraints(
                                     db,
                                     type_mapping,
@@ -391,21 +393,26 @@ impl<'db> CallableSignature<'db> {
                                 merge_receiver_constraints(
                                     db,
                                     env,
-                                    signature.receiver_constraints.as_ref(),
+                                    signature.receiver_constraints(),
                                     mapped.as_ref(),
                                 )
-                            },
+                            }),
                             parameters: signature.parameters().with_prefix(
                                 prefix_parameters.iter().map(|param| {
                                     param.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                                 }),
                             ),
-                            return_ty: self_signature.return_ty.apply_type_mapping_impl(
-                                db,
-                                type_mapping,
-                                tcx,
-                                visitor,
-                            ),
+                            return_ty: if self_signature.is_paramspec_value {
+                                self_signature.return_ty
+                            } else {
+                                self_signature.return_ty.apply_type_mapping_impl(
+                                    db,
+                                    type_mapping,
+                                    tcx,
+                                    visitor,
+                                )
+                            },
+                            is_paramspec_value: self_signature.is_paramspec_value,
                         }),
                     ))
                 }
@@ -462,18 +469,6 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    /// Binds the first (presumably `self`) parameter of this signature. If a `self_type` is
-    /// provided, we will replace any occurrences of `typing.Self` in the parameter and return
-    /// annotations with that type.
-    pub(crate) fn bind_self(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        self_type: Option<Type<'db>>,
-    ) -> Self {
-        self.bind_self_with_receiver(db, env, self_type, self_type)
-    }
-
     /// Binds the receiver using its runtime type while using `typing_self_type` to replace
     /// occurrences of `typing.Self`.
     ///
@@ -523,16 +518,18 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    pub(crate) fn is_single_paramspec(&self) -> Option<(BoundTypeVarInstance<'db>, Type<'db>)> {
+    pub(crate) fn is_single_paramspec(
+        &self,
+    ) -> Option<(BoundTypeVarInstance<'db>, &Signature<'db>)> {
         Self::signatures_is_single_paramspec(&self.overloads)
     }
 
     /// Checks whether the given slice contains a single signature, and that signature is a
-    /// `ParamSpec` signature. If so, returns the [`BoundTypeVarInstance`] for the `ParamSpec`,
-    /// along with the return type of the signature.
-    fn signatures_is_single_paramspec(
-        signatures: &[Signature<'db>],
-    ) -> Option<(BoundTypeVarInstance<'db>, Type<'db>)> {
+    /// `ParamSpec` signature. If so, returns the [`BoundTypeVarInstance`] for the `ParamSpec`
+    /// along with the signature.
+    fn signatures_is_single_paramspec<'a>(
+        signatures: &'a [Signature<'db>],
+    ) -> Option<(BoundTypeVarInstance<'db>, &'a Signature<'db>)> {
         // TODO: This might need updating once we support `Concatenate`
         let [signature] = signatures else {
             return None;
@@ -540,7 +537,7 @@ impl<'db> CallableSignature<'db> {
         signature
             .parameters
             .as_paramspec()
-            .map(|bound_typevar| (bound_typevar, signature.return_ty))
+            .map(|bound_typevar| (bound_typevar, signature))
     }
 
     pub(crate) fn when_constraint_set_assignable_to<'c>(
@@ -582,11 +579,13 @@ impl<'db> VarianceInferable<'db> for &CallableSignature<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
-        self.overloads
-            .iter()
-            .map(|signature| signature.variance_of(db, env, typevar))
-            .collect()
+    ) -> VarianceTerm<'db> {
+        VarianceTerm::join(
+            db,
+            self.overloads
+                .iter()
+                .map(|signature| signature.variance_of(db, env, typevar)),
+        )
     }
 }
 
@@ -600,14 +599,8 @@ pub struct Signature<'db> {
     /// This is useful for locating and extracting docstring information for the signature.
     pub(crate) definition: Option<Definition<'db>>,
 
-    /// Position of this overload in the original function definition.
-    ///
-    /// Filtering, receiver binding, and partial application can leave a signature at a different
-    /// position in the active overload list. Preserve its source position for call diagnostics.
-    source_overload_index: Option<NonZeroU32>,
-
-    /// The constraint introduced by binding an explicitly annotated receiver, if any.
-    receiver_constraints: Option<OwnedConstraintSet<'db>>,
+    /// Information that is only present for overloads or signatures with a bound receiver.
+    extras: Option<Box<SignatureExtras<'db>>>,
 
     /// Parameters, in source order.
     ///
@@ -621,6 +614,42 @@ pub struct Signature<'db> {
 
     /// Return type. If no annotation was provided, this is `Unknown`.
     pub(crate) return_ty: Type<'db>,
+
+    /// Whether this signature is part of the value assigned to a `ParamSpec`.
+    ///
+    /// `ParamSpecs` only match the parameter list of a callable, so the values assigned to them to
+    /// not "have" return types. We store the return type as `Unknown`, since that is usually the
+    /// correct interpretation when _forced_ to consider the non-existent return type. But many
+    /// callers should instead _ignore_ the `return_ty` field of a `paramspec_value` — for
+    /// instance, when visiting, mapping, or comparing types.
+    is_paramspec_value: bool,
+}
+
+/// Additional signature data needed for overload diagnostics or receiver binding.
+#[derive(Clone, Debug, get_size2::GetSize, PartialEq, Eq, Hash, salsa::SalsaValue)]
+struct SignatureExtras<'db> {
+    /// Position of this overload in the original function definition.
+    ///
+    /// Filtering, receiver binding, and partial application can leave a signature at a different
+    /// position in the active overload list. Preserve its source position for call diagnostics.
+    source_overload_index: Option<NonZeroU32>,
+
+    /// The constraint introduced by binding an explicitly annotated receiver, if any.
+    receiver_constraints: Option<OwnedConstraintSet<'db>>,
+}
+
+impl<'db> SignatureExtras<'db> {
+    fn new(
+        source_overload_index: Option<NonZeroU32>,
+        receiver_constraints: Option<OwnedConstraintSet<'db>>,
+    ) -> Option<Box<Self>> {
+        (source_overload_index.is_some() || receiver_constraints.is_some()).then(|| {
+            Box::new(Self {
+                source_overload_index,
+                receiver_constraints,
+            })
+        })
+    }
 }
 
 /// Whether one callable signature's parameters are compatible with another's.
@@ -685,7 +714,9 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     for parameter in &signature.parameters {
         visitor.visit_type(db, parameter.annotated_type());
     }
-    visitor.visit_type(db, signature.return_ty);
+    if !signature.is_paramspec_value {
+        visitor.visit_type(db, signature.return_ty);
+    }
 }
 
 /// Describes how a `functools.partial(...)` call binds one overload's parameters.
@@ -746,10 +777,10 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: None,
             definition: None,
-            source_overload_index: None,
-            receiver_constraints: None,
+            extras: None,
             parameters,
             return_ty,
+            is_paramspec_value: false,
         }
     }
 
@@ -761,11 +792,17 @@ impl<'db> Signature<'db> {
         Self {
             generic_context,
             definition: None,
-            source_overload_index: None,
-            receiver_constraints: None,
+            extras: None,
             parameters,
             return_ty,
+            is_paramspec_value: false,
         }
+    }
+
+    pub(super) fn into_paramspec_value(mut self) -> Self {
+        self.return_ty = Type::unknown();
+        self.is_paramspec_value = true;
+        self
     }
 
     /// Return a signature for a dynamic callable
@@ -773,10 +810,10 @@ impl<'db> Signature<'db> {
         Signature {
             generic_context: None,
             definition: None,
-            source_overload_index: None,
-            receiver_constraints: None,
+            extras: None,
             parameters: Parameters::gradual_form(),
             return_ty: signature_type,
+            is_paramspec_value: false,
         }
     }
 
@@ -827,10 +864,10 @@ impl<'db> Signature<'db> {
         Self {
             generic_context,
             definition: Some(definition),
-            source_overload_index: None,
-            receiver_constraints: None,
+            extras: None,
             parameters,
             return_ty,
+            is_paramspec_value: false,
         }
     }
 
@@ -934,10 +971,10 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
-            source_overload_index: self.source_overload_index,
-            receiver_constraints: self.receiver_constraints.clone(),
+            extras: self.extras.clone(),
             parameters,
             return_ty,
+            is_paramspec_value: self.is_paramspec_value,
         }
     }
 
@@ -966,10 +1003,10 @@ impl<'db> Signature<'db> {
         Some(Self {
             generic_context: self.generic_context,
             definition: self.definition,
-            source_overload_index: self.source_overload_index,
-            receiver_constraints: self.receiver_constraints.clone(),
+            extras: self.extras.clone(),
             parameters,
             return_ty,
+            is_paramspec_value: self.is_paramspec_value,
         })
     }
 
@@ -986,14 +1023,20 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|context| type_mapping.update_signature_generic_context(db, env, context)),
             definition: self.definition,
-            source_overload_index: self.source_overload_index,
-            receiver_constraints: self.map_receiver_constraints(db, type_mapping, tcx, visitor),
+            extras: SignatureExtras::new(
+                self.source_overload_index_raw(),
+                self.map_receiver_constraints(db, type_mapping, tcx, visitor),
+            ),
             parameters: self
                 .parameters
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            return_ty: self
-                .return_ty
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            return_ty: if self.is_paramspec_value {
+                self.return_ty
+            } else {
+                self.return_ty
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            },
+            is_paramspec_value: self.is_paramspec_value,
         }
     }
 
@@ -1209,7 +1252,7 @@ impl<'db> Signature<'db> {
         let receiver_constraints = merge_receiver_constraints(
             db,
             env,
-            self.receiver_constraints.as_ref(),
+            self.receiver_constraints(),
             receiver_constraint.as_deref(),
         );
         if let Some(self_type) = typing_self_type
@@ -1231,10 +1274,10 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
-            source_overload_index: self.source_overload_index,
-            receiver_constraints,
+            extras: SignatureExtras::new(self.source_overload_index_raw(), receiver_constraints),
             parameters,
             return_ty,
+            is_paramspec_value: self.is_paramspec_value,
         }
     }
 
@@ -1277,7 +1320,8 @@ impl<'db> Signature<'db> {
     ///
     /// Matching the receiver can constrain type variables that occur elsewhere in the signature.
     /// Exact bounds determine an unambiguous specialization; one-sided constraints remain
-    /// available to normal call inference. The receiver remains in the returned signature so
+    /// available to normal call inference. A `ParamSpec` can capture multiple overloads, so one
+    /// signature can expand into several. The receiver remains in each returned signature so
     /// bound-method calls can still check it and report receiver-related diagnostics.
     pub(crate) fn specialize_for_bound_receiver(
         &self,
@@ -1285,11 +1329,11 @@ impl<'db> Signature<'db> {
         env: &ProgramEnvironment<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
-    ) -> Option<Self> {
+    ) -> Option<CallableSignature<'db>> {
         let bound_signature =
             self.bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type));
-        let Some(receiver_constraints) = bound_signature.receiver_constraints.as_ref() else {
-            return Some(self.clone());
+        let Some(receiver_constraints) = bound_signature.receiver_constraints() else {
+            return Some(CallableSignature::single(self.clone()));
         };
 
         let constraints = ConstraintSetBuilder::new();
@@ -1297,31 +1341,35 @@ impl<'db> Signature<'db> {
         let inferable = self.inferable_typevars(db);
 
         match when.solutions(db, env, inferable) {
-            Ok(Solutions::Unsatisfiable) => return None,
-            Ok(Solutions::Unconstrained) | Err(_) => return Some(self.clone()),
+            Ok(Solutions::Unsatisfiable(_)) => return None,
+            Ok(Solutions::Unconstrained) | Err(_) => {
+                return Some(CallableSignature::single(self.clone()));
+            }
             // Each receiver path can leave a different type variable unconstrained. Preserve the
             // original relation instead of combining those independent solutions.
             Ok(Solutions::Constrained(solutions)) if solutions.as_slice().len() > 1 => {
-                return Some(self.clone());
+                return Some(CallableSignature::single(self.clone()));
             }
             Ok(Solutions::Constrained(_)) => {}
         }
 
         let Some(generic_context) = self.generic_context else {
-            return Some(self.clone());
+            return Some(CallableSignature::single(self.clone()));
         };
 
         let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);
         builder.add_constraint_set(when).ok()?;
         let concrete_class_receiver =
             matches!(receiver_type, Type::ClassLiteral(_) | Type::GenericAlias(_));
-        let specialization = builder.build_with(|typevar, bounds| {
+        let specialization = builder.build_merged_with(|typevar, bounds| {
             if let Some(bounds) = bounds
-                && let Some(lower) = bounds.lower
-                && let Some(upper) = bounds.upper.as_single_bound(db, env)
+                && let Some(lower) = bounds.evidence_lower()
+                && bounds.has_upper_evidence()
+                && let Some(upper) = bounds.as_single_upper_bound(db, env)
                 && lower.is_equivalent_to(db, env, upper)
                 && let Some(solution) =
-                    PathBounds::default_solve(db, env, &constraints, bounds).as_type()
+                    CandidateSolutions::default_solve(db, env, &constraints, inferable, bounds)
+                        .as_type()
             {
                 return Some(solution);
             }
@@ -1330,10 +1378,14 @@ impl<'db> Signature<'db> {
                 && concrete_class_receiver
                 && bound_signature
                     .variance_of(db, env, typevar.identity(db))
+                    .evaluate(db)
                     .is_covariant()
-                && bounds.lower.is_some_and(|lower| !lower.is_never())
+                && bounds
+                    .evidence_lower()
+                    .is_some_and(|lower| !lower.is_never())
                 && let Some(solution) =
-                    PathBounds::default_solve(db, env, &constraints, bounds).as_type()
+                    CandidateSolutions::default_solve(db, env, &constraints, inferable, bounds)
+                        .as_type()
             {
                 return Some(solution);
             }
@@ -1341,7 +1393,22 @@ impl<'db> Signature<'db> {
             Some(Type::TypeVar(typevar))
         });
 
-        Some(self.apply_specialization(db, specialization))
+        let type_mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
+        let mut specialized = CallableSignature::single(self.clone()).apply_type_mapping_impl(
+            db,
+            &type_mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(env),
+        );
+
+        // The captured `ParamSpec` can carry overload indices from another callable. Keep
+        // this method's overload index so call diagnostics refer to the correct declaration.
+        for signature in &mut specialized.overloads {
+            signature.set_source_overload_index(self.source_overload_index_raw());
+        }
+
+        Some(specialized)
     }
 
     /// Returns this signature bound to `receiver_type` if its explicit receiver annotation is
@@ -1352,7 +1419,7 @@ impl<'db> Signature<'db> {
         env: &ProgramEnvironment<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
-    ) -> Option<Self> {
+    ) -> Option<CallableSignature<'db>> {
         if !self.can_bind_self_to(db, env, receiver_type) {
             return None;
         }
@@ -1409,8 +1476,6 @@ impl<'db> Signature<'db> {
             return true;
         }
 
-        // TODO: Expand type aliases here so `type Alias = Self` in a class body
-        // participates in receiver-specific overload pruning.
         expected_self_ty = expected_self_ty.bind_self_typevars(db, env, self_type);
 
         // `Self` binding can make the receiver annotation trivially compatible.
@@ -1503,6 +1568,80 @@ impl<'db> Signature<'db> {
             .is_some_and(|parameter| parameter.is_positional() && parameter.inferred_annotation)
     }
 
+    /// Binds the `Self` receiver if it is unused in the rest of the signature.
+    ///
+    /// This is purely a performance optimization. Eagerly binding the type of `Self` prevents
+    /// unnecessary work from being performed by the constraint solver.
+    pub(super) fn bind_unused_self(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        self_type: Type<'db>,
+    ) -> Option<Self> {
+        let context = self.generic_context?;
+        let receiver = self.parameters.get(0)?;
+
+        // Ensure `Self` is not used elsewhere in the signature, in which case eagerly binding it
+        // would be unsound.
+        if !receiver.is_positional() || self.needs_self_mapping(db, env, true) {
+            return None;
+        }
+
+        // Extract the `Self` type variable.
+        let self_typevar = match receiver.annotated_type() {
+            Type::TypeVar(typevar) => typevar,
+            Type::SubclassOf(subclass) => subclass.into_type_var()?,
+            _ => return None,
+        };
+        if !self_typevar.typevar(db).is_self(db) {
+            return None;
+        }
+
+        // Also ensure that the receiver satisfies the upper bound of `Self`.
+        let bound = self_typevar.typevar(db).upper_bound(db, env)?;
+        if !self_type.is_assignable_to(db, env, bound) {
+            return None;
+        }
+
+        // And that `Self` is not referenced by any other type variable, in which case removing it
+        // from the generic context may leave it unspecialized.
+        //
+        // TODO: References to `Self` inside of bounds or defaults should not generally be permitted
+        // in the first place, but we still avoid leaving dangling references to `Self` out of principle.
+        for typevar in context.variables(db) {
+            if typevar.identity(db) == self_typevar.identity(db) {
+                continue;
+            }
+
+            let bound = typevar.typevar(db).bound_or_constraints(db, env);
+            if bound.is_some_and(|bound| match bound {
+                TypeVarBoundOrConstraints::UpperBound(bound) => bound.contains_self(db, env),
+                TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                    .elements(db)
+                    .iter()
+                    .any(|constraint| constraint.contains_self(db, env)),
+            }) {
+                return None;
+            }
+
+            if typevar
+                .default_type(db)
+                .is_some_and(|ty| ty.contains_self(db, env))
+            {
+                return None;
+            }
+        }
+
+        let mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::Single(self_typevar, self_type));
+        Some(self.apply_type_mapping_impl(
+            db,
+            &mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(env),
+        ))
+    }
+
     fn apply_self_with_receiver(
         &self,
         db: &'db dyn Db,
@@ -1542,7 +1681,10 @@ impl<'db> Signature<'db> {
             });
         if !self.needs_self_mapping(db, env, false) {
             return Self {
-                receiver_constraints,
+                extras: SignatureExtras::new(
+                    self.source_overload_index_raw(),
+                    receiver_constraints,
+                ),
                 ..self.clone()
             };
         }
@@ -1562,10 +1704,10 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
-            source_overload_index: self.source_overload_index,
-            receiver_constraints,
+            extras: SignatureExtras::new(self.source_overload_index_raw(), receiver_constraints),
             parameters,
             return_ty,
+            is_paramspec_value: self.is_paramspec_value,
         }
     }
 
@@ -1574,7 +1716,7 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         checker: &TypeRelationChecker<'_, 'c, 'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let Some(constraints) = self.receiver_constraints.as_ref() else {
+        let Some(constraints) = self.receiver_constraints() else {
             return checker.always();
         };
         checker.constraints.load(db, checker.env, constraints)
@@ -1587,13 +1729,8 @@ impl<'db> Signature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Option<OwnedConstraintSet<'db>> {
-        let constraints = Self::map_constraints(
-            db,
-            self.receiver_constraints.as_ref()?,
-            type_mapping,
-            tcx,
-            visitor,
-        );
+        let constraints =
+            Self::map_constraints(db, self.receiver_constraints()?, type_mapping, tcx, visitor);
         (!constraints
             .query(|_builder, constraints| constraints.is_always_satisfied(db, visitor.env)))
         .then_some(constraints)
@@ -1621,8 +1758,8 @@ impl<'db> Signature<'db> {
     }
 
     pub(super) fn receiver_constraint_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
-        self.receiver_constraints
-            .iter()
+        self.receiver_constraints()
+            .into_iter()
             .flat_map(OwnedConstraintSet::types)
     }
 
@@ -1639,8 +1776,8 @@ impl<'db> Signature<'db> {
         )
     }
 
-    /// Returns the callable signature produced by partially applying this signature.
-    fn partially_apply(
+    /// Specializes a partial's full signature before matching its bound arguments again.
+    pub(crate) fn specialize_for_partial_application(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -1655,12 +1792,21 @@ impl<'db> Signature<'db> {
             |specialization| self.apply_specialization(db, specialization),
         );
 
-        let parameters = signature.parameters().as_slice();
         let return_ty = signature_specialization.map_or_else(
             || unspecialized_return_ty,
             |specialization| unspecialized_return_ty.apply_specialization(db, specialization),
         );
 
+        signature.with_return_type(return_ty)
+    }
+
+    /// Reduces a specialized signature using bindings matched against that same signature.
+    fn partially_apply(
+        &self,
+        db: &'db dyn Db,
+        partial_application: &PartialApplication<'db>,
+    ) -> Self {
+        let parameters = self.parameters().as_slice();
         let mut remaining = Vec::with_capacity(parameters.len());
         let mut first_keyword_bound_positional_or_keyword = None;
         for (index, parameter) in parameters.iter().enumerate() {
@@ -1685,7 +1831,7 @@ impl<'db> Signature<'db> {
 
         // Expand `P.args`/`P.kwargs` while the pair is still adjacent. The keyword-only reshuffle
         // below can separate them, which would otherwise prevent expansion.
-        let remaining = signature
+        let remaining = self
             .parameters
             .with_transformed_parameters(remaining)
             .expand_paramspec_variadics(db);
@@ -1717,9 +1863,7 @@ impl<'db> Signature<'db> {
 
         let reordered = remaining.with_transformed_parameters(reordered);
 
-        signature
-            .with_parameters(reordered)
-            .with_return_type(return_ty)
+        self.clone().with_parameters(reordered)
     }
 
     /// Returns the specialization used for the callable signature exposed by a partial object.
@@ -1757,14 +1901,16 @@ impl<'db> Signature<'db> {
             .collect();
 
         if promoted_typevars.is_empty() {
-            return Some(inference.specialization(db));
+            return Some(inference.merged_specialization(db));
         }
 
-        Some(inference.specialization_with(db, |typevar, inferred| {
-            promoted_typevars
-                .contains(&typevar.identity(db))
-                .then(|| inferred.map_or(Type::TypeVar(typevar), |ty| ty.promote(db, env)))
-        }))
+        Some(
+            inference.merged_specialization_with(db, |typevar, inferred| {
+                promoted_typevars
+                    .contains(&typevar.identity(db))
+                    .then(|| inferred.map_or(Type::TypeVar(typevar), |ty| ty.promote(db, env)))
+            }),
+        )
     }
 
     fn needs_self_mapping(
@@ -1773,8 +1919,6 @@ impl<'db> Signature<'db> {
         env: &ProgramEnvironment<'db>,
         receiver_is_removed: bool,
     ) -> bool {
-        // TODO: Expand type aliases here so `type Alias = Self` in parameters or returns
-        // triggers binding when a method is accessed on a concrete receiver.
         self.return_ty.contains_self(db, env)
             || self
                 .parameters
@@ -1884,7 +2028,7 @@ impl<'db> Signature<'db> {
         if let Some(self_bound_typevar) = self.parameters.as_paramspec()
             && other.is_single_paramspec().is_none()
         {
-            let upper = Type::Callable(CallableType::new(
+            let upper = Type::Callable(CallableType::paramspec_value_from_signatures(
                 db,
                 CallableSignature::from_overloads(other.overloads.iter().map(|signature| {
                     Signature::new_generic(
@@ -1893,8 +2037,6 @@ impl<'db> Signature<'db> {
                         Type::unknown(),
                     )
                 })),
-                CallableTypeKind::ParamSpecValue,
-                CallableFunctionProvenance::None,
             ));
             let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                 db,
@@ -1903,18 +2045,22 @@ impl<'db> Signature<'db> {
                 self_bound_typevar,
                 upper,
             );
-            let return_types_match = other
-                .overloads
-                .iter()
-                .map(|signature| signature.return_ty)
-                .when_any(db, constraints, |other_return_type| {
-                    self.return_ty.when_constraint_set_assignable_to(
-                        db,
-                        env,
-                        other_return_type,
-                        constraints,
-                    )
-                });
+            let return_types_match =
+                other
+                    .overloads
+                    .iter()
+                    .when_any(db, constraints, |other_signature| {
+                        if self.is_paramspec_value || other_signature.is_paramspec_value {
+                            ConstraintSet::from_bool(constraints, true)
+                        } else {
+                            self.return_ty.when_constraint_set_assignable_to(
+                                db,
+                                env,
+                                other_signature.return_ty,
+                                constraints,
+                            )
+                        }
+                    });
             return param_spec_matches.and(db, constraints, || return_types_match);
         }
 
@@ -1955,16 +2101,40 @@ impl<'db> Signature<'db> {
 
     /// Records this signature's position in its defining function's overload list.
     pub(crate) fn with_source_overload_index(mut self, index: Option<usize>) -> Self {
-        self.source_overload_index = index
+        let index = index
             .and_then(|index| u32::try_from(index).ok())
             .and_then(|index| index.checked_add(1))
             .and_then(NonZeroU32::new);
+        self.set_source_overload_index(index);
         self
+    }
+
+    fn set_source_overload_index(&mut self, index: Option<NonZeroU32>) {
+        if let Some(extras) = self.extras.as_deref_mut() {
+            extras.source_overload_index = index;
+            if index.is_none() && extras.receiver_constraints.is_none() {
+                self.extras = None;
+            }
+        } else {
+            self.extras = SignatureExtras::new(index, None);
+        }
+    }
+
+    fn source_overload_index_raw(&self) -> Option<NonZeroU32> {
+        self.extras
+            .as_ref()
+            .and_then(|extras| extras.source_overload_index)
+    }
+
+    fn receiver_constraints(&self) -> Option<&OwnedConstraintSet<'db>> {
+        self.extras
+            .as_ref()
+            .and_then(|extras| extras.receiver_constraints.as_ref())
     }
 
     /// Returns this signature's position in its defining function's overload list.
     pub(crate) fn source_overload_index(&self) -> Option<usize> {
-        self.source_overload_index
+        self.source_overload_index_raw()
             .map(|index| index.get() as usize - 1)
     }
 
@@ -1985,7 +2155,7 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         tracing::trace!(
             "Checking variance of `{tvar}` in `{self:?}`",
             tvar = typevar.identity.name(db)
@@ -2015,11 +2185,13 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
             Either::Right(self.parameters.iter().map(parameter_variance))
         };
 
-        itertools::chain(
-            parameter_variances,
-            Some(self.return_ty.variance_of(db, env, typevar)),
+        VarianceTerm::join(
+            db,
+            itertools::chain(
+                parameter_variances,
+                Some(self.return_ty.variance_of(db, env, typevar)),
+            ),
         )
-        .collect()
     }
 }
 
@@ -2036,12 +2208,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target_signature: &Signature<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
         // Aggregation summarizes visible parameters and return types, but receiver bindings are
-        // additional per-signature obligations. Leave those signatures to the ordinary relation,
-        // which checks each receiver binding before comparing the visible signature.
-        if target_signature.receiver_constraints.is_some()
-            || source_signatures
-                .iter()
-                .any(|signature| signature.receiver_constraints.is_some())
+        // additional per-signature obligations and `ParamSpec` values have no meaningful return
+        // type. Leave those signatures to the ordinary relation.
+        if target_signature.receiver_constraints().is_some()
+            || target_signature.is_paramspec_value
+            || source_signatures.iter().any(|signature| {
+                signature.receiver_constraints().is_some() || signature.is_paramspec_value
+            })
         {
             return None;
         }
@@ -2159,9 +2332,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // `TypeRelationChecker::check_signature_pair_inner` handle the ParamSpec binding
             // instead.
             match (source_is_single_paramspec, target_is_single_paramspec) {
-                (Some((source_tvar, source_return)), None) if target_overloads.len() > 1 => {
+                (Some((source_tvar, source_signature)), None) if target_overloads.len() > 1 => {
                     let env = self.env;
-                    let upper = Type::Callable(CallableType::new(
+                    let upper = Type::Callable(CallableType::paramspec_value_from_signatures(
                         db,
                         CallableSignature::from_overloads(target_overloads.iter().map(
                             |signature| {
@@ -2173,8 +2346,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 .with_source_overload_index(signature.source_overload_index())
                             },
                         )),
-                        CallableTypeKind::ParamSpecValue,
-                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
@@ -2187,23 +2358,28 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         // TODO: Similar to how we do this for unions, we should collect error
                         // context for all elements and report it if *all* checks fail.
                         self.without_context_collection(|| {
-                            target_overloads
-                                .iter()
-                                .map(|signature| signature.return_ty)
-                                .when_any(db, self.constraints, |target_return| {
-                                    self.check_type_pair(db, source_return, target_return)
-                                })
+                            target_overloads.iter().when_any(
+                                db,
+                                self.constraints,
+                                |target_signature| {
+                                    self.check_signature_return_pair(
+                                        db,
+                                        source_signature,
+                                        target_signature,
+                                    )
+                                },
+                            )
                         })
                     };
                     return param_spec_matches.and(db, self.constraints, return_types_match);
                 }
 
-                (None, Some((target_tvar, target_return))) if source_overloads.len() > 1 => {
+                (None, Some((target_tvar, target_signature))) if source_overloads.len() > 1 => {
                     let env = self.env;
                     // TODO: Ideally, the constraint solver should use the return type constraint
                     // to remove unmatched overloads from the `ParamSpec` specialization instead
                     // of filtering them here.
-                    let lower = Type::Callable(CallableType::new(
+                    let lower = Type::Callable(CallableType::paramspec_value_from_signatures(
                         db,
                         CallableSignature::from_overloads(
                             source_overloads
@@ -2211,10 +2387,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 .filter(|signature| {
                                     !self
                                         .without_context_collection(|| {
-                                            self.check_type_pair(
+                                            self.check_signature_return_pair(
                                                 db,
-                                                signature.return_ty,
-                                                target_return,
+                                                signature,
+                                                target_signature,
                                             )
                                         })
                                         .is_never_satisfied(db, env)
@@ -2228,8 +2404,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     .with_source_overload_index(signature.source_overload_index())
                                 }),
                         ),
-                        CallableTypeKind::ParamSpecValue,
-                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
@@ -2242,12 +2416,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         // TODO: Similar to how we do this for unions, we should collect error
                         // context for all elements and report it if *all* checks fail.
                         self.without_context_collection(|| {
-                            source_overloads
-                                .iter()
-                                .map(|signature| signature.return_ty)
-                                .when_any(db, self.constraints, |source_return| {
-                                    self.check_type_pair(db, source_return, target_return)
-                                })
+                            source_overloads.iter().when_any(
+                                db,
+                                self.constraints,
+                                |source_signature| {
+                                    self.check_paramspec_return_pair(
+                                        db,
+                                        source_signature,
+                                        target_signature,
+                                    )
+                                },
+                            )
                         })
                     };
                     return param_spec_matches.and(db, self.constraints, return_types_match);
@@ -2380,7 +2559,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Every nonterminal receiver constraint constrains at least one typevar. Terminal `always`
         // sets are discarded when receiver constraints are merged, so presence alone is enough to
         // require lazy typevar evaluation here.
-        if source.receiver_constraints.is_some() || target.receiver_constraints.is_some() {
+        if source.receiver_constraints().is_some() || target.receiver_constraints().is_some() {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
         let when = checker.with_signature_recursion_guard(source, target, || {
@@ -2425,6 +2604,53 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // this branch and the result is not memoized.
         self.signature_relation_visitor
             .visit(&key, || self.always(), work)
+    }
+
+    fn check_signature_return_pair(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if source.is_paramspec_value || target.is_paramspec_value {
+            self.always()
+        } else {
+            self.check_type_pair(db, source.return_ty, target.return_ty)
+        }
+    }
+
+    fn check_paramspec_return_pair(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if source.is_paramspec_value || target.is_paramspec_value {
+            return self.always();
+        }
+
+        let target = target.return_ty;
+        if self.relation.is_assignability()
+            && self.typevar_evaluation == TypeVarEvaluation::Lazy
+            && target.resolve_type_alias(db).is_dynamic()
+            && let Type::TypeVar(typevar) = source.return_ty.resolve_type_alias(db)
+            && source.parameters().iter().any(|parameter| {
+                any_over_type(db, self.env, parameter.annotated_type(), false, |ty| {
+                    matches!(ty, Type::TypeVar(other) if other.is_same_typevar_as(db, typevar))
+                })
+            })
+        {
+            // Comparing the generic callable `(value: T) -> T` against the declared type
+            // `Callable[P, Any]` contributes the constraint `T <= Any`, despite the gradual return
+            // type not constraining the callable-scoped type variable, so we ignore the constraints
+            // in this case.
+            //
+            // TODO: Remove this special case once `ParamSpec` inference correctly handles captured
+            // type variables when solving return-type constraints.
+            self.always()
+        } else {
+            self.check_type_pair(db, source.return_ty, target)
+        }
     }
 
     fn check_signature_pair_inner(
@@ -2662,7 +2888,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Avoid returning early after checking the return types in case there is a `ParamSpec` type
         // variable in either signature to ensure that the `ParamSpec` binding is still applied even
         // if the return types are incompatible.
-        let return_type_constraints = self.check_type_pair(db, source.return_ty, target.return_ty);
+        let return_type_constraints = if target_parameters.as_paramspec_with_prefix().is_some() {
+            self.check_paramspec_return_pair(db, source, target)
+        } else {
+            self.check_signature_return_pair(db, source, target)
+        };
         let return_type_checks = !result
             .intersect(db, self.constraints, return_type_constraints)
             .is_never_satisfied(db, env);
@@ -2774,6 +3004,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         };
 
+        // The top signature is supertype of (and assignable from) all other signatures. It is a
+        // subtype of no signature except itself, and assignable only to the gradual signature.
+        if target_parameters.is_top() {
+            return result;
+        }
+
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
             let source_paramspec = source_parameters.as_paramspec_with_prefix();
             let target_paramspec = target_parameters.as_paramspec_with_prefix();
@@ -2786,12 +3022,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: `P`
                 // other: `P`
                 (Some(([], source_bound_typevar)), Some(([], target_bound_typevar))) => {
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_equivalence_bound(
                         db,
                         env,
                         self.constraints,
                         source_bound_typevar,
-                        Type::TypeVar(target_bound_typevar),
                         Type::TypeVar(target_bound_typevar),
                     );
                     result.intersect(db, self.constraints, param_spec_matches);
@@ -2804,7 +3039,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     Some((source_prefix_params, source_bound_typevar)),
                     Some(([], target_bound_typevar)),
                 ) => {
-                    let lower = Type::Callable(CallableType::new(
+                    let lower = Type::Callable(CallableType::paramspec_value_from_signatures(
                         db,
                         CallableSignature::single(Signature::new_generic(
                             source.generic_context,
@@ -2815,8 +3050,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             ),
                             Type::unknown(),
                         )),
-                        CallableTypeKind::ParamSpecValue,
-                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
@@ -2835,7 +3068,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     Some(([], source_bound_typevar)),
                     Some((target_prefix_params, target_bound_typevar)),
                 ) => {
-                    let upper = Type::Callable(CallableType::new(
+                    let upper = Type::Callable(CallableType::paramspec_value_from_signatures(
                         db,
                         CallableSignature::single(Signature::new_generic(
                             target.generic_context,
@@ -2846,8 +3079,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             ),
                             Type::unknown(),
                         )),
-                        CallableTypeKind::ParamSpecValue,
-                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
@@ -2960,7 +3191,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // At this point, we should've exhausted at least one of the parameter lists,
                     // so only one side can have remaining prefix parameters.
                     if let Some(source_param) = source_params.next() {
-                        let lower = Type::Callable(CallableType::new(
+                        let lower = Type::Callable(CallableType::paramspec_value_from_signatures(
                             db,
                             CallableSignature::single(
                                 Signature::new_generic(
@@ -2976,8 +3207,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 )
                                 .with_source_overload_index(source.source_overload_index()),
                             ),
-                            CallableTypeKind::ParamSpecValue,
-                            CallableFunctionProvenance::None,
                         ));
                         let param_spec_prefix_matches =
                             ConstraintSet::constrain_typevar_lower_bound(
@@ -2989,7 +3218,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             );
                         result.intersect(db, self.constraints, param_spec_prefix_matches);
                     } else if let Some(target_param) = target_params.next() {
-                        let upper = Type::Callable(CallableType::new(
+                        let upper = Type::Callable(CallableType::paramspec_value_from_signatures(
                             db,
                             CallableSignature::single(
                                 Signature::new_generic(
@@ -3005,8 +3234,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 )
                                 .with_source_overload_index(target.source_overload_index()),
                             ),
-                            CallableTypeKind::ParamSpecValue,
-                            CallableFunctionProvenance::None,
                         ));
                         let param_spec_prefix_matches =
                             ConstraintSet::constrain_typevar_upper_bound(
@@ -3019,12 +3246,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         result.intersect(db, self.constraints, param_spec_prefix_matches);
                     } else {
                         // When the prefixes match exactly, we just relate the remaining tails.
-                        let param_spec_matches = ConstraintSet::constrain_typevar(
+                        let param_spec_matches = ConstraintSet::constrain_typevar_equivalence_bound(
                             db,
                             env,
                             self.constraints,
                             source_bound_typevar,
-                            Type::TypeVar(target_bound_typevar),
                             Type::TypeVar(target_bound_typevar),
                         );
                         result.intersect(db, self.constraints, param_spec_matches);
@@ -3035,7 +3261,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: callable without ParamSpec
                 // other: `P`
                 (None, Some(([], target_bound_typevar))) => {
-                    let lower = Type::Callable(CallableType::new(
+                    let lower = Type::Callable(CallableType::paramspec_value_from_signatures(
                         db,
                         CallableSignature::single(
                             Signature::new_generic(
@@ -3045,8 +3271,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             )
                             .with_source_overload_index(source.source_overload_index()),
                         ),
-                        CallableTypeKind::ParamSpecValue,
-                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
@@ -3182,7 +3406,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let (source_params, _) = parameters.into_remaining();
                     let source_params =
                         source_parameters.with_transformed_parameters(source_params.cloned());
-                    let lower = Type::Callable(CallableType::new(
+                    let lower = Type::Callable(CallableType::paramspec_value_from_signatures(
                         db,
                         CallableSignature::single(
                             Signature::new_generic(
@@ -3192,8 +3416,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             )
                             .with_source_overload_index(source.source_overload_index()),
                         ),
-                        CallableTypeKind::ParamSpecValue,
-                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
@@ -3210,7 +3432,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: `P`
                 // other: callable without ParamSpec
                 (Some(([], source_bound_typevar)), None) => {
-                    let upper = Type::Callable(CallableType::new(
+                    let upper = Type::Callable(CallableType::paramspec_value_from_signatures(
                         db,
                         CallableSignature::single(
                             Signature::new_generic(
@@ -3220,8 +3442,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             )
                             .with_source_overload_index(target.source_overload_index()),
                         ),
-                        CallableTypeKind::ParamSpecValue,
-                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
@@ -3327,7 +3547,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let (_, target_params) = parameters.into_remaining();
                     let target_params =
                         target_parameters.with_transformed_parameters(target_params.cloned());
-                    let upper = Type::Callable(CallableType::new(
+                    let upper = Type::Callable(CallableType::paramspec_value_from_signatures(
                         db,
                         CallableSignature::single(
                             Signature::new_generic(
@@ -3337,8 +3557,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             )
                             .with_source_overload_index(target.source_overload_index()),
                         ),
-                        CallableTypeKind::ParamSpecValue,
-                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
@@ -3377,11 +3595,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
-        // The top signature is supertype of (and assignable from) all other signatures. It is a
-        // subtype of no signature except itself, and assignable only to the gradual signature.
-        if target_parameters.is_top() {
-            return result;
-        } else if source_parameters.is_top() && !target_parameters.is_gradual() {
+        if source_parameters.is_top() && !target_parameters.is_gradual() {
             if let Some(context) = self.report_context() {
                 context.push(ErrorContext::TopCallableAssignedToNonTop {
                     return_type: source.return_ty,
@@ -4684,6 +4898,23 @@ impl<'db> Parameters<'db> {
         matches!(self.data.kind, ParametersKind::Top)
     }
 
+    /// Returns whether this is the bottom parameter list, `(*args: object, **kwargs: object)`,
+    /// which accepts every call.
+    pub(crate) fn is_bottom(&self) -> bool {
+        // `Parameters::top()` stores the same parameter list, but `ParametersKind::Top`
+        // makes it reject every call. Bottom parameters use `ParametersKind::Standard`,
+        // so check the kind before checking the parameter types.
+        self.is_standard()
+            && matches!(
+                self.as_slice(),
+                [variadic, keyword_variadic]
+                    if variadic.is_variadic()
+                        && variadic.annotated_type().is_object()
+                        && keyword_variadic.is_keyword_variadic()
+                        && keyword_variadic.annotated_type().is_object()
+            )
+    }
+
     /// Returns `true` if the parameters are a standard parameter list (not gradual, top,
     /// `ParamSpec`, or `Concatenate`).
     pub(crate) fn is_standard(&self) -> bool {
@@ -4811,7 +5042,7 @@ impl<'db> Parameters<'db> {
 
     /// Return parameters that represents `(*args: object, **kwargs: object)`, the bottom signature
     /// (accepts any call, so subtype of all other signatures.)
-    fn bottom() -> Self {
+    pub(crate) fn bottom() -> Self {
         Self::new(
             [
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
@@ -5422,6 +5653,13 @@ impl<'db> Parameter<'db> {
     pub(crate) fn with_annotated_type(mut self, annotated_type: Type<'db>) -> Self {
         self.annotated_type = annotated_type;
         self.inferred_annotation = false;
+        self
+    }
+
+    /// Set the inferred type without displaying it as an explicit annotation.
+    pub(super) fn with_inferred_type(mut self, inferred_type: Type<'db>) -> Self {
+        self.annotated_type = inferred_type;
+        self.inferred_annotation = true;
         self
     }
 
@@ -6039,6 +6277,46 @@ mod tests {
                 parameter.definition().is_some(),
                 "source-backed parameter should have a definition"
             );
+        }
+    }
+
+    #[test]
+    fn paramspec_identity_specialization_preserves_source_positions() {
+        for prefix in ["", "first: int, "] {
+            let mut db = setup_db();
+            db.write_dedented(
+                "/src/a.py",
+                &format!("def f[**P]({prefix}*args: P.args, **kwargs: P.kwargs) -> None: ..."),
+            )
+            .unwrap();
+            let signature = get_function_f(&db, "/src/a.py")
+                .literal(&db)
+                .last_definition
+                .signature(&db);
+            let generic_context = signature.generic_context.expect("f has a ParamSpec");
+            let expected_positions = (0..signature.parameters.len())
+                .map(Some)
+                .collect::<Vec<_>>();
+            let specialized = CallableSignature::single(signature).apply_type_mapping_impl(
+                &db,
+                &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
+                    generic_context.identity_specialization(&db),
+                )),
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::new(&db.program_environment()),
+            );
+
+            assert_eq!(specialized.overloads.len(), 1);
+            for signature in &specialized.overloads {
+                assert_eq!(
+                    signature
+                        .parameters()
+                        .iter()
+                        .map(Parameter::source_parameter_index)
+                        .collect::<Vec<_>>(),
+                    expected_positions,
+                );
+            }
         }
     }
 

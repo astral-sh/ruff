@@ -10,7 +10,7 @@ use ty_module_resolver::KnownModule;
 
 use crate::place::PlaceAndQualifiers;
 use crate::place::known_module_symbol;
-use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     DynamicClassHeaderAnchor, DynamicClassScopeOffset, dynamic_class_header_range,
 };
@@ -220,7 +220,6 @@ fn synthesize_typed_dict_init<'db>(
         db,
         CallableSignature::from_overloads([map_overload, keyword_overload]),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -262,7 +261,6 @@ fn synthesize_typed_dict_getitem<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -322,7 +320,6 @@ fn synthesize_typed_dict_setitem<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -376,7 +373,6 @@ fn synthesize_typed_dict_delitem<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -504,7 +500,6 @@ fn synthesize_typed_dict_get<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -654,7 +649,6 @@ fn synthesize_typed_dict_pop<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -705,7 +699,6 @@ fn synthesize_typed_dict_setdefault<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -826,7 +819,6 @@ fn synthesize_typed_dict_merge<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -1094,8 +1086,6 @@ pub(super) fn typed_dict_class_member<'db>(
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    let self_class = class.class_literal(db);
-
     typed_dict_inherited_class_member(
         db,
         env,
@@ -1103,7 +1093,7 @@ pub(super) fn typed_dict_class_member<'db>(
         module,
         lookup_policy,
         name,
-        || determine_upper_bound(db, env, self_class, ClassBase::is_typed_dict),
+        || determine_upper_bound(db, env, class, ClassBase::is_typed_dict),
     )
 }
 

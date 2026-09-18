@@ -274,6 +274,26 @@ def f(x): ...
 reveal_type(f)  # revealed: str
 ```
 
+Each error in a decorator stack describes the value received at that step. An inner decorator can
+replace the function before a failing call, and an outer decorator can replace the result again.
+
+```py
+def returns_bytes(value: object) -> bytes:
+    return b""
+
+def requires_bytes(value: bytes) -> bool:
+    return bool(value)
+
+# error: [invalid-argument-type] "Expected `bytes`, found `str`"
+@requires_bytes
+# error: [invalid-argument-type] "Expected `int`, found `bytes`"
+@wrong_signature
+@returns_bytes
+def stacked(): ...
+
+reveal_type(stacked)  # revealed: bool
+```
+
 #### Wrong number of arguments
 
 Decorators need to be callable with a single argument. If they are not, we emit a diagnostic:
@@ -294,6 +314,25 @@ def takes_no_argument() -> str:
 # error: [too-many-positional-arguments] "Too many positional arguments to function `takes_no_argument`: expected 0, got 1"
 @takes_no_argument
 def g(x): ...
+```
+
+#### No matching overload
+
+An overloaded decorator is rejected when none of its signatures accepts the function being
+decorated.
+
+```py
+from typing import overload
+
+@overload
+def scalar(value: int) -> None: ...
+@overload
+def scalar(value: str) -> None: ...
+def scalar(value: int | str) -> None: ...
+
+# error: [no-matching-overload]
+@scalar
+def f() -> None: ...
 ```
 
 ### Class, with wrong signature, used as a decorator
@@ -388,6 +427,8 @@ def takes_int(x: int) -> int:
 # error: [invalid-argument-type]
 @takes_int
 class Foo: ...
+
+reveal_type(Foo)  # revealed: int
 ```
 
 Using `None` as a decorator is an error:
@@ -396,6 +437,8 @@ Using `None` as a decorator is an error:
 # error: [call-non-callable]
 @None
 class Bar: ...
+
+reveal_type(Bar)  # revealed: <class 'Bar'>
 ```
 
 A decorator can enforce type constraints on the class being decorated:
@@ -457,7 +500,7 @@ reveal_type(DataclassThenWrapped)  # revealed: WrapBackend
 class WrappedThenDataclass:
     value: int
 
-reveal_type(WrappedThenDataclass)  # revealed: Unknown
+reveal_type(WrappedThenDataclass)  # revealed: WrapBackend
 
 def int_decorator_factory() -> Callable[[type[object]], int]:
     def decorator(cls: type[object]) -> int:
@@ -470,7 +513,7 @@ def int_decorator_factory() -> Callable[[type[object]], int]:
 class IntThenDataclass:
     value: int
 
-reveal_type(IntThenDataclass)  # revealed: Unknown
+reveal_type(IntThenDataclass)  # revealed: int
 
 @WrapBackend
 class InvalidWrappedBase(1): ...  # error: [invalid-base]
@@ -496,8 +539,8 @@ class OverloadedCacheClient:
         return b""
 ```
 
-Unannotated class decorators are assumed to preserve the class binding. We do not infer returned
-classes from decorator bodies:
+When a class decorator returns `Unknown`, we preserve the current binding. Unannotated decorators
+have an `Unknown` return type because we do not infer returned classes from decorator bodies:
 
 ```py
 def personify(cls):
@@ -549,7 +592,13 @@ callable_decorator = CallableDecorator()
 class CallableInstanceDecorated: ...
 
 reveal_type(CallableInstanceDecorated)  # revealed: <class 'CallableInstanceDecorated'>
+```
 
+An explicit return annotation can also produce `Unknown`, for example when a type variable is not
+specialized. We preserve the class binding in these cases too, but use the return type when it is
+known:
+
+```py
 class ExplicitReturnDecorator(Generic[T]):
     def __call__(self, cls) -> T:
         raise NotImplementedError
@@ -559,7 +608,7 @@ explicit_return_decorator = ExplicitReturnDecorator()
 @explicit_return_decorator
 class ExplicitReturnCallableInstanceDecorated: ...
 
-reveal_type(ExplicitReturnCallableInstanceDecorated)  # revealed: Unknown
+reveal_type(ExplicitReturnCallableInstanceDecorated)  # revealed: <class 'ExplicitReturnCallableInstanceDecorated'>
 
 specialized_explicit_return_decorator = ExplicitReturnDecorator[int]()
 
@@ -578,7 +627,7 @@ def explicit_return_callable_decorator(cls) -> T:
 @explicit_return_callable_decorator
 class ExplicitReturnCallableDecorated: ...
 
-reveal_type(ExplicitReturnCallableDecorated)  # revealed: Unknown
+reveal_type(ExplicitReturnCallableDecorated)  # revealed: <class 'ExplicitReturnCallableDecorated'>
 
 def regular_callable_replacement_factory() -> Callable[[type[object]], T]:
     raise NotImplementedError
@@ -586,20 +635,28 @@ def regular_callable_replacement_factory() -> Callable[[type[object]], T]:
 @regular_callable_replacement_factory()
 class RegularCallableReplacementDecorated: ...
 
-reveal_type(RegularCallableReplacementDecorated)  # revealed: Unknown
+reveal_type(RegularCallableReplacementDecorated)  # revealed: <class 'RegularCallableReplacementDecorated'>
 ```
 
-An unknown class decorator still makes the class binding unknown:
+An unknown class decorator preserves the class binding while still reporting the unresolved
+reference:
 
 ```py
 # error: [unresolved-reference] "Name `unknown_class_decorator` used when not defined"
 @unknown_class_decorator
-class UnknownDecorated: ...
+class UnknownDecorated:
+    def method(self, value: int) -> str:
+        return str(value)
 
-reveal_type(UnknownDecorated)  # revealed: Unknown
+reveal_type(UnknownDecorated)  # revealed: <class 'UnknownDecorated'>
+reveal_type(UnknownDecorated())  # revealed: UnknownDecorated
+reveal_type(UnknownDecorated().method(1))  # revealed: str
+UnknownDecorated().method("a")  # error: [invalid-argument-type]
 ```
 
-An unannotated class decorator preserves the result of earlier decorators:
+If an earlier decorator replaces the class with an instance, an `Unknown` return type preserves that
+instance's type. This applies both to unannotated decorators and to decorators whose return
+annotations evaluate to `Unknown`:
 
 ```py
 def unannotated_identity(cls):
@@ -610,6 +667,12 @@ def unannotated_identity(cls):
 class WrappedThenUnannotated: ...
 
 reveal_type(WrappedThenUnannotated)  # revealed: WrapBackend
+
+@explicit_return_decorator
+@WrapBackend
+class WrappedThenUnknown: ...
+
+reveal_type(WrappedThenUnknown)  # revealed: WrapBackend
 ```
 
 Metadata decorators still apply above an unannotated class-preserving decorator:
@@ -625,6 +688,55 @@ def unannotated_identity(cls):
 class DeprecatedThenUnannotated: ...
 
 DeprecatedThenUnannotated()  # error: [deprecated] "use OtherClass"
+```
+
+## Unknown return annotations on class decorators
+
+An unresolved return annotation produces `Unknown`. This preserves the class binding and allows
+outer metadata decorators to apply to the class:
+
+```py
+from dataclasses import dataclass
+
+def decorator(cls: type) -> Missing:  # error: [unresolved-reference]
+    return cls
+
+@dataclass
+@decorator
+class C:
+    value: int
+
+reveal_type(C)  # revealed: <class 'C'>
+reveal_type(C(1).value)  # revealed: int
+C("a")  # error: [invalid-argument-type]
+```
+
+## Explicitly dynamic class decorators
+
+Unlike `Unknown`, an explicit `Any` return type replaces the class binding:
+
+```py
+from typing import Any
+
+def decorator(cls: type) -> Any:
+    return cls
+
+@decorator
+class C: ...
+
+reveal_type(C)  # revealed: Any
+```
+
+An explicit `type[Any]` return type also replaces the binding:
+
+```py
+def class_decorator(cls: type) -> type[Any]:
+    return cls
+
+@class_decorator
+class D: ...
+
+reveal_type(D)  # revealed: type[Any]
 ```
 
 ## Preserving the original class object
@@ -825,7 +937,7 @@ def dynamic(function: object):
     return function
 
 f = lambda: f
-assert f
+assert f  # error: [redundant-condition] "always truthy"
 
 # snapshot: dynamic-function-decorator-return
 @dynamic

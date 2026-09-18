@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.13"
 # dependencies = []
 #
 # [tool.ty.rules]
@@ -10,6 +10,11 @@
 # unsound-yield = "warn"
 # unsupported-dynamic-base = "warn"
 # division-by-zero = "warn"
+# dynamic-function-decorator-return = "warn"
+# unsound-assignment = "warn"
+# redundant-condition-strict = "warn"
+# disjoint-cast = "warn"
+# missing-direct-dependency = "warn"
 #
 # [tool.uv]
 # no-build = true
@@ -20,6 +25,7 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import subprocess
 from pathlib import Path
@@ -52,8 +58,9 @@ def get_mapping_data() -> dict[str, list[int]]:
         encoding="utf-8",
     )
     # The content is a JSON object literal wrapped in a JSON string, so double decode:
-    mapping_data: dict[str, list[int]] = json.loads(json.loads(content))
-    return mapping_data
+    mapping_data = json.loads(json.loads(content))
+    assert isinstance(mapping_data, dict)
+    return mapping_data  # ty: ignore[unsound-return-statement]
 
 
 def format_number(number: int) -> str:
@@ -81,10 +88,9 @@ def format_confusables_rs(raw_data: dict[str, list[int]]) -> str:
     """Format the downloaded data into a Rust source file."""
     # The input data contains duplicate entries.
     flattened_items: set[tuple[int, int]] = set()
-    for _category, items in raw_data.items():
+    for items in raw_data.values():
         assert len(items) % 2 == 0, "Expected pairs of items"
-        for i in range(0, len(items), 2):
-            flattened_items.add((items[i], items[i + 1]))
+        flattened_items.update(itertools.batched(items, 2, strict=True))
 
     tuples = [
         f"    {format_number(left)} => '{format_char(right)}',\n"

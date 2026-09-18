@@ -136,6 +136,33 @@ reveal_type(generic_context(into_regular_callable(C)))
 reveal_type(into_regular_callable(C)(1))
 ```
 
+## Generic `__iter__` methods with explicit receivers
+
+Binding `__iter__` to an `Unpacker[Iterable[int]]` infers `S` as `int` from the explicit
+`self: Unpacker[Iterable[S]]` annotation. Calls to `list()` and `iter()` preserve this element type,
+just as `tuple()` and `for` loops do.
+
+Regression test for <https://github.com/astral-sh/ty/issues/3598>.
+
+```py
+from collections.abc import Iterable, Iterator
+
+class Unpacker[T: Iterable[object]]:
+    def __init__(self, it: T, /) -> None:
+        self._it = it
+    def __iter__[S](self: "Unpacker[Iterable[S]]") -> Iterator[S]:
+        return iter(self._it)
+
+def integers() -> Unpacker[Iterable[int]]:
+    return Unpacker([1, 2, 3])
+
+reveal_type(tuple(integers()))  # revealed: tuple[int, ...]
+for x in integers():
+    reveal_type(x)  # revealed: int
+reveal_type(list(integers()))  # revealed: list[int]
+reveal_type(iter(integers()))  # revealed: Iterator[int]
+```
+
 ## Naming a generic `Callable`: type aliases
 
 The easiest way to refer to a generic `Callable` type directly is via a type alias:
@@ -403,10 +430,22 @@ def consume(value: A | B | C | D | E) -> None: ...
 reveal_type(infer_from_consumer(consume))  # revealed: A | B | C | D | E
 ```
 
-## Overlapping inferred union upper bounds exceeding the solution budget
+The same union remains precise when it is defined through nested type aliases:
 
-Even if the precise intersection of two large union upper bounds is small, processing either union
-currently exceeds the solution budget before we can discover that intersection.
+```py
+type FirstTwo = A | B
+type NextTwo = C | D
+type Options = FirstTwo | NextTwo | E
+
+def consume_alias(value: Options) -> None: ...
+
+reveal_type(infer_from_consumer(consume_alias))  # revealed: A | B | C | D | E
+```
+
+## Overlapping inferred union upper bounds with few surviving alternatives
+
+The individual union upper bounds can exceed the solution budget when only a few alternatives
+survive their intersection. Disjoint alternatives do not count toward the budget.
 
 ```py
 from typing import Callable, final
@@ -445,6 +484,150 @@ def consume_left(value: A | B | C | D | E) -> None: ...
 def consume_right(value: A | B | F | G | H) -> None: ...
 
 reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: A | B
+```
+
+Aliases for these unions also preserve the precise intersection in either argument order:
+
+```py
+type Left = A | B | C | D | E
+type Right = A | B | F | G | H
+
+def consume_left_alias(value: Left) -> None: ...
+def consume_right_alias(value: Right) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left_alias, consume_right_alias))  # revealed: A | B
+reveal_type(infer_from_consumers(consume_right_alias, consume_left_alias))  # revealed: A | B
+```
+
+## Intersecting aliased upper bounds exceeding the solution budget
+
+Each consumer constrains `T` to a different union. The classes can share subclasses, so their
+intersection has eight distinct alternatives. Type aliases do not exempt this expansion from the
+solution budget: inference falls back to `Unknown` instead of constructing the entire intersection.
+
+```py
+from typing import Callable
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+
+type First = A | B
+type Second = C | D
+type Third = E | F
+
+def infer_from_consumers[T](
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+    third: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+def consume_first(value: First) -> None: ...
+def consume_second(value: Second) -> None: ...
+def consume_third(value: Third) -> None: ...
+
+reveal_type(infer_from_consumers(consume_first, consume_second, consume_third))  # revealed: Unknown
+```
+
+The same budget applies when an explicit union is intersected with aliased unions:
+
+```py
+def consume_explicit(value: E | F) -> None: ...
+
+reveal_type(infer_from_consumers(consume_first, consume_second, consume_explicit))  # revealed: Unknown
+```
+
+## Narrowing negated intersection aliases
+
+The negation of an aliased intersection acts as a union of negations. Intersecting three such upper
+bounds can exceed the solution budget, but an additional literal upper bound leaves just one
+solution. We infer the literal regardless of the consumer order.
+
+```py
+from typing import Callable, Literal
+from ty_extensions import Intersection, Not
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+
+type AB = Intersection[A, B]
+type CD = Intersection[C, D]
+type EF = Intersection[E, F]
+
+def infer_from_consumers[T](
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+    third: Callable[[T], None],
+    fourth: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+def exclude_ab(value: Not[AB]) -> None: ...
+def exclude_cd(value: Not[CD]) -> None: ...
+def exclude_ef(value: Not[EF]) -> None: ...
+def consume_literal(value: Literal[5]) -> None: ...
+
+reveal_type(infer_from_consumers(exclude_ab, exclude_cd, exclude_ef, consume_literal))  # revealed: Literal[5]
+reveal_type(infer_from_consumers(consume_literal, exclude_ab, exclude_cd, exclude_ef))  # revealed: Literal[5]
+```
+
+## Intersecting recursive inferred union upper bounds
+
+A recursive alias can contribute an upper bound without expanding its nested occurrences. Here, only
+`int` satisfies both consumers, regardless of their order.
+
+```py
+from typing import Callable
+
+type Recursive = int | list[Recursive]
+
+def infer_from_consumers[T](left: Callable[[T], None], right: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume_recursive(value: Recursive) -> None: ...
+def consume_int_or_str(value: int | str) -> None: ...
+
+reveal_type(infer_from_consumers(consume_recursive, consume_int_or_str))  # revealed: int
+reveal_type(infer_from_consumers(consume_int_or_str, consume_recursive))  # revealed: int
+```
+
+## Narrowing recursive inferred union upper bounds
+
+The third consumer restricts two recursive unions to the literal `5`. Its position does not change
+the inferred result.
+
+```py
+from typing import Callable, Literal
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+type First = Literal[5] | A | B | list[First]
+type Second = Literal[5] | C | D | list[Second]
+
+def infer_from_consumers[T](
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+    third: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+def consume_first(value: First) -> None: ...
+def consume_second(value: Second) -> None: ...
+def consume_literal(value: Literal[5]) -> None: ...
+
+reveal_type(infer_from_consumers(consume_first, consume_second, consume_literal))  # revealed: Literal[5]
+reveal_type(infer_from_consumers(consume_literal, consume_first, consume_second))  # revealed: Literal[5]
 ```
 
 ## Contextual generic return exceeding the solution budget
@@ -563,6 +746,127 @@ def consume_int_or_str(value: int | str) -> None: ...
 reveal_type(infer_str(consume_int_or_str))  # revealed: str
 ```
 
+## Gradual class parameters
+
+A callback that accepts `type[Any]` or `type[Unknown]` can accept any class object.
+
+```py
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
+
+def invoke[T](callback: Callable[[type], T]) -> T:
+    return callback(int)
+
+def _(f: Callable[[type[Any]], int], g: Callable[[type[Unknown]], str]):
+    reveal_type(invoke(f))  # revealed: int
+    reveal_type(invoke(g))  # revealed: str
+```
+
+A gradual class argument can also satisfy a callback's metaclass parameter:
+
+```py
+class Meta(type): ...
+
+def f(cls: Meta) -> int:
+    return 1
+
+def invoke_any[T](callback: Callable[[type[Any]], T], cls: type[Any]) -> T:
+    return callback(cls)
+
+def _(cls: type[Any]):
+    reveal_type(invoke_any(f, cls))  # revealed: int
+```
+
+## Inferring gradual tuple returns with concrete bounds
+
+A callback returning `tuple[Any, ...]` satisfies a fixed-length tuple bound because both its
+elements and its length are gradual. Inference preserves the callback's return type.
+
+```py
+from typing import Any, Callable
+
+def get_tuple() -> tuple[Any, ...]:
+    return ()
+
+def infer_fixed[T: tuple[int]](callback: Callable[[], T]) -> T:
+    return callback()
+
+reveal_type(infer_fixed(get_tuple))  # revealed: tuple[Any, ...]
+```
+
+The gradual length can also supply required elements at either end of a variable-length bound.
+
+```py
+def infer_prefix[T: tuple[int, *tuple[int, ...]]](callback: Callable[[], T]) -> T:
+    return callback()
+
+def infer_suffix[T: tuple[*tuple[int, ...], int]](callback: Callable[[], T]) -> T:
+    return callback()
+
+reveal_type(infer_prefix(get_tuple))  # revealed: tuple[Any, ...]
+reveal_type(infer_suffix(get_tuple))  # revealed: tuple[Any, ...]
+```
+
+Fixed elements still have to satisfy the bound, and an ordinary homogeneous tuple does not have a
+gradual length.
+
+```py
+def wrong_element() -> tuple[str, *tuple[Any, ...]]:
+    return ("",)
+
+def get_ints() -> tuple[int, ...]:
+    return ()
+
+infer_fixed(wrong_element)  # error: [invalid-argument-type]
+infer_prefix(wrong_element)  # error: [invalid-argument-type]
+infer_fixed(get_ints)  # error: [invalid-argument-type]
+infer_prefix(get_ints)  # error: [invalid-argument-type]
+infer_suffix(get_ints)  # error: [invalid-argument-type]
+```
+
+## Inferring type variables from gradual tuple elements
+
+A callback returning a gradual-length tuple can constrain the type variables of a fixed-length
+tuple.
+
+```py
+from typing import Any, Callable
+
+def infer_pair[K, V](callback: Callable[[], tuple[K, V]]) -> tuple[K, V]:
+    return callback()
+
+def _(
+    callback: Callable[[], tuple[Any, ...]],
+    prefix: Callable[[], tuple[int, *tuple[Any, ...]]],
+    suffix: Callable[[], tuple[*tuple[Any, ...], str]],
+):
+    reveal_type(infer_pair(callback))  # revealed: tuple[Any, Any]
+    reveal_type(infer_pair(prefix))  # revealed: tuple[int, Any]
+    reveal_type(infer_pair(suffix))  # revealed: tuple[Any, str]
+```
+
+A concrete homogeneous tuple does not guarantee the required length:
+
+```py
+def _(callback: Callable[[], tuple[int, ...]]):
+    infer_pair(callback)  # error: [invalid-argument-type]
+```
+
+## Source type variables in gradual tuple returns
+
+A callback's fixed tuple element can contain an outer type variable and still satisfy a concrete
+bound. The gradual segment can be empty, and inference preserves the outer type variable.
+
+```py
+from typing import Any, Callable
+
+def infer_tuple[R: tuple[object]](callback: Callable[[], R]) -> R:
+    return callback()
+
+def outer[T](callback: Callable[[], tuple[list[T], *tuple[Any, ...]]]) -> None:
+    reveal_type(infer_tuple(callback))  # revealed: tuple[list[T@outer], *tuple[Any, ...]]
+```
+
 ## Inferring `Never` from a callable parameter
 
 `Never` is a valid upper-bound inference result and should not be replaced with the fallback for an
@@ -664,6 +968,25 @@ def f(val: str | bytes) -> None:
     pass
 
 reveal_type(accepts_callable(f))  # revealed: str | bytes
+```
+
+When overloads exchange their input and output types, the inferred return tuple currently contains a
+union for each type variable.
+
+```py
+def infer_pair[T, U](converter: Callable[[T], U]) -> tuple[T, U]:
+    raise NotImplementedError
+
+@overload
+def swap(value: int) -> str: ...
+@overload
+def swap(value: str) -> int: ...
+def swap(value: int | str) -> int | str:
+    raise NotImplementedError
+
+# TODO: Infer the intersection of `tuple[int, str]` and `tuple[str, int]`.
+# Both specializations validate the same call, so its result satisfies both return types.
+reveal_type(infer_pair(swap))  # revealed: tuple[int | str, str | int]
 ```
 
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated
@@ -806,4 +1129,35 @@ class IPolys[T](Protocol):
     def __getitem__(self, key: int) -> IPolys[T]: ...
     @overload
     def __getitem__(self, key: slice) -> IPolys[T] | Domain[T]: ...
+```
+
+## Returned callables with recursive parameter aliases
+
+A type variable used by a recursive parameter alias belongs to the function. The returned callable
+uses the type argument inferred from that parameter.
+
+```py
+from typing import Callable
+
+type Tree[T] = tuple[T, Tree[T] | None]
+
+def make[T](value: Tree[T]) -> Callable[[T], T]:
+    raise NotImplementedError
+
+callback = make((1, None))
+reveal_type(callback)  # revealed: (int, /) -> int
+callback("bad")  # error: [invalid-argument-type]
+```
+
+The type argument can also change at each recursive step.
+
+```py
+type Growing[T] = tuple[T, Growing[list[T]] | None]
+
+def make_growing[T](value: Growing[T]) -> Callable[[T], T]:
+    raise NotImplementedError
+
+callback_growing = make_growing((1, None))
+reveal_type(callback_growing)  # revealed: (int, /) -> int
+callback_growing("bad")  # error: [invalid-argument-type]
 ```

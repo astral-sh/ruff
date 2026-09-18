@@ -6,6 +6,7 @@ use ruff_python_ast::{self as ast, Arguments, Expr, StringFlags, str::Quote};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -39,7 +40,7 @@ use crate::rules::flynt::helpers;
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.266")]
+#[violation_metadata(stable_since = "v0.0.266", category = Category::Complexity)]
 pub(crate) struct StaticJoinToFString {
     expression: SourceCodeSnippet,
 }

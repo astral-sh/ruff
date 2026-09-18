@@ -1364,7 +1364,7 @@ fn ordinary_files_do_not_initialize_scripts() -> anyhow::Result<()> {
     assert_cmd_snapshot!(
         case.command()
             .arg("ordinary.py")
-            .env(EnvVars::TY_UV, "1")
+            .env(EnvVars::TY_UV, "scripts")
             .env(EnvVars::UV, "missing-uv-executable"),
         @"
     success: true
@@ -1417,7 +1417,7 @@ fn excluded_scripts_do_not_initialize_their_environments() -> anyhow::Result<()>
         case.command()
             .arg(".")
             .args(["--config-file", "ty.toml"])
-            .env(EnvVars::TY_UV, "1")
+            .env(EnvVars::TY_UV, "scripts")
             .env(EnvVars::UV, "missing-uv-executable"),
         @"
     success: true
@@ -1437,13 +1437,16 @@ mod uv_metadata {
     use std::{fs, process::Command};
 
     use insta_cmd::assert_cmd_snapshot;
+    use ty_project::uv_test_env_vars;
     use ty_static::EnvVars;
 
     use crate::CliTest;
+    use crate::uv_workspace::{uv_sync_command, write_dependency_wheel};
 
     fn command_with_script_uv(case: &CliTest) -> Command {
-        let mut command = case.command_inheriting_environment();
+        let mut command = case.command();
         command
+            .envs(uv_test_env_vars())
             .env(EnvVars::TY_UV, "1")
             .env(EnvVars::UV, "uv")
             .env("UV_CACHE_DIR", case.root().join("cache"));
@@ -1452,6 +1455,8 @@ mod uv_metadata {
 
     fn assert_uv_supports_script_metadata() -> anyhow::Result<()> {
         let output = Command::new("uv")
+            .env_clear()
+            .envs(uv_test_env_vars())
             .args(["workspace", "metadata", "--help"])
             .output()?;
 
@@ -1474,7 +1479,7 @@ mod uv_metadata {
         # requires-python = ">=3.12"
         # dependencies = ["attrs==25.4.0"]
         # [tool.ty.environment]
-        # python-version = "3.10"
+        # python-version = "3.11"
         # ///
 
         import sys
@@ -1488,35 +1493,9 @@ mod uv_metadata {
         reveal_type(User(1).value)
         reveal_type(sys.version_info[:2])
         "#,
-        )?
-        .with_filter(r"Literal\[(?:1[2-9]|[2-9][0-9])\]", "Literal[<uv-minor>]");
+        )?;
 
         assert_cmd_snapshot!(command_with_script_uv(&case).arg("script.py"), @"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-        info[revealed-type]: Revealed type
-          --> script.py:17:13
-           |
-        17 | reveal_type(User(1).value)
-           |             ^^^^^^^^^^^^^ `int`
-
-        info[revealed-type]: Revealed type
-          --> script.py:18:13
-           |
-        18 | reveal_type(sys.version_info[:2])
-           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[<uv-minor>]]`
-
-        Found 2 diagnostics
-
-        ----- stderr -----
-        ");
-
-        assert_cmd_snapshot!(
-            command_with_script_uv(&case)
-                .arg("script.py")
-                .args(["--python-version", "3.11"]),
-            @"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -1533,6 +1512,157 @@ mod uv_metadata {
            |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[11]]`
 
         Found 2 diagnostics
+
+        ----- stderr -----
+        ");
+
+        assert_cmd_snapshot!(
+            command_with_script_uv(&case)
+                .arg("script.py")
+                .args(["--python-version", "3.12"]),
+            @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        info[revealed-type]: Revealed type
+          --> script.py:17:13
+           |
+        17 | reveal_type(User(1).value)
+           |             ^^^^^^^^^^^^^ `int`
+
+        info[revealed-type]: Revealed type
+          --> script.py:18:13
+           |
+        18 | reveal_type(sys.version_info[:2])
+           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[12]]`
+
+        Found 2 diagnostics
+
+        ----- stderr -----
+        "
+        );
+
+        Ok(())
+    }
+
+    fn script_with_indirect_dependency() -> anyhow::Result<CliTest> {
+        let case = CliTest::with_file(
+            "script.py",
+            r#"
+            # /// script
+            # requires-python = ">=3.8"
+            # dependencies = ["direct-dependency"]
+            # [tool.uv]
+            # no-index = true
+            # find-links = ["wheels"]
+            # ///
+
+            import direct_module
+            from indirect_module import value
+            import indirect_module
+            "#,
+        )?;
+        write_dependency_wheel(&case, "indirect-dependency", "indirect_module", &[])?;
+        write_dependency_wheel(
+            &case,
+            "direct-dependency",
+            "direct_module",
+            &["indirect-dependency"],
+        )?;
+        Ok(case)
+    }
+
+    #[test]
+    fn indirect_dependencies_use_script_declarations() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let case = script_with_indirect_dependency()?;
+        let mut command = command_with_script_uv(&case);
+        command
+            .arg("script.py")
+            .env("UV_OFFLINE", "1")
+            .env("UV_PYTHON_DOWNLOADS", "never");
+
+        assert_cmd_snapshot!(command, @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        All checks passed!
+
+        ----- stderr -----
+        ");
+
+        command.args(["--error", "missing-direct-dependency"]);
+        assert_cmd_snapshot!(command, @"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        error[missing-direct-dependency]: Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+          --> script.py:11:6
+           |
+        11 | from indirect_module import value
+           |      ^^^^^^^^^^^^^^^
+        help: Declare `indirect-dependency` in the script's inline `dependencies` metadata
+        info: See https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies
+
+        error[missing-direct-dependency]: Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+          --> script.py:12:8
+           |
+        12 | import indirect_module
+           |        ^^^^^^^^^^^^^^^
+        help: Declare `indirect-dependency` in the script's inline `dependencies` metadata
+        info: See https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies
+
+        Found 2 diagnostics
+
+        ----- stderr -----
+        ");
+
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_dependencies_do_not_apply_to_scripts() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let case = script_with_indirect_dependency()?;
+        case.write_files([
+            (
+                "pyproject.toml",
+                r#"
+                [project]
+                name = "project"
+                version = "0.1.0"
+                requires-python = ">=3.8"
+                dependencies = ["indirect-dependency"]
+
+                [tool.uv]
+                no-index = true
+                find-links = ["wheels"]
+                "#,
+            ),
+            (
+                "ordinary.py",
+                r#"
+                import indirect_module
+                from typing_extensions import reveal_type
+
+                reveal_type(indirect_module.value)
+                "#,
+            ),
+        ])?;
+
+        assert_cmd_snapshot!(
+            uv_sync_command(&case, None)?
+                .args(["--error", "missing-direct-dependency"]),
+            @"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        ordinary.py:5:13: info[revealed-type] Revealed type: `int`
+        script.py:11:6: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+        script.py:12:8: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+        Found 3 diagnostics
 
         ----- stderr -----
         "
@@ -1560,32 +1690,23 @@ mod uv_metadata {
                 from typing import Literal, assert_type
 
                 foo = 1
-                assert_type(sys.version_info[:2], tuple[Literal[3], Literal[12]])
+                assert_type(sys.version_info[:2], tuple[Literal[3], Literal[11]])
                 "#,
             ),
         ])?;
 
-        // FIXME: Checking a.py can create b.py's environment before synchronization, causing
-        // b.py to use its Python 3.11 fallback instead of the Python 3.12 environment from uv.
+        // Same as for regular projects. An explicit `python-version` takes precedence
+        // over a `requires-python` constraint.
         assert_cmd_snapshot!(
             command_with_script_uv(&case)
                 .args(["a.py", "b.py"])
                 .env(EnvVars::TY_UV, "scripts")
                 .env(EnvVars::TY_MAX_PARALLELISM, "1"),
             @"
-        success: false
-        exit_code: 1
+        success: true
+        exit_code: 0
         ----- stdout -----
-        error[type-assertion-failure]: Argument does not have asserted type `tuple[Literal[3], Literal[12]]`
-          --> b.py:12:1
-           |
-        12 | assert_type(sys.version_info[:2], tuple[Literal[3], Literal[12]])
-           | ^^^^^^^^^^^^--------------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-           |             |
-           |             Inferred type is `tuple[Literal[3], Literal[11]]`
-        info: `tuple[Literal[3], Literal[12]]` and `tuple[Literal[3], Literal[11]]` are not equivalent types
-
-        Found 1 diagnostic
+        All checks passed!
 
         ----- stderr -----
         "
@@ -1636,13 +1757,19 @@ mod uv_metadata {
     fn synchronizes_multiple_scripts_with_one_worker() -> anyhow::Result<()> {
         assert_uv_supports_script_metadata()?;
 
-        let script =
-            "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n";
+        let script = r#"
+        # /// script
+        # requires-python = ">=3.12"
+        # dependencies = ["attrs==25.4.0"]
+        # ///
+        from attrs import define
+        "#;
         let case = CliTest::with_files([("first.py", script), ("second.py", script)])?;
 
         assert_cmd_snapshot!(
             command_with_script_uv(&case)
                 .args(["first.py", "second.py"])
+                .env(EnvVars::TY_UV, "scripts")
                 .env(EnvVars::TY_MAX_PARALLELISM, "1"),
             @"
         success: true
@@ -1685,8 +1812,13 @@ mod uv_metadata {
 
         // The CLI environment selects uv's interpreter, but the script's dependencies must still
         // come from the separate environment that uv creates for the script.
+        // As for projects, `requires-python` takes precedence over the virtual environment because
+        // it defines the minimum Python version the script must support. This allows ty to detect
+        // accidental use of newer language features.
         let environment = case.root().join(".venv");
         let output = Command::new("uv")
+            .env_clear()
+            .envs(uv_test_env_vars())
             .args(["venv", "--no-project", "--python", "3.12"])
             .arg(&environment)
             .env("UV_CACHE_DIR", case.root().join("cache"))
@@ -1715,7 +1847,7 @@ mod uv_metadata {
           --> scripts/script.py:16:13
            |
         16 | reveal_type(sys.version_info[:2])
-           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[12]]`
+           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[11]]`
 
         Found 2 diagnostics
 

@@ -214,7 +214,6 @@ from included import *
 
 ExcludedT = TypeVar("ExcludedT")
 
-# error: [invalid-assignment]
 # error: [invalid-legacy-type-variable]
 IncludedT = TypeVar("IncludedT")
 ```
@@ -377,6 +376,74 @@ reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
 
 # error: [invalid-generic-class] "Default of `U` cannot reference out-of-scope type variable `T`"
 class Invalid(Generic[U]): ...
+```
+
+### Defaults containing bounded type variables
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+A default can specialize a bounded generic with another type variable whose upper bound is
+compatible. Applying the default substitutes the actual type argument, without replacing it with its
+upper bound.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", bound=int)
+
+class Box(Generic[T]): ...
+
+B = TypeVar("B", default=Box[T])
+
+class Holder(Generic[T, B]): ...
+
+reveal_type(Holder[bool]())  # revealed: Holder[bool, Box[bool]]
+```
+
+We reject a nested type argument whose upper bound is incompatible with the generic's bound:
+
+```py
+U = TypeVar("U", bound=str)
+
+# error: [invalid-type-arguments]
+Invalid = TypeVar("Invalid", default=Box[U])
+```
+
+### Defaults containing constrained type variables
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+A constrained type variable can appear inside a default when each of its constraints is allowed by
+the nested generic. The selected type argument is preserved in the default.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", int, str)
+
+class Box(Generic[T]): ...
+
+B = TypeVar("B", default=Box[T])
+
+class Holder(Generic[T, B]): ...
+
+reveal_type(Holder[str]())  # revealed: Holder[str, Box[str]]
+```
+
+We reject a nested type argument if one of its constraints is incompatible with the generic's
+constraints:
+
+```py
+U = TypeVar("U", int, bytes)
+
+# error: [invalid-type-arguments]
+Invalid = TypeVar("Invalid", default=Box[U])
 ```
 
 ### Invalid defaults
@@ -922,6 +989,68 @@ def constrained(x: T_constrained):
     reveal_type(type(x))  # revealed: type[T_constrained@constrained]
 ```
 
+## Enum members on generic class objects
+
+An enum member cannot be reassigned through a generic class receiver. The restriction applies to
+every constraint or alternative in an upper bound. Non-member attributes remain writable.
+
+```py
+from enum import Enum
+from typing import Any, Protocol, TypeAlias, TypeVar
+
+class A(Enum):
+    X = 0
+    label: str
+
+class B(Enum):
+    X = 0
+    label: str
+
+class Writable(Protocol):
+    X: Any
+```
+
+For a constrained type variable, the assignment must be valid for every constraint. These class
+objects also cannot satisfy a protocol that requires a writable enum member:
+
+```py
+Constrained = TypeVar("Constrained", A, B)
+
+def constrained(cls: type[Constrained]):
+    cls.X = 0  # error: [invalid-assignment]
+    writable: Writable = cls  # error: [invalid-assignment]
+    cls.label = "label"
+```
+
+The same applies to a union bound, including one defined through a type alias:
+
+```py
+Both: TypeAlias = A | B
+Bound = TypeVar("Bound", bound=Both)
+
+def union_bound(cls: type[Bound]):
+    cls.X = 0  # error: [invalid-assignment]
+    writable: Writable = cls  # error: [invalid-assignment]
+    cls.label = "label"
+```
+
+One enum alternative is enough to reject the write, even if another class allows assignment to the
+attribute:
+
+```py
+class Plain:
+    X: int = 0
+
+MixedConstrained = TypeVar("MixedConstrained", Plain, A)
+MixedBound = TypeVar("MixedBound", bound=A | Plain)
+
+def mixed_constraints(cls: type[MixedConstrained]):
+    cls.X = 0  # error: [invalid-assignment]
+
+def mixed_bound(cls: type[MixedBound]):
+    cls.X = 0  # error: [invalid-assignment]
+```
+
 ## Cycles
 
 ### Bounds and constraints
@@ -1017,6 +1146,31 @@ class D(Generic[V]):
     x: V
 
 reveal_type(D().x)  # revealed: Unknown
+```
+
+### Defaults through recursive aliases
+
+A default that refers to its own type variable through a recursive alias falls back to `Unknown`.
+This also applies when another specialization of the same alias wraps the reference.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVar
+
+U = TypeVar("U")
+Tree = tuple[U, "Tree[U] | None"]
+T = TypeVar("T", default="Tree[T]")
+N = TypeVar("N", default="Tree[Tree[N]]")
+
+class Box(Generic[T]): ...
+class NestedBox(Generic[N]): ...
+
+reveal_type(Box())  # revealed: Box[Unknown]
+reveal_type(NestedBox())  # revealed: NestedBox[Unknown]
 ```
 
 ## Regression

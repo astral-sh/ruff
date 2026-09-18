@@ -11,6 +11,7 @@ use crate::types::{
     generics::typing_self,
     infer::{function_known_decorator_flags, nearest_enclosing_class},
 };
+use ruff_python_ast::PythonVersion;
 use strum_macros::EnumString;
 use ty_module_resolver::{ImportingFile, KnownModule, file_to_module, resolve_module_confident};
 use ty_python_core::{
@@ -134,8 +135,10 @@ pub enum SpecialFormType {
 
 impl SpecialFormType {
     /// Return the [`KnownClass`] which this symbol is an instance of
-    pub(crate) const fn class(self) -> KnownClass {
+    pub(crate) fn class(self, db: &dyn Db, env: &ProgramEnvironment<'_>) -> KnownClass {
         match self {
+            Self::Union if env.python_version(db) >= PythonVersion::PY314 => KnownClass::Type,
+
             Self::Annotated
             | Self::Literal
             | Self::LiteralString
@@ -185,14 +188,14 @@ impl SpecialFormType {
     /// Return the instance type which this type is a subtype of.
     ///
     /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
-    /// so `SpecialFormType::Literal.instance_fallback(db, python_version)`
+    /// so `SpecialFormType::Literal.instance_fallback(db, env)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing._SpecialForm> })`.
     pub(super) fn instance_fallback<'db>(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        self.class().to_instance(db, env)
+        self.class(db, env).to_instance(db, env)
     }
 
     /// Return `true` if this special form is guaranteed to be a singleton at runtime.
@@ -245,7 +248,7 @@ impl SpecialFormType {
         env: &ProgramEnvironment<'_>,
         class: ClassType,
     ) -> bool {
-        self.class().is_subclass_of(db, env, class)
+        self.class(db, env).is_subclass_of(db, env, class)
     }
 
     pub(super) fn try_from_file_and_name(
@@ -500,8 +503,8 @@ impl SpecialFormType {
 
     /// Return `true` if `module` is a module from which this `SpecialFormType` variant can validly originate.
     ///
-    /// Most variants can only exist in one module, which is the same as `self.class().canonical_module(db)`.
-    /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
+    /// Some variants are defined in only one module; others can be defined in either
+    /// `typing` or `typing_extensions`.
     const fn check_module(self, module: KnownModule) -> bool {
         match self {
             Self::TypeQualifier(qualifier) => qualifier.check_module(module),
@@ -560,7 +563,7 @@ impl SpecialFormType {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        self.class().to_class_literal(db, env)
+        self.class(db, env).to_class_literal(db, env)
     }
 
     /// Return true if this special form is callable at runtime.

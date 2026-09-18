@@ -10,6 +10,11 @@
 # unsound-yield = "warn"
 # unsupported-dynamic-base = "warn"
 # division-by-zero = "warn"
+# dynamic-function-decorator-return = "warn"
+# unsound-assignment = "warn"
+# redundant-condition-strict = "warn"
+# disjoint-cast = "warn"
+# missing-direct-dependency = "warn"
 #
 # [tool.uv]
 # no-build = true
@@ -632,6 +637,8 @@ def collect_diagnostic_entries(test_cases: list[TestCase]) -> list[DiagnosticEnt
                         title=Change.CHANGED.into_title(), test_case=tc, source=None
                     )
                 )
+            else:
+                assert_never(change)
         else:
             if change == Change.ADDED:
                 new_class = tc.classify(Source.NEW)
@@ -679,6 +686,8 @@ def collect_diagnostic_entries(test_cases: list[TestCase]) -> list[DiagnosticEnt
                             source=Source.NEW,
                         )
                     )
+            else:
+                assert_never(change)
 
     entries.sort(
         key=lambda e: (TITLE_PRIORITY.get(e.title, 99), e.title, e.test_case.key)
@@ -743,11 +752,16 @@ def render_test_cases(
     return "\n".join(lines)
 
 
-def collect_file_stats(test_cases: list[TestCase]) -> list[FileStats]:
-    """Compute per-file statistics from grouped test cases."""
-    path_to_cases: dict[Path, list[TestCase]] = {}
+def collect_file_stats(
+    test_cases: list[TestCase], test_files: Sequence[Path]
+) -> list[FileStats]:
+    # `test_cases` only contain files where `ty` generates a diagnostic
+    # We expand this with the full set of `test_files` to ensure we don't undercount
+    path_to_cases: dict[Path, list[TestCase]] = {
+        path.resolve(): [] for path in test_files
+    }
     for tc in test_cases:
-        path_to_cases.setdefault(tc.path, []).append(tc)
+        path_to_cases[tc.path].append(tc)
     return [
         FileStats(
             path=path,
@@ -1105,7 +1119,7 @@ def main():
         expected=expected,
     )
 
-    file_stats = collect_file_stats(grouped)
+    file_stats = collect_file_stats(grouped, test_files)
 
     rendered = "\n\n".join(
         filter(

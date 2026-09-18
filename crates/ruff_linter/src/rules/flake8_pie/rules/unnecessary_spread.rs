@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextLen, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -34,7 +35,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [PIE811]: https://docs.astral.sh/ruff/rules/unnecessary-literal-unpacking/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.231")]
+#[violation_metadata(stable_since = "v0.0.231", category = Category::Complexity)]
 pub(crate) struct UnnecessarySpread;
 
 impl Violation for UnnecessarySpread {

@@ -12,6 +12,11 @@
 # unsound-yield = "warn"
 # unsupported-dynamic-base = "warn"
 # division-by-zero = "warn"
+# dynamic-function-decorator-return = "warn"
+# unsound-assignment = "warn"
+# redundant-condition-strict = "warn"
+# disjoint-cast = "warn"
+# missing-direct-dependency = "warn"
 #
 # [tool.uv]
 # no-build = true
@@ -161,7 +166,7 @@ def main() -> None:
         install_cmd = project.install_cmd.format(install=install_base)
         print(f"Running install command: {install_cmd}")
         # Primer install commands are trusted project metadata and may use shell syntax.
-        subprocess.run(install_cmd, cwd=target_dir, shell=True, check=True)  # noqa: S602
+        subprocess.run(install_cmd, cwd=target_dir, shell=True, check=True)  # ruff: ignore[subprocess-popen-with-shell-equals-true]
 
     # Install listed dependencies (matching primer's setup())
     if project.deps:

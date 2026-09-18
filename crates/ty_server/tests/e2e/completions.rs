@@ -15,7 +15,7 @@ walktr
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default())
+        .with_initialization_options(&ClientOptions::default())
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -64,7 +64,7 @@ walktr
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default().with_auto_import(false))
+        .with_initialization_options(&ClientOptions::default().with_auto_import(false))
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -90,7 +90,7 @@ complete_parenth
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default())
+        .with_initialization_options(&ClientOptions::default())
         .enable_completion_snippets(true)
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
@@ -126,7 +126,7 @@ complete_parenth
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_complete_function_parentheses(true),
+            &ClientOptions::default().with_complete_function_parentheses(true),
         )
         .enable_completion_snippets(true)
         .with_trigger_parameter_hints_command()
@@ -173,7 +173,7 @@ complete_parenth
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_complete_function_parentheses(true),
+            &ClientOptions::default().with_complete_function_parentheses(true),
         )
         .enable_completion_snippets(true)
         .with_workspace(workspace_root, None)?
@@ -212,7 +212,7 @@ complete_parenth
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_complete_function_parentheses(true),
+            &ClientOptions::default().with_complete_function_parentheses(true),
         )
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
@@ -249,7 +249,7 @@ is_typedd
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_complete_function_parentheses(true),
+            &ClientOptions::default().with_complete_function_parentheses(true),
         )
         .enable_completion_snippets(true)
         .with_trigger_parameter_hints_command()
@@ -321,7 +321,7 @@ TypedDi<CURSOR>
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default())
+        .with_initialization_options(&ClientOptions::default())
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -489,7 +489,7 @@ TypedDi<CURSOR>
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default())
+        .with_initialization_options(&ClientOptions::default())
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -687,7 +687,7 @@ re.match('', '', fla<CURSOR>
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default().with_auto_import(false))
+        .with_initialization_options(&ClientOptions::default().with_auto_import(false))
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -757,7 +757,7 @@ x: Literal[\"apple\"] = \"app\"
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default().with_auto_import(false))
+        .with_initialization_options(&ClientOptions::default().with_auto_import(false))
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -800,7 +800,7 @@ take({\"\"})
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default().with_auto_import(false))
+        .with_initialization_options(&ClientOptions::default().with_auto_import(false))
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()

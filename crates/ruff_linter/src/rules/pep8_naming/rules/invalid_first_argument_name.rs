@@ -10,6 +10,7 @@ use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::{Checker, DiagnosticGuard};
+use crate::codes::Category;
 use crate::registry::Rule;
 use crate::renamer::{Renamer, ShadowedKind};
 use crate::{Fix, Violation};
@@ -59,7 +60,7 @@ use crate::{Fix, Violation};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.77")]
+#[violation_metadata(stable_since = "v0.0.77", category = Category::Pedantic)]
 pub(crate) struct InvalidFirstArgumentNameForMethod {
     argument_name: String,
 }
@@ -130,7 +131,7 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 /// [PLW0211]: https://docs.astral.sh/ruff/rules/bad-staticmethod-argument/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.77")]
+#[violation_metadata(stable_since = "v0.0.77", category = Category::Pedantic)]
 pub(crate) struct InvalidFirstArgumentNameForClassMethod {
     argument_name: String,
     // Whether the method is `__new__`

@@ -12,6 +12,11 @@
 # unsound-yield = "warn"
 # unsupported-dynamic-base = "warn"
 # division-by-zero = "warn"
+# dynamic-function-decorator-return = "warn"
+# unsound-assignment = "warn"
+# redundant-condition-strict = "warn"
+# disjoint-cast = "warn"
+# missing-direct-dependency = "warn"
 #
 # [tool.uv]
 # no-build = true
@@ -88,7 +93,7 @@ mod tests {
         Ok(())
     }
 }
-"""  # noqa: UP031  # Using an f-string here is ugly as all the curly parens need to be escaped
+"""  # ruff: ignore[printf-string-formatting]  # Using an f-string here is ugly as all the curly parens need to be escaped
             % dir_name(plugin),
         )
 

@@ -5,6 +5,7 @@ use ruff_text_size::{Ranged, TextRange};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -45,7 +46,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `@functools.cache`](https://docs.python.org/3/library/functools.html#functools.cache)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.225")]
+#[violation_metadata(stable_since = "v0.0.225", category = Category::Style)]
 pub(crate) struct LRUCacheWithMaxsizeNone;
 
 impl AlwaysFixableViolation for LRUCacheWithMaxsizeNone {

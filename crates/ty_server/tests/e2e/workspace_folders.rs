@@ -11,7 +11,7 @@ use crate::{
     TestServer, TestServerBuilder,
     pull_diagnostics::{
         assert_workspace_diagnostics_suspends_for_long_polling, send_workspace_diagnostic_request,
-        shutdown_and_await_workspace_diagnostic,
+        shutdown_and_await_workspace_diagnostic, sort_workspace_diagnostic_response,
     },
 };
 
@@ -42,7 +42,7 @@ fn initialize_multiple_workspace_folders() -> Result<()> {
     let root2 = SystemPath::new("root2");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_file(root1.join("main.py"), "does_not_exist()")?
         .with_file(root2.join("main.py"), "does_not_exist()")?
@@ -72,7 +72,7 @@ fn add_workspace_folder_after_init() -> Result<()> {
     let root2 = SystemPath::new("root2");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_file(root1.join("main.py"), "does_not_exist()")?
         .with_file(root2.join("main.py"), "does_not_exist()")?
@@ -115,7 +115,7 @@ fn add_multiple_workspace_folders() -> Result<()> {
     let root3 = SystemPath::new("root3");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_file(root1.join("main.py"), "does_not_exist()")?
         .with_file(root2.join("main.py"), "does_not_exist()")?
@@ -162,7 +162,7 @@ fn remove_workspace_folder_after_init() -> Result<()> {
     let root2 = SystemPath::new("root2");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_file(root1.join("main.py"), "does_not_exist()")?
         .with_file(root2.join("main.py"), "does_not_exist()")?
@@ -210,7 +210,7 @@ fn remove_multiple_workspace_folders() -> Result<()> {
     let root3 = SystemPath::new("root3");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_file(root1.join("main.py"), "does_not_exist()")?
         .with_file(root2.join("main.py"), "does_not_exist()")?
@@ -266,7 +266,7 @@ fn remove_workspace_folder_with_open_document() -> Result<()> {
     let main2_content = "does_not_exist2()";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default())
+        .with_initialization_options(&ClientOptions::default())
         .with_file(&main1, main1_content)?
         .with_file(&main2, main1_content)?
         .with_workspace(root1, None)?
@@ -313,7 +313,7 @@ fn add_and_remove_workspace_folders() -> Result<()> {
     let root3 = SystemPath::new("root3");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_file(root1.join("main.py"), "does_not_exist()")?
         .with_file(root2.join("main.py"), "does_not_exist()")?
@@ -361,7 +361,7 @@ fn add_existing_workspace_folder_is_no_op() -> Result<()> {
     let root1 = SystemPath::new("root1");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_file(root1.join("main.py"), "does_not_exist()")?
         .with_workspace(root1, None)?
@@ -396,7 +396,7 @@ fn remove_only_workspace() -> Result<()> {
     let root1 = SystemPath::new("root1");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_file(root1.join("main.py"), "does_not_exist()")?
         .with_workspace(root1, None)?
@@ -424,7 +424,7 @@ fn different_settings() -> Result<()> {
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_file(&main1, main_content)?
         .with_file(&main2, main_content)?
@@ -585,7 +585,7 @@ fn global_settings_precedence() -> Result<()> {
     // which causes it to take precedence and apply even to root1.
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default())
+        .with_initialization_options(&ClientOptions::default())
         .with_file(&main1, main_content)?
         .with_file(&main2, main_content)?
         .with_workspace(root1, None)?
@@ -621,7 +621,7 @@ fn global_settings_precedence() -> Result<()> {
     // winning out, and we get syntax error diagnostics.
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default())
+        .with_initialization_options(&ClientOptions::default())
         .with_file(&main1, main_content)?
         .with_file(&main2, main_content)?
         .with_workspace(
@@ -670,7 +670,7 @@ fn global_settings_change() -> Result<()> {
     // we get syntax error diagnostics.
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default())
+        .with_initialization_options(&ClientOptions::default())
         .with_file(&main1, main_content)?
         .with_file(&main2, main_content)?
         .with_workspace(root1, None)?
@@ -723,7 +723,10 @@ fn global_settings_change() -> Result<()> {
 /// LSP is correctly recognizing and reporting diagnostics for each
 /// workspace folder. This isn't really meant to test the diagnostics
 /// themselves, hence the condensed output.
-fn condensed_workspace_diagnostic_snapshot(report: WorkspaceDiagnosticReport) -> String {
+pub(crate) fn condensed_workspace_diagnostic_snapshot(
+    mut report: WorkspaceDiagnosticReport,
+) -> String {
+    sort_workspace_diagnostic_response(&mut report);
     let items = report.items;
     items
         .into_iter()

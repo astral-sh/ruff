@@ -12,7 +12,7 @@
     "dev:build": "npm run dev:build --workspace ty-playground && npm run dev:build --workspace ruff-playground",
     "fmt": "prettier --cache -w .",
     "fmt:check": "prettier --cache --check .",
-    "lint": "eslint --cache --ext .ts,.tsx ruff/src ty/src",
+    "lint": "oxlint ruff/src ty/src",
     "tsc": "tsc"
   },
   "workspaces": [
@@ -24,20 +24,15 @@
     "trailingComma": "all"
   },
   "devDependencies": {
-    "@eslint/js": "^9.21.0",
     "@tailwindcss/vite": "^4.2.2",
     "@types/react": "^19.0.11",
     "@types/react-dom": "^19.0.0",
     "@typescript/native": "npm:typescript@^7.0.2",
     "@vitejs/plugin-react": "^6.0.3",
-    "eslint": "^9.22.0",
-    "eslint-plugin-import": "^2.31.0",
-    "eslint-plugin-react": "^7.31.11",
-    "eslint-plugin-react-hooks": "^7.0.0",
+    "oxlint": "^1.79.0",
     "prettier": "^3.5.3",
     "tailwindcss": "^4.0.14",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "typescript-eslint": "^8.26.1",
     "vite": "^8.0.0",
     "wasm-pack": "^0.15.0"
   }

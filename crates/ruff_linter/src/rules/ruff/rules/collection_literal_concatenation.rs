@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Expr, ExprContext, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -49,7 +50,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [PIE811]: https://docs.astral.sh/ruff/rules/unnecessary-literal-unpacking/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.227")]
+#[violation_metadata(stable_since = "v0.0.227", category = Category::Pedantic)]
 pub(crate) struct CollectionLiteralConcatenation {
     expression: SourceCodeSnippet,
 }

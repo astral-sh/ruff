@@ -16,7 +16,7 @@ use ruff_db::diagnostic::{
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_macros::{Combine, OptionsMetadata, RustDoc};
-use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
+use ruff_options_metadata::{OptionSet, OptionSetKind, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use ruff_text_size::TextRange;
@@ -497,7 +497,7 @@ impl Options {
                 output_format: terminal.output_format,
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
             });
-        let src = strategy.fallback(src, |_| SrcSettings::default())?;
+        let src = strategy.fallback(src, |_| SrcSettings::default(context.configuration_root()))?;
 
         let mut analysis_diagnostics = Vec::new();
         let analysis = self
@@ -600,19 +600,24 @@ impl<'a> OptionsContext<'a> {
 fn python_version_from_config(
     ranged_version: &RangedValue<SupportedPythonVersion>,
 ) -> PythonVersionWithSource {
+    let source = match ranged_version.source() {
+        ValueSource::Cli => PythonVersionSource::Cli,
+        ValueSource::File(path) => PythonVersionSource::ConfigFile(PythonVersionFileSource::new(
+            path.clone(),
+            ranged_version.range(),
+        )),
+        ValueSource::ScriptMetadata(file) => PythonVersionSource::ScriptMetadata(
+            Span::from(*file).with_optional_range(ranged_version.range()),
+        ),
+        ValueSource::Editor => PythonVersionSource::Editor,
+        ValueSource::UvMetadata => {
+            unreachable!("uv metadata does not provide a configured Python version")
+        }
+    };
+
     PythonVersionWithSource {
         version: PythonVersion::from(**ranged_version),
-        source: match ranged_version.source() {
-            ValueSource::Cli => PythonVersionSource::Cli,
-            ValueSource::File(path) => PythonVersionSource::ConfigFile(
-                PythonVersionFileSource::new(path.clone(), ranged_version.range()),
-            ),
-            ValueSource::ScriptMetadata(file) => PythonVersionSource::ScriptMetadata(
-                Span::from(*file).with_optional_range(ranged_version.range()),
-            ),
-            ValueSource::Editor => PythonVersionSource::Editor,
-            ValueSource::UvMetadata => PythonVersionSource::UvMetadata,
-        },
+        source,
     }
 }
 
@@ -740,10 +745,6 @@ fn unsupported_inferred_python_version_diagnostic(
         PythonVersionSource::Editor => diagnostic.sub(SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             "The version was inferred from your editor.",
-        )),
-        PythonVersionSource::UvMetadata => diagnostic.sub(SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            "The version was provided by uv metadata.",
         )),
         PythonVersionSource::Default => diagnostic.sub(SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
@@ -1338,9 +1339,11 @@ fn build_exclude_filter(
     let system = db.system();
     let mut excludes = ExcludeFilterBuilder::new();
 
+    // Like excludes in a `ty.toml`, default excludes only apply under the project root.
+    // An explicit `../sibling/dist` is not excluded by project defaults.
     for pattern in default_patterns {
         PortableGlobPattern::parse(pattern, PortableGlobKind::Exclude)
-            .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
+            .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(project_root))?))
             .unwrap_or_else(|err| {
                 panic!("Expected default exclude to be valid glob but adding it failed with: {err}")
             });
@@ -1541,7 +1544,7 @@ pub struct TerminalOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
     /// Whether ty should use strict narrowing for unspecialized generic classes in
-    /// `isinstance()` and `issubclass()` checks, as well as `match` class patterns.
+    /// `isinstance()` and `issubclass()` checks, `match` class patterns, and `TypeIs` checks.
     ///
     /// When enabled, ty narrows to the top materialization of the class. For example,
     /// `isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
@@ -1864,6 +1867,12 @@ pub struct OverridesOptions(Vec<RangedValue<OverrideOptions>>);
 impl OptionsMetadata for OverridesOptions {
     fn documentation() -> Option<&'static str> {
         Some(<Self as RustDoc>::rust_doc())
+    }
+
+    fn kind() -> OptionSetKind {
+        OptionSetKind::Array {
+            example: r#"include = ["src"]"#,
+        }
     }
 
     fn record(visit: &mut dyn Visit) {

@@ -1,13 +1,14 @@
 use std::borrow::Cow;
+use std::collections::hash_map::Entry;
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
 use colored::Colorize;
 use itertools::Itertools;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
-use rustc_hash::FxBuildHasher;
+use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, SecondaryCode};
 use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
@@ -57,31 +58,35 @@ impl LinterResult {
 
 #[derive(Debug, Default, PartialEq)]
 struct FixCount {
-    rule_name: &'static str,
+    code: Option<SecondaryCode>,
     count: usize,
 }
 
-/// A mapping from a noqa code to the corresponding lint name and a count of applied fixes.
+/// A mapping from a diagnostic's identifier to its optional noqa code and fix count.
 #[derive(Debug, Default, PartialEq)]
-pub struct FixTable(hashbrown::HashMap<SecondaryCode, FixCount, rustc_hash::FxBuildHasher>);
+pub struct FixTable(FxHashMap<DiagnosticId, FixCount>);
 
 impl FixTable {
     pub fn counts(&self) -> impl Iterator<Item = usize> {
         self.0.values().map(|fc| fc.count)
     }
 
-    pub fn entry<'a>(&'a mut self, code: &'a SecondaryCode) -> FixTableEntry<'a> {
-        FixTableEntry(self.0.entry_ref(code))
+    pub fn entry(&mut self, id: DiagnosticId) -> FixTableEntry<'_> {
+        FixTableEntry(self.0.entry(id))
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&SecondaryCode, &'static str, usize)> {
+    pub fn iter(&self) -> impl Iterator<Item = (DiagnosticId, Option<&SecondaryCode>, usize)> {
         self.0
             .iter()
-            .map(|(code, FixCount { rule_name, count })| (code, *rule_name, *count))
+            .map(|(id, FixCount { code, count })| (*id, code.as_ref(), *count))
     }
 
-    fn keys(&self) -> impl Iterator<Item = &SecondaryCode> {
-        self.0.keys()
+    /// Iterate over secondary codes, falling back to rule names for rules without codes.
+    fn identifiers(&self) -> impl Iterator<Item = &str> {
+        self.0.iter().map(|(id, FixCount { code, .. })| {
+            code.as_ref()
+                .map_or_else(|| id.as_str(), SecondaryCode::as_str)
+        })
     }
 
     pub fn is_empty(&self) -> bool {
@@ -89,16 +94,14 @@ impl FixTable {
     }
 }
 
-pub struct FixTableEntry<'a>(
-    hashbrown::hash_map::EntryRef<'a, 'a, SecondaryCode, SecondaryCode, FixCount, FxBuildHasher>,
-);
+pub struct FixTableEntry<'a>(Entry<'a, DiagnosticId, FixCount>);
 
 impl<'a> FixTableEntry<'a> {
-    pub fn or_default(self, rule_name: &'static str) -> &'a mut usize {
+    pub fn or_default(self, code: Option<&SecondaryCode>) -> &'a mut usize {
         &mut (self
             .0
-            .or_insert(FixCount {
-                rule_name,
+            .or_insert_with(|| FixCount {
+                code: code.cloned(),
                 count: 0,
             })
             .count)
@@ -627,7 +630,12 @@ pub fn lint_fix<'a>(
             // syntax error. Return the original code.
             if has_valid_syntax && has_no_syntax_errors {
                 if let Some(error) = parsed.errors().first() {
-                    report_fix_syntax_error(path, transformed.source_code(), error, fixed.keys());
+                    report_fix_syntax_error(
+                        path,
+                        transformed.source_code(),
+                        error,
+                        fixed.identifiers(),
+                    );
                     return Err(anyhow!("Fix introduced a syntax error"));
                 }
             }
@@ -642,8 +650,8 @@ pub fn lint_fix<'a>(
         {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
-                for (rule, name, count) in applied.iter() {
-                    *fixed.entry(rule).or_default(name) += count;
+                for (id, code, count) in applied.iter() {
+                    *fixed.entry(id).or_default(code) += count;
                 }
 
                 transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
@@ -682,7 +690,7 @@ pub(crate) fn report_failed_to_converge_error(
     transformed: &str,
     diagnostics: &[Diagnostic],
 ) {
-    let codes = collect_rule_codes(diagnostics.iter().filter_map(Diagnostic::secondary_code));
+    let codes = collect_rule_codes(diagnostics.iter().map(Diagnostic::secondary_code_or_id));
     if cfg!(debug_assertions) {
         eprintln!(
             "{}{} Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",
@@ -718,7 +726,7 @@ fn report_fix_syntax_error<'a>(
     path: &Path,
     transformed: &str,
     error: &ParseError,
-    rules: impl IntoIterator<Item = &'a SecondaryCode>,
+    rules: impl IntoIterator<Item = &'a str>,
 ) {
     let codes = collect_rule_codes(rules);
     if cfg!(debug_assertions) {

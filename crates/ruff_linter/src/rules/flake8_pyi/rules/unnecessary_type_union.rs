@@ -7,6 +7,7 @@ use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -32,7 +33,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// Note that while the fix may flatten nested unions into a single top-level union,
 /// the semantics of the annotation will remain unchanged.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.283")]
+#[violation_metadata(stable_since = "v0.0.283", category = Category::Complexity)]
 pub(crate) struct UnnecessaryTypeUnion {
     members: Vec<Name>,
     union_kind: UnionKind,
