@@ -1,19 +1,7 @@
 (() => {
   let restoreFilters = () => {};
-  let layoutObserver;
-  const collator = new Intl.Collator(undefined, { numeric: true });
-
-  if (window.Tablesort) {
-    // Tablesort comparators return descending order.
-    Tablesort.extend(
-      "natural",
-      () => true,
-      (a, b) => collator.compare(b.trim(), a.trim()),
-    );
-  }
 
   document$.subscribe(() => {
-    layoutObserver?.disconnect();
     restoreFilters = () => {};
 
     const form = document.getElementById("rule-filters");
@@ -32,20 +20,17 @@
       table.tHead.querySelector(".rule-category").dataset;
     const body = table.tBodies[0];
 
-    const rows = [...body.rows].map((element) => ({
-      element,
-      name: element.querySelector(".rule-identity code").textContent.trim(),
-      text: [".rule-code", ".rule-identity"]
-        .map((selector) => element.querySelector(selector).textContent)
-        .join(" ")
-        .toLowerCase(),
-      category: element.querySelector(".rule-category").textContent.trim(),
-      linter: element.querySelector(".rule-linter").dataset.linter,
-      status: element.querySelector(".rule-status").dataset.status,
-      fixable: element.querySelector(".rule-status").dataset.fixable === "true",
-      isDefault:
-        element.querySelector(".rule-status").dataset.default === "true",
-    }));
+    const rows = Array.from(body.rows, (element) => {
+      const [code, identity, category, linter, status] = element.cells;
+      return {
+        element,
+        text: `${code.textContent} ${identity.querySelector("code").textContent}`.toLowerCase(),
+        category: category.textContent.trim(),
+        linter: linter.dataset.linter,
+        status: status.dataset.status,
+        fixable: status.dataset.fixable === "true",
+      };
+    });
 
     const linters = new Set(rows.map((row) => row.linter));
     const search = form.elements.namedItem("rule-search");
@@ -163,39 +148,6 @@
       toc.parentElement.classList.add("rule-index-nav");
     }
 
-    if (window.Tablesort) {
-      // Rule cells also contain messages; sort by the name alone.
-      for (const row of rows) {
-        row.element.cells[1].dataset.sort = row.name;
-      }
-      for (const button of table.tHead.querySelectorAll("button")) {
-        button.disabled = false;
-      }
-      new Tablesort(table);
-    }
-
-    const siteHeader = document.querySelector(".md-header");
-    // Keep the sticky filters and column headers below the site header, and leave
-    // enough scroll-margin clearance for linked rows when these heights change.
-    layoutObserver = new ResizeObserver(() => {
-      article.style.setProperty(
-        "--rule-site-header-height",
-        `${siteHeader.offsetHeight}px`,
-      );
-      article.style.setProperty(
-        "--rule-filters-height",
-        `${form.offsetHeight}px`,
-      );
-      article.style.setProperty(
-        "--rule-columns-height",
-        `${table.tHead.offsetHeight}px`,
-      );
-    });
-
-    for (const element of [siteHeader, form, table.tHead]) {
-      layoutObserver.observe(element);
-    }
-
     function filter() {
       for (const filter of filters) {
         filter.updateSummary();
@@ -218,9 +170,7 @@
           selectedLinters.includes(row.linter) &&
           statuses.some(
             (value) =>
-              value === row.status ||
-              (value === "fixable" && row.fixable) ||
-              (value === "default" && row.isDefault),
+              value === row.status || (value === "fixable" && row.fixable),
           ) &&
           terms.every((term) => row.text.includes(term));
 
@@ -281,9 +231,6 @@
           url.searchParams.append(filter.name, value);
         }
       }
-
-      url.searchParams.delete("sort");
-      url.searchParams.delete("dir");
 
       history.replaceState(history.state, "", url);
       updateFragmentLinks();

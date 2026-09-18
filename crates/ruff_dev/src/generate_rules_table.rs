@@ -36,11 +36,11 @@ fn generate_table(
     let default_categories = Category::default_categories().iter().join(" ");
     let _ = writeln!(
         table_out,
-        "| <button type='button' title='Sort by code' disabled>Code</button> {{ scope='col' .rule-code }} \
-         | <button type='button' title='Sort by rule' disabled>Rule</button> {{ scope='col' .rule-identity }} \
-         | <button type='button' title='Sort by category' disabled>Category</button> {{ scope='col' .rule-category data-default-categories='{default_categories}' }} \
-         | <button type='button' title='Sort by linter' disabled>Linter</button> {{ scope='col' .rule-linter }} \
-         | Status {{ scope='col' .rule-status data-sort-method='none' aria-label='Status, fix availability, and default selection' }} |"
+        "| Code {{ scope='col' .rule-code }} \
+         | Rule {{ scope='col' .rule-identity }} \
+         | Category {{ scope='col' .rule-category data-default-categories='{default_categories}' }} \
+         | Linter {{ scope='col' .rule-linter }} \
+         | Status {{ scope='col' .rule-status aria-label='Status, fix availability, and default selection' }} |"
     );
     table_out.push_str("| ---- | ---- | -------- | ------ | -: |");
     table_out.push('\n');
@@ -83,8 +83,7 @@ fn generate_table(
             format!("<span {SYMBOL_STYLE}></span>")
         };
 
-        let default = default_rules.enabled(rule);
-        let default_token = if default {
+        let default_token = if default_rules.enabled(rule) {
             format!(
                 "<span aria-hidden='true' {SYMBOL_STYLE} title='Enabled by default'>{DEFAULT_SYMBOL}</span><span class='sr-only'>Enabled by default</span>"
             )
@@ -173,12 +172,11 @@ fn generate_table(
         #[expect(clippy::or_fun_call)]
         let _ = write!(
             table_out,
-            "| <span class='rule-identity'>{ss}{explanation}<br><span class='rule-message'>{message}</span>{se}</span> \
-             | {ss}{category}{se} {{ .rule-category data-sort='{category_rank}' }} \
+            "| <span class='rule-identity'>{ss}{explanation}<br>{message}{se}</span> \
+             | {ss}{category}{se} {{ .rule-category }} \
              | {ss}{linter_name}{se} {{ {linter_anchor} .rule-linter data-linter='{linter_slug}' }} \
-             | <div {SYMBOLS_CONTAINER}>{status_token}{fix_token}{default_token}</div> {{ .rule-status data-status='{status}' data-fixable='{fixable}' data-default='{default}' }} |",
+             | <div {SYMBOLS_CONTAINER}>{status_token}{fix_token}{default_token}</div> {{ .rule-status data-status='{status}' data-fixable='{fixable}' }} |",
             category = rule.category(),
-            category_rank = rule.category() as usize,
             explanation = rule
                 .explanation()
                 .is_some()
