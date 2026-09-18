@@ -1078,12 +1078,40 @@ def check(wrapper: Wrapper[Wrapper[Callable[[], int]]]):
     callback: Callable[[], int] = wrapper
 ```
 
+Long finite chains also retain their signatures. These aliases describe sixty-five nested wrappers,
+each of which removes one layer before reaching the callable.
+
+```py
+from typing import TypeAlias
+
+Four: TypeAlias = Wrapper[Wrapper[Wrapper[Wrapper[T]]]]
+Sixteen: TypeAlias = Four[Four[Four[Four[T]]]]
+SixtyFour: TypeAlias = Sixteen[Sixteen[Sixteen[Sixteen[T]]]]
+
+def check_long(wrapper: Wrapper[SixtyFour[Callable[[], str]]]):
+    reveal_type(wrapper())  # revealed: str
+    wrapper(1)  # error: [too-many-positional-arguments]
+    callback: Callable[[], str] = wrapper
+```
+
+A property can expose the next callable through its return type. Each access removes one wrapper.
+
+```py
+class PropertyWrapper(Generic[T]):
+    @property
+    def __call__(self) -> T:
+        raise NotImplementedError
+
+def check_property(wrapper: PropertyWrapper[PropertyWrapper[Callable[[], str]]]):
+    reveal_type(wrapper())  # revealed: str
+    callback: Callable[[], str] = wrapper
+```
+
 ## Growing callable specializations
 
 Wrapping a type argument in `list` on every step produces infinitely many specializations without
-ever reaching a signature. We stop expanding after a bounded number of steps and use `Unknown`,
-whether the annotation belongs to a nominal class or a protocol. Exhausting the search does not
-establish that the object is non-callable.
+ever reaching a signature. We detect the growing parameter flow and approximate the unresolved
+callable with `Unknown`. This also applies to protocols and property getters.
 
 ```py
 from typing import Callable, Generic, Protocol, TypeVar
@@ -1098,11 +1126,18 @@ T_co = TypeVar("T_co", covariant=True)
 class GrowingProtocol(Protocol[T_co]):
     __call__: "GrowingProtocol[list[T_co]]"
 
-def check(c: Growing[int], p: GrowingProtocol[int]):
+class GrowingProperty(Generic[T]):
+    @property
+    def __call__(self) -> "GrowingProperty[list[T]]":
+        raise NotImplementedError
+
+def check(c: Growing[int], p: GrowingProtocol[int], prop: GrowingProperty[int]):
     reveal_type(c())  # revealed: Unknown
     reveal_type(p())  # revealed: Unknown
+    reveal_type(prop())  # revealed: Unknown
     f: Callable[[], int] = c
     g: Callable[[], int] = p
+    h: Callable[[], int] = prop
 ```
 
 Growth can also pass through another class's type parameter before returning to the original class.
@@ -1172,7 +1207,7 @@ T = TypeVar("T")
 
 class Descriptor(Generic[T]):
     @overload
-    def __get__(self, obj: "C[list[list[int]]]", owner: object) -> Callable[[], str]: ...
+    def __get__(self, obj: "C[list[list[int]]]", owner: object) -> Callable[[int], str]: ...
     @overload
     def __get__(self, obj: "C[T]", owner: object) -> "C[list[T]]": ...
     def __get__(self, obj: object, owner: object) -> object:
@@ -1182,8 +1217,10 @@ class C(Generic[T]):
     __call__: Descriptor[T]
 
 def check(c: C[int]):
-    reveal_type(c())  # revealed: str
-    callback: Callable[[], str] = c
+    reveal_type(c(1))  # revealed: str
+    c("wrong")  # error: [invalid-argument-type]
+    c()  # error: [missing-argument]
+    callback: Callable[[int], str] = c
 ```
 
 ## Callable descriptors exposed by type arguments
@@ -1211,14 +1248,15 @@ class C(Generic[T]):
 
 def check(c: C[int]):
     reveal_type(c())  # revealed: str
+    c(1)  # error: [too-many-positional-arguments]
     callback: Callable[[], str] = c
 ```
 
 ## Unbounded callable descriptor expansion
 
 Custom descriptor expansion can also keep growing without reaching a signature. We stop exploring
-these chains after a bounded number of steps and use `Unknown`: exhausting the search does not
-establish that the object is non-callable.
+these chains when their parameter flow repeats and use `Unknown` when no independent signature can
+be recovered.
 
 ```py
 from typing import Callable, Generic, TypeVar
@@ -1235,4 +1273,30 @@ class C(Generic[T]):
 def check(c: C[int]):
     reveal_type(c())  # revealed: Unknown
     callback: Callable[[], str] = c
+```
+
+## Callable signatures that depend on growing type arguments
+
+A growing descriptor chain can reach signatures whose parameters and return types depend on the
+expanding type argument. We approximate these dependent types with `Unknown` instead of exposing an
+unspecialized type variable from the declaration.
+
+```py
+from typing import Callable, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    @overload
+    def __get__(self, obj: "C[list[list[int]]]", owner: object) -> Callable[[T], T]: ...
+    @overload
+    def __get__(self, obj: "C[T]", owner: object) -> "C[list[T]]": ...
+    def __get__(self, obj: object, owner: object) -> object:
+        raise NotImplementedError
+
+class C(Generic[T]):
+    __call__: Descriptor[T]
+
+def check(c: C[int], value: object):
+    reveal_type(c(value))  # revealed: Unknown
 ```

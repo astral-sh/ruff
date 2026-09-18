@@ -6948,9 +6948,17 @@ impl<'db> Type<'db> {
                         // A recursive `__call__` annotation can keep expanding without reaching
                         // a signature, even if its specialization changes at each step.
                         let mut bindings = recursion_guard.instances.visit(
+                            db,
+                            env,
                             self,
                             || CallableBinding::not_callable(self).into(),
-                            || Binding::single(self, Signature::unknown()).into(),
+                            |callable| {
+                                CallableBinding::from_overloads(
+                                    self,
+                                    callable.signatures(db).iter().cloned(),
+                                )
+                                .into()
+                            },
                             || dunder_callable.bindings_impl(db, env, recursion_guard),
                         );
                         bindings.replace_callable_type(dunder_callable, self);

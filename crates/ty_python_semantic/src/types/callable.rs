@@ -243,9 +243,11 @@ impl<'db> Type<'db> {
                     context
                         .active_instances
                         .visit(
+                            db,
+                            env,
                             self,
                             || None,
-                            || Some(CallableTypes::one(CallableType::unknown(db))),
+                            |callable| Some(CallableTypes::one(callable)),
                             || {
                                 place.ty.try_upcast_to_callable_with_policy_and_context(
                                     db, env, policy, context,
