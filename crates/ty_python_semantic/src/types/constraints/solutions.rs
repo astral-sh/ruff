@@ -9,9 +9,10 @@ use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{Constraint, ConstraintProvenance};
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, CandidateTypeVarSolution,
-    ConstraintAssignment, ConstraintId, ConstraintSetStorage, NodeId, PathBoundBuilder,
-    SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
+    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions,
+    CandidateTypeVarRangeSolutionBuilder, CandidateTypeVarSolution, ConstraintAssignment,
+    ConstraintId, ConstraintSetStorage, NodeId, SolutionLimits, SolutionValidity,
+    SolutionViolation, SolutionViolationKind,
 };
 use crate::types::typevar::TypeVarBoundOrConstraints;
 use crate::types::{BoundTypeVarInstance, Type};
@@ -336,8 +337,10 @@ impl<'db> SolutionWalker<'db> {
             .collect();
 
         // Then collect the combined lower and upper bounds for each typevar.
-        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, PathBoundBuilder<'db>> =
-            FxIndexMap::default();
+        let mut mappings: FxIndexMap<
+            BoundTypeVarInstance<'db>,
+            CandidateTypeVarRangeSolutionBuilder<'db>,
+        > = FxIndexMap::default();
 
         for (constraint, _) in typevars {
             let constraint = storage.constraint_data(constraint);
