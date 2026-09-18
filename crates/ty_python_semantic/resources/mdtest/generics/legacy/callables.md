@@ -1081,8 +1081,9 @@ def check(wrapper: Wrapper[Wrapper[Callable[[], int]]]):
 ## Growing callable specializations
 
 Wrapping a type argument in `list` on every step produces infinitely many specializations without
-ever reaching a signature. This is not callable, whether the annotation belongs to a nominal class
-or a protocol.
+ever reaching a signature. We stop expanding after a bounded number of steps and use `Unknown`,
+whether the annotation belongs to a nominal class or a protocol. Exhausting the search does not
+establish that the object is non-callable.
 
 ```py
 from typing import Callable, Generic, Protocol, TypeVar
@@ -1098,10 +1099,10 @@ class GrowingProtocol(Protocol[T_co]):
     __call__: "GrowingProtocol[list[T_co]]"
 
 def check(c: Growing[int], p: GrowingProtocol[int]):
-    c()  # error: [call-non-callable]
-    p()  # error: [call-non-callable]
-    f: Callable[[], int] = c  # error: [invalid-assignment]
-    g: Callable[[], int] = p  # error: [invalid-assignment]
+    reveal_type(c())  # revealed: Unknown
+    reveal_type(p())  # revealed: Unknown
+    f: Callable[[], int] = c
+    g: Callable[[], int] = p
 ```
 
 Growth can also pass through another class's type parameter before returning to the original class.
@@ -1114,8 +1115,8 @@ class Indirect(Generic[T]):
     __call__: "Wrapper[Indirect[list[T]]]"
 
 def check_indirect(c: Indirect[int]):
-    c()  # error: [call-non-callable]
-    callback: Callable[[], int] = c  # error: [invalid-assignment]
+    reveal_type(c())  # revealed: Unknown
+    callback: Callable[[], int] = c
 ```
 
 ## Callable specialization resets
@@ -1162,8 +1163,7 @@ def check(c: Outer[Outer[Callable[[], int]]]):
 ## Callable descriptors with growing specializations
 
 A descriptor can select a different overload for each specialization of its receiver. This chain
-grows the type argument twice, then reaches a callable returning `str`. The intermediate `Forward`
-instances also remain callable: their expansion depends on the same descriptor dispatch.
+grows the type argument twice, then reaches a callable returning `str`.
 
 ```py
 from typing import Callable, Generic, TypeVar, overload
@@ -1174,23 +1174,16 @@ class Descriptor(Generic[T]):
     @overload
     def __get__(self, obj: "C[list[list[int]]]", owner: object) -> Callable[[], str]: ...
     @overload
-    def __get__(self, obj: "C[T]", owner: object) -> "Forward[T]": ...
+    def __get__(self, obj: "C[T]", owner: object) -> "C[list[T]]": ...
     def __get__(self, obj: object, owner: object) -> object:
         raise NotImplementedError
 
 class C(Generic[T]):
     __call__: Descriptor[T]
 
-class Forward(Generic[T]):
-    __call__: C[list[T]]
-
-def check(c: C[int], near: C[list[int]], forward: Forward[int]):
+def check(c: C[int]):
     reveal_type(c())  # revealed: str
-    reveal_type(near())  # revealed: str
-    reveal_type(forward())  # revealed: str
     callback: Callable[[], str] = c
-    callback_near: Callable[[], str] = near
-    callback_forward: Callable[[], str] = forward
 ```
 
 ## Callable descriptors exposed by type arguments

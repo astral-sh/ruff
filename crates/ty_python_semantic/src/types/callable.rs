@@ -243,8 +243,6 @@ impl<'db> Type<'db> {
                     context
                         .active_instances
                         .visit(
-                            db,
-                            env,
                             self,
                             || None,
                             || Some(CallableTypes::one(CallableType::unknown(db))),
