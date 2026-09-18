@@ -507,26 +507,13 @@ impl Session {
     pub(crate) fn project_state_mut(&mut self, path: &AnySystemPath) -> &mut ProjectState {
         match path {
             AnySystemPath::System(system_path) => {
-                let range = ..=system_path.to_path_buf();
-
-                // Using `range` here to work around a borrow checker limitation
-                // where it can't prove that the `range_mut` call and the `self.projects.values_mut`
-                // never borrow `self.projects` mutably at the same time.
-                // https://rust-lang.github.io/rfcs/2094-nll.html#problem-case-3-conditional-control-flow-across-functions
-                if self
-                    .projects
-                    .range(range.clone())
-                    .any(|(workspace_root, _)| system_path.starts_with(workspace_root))
-                {
-                    return self
+                match self.project_root_for_path(system_path).cloned() {
+                    Some(root) => self
                         .projects
-                        .range_mut(range)
-                        .rfind(|(workspace_root, _)| system_path.starts_with(workspace_root))
-                        .unwrap()
-                        .1;
+                        .get_mut(&root)
+                        .expect("selected project exists"),
+                    None => self.project_state_virtual_fallback_mut(),
                 }
-
-                self.project_state_virtual_fallback_mut()
             }
             AnySystemPath::SystemVirtual(_virtual_path) => {
                 self.project_state_virtual_fallback_mut()
@@ -537,11 +524,16 @@ impl Session {
     /// Returns a reference to the project's [`ProjectState`] corresponding to the given path, if
     /// any.
     fn project_state_for_path(&self, path: impl AsRef<SystemPath>) -> Option<&ProjectState> {
-        let path = path.as_ref();
+        self.project_root_for_path(path.as_ref())
+            .and_then(|root| self.projects.get(root))
+    }
+
+    /// Returns the workspace root of the closest containing project.
+    fn project_root_for_path(&self, path: &SystemPath) -> Option<&SystemPathBuf> {
         self.projects
             .range(..=path.to_path_buf())
             .rfind(|(workspace_root, _)| path.starts_with(workspace_root))
-            .map(|(_, project)| project)
+            .map(|(root, _)| root)
     }
 
     // TODO: While ty supports multiple workspace folders, we still
@@ -1232,16 +1224,21 @@ impl Session {
         &self,
         path: &AnySystemPath,
     ) -> Option<Arc<WorkspaceSettings>> {
-        // Virtual documents use the same "owner" heuristic as `project_state`.
-        match path {
+        let settings = match path {
             AnySystemPath::System(system_path) => self.workspaces.settings_for_path(system_path),
-            AnySystemPath::SystemVirtual(_) => {
-                let project = self.project_state(path);
-                self.workspaces
-                    .settings_for_path(project.db.project().root(&project.db))
-                    .or_else(|| self.workspaces.settings_virtual_fallback())
-            }
-        }
+            AnySystemPath::SystemVirtual(_) => None,
+        };
+        settings.or_else(|| {
+            let workspace_root = path
+                .as_system()
+                .and_then(|path| self.project_root_for_path(path))
+                .or_else(|| self.projects.keys().next())?;
+            // Look up settings using the editor's workspace folder.
+            // Configuration discovery can place the project root above that folder.
+            self.workspaces
+                .settings_for_path(workspace_root)
+                .or_else(|| self.workspaces.settings_virtual_fallback())
+        })
     }
 
     /// Creates a snapshot of the current state of the [`Session`].
