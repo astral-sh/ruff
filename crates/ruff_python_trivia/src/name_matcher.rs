@@ -103,9 +103,11 @@ mod tests {
     #[test]
     fn normalized_unicode_uses_literal_spelling() {
         let matcher = NameMatcher::new("C");
-        for source in ["# note — a comment", "# café", "# 中文", "# שלום", "# 🦀"] {
-            assert!(!matcher.may_match(source), "{source}");
-        }
+        assert!(!matcher.may_match("# note — a comment"));
+        assert!(!matcher.may_match("# café"));
+        assert!(!matcher.may_match("# 中文"));
+        assert!(!matcher.may_match("# שלום"));
+        assert!(!matcher.may_match("# 🦀"));
         assert!(matcher.may_match("# café\nC = 1"));
         assert!(NameMatcher::new("café").may_match("café = 1"));
     }
