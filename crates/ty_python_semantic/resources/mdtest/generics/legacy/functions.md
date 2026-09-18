@@ -2026,6 +2026,84 @@ def fixed_cycle(
 reveal_type(fixed_cycle(identity, identity, identity, identity))
 ```
 
+## Recursive callback solutions with intersections
+
+A recursive tuple contains either a string or another such tuple, excluding integers from its child
+values. A second callback infers a list of these tuples. Both results retain the recursive type, and
+indexing them preserves the child's restriction.
+
+```py
+from typing import Callable, TypeVar
+from ty_extensions import Intersection, Not
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+def fixed(
+    callback: Callable[[T], tuple[Intersection[T, Not[int]] | str]],
+    collect: Callable[[U], list[T]],
+) -> tuple[T, U]:
+    raise NotImplementedError
+
+def identity(value: V) -> V:
+    return value
+
+root, copies = fixed(identity, identity)
+reveal_type(root)  # revealed: μ$0. tuple[($0 & ~int) | str]
+reveal_type(copies)  # revealed: list[μ$0. tuple[($0 & ~int) | str]]
+reveal_type(root[0])  # revealed: ((μ$0. tuple[($0 & ~int) | str]) & ~int) | str
+reveal_type(copies[0])  # revealed: μ$0. tuple[($0 & ~int) | str]
+wrong: str = root  # error: [invalid-assignment]
+```
+
+## Recursive callback solutions with negation
+
+A callback can also exclude its recursive input type from the tuple's element. Indexing the result
+retains that negation.
+
+```py
+from typing import Callable, TypeVar
+from ty_extensions import Not
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def fixed(callback: Callable[[T], tuple[Not[T]]]) -> T:
+    raise NotImplementedError
+
+def identity(value: U) -> U:
+    return value
+
+root = fixed(identity)
+reveal_type(root)  # revealed: μ$0. tuple[~$0]
+reveal_type(root[0])  # revealed: ~(μ$0. tuple[~$0])
+```
+
+## Recursive callback solutions with dynamic elements
+
+An unrelated `Any` element remains dynamic when a recursive child is restricted by an intersection.
+Both elements can be accessed without expanding the recursive type indefinitely.
+
+```py
+from typing import Any, Callable, TypeVar
+from ty_extensions import Intersection, Not
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def fixed(callback: Callable[[T], tuple[Intersection[T, Not[int]], Any]]) -> T:
+    raise NotImplementedError
+
+def identity(value: U) -> U:
+    return value
+
+root = fixed(identity)
+reveal_type(root)  # revealed: μ$0. tuple[$0 & ~int, Any]
+reveal_type(root[0])  # revealed: (μ$0. tuple[$0 & ~int, Any]) & ~int
+reveal_type(root[1])  # revealed: Any
+```
+
 ## Recursive callback solutions through implicit aliases
 
 The callback's return type contains an implicit recursive alias whose argument refers to the
