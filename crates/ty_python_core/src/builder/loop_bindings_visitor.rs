@@ -1,4 +1,5 @@
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
 
 use crate::place::PlaceExpr;
@@ -10,16 +11,28 @@ use crate::symbol::Symbol;
 /// pre-walk so that we can synthesize "loop header definitions" that are visible to the loop body
 /// (and condition). See `LoopHeader`.
 /// TODO: Handle `nonlocal` bindings from nested scopes somehow.
-pub(crate) fn collect_while_loop_bindings(while_stmt: &ast::StmtWhile) -> Vec<PlaceExpr> {
-    let mut collector = LoopBindingsVisitor::default();
+pub(crate) fn collect_while_loop_bindings(
+    while_stmt: &ast::StmtWhile,
+    implicit_submodule: impl Fn(&ast::StmtImportFrom) -> Option<Name>,
+) -> Vec<PlaceExpr> {
+    let mut collector = LoopBindingsVisitor {
+        bound_places: Vec::new(),
+        implicit_submodule,
+    };
     collector.visit_expr(&while_stmt.test);
     collector.visit_body(&while_stmt.body);
     collector.bound_places
 }
 
 /// Like `collect_while_loop_bindings` above, but for `for` loops.
-pub(crate) fn collect_for_loop_bindings(for_stmt: &ast::StmtFor) -> Vec<PlaceExpr> {
-    let mut collector = LoopBindingsVisitor::default();
+pub(crate) fn collect_for_loop_bindings(
+    for_stmt: &ast::StmtFor,
+    implicit_submodule: impl Fn(&ast::StmtImportFrom) -> Option<Name>,
+) -> Vec<PlaceExpr> {
+    let mut collector = LoopBindingsVisitor {
+        bound_places: Vec::new(),
+        implicit_submodule,
+    };
     collector.add_place_from_target(&for_stmt.target);
     collector.visit_body(&for_stmt.body);
     collector.bound_places
@@ -28,12 +41,13 @@ pub(crate) fn collect_for_loop_bindings(for_stmt: &ast::StmtFor) -> Vec<PlaceExp
 /// The visitor that powers `collect_while_loop_bindings` and `collect_for_loop_bindings`.
 ///
 /// This visitor doesn't walk nested function/class definitions since those are different scopes.
-#[derive(Debug, Default)]
-pub(crate) struct LoopBindingsVisitor {
+struct LoopBindingsVisitor<F> {
     bound_places: Vec<PlaceExpr>,
+    /// The package initializer can bind a submodule name in addition to the imported aliases.
+    implicit_submodule: F,
 }
 
-impl LoopBindingsVisitor {
+impl<F> LoopBindingsVisitor<F> {
     fn add_place_from_target(&mut self, target: &ast::Expr) {
         match target {
             ast::Expr::Name(name) => {
@@ -62,7 +76,7 @@ impl LoopBindingsVisitor {
     }
 }
 
-impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
+impl<'ast, F: Fn(&ast::StmtImportFrom) -> Option<Name>> Visitor<'ast> for LoopBindingsVisitor<F> {
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         match stmt {
             ast::Stmt::Assign(node) => {
@@ -123,6 +137,9 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
                 }
             }
             ast::Stmt::ImportFrom(node) => {
+                if let Some(name) = (self.implicit_submodule)(node) {
+                    self.bound_places.push(PlaceExpr::Symbol(Symbol::new(name)));
+                }
                 for alias in &node.names {
                     if &*alias.name != "*" {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
@@ -208,7 +225,7 @@ mod tests {
         let ast::Stmt::While(while_stmt) = stmt else {
             panic!("Expected a while statement");
         };
-        collect_while_loop_bindings(while_stmt)
+        collect_while_loop_bindings(while_stmt, |_| None)
             .into_iter()
             .map(|place| match place {
                 PlaceExpr::Symbol(sym) => sym.name().to_string(),
@@ -272,7 +289,7 @@ mod tests {
         let ast::Stmt::For(for_stmt) = stmt else {
             panic!("Expected a for statement");
         };
-        collect_for_loop_bindings(for_stmt)
+        collect_for_loop_bindings(for_stmt, |_| None)
             .into_iter()
             .map(|place| match place {
                 PlaceExpr::Symbol(sym) => sym.name().to_string(),
