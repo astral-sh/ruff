@@ -246,7 +246,12 @@ impl<'db> BoundMethodType<'db> {
         }
     }
 
-    /// Only supports function payloads; use [`Self::callables`] for other wrapped types.
+    /// Converts an actual or synthesized function into a callable with its receiver bound
+    /// and `typing.Self` substituted.
+    ///
+    /// Returns `None` for other wrapped types, which require resolving their call interface
+    /// and may have multiple callable alternatives that a single [`CallableType`] cannot
+    /// represent. Use [`Self::callables`] to handle those types.
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|db, _, _| Some(CallableType::bottom(db)),
