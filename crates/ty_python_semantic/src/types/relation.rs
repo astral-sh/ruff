@@ -217,11 +217,11 @@ impl TypeRelation {
         matches!(self, TypeRelation::Subtyping)
     }
 
-    fn can_safely_assume_reflexivity<'db>(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+    const fn can_safely_assume_reflexivity(self, ty: Type<'_>) -> bool {
         match self {
             TypeRelation::Assignability | TypeRelation::Redundancy { .. } => true,
             TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
-                ty.subtyping_is_always_reflexive(db)
+                ty.subtyping_is_always_reflexive()
             }
         }
     }
@@ -257,19 +257,9 @@ impl<'db> Type<'db> {
     ///
     /// This method may have false negatives, but it should not have false positives. It should be
     /// a cheap shallow check, not an exhaustive recursive check.
-    fn subtyping_is_always_reflexive(self, db: &'db dyn Db) -> bool {
+    const fn subtyping_is_always_reflexive(self) -> bool {
         match self {
             Type::RecursiveVar(_) => panic!("semantic operation on an unbound recursive variable"),
-            Type::BoundMethod(method)
-            | Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(method)) => {
-                method.function(db).is_some()
-            }
-            Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(callable)) => {
-                callable.inner(db).subtyping_is_always_reflexive(db)
-            }
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
-                function.inner(db).is_function_literal()
-            }
             Type::Never
             | Type::FunctionLiteral(..)
             | Type::WrapperDescriptor(_)
@@ -305,7 +295,8 @@ impl<'db> Type<'db> {
             // might inherit `Any`, but subtyping is still reflexive
             Type::ClassLiteral(_) => true,
 
-            Type::Dynamic(_)
+            Type::BoundMethod(_)
+            | Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Recursive(_)
             | Type::NominalInstance(_)
@@ -317,7 +308,10 @@ impl<'db> Type<'db> {
             | Type::EnumComplement(_)
             | Type::Callable(_)
             | Type::KnownBoundMethod(
-                KnownBoundMethodType::PropertyDunderGet(_)
+                KnownBoundMethodType::MethodTypeDunderGet(_)
+                | KnownBoundMethodType::DunderCall(_)
+                | KnownBoundMethodType::FunctionTypeDunderGet(_)
+                | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::PropertyDunderDelete(_),
             )
@@ -1696,7 +1690,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         //
         // Note that we could do a full equivalence check here, but that would be both expensive
         // and unnecessary. This early return is only an optimisation.
-        if source == target && self.relation.can_safely_assume_reflexivity(db, source) {
+        if source == target && self.relation.can_safely_assume_reflexivity(source) {
             return self.always();
         }
 
@@ -2105,7 +2099,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // However, there is one exception to this general rule: for any given typevar `T`,
             // `T` will always be a subtype of any union containing `T`.
             (_, Type::Union(union))
-                if self.relation.can_safely_assume_reflexivity(db, source)
+                if self.relation.can_safely_assume_reflexivity(source)
                     && union.elements(db).contains(&source) =>
             {
                 self.always()
@@ -2113,7 +2107,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // A similar rule applies in reverse to intersection types.
             (Type::Intersection(intersection), _)
-                if self.relation.can_safely_assume_reflexivity(db, target)
+                if self.relation.can_safely_assume_reflexivity(target)
                     && intersection.positive(db).contains(&target) =>
             {
                 self.always()
@@ -2128,7 +2122,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
             (Type::Intersection(intersection), _)
-                if self.relation.can_safely_assume_reflexivity(db, target)
+                if self.relation.can_safely_assume_reflexivity(target)
                     && intersection.negative(db).contains(&target) =>
             {
                 self.never()
