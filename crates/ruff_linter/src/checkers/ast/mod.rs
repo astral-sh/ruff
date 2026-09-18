@@ -2535,14 +2535,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 node_index: _,
             }) => {
                 if let Some(expr) = bound {
-                    self.visit
-                        .type_param_definitions
-                        .push((expr, self.semantic.snapshot()));
+                    self.visit_type_param_definition(expr);
                 }
                 if let Some(expr) = default {
-                    self.visit
-                        .type_param_definitions
-                        .push((expr, self.semantic.snapshot()));
+                    self.visit_type_param_definition(expr);
                 }
             }
             ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple {
@@ -2552,9 +2548,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 node_index: _,
             }) => {
                 if let Some(expr) = default {
-                    self.visit
-                        .type_param_definitions
-                        .push((expr, self.semantic.snapshot()));
+                    self.visit_type_param_definition(expr);
                 }
             }
             ast::TypeParam::ParamSpec(ast::TypeParamParamSpec {
@@ -2564,9 +2558,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 node_index: _,
             }) => {
                 if let Some(expr) = default {
-                    self.visit
-                        .type_param_definitions
-                        .push((expr, self.semantic.snapshot()));
+                    self.visit_type_param_definition(expr);
                 }
             }
         }
@@ -2727,7 +2719,35 @@ impl<'a> Checker<'a> {
         // even though we don't visit these nodes immediately we need to
         // modify the semantic flags before we push the expression and its
         // corresponding semantic snapshot
-        self.semantic.flags |= SemanticModelFlags::DEFERRED_TYPE_ALIAS;
+        self.semantic.flags |=
+            SemanticModelFlags::DEFERRED_TYPE_ALIAS | SemanticModelFlags::TYPE_DEFINITION;
+        self.visit
+            .type_param_definitions
+            .push((expr, self.semantic.snapshot()));
+        self.semantic.flags = snapshot;
+    }
+
+    /// Visit an [`Expr`], and treat it as the bound/constraint/default of
+    /// a [type parameter definition].
+    ///
+    /// Type parameters natively support forward references,
+    /// so are always deferred during initial traversal of the source tree.
+    ///
+    /// For example:
+    /// ```python
+    /// class Foo[T: Bar]: pass  # <-- Forward reference used in definition of type parameter `T`
+    /// type X[T: Bar] = Foo[T]  # <-- Ditto
+    /// class Bar: pass
+    /// ```
+    ///
+    /// [type parameter definition]: https://docs.python.org/3/reference/executionmodel.html#annotation-scopes
+    fn visit_type_param_definition(&mut self, expr: &'a Expr) {
+        let snapshot = self.semantic.flags;
+        // even though we don't visit these nodes immediately we need to
+        // modify the semantic flags before we push the expression and its
+        // corresponding semantic snapshot
+        self.semantic.flags |=
+            SemanticModelFlags::TYPE_PARAM_DEFINITION | SemanticModelFlags::TYPE_DEFINITION;
         self.visit
             .type_param_definitions
             .push((expr, self.semantic.snapshot()));
@@ -3130,9 +3150,6 @@ impl<'a> Checker<'a> {
             let type_params = std::mem::take(&mut self.visit.type_param_definitions);
             for (type_param, snapshot) in type_params {
                 self.semantic.restore(snapshot);
-
-                self.semantic.flags |=
-                    SemanticModelFlags::TYPE_PARAM_DEFINITION | SemanticModelFlags::TYPE_DEFINITION;
                 self.visit_expr(type_param);
             }
         }
