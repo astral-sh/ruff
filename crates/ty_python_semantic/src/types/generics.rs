@@ -2806,6 +2806,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                     db,
                                     builder.env,
                                     builder.constraints,
+                                    builder.inferable,
                                     path_bound,
                                 )
                             });
@@ -2954,7 +2955,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 budget,
                 |_variance, path_bound| {
                     choose(path_bound.bound_typevar, Some(path_bound)).unwrap_or_else(|| {
-                        CandidateSolutions::default_solve(db, builder.env, builder.constraints, path_bound)
+                        CandidateSolutions::default_solve(
+                            db,
+                            builder.env,
+                            builder.constraints,
+                            builder.inferable,
+                            path_bound,
+                        )
                     })
                 },
             )?;
@@ -3512,7 +3519,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.inferable,
             SolutionBudget::default(),
             |_variance, path_bound| {
-                CandidateSolutions::preliminary_solve(db, self.env, self.constraints, path_bound)
+                CandidateSolutions::preliminary_solve(
+                    db,
+                    self.env,
+                    self.constraints,
+                    self.inferable,
+                    path_bound,
+                )
             },
         );
 
