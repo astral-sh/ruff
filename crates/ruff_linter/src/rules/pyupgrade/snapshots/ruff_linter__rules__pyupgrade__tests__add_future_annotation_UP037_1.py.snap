@@ -24,7 +24,6 @@ UP037 [*] Remove quotes from type annotation
 13 | # OK
 14 | X: "Tuple[int, int]" = (0, 0)
    |    ^^^^^^^^^^^^^^^^^
-   |
 help: Remove quotes
    |
 13 | # OK

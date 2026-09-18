@@ -42,7 +42,6 @@ error[invalid-type-arguments]: Type `int` is not assignable to upper bound `str`
   |
 1 | class Bounded[T: str]:
   |               - Type variable defined here
-  |
 
 ```
 
@@ -57,6 +56,5 @@ error[invalid-type-arguments]: Type `str` does not satisfy constraints `int`, `b
   |
 4 | class Constrained[U: (int, bytes)]:
   |                   - Type variable defined here
-  |
 
 ```

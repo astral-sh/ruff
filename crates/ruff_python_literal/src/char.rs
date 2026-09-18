@@ -9,7 +9,7 @@ use icu_properties::props::{EnumeratedProperty, GeneralCategory};
 /// * Zl Separator, Line ('\u2028', LINE SEPARATOR)
 /// * Zp Separator, Paragraph ('\u2029', PARAGRAPH SEPARATOR)
 /// * Zs (Separator, Space) other than ASCII space('\x20').
-pub fn is_printable(c: char) -> bool {
+pub(crate) fn is_printable(c: char) -> bool {
     let cat = GeneralCategory::for_char(c);
 
     !matches!(

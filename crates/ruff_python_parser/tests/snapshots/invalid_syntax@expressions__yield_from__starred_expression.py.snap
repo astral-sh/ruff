@@ -101,4 +101,3 @@ Module(
 3 | yield from *x
 4 | yield from *x, y
   |            ^^ Syntax Error: Starred expression cannot be used here
-  |

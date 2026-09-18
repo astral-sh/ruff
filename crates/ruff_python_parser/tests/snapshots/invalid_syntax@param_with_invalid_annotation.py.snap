@@ -256,7 +256,6 @@ Module(
 2 | def foo(arg: yield int): ...
 3 | def foo(arg: x := int): ...
   |                ^^ Syntax Error: Expected `,`, found `:=`
-  |
 
 
 ## Semantic Syntax Errors

@@ -1,6 +1,6 @@
 """Different kinds of SAX Exceptions"""
 
-from typing import NoReturn
+from typing_extensions import Never
 from xml.sax.xmlreader import Locator
 
 class SAXException(Exception):
@@ -25,7 +25,7 @@ class SAXException(Exception):
     def getException(self) -> Exception | None:
         """Return the embedded exception, or None if there was none."""
 
-    def __getitem__(self, ix: object) -> NoReturn:
+    def __getitem__(self, ix: object) -> Never:
         """Avoids weird error messages if someone does exception[ix] by
         mistake, since Exception has __getitem__ defined.
         """

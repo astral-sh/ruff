@@ -375,7 +375,8 @@ class Color(Enum):
     PURPLE = []  # error: [invalid-assignment]
 ```
 
-When `_value_` is annotated, `.value` and `._value_` are inferred as the declared type:
+When `_value_` is annotated, `.value` and `._value_` are inferred as the declared type on both enum
+members and method receivers:
 
 ```py
 from enum import Enum
@@ -385,6 +386,11 @@ class Color2(Enum):
     _value_: int
     RED = 1
     GREEN = 2
+
+    def read_value(self) -> int:
+        reveal_type(self._value_)  # revealed: int
+        reveal_type(self.value)  # revealed: int
+        return self.value
 
 reveal_type(Color2.RED.value)  # revealed: int
 reveal_type(Color2.RED._value_)  # revealed: int
@@ -527,6 +533,8 @@ to `Any`:
 from enum import Enum
 
 class Connector(Enum):
+    connector_id: int
+
     def __new__(cls, value: str, connector_id: int) -> "Connector":
         obj = object.__new__(cls)
         obj._value_ = value
@@ -546,6 +554,7 @@ from enum import Enum
 
 class AnnotatedConnector(Enum):
     _value_: str
+    connector_id: int
 
     def __new__(cls, value: str, connector_id: int = 0) -> "AnnotatedConnector":
         obj = object.__new__(cls)
@@ -661,6 +670,8 @@ annotation, subclass member values remain dynamic:
 from enum import Enum
 
 class Base(Enum):
+    connector_id: int
+
     def __new__(cls, value: str, connector_id: int) -> "Base":
         obj = object.__new__(cls)
         obj._value_ = value
@@ -680,6 +691,8 @@ An explicit `_value_` annotation on the subclass still takes precedence:
 from enum import Enum
 
 class Base(Enum):
+    connector_id: int
+
     def __new__(cls, value: str, connector_id: int = 0) -> "Base":
         obj = object.__new__(cls)
         obj._value_ = value
@@ -702,6 +715,8 @@ explicitly annotated:
 from enum import Enum
 
 class Base(Enum):
+    connector_id: int
+
     def __new__(cls, value: int, connector_id: int = 0) -> "Base":
         obj = object.__new__(cls)
         obj._value_ = value
@@ -794,6 +809,67 @@ class InheritedWeirdEnum(EmptyWeirdEnum):
 reveal_type(InheritedWeirdEnum.FROM_BOOL.value)  # revealed: Any
 reveal_type(InheritedWeirdEnum.FROM_INT)  # revealed: Literal[InheritedWeirdEnum.FROM_INT]
 reveal_type(enum_members(InheritedWeirdEnum))  # revealed: Unknown
+```
+
+### Generic data-type mixin `__new__`
+
+A data-type mixin may be generic. When an enum lists a specialized alias of that mixin as a base,
+members are validated against the specialized `__new__` signature, not against one whose typevars
+are still free. Here `T` is `str`, so a `str` member is accepted and an `int` member is not:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+from typing import Self
+
+class GenericMixin[T]:
+    def __new__(cls, value: T) -> Self:
+        return object.__new__(cls)
+
+class Specialized(GenericMixin[str], Enum):
+    A = "a"
+    B = 1  # error: [invalid-assignment]
+```
+
+The specialization is applied through intermediate generic bases, too. `Middle[int]` binds
+`GenericMixin`'s `T` to `int` one step further up the MRO:
+
+```py
+class Middle[T](GenericMixin[T]): ...
+
+class Inherited(Middle[int], Enum):
+    A = 1
+    B = "b"  # error: [invalid-assignment]
+```
+
+A mixin with several type parameters is specialized the same way, and each element of a member's
+tuple payload is checked against the corresponding specialized parameter:
+
+```py
+class Pair[T, U]:
+    def __new__(cls, first: T, second: U) -> Self:
+        return object.__new__(cls)
+
+class Unpacked(Pair[str, int], Enum):
+    A = ("a", 1)
+    B = ("b", "c")  # error: [invalid-assignment]
+```
+
+A mixin whose `__new__` does not mention its type parameters at all is accepted as well. Before the
+specialization was applied, the free typevar made the synthesized `cls` argument fail to match, so
+even a fully permissive signature rejected every member:
+
+```py
+class Ignored[T]:
+    def __new__(cls, *args: object, **kwargs: object) -> Self:
+        return object.__new__(cls)
+
+class Permissive(Ignored[str], Enum):
+    A = "a"
 ```
 
 ### Built-in data types
@@ -1178,6 +1254,9 @@ class Choices(Enum):
 
     @enum_property
     def value(self) -> Any: ...
+    def read_value(self) -> Any:
+        reveal_type(self.value)  # revealed: Any
+        return self.value
 
 reveal_type(Choices.A.value)  # revealed: Any
 
@@ -1189,7 +1268,44 @@ class BaseChoices(Enum):
 class InheritedChoices(BaseChoices):
     A = 1
 
+    def read_value(self) -> str:
+        reveal_type(self.value)  # revealed: str
+        return self.value
+
 reveal_type(InheritedChoices.A.value)  # revealed: str
+```
+
+### Subclasses of `enum.property`
+
+An inherited property initializer and accessor-copy methods retain the descriptor's subclass.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, property as enum_property
+
+class CustomProperty(enum_property): ...
+
+def get_value(obj: object) -> int:
+    return 1
+
+def set_value(obj: object, value: str) -> None:
+    pass
+
+descriptor = CustomProperty(get_value).setter(set_value)
+reveal_type(descriptor)  # revealed: CustomProperty
+retained: CustomProperty = descriptor
+
+class Choice(Enum):
+    A = 1
+    value = descriptor
+
+reveal_type(Choice.A.value)  # revealed: int
+Choice.A.value = "new"
+Choice.A.value = 1  # error: [invalid-assignment]
 ```
 
 ### `types.DynamicClassAttribute`
@@ -1215,7 +1331,9 @@ reveal_type(enum_members(Answer))
 
 ### In stubs
 
-Stubs can optionally use `...` for the actual value:
+Stubs can optionally use `...` for the actual value. They should use `cast()` to declare the type of
+the enum member's value in cases where the value type cannot be unambiguously expressed as a static
+assignment without a type annotation:
 
 ```pyi
 from enum import Enum
@@ -1986,6 +2104,49 @@ reveal_type(Answer.name)  # revealed: Literal[Answer.name]
 reveal_type(Answer.value)  # revealed: Literal[Answer.value]
 ```
 
+## Enum classes as collection protocols
+
+An enum class is a container because `EnumMeta.__contains__` accepts any object. Consequently, the
+class satisfies `Container[T]` for every `T`, including types unrelated to its members. Its
+metaclass also provides the iteration, reversal, and length methods required by the corresponding
+collection protocols.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Collection, Container, Iterable, Reversible
+from enum import Enum, IntEnum, StrEnum, auto
+from typing import Any
+
+class Color(Enum):
+    RED = auto()
+
+unparameterized_container: Container = Color
+any_container: Container[Any] = Color
+object_container: Container[object] = Color
+member_container: Container[Color] = Color
+integer_container: Container[int] = Color
+string_container: Container[str] = Color
+iterable: Iterable[Color] = Color
+reversible: Reversible[Color] = Color
+collection: Collection[Color] = Color
+
+class Number(IntEnum):
+    ONE = 1
+
+integer_enum_container: Container[int] = Number
+integer_enum_iterable: Iterable[int] = Number
+
+class Word(StrEnum):
+    HELLO = "hello"
+
+string_enum_container: Container[str] = Word
+string_enum_iterable: Iterable[str] = Word
+```
+
 ## Iterating over enum members
 
 ```py
@@ -1999,8 +2160,7 @@ class Color(Enum):
 for color in Color:
     reveal_type(color)  # revealed: Color
 
-# TODO: Should be `list[Color]`
-reveal_type(list(Color))  # revealed: list[Unknown]
+reveal_type(list(Color))  # revealed: list[Color]
 ```
 
 ## Methods / non-member attributes
@@ -2065,6 +2225,109 @@ class Answer(Enum):
 def _(answer: type[Answer]) -> None:
     reveal_type(answer.YES)  # revealed: Literal[Answer.YES]
     reveal_type(answer.NO)  # revealed: Literal[Answer.NO]
+```
+
+## Reassigning enum members
+
+### Class attributes
+
+Enum members cannot be reassigned on the class, even to their original value or to the member
+itself. This also applies to aliases, including aliases declared with the same value.
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+    ALIAS = NO
+    SAME_VALUE = 0
+
+Answer.NO = 5  # error: [invalid-assignment] "Cannot assign to attribute `NO` on type `<class 'Answer'>`"
+Answer.NO = 0  # error: [invalid-assignment]
+Answer.NO = Answer.NO  # error: [invalid-assignment]
+Answer.ALIAS = 0  # error: [invalid-assignment]
+Answer.SAME_VALUE = 0  # error: [invalid-assignment]
+```
+
+The assigned expression is still checked when the target is read-only:
+
+```py
+# error: [invalid-assignment]
+# error: [unresolved-reference]
+Answer.YES = missing
+```
+
+The same restriction applies through a `type[Answer]` receiver and to enums created with the
+functional syntax:
+
+```py
+def reassign(cls: type[Answer]):
+    cls.NO = 0  # error: [invalid-assignment]
+
+Dynamic = Enum("Dynamic", {"NO": 0, "ALIAS": 0})
+Dynamic.NO = 0  # error: [invalid-assignment]
+Dynamic.ALIAS = 0  # error: [invalid-assignment]
+```
+
+### Augmented assignments
+
+An augmented assignment also replaces the class attribute, so it cannot target an enum member.
+
+```py
+from enum import IntEnum
+
+class Answer(IntEnum):
+    NO = 0
+    YES = 1
+
+Answer.NO += 1  # error: [invalid-assignment]
+```
+
+### Non-member and instance attributes
+
+Non-member attributes remain assignable, even when they hold an enum member. Assignment through an
+enum instance is also allowed: it shadows the class attribute without replacing the member on the
+enum class.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, nonmember
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+    description: str
+    default = nonmember(NO)
+    _ignore_ = "temporary"
+    temporary = 0
+
+Answer.description = "An answer"
+Answer.default = 1
+Answer.temporary = 1
+Answer.NO.NO = 0
+
+def shadow(answer: Answer):
+    answer.NO = 0
+
+class Settings:
+    default = Answer.NO
+
+Settings.default = Answer.YES
+```
+
+An enum's non-member attribute can also hold a member of another enum:
+
+```py
+class Other(Enum):
+    MEMBER = 1
+    default = nonmember(Answer.NO)
+
+Other.default = Answer.YES
 ```
 
 ## Calling enum variants
@@ -2152,6 +2415,106 @@ reveal_type(Answer.NO._value_)  # revealed: Literal["no"]
 
 def _(answer: Answer):
     reveal_type(answer.value)  # revealed: Literal["yes", "no"]
+```
+
+### Special attributes on method receivers
+
+Implicit receivers and receivers annotated with `Self` retain the special attributes of their enum
+bound. Their `Self` type preserves the particular member at call sites.
+
+```toml
+[environment]
+python-version = "3.11"
+
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from enum import Enum
+from typing import Self
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+    def implicit(self) -> int:
+        reveal_type(self)  # revealed: Self@implicit
+        reveal_type(self.name)  # revealed: Literal["YES", "NO"]
+        reveal_type(self._name_)  # revealed: Literal["YES", "NO"]
+        reveal_type(self.value)  # revealed: Literal[1, 2]
+        reveal_type(self._value_)  # revealed: Literal[1, 2]
+        return self.value
+
+    def explicit(self: Self) -> int:
+        reveal_type(self.value)  # revealed: Literal[1, 2]
+        return self.value
+
+    def concrete(self: "Answer") -> int:
+        reveal_type(self.value)  # revealed: Literal[1, 2]
+        return self.value
+
+    def identity(self) -> Self:
+        return self
+
+reveal_type(Answer.YES.identity())  # revealed: Literal[Answer.YES]
+```
+
+### Special attributes on bounded type variables
+
+An ordinary type variable bounded by an enum has the same special attributes as the enum itself.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from enum import Enum
+from typing import TypeVar
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+AnswerT = TypeVar("AnswerT", bound=Answer)
+
+def value(answer: AnswerT) -> int:
+    reveal_type(answer.name)  # revealed: Literal["YES", "NO"]
+    reveal_type(answer._name_)  # revealed: Literal["YES", "NO"]
+    reveal_type(answer.value)  # revealed: Literal[1, 2]
+    reveal_type(answer._value_)  # revealed: Literal[1, 2]
+    return answer.value
+```
+
+### Special attributes on constrained type variables
+
+When a type variable can be one of several enum types, its special attributes include the values
+from every possible enum.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from enum import Enum
+from typing import TypeVar
+
+class Number(Enum):
+    ONE = 1
+    TWO = 2
+
+class Word(Enum):
+    LEFT = "left"
+    RIGHT = "right"
+
+EnumT = TypeVar("EnumT", Number, Word)
+
+def value(item: EnumT) -> int | str:
+    reveal_type(item.name)  # revealed: Literal["ONE", "TWO", "LEFT", "RIGHT"]
+    reveal_type(item.value)  # revealed: Literal[1, 2, "left", "right"]
+    return item.value
 ```
 
 ## Properties of enum types
@@ -2443,7 +2806,6 @@ warning[mismatched-type-name]: The name passed to `Enum` must match the variable
   |
 8 | Mismatch = Enum("WrongName", "A B")
   |                 ^^^^^^^^^^^ Expected "Mismatch", got "WrongName"
-  |
 ```
 
 If the name is not a string literal, we also emit a diagnostic:
@@ -2460,7 +2822,6 @@ warning[mismatched-type-name]: The name passed to `Enum` must match the variable
    |
 11 |     DynamicMismatch = Enum(name, "A B")
    |                            ^^^^ Expected "DynamicMismatch", got variable of type `str`
-   |
 ```
 
 ### List/tuple of tuples
@@ -2942,8 +3303,8 @@ reveal_type(StringyNames.A.value)  # revealed: Literal["1"]
 reveal_type(StringyNames.B.value)  # revealed: Literal["2"]
 reveal_type(BytesyNames.A.value)  # revealed: bytes
 reveal_type(BytesyNames.B.value)  # revealed: bytes
-reveal_type(FloatyNames.A.value)  # revealed: float
-reveal_type(FloatyNames.B.value)  # revealed: float
+reveal_type(FloatyNames.A.value)  # revealed: float*
+reveal_type(FloatyNames.B.value)  # revealed: float*
 
 # revealed: tuple[Literal["A"], Literal["B"]]
 reveal_type(enum_members(StringyNames))
@@ -3023,6 +3384,21 @@ class StaticHttp(int, Enum):
     NOT_FOUND = 2
 
 reveal_mro(StaticHttp)  # revealed: (<class 'StaticHttp'>, <class 'int'>, <class 'Enum'>, <class 'object'>)
+```
+
+### Fallback MROs
+
+Putting `object` before `Enum` creates an inconsistent MRO. The fallback still includes `Enum` and
+places `object` last.
+
+```py
+from enum import Enum
+from ty_extensions._internal import reveal_mro
+
+# error: [inconsistent-mro]
+Broken = Enum("Broken", "MEMBER", type=object)
+
+reveal_mro(Broken)  # revealed: (<class 'Broken'>, <class 'Enum'>, <class 'object'>)
 ```
 
 ### IntEnum function syntax
@@ -3227,6 +3603,7 @@ def color_value_without_red_and_with_restricted_typevar(
 def color_truthy_without_red(color: Color) -> int:
     if color is Color.RED:
         raise ValueError()
+    # error: [redundant-condition] "always truthy"
     if color:
         return 1
 
@@ -3445,10 +3822,28 @@ def color_name_misses_one_variant(color: Color) -> str:
         assert_never(color)  # error: [type-assertion-failure] "Type `Literal[Color.BLUE]` is not equivalent to `Never`"
 ```
 
+A functional enum inherits `object.__eq__`, so comparing members with `==` and `!=` narrows just as
+`is` does:
+
+```py
+def equality(color: Color) -> None:
+    if color == Color.RED:
+        reveal_type(color)  # revealed: Literal[Color.RED]
+    else:
+        reveal_type(color)  # revealed: Literal[Color.GREEN, Color.BLUE]
+
+def inequality(color: Color) -> None:
+    if color != Color.RED:
+        reveal_type(color)  # revealed: Literal[Color.GREEN, Color.BLUE]
+    else:
+        reveal_type(color)  # revealed: Literal[Color.RED]
+```
+
 ## `match` statements (function syntax)
 
-TODO: `match` exhaustiveness does not yet work for functional enums. The pattern matching narrowing
-path does not resolve functional enum members the same way `is` comparisons do.
+Value patterns narrow members of a functional enum exactly as they do for an enum declared with
+class syntax. A `match` that covers every member is exhaustive, so the wildcard case is unreachable
+and `assert_never` holds:
 
 ```toml
 [environment]
@@ -3461,19 +3856,22 @@ from typing_extensions import assert_never
 
 Color = Enum("Color", "RED GREEN BLUE")
 
-# TODO: `assert_never` should not fire here (exhaustive match).
 def color_name(color: Color) -> str:
     match color:
         case Color.RED:
+            reveal_type(color)  # revealed: Literal[Color.RED]
             return "Red"
         case Color.GREEN:
             return "Green"
         case Color.BLUE:
             return "Blue"
         case _:
-            assert_never(color)  # error: [type-assertion-failure]
+            assert_never(color)
+```
 
-# TODO: This should ideally emit `Literal[Color.BLUE]` in the assertion, not `Color`.
+When a member is left uncovered, the wildcard case receives exactly that member:
+
+```py
 def color_name_misses_one_variant(color: Color) -> str:
     match color:
         case Color.RED:
@@ -3481,7 +3879,7 @@ def color_name_misses_one_variant(color: Color) -> str:
         case Color.GREEN:
             return "Green"
         case _:
-            assert_never(color)  # error: [type-assertion-failure] "Type `Color` is not equivalent to `Never`"
+            assert_never(color)  # error: [type-assertion-failure] "Type `Literal[Color.BLUE]` is not equivalent to `Never`"
 ```
 
 ## `__eq__` and `__ne__`

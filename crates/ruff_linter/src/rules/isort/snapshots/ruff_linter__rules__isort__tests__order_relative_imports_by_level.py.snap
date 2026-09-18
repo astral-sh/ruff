@@ -9,7 +9,6 @@ I001 [*] Import block is un-sorted or un-formatted
 3 | | from ..b import a
 4 | | from .b import a
   | |________________^
-  |
 help: Organize imports
   |
   - from .a import a

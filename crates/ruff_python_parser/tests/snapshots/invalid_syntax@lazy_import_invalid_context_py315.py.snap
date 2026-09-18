@@ -375,4 +375,3 @@ Module(
 22 |     class Inner:
 23 |         lazy import json
    |         ^^^^^^^^^^^^^^^^ Syntax Error: lazy import not allowed inside classes
-   |

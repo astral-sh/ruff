@@ -308,4 +308,3 @@ Module(
 3 | lambda x: *y, z
 4 | lambda x: *y and z
   |           ^^^^^^^^ Syntax Error: Starred expression cannot be used here
-  |

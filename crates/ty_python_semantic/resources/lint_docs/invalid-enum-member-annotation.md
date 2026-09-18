@@ -4,13 +4,12 @@ Checks for enum members that have explicit type annotations.
 
 ## Why is this bad?
 
-The [typing spec] states that type checkers should infer a literal type
-for all enum members. An explicit type annotation on an enum member is
-misleading because the annotated type will be incorrect — the actual
-runtime type is the enum class itself, not the annotated type.
+The [typing spec] states that type checkers should infer a literal type for all enum members. An
+explicit type annotation on an enum member is misleading because the annotated type will be
+incorrect — the actual runtime type is the enum class itself, not the annotated type.
 
-In CPython's `enum` module, annotated assignments with values are still
-treated as members at runtime, but the annotation will confuse readers of the code.
+In CPython's `enum` module, annotated assignments with values are still treated as members at
+runtime, but the annotation will confuse readers of the code.
 
 ## Examples
 

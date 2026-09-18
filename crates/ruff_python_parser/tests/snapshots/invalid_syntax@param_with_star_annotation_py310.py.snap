@@ -85,4 +85,3 @@ Module(
 1 | # parse_options: {"target-version": "3.10"}
 2 | def foo(*args: *Ts): ...
   |                ^^^ Syntax Error: Cannot use star annotation on Python 3.10 (syntax was added in Python 3.11)
-  |

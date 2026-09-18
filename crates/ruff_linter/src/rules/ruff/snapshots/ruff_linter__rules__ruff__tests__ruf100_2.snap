@@ -6,7 +6,6 @@ RUF100 [*] Unused `noqa` directive (non-enabled: `F401`)
   |
 1 | import itertools  # noqa: F401
   |                   ^^^^^^^^^^^^
-  |
 help: Remove unused `noqa` directive
   |
   - import itertools  # noqa: F401

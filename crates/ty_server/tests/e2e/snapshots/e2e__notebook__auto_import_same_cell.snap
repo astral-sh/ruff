@@ -44,5 +44,47 @@ expression: completions
         "newText": ", LiteralString"
       }
     ]
+  },
+  {
+    "label": "Literal (import typing_extensions)",
+    "kind": 6,
+    "sortText": "[RANKING]",
+    "insertText": "Literal",
+    "additionalTextEdits": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "newText": "from typing_extensions import Literal\n"
+      }
+    ]
+  },
+  {
+    "label": "LiteralString (import typing_extensions)",
+    "kind": 6,
+    "sortText": "[RANKING]",
+    "insertText": "LiteralString",
+    "additionalTextEdits": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "newText": "from typing_extensions import LiteralString\n"
+      }
+    ]
   }
 ]

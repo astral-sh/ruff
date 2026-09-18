@@ -295,10 +295,14 @@ impl RuffSettingsIndex {
                     return WalkState::Continue;
                 }
 
+                let depth = entry.depth();
                 let directory = entry.into_path();
 
-                // If the directory is excluded from the workspace, skip it.
-                if let Some(file_name) = directory.file_name() {
+                // An explicitly opened workspace root must be indexed even if an ancestor
+                // configuration excludes it. Excluded descendants can still be skipped.
+                if depth > 0
+                    && let Some(file_name) = directory.file_name()
+                {
                     let settings = index
                         .read()
                         .unwrap()

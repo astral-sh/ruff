@@ -4,6 +4,7 @@ use ruff_python_semantic::Binding;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{Applicability, Fix, FixAvailability, Violation};
 use crate::{
     checkers::ast::Checker,
@@ -66,7 +67,7 @@ use crate::{
 /// [UP046]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Style)]
 pub(crate) struct PrivateTypeParameter {
     kind: ParamKind,
 }

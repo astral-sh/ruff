@@ -4,6 +4,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::rules::flake8_async::helpers::MethodName;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -38,7 +39,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// This rule's fix is marked as unsafe, as adding an `await` to a function
 /// call changes its semantics and runtime behavior.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Suspicious)]
 pub(crate) struct TrioSyncCall {
     method_name: MethodName,
 }
@@ -87,7 +88,7 @@ pub(crate) fn sync_call(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(TrioSyncCall { method_name }, call.range);
+    let mut diagnostic = checker.report_diagnostic(TrioSyncCall { method_name }, call.range());
     if checker.semantic().in_async_context() {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
             pad(

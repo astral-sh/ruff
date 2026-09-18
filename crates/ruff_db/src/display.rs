@@ -35,17 +35,6 @@ impl Join<'_, '_> {
         self
     }
 
-    pub fn entries<I, F>(&mut self, items: I) -> &mut Self
-    where
-        I: IntoIterator<Item = F>,
-        F: Display,
-    {
-        for item in items {
-            self.entry(&item);
-        }
-        self
-    }
-
     pub fn finish(&mut self) -> fmt::Result {
         self.result
     }

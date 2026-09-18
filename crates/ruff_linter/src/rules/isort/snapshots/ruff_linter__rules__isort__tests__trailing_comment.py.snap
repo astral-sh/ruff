@@ -115,7 +115,6 @@ I001 [*] Import block is un-sorted or un-formatted
 53 | |     # e
 54 | | ) # f
    | |_^
-   |
 help: Organize imports
    |
 49 | # a

@@ -62,10 +62,8 @@ Module(
   |
 1 | match foo: case _: ...
   |            ^^^^ Syntax Error: Expected newline, found `case`
-  |
 
 
   |
 1 | match foo: case _: ...
   |                       ^ Syntax Error: Expected dedent, found end of file
-  |

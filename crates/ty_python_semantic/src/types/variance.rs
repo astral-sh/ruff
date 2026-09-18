@@ -1,4 +1,105 @@
-use crate::{Db, types::BoundTypeVarIdentity};
+use crate::{
+    Db, ProgramEnvironment,
+    types::{
+        BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, StaticClassLiteral, Type,
+        attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
+    },
+};
+
+mod equations;
+
+pub(super) use equations::{VarianceOrigin, VarianceTerm, infer_protocol_variance};
+
+impl<'db> StaticClassLiteral<'db> {
+    /// Keeps `Self` symbolic while inspecting a class's interface. Substituting `C[T]` would
+    /// incorrectly make a parameter annotated as `Self` consume the class's `T`.
+    pub(super) fn variance_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+            db,
+            Type::instance(db, env, self.identity_specialization(db)),
+            BindingContext::Definition(self.definition(db)),
+        ))
+    }
+}
+
+/// The read and write contributions of one exposed member, before attribute mutability or
+/// source-specific exclusions are applied.
+#[derive(Clone, Copy)]
+pub(super) struct MemberVariance<'db> {
+    pub(super) read_ty: Type<'db>,
+    pub(super) write_domain: DescriptorSetterDomain<'db>,
+}
+
+impl<'db> MemberVariance<'db> {
+    /// Resolves the instance read and descriptor write types of a class member.
+    pub(super) fn of(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        receiver: Type<'db>,
+    ) -> Self {
+        if let Type::SlotDescriptor(descriptor) = ty {
+            // The built-in descriptor's untyped `__set__` loses the slot's stored value type.
+            let value_ty = descriptor.value_type(db);
+            return Self {
+                read_ty: value_ty,
+                write_domain: DescriptorSetterDomain::Known(value_ty),
+            };
+        }
+        Self {
+            read_ty: Self::bind(db, env, ty, receiver),
+            write_domain: descriptor_setter_domain(db, env, ty, receiver),
+        }
+    }
+
+    /// An accessor contributes its bound callable signature, including a setter's input.
+    pub(super) fn accessor(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        receiver: Type<'db>,
+    ) -> Self {
+        Self {
+            read_ty: Self::bind(db, env, ty, receiver),
+            write_domain: DescriptorSetterDomain::Missing,
+        }
+    }
+
+    fn bind(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        receiver: Type<'db>,
+    ) -> Type<'db> {
+        ty.try_call_dunder_get(db, env, Some(receiver), receiver.to_meta_type(db, env))
+            .unwrap_or_else(|error| Some(error.fallback()))
+            .map_or(ty, |result| result.return_type)
+    }
+}
+
+impl<'db> VarianceInferable<'db> for MemberVariance<'db> {
+    fn variance_of(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> VarianceTerm<'db> {
+        let write = match self.write_domain {
+            DescriptorSetterDomain::Known(ty) => ty
+                .with_polarity(TypeVarVariance::Contravariant)
+                .variance_of(db, env, typevar),
+            // An unresolved write domain does not erase a known read requirement.
+            DescriptorSetterDomain::Missing | DescriptorSetterDomain::Deferred => {
+                VarianceTerm::BIVARIANT
+            }
+        };
+        VarianceTerm::join(db, [self.read_ty.variance_of(db, env, typevar), write])
+    }
+}
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub enum TypeVarVariance {
@@ -9,14 +110,6 @@ pub enum TypeVarVariance {
 }
 
 impl TypeVarVariance {
-    pub const fn bottom() -> Self {
-        TypeVarVariance::Bivariant
-    }
-
-    pub const fn top() -> Self {
-        TypeVarVariance::Invariant
-    }
-
     // supremum
     #[must_use]
     pub(crate) const fn join(self, other: Self) -> Self {
@@ -133,22 +226,24 @@ impl std::iter::FromIterator<Self> for TypeVarVariance {
 }
 
 pub(crate) trait VarianceInferable<'db>: Sized {
-    /// The variance of `typevar` in `self`
+    /// Builds a variance expression without choosing how protocol declarations are evaluated.
     ///
-    /// Generally, one will implement this by traversing any types within `self`
-    /// in which `typevar` could occur, and calling `variance_of` recursively on
-    /// them.
-    ///
-    /// Sometimes the recursive calls will be in positions where you need to
-    /// specify a non-covariant polarity. See `with_polarity` for more details.
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance;
+    /// Recursive definitions contribute named variables instead of expanding their bodies.
+    /// Evaluation and dependency discovery operate on the resulting expression, so both use
+    /// the same member-selection and variance-composition rules.
+    fn variance_of(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> VarianceTerm<'db>;
 
     /// Creates a `VarianceInferable` that applies `polarity` (see
     /// `TypeVarVariance::compose`) to the result of variance inference on the
     /// underlying value.
     ///
     /// In some cases, we need to apply a polarity to the recursive call.
-    /// You can do this with `ty.with_polarity(polarity).variance_of(typevar)`.
+    /// You can do this with `ty.with_polarity(polarity).variance_of(db, env, typevar)`.
     /// Generally, this will be whenever the type occurs in argument-position,
     /// in which case you will want `TypeVarVariance::Contravariant`, or
     /// `TypeVarVariance::Invariant` if the value(s) being annotated is known to
@@ -173,12 +268,18 @@ impl<'db, T> VarianceInferable<'db> for WithPolarity<T>
 where
     T: VarianceInferable<'db>,
 {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
+    fn variance_of(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> VarianceTerm<'db> {
         let WithPolarity {
             variance_inferable,
             polarity,
         } = self;
 
-        polarity.compose_thunk(|| variance_inferable.variance_of(db, typevar))
+        VarianceTerm::from(polarity)
+            .compose_thunk(db, || variance_inferable.variance_of(db, env, typevar))
     }
 }

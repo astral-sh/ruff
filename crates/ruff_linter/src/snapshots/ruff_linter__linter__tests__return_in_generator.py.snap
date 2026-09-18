@@ -52,4 +52,3 @@ B901 Using `yield` and `return {value}` in a generator function can lead to conf
 23 |         yield 1
 24 |     return 10
    |     ^^^^^^^^^
-   |

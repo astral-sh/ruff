@@ -145,11 +145,9 @@ Module(
 5 | def func():
 6 |     lazy from sys import *
   |     ^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: lazy from ... import not allowed inside functions
-  |
 
 
   |
 5 | def func():
 6 |     lazy from sys import *
   |     ^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: `from sys import *` only allowed at module level
-  |

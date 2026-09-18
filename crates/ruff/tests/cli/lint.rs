@@ -607,6 +607,141 @@ extend = "ruff3.toml"
 }
 
 #[test]
+fn extend_banned_api() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+        [lint]
+        select = ["TID251"]
+
+        [lint.flake8-tidy-imports.extend-banned-api]
+        "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+        "cgi".msg = "Use a supported library instead."
+        "typing.Any".msg = "Use a precise type instead."
+        "#,
+    )?;
+    fixture.write_file(
+        "test.py",
+        "
+        import cgi
+        from typing import TypedDict
+        import typing
+        x: typing.Any
+        ",
+    )?;
+
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:8: TID251 `cgi` is banned: Use a supported library instead.
+    test.py:3:20: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+    test.py:5:4: TID251 `typing.Any` is banned: Use a precise type instead.
+    Found 3 errors.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn extend_banned_api_inherited() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+        [lint]
+        select = ["TID251"]
+
+        [lint.flake8-tidy-imports.banned-api]
+        "cgi".msg = "The cgi module is deprecated."
+        "pipes".msg = "Use shlex instead."
+
+        [lint.flake8-tidy-imports.extend-banned-api]
+        "typing.Any".msg = "Use a precise type instead."
+        "#,
+    )?;
+    fixture.write_file(
+        "child/ruff.toml",
+        r#"
+        extend = "../ruff.toml"
+
+        [lint.flake8-tidy-imports.extend-banned-api]
+        "cgi".msg = "Use a supported library instead."
+        "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+        "#,
+    )?;
+    fixture.write_file(
+        "child/grandchild/ruff.toml",
+        r#"
+        extend = "../ruff.toml"
+        "#,
+    )?;
+    fixture.write_file(
+        "child/grandchild/test.py",
+        "
+        import cgi
+        import pipes
+        from typing import Any, TypedDict
+        ",
+    )?;
+
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    child/grandchild/test.py:2:8: TID251 `cgi` is banned: Use a supported library instead.
+    child/grandchild/test.py:3:8: TID251 `pipes` is banned: Use shlex instead.
+    child/grandchild/test.py:4:25: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+    Found 3 errors.
+
+    ----- stderr -----
+    ");
+
+    // Clear inherited extensions while preserving the inherited base bans.
+    fixture.write_file(
+        "child/grandchild/ruff.toml",
+        r#"
+        extend = "../ruff.toml"
+        [lint.flake8-tidy-imports]
+        extend-banned-api = {}
+        "#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    child/grandchild/test.py:2:8: TID251 `cgi` is banned: The cgi module is deprecated.
+    child/grandchild/test.py:3:8: TID251 `pipes` is banned: Use shlex instead.
+    Found 2 errors.
+
+    ----- stderr -----
+    ");
+
+    // Clear inherited base bans while preserving the inherited extensions.
+    fixture.write_file(
+        "child/grandchild/ruff.toml",
+        r#"
+        extend = "../ruff.toml"
+        [lint.flake8-tidy-imports]
+        banned-api = {}
+        "#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    child/grandchild/test.py:2:8: TID251 `cgi` is banned: Use a supported library instead.
+    child/grandchild/test.py:4:25: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+    Found 2 errors.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
 fn circular_extend() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file(
@@ -1238,6 +1373,40 @@ fn rule_name_selector_cli_preview_enabled() -> Result<()> {
 }
 
 #[test]
+fn rule_category_selector_cli_preview_disabled() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+
+    assert_cmd_snapshot!(fixture.check_command().args(["--select", "restriction"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Invalid selector `restriction` in `select` from the CLI. Selecting rules by category requires preview mode
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn rule_category_selector_cli_preview_enabled() -> Result<()> {
+    let fixture = CliTest::with_file("test.py", "assert True")?;
+
+    assert_cmd_snapshot!(fixture.check_command().args(["--select", "restriction", "--preview"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:1: assert: Use of `assert` detected
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn rule_name_selector_config_preview_disabled() -> Result<()> {
     let fixture = unknown_rule_selector_test()?;
     fixture.write_file("ruff.toml", r#"lint = { select = ["unused-import"] }"#)?;
@@ -1509,9 +1678,10 @@ fn complex_config_setting_overridden_via_cli() -> Result<()> {
 }
 
 #[test]
-fn deprecated_config_option_overridden_via_cli() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn deprecated_config_option_overridden_via_cli() -> Result<()> {
+    let test = CliTest::new()?;
+
+    assert_cmd_snapshot!(test.check_command()
         .args(["--config", "select=['N801']", "-"])
         .pass_stdin("class lowercase: ..."),
         @"
@@ -1525,6 +1695,8 @@ fn deprecated_config_option_overridden_via_cli() {
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your `--config` CLI arguments:
       - 'select' -> 'lint.select'
     ");
+
+    Ok(())
 }
 
 #[test]
@@ -3519,30 +3691,36 @@ fn required_import_set_conflicts_with_pyi025() {
 
 // https://github.com/astral-sh/ruff/issues/20891
 #[test]
-fn required_import_set_aliased_as_abstract_set_no_conflict() {
+fn required_import_set_aliased_as_abstract_set_no_conflict() -> Result<()> {
+    let test = CliTest::new()?;
+
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+        test.check_command()
             .arg("--config")
             .arg(r#"lint.isort.required-imports = ["from collections.abc import Set as AbstractSet"]"#)
             .args(["--select", "I002,PYI025"])
             .arg("-")
             .pass_stdin("1")
     );
+
+    Ok(())
 }
 
 // https://github.com/astral-sh/ruff/issues/20891
 #[test]
-fn required_import_set_without_pyi025_no_conflict() {
+fn required_import_set_without_pyi025_no_conflict() -> Result<()> {
+    let test = CliTest::new()?;
+
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+        test.check_command()
             .arg("--config")
             .arg(r#"lint.isort.required-imports = ["from collections.abc import Set"]"#)
             .args(["--select", "I002"])
             .arg("-")
             .pass_stdin("1")
     );
+
+    Ok(())
 }
 
 // https://github.com/astral-sh/ruff/issues/19842
@@ -4273,6 +4451,31 @@ class Foo:
     );
 }
 
+#[test]
+fn prefer_rule_codes_in_output() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args([
+                "--preview",
+                "--config",
+                "output-prefer-rule-codes = true",
+                "--select=A001",
+                "-",
+            ])
+            .pass_stdin("print = 1\n"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: A001 Variable `print` is shadowing a Python builtin
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+}
+
 #[test_case::test_case("concise")]
 #[test_case::test_case("full")]
 #[test_case::test_case("json")]
@@ -4397,6 +4600,54 @@ fn output_format_show_fixes(output_format: &str) -> Result<()> {
     Ok(())
 }
 
+/// Rule codes in `--statistics` output link to the rule documentation, as they do in the concise
+/// and full output formats.
+#[test]
+fn statistics_hyperlinks() -> Result<()> {
+    let fixture = CliTest::with_settings(|_project_dir, mut settings| {
+        // Spell out the hyperlink escapes to keep the snapshot readable, filtering them before
+        // the fixture rewrites the backslash in their `ESC \` terminators. The colors are absent
+        // because test builds enable `colored`'s `no-color` feature; the last filter only keeps
+        // stray escapes out of the snapshot if that ever changes.
+        settings.add_filter(r"\x1b\]8;;(.+?)\x1b\\", "<link ${1}>");
+        settings.add_filter(r"\x1b\]8;;\x1b\\", "</link>");
+        settings.add_filter(r"\x1b", "<ESC>");
+        settings
+    })?;
+    fixture.write_file("input.py", "import os as os, math")?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .command()
+            .args([
+                "check",
+                "--no-cache",
+                "--select",
+                "F401,PLC0414",
+                "--statistics",
+                "--color",
+                "always",
+                "input.py",
+            ])
+            // Hyperlink support is otherwise detected from the terminal, which varies between
+            // local runs and CI.
+            .env("FORCE_HYPERLINK", "1"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1	<link https://docs.astral.sh/ruff/rules/unused-import>F401</link>   	[*] unused-import
+    1	<link https://docs.astral.sh/ruff/rules/useless-import-alias>PLC0414</link>	[ ] useless-import-alias
+    Found 2 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    ",
+    );
+
+    Ok(())
+}
+
 #[test]
 fn show_fixes_preview() -> Result<()> {
     let fixture = CliTest::with_file("input.py", "import os  # F401")?;
@@ -4475,7 +4726,6 @@ fn show_fixes_in_full_output_with_preview_enabled() {
       |
     1 | import math
       |        ^^^^
-      |
     help: Remove unused import: `math`
       |
       - import math
@@ -5195,7 +5445,6 @@ fn ruff_toml_is_linted() -> Result<()> {
       |
     1 | lint.select = ["F401"]
       |                 ^^^^
-      |
     help: Replace rule code with `unused-import`
       |
       - lint.select = ["F401"]

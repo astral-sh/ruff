@@ -6,4 +6,3 @@ F821 Undefined name `frozendict`. Consider specifying `requires-python = ">= 3.1
   |
 1 | frozendict
   | ^^^^^^^^^^
-  |

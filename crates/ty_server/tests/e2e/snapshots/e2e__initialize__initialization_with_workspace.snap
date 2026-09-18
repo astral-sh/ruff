@@ -44,6 +44,7 @@ expression: initialization_result
     "declarationProvider": true,
     "definitionProvider": true,
     "typeDefinitionProvider": true,
+    "implementationProvider": true,
     "referencesProvider": true,
     "documentHighlightProvider": true,
     "documentSymbolProvider": true,
@@ -82,7 +83,9 @@ expression: initialization_result
           "number",
           "decorator",
           "builtinConstant",
-          "typeParameter"
+          "typeParameter",
+          "operator",
+          "regexp"
         ],
         "tokenModifiers": [
           "definition",

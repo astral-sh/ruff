@@ -1,0 +1,56 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: name `a` cannot refer to a parameter and a nonlocal variable
+ --> resources/test/fixtures/semantic_errors/nonlocal_parameter.py:2:14
+  |
+1 | def f(a):
+2 |     nonlocal a
+  |              ^
+3 |
+4 | def g(a):
+  |
+
+invalid-syntax: name `a` cannot refer to a parameter and a nonlocal variable
+ --> resources/test/fixtures/semantic_errors/nonlocal_parameter.py:6:18
+  |
+4 | def g(a):
+5 |     if True:
+6 |         nonlocal a
+  |                  ^
+7 |
+8 | def h(a):
+  |
+
+invalid-syntax: name `a` cannot refer to a parameter and a nonlocal variable
+  --> resources/test/fixtures/semantic_errors/nonlocal_parameter.py:14:18
+   |
+12 | def i(a):
+13 |     try:
+14 |         nonlocal a
+   |                  ^
+15 |     except Exception:
+16 |         pass
+   |
+
+invalid-syntax: name `a` cannot refer to a parameter and a nonlocal variable
+  --> resources/test/fixtures/semantic_errors/nonlocal_parameter.py:21:14
+   |
+19 |     a = 1
+20 |     a = 2
+21 |     nonlocal a
+   |              ^
+22 |
+23 | def f(a):
+   |
+
+invalid-syntax: name `a` cannot refer to a parameter and a nonlocal variable
+  --> resources/test/fixtures/semantic_errors/nonlocal_parameter.py:29:18
+   |
+27 | def f(a):
+28 |     def inner(a):
+29 |         nonlocal a
+   |                  ^
+30 |
+31 | def f(a=1):
+   |

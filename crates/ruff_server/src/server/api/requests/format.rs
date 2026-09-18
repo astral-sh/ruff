@@ -77,7 +77,7 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes>
 
 /// Formats either a full text document or an specific notebook cell. If the query within the snapshot is a notebook document
 /// with no selected cell, this will throw an error.
-pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::FormatResponse> {
+fn format_document(snapshot: &DocumentSnapshot) -> Result<super::FormatResponse> {
     let text_document = snapshot
         .query()
         .as_single_document()

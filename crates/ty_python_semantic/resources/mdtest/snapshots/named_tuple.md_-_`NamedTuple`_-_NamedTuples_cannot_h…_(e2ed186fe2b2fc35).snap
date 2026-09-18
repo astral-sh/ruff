@@ -51,7 +51,6 @@ error[invalid-named-tuple]: NamedTuple field name cannot start with an underscor
   |
 5 |     _bar: int
   |     ^^^^^^^^^ Class definition will raise `TypeError` at runtime due to this field
-  |
 
 ```
 
@@ -61,7 +60,6 @@ error[invalid-named-tuple]: Field name `_x` in `NamedTuple()` cannot start with 
    |
 15 | Underscore = NamedTuple("Underscore", [("_x", int), ("y", str)])
    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^ Will raise `ValueError` at runtime
-   |
 
 ```
 
@@ -71,7 +69,6 @@ error[invalid-named-tuple]: Field name `class` in `NamedTuple()` cannot be a Pyt
    |
 19 | Keyword = NamedTuple("Keyword", [("x", int), ("class", str)])
    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Will raise `ValueError` at runtime
-   |
 
 ```
 
@@ -81,7 +78,6 @@ error[invalid-named-tuple]: Duplicate field name `x` in `NamedTuple()`
    |
 23 | Duplicate = NamedTuple("Duplicate", [("x", int), ("y", str), ("x", float)])
    |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Field `x` already defined; will raise `ValueError` at runtime
-   |
 
 ```
 
@@ -91,6 +87,5 @@ error[invalid-named-tuple]: Field name `not valid` in `NamedTuple()` is not a va
    |
 27 | Invalid = NamedTuple("Invalid", [("not valid", int), ("ok", str)])
    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Will raise `ValueError` at runtime
-   |
 
 ```

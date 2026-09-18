@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::{AlwaysFixableViolation, Fix};
 
@@ -27,7 +28,7 @@ use crate::{AlwaysFixableViolation, Fix};
 ///     x: int
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.260")]
+#[violation_metadata(stable_since = "v0.0.260", category = Category::Correctness)]
 pub(crate) struct PassInClassBody;
 
 impl AlwaysFixableViolation for PassInClassBody {

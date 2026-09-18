@@ -184,13 +184,13 @@ pub(crate) enum SuppressionComments {
 }
 
 impl SuppressionComments {
-    pub(crate) fn first(&self) -> &SuppressionComment {
+    fn first(&self) -> &SuppressionComment {
         match self {
             SuppressionComments::Single(comment) => comment,
             SuppressionComments::DisableEnable(comment, _) => comment,
         }
     }
-    pub(crate) fn second(&self) -> Option<&SuppressionComment> {
+    fn second(&self) -> Option<&SuppressionComment> {
         match self {
             SuppressionComments::Single(_) => None,
             SuppressionComments::DisableEnable(_, comment) => Some(comment),
@@ -241,9 +241,6 @@ struct SuppressionDiagnostic<'a> {
     disabled_codes: Vec<&'a str>,
     unused_codes: Vec<&'a str>,
 
-    /// Whether one of the invalid codes was totally unknown and may be external.
-    has_unknown_code: bool,
-
     /// Whether one of the invalid codes was a rule name with preview disabled.
     has_stable_rule_name: bool,
 }
@@ -256,7 +253,6 @@ impl<'a> SuppressionDiagnostic<'a> {
             duplicated_codes: Vec::new(),
             disabled_codes: Vec::new(),
             unused_codes: Vec::new(),
-            has_unknown_code: false,
             has_stable_rule_name: false,
         }
     }
@@ -361,7 +357,12 @@ impl Suppressions {
         range: TextRange,
         parent: Option<TextSize>,
     ) -> bool {
-        self.check_suppression(Some(&rule.noqa_code()), rule.name().as_str(), range, parent)
+        self.check_suppression(
+            rule.noqa_code().as_ref(),
+            rule.name().as_str(),
+            range,
+            parent,
+        )
     }
 
     /// Check whether the given rule code or name corresponds to a valid suppression comment at
@@ -467,11 +468,6 @@ impl Suppressions {
                         whole_comment: group.suppression.codes().len() == group.invalid_codes.len(),
                     },
                 ) {
-                    if group.has_unknown_code {
-                        diagnostic.help(
-                            "Add non-Ruff rule codes to the `lint.external` configuration option",
-                        );
-                    }
                     if group.has_stable_rule_name {
                         diagnostic.help("Enable `lint.preview` to use rule names");
                     }
@@ -524,7 +520,6 @@ impl Suppressions {
                 let (_key, group) = grouped_diagnostic
                     .get_or_insert_with(|| (key, SuppressionDiagnostic::new(suppression)));
                 group.invalid_codes.push(code_str);
-                group.has_unknown_code |= !name_is_known;
                 group.has_stable_rule_name |= name_is_known;
             } else if !suppression.used.get() {
                 // UnusedNOQA
@@ -703,7 +698,7 @@ impl Suppressions {
     }
 }
 
-pub(crate) struct SuppressionsBuilder<'a> {
+struct SuppressionsBuilder<'a> {
     source: &'a str,
     settings: &'a LinterSettings,
 
@@ -714,7 +709,7 @@ pub(crate) struct SuppressionsBuilder<'a> {
 }
 
 impl<'a> SuppressionsBuilder<'a> {
-    pub(crate) fn new(source: &'a str, settings: &'a LinterSettings) -> Self {
+    fn new(source: &'a str, settings: &'a LinterSettings) -> Self {
         Self {
             source,
             settings,
@@ -724,7 +719,7 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
-    pub(crate) fn load_from_tokens(mut self, tokens: &Tokens, indexer: &Indexer) -> Suppressions {
+    fn load_from_tokens(mut self, tokens: &Tokens, indexer: &Indexer) -> Suppressions {
         let mut indents: Vec<&str> = vec![];
         let mut errors = Vec::new();
 

@@ -443,10 +443,6 @@ impl Notebook {
         &self.raw.cells
     }
 
-    pub fn metadata(&self) -> &RawNotebookMetadata {
-        &self.raw.metadata
-    }
-
     /// Check if it's a Python notebook.
     ///
     /// This is determined by checking the `language_info` or `kernelspec` in the notebook
@@ -486,6 +482,7 @@ impl Eq for Notebook {}
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
     use std::path::Path;
 
     use anyhow::Result;
@@ -512,18 +509,18 @@ mod tests {
 
     #[test]
     fn test_invalid() {
-        assert!(matches!(
+        assert_matches!(
             Notebook::from_path(&notebook_path("invalid_extension.ipynb")),
             Err(NotebookError::InvalidJson(_))
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             Notebook::from_path(&notebook_path("not_json.ipynb")),
             Err(NotebookError::InvalidJson(_))
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             Notebook::from_path(&notebook_path("wrong_schema.ipynb")),
             Err(NotebookError::InvalidSchema(_))
-        ));
+        );
     }
 
     #[test]

@@ -13,6 +13,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{adjust_indentation, delete_stmt};
 use crate::preview::is_outdated_version_check_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -79,7 +80,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.240")]
+#[violation_metadata(stable_since = "v0.0.240", category = Category::Suspicious)]
 pub(crate) struct OutdatedVersionBlock {
     reason: Reason,
     /// Whether the comparison makes up the entire test of an `if` or `elif` branch,
@@ -157,13 +158,13 @@ pub(crate) fn outdated_version_block(checker: &Checker, expr: &Expr, compare: &a
     let links: Vec<Link> = compare
         .ops
         .iter()
-        .zip(&compare.comparators)
+        .zip(compare.comparators())
         .enumerate()
         .map(|(index, (op, right))| {
             let left = if index == 0 {
-                &*compare.left
+                compare.first_operand()
             } else {
-                &compare.comparators[index - 1]
+                &compare.comparators()[index - 1]
             };
             // For a lone comparison, prefer the range of the comparison itself, so that any
             // parentheses around the left operand are covered.

@@ -90,6 +90,27 @@ fn exclude_scripts_only_applies_to_implicitly_discovered_files() -> anyhow::Resu
     Ok(())
 }
 
+#[test]
+fn exclude_scripts_ignores_scripts_with_invalid_toml() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("main.py", "value: int = 1"),
+        (
+            "script.py",
+            r#"
+            # /// script
+            # requires-python =
+            # ///
+            value: int = "script"
+            "#,
+        ),
+    ])?;
+
+    let output = case.command().arg("--exclude-scripts").output()?;
+    assert!(output.status.success(), "{output:?}");
+
+    Ok(())
+}
+
 /// Test exclude CLI argument functionality
 #[test]
 fn exclude_argument() -> anyhow::Result<()> {
@@ -124,14 +145,12 @@ fn exclude_argument() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `temp_undefined_var` used when not defined
      --> temp_file.py:2:7
       |
     2 | print(temp_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -148,7 +167,6 @@ fn exclude_argument() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -200,7 +218,6 @@ fn configuration_include() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -225,14 +242,12 @@ fn configuration_include() -> anyhow::Result<()> {
       |
     2 | print(other_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> src/main.py:2:7
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -290,7 +305,6 @@ fn configuration_include_no_extension() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -342,14 +356,12 @@ fn configuration_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `temp_undefined_var` used when not defined
      --> temp_file.py:2:7
       |
     2 | print(temp_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -374,7 +386,6 @@ fn configuration_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -427,12 +438,44 @@ fn exclude_precedence_over_include() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
     ----- stderr -----
     ");
+
+    Ok(())
+}
+
+/// `src/keep.py` and `src/explicit` must be found under `dir[1]`. An unescaped
+/// `[1]` in their anchored globs would match paths under `dir1` instead,
+/// missing both files. `src/skip.py` must be excluded.
+#[test]
+fn project_directory_brackets_do_not_act_as_glob_syntax() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "dir[1]/ty.toml",
+            r#"
+            [src]
+            include = ["src/*.py", "src/explicit"]
+            exclude = ["src/skip.py"]
+            "#,
+        ),
+        ("dir[1]/src/keep.py", "print(undefined_keep)"),
+        ("dir[1]/src/skip.py", "print(undefined_skip)"),
+        ("dir[1]/src/explicit", "print(undefined_explicit)"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("dir[1]")).env("TY_OUTPUT_FORMAT", "concise"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    src/explicit:1:7: error[unresolved-reference] Name `undefined_explicit` used when not defined
+    src/keep.py:1:7: error[unresolved-reference] Name `undefined_keep` used when not defined
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
 
     Ok(())
 }
@@ -479,7 +522,6 @@ fn exclude_argument_precedence_include_argument() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -517,7 +559,6 @@ fn remove_default_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -542,14 +583,12 @@ fn remove_default_exclude() -> anyhow::Result<()> {
       |
     2 | print(another_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> src/main.py:2:7
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -596,7 +635,6 @@ fn cli_removes_config_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -613,14 +651,12 @@ fn cli_removes_config_exclude() -> anyhow::Result<()> {
       |
     2 | print(build_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> src/main.py:2:7
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -671,7 +707,6 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -688,7 +723,6 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
       |
     2 | print(dist_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -705,7 +739,6 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
       |
     2 | print(other_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -756,14 +789,12 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `dist_undefined_var` used when not defined
      --> tests/generated.py:2:7
       |
     2 | print(dist_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -780,7 +811,6 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -797,14 +827,12 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
       |
     2 | print(other_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> src/main.py:2:7
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -821,7 +849,6 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -831,7 +858,7 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Test that `--force-exclude` respects exclude patterns even for explicitly passed files.
+/// Test that `--force-exclude` respects exclude patterns for explicitly passed files and directories.
 #[test]
 fn force_exclude_directory_exclusion() -> anyhow::Result<()> {
     let case = CliTest::with_files([
@@ -868,14 +895,12 @@ fn force_exclude_directory_exclusion() -> anyhow::Result<()> {
       |
     3 | if base_path not in CMAKE_PREFIX_PATH:
       |                     ^^^^^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `CMAKE_PREFIX_PATH` used when not defined
      --> out/amd64/install/_setup_util.py:4:5
       |
     4 |     CMAKE_PREFIX_PATH.insert(0, base_path)
       |     ^^^^^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -891,6 +916,142 @@ fn force_exclude_directory_exclusion() -> anyhow::Result<()> {
 
     ----- stderr -----
     WARN No python files found under the given path(s)
+    ");
+
+    // The exclusion also applies when the passed directory is inside an excluded directory.
+    let output = case
+        .command()
+        .arg("--force-exclude")
+        .arg("out/amd64/install")
+        .output()?;
+    assert!(output.status.success(), "{output:?}");
+
+    Ok(())
+}
+
+/// Default exclusions do not apply to ancestors of the project root.
+#[test]
+fn force_exclude_project_under_excluded_directory() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "dist/project/src/main.py",
+        r#"
+        print(undefined_var)
+        "#,
+    )?;
+    let project_dir = case.root().join("dist/project");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)
+      |       ^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude").arg("src"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)
+      |       ^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude").arg("src/main.py"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)
+      |       ^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// Default exclusions do not apply to a sibling outside the project root.
+#[test]
+fn force_exclude_sibling_outside_project_root() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("dist/project/main.py", ""),
+        ("dist/sibling/main.py", "print(undefined_var)"),
+    ])?;
+    let project_dir = case.root().join("dist/project");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude").arg("../sibling"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> <temp_dir>/dist/sibling/main.py:1:7
+      |
+    1 | print(undefined_var)
+      |       ^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude").arg("../sibling/main.py"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> <temp_dir>/dist/sibling/main.py:1:7
+      |
+    1 | print(undefined_var)
+      |       ^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// A default exclusion does not apply to an explicit directory outside the project.
+#[test]
+fn force_exclude_directory_outside_project() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("project/main.py", ""),
+        ("sibling/dist/main.py", "print(undefined_var)"),
+    ])?;
+    let project_dir = case.root().join("project");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude").arg("../sibling/dist"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> <temp_dir>/sibling/dist/main.py:1:7
+      |
+    1 | print(undefined_var)
+      |       ^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
     ");
 
     Ok(())
@@ -935,14 +1096,12 @@ fn cli_and_configuration_exclude() -> anyhow::Result<()> {
       |
     2 | print(other_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> src/main.py:2:7
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -958,7 +1117,6 @@ fn cli_and_configuration_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -1142,14 +1300,12 @@ print(other_undefined)  # error: unresolved-reference
       |
     3 |     return missing_value  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> main.py:5:7
       |
     5 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -1166,7 +1322,6 @@ print(other_undefined)  # error: unresolved-reference
       |
     5 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -1219,21 +1374,18 @@ print(regular_undefined)  # error: unresolved-reference
       |
     2 | print(regular_undefined)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> src/module.py:3:12
       |
     3 |     return undefined_var  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `missing_value` used when not defined
      --> src/utils.py:3:12
       |
     3 |     return missing_value  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
-      |
 
     Found 3 diagnostics
 
@@ -1250,21 +1402,18 @@ print(regular_undefined)  # error: unresolved-reference
       |
     3 |     return undefined_var  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `missing_value` used when not defined
      --> generated_utils.py:3:12
       |
     3 |     return missing_value  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `regular_undefined` used when not defined
      --> regular.py:2:7
       |
     2 | print(regular_undefined)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^
-      |
 
     Found 3 diagnostics
 
@@ -1281,7 +1430,6 @@ print(regular_undefined)  # error: unresolved-reference
       |
     3 |     return undefined_var  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 

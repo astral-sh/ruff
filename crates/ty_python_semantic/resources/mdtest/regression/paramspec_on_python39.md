@@ -12,7 +12,7 @@ diagnostic message for `invalid-exception-caught` expects to construct `typing.P
 # error: [invalid-syntax]
 def foo[**P]() -> None:
     try:
-        pass
+        raise Exception
     # error: [invalid-exception-caught] "Invalid object caught in an exception handler: Object has type `ParamSpec`"
     except P:
         pass

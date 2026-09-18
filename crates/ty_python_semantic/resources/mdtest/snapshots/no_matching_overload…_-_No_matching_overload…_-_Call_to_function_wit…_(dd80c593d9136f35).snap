@@ -72,14 +72,12 @@ error[no-matching-overload]: No overload of function `foo` matches arguments
    |
 49 | foo(Foo(), Foo())  # error: [no-matching-overload]
    | ^^^^^^^^^^^^^^^^^
-   |
 info: First overload defined here
  --> src/mdtest_snippet.py:5:1
   |
 5 | / @overload
 6 | | def foo(a: int, b: int, c: int): ...
   | |____________________________________^ First overload defined here
-  |
 info: Possible overloads for function `foo`:
 info:   (a: int, b: int, c: int) -> Unknown
 info:   (a: str, b: int, c: int) -> Unknown
@@ -89,24 +87,23 @@ info:   (a: str, b: str, c: int) -> Unknown
 info:   (a: int, b: str, c: str) -> Unknown
 info:   (a: str, b: str, c: str) -> Unknown
 info:   (a: int, b: int, c: int) -> Unknown
-info:   (a: int | float, b: int, c: int) -> Unknown
-info:   (a: int, b: int | float, c: int) -> Unknown
-info:   (a: int, b: int, c: int | float) -> Unknown
-info:   (a: int | float, b: int | float, c: int) -> Unknown
-info:   (a: int, b: int | float, c: int | float) -> Unknown
-info:   (a: int | float, b: int | float, c: int | float) -> Unknown
+info:   (a: float, b: int, c: int) -> Unknown
+info:   (a: int, b: float, c: int) -> Unknown
+info:   (a: int, b: int, c: float) -> Unknown
+info:   (a: float, b: float, c: int) -> Unknown
+info:   (a: int, b: float, c: float) -> Unknown
+info:   (a: float, b: float, c: float) -> Unknown
 info:   (a: str, b: str, c: str) -> Unknown
-info:   (a: int | float, b: str, c: str) -> Unknown
-info:   (a: str, b: int | float, c: str) -> Unknown
-info:   (a: str, b: str, c: int | float) -> Unknown
-info:   (a: int | float, b: int | float, c: str) -> Unknown
-info:   (a: str, b: int | float, c: int | float) -> Unknown
-info:   (a: int | float, b: int | float, c: int | float) -> Unknown
+info:   (a: float, b: str, c: str) -> Unknown
+info:   (a: str, b: float, c: str) -> Unknown
+info:   (a: str, b: str, c: float) -> Unknown
+info:   (a: float, b: float, c: str) -> Unknown
+info:   (a: str, b: float, c: float) -> Unknown
+info:   (a: float, b: float, c: float) -> Unknown
 info: Overload implementation defined here
   --> src/mdtest_snippet.py:47:5
    |
 47 | def foo(a, b, c): ...
    |     ^^^^^^^^^^^^
-   |
 
 ```

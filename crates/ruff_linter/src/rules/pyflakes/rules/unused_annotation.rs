@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for local variables that are annotated but never used.
@@ -27,7 +28,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [PEP 484 – Type Hints](https://peps.python.org/pep-0484/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.172")]
+#[violation_metadata(stable_since = "v0.0.172", category = Category::Correctness)]
 pub(crate) struct UnusedAnnotation {
     name: String,
 }

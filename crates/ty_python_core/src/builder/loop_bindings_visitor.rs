@@ -34,7 +34,7 @@ pub(crate) struct LoopBindingsVisitor {
 }
 
 impl LoopBindingsVisitor {
-    pub(crate) fn add_place_from_target(&mut self, target: &ast::Expr) {
+    fn add_place_from_target(&mut self, target: &ast::Expr) {
         match target {
             ast::Expr::Name(name) => {
                 self.bound_places.push(PlaceExpr::from_expr_name(name));

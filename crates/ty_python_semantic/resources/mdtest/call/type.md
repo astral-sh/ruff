@@ -2,12 +2,184 @@
 
 ## Single-argument form
 
-A single-argument call to `type()` returns an object that has the argument's meta-type. (This is
-tested more extensively in `crates/ty_python_semantic/resources/mdtest/attributes.md`, alongside the
-tests for the `__class__` attribute.)
+A single-argument call to `type()` returns an object that has the argument's meta-type.
+
+### Basic
+
+For an integer literal, the result is the exact class object `int`.
 
 ```py
 reveal_type(type(1))  # revealed: <class 'int'>
+```
+
+### Classes of recursive intersections
+
+These aliases are invalid because expanding either one includes itself as a union member. During
+error recovery, computing the class of their intersection preserves every non-recursive member,
+regardless of expansion order.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import Intersection
+
+type First = Second | int  # error: [cyclic-type-alias-definition]
+type Second = First | str  # error: [cyclic-type-alias-definition]
+
+def recursive(value: Intersection[First, Second]):
+    reveal_type(type(value))  # revealed: type[int | str]
+```
+
+### Classes of recursive aliases with repeating specializations
+
+This invalid cyclic alias rotates its arguments through a finite set of specializations. During
+error recovery, class inference retains the union of those arguments instead of widening to `type`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Rotate[T, U] = T | Rotate[U, T]  # error: [cyclic-type-alias-definition]
+
+def rotating(value: Rotate[int, str]):
+    reveal_type(type(value))  # revealed: type[int | str]
+```
+
+### Classes of recursive aliases with growing specializations
+
+After reporting this invalid cyclic definition, class inference uses the non-recursive type
+argument. The recursive branch is discarded during error recovery even when its type arguments keep
+growing.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Growing[T] = T | Growing[list[T]]  # error: [cyclic-type-alias-definition]
+
+def growing(value: Growing[int]):
+    reveal_type(type(value))  # revealed: type[int]
+```
+
+### Classes of recursive class aliases with growing specializations
+
+The arguments of a recursive alias can grow while nested `type` specializations are resolved.
+Computing the class still terminates and retains the possible metaclasses.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Meta[T] = type[T]
+type Growing[T] = T | Meta[Growing[list[T]]]
+
+def growing_class(value: Growing[int]):
+    reveal_type(type(value))  # revealed: type[int | type]
+```
+
+### Classes of recursive class aliases with nested specializations
+
+An alias can forward a class type to another alias. Class inference also terminates when that class
+type contains a growing recursive specialization, retaining the possible metaclasses.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Meta[T] = type[T]
+type NestedMeta[T] = Meta[type[T]]
+type Growing[T] = T | NestedMeta[Growing[list[T]]]
+
+def nested_specialization(value: Growing[int]):
+    reveal_type(type(value))  # revealed: type[int | type]
+```
+
+### Classes of materialized recursive aliases
+
+Upper and lower materializations retain their different class types after recursive alias expansion.
+Interleaving queries with the original alias preserves all three results.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import Bottom, Top
+
+type Meta[T] = type[T]
+type Gradual = list[Any] | Meta[Gradual]
+
+def materialized_classes(top: Top[Gradual], bottom: Bottom[Gradual], plain: Gradual):
+    reveal_type(type(top))  # revealed: type[Top[list[Any]] | type]
+    reveal_type(type(bottom))  # revealed: type[Bottom[list[Any]] | type]
+    reveal_type(type(plain))  # revealed: type[list[Any] | type]
+    reveal_type(top.__class__)  # revealed: type[Top[list[Any]] | type]
+    reveal_type(bottom.__class__)  # revealed: type[Bottom[list[Any]] | type]
+    reveal_type(type(top))  # revealed: type[Top[list[Any]] | type]
+```
+
+### Classes with an aliased recursive type-variable bound
+
+A type variable cannot appear in its own bound, but this is not yet diagnosed when an alias hides
+the type variable. Computing a parameter's class still terminates in this case.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Meta[T] = type[T]
+
+def recursive_bound[T: Meta[T]](value: type[T]):
+    type(value)
+```
+
+### Classes with an identity alias in a recursive type-variable bound
+
+An identity alias can also hide an invalid bound that refers back to the same type variable.
+Computing a parameter's class terminates after the alias has been expanded.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Identity[T] = T
+
+def recursive_bound[T: Identity[T]](value: type[T]):
+    type(value)
+```
+
+### Classes with aliased recursive type-variable constraints
+
+An alias for `type[T]` can hide an invalid recursive constraint. Although this is not yet diagnosed,
+computing a `type[T]` parameter's class still terminates.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Meta[T] = type[T]
+
+def recursive_constraints[T: (Meta[T], int)](value: type[T]):
+    type(value)
 ```
 
 ## Three-argument form (dynamic class creation)
@@ -79,6 +251,14 @@ takes_foo2(foo2)  # OK
 takes_foo1(foo2)
 # error: [invalid-argument-type] "Argument to function `takes_foo2` is incorrect: Expected `mdtest_snippet.Foo @ src/mdtest_snippet.py:7:8`, found `mdtest_snippet.Foo @ src/mdtest_snippet.py:6:8`"
 takes_foo2(foo1)
+```
+
+The classes also remain distinct when both calls occur in the same string annotation, even though
+the surrounding type expression is invalid:
+
+```py
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+distinct: "static_assert(type('Foo', (), {}) is not type('Foo', (), {}))[int]"
 ```
 
 ## Instances and attribute access
@@ -518,7 +698,7 @@ them:
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def f(a: type[Any], b: type[Unknown]):
     reveal_type(a.__mro__)  # revealed: tuple[type, ...] & Any
@@ -691,7 +871,6 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
   |
 7 | class Foo1(Generic[K, V], dict): ...  # snapshot: inconsistent-mro
   |       ^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Move `Generic[K, V]` to the end of the bases list
   |
 6 | # error: [missing-type-argument]
@@ -729,7 +908,6 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
 16 | |     # comment5
 17 | | ): ...
    | |_^
-   |
 help: Move `Generic[K, V]` to the end of the bases list
    |
 11 |     # comment1
@@ -754,7 +932,6 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
    |
 19 | class Foo3(Generic[K, V], dict, metaclass=type): ...  # snapshot: inconsistent-mro
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Move `Generic[K, V]` to the end of the bases list
    |
 18 | # error: [missing-type-argument]
@@ -796,7 +973,6 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
 28 | |     # comment7
 29 | | ): ...
    | |_^
-   |
 help: Move `Generic[K, V]` to the end of the bases list
    |
 21 |     # comment1
@@ -828,7 +1004,6 @@ error[duplicate-base]: Duplicate base class <class 'A'> in class `Dup`
   |
 4 | Dup = type("Dup", (A, A), {})
   |       ^^^^^^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 ## Metaclass conflicts
@@ -956,7 +1131,6 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
   |
 8 | X = type("X", (A, B), {})
   |     ^^^^^^^^^^^^^^^^^^^^^ Bases `A` and `B` cannot be combined in multiple inheritance
-  |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
  --> src/mdtest_snippet.py:8:16
   |
@@ -964,7 +1138,6 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
   |                -  - `B` instances have a distinct memory layout because `B` defines non-empty `__slots__`
   |                |
   |                `A` instances have a distinct memory layout because `A` defines non-empty `__slots__`
-  |
 ```
 
 When the bases are not a tuple literal (e.g., a variable), the diagnostic is emitted without
@@ -980,6 +1153,31 @@ class D:
 bases: tuple[type[C], type[D]] = (C, D)
 # error: [instance-layout-conflict]
 Y = type("Y", bases, {})
+```
+
+When a class is created in the metadata of a string annotation, the diagnostic still highlights the
+class-creation call, not the whole string:
+
+```py
+from typing import Annotated
+
+# snapshot: instance-layout-conflict
+bad: "Annotated[int, type('Bad', (A, B), {})]"
+```
+
+```snapshot
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+  --> src/mdtest_snippet.py:21:22
+   |
+21 | bad: "Annotated[int, type('Bad', (A, B), {})]"
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^ Bases `A` and `B` cannot be combined in multiple inheritance
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
+  --> src/mdtest_snippet.py:21:35
+   |
+21 | bad: "Annotated[int, type('Bad', (A, B), {})]"
+   |                                   -  - `B` instances have a distinct memory layout because `B` defines non-empty `__slots__`
+   |                                   |
+   |                                   `A` instances have a distinct memory layout because `A` defines non-empty `__slots__`
 ```
 
 ## Cyclic functional class definitions
@@ -1187,6 +1385,44 @@ class Unrelated: ...
 Bad: type[Unrelated] = type("Bad", (Base,), {})
 ```
 
+## Dynamic class calls in string annotations
+
+Dynamic class constructors can appear as `Annotated` metadata inside valid string annotations:
+
+```py
+from collections import namedtuple
+from enum import Enum
+from types import new_class
+from typing import Annotated, NamedTuple, TypedDict
+
+def f(
+    builtin: "Annotated[int, type('X', (), {})]",
+    new: "Annotated[int, new_class('X', ())]",
+    enum: "Annotated[int, Enum('X', {'VALUE': 1})]",
+    named_tuple: "Annotated[int, NamedTuple('X', [('value', int)])]",
+    collections_named_tuple: "Annotated[int, namedtuple('X', ['value'])]",
+    typed_dict: "Annotated[int, TypedDict('X', {'value': int})]",
+):
+    reveal_type(builtin)  # revealed: int
+    reveal_type(new)  # revealed: int
+    reveal_type(enum)  # revealed: int
+    reveal_type(named_tuple)  # revealed: int
+    reveal_type(collections_named_tuple)  # revealed: int
+    reveal_type(typed_dict)  # revealed: int
+```
+
+An invalid subscript of a `type()` call should produce the usual diagnostic, including when the call
+appears in a nested string annotation:
+
+```py
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+plain: "type('X', (), {})[int]"
+
+name = "Nested"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+nested: "'type(name, (), {})[int]'"
+```
+
 ## Dynamic class reassignment in a loop
 
 A dynamic class can capture the previous value of a loop-carried variable in its namespace. Type
@@ -1290,7 +1526,8 @@ NT = type("NT", (NamedTuple,), {})
 
 ### Protocol bases
 
-Inheriting from a class that is itself a protocol is valid:
+When a dynamic class inherits from a source-defined protocol, it also inherits the protocol's
+`_ProtocolMeta` metaclass:
 
 ```py
 from typing import Protocol
@@ -1301,10 +1538,20 @@ class MyProtocol(Protocol):
 
 ProtoImpl = type("ProtoImpl", (MyProtocol,), {"method": lambda self: 42})
 reveal_type(ProtoImpl)  # revealed: <class 'ProtoImpl'>
+reveal_type(type(ProtoImpl))  # revealed: <class '_ProtocolMeta'>
 reveal_mro(ProtoImpl)  # revealed: (<class 'ProtoImpl'>, <class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
 
 instance = ProtoImpl()
 reveal_type(instance)  # revealed: ProtoImpl
+```
+
+A subclass of the dynamic class cannot choose a metaclass unrelated to `_ProtocolMeta`.
+
+```py
+class Meta(type): ...
+
+# error: [conflicting-metaclass]
+class Invalid(ProtoImpl, metaclass=Meta): ...
 ```
 
 ### TypedDict bases
@@ -1404,6 +1651,110 @@ reveal_type(instance)  # revealed: EmptyBases
 # object methods are available
 reveal_type(instance.__hash__())  # revealed: int
 reveal_type(instance.__str__())  # revealed: str
+```
+
+## Metaclasses with gradual bases
+
+A dynamically created class accepts an inherited metaclass with an unknown superclass. A known
+subclass of that metaclass still takes precedence, regardless of the order of the bases.
+
+```py
+from typing import Any
+
+def _(base: Any):
+    class Meta(base): ...
+    class DerivedMeta(Meta): ...
+    class Base(metaclass=Meta): ...
+    class Other(metaclass=DerivedMeta): ...
+    class Plain: ...
+
+    Child = type("Child", (Base, object), {})
+    Reversed = type("Reversed", (Plain, Base), {})
+    Combined = type("Combined", (Base, Other), {})
+
+    reveal_type(Child.__class__)  # revealed: <class 'Meta'>
+    reveal_type(Reversed.__class__)  # revealed: <class 'Meta'>
+    reveal_type(Combined.__class__)  # revealed: <class 'DerivedMeta'>
+```
+
+## Sibling metaclasses with an unknown ancestor
+
+An unknown ancestor cannot make sibling metaclasses inherit from each other without a cycle. We
+report the conflict and infer an unknown metaclass.
+
+```py
+from typing import Any
+
+def _(base: Any):
+    class RootMeta(base): ...
+    class LeftMeta(RootMeta): ...
+    class RightMeta(RootMeta): ...
+    class Left(metaclass=LeftMeta): ...
+    class Right(metaclass=RightMeta): ...
+
+    Combined = type("Combined", (Left, Right), {})  # error: [conflicting-metaclass]
+    Reversed = type("Reversed", (Right, Left), {})  # error: [conflicting-metaclass]
+
+    reveal_type(Combined.__class__)  # revealed: type[Unknown]
+    reveal_type(type(Reversed))  # revealed: type[Unknown]
+```
+
+## Metaclasses with a separate unknown base
+
+An unknown base outside the shared ancestry can make `LeftMeta` inherit from `RightMeta`. Only
+`LeftMeta` can be the winner, regardless of the order of the bases passed to `type()`.
+
+```py
+from typing import Any
+
+def _(extra: Any):
+    class RootMeta(type): ...
+    class RightMeta(RootMeta): ...
+    class LeftMeta(extra, RootMeta): ...
+    class Left(metaclass=LeftMeta): ...
+    class Right(metaclass=RightMeta): ...
+
+    Forward = type("Forward", (Left, Right), {})
+    Reverse = type("Reverse", (Right, Left), {})
+
+    reveal_type(Forward.__class__)  # revealed: <class 'LeftMeta'>
+    reveal_type(type(Reverse))  # revealed: <class 'LeftMeta'>
+```
+
+## Ambiguous metaclasses
+
+Unknown ancestry can leave either metaclass as the winner. Dynamic class creation preserves this
+uncertainty in both base orders and when inheriting from an ambiguous class.
+
+```py
+from typing import Any
+
+def _(base1: Any, base2: Any):
+    class Meta1(base1): ...
+    class Meta2(base2): ...
+    class A(metaclass=Meta1): ...
+    class B(metaclass=Meta2): ...
+
+    Forward = type("Forward", (A, B), {})
+    Reverse = type("Reverse", (B, A), {})
+    Child = type("Child", (Forward,), {})
+
+    reveal_type(Forward.__class__)  # revealed: type[Unknown]
+    reveal_type(type(Forward))  # revealed: type[Unknown]
+    reveal_type(Reverse.__class__)  # revealed: type[Unknown]
+    reveal_type(Child.__class__)  # revealed: type[Unknown]
+
+    # Once the metaclass is unknown, a later base does not resolve the ambiguity.
+    # The possible candidates are not retained, including when the unknown
+    # metaclass is inherited from a dynamic class.
+    class CommonMeta(Meta2, Meta1): ...
+    class Common(metaclass=CommonMeta): ...
+
+    WithCommonBase = type("WithCommonBase", (A, B, Common), {})
+    InheritedWithCommonBase = type("InheritedWithCommonBase", (Forward, Common), {})
+
+    reveal_type(WithCommonBase.__class__)  # revealed: type[Unknown]
+    reveal_type(InheritedWithCommonBase.__class__)  # revealed: type[Unknown]
 ```
 
 ## Custom metaclass via bases

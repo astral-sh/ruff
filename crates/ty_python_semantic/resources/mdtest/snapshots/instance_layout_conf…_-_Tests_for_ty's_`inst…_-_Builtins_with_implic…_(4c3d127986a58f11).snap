@@ -70,7 +70,6 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
 7 | |     str
 8 | | ): ...
   | |_^ Bases `int` and `str` cannot be combined in multiple inheritance
-  |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
  --> src/mdtest_snippet.py:6:5
   |
@@ -78,7 +77,6 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
   |     --- `int` instances have a distinct memory layout because of the way `int` is implemented in a C extension
 7 |     str
   |     --- `str` instances have a distinct memory layout because of the way `str` is implemented in a C extension
-  |
 
 ```
 
@@ -92,7 +90,6 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
 15 | |     B,
 16 | | ): ...
    | |_^ Bases `int` and `B` cannot be combined in multiple inheritance
-   |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
   --> src/mdtest_snippet.py:14:5
    |
@@ -100,7 +97,6 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
    |     --- `int` instances have a distinct memory layout because of the way `int` is implemented in a C extension
 15 |     B,
    |     - `B` instances have a distinct memory layout because `B` defines non-empty `__slots__`
-   |
 
 ```
 
@@ -114,7 +110,6 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
 21 | |     str
 22 | | ): ...
    | |_^ Bases `D` and `str` cannot be combined in multiple inheritance
-   |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
   --> src/mdtest_snippet.py:20:5
    |
@@ -125,7 +120,6 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
    |     `int` instances have a distinct memory layout because of the way `int` is implemented in a C extension
 21 |     str
    |     --- `str` instances have a distinct memory layout because of the way `str` is implemented in a C extension
-   |
 
 ```
 
@@ -135,7 +129,6 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
    |
 24 | class F(int, bytes, bytearray): ...  # error: [instance-layout-conflict]
    |       ^^^^^^^^^^^^^^^^^^^^^^^^ Bases `int`, `bytes` and `bytearray` cannot be combined in multiple inheritance
-   |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
   --> src/mdtest_snippet.py:24:9
    |
@@ -144,7 +137,6 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
    |         |    |
    |         |    `bytes` instances have a distinct memory layout because of the way `bytes` is implemented in a C extension
    |         `int` instances have a distinct memory layout because of the way `int` is implemented in a C extension
-   |
 
 ```
 
@@ -154,7 +146,6 @@ error[invalid-typed-dict-header]: `@disjoint_base` cannot be used with `TypedDic
    |
 31 | @disjoint_base  # error: [invalid-typed-dict-header] "`@disjoint_base` cannot be used with `TypedDict` class `Movie`"
    | ^^^^^^^^^^^^^^
-   |
 
 ```
 
@@ -164,7 +155,6 @@ error[invalid-protocol]: `@disjoint_base` cannot be used with protocol class `Su
    |
 34 | @disjoint_base  # error: [invalid-protocol] "`@disjoint_base` cannot be used with protocol class `SupportsClose`"
    | ^^^^^^^^^^^^^^
-   |
 
 ```
 
@@ -178,7 +168,6 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
 39 | |     H
 40 | | ): ...
    | |_^ Bases `G` and `H` cannot be combined in multiple inheritance
-   |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
   --> src/mdtest_snippet.py:38:5
    |
@@ -186,7 +175,6 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
    |     - `G` instances have a distinct memory layout because of the way `G` is implemented in a C extension
 39 |     H
    |     - `H` instances have a distinct memory layout because of the way `H` is implemented in a C extension
-   |
 
 ```
 
@@ -199,7 +187,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Sequence` among c
    |           |      |
    |           |      Later class base inherits from `Sequence[str]`
    |           Earlier class base inherits from `Sequence[int]`
-   |
 
 ```
 
@@ -209,6 +196,5 @@ error[subclass-of-final-class]: Class `Foo` cannot inherit from final class `ran
    |
 43 | class Foo(range, str): ...  # error: [subclass-of-final-class]
    |           ^^^^^
-   |
 
 ```

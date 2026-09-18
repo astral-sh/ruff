@@ -57,6 +57,29 @@ def _(x: Literal[1, "a"], y: Literal[1, "a", b"b"]):
         reveal_type(y)  # revealed: Literal["a", b"b"]
 ```
 
+## A tuple of classes covers a recursive union
+
+A fixed tuple of classes can cover every alternative in a recursive union. Such an `isinstance`
+check is always true; omitting one of those classes leaves the result uncertain.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+Implicit = int | list["Implicit"]
+type Explicit = int | list[Explicit]
+
+def implicit(value: Implicit):
+    reveal_type(isinstance(value, (int, list)))  # revealed: Literal[True]
+    reveal_type(isinstance(value, (int, str)))  # revealed: bool
+
+def explicit(value: Explicit):
+    reveal_type(isinstance(value, (int, list)))  # revealed: Literal[True]
+    reveal_type(isinstance(value, (int, str)))  # revealed: bool
+```
+
 ## `classinfo` is a nested tuple of types
 
 ```py
@@ -67,6 +90,182 @@ def _(x: Literal[1, "a"]):
         reveal_type(x)  # revealed: Literal[1]
     else:
         reveal_type(x)  # revealed: Literal["a"]
+```
+
+## Recursive tuples as `classinfo`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A recursive tuple of integer classes narrows a successful check to `int`. An unsuccessful check does
+not exclude integers: the tuple can be empty or contain only a subclass of `int`. Implicit and PEP
+695 aliases describe the same class-info values.
+
+```py
+ClassInfo = type[int] | tuple["ClassInfo", ...]
+type ExplicitClassInfo = type[int] | tuple[ExplicitClassInfo, ...]
+
+def implicit(value: object, classes: ClassInfo):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: object
+
+def explicit(value: object, classes: ExplicitClassInfo):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: object
+```
+
+Even when the leaf class is final, a failed check does not exclude its instances: the recursive
+tuple can be empty.
+
+```py
+from typing import final
+
+@final
+class Leaf: ...
+
+FinalClasses = type[Leaf] | tuple["FinalClasses", ...]
+type ExplicitFinalClasses = type[Leaf] | tuple[ExplicitFinalClasses, ...]
+
+def final_classes(value: object, classes: FinalClasses, explicit_classes: ExplicitFinalClasses):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: Leaf
+    else:
+        reveal_type(value)  # revealed: object
+    if isinstance(value, explicit_classes):
+        reveal_type(value)  # revealed: Leaf
+    else:
+        reveal_type(value)  # revealed: object
+```
+
+A tuple tree with no class objects can only make the check fail:
+
+```py
+OnlyTuples = tuple["OnlyTuples", ...]
+type ExplicitOnlyTuples = tuple[ExplicitOnlyTuples, ...]
+
+def only_tuples(value: object, classes: OnlyTuples, explicit_classes: ExplicitOnlyTuples):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: object
+    if isinstance(value, explicit_classes):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: object
+```
+
+## `classinfo` with changing recursive arguments
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Deeper tuples can contain different classes when the recursive type arguments change. The outer
+argument `int` does not describe all the classes tested: `(list,)` is also a valid class-info value.
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+Growing: TypeAlias = type[T] | tuple["Growing[list[T]]", ...]
+type ExplicitGrowing[T] = type[T] | tuple[ExplicitGrowing[list[T]], ...]
+
+classes: Growing[int] = (list,)
+explicit_classes: ExplicitGrowing[int] = (list,)
+
+def implicit(value: object, classes: Growing[int]):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: object
+
+def explicit(value: object, classes: ExplicitGrowing[int]):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: object
+```
+
+## Validating growing recursive tuples
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Changing type arguments does not invalidate a recursive tuple whose leaves are always classes. Both
+`isinstance` and `issubclass` accept these tuples, including classes reached through another alias.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+type Identity[U] = U
+ClassInfo = Identity[type] | tuple["ClassInfo[list[T]]", ...]
+type ExplicitClassInfo[T] = Identity[type] | tuple[ExplicitClassInfo[list[T]], ...]
+
+def valid(classes: ClassInfo[int], explicit_classes: ExplicitClassInfo[int]):
+    isinstance(None, classes)
+    issubclass(int, classes)
+    isinstance(None, explicit_classes)
+    issubclass(int, explicit_classes)
+```
+
+When the argument also supplies the leaf type, a class at the outer level does not guarantee that
+all deeper leaves are classes. These aliases also admit lists, which are invalid class-info values.
+
+```py
+Invalid = T | tuple["Invalid[list[T]]", ...]
+type ExplicitInvalid[T] = T | tuple[ExplicitInvalid[list[T]], ...]
+
+def invalid(classes: Invalid[type], explicit_classes: ExplicitInvalid[type]):
+    isinstance(None, classes)  # error: [invalid-argument-type]
+    issubclass(int, classes)  # error: [invalid-argument-type]
+    isinstance(None, explicit_classes)  # error: [invalid-argument-type]
+    issubclass(int, explicit_classes)  # error: [invalid-argument-type]
+```
+
+A leaf can itself be a recursive tuple with fixed arguments. Those arguments still constrain its
+leaves, even when the enclosing alias has growing arguments.
+
+```py
+U = TypeVar("U")
+Stable = U | tuple["Stable[U]", ...]
+Nested = Stable[type] | tuple["Nested[list[T]]", ...]
+type ExplicitNested[T] = Stable[type] | tuple[ExplicitNested[list[T]], ...]
+
+def nested(classes: Nested[int], explicit_classes: ExplicitNested[int]):
+    isinstance(None, classes)
+    issubclass(int, classes)
+    isinstance(None, explicit_classes)
+    issubclass(int, explicit_classes)
+```
+
+## Recursive tuples with metaclass arguments
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Successive metaclasses are still classes. Starting with `type[int]`, these aliases therefore contain
+only valid class-info values at every depth.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+ClassInfo = T | tuple["ClassInfo[type[T]]", ...]
+type ExplicitClassInfo[T] = T | tuple[ExplicitClassInfo[type[T]], ...]
+
+def valid(classes: ClassInfo[type[int]], explicit_classes: ExplicitClassInfo[type[int]]):
+    isinstance(None, classes)
+    issubclass(int, classes)
+    isinstance(None, explicit_classes)
+    issubclass(int, explicit_classes)
 ```
 
 ## `classinfo` is a PEP-604 union of types
@@ -125,7 +324,6 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
   |        ^^^^^^^^^^^^^^---------------^
   |                      |
   |                      This `UnionType` instance contains non-class elements
-  |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
@@ -144,7 +342,6 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
   |          ^^^^^^^^^^^^^^-------------------------------^
   |                        |
   |                        This `UnionType` instance contains non-class elements
-  |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Elements `<special-form 'Literal[42]'>` and `<class 'list[int]'>` in the union are not class objects
 ```
@@ -163,7 +360,6 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
    |          ^^^^^^^^^^^^^^----------------------------^
    |                        |
    |                        This `UnionType` instance contains non-class elements
-   |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<special-form 'typing.Any'>` in the union, and 2 more elements, are not class objects
 ```
@@ -192,7 +388,6 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
    |        ^^^^^^^^^^^^^^^^^^^^-----------------^^
    |                            |
    |                            This `UnionType` instance contains non-class elements
-   |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
@@ -216,7 +411,6 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^-----------------^^^
    |                                  |
    |                                  This `UnionType` instance contains non-class elements
-   |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
@@ -240,7 +434,6 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
    |
 31 |     if isinstance(x, classes):
    |        ^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union `list[int] | bytes` is not a class object
 ```
@@ -311,7 +504,7 @@ def f(x: dict[str, int] | list[str], y: object):
         reveal_type(x)  # revealed: list[str]
 
     if isinstance(y, t.Callable):
-        reveal_type(y)  # revealed: Top[(...) -> object]
+        reveal_type(y)  # revealed: (...) -> Unknown
 ```
 
 ## Class types
@@ -336,6 +529,37 @@ elif isinstance(x, (A, C)):
     reveal_type(x)  # revealed: C & ~A & ~B
 else:
     reveal_type(x)  # revealed: ~A & ~B & ~C
+```
+
+## `NewType` instances and concrete-base subclasses
+
+A `NewType` constructor returns its argument unchanged at runtime, and runtime class checks ignore
+its static tag. The resulting value can therefore still be an instance of a subclass of its concrete
+base. For example, `UserId(True)` is valid because `bool` is a subtype of `int`, and the returned
+value remains a `bool`.
+
+```py
+from typing import NewType
+
+class Base: ...
+class Child(Base): ...
+
+BrandedBase = NewType("BrandedBase", Base)
+UserId = NewType("UserId", int)
+
+UserId(True)
+
+def narrow_branded_subclass(value: BrandedBase) -> None:
+    if isinstance(value, Child):
+        reveal_type(value)  # revealed: BrandedBase & Child
+    else:
+        reveal_type(value)  # revealed: BrandedBase & ~Child
+
+def narrow_branded_boolean(value: UserId) -> None:
+    if isinstance(value, bool):
+        reveal_type(value)  # revealed: UserId & bool
+    else:
+        reveal_type(value)  # revealed: UserId & ~bool
 ```
 
 ## No narrowing for instances of `builtins.type`
@@ -390,11 +614,11 @@ def _(x: Literal[1, "a"]):
 from typing import Literal
 
 def _(x: Literal[1, "a"]):
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["a"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `_ClassInfo`, found `Literal["a"]"
     if isinstance(x, "a"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["int"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `_ClassInfo`, found `Literal["int"]"
     if isinstance(x, "int"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 ```
@@ -609,14 +833,19 @@ def f(x: Foo, y: Intersection[type[Bar], type[list[int]]]):
 
 ## Narrowing with generics
 
+### Strict mode
+
 ```toml
 [environment]
 python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
 ```
 
-Narrowing to a generic class using `isinstance()` uses the top materialization of the generic. With
-a covariant generic, this is equivalent to using the upper bound of the type parameter (by default,
-`object`):
+In strict mode, narrowing to a generic class using `isinstance()` uses the top materialization of
+the generic. With a covariant generic, this is equivalent to using the upper bound of the type
+parameter (by default, `object`):
 
 ```py
 from typing import Self
@@ -629,6 +858,88 @@ def _(x: object):
     if isinstance(x, Covariant):
         reveal_type(x)  # revealed: Covariant[object]
         reveal_type(x.get())  # revealed: object
+```
+
+A bounded covariant generic uses its declared upper bound rather than `object`:
+
+```py
+class BoundedCovariant[T: int]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, BoundedCovariant):
+        reveal_type(x)  # revealed: BoundedCovariant[int]
+        reveal_type(x.get())  # revealed: int
+```
+
+Negative narrowing must exclude every specialization of a bounded generic, including a gradual one.
+
+```py
+from typing import Any
+
+def excludes_bounded_generic(value: BoundedCovariant[Any] | bool) -> bool:
+    if isinstance(value, BoundedCovariant):
+        reveal_type(value)  # revealed: BoundedCovariant[int & Any]
+        return False
+
+    reveal_type(value)  # revealed: bool
+    return value
+```
+
+The same exclusion applies when the generic appears in a tuple of runtime classes.
+
+```py
+def excludes_bounded_generic_tuple(
+    value: BoundedCovariant[Any] | bool | bytes,
+) -> bool:
+    if isinstance(value, (BoundedCovariant, bytes)):
+        reveal_type(value)  # revealed: BoundedCovariant[int & Any] | bytes
+        return False
+
+    reveal_type(value)  # revealed: bool
+    return value
+```
+
+Constrained type parameters preserve the materialization of the generic class while making the union
+of valid constraints available when reading a covariant attribute:
+
+```py
+class ConstrainedCovariant[T: (int, str)]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, ConstrainedCovariant):
+        reveal_type(x)  # revealed: Top[ConstrainedCovariant[Unknown]]
+        reveal_type(x.get())  # revealed: int | str
+```
+
+Constrained generics must also be excluded by negative narrowing.
+
+```py
+def excludes_constrained_generic(value: ConstrainedCovariant[Any] | bool) -> bool:
+    if isinstance(value, ConstrainedCovariant):
+        reveal_type(value)  # revealed: ConstrainedCovariant[Any]
+        return False
+
+    reveal_type(value)  # revealed: bool
+    return value
+```
+
+A concrete `ParamSpec` specialization does not affect an `isinstance()` check. Negative narrowing
+therefore excludes that specialization along with every other instance of the generic class.
+
+```py
+from typing import Callable
+
+class ParamSpecBox[**P]:
+    callback: Callable[P, None]
+
+def excludes_paramspec_generic(value: ParamSpecBox[[int]] | int) -> int:
+    if isinstance(value, ParamSpecBox):
+        return 0
+    return value
 ```
 
 Similarly, contravariant type parameters use their lower bound of `Never`:
@@ -692,7 +1003,7 @@ class InvariantWithAny[T: int]:
 def _(x: object):
     if isinstance(x, InvariantWithAny):
         reveal_type(x)  # revealed: Top[InvariantWithAny[Unknown]]
-        reveal_type(x.a)  # revealed: object
+        reveal_type(x.a)  # revealed: int
         reveal_type(x.b)  # revealed: Any
 ```
 
@@ -732,6 +1043,28 @@ def _(x: Invariant[int] | Covariant[str]):
         reveal_type(x)  # revealed: Covariant[str] & ~Top[Invariant[Unknown]]
 ```
 
+The built-in `tuple` stores its variable-length shape separately from its generic type argument.
+Narrowing must preserve and materialize that shape.
+
+```py
+def narrow_tuple(value: object) -> None:
+    if isinstance(value, tuple):
+        reveal_type(value)  # revealed: tuple[object, ...]
+```
+
+A tuple subclass retains its nominal type and inherits its tuple shape from its specialized base.
+The subclass's own type parameter is still materialized using its declared bound.
+
+```py
+class BoundedTuple[T: int](tuple[T, str]): ...
+
+def narrow_tuple_subclass(value: object) -> None:
+    if isinstance(value, BoundedTuple):
+        reveal_type(value)  # revealed: BoundedTuple[int]
+        reveal_type(value[0])  # revealed: int
+        reveal_type(value[1])  # revealed: str
+```
+
 The behavior of `issubclass()` is similar.
 
 ```py
@@ -744,6 +1077,648 @@ def _(x: type[object], y: type[object], z: type[object]):
         reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
 ```
 
+Negative `issubclass()` narrowing also excludes every specialization of a bounded generic.
+
+```py
+def excludes_bounded_generic_subclass(
+    cls: type[BoundedCovariant[Any]] | type[bool],
+) -> type[bool]:
+    if issubclass(cls, BoundedCovariant):
+        reveal_type(cls)  # revealed: type[BoundedCovariant[Any]]
+        return bool
+
+    reveal_type(cls)  # revealed: <class 'bool'>
+    return cls
+```
+
+### Gradual mode
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = false
+```
+
+In gradual mode, narrowing to a generic class using `isinstance()` preserves any compatible
+specialization from the original type. If the original type does not provide a specialization, we
+intersect with the `Unknown` specialization. The negative branch still excludes the top
+materialization because a failed `isinstance()` check rules out every specialization of the class.
+
+```py
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, Covariant):
+        # `object & Covariant[Unknown]` simplifies to `Covariant[Unknown]`.
+        reveal_type(x)  # revealed: Covariant[Unknown]
+        reveal_type(x.get())  # revealed: Unknown
+    else:
+        reveal_type(x)  # revealed: ~Covariant[object]
+```
+
+For contravariant generics, we similarly intersect with the `Unknown` specialization:
+
+```py
+class Contravariant[T]:
+    def push(self, x: T) -> None: ...
+
+def _(x: object):
+    if isinstance(x, Contravariant):
+        reveal_type(x)  # revealed: Contravariant[Unknown]
+        x.push(42)
+        x.push("foo")
+    else:
+        reveal_type(x)  # revealed: ~Contravariant[Never]
+```
+
+Similarly, for invariant generics we intersect with the `Unknown` specialization. Reading produces
+`Unknown`, while writing accepts arguments of any type:
+
+```py
+class Invariant[T]:
+    def push(self, x: T) -> None: ...
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, Invariant):
+        reveal_type(x)  # revealed: Invariant[Unknown]
+        reveal_type(x.get)  # revealed: bound method Invariant[Unknown].get() -> Unknown
+        reveal_type(x.get())  # revealed: Unknown
+        reveal_type(x.push)  # revealed: bound method Invariant[Unknown].push(x: Unknown) -> None
+        x.push(42)
+        x.push("foo")
+    else:
+        reveal_type(x)  # revealed: ~Top[Invariant[Unknown]]
+```
+
+Narrowing already specialized generics preserves their concrete type arguments:
+
+```py
+class P: ...
+
+def _(x: Covariant[P], y: Contravariant[P], z: Invariant[P]):
+    if isinstance(x, Covariant):
+        reveal_type(x)  # revealed: Covariant[P]
+    if isinstance(y, Contravariant):
+        reveal_type(y)  # revealed: Contravariant[P]
+    if isinstance(z, Invariant):
+        reveal_type(z)  # revealed: Invariant[P]
+```
+
+Specialized base classes also determine the type arguments of matching subclasses, including
+subclasses with a stricter variance:
+
+```py
+class SubOfCovariant[T](Covariant[T]): ...
+class SubOfContravariant[T](Contravariant[T]): ...
+class SubOfInvariant[T](Invariant[T]): ...
+
+class InvariantSubOfCovariant[T](Covariant[T]):
+    def push(self, value: T) -> None: ...
+
+class InvariantSubOfContravariant[T](Contravariant[T]):
+    def get(self) -> T:
+        raise NotImplementedError
+
+def narrow_generic_subclasses(covariant: Covariant[P], contravariant: Contravariant[P], invariant: Invariant[P]) -> None:
+    if isinstance(covariant, SubOfCovariant):
+        reveal_type(covariant)  # revealed: SubOfCovariant[P]
+
+    if isinstance(contravariant, SubOfContravariant):
+        reveal_type(contravariant)  # revealed: SubOfContravariant[P]
+
+    if isinstance(invariant, SubOfInvariant):
+        reveal_type(invariant)  # revealed: SubOfInvariant[P]
+
+    if isinstance(covariant, InvariantSubOfCovariant):
+        reveal_type(covariant)  # revealed: InvariantSubOfCovariant[P]
+
+    if isinstance(contravariant, InvariantSubOfContravariant):
+        reveal_type(contravariant)  # revealed: InvariantSubOfContravariant[P]
+```
+
+Narrowing unions and intersections preserves unrelated types when they can overlap with the checked
+class, while excluding unrelated final classes:
+
+```py
+from typing import Sequence, final
+from ty_extensions import Intersection
+
+@final
+class Item: ...
+
+class OpenItem: ...
+
+def _(value: Item | OpenItem | Sequence[int]) -> None:
+    if isinstance(value, list):
+        reveal_type(value)  # revealed: (OpenItem & list[Unknown]) | list[int]
+
+def _(
+    value: Intersection[OpenItem, Sequence[int]],
+) -> None:
+    if isinstance(value, list):
+        reveal_type(value)  # revealed: OpenItem & list[int]
+```
+
+When an intersection contains multiple specialized bases, each base contributes its known type
+arguments to a matching subclass:
+
+```py
+class Left[L]: ...
+class Right[R]: ...
+
+class Both[L, R](Left[L], Right[R]):
+    left: L
+    right: R
+
+def _(value: Intersection[Left[int], Right[str]]) -> None:
+    if isinstance(value, Both):
+        reveal_type(value)  # revealed: Both[int, str]
+        reveal_type(value.left)  # revealed: int
+        reveal_type(value.right)  # revealed: str
+```
+
+Subclass type arguments are inferred through their actual inheritance relationship, so this also
+works correctly if type parameters change position:
+
+```py
+class Base[A, B]: ...
+class Child[X, Y](Base[Y, X]): ...
+
+def _(value: Base[int, str]) -> None:
+    if isinstance(value, Child):
+        reveal_type(value)  # revealed: Child[str, int]
+```
+
+A subclass type parameter that cannot be inferred from its base remains `Unknown`:
+
+```py
+class PartiallyInferredChild[Extra1, T, Extra2](Sequence[T]): ...
+
+def _(value: Sequence[int]) -> None:
+    if isinstance(value, PartiallyInferredChild):
+        reveal_type(value)  # revealed: PartiallyInferredChild[Unknown, int, Unknown]
+```
+
+If we're "narrowing" in the opposite direction, we retain the existing subclass specialization:
+
+```py
+def _(covariant: SubOfCovariant[P], contravariant: SubOfContravariant[P], invariant: SubOfInvariant[P]) -> None:
+    if isinstance(covariant, Covariant):
+        reveal_type(covariant)  # revealed: SubOfCovariant[P]
+
+    if isinstance(contravariant, Contravariant):
+        reveal_type(contravariant)  # revealed: SubOfContravariant[P]
+
+    if isinstance(invariant, Invariant):
+        reveal_type(invariant)  # revealed: SubOfInvariant[P]
+```
+
+This also works for runtime-checkable protocols:
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader[T](Protocol):
+    def read(self) -> T: ...
+
+class Concrete[T]:
+    def read(self) -> T:
+        raise NotImplementedError
+
+def _(value: Concrete[int]) -> None:
+    if isinstance(value, Reader):
+        reveal_type(value)  # revealed: Concrete[int]
+        reveal_type(value.read())  # revealed: int
+```
+
+## Negative narrowing for protocols with gradual members
+
+Negative narrowing excludes every materialization of a protocol, including when its members are
+gradual. `IntReader` is a subtype of the fully materialized `Reader` protocol, so the negative
+branch retains only `None`:
+
+```py
+from typing import Any, Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader(Protocol):
+    def read(self) -> Any: ...
+
+class IntReader:
+    def read(self) -> int:
+        return 1
+
+def f(reader: IntReader | None):
+    if isinstance(reader, Reader):
+        reveal_type(reader.read())  # revealed: int
+    else:
+        reveal_type(reader)  # revealed: None
+```
+
+## Narrowing iterables to containers and iterators in strict mode
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+Narrowing an `Iterable[T]` to an `Iterator`, or to a container type, retains its element type. See
+`generics/set_theoretic.md` for more details on the assumptions behind this, and for an explanation
+of the behavior of invariant containers:
+
+```py
+from typing import Iterable, Iterator
+
+def f(values: Iterable[int]):
+    if isinstance(values, Iterator):
+        reveal_type(values)  # revealed: Iterator[int]
+        reveal_type(next(values))  # revealed: int
+    if isinstance(values, tuple):
+        reveal_type(values)  # revealed: tuple[int, ...]
+        reveal_type(values[0])  # revealed: int
+    if isinstance(values, frozenset):
+        reveal_type(values)  # revealed: frozenset[int]
+        reveal_type(next(iter(values)))  # revealed: int
+    if isinstance(values, list):
+        reveal_type(values)  # revealed: Top[list[Unknown & int]]
+        reveal_type(values[0])  # revealed: int
+    if isinstance(values, set):
+        reveal_type(values)  # revealed: Top[set[Unknown & int]]
+        reveal_type(next(iter(values)))  # revealed: int
+```
+
+## Use cases: `isinstance` narrowing and generics
+
+### Strict mode
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+#### Covariance
+
+Narrowing from `object` via `isinstance(.., Sequence)`:
+
+```py
+from typing import Sequence, final
+
+def _(xs: object):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: Sequence[object]
+        for x in xs:
+            reveal_type(x)  # revealed: object
+    else:
+        reveal_type(xs)  # revealed: ~Sequence[object]
+```
+
+Narrowing from `Item | Sequence[Item]` via `isinstance(.., Sequence)`:
+
+```py
+@final
+class Item: ...
+
+def _(xs: Item | Sequence[Item]):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: Sequence[Item]
+        for x in xs:
+            reveal_type(x)  # revealed: Item
+    else:
+        reveal_type(xs)  # revealed: Item
+```
+
+Narrowing from (non-final) `OpenItem | Sequence[OpenItem]` via `isinstance(.., Sequence)`:
+
+```py
+class OpenItem: ...
+
+def _(xs: OpenItem | Sequence[OpenItem]):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: (OpenItem & Sequence[object]) | Sequence[OpenItem]
+        for x in xs:
+            reveal_type(x)  # revealed: object
+    else:
+        reveal_type(xs)  # revealed: OpenItem & ~Sequence[object]
+```
+
+#### Invariance
+
+Narrowing from `object` via `isinstance(.., list)`:
+
+```py
+def _(xs: object):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: Top[list[Unknown]]
+        for x in xs:
+            reveal_type(x)  # revealed: object
+
+        # This is an error in strict mode:
+        # error: [invalid-argument-type] "Expected `Never`, found `Literal[1]`"
+        xs.append(1)
+
+    else:
+        reveal_type(xs)  # revealed: ~Top[list[Unknown]]
+```
+
+Narrowing from `Item | list[Item]` via `isinstance(.., list)`:
+
+```py
+from typing import final
+
+@final
+class Item: ...
+
+def _(xs: Item | list[Item]):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: list[Item]
+        for x in xs:
+            reveal_type(x)  # revealed: Item
+    else:
+        reveal_type(xs)  # revealed: Item
+```
+
+Narrowing from (non-final) `OpenItem | list[OpenItem]` via `isinstance(.., list)`:
+
+```py
+class OpenItem: ...
+
+def _(xs: OpenItem | list[OpenItem]):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: (OpenItem & Top[list[Unknown]]) | list[OpenItem]
+        for x in xs:
+            reveal_type(x)  # revealed: object
+    else:
+        reveal_type(xs)  # revealed: OpenItem & ~Top[list[Unknown]]
+```
+
+#### Exhaustiveness checking
+
+```py
+def _(xs: list[str] | set[str]) -> str:
+    if isinstance(xs, list):
+        return "it's a list!"
+    elif isinstance(xs, set):
+        return "it's a set!"
+```
+
+#### Invariance with bounded type variables
+
+A value of a type variable bounded by `str` can also be an instance of a `Box` specialization
+through multiple inheritance. Checking `isinstance(value, Box)` cannot establish that this
+specialization is `Box[T]`, so the intersection with `T` survives and the return is rejected.
+
+```py
+class Box[T]:
+    value: T
+
+def narrow_box[T: str](value: Box[T] | T) -> Box[T]:
+    if isinstance(value, Box):
+        reveal_type(value)  # revealed: Box[T@narrow_box] | (T@narrow_box & Top[Box[Unknown]])
+        return value  # error: [invalid-return-type]
+
+    reveal_type(value)  # revealed: T@narrow_box & ~Top[Box[Unknown]]
+    raise TypeError
+```
+
+### Gradual mode
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = false
+```
+
+#### Covariance
+
+Narrowing from `object` via `isinstance(.., Sequence)`:
+
+```py
+from typing import Sequence, final
+
+def _(xs: object):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: Sequence[Unknown]
+        for x in xs:
+            reveal_type(x)  # revealed: Unknown
+    else:
+        reveal_type(xs)  # revealed: ~Sequence[object]
+```
+
+Narrowing from `Item | Sequence[Item]` via `isinstance(.., Sequence)`:
+
+```py
+@final
+class Item: ...
+
+def _(xs: Item | Sequence[Item]):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: Sequence[Item]
+        for x in xs:
+            reveal_type(x)  # revealed: Item
+    else:
+        reveal_type(xs)  # revealed: Item
+```
+
+Narrowing from (non-final) `OpenItem | Sequence[OpenItem]` via `isinstance(.., Sequence)`:
+
+```py
+class OpenItem: ...
+
+def _(xs: OpenItem | Sequence[OpenItem]):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: (OpenItem & Sequence[Unknown]) | Sequence[OpenItem]
+        for x in xs:
+            reveal_type(x)  # revealed: Unknown | OpenItem
+    else:
+        reveal_type(xs)  # revealed: OpenItem & ~Sequence[object]
+```
+
+#### Invariance
+
+Narrowing from `object` via `isinstance(.., list)`:
+
+```py
+def _(xs: object):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: list[Unknown]
+        for x in xs:
+            reveal_type(x)  # revealed: Unknown
+
+        xs.append(1)
+        xs.append("foo")
+
+    else:
+        reveal_type(xs)  # revealed: ~Top[list[Unknown]]
+```
+
+Narrowing from `Item | list[Item]` via `isinstance(.., list)`:
+
+```py
+from typing import final
+
+@final
+class Item: ...
+
+def _(xs: Item | list[Item]):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: list[Item]
+        for x in xs:
+            reveal_type(x)  # revealed: Item
+    else:
+        reveal_type(xs)  # revealed: Item
+```
+
+Narrowing from (non-final) `OpenItem | list[OpenItem]` via `isinstance(.., list)`:
+
+```py
+class OpenItem: ...
+
+def _(xs: OpenItem | list[OpenItem]):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: (OpenItem & list[Unknown]) | list[OpenItem]
+        for x in xs:
+            reveal_type(x)  # revealed: Unknown | OpenItem
+    else:
+        reveal_type(xs)  # revealed: OpenItem & ~Top[list[Unknown]]
+```
+
+#### Exhaustiveness checking
+
+```py
+def _(xs: list[str] | set[str]) -> str:
+    if isinstance(xs, list):
+        return "it's a list!"
+    elif isinstance(xs, set):
+        return "it's a set!"
+```
+
+#### Invariance with bounded type variables
+
+A value of a type variable bounded by `str` can also be an instance of a `Box` specialization
+through multiple inheritance. In gradual mode, `isinstance(value, Box)` preserves this overlap using
+`Box[Unknown]`, which is assignable to `Box[T]`, so the return statement is (unsoundly) accepted.
+
+```py
+class Box[T]:
+    value: T
+
+def narrow_box[T: str](value: Box[T] | T) -> Box[T]:
+    if isinstance(value, Box):
+        reveal_type(value)  # revealed: Box[T@narrow_box] | (T@narrow_box & Box[Unknown])
+        return value
+
+    reveal_type(value)  # revealed: T@narrow_box & ~Top[Box[Unknown]]
+    raise TypeError
+```
+
+## Narrowing recursively bounded generics (strict mode)
+
+An `isinstance()` check must not recurse indefinitely when a generic bound refers to its own class.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Any
+
+class Recursive[T: "Recursive[Any]"]: ...
+
+def narrow(value: object) -> None:
+    if isinstance(value, Recursive):
+        reveal_type(value)  # revealed: Recursive[object]
+```
+
+A self-referential bound must also be safe when its recursion is hidden behind a type alias.
+
+```py
+class AliasedRecursive[T: "RecursiveAlias"]: ...
+
+type RecursiveAlias = AliasedRecursive[Any]
+
+def narrow_alias(value: object) -> None:
+    if isinstance(value, AliasedRecursive):
+        reveal_type(value)  # revealed: AliasedRecursive[object]
+```
+
+The same cycle recovery must handle bounds shared by mutually recursive generic classes.
+
+```py
+class Left[T: "Right[Any]"]: ...
+class Right[U: Left[Any]]: ...
+
+def narrow_mutual(value: object) -> None:
+    if isinstance(value, Left):
+        reveal_type(value)  # revealed: Left[object]
+
+    if isinstance(value, Right):
+        reveal_type(value)  # revealed: Right[object]
+```
+
+## Narrowing recursively bounded generics (gradual mode)
+
+An `isinstance()` check must not recurse indefinitely when a generic bound refers to its own class.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = false
+```
+
+```py
+from typing import Any
+
+class Recursive[T: "Recursive[Any]"]: ...
+
+def narrow(value: object) -> None:
+    if isinstance(value, Recursive):
+        reveal_type(value)  # revealed: Recursive[Unknown]
+```
+
+A self-referential bound must also be safe when its recursion is hidden behind a type alias.
+
+```py
+class AliasedRecursive[T: "RecursiveAlias"]: ...
+
+type RecursiveAlias = AliasedRecursive[Any]
+
+def narrow_alias(value: object) -> None:
+    if isinstance(value, AliasedRecursive):
+        reveal_type(value)  # revealed: AliasedRecursive[Unknown]
+```
+
+The same cycle recovery must handle bounds shared by mutually recursive generic classes.
+
+```py
+class Left[T: "Right[Any]"]: ...
+class Right[U: Left[Any]]: ...
+
+def narrow_mutual(value: object) -> None:
+    if isinstance(value, Left):
+        reveal_type(value)  # revealed: Left[Unknown]
+
+    if isinstance(value, Right):
+        reveal_type(value)  # revealed: Right[Unknown]
+```
+
 ## Narrowing generic defaults in Python 3.13
 
 When a type parameter has a bare `Any` default, narrowing still materializes the substituted
@@ -753,6 +1728,9 @@ instead), so the default value is irrelevant here:
 ```toml
 [environment]
 python-version = "3.13"
+
+[analysis]
+strict-generic-narrowing = true
 ```
 
 ```py
@@ -779,6 +1757,82 @@ class WithAliasDefault[T = A]:
 def _(x: object):
     if isinstance(x, WithAliasDefault):
         reveal_type(x.y)  # revealed: tuple[A, object]
+```
+
+`isinstance(value, Box)` checks the runtime class, not the type argument used to specialize it.
+Narrowing must therefore preserve the original type argument instead of substituting `Box`'s
+default.
+
+```py
+from typing import assert_never, final
+
+@final
+class Box[T: str = str]:
+    value: T
+
+    def __init__(self, value: T) -> None: ...
+
+def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
+    if isinstance(value, Box):
+        reveal_type(value)  # revealed: Box[T@box_with_default]
+        return value
+
+    if not isinstance(value, Box):
+        reveal_type(value)  # revealed: T@box_with_default
+        return Box[T](value)
+
+    assert_never(value)
+```
+
+When `isinstance()` narrows a value of type `object` to a tuple subclass, its type argument comes
+from the declared upper bound, not the default. Its element types are inherited from the specialized
+base.
+
+```py
+class DefaultedTuple[T: int = bool](tuple[T, str]): ...
+
+def narrow_defaulted_tuple(value: object) -> None:
+    if isinstance(value, DefaultedTuple):
+        reveal_type(value)  # revealed: DefaultedTuple[int]
+        reveal_type(value[0])  # revealed: int
+        reveal_type(value[1])  # revealed: str
+```
+
+Negative narrowing also excludes gradual specializations of the defaulted tuple subclass.
+
+```py
+def excludes_defaulted_tuple(value: DefaultedTuple[Any] | bool) -> bool:
+    if isinstance(value, DefaultedTuple):
+        reveal_type(value)  # revealed: DefaultedTuple[int & Any]
+        reveal_type(value[0])  # revealed: int & Any
+        reveal_type(value[1])  # revealed: str
+        return False
+
+    reveal_type(value)  # revealed: bool
+    return value
+```
+
+## Narrowing bounded generic defaults in gradual mode
+
+In gradual mode, narrowing a value of type `object` to a tuple subclass leaves its type argument
+`Unknown`.
+
+```toml
+[environment]
+python-version = "3.13"
+
+[analysis]
+strict-generic-narrowing = false
+```
+
+```py
+class DefaultedTuple[T: int = bool](tuple[T, str]): ...
+
+def narrow_defaulted_tuple(value: object) -> None:
+    if isinstance(value, DefaultedTuple):
+        reveal_type(value)  # revealed: DefaultedTuple[Unknown]
+        reveal_type(value[0])  # revealed: Unknown
+        reveal_type(value[1])  # revealed: str
 ```
 
 ## Narrowing generic `classmethod`
@@ -857,4 +1911,76 @@ def f():
     else:
         reveal_type(value)  # revealed: str
         reveal_type(result)  # revealed: Literal[False]
+```
+
+## Preserving TypedDict interfaces when narrowing mappings
+
+A `TypedDict` is always a dictionary at runtime, but its static interface deliberately disallows
+operations that could remove required keys or introduce undeclared ones. Narrowing to `dict`,
+`Mapping`, or `MutableMapping` must not discard these restrictions.
+
+Use a `TypedDict` with one required key and one optional key to distinguish safe operations from
+those that could invalidate its declared shape.
+
+```py
+from typing import TypedDict, Mapping, MutableMapping
+from typing_extensions import NotRequired
+
+class Payload(TypedDict):
+    key: int
+    optional: NotRequired[str]
+```
+
+Narrowing directly to `dict` preserves both the required-key restrictions and the optional key's
+known type.
+
+```py
+def narrow_typed_dict_to_dict(value: int | Payload) -> None:
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: Payload
+        reveal_type(value["key"])  # revealed: int
+        value["key"] = 1
+        value["optional"] = "present"
+        reveal_type(value.pop("optional"))  # revealed: str
+
+        # error: [unresolved-attribute]
+        value.clear()
+        # error: [invalid-argument-type] "Cannot pop required field 'key' from TypedDict `Payload`"
+        value.pop("key")
+        # error: [invalid-key] "Unknown key "unexpected" for TypedDict `Payload`"
+        value["unexpected"] = 1
+        # error: [invalid-argument-type] "Cannot delete required key "key" from TypedDict `Payload`"
+        del value["key"]
+```
+
+Same for `MutableMapping`:
+
+```py
+def narrow_typed_dict_to_mutable_mapping(value: Payload) -> None:
+    if isinstance(value, MutableMapping):
+        reveal_type(value)  # revealed: Payload
+        # error: [unresolved-attribute]
+        value.clear()
+```
+
+And for `Mapping`:
+
+```py
+def narrow_typed_dict_to_mapping(value: Payload) -> None:
+    if isinstance(value, Mapping):
+        reveal_type(value)  # revealed: Payload
+        # error: [unresolved-attribute]
+        value.clear()
+```
+
+A type alias must retain the same `TypedDict` interface.
+
+```py
+PayloadAlias = Payload
+
+def narrow_aliased_typed_dict_to_dict(value: PayloadAlias) -> None:
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: Payload
+        # error: [unresolved-attribute]
+        value.clear()
 ```

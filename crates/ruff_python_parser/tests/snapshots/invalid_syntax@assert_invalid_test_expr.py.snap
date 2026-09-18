@@ -160,4 +160,3 @@ Module(
 3 | assert yield x
 4 | assert x := 1
   |          ^^ Syntax Error: Expected a statement
-  |

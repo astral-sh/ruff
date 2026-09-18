@@ -321,7 +321,6 @@ Q004 [*] Unnecessary escape on inner quote character
 44 | this_is_fine = 'This is an \\"escaped\\" quote'
 45 | this_should_raise_Q004 = 'This is an \\\"escaped\\\" quote with an extra backslash'
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove backslash
    |
 44 | this_is_fine = 'This is an \\"escaped\\" quote'

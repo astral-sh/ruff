@@ -7,7 +7,6 @@ I001 [*] Import block is un-sorted or un-formatted
 1 | / import requests
 2 | | import pandas
   | |_____________^
-  |
 help: Organize imports
   |
   - import requests

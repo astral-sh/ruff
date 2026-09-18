@@ -12,7 +12,7 @@ pub struct FrozenIndexVec<I, T> {
 
 impl<I: Idx, T> FrozenIndexVec<I, T> {
     #[inline]
-    pub fn from_raw(raw: Box<[T]>) -> Self {
+    fn from_raw(raw: Box<[T]>) -> Self {
         Self {
             raw,
             index: PhantomData,
@@ -20,12 +20,12 @@ impl<I: Idx, T> FrozenIndexVec<I, T> {
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &IndexSlice<I, T> {
+    fn as_slice(&self) -> &IndexSlice<I, T> {
         IndexSlice::from_raw(&self.raw)
     }
 
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut IndexSlice<I, T> {
+    fn as_mut_slice(&mut self) -> &mut IndexSlice<I, T> {
         IndexSlice::from_raw_mut(&mut self.raw)
     }
 }

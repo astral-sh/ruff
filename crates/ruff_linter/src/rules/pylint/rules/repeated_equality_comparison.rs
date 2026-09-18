@@ -11,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -53,7 +54,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.279")]
+#[violation_metadata(stable_since = "v0.0.279", category = Category::Pedantic)]
 pub(crate) struct RepeatedEqualityComparison {
     expression: SourceCodeSnippet,
     all_hashable: bool,
@@ -65,16 +66,17 @@ impl AlwaysFixableViolation for RepeatedEqualityComparison {
         match (self.expression.full_display(), self.all_hashable) {
             (Some(expression), false) => {
                 format!(
-                    "Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable."
+                    "Consider merging multiple comparisons: `{expression}`. \
+                    Use a `set` if the elements are hashable."
                 )
             }
             (Some(expression), true) => {
                 format!("Consider merging multiple comparisons: `{expression}`.")
             }
-            (None, false) => {
-                "Consider merging multiple comparisons. Use a `set` if the elements are hashable."
-                    .to_string()
-            }
+            (None, false) => "\
+                Consider merging multiple comparisons. \
+                    Use a `set` if the elements are hashable."
+                .to_string(),
             (None, true) => "Consider merging multiple comparisons.".to_string(),
         }
     }
@@ -200,12 +202,11 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                     op: bool_op.op,
                     values: before
                         .chain(std::iter::once(Expr::Compare(ast::ExprCompare {
-                            left: Box::new(expr.clone()),
                             ops: match bool_op.op {
-                                BoolOp::Or => Box::from([CmpOp::In]),
-                                BoolOp::And => Box::from([CmpOp::NotIn]),
+                                BoolOp::Or => [CmpOp::In].into(),
+                                BoolOp::And => [CmpOp::NotIn].into(),
                             },
-                            comparators: Box::from([comparator]),
+                            operands: Box::from([expr.clone(), comparator]),
                             range: bool_op.range(),
                             node_index: AtomicNodeIndex::NONE,
                         })))
@@ -228,20 +229,8 @@ fn to_allowed_value<'a>(
     value: &'a Expr,
     semantic: &SemanticModel,
 ) -> Option<(&'a Expr, &'a Expr)> {
-    let Expr::Compare(ast::ExprCompare {
-        left,
-        ops,
-        comparators,
-        ..
-    }) = value
-    else {
-        return None;
-    };
-
     // Ignore, e.g., `foo == bar == baz`.
-    let [op] = &**ops else {
-        return None;
-    };
+    let (left, op, right) = value.as_compare_expr()?.as_single()?;
 
     if match bool_op {
         BoolOp::Or => !matches!(op, CmpOp::Eq),
@@ -251,9 +240,6 @@ fn to_allowed_value<'a>(
     }
 
     // Ignore self-comparisons, e.g., `foo == foo`.
-    let [right] = &**comparators else {
-        return None;
-    };
     if ComparableExpr::from(left) == ComparableExpr::from(right) {
         return None;
     }

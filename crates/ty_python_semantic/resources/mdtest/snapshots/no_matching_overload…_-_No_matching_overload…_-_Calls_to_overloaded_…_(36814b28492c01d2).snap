@@ -84,7 +84,6 @@ error[no-matching-overload]: No overload of function `f` matches arguments
    |
 61 | f(b"foo")  # error: [no-matching-overload]
    | ^^^^^^^^^
-   |
 info: First overload defined here
   --> src/mdtest_snippet.py:3:1
    |
@@ -108,7 +107,6 @@ info: First overload defined here
 20 | |     hyena: int,
 21 | | ) -> int: ...
    | |_____________^ First overload defined here
-   |
 info: Possible overloads for function `f`:
 info:   (lion: int, turtle: int, tortoise: int, goat: int, capybara: int, chicken: int, ostrich: int, gorilla: int, giraffe: int, condor: int, kangaroo: int, anaconda: int, tarantula: int, millipede: int, leopard: int, hyena: int) -> int
 info:   (lion: str, turtle: str, tortoise: str, goat: str, capybara: str, chicken: str, ostrich: str, gorilla: str, giraffe: str, condor: str, kangaroo: str, anaconda: str, tarantula: str, millipede: str, leopard: str, hyena: str) -> str
@@ -135,6 +133,5 @@ info: Overload implementation defined here
 57 | |     hyena: int | str,
 58 | | ) -> int | str:
    | |______________^
-   |
 
 ```

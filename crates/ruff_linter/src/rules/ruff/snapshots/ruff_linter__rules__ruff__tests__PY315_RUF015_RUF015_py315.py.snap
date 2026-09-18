@@ -25,7 +25,6 @@ RUF015 [*] Prefer `next(*x for x in xs)` over single element slice
 3 | [*x for x in xs][0]
 4 | list(*x for x in xs)[0]
   | ^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Replace with `next(*x for x in xs)`
   |
 3 | [*x for x in xs][0]

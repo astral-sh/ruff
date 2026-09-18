@@ -41,7 +41,6 @@ UP006 [*] Use `list` instead of `List` for type annotation
 41 |
 42 | MyList: TypeAlias = Union[List[int], List[str]]
    |                           ^^^^
-   |
 help: Replace with `list`
    |
 41 |
@@ -56,7 +55,6 @@ UP006 [*] Use `list` instead of `List` for type annotation
 41 |
 42 | MyList: TypeAlias = Union[List[int], List[str]]
    |                                      ^^^^
-   |
 help: Replace with `list`
    |
 41 |

@@ -319,7 +319,7 @@ pub(crate) fn fix_unnecessary_collection_call(
 /// However, this is a syntax error under the f-string grammar. As such,
 /// this method will pad the start and end of an expression as needed to
 /// avoid producing invalid syntax.
-pub(crate) fn pad_expression(
+fn pad_expression(
     content: String,
     range: TextRange,
     locator: &Locator,

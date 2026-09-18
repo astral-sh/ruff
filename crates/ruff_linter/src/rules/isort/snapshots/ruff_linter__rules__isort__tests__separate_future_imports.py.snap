@@ -8,7 +8,6 @@ I001 [*] Import block is un-sorted or un-formatted
 2 | | import os
 3 | | from __future__ import annotations
   | |__________________________________^
-  |
 help: Organize imports
   |
   - import sys

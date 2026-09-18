@@ -33,7 +33,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 
 ```
 error[invalid-return-type]: Return type does not match returned value
- --> src/mdtest_snippet.py:1:22
+ --> src/mdtest_snippet.py:6:16
   |
 1 | def f(cond: bool) -> str:
   |                      --- Expected `str` because of return type
@@ -43,13 +43,12 @@ error[invalid-return-type]: Return type does not match returned value
 5 |         # error: [invalid-return-type]
 6 |         return 1
   |                ^ expected `str`, found `Literal[1]`
-  |
 
 ```
 
 ```
 error[invalid-return-type]: Return type does not match returned value
-  --> src/mdtest_snippet.py:8:22
+  --> src/mdtest_snippet.py:11:16
    |
  8 | def f(cond: bool) -> str:
    |                      --- Expected `str` because of return type
@@ -57,7 +56,6 @@ error[invalid-return-type]: Return type does not match returned value
 10 |         # error: [invalid-return-type]
 11 |         return 1
    |                ^ expected `str`, found `Literal[1]`
-   |
 
 ```
 
@@ -72,6 +70,5 @@ error[invalid-return-type]: Return type does not match returned value
    |
  8 | def f(cond: bool) -> str:
    |                      --- Expected `str` because of return type
-   |
 
 ```

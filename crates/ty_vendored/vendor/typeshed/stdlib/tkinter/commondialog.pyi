@@ -1,3 +1,5 @@
+"""Base class for the Tk common dialogs."""
+
 from collections.abc import Mapping
 from tkinter import Misc
 from typing import Any, ClassVar

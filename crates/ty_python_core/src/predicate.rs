@@ -7,14 +7,18 @@
 //! - [_Reachability constraints_][crate::reachability_constraints] determine the
 //!   static reachability of a binding, and the reachability of a statement or expression.
 
+use crate::Program;
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_index::{FrozenIndexVec, Idx, IndexVec};
-use ruff_python_ast::{Singleton, name::Name};
+use ruff_python_ast::{self as ast, Singleton, name::Name};
 
+use crate::ProgramFile;
 use crate::ast_ids::ExpressionNodeKey;
 use crate::db::Db;
 use crate::expression::Expression;
 use crate::global_scope;
+use crate::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 
@@ -98,19 +102,91 @@ impl PredicateOrLiteral<'_> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+/// A stable key for call-completion queries. Creating it while building predicates lets cached
+/// queries use its ID directly, without looking up its components in Salsa's intern table again.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct CallableAndCallExpr<'db> {
+    #[returns(copy)]
     pub callable: Expression<'db>,
+    #[returns(copy)]
     pub call_expr: Expression<'db>,
     /// Whether the call is wrapped in an `await` expression. If `true`, `call_expr` refers to the
     /// `await` expression rather than the call itself. This is used to detect terminal `await`s of
     /// async functions that return `Never`.
+    #[returns(copy)]
     pub is_await: bool,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for CallableAndCallExpr<'_> {}
+
+/// A call whose completion determines whether an expression statement can continue.
+#[derive(Debug)]
+pub struct StatementCall<'ast> {
+    pub call: &'ast ast::ExprCall,
+    pub is_await: bool,
+}
+
+impl<'ast> StatementCall<'ast> {
+    /// Extracts a direct or awaited call for checking whether an expression statement can return.
+    ///
+    /// Callers pass the value of an expression statement, such as `sys.exit()` or `await stop()`.
+    /// The semantic-index builder uses the returned call to record a reachability constraint:
+    /// if the call returns `Never`, subsequent statements are unreachable. The
+    /// `redundant-condition-strict` rule uses the same extraction when recognizing defensive exits.
+    ///
+    /// The `is_await` flag matters for async functions returning `Never`: calling one creates a
+    /// coroutine, while awaiting it prevents execution from continuing.
+    ///
+    /// Calls inside larger expressions, such as `1 + sys.exit()`, are deliberately excluded.
+    /// Tracking their termination would require many more reachability constraints and degrade
+    /// analysis performance.
+    pub fn from_expression(expression: &'ast ast::Expr) -> Option<Self> {
+        match expression {
+            ast::Expr::Call(call) => Some(Self {
+                call,
+                is_await: false,
+            }),
+            ast::Expr::Await(ast::ExprAwait { value, .. }) => {
+                value.as_call_expr().map(|call| Self {
+                    call,
+                    is_await: true,
+                })
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PredicateNode<'db> {
+    /// The truthiness of an expression's resulting value.
     Expression(Expression<'db>),
+    /// A boolean operation, `not`, or conditional expression evaluated directly as a condition.
+    ///
+    /// In `if x and False`, the truthy branch is unreachable. But after `y = x and False`,
+    /// `if y` may be truthy: it can call `x.__bool__` a second time and get a different result.
+    Condition(Expression<'db>),
+    /// A chained comparison evaluated directly as a condition. Its inferred truthiness is
+    /// available without walking the expression again.
+    ChainedComparisonCondition(Expression<'db>),
+    /// Whether a context manager's exit return type allows an exception to be suppressed.
+    ///
+    /// Resolved during type inference because the context manager's type is unavailable during
+    /// semantic indexing.
+    ContextManagerSuppresses {
+        expression: Expression<'db>,
+        is_async: bool,
+    },
+    /// Whether semantic evaluation rules out every normal entry into a `finally` suite.
+    ///
+    /// The continuation is captured before constructing this predicate, so its constraint cannot
+    /// depend on the predicate itself. Deferring evaluation preserves terminal cleanup paths when
+    /// a context manager's suppression behavior is unavailable during semantic indexing.
+    FinallyNormalPathImpossible {
+        scope: ScopeId<'db>,
+        continuation: ScopedReachabilityConstraintId,
+    },
     /// These predicates are recorded for statements with call expressions. As part of
     /// reachability constraints, they are used to determine whether control flow can
     /// continue past this statement or not.
@@ -135,6 +211,10 @@ pub enum PredicateNode<'db> {
     /// semantically during type checking, so calls to a shadowed `range` remain ambiguous.
     IsNonEmptyIterable(Expression<'db>),
     Pattern(PatternPredicate<'db>),
+    /// Whether control flow takes one branch of an OR pattern instead of its remaining
+    /// alternatives. The selected branch is unknown, but recording a predicate and its negation
+    /// preserves the fact that exactly one branch is taken.
+    OrPatternAlternative(ScopeId<'db>),
     SubjectElementPattern(SubjectElementPatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
@@ -231,7 +311,7 @@ pub enum PatternPredicateKind<'db> {
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PatternPredicate<'db> {
     #[returns(copy)]
-    pub file: File,
+    pub program_file: ProgramFile<'db>,
 
     #[returns(copy)]
     pub file_scope: FileScopeId,
@@ -254,8 +334,20 @@ pub struct PatternPredicate<'db> {
 impl get_size2::GetSize for PatternPredicate<'_> {}
 
 impl<'db> PatternPredicate<'db> {
+    pub fn file(self, db: &'db dyn Db) -> File {
+        self.program_file(db).file(db)
+    }
+
+    pub fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
+        self.program_file(db).python_file(db)
+    }
+
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.file_scope(db).to_scope_id(db, self.file(db))
+        self.file_scope(db).to_scope_id(db, self.program_file(db))
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program<'db> {
+        self.scope(db).program(db)
     }
 }
 
@@ -302,7 +394,7 @@ impl<'db> PatternPredicate<'db> {
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct StarImportPlaceholderPredicate<'db> {
     #[returns(copy)]
-    pub importing_file: File,
+    pub importing_file: ProgramFile<'db>,
 
     /// Each symbol imported by a `*` import has a separate predicate associated with it:
     /// this field identifies which symbol that is.
@@ -317,7 +409,7 @@ pub struct StarImportPlaceholderPredicate<'db> {
     pub symbol_id: ScopedSymbolId,
 
     #[returns(copy)]
-    pub referenced_file: File,
+    pub referenced_file: ProgramFile<'db>,
 }
 
 // The Salsa heap is tracked separately.

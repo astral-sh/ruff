@@ -25,6 +25,7 @@
 //! [`await_request`]: TestServer::await_request
 //! [`await_notification`]: TestServer::await_notification
 
+mod capabilities;
 mod code_action;
 mod custom_extension;
 mod diagnostics;
@@ -530,7 +531,6 @@ impl TestServer {
     ///
     /// If receiving the request fails.
     #[track_caller]
-    #[expect(dead_code)]
     pub(crate) fn await_request<R: Request>(&mut self) -> (RequestId, R::Params) {
         match self.try_await_request::<R>(None) {
             Ok(result) => result,
@@ -653,7 +653,6 @@ impl TestServer {
     }
 
     /// Get the initialization result
-    #[expect(dead_code)]
     pub(crate) fn initialization_result(&self) -> Option<&InitializeResult> {
         self.initialize_response.as_ref()
     }
@@ -1057,6 +1056,26 @@ impl TestServerBuilder {
             .text_document
             .get_or_insert_default()
             .diagnostic
+            .get_or_insert_default()
+            .dynamic_registration = Some(enabled);
+        self
+    }
+
+    pub(crate) fn enable_formatting_dynamic_registration(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .formatting
+            .get_or_insert_default()
+            .dynamic_registration = Some(enabled);
+        self
+    }
+
+    pub(crate) fn enable_range_formatting_dynamic_registration(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .range_formatting
             .get_or_insert_default()
             .dynamic_registration = Some(enabled);
         self

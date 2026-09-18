@@ -6,7 +6,10 @@
 
     Ruff now enables a much larger set of rules by default (413, up from 59). See the blog post for
     more details and the new [Default Rules](https://docs.astral.sh/ruff/default-rules/) page for a
-    full listing of the enabled rules.
+    full listing of the enabled rules. Note that this is primarily an expansion, but 18 of the more
+    opinionated pycodestyle (`E`) and pyflakes (`F`) rules have been removed from the default set:
+    `E401`, `E402`, `E701`, `E702`, `E703`, `E711`, `E712`, `E713`, `E714`, `E721`, `E731`, `E741`,
+    `E742`, `E743`, `F403`, `F405`, `F406`, and `F722`.
 
 - **Python code block formatting in Markdown files**
 

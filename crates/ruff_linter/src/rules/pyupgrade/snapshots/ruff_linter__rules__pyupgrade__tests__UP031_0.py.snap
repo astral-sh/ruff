@@ -455,7 +455,6 @@ UP031 [*] Use format specifiers instead of percent format
 57 |
 58 | print("%(a)s" % {"a"  :  1})
    |       ^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with format specifiers
    |
 57 |
@@ -815,7 +814,6 @@ UP031 [*] Use format specifiers instead of percent format
 112 | |     x,  # comment
 113 | | )
     | |_^
-    |
 help: Replace with format specifiers
     |
 110 |
@@ -830,7 +828,7 @@ UP031 [*] Use format specifiers instead of percent format
     |
 116 |   path = "%s-%s-%s.pem" % (
     |  ________^
-117 | |     safe_domain_name(cn), # common name, which should be filename safe because it is IDNA-encoded, but in case of a malformed cert ma…
+117 | |     safe_domain_name(cn), # common name, which should be filename safe because it is IDNA-encoded, but in case of a malformed cert …
 118 | |     cert.not_valid_after.date().isoformat().replace("-", ""), # expiration date
 119 | |     hexlify(cert.fingerprint(hashes.SHA256())).decode("ascii")[0:8], # fingerprint prefix
 120 | | )
@@ -1214,5 +1212,4 @@ UP031 Use format specifiers instead of percent format
 170 |
 171 | "%(and)s" % {"and": 2}
     | ^^^^^^^^^
-    |
 help: Replace with format specifiers

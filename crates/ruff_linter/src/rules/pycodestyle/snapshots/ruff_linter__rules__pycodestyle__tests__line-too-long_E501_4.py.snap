@@ -1,0 +1,191 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+invalid-syntax: Expected an expression
+ --> E501_4.py:2:27
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                           ^^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:53
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                     ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:54
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                      ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:55
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                       ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:56
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                        ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:57
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                         ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:58
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                          ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:59
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                           ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:62
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                              ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:64
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:65
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                 ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:66
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                  ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:67
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                   ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:68
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                    ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:91
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                                           ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:92
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                                            ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:93
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                                             ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:94
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                                              ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:95
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                                               ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:96
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                                                ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:97
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                                                 ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:98
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                                                  ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:99
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                                                   ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:100
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                                                    ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:101
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                                                     ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:102
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                                                      ^
+
+invalid-syntax: Got unexpected token ␀
+ --> E501_4.py:2:103
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/12130
+2 | aaaaaaaaaaaaaaaaaaaaaaaa ://aaaaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀aa␀a␀␀␀␀␀aaaaaaaaaaaaaaaaaaaaaa␀␀␀␀␀␀␀␀␀␀␀␀␀aaaaaaaaaaaaaaaaa
+  |                                                                                                       ^

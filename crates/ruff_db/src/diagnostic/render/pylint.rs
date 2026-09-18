@@ -46,7 +46,7 @@ impl PylintRenderer<'_> {
                 })
                 .unwrap_or_default();
 
-            let code = if self.config.preview {
+            let code = if self.config.preview && !self.config.prefer_rule_codes {
                 diagnostic.id().as_str()
             } else {
                 diagnostic.secondary_code_or_id()

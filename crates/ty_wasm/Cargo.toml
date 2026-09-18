@@ -29,6 +29,7 @@ ty_project = { workspace = true, default-features = false, features = [
     "format",
 ] }
 ty_python_core = { workspace = true }
+ty_python_semantic = { workspace = true }
 
 ruff_db = { workspace = true, default-features = false, features = [] }
 ruff_diagnostics = { workspace = true }

@@ -85,6 +85,12 @@ mod tests {
     #[test_case(Rule::MissingSectionNameColon, Path::new("D.py"))]
     #[test_case(Rule::OverindentedSection, Path::new("sections.py"))]
     #[test_case(Rule::OverindentedSection, Path::new("D214_module.py"))]
+    #[test_case(Rule::OverindentedSection, Path::new("sphinx_directive.py"))]
+    #[test_case(Rule::NonCapitalizedSectionName, Path::new("sphinx_directive.py"))]
+    #[test_case(
+        Rule::MissingBlankLineAfterLastSection,
+        Path::new("sphinx_directive.py")
+    )]
     #[test_case(Rule::OverindentedSectionUnderline, Path::new("D215.py"))]
     #[test_case(Rule::MissingSectionUnderlineAfterName, Path::new("sections.py"))]
     #[test_case(Rule::MismatchedSectionUnderlineLength, Path::new("sections.py"))]
@@ -97,7 +103,7 @@ mod tests {
     #[test_case(Rule::TripleSingleQuotes, Path::new("D.py"))]
     #[test_case(Rule::TripleSingleQuotes, Path::new("D300.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pydocstyle").join(path).as_path(),
             &settings::LinterSettings {

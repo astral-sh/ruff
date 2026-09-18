@@ -5,7 +5,8 @@ This avoids all the overhead of SAX and pulldom to gain performance.
 """
 
 from _typeshed import ReadableBuffer, SupportsRead
-from typing import Any, Final, NoReturn, TypeAlias
+from typing import Any, Final, TypeAlias
+from typing_extensions import Never
 from xml.dom.minidom import Document, DocumentFragment, DOMImplementation, Element, Node, TypeInfo
 from xml.dom.xmlbuilder import DOMBuilderFilter, Options
 from xml.parsers.expat import XMLParserType
@@ -176,8 +177,8 @@ class InternalSubsetExtractor(ExpatBuilder):
     def start_doctype_decl_handler(  # type: ignore[override]
         self, name: str, publicId: str | None, systemId: str | None, has_internal_subset: bool
     ) -> None: ...
-    def end_doctype_decl_handler(self) -> NoReturn: ...
-    def start_element_handler(self, name: str, attrs: list[str]) -> NoReturn: ...
+    def end_doctype_decl_handler(self) -> Never: ...
+    def start_element_handler(self, name: str, attrs: list[str]) -> Never: ...
 
 def parse(file: str | SupportsRead[ReadableBuffer | str], namespaces: bool = True) -> Document:
     """Parse a document, returning the resulting Document node.

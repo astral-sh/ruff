@@ -33,7 +33,7 @@ pub(crate) enum ConfigurationPreference {
     EditorOnly,
 }
 
-/// A direct representation of of `configuration` schema within the client settings.
+/// A direct representation of the `configuration` schema within the client settings.
 #[derive(Clone, Debug, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(untagged)]
@@ -58,12 +58,12 @@ pub(crate) struct GlobalOptions {
 }
 
 impl GlobalOptions {
-    pub(crate) fn set_preview(&mut self, preview: bool) {
+    fn set_preview(&mut self, preview: bool) {
         self.client.set_preview(preview);
     }
 
     #[cfg(test)]
-    pub(crate) fn client(&self) -> &ClientOptions {
+    fn client(&self) -> &ClientOptions {
         &self.client
     }
 
@@ -169,7 +169,7 @@ impl ClientOptions {
     }
 
     /// Update the preview flag for the linter and the formatter with the given value.
-    pub(crate) fn set_preview(&mut self, preview: bool) {
+    fn set_preview(&mut self, preview: bool) {
         match self.lint.as_mut() {
             None => self.lint = Some(LintOptions::default().with_preview(preview)),
             Some(lint) => lint.set_preview(preview),
@@ -350,8 +350,14 @@ impl AllOptions {
         Self::from_init_options(
             serde_json::from_value(options)
                 .map_err(|err| {
-                    tracing::error!("Failed to deserialize initialization options: {err}. Falling back to default client settings...");
-                    client.show_error_message("Ruff received invalid client settings - falling back to default client settings.");
+                    tracing::error!(
+                        "Failed to deserialize initialization options: {err}. \
+                        Falling back to default client settings..."
+                    );
+                    client.show_error_message(
+                        "Ruff received invalid client settings - \
+                        falling back to default client settings.",
+                    );
                 })
                 .unwrap_or_default(),
         )
@@ -485,8 +491,6 @@ impl_noop_combine!(LineLength);
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use insta::assert_debug_snapshot;
     use ruff_linter::settings::types::PreviewMode;
     use ruff_python_formatter::QuoteStyle;
@@ -740,6 +744,8 @@ mod tests {
     #[cfg(not(windows))]
     #[test]
     fn test_vs_code_workspace_settings_resolve() {
+        use std::str::FromStr;
+
         let options = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
         let AllOptions {
             global,

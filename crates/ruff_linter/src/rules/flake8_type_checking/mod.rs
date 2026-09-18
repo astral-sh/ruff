@@ -79,7 +79,10 @@ mod tests {
     #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001_future.py"))]
     #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001_future_present.py"))]
     fn add_future_import(rules: &[Rule], path: &Path) -> Result<()> {
-        let name = rules.iter().map(Rule::noqa_code).join("-");
+        let name = rules
+            .iter()
+            .map(|rule| rule.name().as_str().strip_prefix("typing-only-").unwrap())
+            .join("-");
         let snapshot = format!("add_future_import__{}_{}", name, path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
@@ -102,7 +105,7 @@ mod tests {
     fn add_future_import_dataclass_kw_only_py313(rule: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "add_future_import_kw_only__{}_{}",
-            rule.noqa_code(),
+            rule.name(),
             path.to_string_lossy()
         );
         let diagnostics = test_path(
@@ -164,10 +167,7 @@ mod tests {
         let snapshot = format!("pre_py310_{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY39.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY39),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -643,10 +643,8 @@ mod tests {
     fn contents_preview(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(
             contents,
-            &settings::LinterSettings {
-                preview: settings::types::PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rules(Linter::Flake8TypeChecking.rules())
-            },
+            &settings::LinterSettings::for_rules(Linter::Flake8TypeChecking.rules())
+                .with_preview_mode(),
         );
         assert_diagnostics!(snapshot, diagnostics);
     }

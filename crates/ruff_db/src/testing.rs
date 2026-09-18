@@ -18,7 +18,10 @@ pub fn assert_function_query_was_not_run<Db, Q, QDb, I, R>(
 
     db.attach(|_| {
         if let Some(will_execute_event) = will_execute_event {
-            panic!("Expected query {query_name}({id:?}) not to have run but it did: {will_execute_event:?}\n\n{events:#?}");
+            panic!(
+                "Expected query {query_name}({id:?}) not to have run but it did: \
+                 {will_execute_event:?}\n\n{events:#?}"
+            );
         }
     });
 }
@@ -40,7 +43,8 @@ pub fn assert_const_function_query_was_not_run<Db, Q, QDb, R>(
     db.attach(|_| {
         if let Some(will_execute_event) = event {
             panic!(
-                "Expected query {query_name}() not to have run but it did: {will_execute_event:?}\n\n{events:#?}"
+                "Expected query {query_name}() not to have run but it did: \
+                 {will_execute_event:?}\n\n{events:#?}"
             );
         }
     });
@@ -61,12 +65,14 @@ pub fn assert_function_query_was_not_run_by_name<Db>(
             match input {
                 Some(input) => {
                     panic!(
-                        "Expected query {query_name}({input:?}) not to have run but it did: {will_execute_event:?}\n\n{events:#?}"
+                        "Expected query {query_name}({input:?}) not to have run \
+                        but it did: {will_execute_event:?}\n\n{events:#?}"
                     );
                 }
                 None => {
                     panic!(
-                        "Expected query {query_name} not to have run for any input but it did: {will_execute_event:?}\n\n{events:#?}"
+                        "Expected query {query_name} not to have run for any input \
+                        but it did: {will_execute_event:?}\n\n{events:#?}"
                     );
                 }
             }

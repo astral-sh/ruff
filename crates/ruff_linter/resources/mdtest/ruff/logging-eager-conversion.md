@@ -31,7 +31,6 @@ error[RUF065]: Unnecessary `repr()` conversion when formatting with `%s`. Use `%
   |
 7 | logging.warning("%s %s", repr("1"), *["1234"])  # snapshot: logging-eager-conversion
   |                          ^^^^^^^^^
-  |
 
 
 error[RUF065]: Unnecessary `repr()` conversion when formatting with `%s`. Use `%r` instead of `%s`
@@ -39,5 +38,4 @@ error[RUF065]: Unnecessary `repr()` conversion when formatting with `%s`. Use `%
    |
 13 | logging.warning("%s %s %s", repr("1"), *["2", "3"])  # snapshot: logging-eager-conversion
    |                             ^^^^^^^^^
-   |
 ```

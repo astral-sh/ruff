@@ -126,7 +126,7 @@ from shapes.polygons.hexagon import Hexagon
 from shapes.polygons.pentagon import Pentagon
 
 reveal_type(Pentagon().sides)  # revealed: int
-reveal_type(Hexagon().area)  # revealed: int | float
+reveal_type(Hexagon().area)  # revealed: float
 ```
 
 ## Manual overrides from extra paths
@@ -606,7 +606,7 @@ from shapes.polygons.pentagon import Pentagon
 from shapes.polygons.hexagon import Hexagon
 
 reveal_type(Pentagon().sides)  # revealed: int
-reveal_type(Hexagon().area)  # revealed: int | float
+reveal_type(Hexagon().area)  # revealed: float
 ```
 
 ## Stub package using `__init__.py` over `.pyi`
@@ -644,7 +644,7 @@ class Hexagon: ...
 from shapes import Hexagon, Pentagon
 
 reveal_type(Pentagon().sides)  # revealed: int
-reveal_type(Hexagon().area)  # revealed: int | float
+reveal_type(Hexagon().area)  # revealed: float
 ```
 
 ## Relative import in stub package

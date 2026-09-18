@@ -47,7 +47,6 @@ error[invalid-type-arguments]: Type `int` is not assignable to upper bound `str`
   |
 3 | T = TypeVar("T", bound=str)
   | - Type variable defined here
-  |
 
 ```
 
@@ -62,6 +61,5 @@ error[invalid-type-arguments]: Type `str` does not satisfy constraints `int`, `b
   |
 4 | U = TypeVar("U", int, bytes)
   | - Type variable defined here
-  |
 
 ```

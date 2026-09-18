@@ -57,4 +57,3 @@ Module(
   |
 1 | for in x: ...
   |     ^^ Syntax Error: Expected an identifier
-  |

@@ -25,7 +25,6 @@ PIE790 [*] Unnecessary `...` literal
 5 |     """Will report both, but only fix the first."""  # ERROR PYI021
 6 |     ...  # ERROR PIE790
   |     ^^^
-  |
 help: Remove unnecessary `...`
   |
 5 |     """Will report both, but only fix the first."""  # ERROR PYI021

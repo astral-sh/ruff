@@ -6,6 +6,7 @@ use ruff_python_ast::helpers::pep_604_union;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -24,7 +25,7 @@ impl fmt::Display for CallKind {
 }
 
 impl CallKind {
-    pub(crate) fn from_name(name: &str) -> Option<Self> {
+    fn from_name(name: &str) -> Option<Self> {
         match name {
             "isinstance" => Some(CallKind::Isinstance),
             "issubclass" => Some(CallKind::Issubclass),
@@ -72,7 +73,7 @@ impl CallKind {
 /// [PEP 604]: https://peps.python.org/pep-0604/
 /// [PEP 695]: https://peps.python.org/pep-0695/
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.13.0")]
+#[violation_metadata(removed_since = "0.13.0", category = Category::Pedantic)]
 pub(crate) struct NonPEP604Isinstance {
     kind: CallKind,
 }

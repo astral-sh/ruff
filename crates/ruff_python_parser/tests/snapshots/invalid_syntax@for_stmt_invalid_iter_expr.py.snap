@@ -193,7 +193,6 @@ Module(
 2 | for x in yield a: ...
 3 | for target in x := 1: ...
   |                 ^^ Syntax Error: Expected `:`, found `:=`
-  |
 
 
   |
@@ -201,7 +200,6 @@ Module(
 2 | for x in yield a: ...
 3 | for target in x := 1: ...
   |                    ^ Syntax Error: Invalid annotated assignment target
-  |
 
 
 ## Semantic Syntax Errors

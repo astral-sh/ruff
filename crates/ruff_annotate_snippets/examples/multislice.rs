@@ -1,19 +1,21 @@
-use ruff_annotate_snippets::{Level, Renderer, Snippet};
+use annotate_snippets::{Annotation, Level, Renderer, Snippet, renderer::DecorStyle};
 
 fn main() {
-    let message = Level::Error
-        .title("mismatched types")
-        .snippet(
-            Snippet::source("Foo")
+    let report = &[Level::ERROR
+        .primary_title("mismatched types")
+        .element(
+            Snippet::<Annotation<'_>>::source("Foo")
                 .line_start(51)
-                .origin("src/format.rs"),
+                .fold(false)
+                .path("src/format.rs"),
         )
-        .snippet(
-            Snippet::source("Faa")
+        .element(
+            Snippet::<Annotation<'_>>::source("Faa")
                 .line_start(129)
-                .origin("src/display.rs"),
-        );
+                .fold(false)
+                .path("src/display.rs"),
+        )];
 
-    let renderer = Renderer::styled();
-    anstream::println!("{}", renderer.render(message));
+    let renderer = Renderer::styled().decor_style(DecorStyle::Unicode);
+    anstream::println!("{}", renderer.render(report));
 }

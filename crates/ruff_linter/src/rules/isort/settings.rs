@@ -73,13 +73,13 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn requires_module_import(&self, name: String, as_name: Option<String>) -> bool {
+    pub(crate) fn requires_module_import(&self, name: String, as_name: Option<String>) -> bool {
         self.required_imports
             .contains(&NameImport::Import(ModuleNameImport {
                 name: Alias { name, as_name },
             }))
     }
-    pub fn requires_member_import(
+    pub(crate) fn requires_member_import(
         &self,
         module: Option<String>,
         name: String,

@@ -68,13 +68,11 @@ warning[ambiguous-protocol-member]: Cannot assign to undeclared variable in the 
    |
 12 |     a = None  # type: int
    |     ^^^^^^^^ Consider adding an annotation for `a`
-   |
 info: Assigning to an undeclared variable in a protocol class leads to an ambiguous interface
  --> src/a.py:6:7
   |
 6 | class A(Protocol):
   |       ^^^^^^^^^^^ `A` declared as a protocol here
-  |
 info: No declarations found for `a` in the body of `A` or any of its superclasses
 
 ```
@@ -85,13 +83,11 @@ warning[ambiguous-protocol-member]: Cannot assign to undeclared variable in the 
    |
 14 |     b = ...  # type: str
    |     ^^^^^^^ Consider adding an annotation for `b`
-   |
 info: Assigning to an undeclared variable in a protocol class leads to an ambiguous interface
  --> src/a.py:6:7
   |
 6 | class A(Protocol):
   |       ^^^^^^^^^^^ `A` declared as a protocol here
-  |
 info: No declarations found for `b` in the body of `A` or any of its superclasses
 
 ```
@@ -102,13 +98,11 @@ warning[ambiguous-protocol-member]: Cannot assign to undeclared variable in the 
    |
 17 |         c = 1  # error: [ambiguous-protocol-member]
    |         ^^^^^ Consider adding an annotation, e.g. `c: int = ...`
-   |
 info: Assigning to an undeclared variable in a protocol class leads to an ambiguous interface
  --> src/a.py:6:7
   |
 6 | class A(Protocol):
   |       ^^^^^^^^^^^ `A` declared as a protocol here
-  |
 info: No declarations found for `c` in the body of `A` or any of its superclasses
 
 ```
@@ -119,13 +113,11 @@ warning[ambiguous-protocol-member]: Cannot assign to undeclared variable in the 
    |
 22 |     for d in range(42):
    |         ^ `d` is not declared as a protocol member
-   |
 info: Assigning to an undeclared variable in a protocol class leads to an ambiguous interface
  --> src/a.py:6:7
   |
 6 | class A(Protocol):
   |       ^^^^^^^^^^^ `A` declared as a protocol here
-  |
 info: No declarations found for `d` in the body of `A` or any of its superclasses
 
 ```

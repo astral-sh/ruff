@@ -37,7 +37,6 @@ error[invalid-await]: `UnawaitableUnion` is not awaitable
    |
 14 |     await UnawaitableUnion()  # error: [invalid-await]
    |           ^^^^^^^^^^^^^^^^^^
-   |
 info: `__await__` returns `Generator[Any, None, None] | int`, which is not a valid iterator
 
 ```

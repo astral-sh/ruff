@@ -8,4 +8,3 @@ SLF001 Private member accessed: `_x`
 18 |     def bad_staticmethod(this):
 19 |         return this._x  # error
    |                ^^^^^^^
-   |

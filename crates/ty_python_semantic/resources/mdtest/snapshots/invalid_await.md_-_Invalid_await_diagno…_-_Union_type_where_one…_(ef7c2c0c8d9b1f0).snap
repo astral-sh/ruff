@@ -36,7 +36,6 @@ error[invalid-await]: `Awaitable | NotAwaitable` is not awaitable
   |
 2 |     def __await__(self):
   |         --------------- method defined here
-  |
 info: `__await__` may be missing
 info: `NotAwaitable` does not implement `__await__`
 

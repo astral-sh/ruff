@@ -69,6 +69,75 @@ def _(c: Callable[[...], int]):
     reveal_type(c)  # revealed: (...) -> int
 ```
 
+The invalid parameter list also offers an autofix that replaces the list with an ellipsis.
+
+```py
+def fixable(callback: Callable[[...], int]): ...  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: `[...]` is not a valid parameter list for `Callable`
+  --> src/mdtest_snippet.py:17:32
+   |
+17 | def fixable(callback: Callable[[...], int]): ...  # snapshot: invalid-type-form
+   |                                ^^^^^ Did you mean `Callable[..., int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Replace `[...]` with `...`
+   |
+16 |     reveal_type(c)  # revealed: (...) -> int
+   - def fixable(callback: Callable[[...], int]): ...  # snapshot: invalid-type-form
+17 + def fixable(callback: Callable[..., int]): ...  # snapshot: invalid-type-form
+18 | def with_comments(
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+A multiline parameter list can contain comments, so its brackets are not removed automatically.
+
+```py
+def with_comments(
+    callback: Callable[
+        [  # snapshot: invalid-type-form
+            # The callable accepts arbitrary arguments.
+            ...,  # The parameter description remains documented.
+        ],
+        int,
+    ],
+): ...
+```
+
+```snapshot
+error[invalid-type-form]: `[...]` is not a valid parameter list for `Callable`
+  --> src/mdtest_snippet.py:20:9
+   |
+20 | /         [  # snapshot: invalid-type-form
+21 | |             # The callable accepts arbitrary arguments.
+22 | |             ...,  # The parameter description remains documented.
+23 | |         ],
+   | |_________^ Did you mean `Callable[..., int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+A quoted callable annotation still receives the diagnostic, but its parsed source range cannot be
+rewritten directly.
+
+```py
+# snapshot: invalid-type-form
+def quoted(callback: "Callable[[...], int]"): ...
+```
+
+```snapshot
+error[invalid-type-form]: `[...]` is not a valid parameter list for `Callable`
+  --> src/mdtest_snippet.py:28:32
+   |
+28 | def quoted(callback: "Callable[[...], int]"): ...
+   |                                ^^^^^ Did you mean `Callable[..., int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
 ```py
 # error: [invalid-type-form] "`...` is not allowed in this context in a parameter annotation"
 def _(c: Callable[[int, ...], int]):
@@ -491,9 +560,8 @@ def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
         reveal_type(c.__qualname__)  # revealed: object
 
-        # TODO: should be `property`
-        # (or complain that we don't know that `type(c)` has the attribute at all!)
-        reveal_type(type(c).__qualname__)  # revealed: @Todo(Intersection meta-type)
+        # This is the class object's own qualified name, not the instance's descriptor.
+        reveal_type(type(c).__qualname__)  # revealed: str
 
         # `hasattr` only guarantees that an attribute is readable.
         #
@@ -504,8 +572,8 @@ def f_okay(c: Callable[[], None]):
         # into a writable attribute...? What would that look like? Something like this?
         if (
             hasattr(type(c), "__qualname__")
-            and isinstance(type(c).__qualname__, property)
-            and type(c).__qualname__.fset is not None
+            and isinstance(descriptor := type(c).__qualname__, property)
+            and descriptor.fset is not None
         ):
             c.__qualname__ = "my_callable"  # error: [invalid-assignment]
 ```

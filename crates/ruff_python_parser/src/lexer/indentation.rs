@@ -12,7 +12,7 @@ use ruff_python_trivia::tab_offset_u32;
 pub(super) struct Column(u32);
 
 impl Column {
-    pub(super) const fn new(column: u32) -> Self {
+    const fn new(column: u32) -> Self {
         Self(column)
     }
 }
@@ -22,7 +22,7 @@ impl Column {
 pub(super) struct Character(u32);
 
 impl Character {
-    pub(super) const fn new(characters: u32) -> Self {
+    const fn new(characters: u32) -> Self {
         Self(characters)
     }
 }
@@ -45,7 +45,7 @@ impl Indentation {
     }
 
     #[cfg(test)]
-    pub(super) const fn new(column: Column, character: Character) -> Self {
+    const fn new(column: Column, character: Character) -> Self {
         Self { column, character }
     }
 

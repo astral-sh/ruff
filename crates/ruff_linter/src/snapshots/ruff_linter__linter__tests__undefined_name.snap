@@ -6,4 +6,3 @@ F821 Undefined name `undefined`
   |
 1 | print(undefined)
   |       ^^^^^^^^^
-  |

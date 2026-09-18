@@ -23,6 +23,7 @@ cache_dir = "[TMP]/foo/.ruff_cache"
 fix = false
 fix_only = false
 output_format = concise
+output_prefer_rule_codes = false
 show_fixes = false
 unsafe_fixes = hint
 

@@ -89,16 +89,13 @@ Module(
   |
 1 | type X[*T: int] = int
   |          ^ Syntax Error: Expected `]`, found `:`
-  |
 
 
   |
 1 | type X[*T: int] = int
   |               ^ Syntax Error: Expected a statement
-  |
 
 
   |
 1 | type X[*T: int] = int
   |                 ^ Syntax Error: Expected a statement
-  |

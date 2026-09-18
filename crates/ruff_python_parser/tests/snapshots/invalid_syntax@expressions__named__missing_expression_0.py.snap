@@ -35,7 +35,6 @@ Module(
 2 |
 3 | x :=
   |   ^^ Syntax Error: Expected a statement
-  |
 
 
   |
@@ -43,4 +42,3 @@ Module(
 2 |
 3 | x :=
   |     ^ Syntax Error: Expected a statement
-  |

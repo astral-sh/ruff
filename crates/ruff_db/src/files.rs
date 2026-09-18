@@ -4,9 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use dashmap::mapref::entry::Entry;
-pub use directory::{
-    DirectoryListing, DirectoryListingError, directory_listing, system_path_to_directory,
-};
+pub use directory::{DirectoryListing, DirectoryListingError, directory_listing};
 pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};
@@ -404,7 +402,7 @@ impl File {
     ///
     /// Reading the same file multiple times isn't guaranteed to return the same content. It's possible
     /// that the file has been modified in between the reads.
-    pub fn read_to_string(&self, db: &dyn Db) -> crate::system::Result<String> {
+    pub(crate) fn read_to_string(&self, db: &dyn Db) -> crate::system::Result<String> {
         let path = self.path(db);
 
         match path {
@@ -428,7 +426,7 @@ impl File {
     ///
     /// Reading the same file multiple times isn't guaranteed to return the same content. It's possible
     /// that the file has been modified in between the reads.
-    pub fn read_to_notebook(&self, db: &dyn Db) -> Result<Notebook, NotebookError> {
+    pub(crate) fn read_to_notebook(&self, db: &dyn Db) -> Result<Notebook, NotebookError> {
         let path = self.path(db);
 
         match path {
@@ -569,11 +567,6 @@ impl File {
     }
 
     /// Returns `true` if the file is an `__init__.pyi`
-    pub fn is_package_stub(self, db: &dyn Db) -> bool {
-        self.path(db).as_str().ends_with("__init__.pyi")
-    }
-
-    /// Returns `true` if the file is an `__init__.pyi`
     pub fn is_package(self, db: &dyn Db) -> bool {
         let path = self.path(db).as_str();
         path.ends_with("__init__.pyi") || path.ends_with("__init__.py")
@@ -687,6 +680,14 @@ impl FileRange {
 
     pub const fn file(&self) -> File {
         self.file
+    }
+
+    /// Return a new [`FileRange`] instance where `self.range`
+    /// has been extended to cover `range` as well.
+    #[must_use]
+    pub fn cover_range(mut self, range: TextRange) -> Self {
+        self.range = self.range.cover(range);
+        self
     }
 }
 

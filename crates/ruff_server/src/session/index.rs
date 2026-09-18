@@ -512,28 +512,28 @@ impl DocumentController {
         }
     }
 
-    pub(crate) fn as_notebook_mut(&mut self) -> Option<&mut NotebookDocument> {
+    fn as_notebook_mut(&mut self) -> Option<&mut NotebookDocument> {
         Some(match self {
             Self::Notebook(notebook) => Arc::make_mut(notebook),
             Self::Text(_) => return None,
         })
     }
 
-    pub(crate) fn as_notebook(&self) -> Option<&NotebookDocument> {
+    fn as_notebook(&self) -> Option<&NotebookDocument> {
         match self {
             Self::Notebook(notebook) => Some(notebook),
             Self::Text(_) => None,
         }
     }
 
-    pub(crate) fn as_text(&self) -> Option<&TextDocument> {
+    fn as_text(&self) -> Option<&TextDocument> {
         match self {
             Self::Text(document) => Some(document),
             Self::Notebook(_) => None,
         }
     }
 
-    pub(crate) fn as_text_mut(&mut self) -> Option<&mut TextDocument> {
+    fn as_text_mut(&mut self) -> Option<&mut TextDocument> {
         Some(match self {
             Self::Text(document) => Arc::make_mut(document),
             Self::Notebook(_) => return None,
@@ -620,7 +620,7 @@ impl DocumentQuery {
     }
 
     /// Get the URI for the document selected by this query.
-    pub(crate) fn file_uri(&self) -> &Uri {
+    fn file_uri(&self) -> &Uri {
         match self {
             Self::Text { file_uri, .. } | Self::Notebook { file_uri, .. } => file_uri,
         }

@@ -13,7 +13,9 @@ from typing import Self, overload, reveal_type
 class C:
     a: D
 
+# error: [invalid-attribute-access]
 C.a
+# error: [invalid-attribute-access]
 reveal_type(C().a)  # revealed: Unknown | D
 
 class D:

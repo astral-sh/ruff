@@ -496,7 +496,7 @@ class Handler(Filterer):
 
     level: int  # undocumented
     formatter: Formatter | None  # undocumented
-    lock: threading.Lock | None  # undocumented
+    lock: threading.RLock | None  # undocumented
     name: str | None  # undocumented
     def __init__(self, level: _Level = 0) -> None:
         """

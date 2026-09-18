@@ -26,7 +26,7 @@ impl FormatConversion {
 }
 
 impl FormatConversion {
-    pub fn from_char(c: char) -> Option<FormatConversion> {
+    fn from_char(c: char) -> Option<FormatConversion> {
         match c {
             's' => Some(FormatConversion::Str),
             'r' => Some(FormatConversion::Repr),

@@ -2,7 +2,7 @@
 
 ```toml
 [environment]
-python-version = "3.12"
+python-version = "3.13"
 python-platform = "linux"
 
 [project]
@@ -152,6 +152,7 @@ Scalar types follow the Python-input conversions in Pydantic's [conversion table
 import re
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from fractions import Fraction
 from ipaddress import (
     IPv4Address,
     IPv4Interface,
@@ -174,6 +175,7 @@ LaxBool(value=1.0)
 LaxBool(value=1)
 LaxBool(value=Decimal(1))
 LaxBool(value="true")
+LaxBool(value=b"true")
 LaxBool(value=[True])  # error: [invalid-argument-type]
 
 class LaxBytes(BaseModel):
@@ -217,6 +219,7 @@ LaxFloat(value=True)
 LaxFloat(value=b"1.0")
 LaxFloat(value="1.0")
 LaxFloat(value=Decimal("1.0"))
+LaxFloat(value=Fraction(1, 2))
 LaxFloat(value=(1, 0))  # error: [invalid-argument-type]
 
 class LaxInt(BaseModel):
@@ -228,6 +231,7 @@ LaxInt(value=b"1")
 LaxInt(value=1.0)
 LaxInt(value="1")
 LaxInt(value=Decimal(1))
+LaxInt(value=Fraction(2, 1))
 LaxInt(value=(1,))  # error: [invalid-argument-type]
 
 class LaxStr(BaseModel):
@@ -711,6 +715,31 @@ LaxNestedList(value=1)  # error: [invalid-argument-type]
 LaxNestedList(value=[1, [2, None]])
 ```
 
+Implicit recursive aliases also retain their outer input requirements in lax mode, including when
+recursive specializations grow. As with PEP 695 aliases above, nested recursive values are currently
+approximated by `Any` during input conversion.
+
+```py
+from typing import TypeVar
+
+Tree = int | list["Tree"]
+T = TypeVar("T")
+Growing = T | list["Growing[list[T]]"]
+
+class LaxTree(BaseModel):
+    value: Tree
+
+class LaxGrowing(BaseModel):
+    value: Growing[int]
+
+LaxTree(value="1")
+LaxTree(value=["1", [2]])
+LaxTree(value=object())  # error: [invalid-argument-type]
+LaxGrowing(value="1")
+LaxGrowing(value=[[1]])
+LaxGrowing(value=object())  # error: [invalid-argument-type]
+```
+
 We support validation of `JsonValue` fields in lax mode:
 
 ```py
@@ -736,6 +765,101 @@ JsonValueModel(value=SomethingElse())  # error: [invalid-argument-type]
 
 # TODO: this should be an error once we support recursive types
 JsonValueModel(value={"outer": [1, {"inner": SomethingElse()}]})
+```
+
+### Enum values for string fields
+
+In lax mode, Pydantic converts enum members to strings regardless of the member's underlying value.
+
+```py
+from enum import Enum
+
+from pydantic import BaseModel, ConfigDict, Field
+
+class StringEnum(Enum):
+    VALUE = "value"
+
+class IntegerEnum(Enum):
+    VALUE = 1
+
+class LaxModel(BaseModel):
+    value: str
+
+LaxModel(value=StringEnum.VALUE)
+LaxModel(value=IntegerEnum.VALUE)
+```
+
+Strict models and fields reject ordinary enum members because they are not strings.
+
+```py
+class StrictModel(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    value: str
+
+class StrictFieldModel(BaseModel):
+    value: str = Field(strict=True)
+
+StrictModel(value=StringEnum.VALUE)  # error: [invalid-argument-type]
+StrictModel(value=IntegerEnum.VALUE)  # error: [invalid-argument-type]
+StrictFieldModel(value=StringEnum.VALUE)  # error: [invalid-argument-type]
+StrictFieldModel(value=IntegerEnum.VALUE)  # error: [invalid-argument-type]
+```
+
+A field that opts out of model-wide strict mode accepts enum members again.
+
+```py
+class LaxFieldModel(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    value: str = Field(strict=False)
+
+LaxFieldModel(value=StringEnum.VALUE)
+LaxFieldModel(value=IntegerEnum.VALUE)
+```
+
+### Enum values for integer fields
+
+In lax mode, Pydantic accepts enum members as integers by using their underlying values.
+
+```py
+from enum import Enum
+
+from pydantic import BaseModel, ConfigDict, Field
+
+class IntegerEnum(Enum):
+    VALUE = 1
+
+class LaxModel(BaseModel):
+    value: int
+
+LaxModel(value=IntegerEnum.VALUE)
+```
+
+Strict models and fields reject ordinary enum members because they are not integers.
+
+```py
+class StrictModel(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    value: int
+
+class StrictFieldModel(BaseModel):
+    value: int = Field(strict=True)
+
+StrictModel(value=IntegerEnum.VALUE)  # error: [invalid-argument-type]
+StrictFieldModel(value=IntegerEnum.VALUE)  # error: [invalid-argument-type]
+```
+
+A field that opts out of model-wide strict mode accepts enum members again.
+
+```py
+class LaxFieldModel(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    value: int = Field(strict=False)
+
+LaxFieldModel(value=IntegerEnum.VALUE)
 ```
 
 ### Changing a specific field
@@ -1131,7 +1255,7 @@ There are various ways to make a field immutable. A model can be globally frozen
 parameter:
 
 ```py
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 class PersonFrozenName1(BaseModel, frozen=True):
     name: str
@@ -1176,6 +1300,120 @@ class Derived(Base):
 
 derived = Derived(value=1)
 derived.value = 2  # error: [invalid-assignment]
+```
+
+Pydantic allows a frozen model to be subclassed and then made mutable again. This is generally
+unsound (a violation of the Liskov substitution principle), but we currently support it without
+emitting any errors:
+
+```py
+class MutableChildOfFrozenBase(Base):
+    model_config = ConfigDict(frozen=False)
+
+mutable = MutableChildOfFrozenBase(value=1)
+mutable.value = 2
+```
+
+Subclasses of the mutable child (with unspecified `frozen`) are also mutable:
+
+```py
+class GrandChild(MutableChildOfFrozenBase):
+    text: str
+
+grandchild = GrandChild(value=1, text="before")
+grandchild.value = 2
+grandchild.text = "after"
+```
+
+Freezing the model again makes both fields read-only:
+
+```py
+class FrozenAgain(GrandChild):
+    model_config = ConfigDict(frozen=True)
+
+frozen_again = FrozenAgain(value=1, text="before")
+frozen_again.value = 2  # error: [invalid-assignment]
+frozen_again.text = "after"  # error: [invalid-assignment]
+```
+
+If there is a custom `__setattr__` method on a frozen model, we allow mutation, unless that
+`__setattr__` return `Never`:
+
+```py
+from typing_extensions import Never
+
+class FrozenWithCustomSetattr(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    value: int
+
+    def __setattr__(self, name, value):
+        object.__setattr__(self, name, value)
+
+frozen_custom = FrozenWithCustomSetattr(value=1)
+frozen_custom.value = 2
+
+class FrozenWithCustomSetattrNever(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    value: int
+
+    def __setattr__(self, name, value) -> Never:
+        raise AttributeError(name)
+
+frozen_custom_never = FrozenWithCustomSetattrNever(value=1)
+frozen_custom_never.value = 2  # error: [invalid-assignment]
+```
+
+Private attributes on models with `frozen=True` can be mutated:
+
+```py
+class FrozenPerson(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    _implicit_private: int
+    _private_with_default: int = 1
+    _explicit_private: int = PrivateAttr(default=0)
+
+person = FrozenPerson()
+
+person._implicit_private = 2
+person._private_with_default = 2
+person._explicit_private = 2
+```
+
+## Frozen models and protocols
+
+Frozen models cannot satisfy a protocol that requires a writable field, but can satisfy one that
+only requires reading it:
+
+```py
+from typing import Protocol
+from pydantic import BaseModel, ConfigDict
+
+class Frozen(BaseModel, frozen=True):
+    value: int
+
+class Mutable(Frozen):
+    model_config = ConfigDict(frozen=False)
+
+class Writable(Protocol):
+    value: int
+
+class Readable(Protocol):
+    @property
+    def value(self) -> int: ...
+
+def update(model: Writable) -> None:
+    model.value = 2
+
+def read(model: Readable) -> int:
+    return model.value
+
+update(Frozen(value=1))  # error: [invalid-argument-type]
+update(Mutable(value=1))
+read(Frozen(value=1))
+read(Mutable(value=1))
 ```
 
 ## Validation of default values
@@ -1324,6 +1562,39 @@ HasGenericRoot(root=GenericRoot("1"))
 
 # This would ideally be an error, but we currently do not attempt to detect this:
 HasGenericRoot(root=GenericRoot(None))
+```
+
+## Generic models
+
+Generic models inherit model configuration with both PEP 695 and legacy generic syntax. An explicit
+`Generic[T]` base does not override the inherited configuration.
+
+```py
+from typing import Generic, TypeVar
+
+from pydantic import BaseModel, ConfigDict
+
+class ForbidExtras(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+class Model[T](ForbidExtras):
+    value: T
+
+Model[int](value=1)
+Model[int](value=1, something_else=7)  # error: [unknown-argument]
+
+T = TypeVar("T")
+
+class LegacyModel(ForbidExtras, Generic[T]):
+    value: T
+
+LegacyModel[int](value=1)
+LegacyModel[int](value=1, something_else=7)  # error: [unknown-argument]
+
+class InheritsLegacyModel(LegacyModel[int]): ...
+
+InheritsLegacyModel(value=1)
+InheritsLegacyModel(value=1, something_else=7)  # error: [unknown-argument]
 ```
 
 ## Model configuration
@@ -1497,6 +1768,187 @@ class InvalidFieldQualifiers(BaseModel):
     read_only: ReadOnly[int]
     # error: [invalid-type-form] "`Required` is not allowed in Pydantic model fields"
     required: Required[int]
+```
+
+## Replacement
+
+Pydantic models support `copy.replace` and expose a synthesized `__replace__` method on Python 3.13
+and later.
+
+### Frozen models
+
+```py
+from copy import replace
+
+from pydantic import BaseModel
+
+class Model(BaseModel, frozen=True):
+    value: int
+
+model = Model(value=1)
+
+# revealed: (self: Model, *, value: int = ...) -> Model
+reveal_type(Model.__replace__)
+
+reveal_type(model.__replace__(value=2))  # revealed: Model
+reveal_type(replace(model, value=2))  # revealed: Model
+```
+
+### Mutable models
+
+Replacement is available on mutable models and accepts only real model fields.
+
+```py
+from copy import replace
+
+from pydantic import BaseModel
+
+class Model(BaseModel):
+    value: int
+    _private: int = 0
+
+model = Model(value=1)
+
+# revealed: (self: Model, *, value: int = ...) -> Model
+reveal_type(Model.__replace__)
+
+reveal_type(model.__replace__(value=2))  # revealed: Model
+reveal_type(replace(model, value=2))  # revealed: Model
+
+model.__replace__(value="two")  # error: [invalid-argument-type]
+model.__replace__(_private=2)  # error: [unknown-argument]
+model.__replace__(missing=2)  # error: [unknown-argument]
+```
+
+### Field aliases
+
+Replacement updates model fields by name, even when initialization uses an alias.
+
+```py
+from copy import replace
+
+from pydantic import BaseModel, Field
+
+class Model(BaseModel):
+    value: int = Field(alias="external_value")
+
+model = Model(external_value=1)
+
+# revealed: (self: Model, *, value: int = ...) -> Model
+reveal_type(Model.__replace__)
+
+reveal_type(model.__replace__(value=2))  # revealed: Model
+reveal_type(replace(model, value=2))  # revealed: Model
+
+model.__replace__(external_value=2)  # error: [unknown-argument]
+```
+
+### Member discovery
+
+The synthesized method is available in completions for both a model class and its instances. Models
+do not expose attributes that belong only to standard-library dataclasses.
+
+```py
+from pydantic import BaseModel
+from ty_extensions import static_assert
+from ty_extensions._internal import has_member
+
+class Model(BaseModel):
+    value: int
+
+model = Model(value=1)
+
+static_assert(has_member(Model, "__replace__"))
+static_assert(has_member(model, "__replace__"))
+static_assert(not has_member(Model, "__dataclass_fields__"))
+static_assert(not has_member(Model, "__dataclass_params__"))
+static_assert(not has_member(Model, "__match_args__"))
+```
+
+### Inherited fields
+
+```py
+from copy import replace
+
+from pydantic import BaseModel
+
+class Parent(BaseModel):
+    inherited: int
+
+class Child(Parent):
+    own: str
+
+model = Child(inherited=1, own="first")
+
+# revealed: (self: Child, *, inherited: int = ..., own: str = ...) -> Child
+reveal_type(Child.__replace__)
+
+reveal_type(model.__replace__(inherited=2))  # revealed: Child
+reveal_type(model.__replace__(own="second"))  # revealed: Child
+reveal_type(replace(model, inherited=2, own="second"))  # revealed: Child
+
+model.__replace__(inherited="two")  # error: [invalid-argument-type]
+model.__replace__(own=2)  # error: [invalid-argument-type]
+```
+
+### Generic models
+
+```py
+from copy import replace
+
+from pydantic import BaseModel
+
+class Model[T](BaseModel):
+    value: T
+
+model = Model[int](value=1)
+
+reveal_type(model.__replace__(value=2))  # revealed: Model[int]
+reveal_type(replace(model, value=2))  # revealed: Model[int]
+
+model.__replace__(value="two")  # error: [invalid-argument-type]
+```
+
+### Root models
+
+```py
+from copy import replace
+
+from pydantic import RootModel
+
+class Model(RootModel[int]): ...
+
+model = Model(1)
+
+# revealed: (self: Model, *, root: int = ...) -> Model
+reveal_type(Model.__replace__)
+
+reveal_type(model.__replace__(root=2))  # revealed: Model
+reveal_type(replace(model, root=2))  # revealed: Model
+
+model.__replace__(root="two")  # error: [invalid-argument-type]
+```
+
+### Settings models
+
+```py
+from copy import replace
+
+from pydantic_settings import BaseSettings
+
+class Model(BaseSettings):
+    value: int
+
+model = Model(value=1)
+
+# revealed: (self: Model, *, value: int = ...) -> Model
+reveal_type(Model.__replace__)
+
+reveal_type(model.__replace__(value=2))  # revealed: Model
+reveal_type(replace(model, value=2))  # revealed: Model
+
+model.__replace__(value="two")  # error: [invalid-argument-type]
+model.__replace__(_secrets_dir=".")  # error: [unknown-argument]
 ```
 
 ## Pydantic dataclasses

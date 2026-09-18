@@ -5,7 +5,7 @@ import sys
 import types
 from _typeshed import ReadableBuffer, StrPath
 from abc import ABCMeta, abstractmethod
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from importlib import _bootstrap_external
 from importlib._abc import Loader as Loader
 from importlib.machinery import ModuleSpec
@@ -94,15 +94,28 @@ class InspectLoader(Loader):
     def exec_module(self, module: types.ModuleType) -> None:
         """Execute the module."""
 
-    @staticmethod
-    def source_to_code(
-        data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: bytes | StrPath = "<string>"
-    ) -> types.CodeType:
-        """Compile 'data' into a code object.
+    if sys.version_info >= (3, 15):
+        @staticmethod
+        def source_to_code(
+            data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive,
+            path: bytes | StrPath = "<string>",
+            fullname: str | None = None,
+        ) -> types.CodeType:
+            """Compile 'data' into a code object.
 
-        The 'data' argument can be anything that compile() can handle. The'path'
-        argument should be where the data was retrieved (when applicable).
-        """
+            The 'data' argument can be anything that compile() can handle. The'path'
+            argument should be where the data was retrieved (when applicable).
+            """
+    else:
+        @staticmethod
+        def source_to_code(
+            data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: bytes | StrPath = "<string>"
+        ) -> types.CodeType:
+            """Compile 'data' into a code object.
+
+            The 'data' argument can be anything that compile() can handle. The'path'
+            argument should be where the data was retrieved (when applicable).
+            """
 
 class ExecutionLoader(InspectLoader):
     """Abstract base class for loaders that wish to support the execution of
@@ -188,6 +201,14 @@ class MetaPathFinder(metaclass=ABCMeta):
     def find_spec(
         self, fullname: str, path: Sequence[str] | None, target: types.ModuleType | None = ..., /
     ) -> ModuleSpec | None: ...
+    if sys.version_info >= (3, 15):
+        def discover(self, parent: ModuleSpec | None = None) -> Iterable[ModuleSpec]:
+            """An optional method which searches for possible specs with given *parent*
+            module spec. If *parent* is *None*, MetaPathFinder.discover will search
+            for top-level modules.
+
+            Returns an iterable of possible specs.
+            """
 
 class PathEntryFinder(metaclass=ABCMeta):
     """Abstract base class for path entry finders used by PathFinder."""
@@ -226,6 +247,14 @@ class PathEntryFinder(metaclass=ABCMeta):
 
     # Not defined on the actual class, but expected to exist.
     def find_spec(self, fullname: str, target: types.ModuleType | None = ...) -> ModuleSpec | None: ...
+    if sys.version_info >= (3, 15):
+        def discover(self, parent: ModuleSpec | None = None) -> Iterable[ModuleSpec]:
+            """An optional method which searches for possible specs with given
+            *parent* module spec. If *parent* is *None*, PathEntryFinder.discover
+            will search for top-level modules.
+
+            Returns an iterable of possible specs.
+            """
 
 class FileLoader(_bootstrap_external.FileLoader, ResourceLoader, ExecutionLoader, metaclass=ABCMeta):
     """Abstract base class partially implementing the ResourceLoader and
@@ -245,12 +274,14 @@ class FileLoader(_bootstrap_external.FileLoader, ResourceLoader, ExecutionLoader
     def get_filename(self, fullname: str | None = None) -> str:
         """Return the path to the source file as found by the finder."""
 
-    def load_module(self, fullname: str | None = None) -> types.ModuleType:
-        """Load a module from a file.
+    if sys.version_info < (3, 15):
+        @deprecated("Deprecated since Python 3.10; removed in Python 3.15. Use `exec_module()` instead.")
+        def load_module(self, fullname: str | None = None) -> types.ModuleType:
+            """Load a module from a file.
 
-        This method is deprecated.  Use exec_module() instead.
+            This method is deprecated.  Use exec_module() instead.
 
-        """
+            """
 
 if sys.version_info < (3, 11):
     class ResourceReader(metaclass=ABCMeta):

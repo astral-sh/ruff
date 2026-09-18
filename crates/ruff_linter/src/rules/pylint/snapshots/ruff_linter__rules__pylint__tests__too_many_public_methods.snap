@@ -40,4 +40,3 @@ PLR0904 Too many public methods (10 > 7)
 37 | |     def method9(self):
 38 | |         pass
    | |____________^
-   |

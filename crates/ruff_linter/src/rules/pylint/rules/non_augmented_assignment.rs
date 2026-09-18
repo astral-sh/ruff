@@ -7,6 +7,7 @@ use ruff_python_ast::{ExprBinOp, ExprRef, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -68,8 +69,15 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// foo += [2]
 /// assert (foo, bar) == ([1, 2], [1, 2])
 /// ```
+///
+/// An augmented assignment can also fail where the plain form succeeds. NumPy
+/// writes the result into the target's buffer, so `a *= b` raises where
+/// `a = a * b` would broadcast to a new shape or promote the dtype. The same
+/// applies to `a @= b`, which requires the product to have the target's shape.
+///
+/// The fix replaces the whole statement, so any comments inside it are lost.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.7")]
+#[violation_metadata(preview_since = "v0.3.7", category = Category::Pedantic)]
 pub(crate) struct NonAugmentedAssignment {
     operator: AugmentedOperator,
 }
@@ -116,10 +124,9 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
         return;
     }
 
-    // If the operator is commutative, match, e.g., `x = 1 + x`, but limit such matches to primitive
-    // types.
+    // If the operator is commutative, match, e.g., `x = 1 + x`.
     if operator.is_commutative()
-        && (value.left.is_number_literal_expr() || value.left.is_boolean_literal_expr())
+        && is_number_or_bool_constant(&value.left)
         && ComparableExpr::from(target) == ComparableExpr::from(&value.right)
     {
         let mut diagnostic =
@@ -133,6 +140,16 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
             assign.range,
         )));
     }
+}
+
+/// Returns `true` if `expr` evaluates to a number or a boolean, looking through
+/// any unary operators applied to a number or boolean literal.
+fn is_number_or_bool_constant(mut expr: &Expr) -> bool {
+    while let Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) = expr {
+        expr = operand;
+    }
+
+    expr.is_number_literal_expr() || expr.is_boolean_literal_expr()
 }
 
 /// Generate a fix to convert an assignment statement to an augmented assignment.

@@ -8,4 +8,3 @@ PD011 Use `.to_numpy()` or `.array` instead of `.values`
 3 | x = pd.DataFrame()
 4 | result = x.values
   |          ^^^^^^^^
-  |

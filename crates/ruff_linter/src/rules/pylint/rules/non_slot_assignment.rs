@@ -6,6 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for assignments to attributes that are not defined in `__slots__`.
@@ -47,7 +48,7 @@ use crate::checkers::ast::Checker;
 ///         pass
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.1.15")]
+#[violation_metadata(stable_since = "v0.1.15", category = Category::Pedantic)]
 pub(crate) struct NonSlotAssignment {
     name: String,
 }

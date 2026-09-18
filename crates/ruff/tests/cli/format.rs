@@ -56,14 +56,14 @@ fn default_files() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> bar.py:1:1
+     --> bar.py:1:7
       |
       - bar =     "needs formatting"
     1 + bar = "needs formatting"
       |
 
     unformatted: File would be reformatted
-     --> foo.py:1:1
+     --> foo.py:1:7
       |
       - foo =     "needs formatting"
     1 + foo = "needs formatting"
@@ -520,7 +520,7 @@ exclude = ["format_excluded.py"]
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> main.py:1:1
+     --> main.py:1:3
       |
       - x    = 1
     1 + x = 1
@@ -548,7 +548,7 @@ fn deduplicate_directory_and_explicit_file() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> main.py:1:1
+     --> main.py:1:3
       |
       - x   = 1
     1 + x = 1
@@ -584,7 +584,6 @@ from module import =
       |
     2 | from module import =
       |                    ^
-      |
 
 
     ----- stderr -----
@@ -700,7 +699,7 @@ fn output_format_notebook() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-      --> CRATE_ROOT/resources/test/fixtures/unformatted.ipynb:cell 1:1:1
+      --> CRATE_ROOT/resources/test/fixtures/unformatted.ipynb:cell 1:2:1
      ::: cell 1
       |
     1 | import numpy
@@ -835,7 +834,7 @@ fn check_quiet_mode_shows_diagnostics_only() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> main.py:1:1
+     --> main.py:1:5
       |
       - def     foo():
       -                 pass
@@ -859,7 +858,7 @@ fn check_default_mode_shows_diagnostics_and_summary() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> main.py:1:1
+     --> main.py:1:5
       |
       - def     foo():
       -                 pass
@@ -1064,7 +1063,7 @@ if condition:
     	print('Should change quotes')
 
     ----- stderr -----
-    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
+    warning: The following rule may cause conflicts when used with the formatter: `missing-trailing-comma` (`COM812`). To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
     "#);
     Ok(())
 }
@@ -1188,13 +1187,13 @@ def say_hy(name: str):
     1 file reformatted
 
     ----- stderr -----
-    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
-    warning: The `format.indent-style="tab"` option is incompatible with `W191`, which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
-    warning: The `lint.flake8-implicit-str-concat.allow-multiline = false` option is incompatible with the formatter unless `ISC001` is enabled. We recommend enabling `ISC001` or setting `allow-multiline=true`.
-    warning: The `format.indent-style="tab"` option is incompatible with `D206`, with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
-    warning: The `flake8-quotes.inline-quotes="single"` option is incompatible with the formatter's `format.quote-style="double"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `"single"` or `"double"`.
-    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `"double"`.`
-    warning: The `flake8-quotes.docstring-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `"double"`.`
+    warning: The following rule may cause conflicts when used with the formatter: `missing-trailing-comma` (`COM812`). To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
+    warning: The `format.indent-style="tab"` option is incompatible with `tab-indentation` (`W191`), which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
+    warning: The `lint.flake8-implicit-str-concat.allow-multiline = false` option is incompatible with the formatter unless `single-line-implicit-string-concatenation` (`ISC001`) is enabled. We recommend enabling `single-line-implicit-string-concatenation` (`ISC001`) or setting `allow-multiline=true`.
+    warning: The `format.indent-style="tab"` option is incompatible with `docstring-tab-indentation` (`D206`), with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
+    warning: The `flake8-quotes.inline-quotes="single"` option is incompatible with the formatter's `format.quote-style="double"`. We recommend disabling `bad-quotes-inline-string` (`Q000`) and `avoidable-escaped-quote` (`Q003`) when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `"single"` or `"double"`.
+    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `bad-quotes-multiline-string` (`Q001`) when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `"double"`.`
+    warning: The `flake8-quotes.docstring-quotes="single"` option is incompatible with the formatter. We recommend disabling `bad-quotes-docstring` (`Q002`) when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `"double"`.`
     warning: The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).
     warning: The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).
     warning: The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.
@@ -1246,12 +1245,12 @@ def say_hy(name: str):
     	print(f"Hy {name}")
 
     ----- stderr -----
-    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
-    warning: The `format.indent-style="tab"` option is incompatible with `W191`, which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
-    warning: The `format.indent-style="tab"` option is incompatible with `D206`, with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
-    warning: The `flake8-quotes.inline-quotes="single"` option is incompatible with the formatter's `format.quote-style="double"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `"single"` or `"double"`.
-    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `"double"`.`
-    warning: The `flake8-quotes.docstring-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `"double"`.`
+    warning: The following rule may cause conflicts when used with the formatter: `missing-trailing-comma` (`COM812`). To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
+    warning: The `format.indent-style="tab"` option is incompatible with `tab-indentation` (`W191`), which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
+    warning: The `format.indent-style="tab"` option is incompatible with `docstring-tab-indentation` (`D206`), with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
+    warning: The `flake8-quotes.inline-quotes="single"` option is incompatible with the formatter's `format.quote-style="double"`. We recommend disabling `bad-quotes-inline-string` (`Q000`) and `avoidable-escaped-quote` (`Q003`) when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `"single"` or `"double"`.
+    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `bad-quotes-multiline-string` (`Q001`) when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `"double"`.`
+    warning: The `flake8-quotes.docstring-quotes="single"` option is incompatible with the formatter. We recommend disabling `bad-quotes-docstring` (`Q002`) when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `"double"`.`
     warning: The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).
     warning: The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).
     warning: The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.
@@ -1377,9 +1376,9 @@ def say_hy(name: str):
     1 file reformatted
 
     ----- stderr -----
-    warning: `incorrect-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `incorrect-blank-line-before-class`.
+    warning: `incorrect-blank-line-before-class` (D203) and `blank-line-before-class` (D211) are incompatible. Ignoring `incorrect-blank-line-before-class`.
     warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
-    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
+    warning: The following rule may cause conflicts when used with the formatter: `missing-trailing-comma` (`COM812`). To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
     ");
     Ok(())
 }
@@ -2052,7 +2051,6 @@ fn syntax_error_in_notebooks_check() -> Result<()> {
     2 |     # выберите случайный индекс в диапазон от 0 до len(X)-1 включительно при помощи функции random.randint
     3 |     j = # ваш код здесь
       |                        ^
-      |
 
 
     ----- stderr -----
@@ -2557,7 +2555,7 @@ fn markdown_formatting() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-      --> CRATE_ROOT/resources/test/fixtures/unformatted.md:1:1
+      --> CRATE_ROOT/resources/test/fixtures/unformatted.md:4:7
        |
     3  | ```py
        - print( "hello" )
@@ -2694,7 +2692,7 @@ print( 'hello' )
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> test.bar:1:1
+     --> test.bar:5:7
       |
     4 | ```py
       - print( 'hello' )

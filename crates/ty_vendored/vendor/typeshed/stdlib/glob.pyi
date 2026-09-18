@@ -12,13 +12,9 @@ if sys.version_info >= (3, 13):
     __all__ += ["translate"]
 
 if sys.version_info < (3, 15):
-    @deprecated(
-        "Deprecated since Python 3.10; will be removed in Python 3.15. Use `glob.glob()` with the *root_dir* argument instead."
-    )
+    @deprecated("Deprecated since Python 3.10; removed in Python 3.15. Use `glob.glob()` with the *root_dir* argument instead.")
     def glob0(dirname: AnyStr, pattern: AnyStr) -> list[AnyStr]: ...
-    @deprecated(
-        "Deprecated since Python 3.10; will be removed in Python 3.15. Use `glob.glob()` with the *root_dir* argument instead."
-    )
+    @deprecated("Deprecated since Python 3.10; removed in Python 3.15. Use `glob.glob()` with the *root_dir* argument instead.")
     def glob1(dirname: AnyStr, pattern: AnyStr) -> list[AnyStr]: ...
 
 if sys.version_info >= (3, 11):
@@ -49,8 +45,8 @@ if sys.version_info >= (3, 11):
         If `dir_fd` is not None, it should be a file descriptor referring to a
         directory, and paths will then be relative to that directory.
 
-        If `include_hidden` is true, the patterns '*', '?', '**'  will match
-        hidden directories.
+        If `include_hidden` is true, wildcards can match path segments beginning
+        with a dot ('.').
 
         If `recursive` is true, the pattern '**' will match any files and
         zero or more directories and subdirectories.
@@ -83,8 +79,8 @@ if sys.version_info >= (3, 11):
         If `dir_fd` is not None, it should be a file descriptor referring to a
         directory, and paths will then be relative to that directory.
 
-        If `include_hidden` is true, the patterns '*', '?', '**'  will match
-        hidden directories.
+        If `include_hidden` is true, wildcards can match path segments beginning
+        with a dot ('.').
 
         If `recursive` is true, the pattern '**' will match any files and
         zero or more directories and subdirectories.

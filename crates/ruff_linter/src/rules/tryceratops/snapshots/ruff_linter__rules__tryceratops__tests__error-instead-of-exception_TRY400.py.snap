@@ -25,7 +25,6 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
 15 |         if True:
 16 |             logging.error("Context message here")
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `exception`
    |
 15 |         if True:
@@ -59,7 +58,6 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
 29 |         if True:
 30 |             logger.error("Context message here")
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `exception`
    |
 29 |         if True:
@@ -94,7 +92,6 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
 39 |         if True:
 40 |             log.error("Context message here")
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `exception`
    |
 39 |         if True:
@@ -129,7 +126,6 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
 49 |         if True:
 50 |             self.logger.error("Context message here")
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `exception`
    |
 49 |         if True:
@@ -163,7 +159,6 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
 102 |         if True:
 103 |             error("Context message here")
     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace with `exception`
     |
 102 |         if True:
@@ -179,7 +174,6 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
 142 |         except Exception:
 143 |             error("Context message here")
     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace with `exception`
     |
 142 |         except Exception:

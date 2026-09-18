@@ -959,4 +959,3 @@ Module(
 16 | {x: y for x in data if yield from y}
 17 | {x: y for x in data if lambda y: y}
    |                        ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
-   |

@@ -380,7 +380,7 @@ mod tests {
     #[test_case(Rule::PandasUseOfInplaceArgument, Path::new("PD002.py"))]
     #[test_case(Rule::PandasNuniqueConstantSeriesCheck, Path::new("PD101.py"))]
     fn paths(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pandas_vet").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),

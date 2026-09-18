@@ -85,3 +85,20 @@ round(
 # See: https://github.com/astral-sh/ruff/issues/21209
 print(round(125, **{"ndigits": -2}))
 print(round(125, *[-2]))
+
+# Assignment expressions remain parenthesized after the call is removed.
+round(value := 1)
+
+# Integer attribute access still requires parentheses.
+round(1).real
+
+# Parentheses separate the replacement from adjacent keywords.
+round(1)and True
+
+def parenthesized_callee():
+    return(round)(1)
+
+# Preserve comments within explicit argument parentheses.
+round((  # Keep the argument comment.
+    1
+))

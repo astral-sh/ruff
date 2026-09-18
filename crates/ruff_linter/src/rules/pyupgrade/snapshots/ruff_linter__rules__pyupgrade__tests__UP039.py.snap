@@ -89,7 +89,6 @@ UP039 [*] Unnecessary parentheses after class definition
 47 | |     # text
 48 | | ): ...
    | |_^
-   |
 help: Remove parentheses
    |
 45 |

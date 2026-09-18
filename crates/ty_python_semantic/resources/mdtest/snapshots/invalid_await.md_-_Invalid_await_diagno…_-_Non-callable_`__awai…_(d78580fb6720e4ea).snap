@@ -42,7 +42,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_awai
 
 ```
 error[invalid-await]: `NonCallableAwait` is not awaitable
- --> src/mdtest_snippet.py:2:5
+ --> src/mdtest_snippet.py:5:11
   |
 2 |     __await__ = 42
   |     --------- attribute defined here
@@ -50,7 +50,6 @@ error[invalid-await]: `NonCallableAwait` is not awaitable
 4 | async def main() -> None:
 5 |     await NonCallableAwait()  # error: [invalid-await]
   |           ^^^^^^^^^^^^^^^^^^
-  |
 info: `__await__` is not callable
 
 ```
@@ -66,7 +65,6 @@ error[invalid-await]: `DeepInheritedNonCallableAwait` is not awaitable
    |
  7 |     __await__ = 42
    |     --------- attribute defined here
-   |
 info: `__await__` is not callable
 
 ```
@@ -77,7 +75,6 @@ error[invalid-await]: `A | B` is not awaitable
    |
 23 |     await x  # error: [invalid-await]
    |           ^
-   |
 info: `__await__` is not callable
 
 ```

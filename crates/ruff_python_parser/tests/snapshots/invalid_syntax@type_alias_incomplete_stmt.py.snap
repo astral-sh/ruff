@@ -94,4 +94,3 @@ Module(
 2 | type x
 3 | type x =
   |         ^ Syntax Error: Expected an expression
-  |

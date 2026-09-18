@@ -125,20 +125,21 @@ impl PythonWhitespace for str {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
     use std::borrow::Cow;
 
     use super::{expand_tabs, tab_offset, tab_offset_u32};
 
     #[test]
     fn tab_expansion_borrows_unchanged_text() {
-        assert!(matches!(expand_tabs("unchanged"), Cow::Borrowed(_)));
+        assert_matches!(expand_tabs("unchanged"), Cow::Borrowed(_));
     }
 
     #[test]
     fn tab_expansion_allocates_changed_text() {
         let expanded = expand_tabs("  \tvalue");
 
-        assert!(matches!(&expanded, Cow::Owned(_)));
+        assert_matches!(&expanded, Cow::Owned(_));
         assert_eq!(expanded, "        value");
     }
 

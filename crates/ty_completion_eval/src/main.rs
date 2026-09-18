@@ -17,7 +17,7 @@ use ty_module_resolver::ModuleName;
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
-use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_project::{ProjectDatabase, ProjectMetadata, SemanticDb as _};
 
 #[derive(Debug, clap::Parser)]
 #[command(
@@ -280,7 +280,7 @@ impl Task {
         let system = OsSystem::new(project_path);
         let mut project_metadata = ProjectMetadata::discover(project_path, &system)?;
         // Explicitly point ty to the .venv to avoid any set VIRTUAL_ENV variable to take precedence.
-        project_metadata.apply_override_options(Options {
+        project_metadata.set_override_options(Options {
             environment: Some(EnvironmentOptions {
                 python: Some(RelativePathBuf::cli(".venv")),
                 ..EnvironmentOptions::default()
@@ -330,7 +330,7 @@ impl Task {
             &self.db,
             &self.settings,
             CompletionCapabilities::default(),
-            file,
+            self.db.program_file(file),
             offset,
         );
         Ok(completions)
@@ -545,6 +545,7 @@ fn copy_project(src_dir: &SystemPath, dst_dir: &SystemPath) -> anyhow::Result<Ve
 
     let mut cursors = vec![];
     let it = walkdir::WalkDir::new(src_dir.as_std_path())
+        .sort_by_file_name()
         .into_iter()
         .filter_entry(|dent| {
             !dent

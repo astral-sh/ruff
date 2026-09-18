@@ -1,0 +1,164 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLE2513 [*] Invalid unescaped character ESC, use "\x1b" instead
+  --> invalid_characters.py:30:16
+   |
+28 | sub_ok = f'\x1a'
+29 |
+30 | esc = 'esc esc ␛'
+   |                ^
+31 | esc = f'esc esc ␛'
+   |
+help: Replace with escape sequence
+   |
+29 |
+   - esc = 'esc esc ␛'
+30 + esc = 'esc esc \x1b'
+31 | esc = f'esc esc ␛'
+   |
+
+PLE2513 [*] Invalid unescaped character ESC, use "\x1b" instead
+  --> invalid_characters.py:31:17
+   |
+30 | esc = 'esc esc ␛'
+31 | esc = f'esc esc ␛'
+   |                 ^
+32 |
+33 | esc_ok = '\x1b'
+   |
+help: Replace with escape sequence
+   |
+30 | esc = 'esc esc ␛'
+   - esc = f'esc esc ␛'
+31 + esc = f'esc esc \x1b'
+32 |
+   |
+
+PLE2513 [*] Invalid unescaped character ESC, use "\x1b" instead
+  --> invalid_characters.py:55:29
+   |
+53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+54 |
+55 | nested_fstrings = f'␈{f'␚{f'␛'}'}'
+   |                             ^
+56 |
+57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
+   |
+help: Replace with escape sequence
+   |
+54 |
+   - nested_fstrings = f'␈{f'{f'␛'}'}'
+55 + nested_fstrings = f'␈{f'{f'\x1b'}'}'
+56 |
+   |
+
+PLE2513 [*] Invalid unescaped character ESC, use "\x1b" instead
+  --> invalid_characters.py:60:12
+   |
+58 | x = f"""}}a␚b"""
+59 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998256
+60 | x = f"""}}a␛b"""
+   |            ^
+help: Replace with escape sequence
+   |
+59 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998256
+   - x = f"""}}a␛b"""
+60 + x = f"""}}a\x1bb"""
+61 |
+   |
+
+PLE2513 Invalid unescaped character ESC, use "\x1b" instead
+  --> invalid_characters.py:64:13
+   |
+63 | # https://github.com/astral-sh/ruff/issues/13294
+64 | print(r"""␈␚␛␀​
+   |             ^
+65 | """)
+66 | print(fr"""␈␚␛␀​
+   |
+help: Replace with escape sequence
+
+PLE2513 Invalid unescaped character ESC, use "\x1b" instead
+  --> invalid_characters.py:66:14
+   |
+64 | print(r"""␈␚␛␀​
+65 | """)
+66 | print(fr"""␈␚␛␀​
+   |              ^
+67 | """)
+68 | print(Rf"""␈␚␛␀​
+   |
+help: Replace with escape sequence
+
+PLE2513 Invalid unescaped character ESC, use "\x1b" instead
+  --> invalid_characters.py:68:14
+   |
+66 | print(fr"""␈␚␛␀​
+67 | """)
+68 | print(Rf"""␈␚␛␀​
+   |              ^
+69 | """)
+   |
+help: Replace with escape sequence
+
+PLE2513 Invalid unescaped character ESC, use "\x1b" instead
+  --> invalid_characters.py:74:9
+   |
+72 | b = "\␈"
+73 | sub = "\␚"
+74 | esc = "\␛"
+   |         ^
+75 | zwsp = "\​"
+76 | nul = "\␀"
+   |
+help: Replace with escape sequence
+
+PLE2513 [*] Invalid unescaped character ESC, use "\x1b" instead
+  --> invalid_characters.py:79:17
+   |
+78 | # tstrings
+79 | esc = t'esc esc ␛'
+   |                 ^
+80 | nested_tstrings = t'␈{t'␚{t'␛'}'}'
+81 | nested_ftstrings = t'␈{f'␚{t'␛'}'}'
+   |
+help: Replace with escape sequence
+   |
+78 | # tstrings
+   - esc = t'esc esc ␛'
+79 + esc = t'esc esc \x1b'
+80 | nested_tstrings = t'␈{t'{t'␛'}'}'
+   |
+
+PLE2513 [*] Invalid unescaped character ESC, use "\x1b" instead
+  --> invalid_characters.py:80:29
+   |
+78 | # tstrings
+79 | esc = t'esc esc ␛'
+80 | nested_tstrings = t'␈{t'␚{t'␛'}'}'
+   |                             ^
+81 | nested_ftstrings = t'␈{f'␚{t'␛'}'}'
+   |
+help: Replace with escape sequence
+   |
+79 | esc = t'esc esc ␛'
+   - nested_tstrings = t'␈{t'{t'␛'}'}'
+80 + nested_tstrings = t'␈{t'{t'\x1b'}'}'
+81 | nested_ftstrings = t'␈{f'{t'␛'}'}'
+   |
+
+PLE2513 [*] Invalid unescaped character ESC, use "\x1b" instead
+  --> invalid_characters.py:81:30
+   |
+79 | esc = t'esc esc ␛'
+80 | nested_tstrings = t'␈{t'␚{t'␛'}'}'
+81 | nested_ftstrings = t'␈{f'␚{t'␛'}'}'
+   |                              ^
+help: Replace with escape sequence
+   |
+80 | nested_tstrings = t'␈{t'{t'␛'}'}'
+   - nested_ftstrings = t'␈{f'{t'␛'}'}'
+81 + nested_ftstrings = t'␈{f'{t'\x1b'}'}'
+82 |
+   |

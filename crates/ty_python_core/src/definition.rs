@@ -1,5 +1,6 @@
 use std::ops::Deref;
 
+use ruff_db::PythonFile;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::find_node::covering_node;
@@ -10,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
 
 use crate::LoopHeaderId;
+use crate::ProgramFile;
 use crate::ast_node_ref::AstNodeRef;
 use crate::member::ScopedMemberId;
 use crate::node_key::NodeKey;
@@ -19,7 +21,7 @@ use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::use_def::BindingWithConstraintsIterator;
-use crate::{Db, SemanticIndex};
+use crate::{Db, Program, SemanticIndex};
 
 /// A definition of a place.
 ///
@@ -83,6 +85,18 @@ impl<'db> Definition<'db> {
         self.scope_id(db).file(db)
     }
 
+    pub fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
+        self.scope_id(db).python_file(db)
+    }
+
+    pub fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
+        self.scope_id(db).program_file(db)
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program<'db> {
+        self.scope_id(db).program(db)
+    }
+
     pub fn file_scope(self, db: &'db dyn Db) -> FileScopeId {
         self.scope_id(db).file_scope_id(db)
     }
@@ -105,8 +119,7 @@ impl<'db> Definition<'db> {
 
     /// Returns the name of the item being defined, if applicable.
     pub fn name(self, db: &'db dyn Db) -> Option<String> {
-        let file = self.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, self.python_file(db)).load(db);
         let kind = self.kind(db);
         match kind {
             DefinitionKind::Function(def) => {
@@ -142,8 +155,7 @@ impl<'db> Definition<'db> {
     /// This method returns a docstring for function, class, and attribute definitions.
     /// The docstring is extracted from the first statement in the body if it's a string literal.
     pub fn docstring(self, db: &'db dyn Db) -> Option<String> {
-        let file = self.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, self.python_file(db)).load(db);
         let kind = self.kind(db);
 
         match kind {
@@ -271,13 +283,7 @@ pub struct Definitions<'db> {
 }
 
 impl<'db> Definitions<'db> {
-    pub fn single(definition: Definition<'db>) -> Self {
-        Self {
-            definitions: smallvec::smallvec_inline![definition],
-        }
-    }
-
-    pub fn push(&mut self, definition: Definition<'db>) {
+    pub(crate) fn push(&mut self, definition: Definition<'db>) {
         self.definitions.push(definition);
     }
 
@@ -522,6 +528,7 @@ pub(crate) struct AssignmentDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<Unpack<'db>>,
     pub(crate) value: &'ast ast::Expr,
     pub(crate) target: &'ast ast::Expr,
+    pub(crate) owner: BindingsOwner,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -586,7 +593,7 @@ pub(crate) enum ParameterDefinitionNodeRef<'ast> {
 }
 
 impl ParameterDefinitionNodeRef<'_> {
-    pub(super) fn into_owned(self, parsed: &ParsedModuleRef) -> ParameterDefinitionNodeKind {
+    fn into_owned(self, parsed: &ParsedModuleRef) -> ParameterDefinitionNodeKind {
         match self {
             Self::VariadicPositionalParameter(parameter) => {
                 ParameterDefinitionNodeKind::VariadicPositionalParameter(AstNodeRef::new(
@@ -604,7 +611,7 @@ impl ParameterDefinitionNodeRef<'_> {
         }
     }
 
-    pub(super) fn key(self) -> DefinitionNodeKey {
+    fn key(self) -> DefinitionNodeKey {
         match self {
             Self::VariadicPositionalParameter(node) => node.into(),
             Self::VariadicKeywordParameter(node) => node.into(),
@@ -672,7 +679,10 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 })
             }
             DefinitionNodeRef::Function(function) => {
-                DefinitionKind::Function(AstNodeRef::new(parsed, function))
+                DefinitionKind::Function(FunctionDefinitionKind {
+                    node: AstNodeRef::new(parsed, function),
+                    has_decorators: !function.decorator_list.is_empty(),
+                })
             }
             DefinitionNodeRef::Class(class) => {
                 DefinitionKind::Class(AstNodeRef::new(parsed, class))
@@ -687,15 +697,18 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 unpack,
                 value,
                 target,
+                owner,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
                 unpack,
                 value: AstNodeRef::new(parsed, value),
                 target: AstNodeRef::new(parsed, target),
+                owner,
             }),
             DefinitionNodeRef::AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef {
                 node,
             }) => DefinitionKind::AnnotatedAssignment(AnnotatedAssignmentDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
+                has_value: node.value.is_some(),
             }),
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
@@ -834,6 +847,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 value: _,
                 unpack: _,
                 target,
+                owner: _,
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
             Self::AnnotatedAssignment(ann_assign) => ann_assign.node.into(),
             Self::AugmentedAssignment(node) => node.into(),
@@ -887,7 +901,7 @@ impl DefinitionCategory {
     /// If so, any assignments reached by this definition are in error if they assign a value of a
     /// type not assignable to the declared type.
     ///
-    /// Annotations establish a declared type. So do function and class definitions, and imports.
+    /// Annotations establish a declared type. So do function and class definitions.
     pub fn is_declaration(self) -> bool {
         matches!(
             self,
@@ -919,7 +933,7 @@ pub enum DefinitionKind<'db> {
     ImportFrom(ImportFromDefinitionKind),
     ImportFromSubmodule(ImportFromSubmoduleDefinitionKind),
     StarImport(StarImportDefinitionKind),
-    Function(AstNodeRef<ast::StmtFunctionDef>),
+    Function(FunctionDefinitionKind),
     Class(AstNodeRef<ast::StmtClassDef>),
     TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
     NamedExpression(AstNodeRef<ast::ExprNamed>),
@@ -943,7 +957,7 @@ pub enum DefinitionKind<'db> {
 }
 
 impl<'db> DefinitionKind<'db> {
-    pub fn is_reexported(&self) -> bool {
+    pub(crate) fn is_reexported(&self) -> bool {
         match self {
             DefinitionKind::Import(import) => import.is_reexported(),
             DefinitionKind::ImportFrom(import) => import.is_reexported(),
@@ -980,7 +994,7 @@ impl<'db> DefinitionKind<'db> {
         matches!(self, DefinitionKind::Assignment(_))
     }
 
-    pub fn as_unannotated_assignment(&self) -> Option<AssignmentDefinitionKind<'db>> {
+    pub(crate) fn as_unannotated_assignment(&self) -> Option<AssignmentDefinitionKind<'db>> {
         match self {
             DefinitionKind::Assignment(assignment) => Some(assignment.clone()),
             _ => None,
@@ -1118,13 +1132,10 @@ impl<'db> DefinitionKind<'db> {
 
     pub fn category(&self, in_stub: bool, module: &ParsedModuleRef) -> DefinitionCategory {
         match self {
-            // functions, classes, and imports always bind, and we consider them declarations
+            // Functions and classes always bind, and we consider them declarations.
             DefinitionKind::Function(_)
             | DefinitionKind::Class(_)
             | DefinitionKind::TypeAlias(_)
-            | DefinitionKind::Import(_)
-            | DefinitionKind::ImportFrom(_)
-            | DefinitionKind::StarImport(_)
             | DefinitionKind::TypeVar(_)
             | DefinitionKind::ParamSpec(_)
             | DefinitionKind::TypeVarTuple(_) => DefinitionCategory::DeclarationAndBinding,
@@ -1136,7 +1147,7 @@ impl<'db> DefinitionKind<'db> {
             // Annotated assignment is always a declaration. It is also a binding if there is a RHS
             // or if we are in a stub file. Unfortunately, it is common for stubs to omit even an `...` value placeholder.
             DefinitionKind::AnnotatedAssignment(ann_assign) => {
-                if in_stub || ann_assign.value(module).is_some() {
+                if in_stub || ann_assign.has_value() {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
                     DefinitionCategory::Declaration
@@ -1151,6 +1162,9 @@ impl<'db> DefinitionKind<'db> {
             | DefinitionKind::Comprehension(_)
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
+            | DefinitionKind::Import(_)
+            | DefinitionKind::ImportFrom(_)
+            | DefinitionKind::StarImport(_)
             | DefinitionKind::ImportFromSubmodule(_)
             | DefinitionKind::ExceptHandler(_)
             | DefinitionKind::LoopHeader(_)
@@ -1168,6 +1182,27 @@ impl<'db> DefinitionKind<'db> {
             DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(module),
             _ => None,
         }
+    }
+}
+
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct FunctionDefinitionKind {
+    node: AstNodeRef<ast::StmtFunctionDef>,
+    has_decorators: bool,
+}
+
+impl FunctionDefinitionKind {
+    pub fn node<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtFunctionDef {
+        self.node.node(module)
+    }
+
+    pub fn node_key(&self) -> NodeKey {
+        NodeKey::from_node_ref(&self.node)
+    }
+
+    /// Whether the function has decorators, without loading its module's AST.
+    pub fn has_decorators(&self) -> bool {
+        self.has_decorators
     }
 }
 
@@ -1279,7 +1314,7 @@ pub enum ParameterDefinitionNodeKind {
 }
 
 impl ParameterDefinitionNodeKind {
-    pub(crate) fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
+    fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
         match self {
             Self::VariadicPositionalParameter(parameter) => parameter.node(module).name.range(),
             Self::VariadicKeywordParameter(parameter) => parameter.node(module).name.range(),
@@ -1287,7 +1322,7 @@ impl ParameterDefinitionNodeKind {
         }
     }
 
-    pub(crate) fn full_range(&self, module: &ParsedModuleRef) -> TextRange {
+    fn full_range(&self, module: &ParsedModuleRef) -> TextRange {
         match self {
             Self::VariadicPositionalParameter(parameter) => parameter.node(module).range(),
             Self::VariadicKeywordParameter(parameter) => parameter.node(module).range(),
@@ -1295,7 +1330,7 @@ impl ParameterDefinitionNodeKind {
         }
     }
 
-    pub(crate) fn category(&self, module: &ParsedModuleRef) -> DefinitionCategory {
+    fn category(&self, module: &ParsedModuleRef) -> DefinitionCategory {
         match self {
             // a parameter always binds a value, but is only a declaration if annotated
             Self::VariadicPositionalParameter(parameter)
@@ -1319,6 +1354,20 @@ impl ParameterDefinitionNodeKind {
                     DefinitionCategory::Binding
                 }
             }
+        }
+    }
+
+    pub fn annotation<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
+        match self {
+            Self::VariadicPositionalParameter(parameter)
+            | Self::VariadicKeywordParameter(parameter) => {
+                parameter.node(module).annotation.as_deref()
+            }
+            Self::Parameter(parameter_with_default) => parameter_with_default
+                .node(module)
+                .parameter
+                .annotation
+                .as_deref(),
         }
     }
 }
@@ -1346,7 +1395,7 @@ impl ImportDefinitionKind {
         &self.node.node(module).names[self.alias_index as usize]
     }
 
-    pub fn is_reexported(&self) -> bool {
+    fn is_reexported(&self) -> bool {
         self.is_reexported
     }
 }
@@ -1367,7 +1416,7 @@ impl ImportFromDefinitionKind {
         &self.node.node(module).names[self.alias_index as usize]
     }
 
-    pub fn is_reexported(&self) -> bool {
+    fn is_reexported(&self) -> bool {
         self.is_reexported
     }
 }
@@ -1382,14 +1431,14 @@ impl ImportFromSubmoduleDefinitionKind {
         self.node.node(module)
     }
 
-    pub fn module<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Identifier {
+    fn module<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Identifier {
         self.import(module)
             .module
             .as_ref()
             .expect("import-from submodule definitions should always have a module identifier")
     }
 
-    pub fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
+    fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
         let module_ident = self.module(module);
         let module_str = module_ident.as_str();
 
@@ -1415,11 +1464,21 @@ impl ImportFromSubmoduleDefinitionKind {
     }
 }
 
+/// The inference region that owns bindings created while evaluating an assignment's value.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum BindingsOwner {
+    /// A simple-name assignment is represented by its definition.
+    Definition,
+    /// An assignment with multiple, unpacking, or non-name targets is represented by its statement.
+    Statement,
+}
+
 #[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct AssignmentDefinitionKind<'db> {
     unpack: Option<Unpack<'db>>,
     value: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::Expr>,
+    owner: BindingsOwner,
 }
 
 impl<'db> AssignmentDefinitionKind<'db> {
@@ -1434,11 +1493,16 @@ impl<'db> AssignmentDefinitionKind<'db> {
     pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
         self.target.node(module)
     }
+
+    pub fn owner(&self) -> BindingsOwner {
+        self.owner
+    }
 }
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct AnnotatedAssignmentDefinitionKind {
     node: AstNodeRef<ast::StmtAnnAssign>,
+    has_value: bool,
 }
 
 impl AnnotatedAssignmentDefinitionKind {
@@ -1448,6 +1512,11 @@ impl AnnotatedAssignmentDefinitionKind {
 
     pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
         self.node(module).value.as_deref()
+    }
+
+    /// Returns whether this annotated assignment has a right-hand-side value.
+    pub const fn has_value(&self) -> bool {
+        self.has_value
     }
 
     pub fn annotation<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
@@ -1461,9 +1530,9 @@ impl AnnotatedAssignmentDefinitionKind {
 
 #[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct DictKeyAssignmentKind<'db> {
-    pub(crate) key: AstNodeRef<ast::Expr>,
-    pub(crate) value: AstNodeRef<ast::Expr>,
-    pub(crate) assignment: Definition<'db>,
+    key: AstNodeRef<ast::Expr>,
+    value: AstNodeRef<ast::Expr>,
+    assignment: Definition<'db>,
 }
 
 impl<'db> DictKeyAssignmentKind<'db> {
@@ -1584,7 +1653,7 @@ impl LoopHeaderDefinitionKind {
         self.place
     }
 
-    pub fn range(&self, module: &ParsedModuleRef) -> TextRange {
+    fn range(&self, module: &ParsedModuleRef) -> TextRange {
         match &self.loop_stmt {
             LoopStmtKind::While(stmt) => stmt.node(module).range(),
             LoopStmtKind::For(stmt) => stmt.node(module).range(),
@@ -1603,8 +1672,10 @@ pub struct NestedBindingsDefinitionKind {
 }
 
 impl NestedBindingsDefinitionKind {
-    /// Returns the binding source for each nested declaration, along with whether it is global.
-    pub fn binding_sources<'index, 'db>(
+    /// Returns every nested binding source and whether it was declared `global`.
+    ///
+    /// Use [`Self::visible_binding_sources`] when resolving the binding in a particular scope.
+    fn binding_sources<'index, 'db>(
         &'index self,
         index: &'index SemanticIndex<'db>,
     ) -> impl Iterator<Item = (bool, BindingWithConstraintsIterator<'index, 'db>)> + 'index {
@@ -1620,6 +1691,53 @@ impl NestedBindingsDefinitionKind {
             };
             Some((declaration.is_global(), bindings))
         })
+    }
+
+    /// Returns nested binding sources that can update the same variable as `scope`.
+    ///
+    /// A synthetic binding can collect both `global` and `nonlocal` writes to one name:
+    ///
+    /// ```python
+    /// x = 0
+    ///
+    /// def outer():
+    ///     x = 1
+    ///
+    ///     def change_global():
+    ///         global x
+    ///         x = 2
+    ///
+    ///     def change_nonlocal():
+    ///         nonlocal x
+    ///         x = 3
+    /// ```
+    ///
+    /// Only `change_nonlocal` can update `outer`'s local `x`. Nested functions also cannot
+    /// capture a class-local variable, so class scopes do not see nonlocal writes to their
+    /// own bindings.
+    pub fn visible_binding_sources<'index, 'db>(
+        &'index self,
+        index: &'index SemanticIndex<'db>,
+        scope: FileScopeId,
+    ) -> impl Iterator<Item = BindingWithConstraintsIterator<'index, 'db>> + 'index {
+        let symbol_id = index.place_table(scope).symbol_id(&self.name);
+        let sees_global = symbol_id
+            .is_some_and(|symbol_id| index.symbol_resolves_to_global_scope(symbol_id, scope));
+        let sees_nonlocal = !sees_global
+            && symbol_id.is_some_and(|symbol_id| {
+                !(index.scope(scope).kind().is_class()
+                    && index.place_table(scope).symbol(symbol_id).is_local())
+            });
+
+        self.binding_sources(index)
+            .filter_map(move |(is_global, bindings)| {
+                (if is_global {
+                    sees_global
+                } else {
+                    sees_nonlocal
+                })
+                .then_some(bindings)
+            })
     }
 }
 

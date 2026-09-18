@@ -13,7 +13,7 @@ use crate::ExprRef;
 /// generally prefer [`parenthesized_range`].
 ///
 /// Prefer [`crate::token::parentheses_iterator`] if you have access to [`crate::token::Tokens`].
-pub fn parentheses_iterator<'a>(
+fn parentheses_iterator<'a>(
     expr: ExprRef<'a>,
     parent: Option<AnyNodeRef>,
     comment_ranges: &'a CommentRanges,
