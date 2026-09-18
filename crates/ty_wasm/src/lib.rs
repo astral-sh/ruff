@@ -1002,7 +1002,7 @@ impl Diagnostic {
 
         let title = self
             .inner
-            .first_help_text()
+            .fix_title()
             .map(ToString::to_string)
             .unwrap_or_else(|| format!("Fix {}", self.inner.id()));
 

@@ -347,9 +347,7 @@ impl<'a> SarifResult<'a> {
             return None;
         };
 
-        let fix_description = diagnostic
-            .first_help_text()
-            .map(std::string::ToString::to_string);
+        let fix_description = diagnostic.fix_title().map(std::string::ToString::to_string);
 
         let replacements: Vec<SarifReplacement> = fix
             .edits()

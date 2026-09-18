@@ -729,7 +729,7 @@ impl DiagnosticData {
 
         Some(DiagnosticFixData {
             fix_title: diagnostic
-                .first_help_text()
+                .fix_title()
                 .map(ToString::to_string)
                 .unwrap_or_else(|| format!("Fix {}", diagnostic.id())),
             edits: lsp_edits,

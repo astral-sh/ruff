@@ -184,6 +184,13 @@ impl Diagnostic {
         self.sub(SubDiagnostic::new(SubDiagnosticSeverity::Help, message));
     }
 
+    /// Adds a help sub-diagnostic whose message is used as the fix title.
+    pub fn help_with_fix_title<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
+        let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Help, message);
+        sub.inner.is_fix_title = true;
+        self.sub(sub);
+    }
+
     /// Adds a "sub" diagnostic to this diagnostic.
     ///
     /// This is useful when a sub diagnostic has its own annotations attached
@@ -458,14 +465,19 @@ impl Diagnostic {
         self.id().is_invalid_syntax()
     }
 
-    /// Returns the message of the first sub-diagnostic with a `Help` severity.
+    /// Returns the message to use as the fix title.
     ///
-    /// Note that this is used as the fix title/suggestion for some of Ruff's output formats, but in
-    /// general this is not the guaranteed meaning of such a message.
-    pub fn first_help_text(&self) -> Option<&str> {
+    /// Uses the first sub-diagnostic added with [`Diagnostic::help_with_fix_title`],
+    /// falling back to the first help sub-diagnostic if no title was explicitly selected.
+    pub fn fix_title(&self) -> Option<&str> {
         self.sub_diagnostics()
             .iter()
-            .find(|sub| matches!(sub.inner.severity, SubDiagnosticSeverity::Help))
+            .find(|sub| sub.inner.is_fix_title)
+            .or_else(|| {
+                self.sub_diagnostics()
+                    .iter()
+                    .find(|sub| matches!(sub.inner.severity, SubDiagnosticSeverity::Help))
+            })
             .map(|sub| sub.inner.message.as_str())
     }
 
@@ -669,6 +681,7 @@ impl SubDiagnostic {
             severity,
             message: message.into_diagnostic_message(),
             annotations: vec![],
+            is_fix_title: false,
         });
         SubDiagnostic { inner }
     }
@@ -757,6 +770,7 @@ struct SubDiagnosticInner {
     severity: SubDiagnosticSeverity,
     message: DiagnosticMessage,
     annotations: Vec<Annotation>,
+    is_fix_title: bool,
 }
 
 /// Returns all annotations, skipping the first primary annotation.
