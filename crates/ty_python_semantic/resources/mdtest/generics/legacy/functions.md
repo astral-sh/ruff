@@ -544,8 +544,7 @@ Note that a gradual type is compatible with any declared constraint:
 from typing import Any
 
 def _(value: Any, text: str) -> None:
-    # XXX: revealed: str
-    reveal_type(f(value, text))  # revealed: Any | str
+    reveal_type(f(value, text))  # revealed: str
 ```
 
 ## Diagnostic recovery with conflicting bounds
@@ -865,17 +864,13 @@ class Sparse: ...
 def consume(rows: Iterable[Row]) -> Row:
     raise NotImplementedError
 
-# XXX: revealed: tuple[Any, ...]
-# revealed: tuple[float, Dense] | tuple[float, Sparse] | tuple[Any, ...]
-reveal_type(consume([(1.0, Dense()), (0.0, Sparse())]))
+reveal_type(consume([(1.0, Dense()), (0.0, Sparse())]))  # revealed: tuple[Any, ...]
 
 def callback(row: tuple[int, ...]) -> None: ...
 def consume_callback(callback: Callable[[Row], None]) -> Row:
     raise NotImplementedError
 
-# XXX: revealed: tuple[Any, ...]
-# revealed: tuple[int, ...]
-reveal_type(consume_callback(callback))
+reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
 ```
 
 ## Gradual invariant protocol members
@@ -1725,20 +1720,12 @@ def choose(left: T, right: T) -> T:
 def caller(value: Any) -> None:
     reveal_type(identity(value))  # revealed: Any
     # TODO: revealed: Any
-    # XXX: revealed: int
-    # revealed: Any | int
-    reveal_type(choose(value, 1))
+    reveal_type(choose(value, 1))  # revealed: int
 
 def list_caller(value: list[Any]) -> None:
-    # XXX: revealed: int | list[int]
-    # revealed: list[Any] | int | list[int]
-    reveal_type(identity(value))
-    # XXX: revealed: int | list[int]
-    # revealed: list[Any] | int | list[int]
-    reveal_type(choose(value, 1))
-    # XXX: revealed: int | list[int]
-    # revealed: list[Any] | int | list[int]
-    reveal_type(choose(value, [1]))
+    reveal_type(identity(value))  # revealed: int | list[int]
+    reveal_type(choose(value, 1))  # revealed: int | list[int]
+    reveal_type(choose(value, [1]))  # revealed: int | list[int]
 ```
 
 The `Unknown` returned by a lambda without declared parameter types is also gradual evidence:
@@ -2055,8 +2042,7 @@ def single_constraint(value: SingleConstraint) -> SingleConstraint:
     return value
 
 def single_matching_constraint(value: GradualList) -> None:
-    # XXX: revealed: list[int]
-    reveal_type(single_constraint(value))  # revealed: GradualList@single_matching_constraint
+    reveal_type(single_constraint(value))  # revealed: list[int]
 ```
 
 ## Selecting constraints for narrowed caller type variables

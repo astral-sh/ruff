@@ -15,7 +15,7 @@ use crate::types::constraints::{
     SolutionValidity, SolutionViolation, SolutionViolationKind,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
-use crate::types::{BoundTypeVarInstance, Type};
+use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
 type ProcessSatisfied<'a, 'db, L, B> = dyn FnMut(
@@ -29,6 +29,7 @@ type ProcessSatisfied<'a, 'db, L, B> = dyn FnMut(
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,
     inferable: TypeVarSet<'db>,
+    declared_constraint_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
 
     /// Candidate solutions for each satisfiable path in the BDD.
     ///
@@ -56,6 +57,7 @@ impl<'db> SolutionWalker<'db> {
         Self {
             source_orders,
             inferable,
+            declared_constraint_solutions: FxHashMap::default(),
             pending: Vec::default(),
             _phantom: PhantomData,
         }
@@ -191,6 +193,21 @@ impl<'db> SolutionWalker<'db> {
                 ControlFlow::Continue(())
             },
         )
+    }
+
+    fn with_declared_constraint_solution<R>(
+        &mut self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        declared_constraint_solution: Type<'db>,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let identity = bound_typevar.identity(db);
+        self.declared_constraint_solutions
+            .insert(identity, declared_constraint_solution);
+        let result = f(self);
+        self.declared_constraint_solutions.remove(&identity);
+        result
     }
 
     #[expect(clippy::too_many_arguments)]
@@ -450,12 +467,14 @@ impl<'db> SolutionWalker<'db> {
                         })
                     })
         };
+        let has_preservable_typevar_evidence =
+            evidence.evidence_lower.is_some_and(is_preservable_typevar)
+                || evidence
+                    .as_single_upper_bound(db, env)
+                    .is_some_and(is_preservable_typevar);
         let has_non_concrete_evidence = has_no_evidence
             || evidence.has_only_gradual_evidence == Some(true)
-            || evidence.evidence_lower.is_some_and(is_preservable_typevar)
-            || evidence
-                .as_single_upper_bound(db, env)
-                .is_some_and(is_preservable_typevar);
+            || has_preservable_typevar_evidence;
 
         if has_non_concrete_evidence {
             let mut any_trivial_failures = false;
@@ -519,6 +538,17 @@ impl<'db> SolutionWalker<'db> {
                                     path,
                                     constraints,
                                     &mut |this, storage, _limits, path| {
+                                        if !has_preservable_typevar_evidence
+                                            && !this.evidence_satisfies_declared_constraint(
+                                                db,
+                                                env,
+                                                storage,
+                                                &evidence,
+                                                declared_constraint.constrained_ty,
+                                            )
+                                        {
+                                            return ControlFlow::Continue(());
+                                        }
                                         let solution = this.pending_candidate_solution(
                                             db, env, storage, path, None,
                                         );
@@ -559,36 +589,43 @@ impl<'db> SolutionWalker<'db> {
         for declared_constraint in &constrained_typevar.declared_constraints {
             let start = self.pending.len();
             if let Some(constraints) = declared_constraint.constraints.as_deref() {
-                self.visit_constraints_and_then(
+                self.with_declared_constraint_solution(
                     db,
-                    env,
-                    storage,
-                    limits,
-                    path,
-                    constraints,
-                    &mut |this, storage, limits, path| {
-                        // Selecting a concrete constraint must not specialize a caller's fixed
-                        // typevar: `S & str <= int` may hold for some `S`, but not for every `S`.
-                        if !this.evidence_satisfies_declared_constraint(
-                            db,
-                            env,
-                            storage,
-                            &evidence,
-                            declared_constraint.constrained_ty,
-                        ) {
-                            return ControlFlow::Continue(());
-                        }
-
-                        // The candidate solution satisfies this declared constraint, but we still
-                        // need to check any remaining constrained typevars.
-                        this.validate_constrained_and_then(
+                    bound_typevar,
+                    declared_constraint.constrained_ty,
+                    |this| {
+                        this.visit_constraints_and_then(
                             db,
                             env,
                             storage,
                             limits,
                             path,
-                            constrained,
-                            process_satisfied,
+                            constraints,
+                            &mut |this, storage, limits, path| {
+                                // Selecting a concrete constraint must not specialize a caller's fixed
+                                // typevar: `S & str <= int` may hold for some `S`, but not for every `S`.
+                                if !this.evidence_satisfies_declared_constraint(
+                                    db,
+                                    env,
+                                    storage,
+                                    &evidence,
+                                    declared_constraint.constrained_ty,
+                                ) {
+                                    return ControlFlow::Continue(());
+                                }
+
+                                // The candidate solution satisfies this declared constraint, but we still
+                                // need to check any remaining constrained typevars.
+                                this.validate_constrained_and_then(
+                                    db,
+                                    env,
+                                    storage,
+                                    limits,
+                                    path,
+                                    constrained,
+                                    process_satisfied,
+                                )
+                            },
                         )
                     },
                 )?;
@@ -753,20 +790,34 @@ impl<'db> SolutionWalker<'db> {
         let typevars: Option<Box<[_]>> = mappings
             .into_iter()
             .map(|(bound_typevar, solver)| {
-                let range = solver.finish(db, env, storage, bound_typevar)?;
+                let (solution, argument) = match self
+                    .declared_constraint_solutions
+                    .get(&bound_typevar.identity(db))
+                {
+                    Some(&ty) => {
+                        let solution = CandidateTypeVarSolution::exact(bound_typevar, ty);
+                        (solution, Some(ty))
+                    }
+                    None => {
+                        let range = solver.finish(db, env, storage, bound_typevar)?;
+                        let argument = range.inference_lower(db, env);
+                        let solution = CandidateTypeVarSolution::range(bound_typevar, range);
+                        (solution, argument)
+                    }
+                };
 
                 if let Some(typevar_violations) = typevar_violations
                     && let Some(&kind) = typevar_violations.get(&bound_typevar)
                 {
                     violations.push(SolutionViolation {
                         bound_typevar,
-                        argument: range.inference_lower(db, env),
-                        variance: range.variance(),
+                        argument,
+                        variance: solution.variance(),
                         kind,
                     });
                 }
 
-                Some(CandidateTypeVarSolution::range(bound_typevar, range))
+                Some(solution)
             })
             .collect();
         let typevars = typevars?;
