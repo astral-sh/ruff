@@ -258,21 +258,13 @@ impl<'db> BoundMethodType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
-        let signatures = self.unbound_signatures(db)?;
         let env = ProgramEnvironment::from_program(self.program(db));
-        let typing_self_type = self.typing_self_type(db);
-        let receiver_type = self.signature_receiver(db);
-
-        Some(self.callable_with_signatures(
+        self.into_callable_type_with_receiver(
             db,
-            Self::bound_signatures_with_receiver(
-                db,
-                &env,
-                signatures,
-                receiver_type,
-                typing_self_type,
-            ),
-        ))
+            &env,
+            self.signature_receiver(db),
+            self.typing_self_type(db),
+        )
     }
 
     pub(crate) fn into_callable_type_with_receiver(
@@ -282,27 +274,22 @@ impl<'db> BoundMethodType<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Option<CallableType<'db>> {
-        let signatures = self.unbound_signatures(db)?;
-        Some(self.callable_with_signatures(
+        let callable = self.unbound_callable(db)?;
+        let signatures = Self::bound_signatures_with_receiver(
             db,
-            Self::bound_signatures_with_receiver(
-                db,
-                env,
-                signatures,
-                receiver_type,
-                typing_self_type,
-            ),
-        ))
+            env,
+            callable.signatures(db),
+            receiver_type,
+            typing_self_type,
+        );
+        Some(callable.with_signatures(db, signatures).into_regular(db))
     }
 
-    fn callable_with_signatures(
-        self,
-        db: &'db dyn Db,
-        signatures: CallableSignature<'db>,
-    ) -> CallableType<'db> {
+    fn unbound_callable(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
         match self.func(db) {
-            Type::Callable(callable) => callable.with_signatures(db, signatures).into_regular(db),
-            _ => CallableType::new(db, signatures, CallableTypeKind::Regular),
+            Type::FunctionLiteral(function) => Some(function.into_callable_type(db)),
+            Type::Callable(callable) => Some(callable),
+            _ => None,
         }
     }
 
