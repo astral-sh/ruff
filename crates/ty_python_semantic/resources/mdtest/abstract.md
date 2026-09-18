@@ -390,12 +390,11 @@ ConcreteDeleter()  # no diagnostic
 ## Slots overriding abstract properties
 
 A slot creates a descriptor in the class namespace, which overrides an inherited abstract property.
-An instance annotation inside `TYPE_CHECKING` supplies the slot's type without changing this runtime
-behavior.
+The resulting concrete class can be marked `final`.
 
 ```py
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, final
+from typing import final
 
 class Abstract(ABC):
     @property
@@ -405,27 +404,11 @@ class Abstract(ABC):
     @abstractmethod
     def value(self, value: int) -> None: ...
 
+@final
 class Concrete(Abstract):
     __slots__ = ("value",)
 
-    if TYPE_CHECKING:
-        value: int
-
-    def __init__(self) -> None:
-        self.value = 1
-
 Concrete()
-```
-
-The slot also overrides the abstract property without an annotation. The resulting concrete class
-can be marked `final`.
-
-```py
-@final
-class WithoutAnnotation(Abstract):
-    __slots__ = ("value",)
-
-WithoutAnnotation()
 ```
 
 ## Slots and abstract properties in the MRO
