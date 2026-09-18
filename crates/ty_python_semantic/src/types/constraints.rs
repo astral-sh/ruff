@@ -123,6 +123,7 @@ use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 mod monotone;
 pub(crate) mod paths;
 pub(crate) mod projection;
+pub(super) mod relations;
 pub(crate) mod resolution;
 mod sequents;
 mod solutions;
@@ -3087,27 +3088,6 @@ impl<'db> PathBoundBuilder<'db> {
             has_gradual_evidence,
             has_static_evidence,
         } = self;
-        // An explicit equality provides a candidate without comparing lower bounds to each
-        // other. Prefer a defining type to bare variable aliases, which can form empty cycles.
-        let candidate_lower = upper
-            .iter_clauses()
-            .find(|upper| {
-                !upper.is_type_var()
-                    && evidence_lower.contains(upper)
-                    && upper.is_fully_static(db, env)
-            })
-            .map(|exact| {
-                // Gradual evidence remains an alternative even alongside a static equality.
-                UnionType::from_elements(
-                    db,
-                    env,
-                    evidence_lower
-                        .iter()
-                        .chain(&validity_lower)
-                        .copied()
-                        .filter(|lower| *lower == exact || !lower.is_fully_static(db, env)),
-                )
-            });
         let evidence_lower =
             (!evidence_lower.is_empty()).then(|| UnionType::from_elements(db, env, evidence_lower));
         let validity_lower = if validity_lower.is_empty() {
@@ -3118,7 +3098,7 @@ impl<'db> PathBoundBuilder<'db> {
         upper.shrink_to_fit();
         PathBound {
             bound_typevar,
-            candidate_lower,
+            candidate_lower: None,
             evidence_lower,
             validity_lower,
             upper,
@@ -3180,7 +3160,8 @@ impl<'db> PathBoundSolution<'db> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct PathBound<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
-    /// A candidate from an explicit static equality, retaining gradual lower bounds.
+    /// A lower candidate with redundant relations between equivalent types removed.
+    /// The original bounds remain available for validation and diagnostic recovery.
     candidate_lower: Option<Type<'db>>,
     evidence_lower: Option<Type<'db>>,
     validity_lower: Type<'db>,

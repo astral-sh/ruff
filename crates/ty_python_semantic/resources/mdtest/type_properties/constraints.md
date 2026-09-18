@@ -1105,8 +1105,8 @@ def transitive[X, Y, Z]():
 
 ## Equivalent bounds in a gradual solution
 
-When `A` is `int`, the two tuple lower bounds describe the same type. Their symbolic dependency
-currently prevents restricting the `Any` part of the solution by the upper bound `tuple[int | str]`.
+When `A` is `int`, the two tuple lower bounds describe the same type. After combining them, the
+`Any` part of the solution is still restricted by the upper bound `tuple[int | str]`.
 
 ```py
 from typing import Any
@@ -1119,8 +1119,7 @@ def gradual[A, X]():
         & ConstraintSet.lower_bound(tuple[A], X)
         & ConstraintSet.range(Any, X, tuple[int | str])
     )
-    # TODO: revealed: tuple[Solution[A=int, X=tuple[int] | (tuple[int | str] & Any)]]
-    # revealed: tuple[Solution[A=int, X=tuple[int] | Any]]
+    # revealed: tuple[Solution[A=int, X=tuple[int] | (tuple[int | str] & Any)]]
     reveal_type(constraints.solutions(inferable=tuple[A, X]))
 ```
 

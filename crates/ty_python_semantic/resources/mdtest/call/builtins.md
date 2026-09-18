@@ -400,8 +400,8 @@ def partial_mutually_recursive_alias(x: RecursivePartialA) -> bool:  # error: [i
 
 ## Generic builtins with unknown iterable elements
 
-An unknown iterable does not determine its element type. The callback's return type should still
-determine the element type of `map`, but this is not yet inferred here.
+An unknown iterable does not determine its element type. A callback can still determine the mapped
+return type, allowing a string result to be passed to `join`.
 
 ```py
 from ty_extensions._internal import Unknown
@@ -410,12 +410,9 @@ def _(xs: Unknown):
     # TODO: should be `list[Unknown]`
     reveal_type(sorted(xs, key=len))  # revealed: list[Sized]
 
-    # TODO: should be `map[str]`
-    reveal_type(map("{}".format, xs))  # revealed: map[object]
+    reveal_type(map("{}".format, xs))  # revealed: map[str]
 
-    # TODO: should not emit an error and should reveal `str`
-    # error: [no-matching-overload]
-    reveal_type("".join(map("{}".format, xs)))  # revealed: Unknown
+    reveal_type("".join(map("{}".format, xs)))  # revealed: str
 ```
 
 ## Mapping methods accept arbitrary object types

@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
 use crate::types::constraints::paths::PathAssignments;
+use crate::types::constraints::relations::PathRelations;
 use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, ConstraintAssignment,
@@ -165,10 +166,8 @@ impl<'db> SolutionWalker<'db> {
                 }
             }
 
-            let path_bounds = mappings
-                .drain(..)
-                .map(|(variable, bounds)| bounds.finish(db, env, variable))
-                .collect();
+            let relations = PathRelations::new(db, env, &mappings, inferable);
+            let path_bounds = relations.collect_bounds(db, env, std::mem::take(&mut mappings));
             result.push(CandidateSolution {
                 typevars: path_bounds,
             });
