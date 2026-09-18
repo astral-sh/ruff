@@ -1,7 +1,8 @@
 # Publish the ty playground.
 name: "[ty Playground] Release"
 
-permissions: {}
+permissions:
+  contents: read
 
 on:
   push:
