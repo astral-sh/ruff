@@ -500,10 +500,10 @@ impl<'db> RecursiveType<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         let env = self.environment(db);
-        match self.unfold(db, &env) {
-            UnfoldResult::Unfolded(unfolded) => unfolded.variance_of(db, &env, typevar),
-            UnfoldResult::Unchanged(_) => VarianceTerm::BIVARIANT,
-        }
+        self.unfold(db, &env)
+            .map_or(VarianceTerm::BIVARIANT, |unfolded| {
+                unfolded.variance_of(db, &env, typevar)
+            })
     }
 }
 

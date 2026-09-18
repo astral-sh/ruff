@@ -20,7 +20,7 @@ use super::relation::TypeRelationChecker;
 use super::{
     BindingContext, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter,
     PropertyInstanceType, SelfBinding, Signature, Type, TypeContext, TypeMapping, TypeQualifiers,
-    TypeVarBoundOrConstraints, UnfoldResult, UnionType, UpcastPolicy,
+    TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::ProgramEnvironment;
 use crate::place::{
@@ -304,12 +304,11 @@ pub(super) fn attribute_write_requirement<'db>(
         Type::TypeAlias(alias) => {
             attribute_write_requirement(db, env, alias.value_type(db), attribute)
         }
-        Type::Recursive(recursive) => match recursive.unfold(db, env) {
-            UnfoldResult::Unfolded(unfolded) => {
+        Type::Recursive(recursive) => recursive
+            .unfold(db, env)
+            .map_or(AttributeWriteRequirement::Unconstrained, |unfolded| {
                 attribute_write_requirement(db, env, unfolded, attribute)
-            }
-            UnfoldResult::Unchanged(_) => AttributeWriteRequirement::Unconstrained,
-        },
+            }),
 
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
             AttributeWriteRequirement::CannotAssign

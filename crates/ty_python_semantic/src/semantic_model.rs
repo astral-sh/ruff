@@ -20,8 +20,8 @@ use crate::place::{builtins_module_scope, implicit_builtins_symbol_scope};
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, UnfoldResult,
-    binding_type, infer_complete_scope_types, inferred_declaration,
+    CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
+    infer_complete_scope_types, inferred_declaration,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place_table;
@@ -673,10 +673,9 @@ impl<'db> SemanticModel<'db> {
                     visitor.visit(db, ty, || collect(db, alias.value_type(db), visitor))
                 }
                 Type::Recursive(recursive) => visitor.visit(db, ty, || {
-                    match recursive.unfold(db, &recursive.environment(db)) {
-                        UnfoldResult::Unfolded(unfolded) => collect(db, unfolded, visitor),
-                        UnfoldResult::Unchanged(_) => Vec::new(),
-                    }
+                    recursive
+                        .unfold(db, &recursive.environment(db))
+                        .map_or_else(Vec::new, |unfolded| collect(db, unfolded, visitor))
                 }),
                 _ => Vec::new(),
             }

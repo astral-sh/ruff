@@ -96,8 +96,7 @@ use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassType, FindLegacyTypeVarsVisitor,
     IntersectionBuilder, KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner,
     SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnfoldResult, UnionBuilder, UnionType, binding_type, definition_expression_type,
-    walk_signature,
+    UnionBuilder, UnionType, binding_type, definition_expression_type, walk_signature,
 };
 use crate::{Db, FxIndexMap, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -2040,10 +2039,11 @@ fn is_instance_truthiness<'db>(
     };
 
     match ty {
-        Type::Recursive(recursive) => match recursive.unfold(db, env) {
-            UnfoldResult::Unfolded(unfolded) => is_instance_truthiness(db, env, unfolded, class),
-            UnfoldResult::Unchanged(_) => Truthiness::Ambiguous,
-        },
+        Type::Recursive(recursive) => recursive
+            .unfold(db, env)
+            .map_or(Truthiness::Ambiguous, |unfolded| {
+                is_instance_truthiness(db, env, unfolded, class)
+            }),
         Type::RecursiveVar(_) => {
             unreachable!("semantic operation on an unbound recursive variable")
         }

@@ -19,7 +19,7 @@ use crate::types::{
     BoundMethodType, CallableType, DynamicType, FunctionType, IntersectionBuilder,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueType,
     LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType, Type, TypeContext,
-    TypeTransformer, TypeVarBoundOrConstraints, UnfoldResult, UnionBuilder,
+    TypeTransformer, TypeVarBoundOrConstraints, UnionBuilder,
 };
 use ty_python_core::Truthiness;
 
@@ -310,12 +310,13 @@ impl<'db> Type<'db> {
             visitor: &UpcastingVisitor<'db>,
         ) -> UpcastResult<'db> {
             match ty {
-                Type::Recursive(recursive) => {
-                    visit_type(db, ty, visitor, || match recursive.unfold(db, env) {
-                        UnfoldResult::Unfolded(unfolded) => upcast(db, env, unfolded, visitor),
-                        UnfoldResult::Unchanged(_) => UpcastResult::unstable(ty),
-                    })
-                }
+                Type::Recursive(recursive) => visit_type(db, ty, visitor, || {
+                    recursive
+                        .unfold(db, env)
+                        .map_or(UpcastResult::unstable(ty), |unfolded| {
+                            upcast(db, env, unfolded, visitor)
+                        })
+                }),
                 Type::RecursiveVar(_) => {
                     unreachable!("semantic operation on an unbound recursive variable")
                 }
