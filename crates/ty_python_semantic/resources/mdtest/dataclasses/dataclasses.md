@@ -2821,7 +2821,8 @@ from dataclasses import dataclass
 
 dataclass_with_order = dataclass(order=True)
 
-reveal_type(dataclass_with_order)  # revealed: <decorator produced by dataclass-like function>
+reveal_type(dataclass_with_order)  # revealed: [T](cls: type[T], /) -> type[T]
+reveal_type(dataclass_with_order.__name__)  # revealed: str
 
 @dataclass_with_order
 class C:
@@ -2971,9 +2972,9 @@ def test_c():
 
 ## Imperatively calling `dataclasses.dataclass`
 
-While we do not currently recognize the special behaviour of `dataclasses.dataclass` if it is called
-imperatively, we recognize that it can be called imperatively and do not emit any false-positive
-diagnostics on such calls:
+Calls to `dataclasses.dataclass` preserve the input class type, both when passing the class directly
+and when first creating a decorator with options. A nonliteral class argument retains its annotated
+type; a class literal also exposes the generated dataclass methods.
 
 ```py
 from dataclasses import dataclass
@@ -2989,7 +2990,7 @@ def sequence(cls: type[U]) -> type[U]:
         match_args=False,
         kw_only=True,
     )(cls)
-    reveal_type(d)  # revealed: type[U@sequence] & Any
+    reveal_type(d)  # revealed: type[U@sequence]
     return d
 
 @dataclass_transform(kw_only_default=True)
@@ -3000,18 +3001,16 @@ def sequence2(cls: type) -> type:
         match_args=False,
         kw_only=True,
     )(cls)
-    reveal_type(d)  # revealed: type & Any
+    reveal_type(d)  # revealed: type
     return d
 
 @dataclass_transform(kw_only_default=True)
 def sequence3(cls: type[U]) -> type[U]:
-    # TODO: should reveal `type[U@sequence3]`
-    return reveal_type(dataclass(cls))  # revealed: Unknown
+    return reveal_type(dataclass(cls))  # revealed: type[U@sequence3]
 
 @dataclass_transform(kw_only_default=True)
 def sequence4(cls: type) -> type:
-    # TODO: should reveal `type`
-    return reveal_type(dataclass(cls))  # revealed: Unknown
+    return reveal_type(dataclass(cls))  # revealed: type
 
 class Foo: ...
 

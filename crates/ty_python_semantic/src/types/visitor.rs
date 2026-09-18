@@ -8,11 +8,11 @@ use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
 use crate::types::{
-    BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
-    GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
-    PropertyInstanceType, ProtocolInstanceType, RecursiveType, SlotDescriptorType,
-    StaticClassLiteral, SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType,
-    TypeIsType, TypedDictType, UnionType,
+    BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, DataclassDecorator,
+    EnumComplementType, GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType,
+    NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, RecursiveType,
+    SlotDescriptorType, StaticClassLiteral, SubclassOfType, Type, TypeAliasType, TypeFormType,
+    TypeGuardType, TypeIsType, TypedDictType, UnionType,
     bound_super::walk_bound_super_type,
     callable::walk_callable_type,
     class::walk_generic_alias,
@@ -167,6 +167,7 @@ pub(super) enum NonAtomicType<'db> {
     BoundSuper(BoundSuperType<'db>),
     MethodWrapper(KnownBoundMethodType<'db>),
     Callable(CallableType<'db>),
+    DataclassDecorator(DataclassDecorator<'db>),
     GenericAlias(GenericAlias<'db>),
     KnownInstance(KnownInstanceType<'db>),
     SubclassOf(SubclassOfType<'db>),
@@ -199,7 +200,6 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             | Type::AlwaysTruthy
             | Type::Never
             | Type::LiteralValue(_)
-            | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::WrapperDescriptor(_)
             | Type::ModuleLiteral(_)
@@ -227,6 +227,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::MethodWrapper(method_wrapper))
             }
             Type::Callable(callable) => TypeKind::NonAtomic(NonAtomicType::Callable(callable)),
+            Type::DataclassDecorator(decorator) => {
+                TypeKind::NonAtomic(NonAtomicType::DataclassDecorator(decorator))
+            }
             Type::GenericAlias(alias) => TypeKind::NonAtomic(NonAtomicType::GenericAlias(alias)),
             Type::KnownInstance(known_instance) => {
                 TypeKind::NonAtomic(NonAtomicType::KnownInstance(known_instance))
@@ -293,6 +296,9 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         }
         NonAtomicType::Callable(callable) => {
             visitor.visit_callable_type(db, callable);
+        }
+        NonAtomicType::DataclassDecorator(decorator) => {
+            visitor.visit_type(db, decorator.callable(db));
         }
         NonAtomicType::GenericAlias(alias) => {
             visitor.visit_generic_alias_type(db, alias);

@@ -300,11 +300,16 @@ impl<'db> Type<'db> {
                 )?
             }
 
+            Type::DataclassDecorator(decorator) => {
+                decorator
+                    .callable(db)
+                    .try_bool_impl(db, env, allow_short_circuit, visitor)?
+            }
+
             Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
-            | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::PropertyInstance(_)

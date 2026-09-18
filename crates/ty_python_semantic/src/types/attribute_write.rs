@@ -304,6 +304,9 @@ pub(super) fn attribute_write_requirement<'db>(
         Type::TypeAlias(alias) => {
             attribute_write_requirement(db, env, alias.value_type(db), attribute)
         }
+        Type::DataclassDecorator(decorator) => {
+            attribute_write_requirement(db, env, decorator.callable(db), attribute)
+        }
         Type::Recursive(recursive) => recursive.map_or(
             db,
             env,
@@ -342,7 +345,6 @@ pub(super) fn attribute_write_requirement<'db>(
         | Type::BoundMethod(_)
         | Type::KnownBoundMethod(_)
         | Type::WrapperDescriptor(_)
-        | Type::DataclassDecorator(_)
         | Type::DataclassTransformer(_)
         | Type::TypeVar(..)
         | Type::AlwaysTruthy

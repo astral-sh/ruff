@@ -1583,10 +1583,14 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     .write_str(object)?;
                 f.write_str("' objects>")
             }
-            Type::DataclassDecorator(_) => {
+            Type::DataclassDecorator(decorator) if decorator.callable(db).is_unknown() => {
                 f.set_invalid_type_annotation();
                 f.write_str("<decorator produced by dataclass-like function>")
             }
+            Type::DataclassDecorator(decorator) => decorator
+                .callable(db)
+                .display_with(db, self.env, self.settings.clone())
+                .fmt_detailed(f),
             Type::DataclassTransformer(_) => {
                 f.set_invalid_type_annotation();
                 f.write_str("<decorator produced by typing.dataclass_transform>")
