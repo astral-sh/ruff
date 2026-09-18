@@ -9,7 +9,8 @@ use crate::codes::Category;
 use super::LogicalLine;
 
 /// ## What it does
-/// Checks for indentation with a non-multiple of 4 spaces.
+/// Checks for indentation with a non-multiple of the [`indent-width`] setting
+/// (4 by default).
 ///
 /// ## Why is this bad?
 /// According to [PEP 8], 4 spaces per indentation level should be preferred.
@@ -29,9 +30,6 @@ use super::LogicalLine;
 /// ## Formatter compatibility
 /// We recommend against using this rule alongside the [formatter]. The
 /// formatter enforces consistent indentation, making the rule redundant.
-///
-/// The rule is also incompatible with the [formatter] when using
-/// `indent-width` with a value other than `4`.
 ///
 /// ## Options
 /// - `indent-width`
@@ -53,7 +51,8 @@ impl Violation for IndentationWithInvalidMultiple {
 }
 
 /// ## What it does
-/// Checks for indentation of comments with a non-multiple of 4 spaces.
+/// Checks for indentation of comments with a non-multiple of the
+/// [`indent-width`] setting (4 by default).
 ///
 /// ## Why is this bad?
 /// According to [PEP 8], 4 spaces per indentation level should be preferred.
@@ -75,9 +74,6 @@ impl Violation for IndentationWithInvalidMultiple {
 /// ## Formatter compatibility
 /// We recommend against using this rule alongside the [formatter]. The
 /// formatter enforces consistent indentation, making the rule redundant.
-///
-/// The rule is also incompatible with the [formatter] when using
-/// `indent-width` with a value other than `4`.
 ///
 /// ## Options
 /// - `indent-width`
@@ -273,23 +269,19 @@ pub(crate) fn indentation(
     indent_char: char,
     indent_level: usize,
     prev_indent_level: Option<usize>,
-    indent_size: usize,
+    indent_width: usize,
     range: TextRange,
     context: &LintContext,
 ) {
-    if !indent_level.is_multiple_of(indent_size) {
+    if !indent_level.is_multiple_of(indent_width) {
         if logical_line.is_comment_only() {
             context.report_diagnostic_if_enabled(
-                IndentationWithInvalidMultipleComment {
-                    indent_width: indent_size,
-                },
+                IndentationWithInvalidMultipleComment { indent_width },
                 range,
             );
         } else {
             context.report_diagnostic_if_enabled(
-                IndentationWithInvalidMultiple {
-                    indent_width: indent_size,
-                },
+                IndentationWithInvalidMultiple { indent_width },
                 range,
             );
         }
