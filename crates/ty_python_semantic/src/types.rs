@@ -6545,8 +6545,11 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Bindings<'db> {
-        let constructors = ActiveRecursionDetector::default();
-        self.bindings_impl(db, env, &BindingsRecursionContext::new(&constructors))
+        self.bindings_impl(
+            db,
+            env,
+            &BindingsRecursionContext::new(&ActiveRecursionDetector::default()),
+        )
     }
 
     fn bindings_impl(
