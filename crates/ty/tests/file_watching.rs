@@ -3791,6 +3791,133 @@ mod uv_metadata {
         Ok(())
     }
 
+    /// Deleting the selected environment reports a missing-environment warning. Recreating
+    /// it with `uv venv` clears that warning.
+    #[test]
+    fn recreating_selected_environment_clears_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv(UseUv::On, &[("pyproject.toml", MANIFEST)])?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        // Check the warning while the environment is missing, before recreating it.
+        std::fs::remove_dir_all(case.project_path(".venv").as_std_path())?;
+
+        let deleted = case.take_watch_changes(event_for_file(".venv"));
+        apply_changes_and_synchronize_project(&mut case, &deleted)?;
+        let diagnostics = case.db().check();
+        assert_snapshot!(
+            case.render_diagnostics(&diagnostics),
+            @"pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: uv did not provide a Python environment"
+        );
+
+        run_uv(&case, &["venv", "--offline"])?;
+        let created = case.take_watch_changes(event_for_file(".venv"));
+        apply_changes_and_synchronize_project(&mut case, &created)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    /// Installing the dependency with `uv pip install` clears the unresolved-import diagnostic
+    /// and uv metadata warning without changing the project's manifest or lockfile.
+    #[test]
+    fn uv_pip_install_clears_import_and_metadata_errors() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "pyproject.toml",
+                    r#"
+                    [project]
+                    name = "example"
+                    version = "0.1.0"
+                    requires-python = ">=3.8"
+
+                    [project.optional-dependencies]
+                    extra = ["dependency"]
+
+                    [tool.uv.sources]
+                    dependency = { path = "../dependency" }
+                    "#,
+                ),
+                ("main.py", "import dependency\n"),
+                (
+                    "../dependency/pyproject.toml",
+                    r#"
+                    [project]
+                    name = "dependency"
+                    version = "0.1.0"
+
+                    [build-system]
+                    requires = ["uv_build"]
+                    build-backend = "uv_build"
+                    "#,
+                ),
+                ("../dependency/src/dependency/__init__.py", ""),
+            ],
+        )?;
+        // The optional dependency is resolved but not installed by setup's `uv sync`.
+        assert_snapshot!(case.render_diagnostics(&case.db().check()), @"
+        main.py:1:8: error[unresolved-import] Cannot resolve imported module `dependency`
+        pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: uv metadata has no module ownership or editable source paths
+        ");
+
+        // Installing a local package changes the environment without editing the project's
+        // manifest or lockfile. uv's bundled build backend keeps the test offline.
+        run_uv(&case, &["pip", "install", "--offline", "../dependency"])?;
+        let created = case.take_watch_changes(event_for_file("dependency-0.1.0.dist-info"));
+        apply_changes_and_synchronize_project(&mut case, &created)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    /// Uninstalling the dependency with `uv pip uninstall` reports an unresolved-import
+    /// diagnostic and uv metadata warning without changing the project's manifest or lockfile.
+    #[test]
+    fn uv_pip_uninstall_reports_import_and_metadata_errors() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "pyproject.toml",
+                    r#"
+                    [project]
+                    name = "example"
+                    version = "0.1.0"
+                    requires-python = ">=3.8"
+                    dependencies = ["dependency"]
+
+                    [tool.uv.sources]
+                    dependency = { path = "../dependency" }
+                    "#,
+                ),
+                ("main.py", "import dependency\n"),
+                (
+                    "../dependency/pyproject.toml",
+                    r#"
+                    [project]
+                    name = "dependency"
+                    version = "0.1.0"
+
+                    [build-system]
+                    requires = ["uv_build"]
+                    build-backend = "uv_build"
+                    "#,
+                ),
+                ("../dependency/src/dependency/__init__.py", ""),
+            ],
+        )?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        // Setup installs the dependency before watching starts. Uninstalling it removes its
+        // `.dist-info` directory without changing the project's manifest or lockfile.
+        run_uv(&case, &["pip", "uninstall", "--offline", "dependency"])?;
+        let deleted = case.take_watch_changes(event_for_file("dependency-0.1.0.dist-info"));
+        apply_changes_and_synchronize_project(&mut case, &deleted)?;
+        assert_snapshot!(case.render_diagnostics(&case.db().check()), @"
+        main.py:1:8: error[unresolved-import] Cannot resolve imported module `dependency`
+        pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: uv metadata has no module ownership or editable source paths
+        ");
+        Ok(())
+    }
+
     #[test]
     fn unchanged_script_environment_is_reused_after_source_edits() -> anyhow::Result<()> {
         let mut case = setup_uv(

@@ -145,13 +145,19 @@ impl ProjectDatabase {
             let change = change.as_ref();
             tracing::debug!("Handling file watcher change event: {:?}", change);
 
-            refresh_program_settings |= affects_python_environment(
+            let environment_changed = affects_python_environment(
                 change,
                 virtual_environment.as_deref(),
                 python_path.as_deref(),
             );
+            refresh_program_settings |= environment_changed;
 
-            if uv_enabled && !reload_project && affects_uv_metadata(change) {
+            // Recreating an environment can change uv's reported interpreter and installed
+            // module ownership without changing the lockfile.
+            if uv_enabled
+                && !reload_project
+                && (environment_changed || affects_uv_metadata(change))
+            {
                 reload_project = true;
             }
 
@@ -583,14 +589,36 @@ fn affects_uv_metadata(change: &ChangeEvent) -> bool {
     // A matching name in an unrelated watched path may also trigger a refresh. The event path is
     // not passed to uv, so it cannot make ty use the other project's metadata. If this project's
     // metadata and settings are unchanged, the false positive only costs a no-op uv workspace metadata call.
-    matches!(
-        change,
+    match change {
         ChangeEvent::Created { path, .. }
         | ChangeEvent::Changed { path, .. }
         | ChangeEvent::Deleted { path, .. }
             if matches!(
                 path.file_name(),
                 Some("pyproject.toml" | "uv.lock" | "uv.toml" | ".python-version")
-            )
-    )
+            ) =>
+        {
+            true
+        }
+
+        // uv derives `module_owners` from installed distributions in `site-packages`, not just the
+        // lockfile. `uv pip uninstall` or `uv sync --frozen` can remove or create a `.dist-info`
+        // directory without updating `uv.lock`. Require `site-packages` to be the immediate
+        // parent: installed packages can contain vendored `.dist-info` directories that uv does
+        // not treat as installed distributions. Matching the parent by name also handles
+        // events through aliases such as `lib64` without filesystem reads. An unrelated
+        // environment only causes an extra refresh of this project's metadata.
+        ChangeEvent::Created { path, .. } | ChangeEvent::Deleted { path, .. }
+            if path
+                .file_name()
+                .is_some_and(|name| name.ends_with(".dist-info"))
+                && path
+                    .parent()
+                    .is_some_and(|parent| parent.file_name() == Some("site-packages")) =>
+        {
+            true
+        }
+
+        _ => false,
+    }
 }
