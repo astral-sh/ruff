@@ -5418,7 +5418,7 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct ParameterDisplayName<N> {
     name: N,
     prefix: ParameterNamePrefix,
@@ -5440,7 +5440,7 @@ impl<N: AsRef<str>> fmt::Display for ParameterDisplayName<N> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize)]
 enum ParameterNamePrefix {
     None,
     Variadic,
@@ -5747,7 +5747,18 @@ impl<'db> Parameter<'db> {
                 (
                     function_signature_expression_type(db, function_definition, annotation),
                     false,
-                    function_signature_type_expression_flags(db, function_definition, annotation),
+                    if matches!(
+                        &kind,
+                        ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. }
+                    ) {
+                        function_signature_type_expression_flags(
+                            db,
+                            function_definition,
+                            annotation,
+                        )
+                    } else {
+                        TypeExpressionFlags::empty()
+                    },
                     annotation.is_starred_expr(),
                 )
             } else {

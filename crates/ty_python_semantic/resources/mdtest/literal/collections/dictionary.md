@@ -69,6 +69,21 @@ reveal_type(x)  # revealed: dict[int, (_: int) -> int]
 reveal_type({"a": 1, "b": (1, 2), "c": (1, 2, 3)})
 ```
 
+## Inferring from key and value types
+
+An unannotated dictionary combines the key and value types independently. A union key contributes
+each of its alternatives, and an unpacked dictionary contributes both its key and value types.
+
+```py
+from typing import TypeAlias
+
+Key: TypeAlias = int | str
+
+def example(key: Key, value: bytes) -> None:
+    reveal_type({key: value, False: "other"})  # revealed: dict[int | str, bytes | str]
+    reveal_type({**{"key": 1}, 2: "other"})  # revealed: dict[str | int, int | str]
+```
+
 ## Dict comprehensions
 
 ```py

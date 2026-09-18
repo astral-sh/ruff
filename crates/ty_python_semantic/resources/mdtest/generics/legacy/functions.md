@@ -63,6 +63,25 @@ reveal_type(f(True))  # revealed: Literal[True]
 reveal_type(f("string"))  # revealed: Literal["string"]
 ```
 
+## Concrete parameters in generic calls
+
+A concrete parameter is checked independently of the type variable inferred from another argument.
+An invalid concrete argument does not erase the inferred return type.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def select(count: int, value: T) -> T:
+    return value
+
+reveal_type(select(True, "value"))  # revealed: Literal["value"]
+
+# error: [invalid-argument-type] "Expected `int`"
+reveal_type(select("bad", 1))  # revealed: Literal[1]
+```
+
 ## Inferring “deep” generic parameter types
 
 The matching up of call arguments and discovery of constraints on typevars can be a recursive
@@ -1910,4 +1929,41 @@ def grandchild_value(value: Levels[object, object, U]) -> U:
 
 def probe(value: Levels[int, str, bytes]):
     reveal_type(grandchild_value(value))  # revealed: bytes
+```
+
+## Repeated concrete arguments and recursive calls
+
+Repeated calls with the same concrete arguments preserve literal inference. A different argument
+infers a different type, while a rejected bound is reported independently at each call. Recursive
+function bodies retain their declared generic result.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Bound = TypeVar("Bound", bound=int)
+
+def identity(value: T) -> T:
+    return value
+
+def bounded(value: Bound) -> Bound:
+    return value
+
+def recursive(value: T, depth: int) -> T:
+    return recursive(value, depth - 1) if depth else value
+
+def make_list(value: T) -> list[T]:
+    return [value]
+
+reveal_type(identity(1))  # revealed: Literal[1]
+reveal_type(identity(1))  # revealed: Literal[1]
+reveal_type(identity("text"))  # revealed: Literal["text"]
+bounded("bad")  # error: [invalid-argument-type]
+bounded("bad")  # error: [invalid-argument-type]
+reveal_type(recursive("text", 2))  # revealed: Literal["text"]
+
+numbers: list[int] = make_list(1)
+objects: list[object] = make_list(1)
+reveal_type(numbers)  # revealed: list[int]
+reveal_type(objects)  # revealed: list[object]
 ```

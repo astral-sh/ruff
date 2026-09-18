@@ -86,6 +86,54 @@ pub(crate) fn all_end_of_scope_members<'db>(
         ))
 }
 
+/// Returns each distinct declaration or binding for override checks.
+///
+/// A common base can be visited from many subclasses. Cache the inferred types along with their
+/// definitions so those visits don't repeat the same inference and collection work.
+pub(super) fn unique_end_of_scope_members<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+) -> impl Iterator<Item = MemberWithDefinition<'db>> + Clone + 'db {
+    #[salsa::tracked(
+        returns(deref),
+        cycle_initial=|_, _, _| Box::default(),
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn cached<'db>(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+    ) -> Box<[(Name, Type<'db>, Definition<'db>)]> {
+        let members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
+        let mut result = Vec::with_capacity(members.len());
+
+        // `Member` equality deliberately ignores the type. The cached value must include it so
+        // changing the type of an otherwise unchanged definition invalidates dependent queries.
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "override checks already visit independently checked members in this order"
+        )]
+        for member in members {
+            result.push((
+                member.member.name,
+                member.member.ty,
+                member.first_reachable_definition,
+            ));
+        }
+        result.into_boxed_slice()
+    }
+
+    cached(db, scope)
+        .iter()
+        .map(|(name, ty, definition)| MemberWithDefinition {
+            member: Member {
+                name: name.clone(),
+                ty: *ty,
+                is_type_check_only: false,
+            },
+            first_reachable_definition: *definition,
+        })
+}
+
 /// Iterate over all declarations and bindings that are reachable anywhere
 /// in the given scope.
 pub(crate) fn all_reachable_members<'db>(

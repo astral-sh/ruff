@@ -38,6 +38,22 @@ reveal_type(x[0].__name__)  # revealed: str
 reveal_type([1, (1, 2), (1, 2, 3)])
 ```
 
+## Inferring from element types
+
+An unannotated list combines the promoted types of its elements. An element with a union type
+contributes all its alternatives, and a starred element contributes the type yielded by iteration.
+
+```py
+from typing import TypeAlias
+
+NumberOrText: TypeAlias = int | str
+
+def example(value: NumberOrText) -> None:
+    reveal_type([1, "text"])  # revealed: list[int | str]
+    reveal_type([value, b""])  # revealed: list[int | str | bytes]
+    reveal_type([*range(3), "text"])  # revealed: list[int | str]
+```
+
 ## None promotion
 
 `None` is promoted to `None | Unknown` in list literals when it is the only element type, so that

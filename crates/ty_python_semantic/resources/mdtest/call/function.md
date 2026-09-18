@@ -2068,3 +2068,74 @@ def _(args_tuple: tuple[int, int], args_union: tuple[int] | tuple[int, int], kwa
     f(*args_tuple, **kwargs)  # fine
     f(*args_union, **kwargs)  # fine
 ```
+
+## Repeated concrete calls and contextual arguments
+
+Each invalid call reports its own argument, even when another call passed an identical value. A
+different value is checked separately, and valid calls retain the declared return type.
+
+```py
+def integer(value: int) -> str:
+    return str(value)
+
+integer("bad")  # error: [invalid-argument-type]
+integer("bad")  # error: [invalid-argument-type]
+integer(b"bad")  # error: [invalid-argument-type]
+reveal_type(integer(1))  # revealed: str
+```
+
+Keyword names still determine which parameter checks an argument, and each repeated keyword error
+points to its own call.
+
+```py
+def mixed(number: int = 0, text: str = "") -> None: ...
+
+mixed(number="bad")  # error: [invalid-argument-type]
+mixed(number="bad")  # error: [invalid-argument-type]
+mixed(text="bad")
+mixed(text=1)  # error: [invalid-argument-type]
+mixed(text="bad", number=1)
+mixed(text="bad", number="bad")  # error: [invalid-argument-type]
+mixed("bad", text="bad")  # error: [invalid-argument-type]
+```
+
+Repeating a keyword remains a syntax error at each call, even when both arguments have valid types.
+
+```py
+mixed(number=1, number=2)  # error: [invalid-syntax] "Duplicate keyword argument `number`"
+mixed(number=1, number=2)  # error: [invalid-syntax] "Duplicate keyword argument `number`"
+```
+
+Methods and constructors also report each explicit argument at its own call site; the implicit
+receiver is not counted as a source argument.
+
+```py
+class Converter:
+    def __init__(self, value: int) -> None: ...
+    def method(self, value: int) -> str:
+        return str(value)
+
+def check_converter(converter: Converter) -> None:
+    converter.method("bad")  # error: [invalid-argument-type]
+    converter.method("bad")  # error: [invalid-argument-type]
+    Converter("bad")  # error: [invalid-argument-type]
+    Converter("bad")  # error: [invalid-argument-type]
+    reveal_type(converter.method(1))  # revealed: str
+```
+
+Overloads still infer lambdas and collection literals using their matching parameter types.
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+@overload
+def select(callback: Callable[[int], int], values: list[int]) -> int: ...
+@overload
+def select(callback: Callable[[str], str], values: list[str]) -> str: ...
+def select(callback, values):
+    return callback(values[0])
+
+reveal_type(select(lambda value: value + 1, [1]))  # revealed: int
+reveal_type(select(lambda value: value.upper(), ["text"]))  # revealed: str
+```

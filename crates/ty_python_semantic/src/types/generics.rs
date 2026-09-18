@@ -502,7 +502,15 @@ impl<'db> GenericContext<'db> {
 
     /// Returns the typevars directly bound by this generic context.
     pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> TypeVarSet<'db> {
-        TypeVarSet::from_typevars(db, self.variables(db))
+        #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+        fn inferable_typevars<'db>(
+            db: &'db dyn Db,
+            generic_context: GenericContext<'db>,
+        ) -> TypeVarSet<'db> {
+            TypeVarSet::from_typevars(db, generic_context.variables(db))
+        }
+
+        inferable_typevars(db, self)
     }
 
     pub(crate) fn variables(
@@ -4164,15 +4172,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // ```
                 //
                 // without specializing `T` to `None`.
-                if !actual.is_never() {
-                    let assignable_elements = union_formal.elements(db).iter().filter(|ty| {
-                        actual
-                            .when_subtype_of(db, self.env, **ty, self.constraints, self.inferable)
-                            .is_always_satisfied(db, self.env)
-                    });
-                    if assignable_elements.exactly_one().is_ok() {
-                        return Ok(());
-                    }
+                if !actual.is_never()
+                    && is_subtype_of_exactly_one_union_member(
+                        db,
+                        self.env,
+                        actual,
+                        union_formal,
+                        self.inferable,
+                        self.constraints,
+                    )
+                {
+                    return Ok(());
                 }
 
                 let mut bound_typevars = union_formal
@@ -4750,6 +4760,66 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 }
 
+/// Whether exactly one union member accepts the actual type without constraining any type variables.
+/// Repeated generic calls can ask this independently of their accumulated constraints.
+fn is_subtype_of_exactly_one_union_member<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    actual: Type<'db>,
+    formal: UnionType<'db>,
+    inferable: TypeVarSet<'db>,
+    constraints: &ConstraintSetBuilder<'db>,
+) -> bool {
+    fn compute<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        actual: Type<'db>,
+        formal: UnionType<'db>,
+        inferable: TypeVarSet<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+    ) -> bool {
+        formal
+            .elements(db)
+            .iter()
+            .filter(|&&member| {
+                actual
+                    .when_subtype_of(db, env, member, constraints, inferable)
+                    .is_always_satisfied(db, env)
+            })
+            .exactly_one()
+            .is_ok()
+    }
+
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _, _, _, _| None,
+        cycle_fn=|_, _, _, _, _, _, _, _| None,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn cached<'db>(
+        db: &'db dyn Db,
+        program: Program<'db>,
+        actual: Type<'db>,
+        formal: UnionType<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> Option<bool> {
+        let env = ProgramEnvironment::from_program(program);
+        Some(compute(
+            db,
+            &env,
+            actual,
+            formal,
+            inferable,
+            &ConstraintSetBuilder::new(),
+        ))
+    }
+
+    // A provisional subtype result can change which union members contribute inference. If this
+    // query participates in a cycle, repeat the checks in the original inference query instead.
+    cached(db, env.program(db), actual, formal, inferable)
+        .unwrap_or_else(|| compute(db, env, actual, formal, inferable, constraints))
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum SpecializationError<'db> {
     MismatchedBound {
@@ -4828,6 +4898,54 @@ mod tests {
                     )
                 })
         })
+    }
+
+    #[test]
+    fn unique_union_subtype_distinguishes_one_multiple_and_no_matches() -> anyhow::Result<()> {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(db, &env);
+        let str = KnownClass::Str.to_instance(db, &env);
+        let bytes = KnownClass::Bytes.to_instance(db, &env);
+        let object = KnownClass::Object.to_instance(db, &env);
+        let hashable = KnownClass::Hashable.to_instance(db, &env);
+        let iterable = KnownClass::Iterable.to_specialized_instance(db, &env, &[object]);
+        let list = KnownClass::List.to_specialized_instance(db, &env, &[int]);
+        let Type::Union(concrete) = UnionType::from_two_elements(db, &env, int, str) else {
+            anyhow::bail!("int and str should form a union");
+        };
+        let Type::Union(protocols) = UnionType::from_two_elements(db, &env, hashable, iterable)
+        else {
+            anyhow::bail!("Hashable and Iterable should form a union");
+        };
+        let [typevar] = create_typevars(db, ["T"]);
+
+        for inferable in [TypeVarSet::None, TypeVarSet::from_typevars(db, [typevar])] {
+            for (actual, formal, expected) in [
+                (int, concrete, true),
+                (bytes, concrete, false),
+                (str, protocols, false),
+                (int, protocols, true),
+                (list, protocols, true),
+                (str, concrete, true),
+                (int, protocols, true),
+                (str, protocols, false),
+            ] {
+                assert_eq!(
+                    is_subtype_of_exactly_one_union_member(
+                        db,
+                        &env,
+                        actual,
+                        formal,
+                        inferable,
+                        &ConstraintSetBuilder::new(),
+                    ),
+                    expected,
+                );
+            }
+        }
+        Ok(())
     }
 
     #[test]

@@ -709,7 +709,7 @@ impl<'db> ConstructorContext<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) enum ConstructorCallableKind {
     /// A metaclass `__call__` method.
     MetaclassCall,

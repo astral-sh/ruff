@@ -79,6 +79,14 @@ impl<'db> CallArgumentTypes<'db> {
         self.fallback_type
     }
 
+    /// Returns a type that was the same under every type context used for this argument.
+    pub(super) fn context_independent_type(&self) -> Option<Type<'db>> {
+        let first = self
+            .fallback_type
+            .or_else(|| self.types.values().next().copied())?;
+        self.types.values().all(|ty| *ty == first).then_some(first)
+    }
+
     /// Returns the type of this argument when inferred against the provided declared type.
     ///
     /// If the type was not inferred against the declared type directly, this method will fall back to

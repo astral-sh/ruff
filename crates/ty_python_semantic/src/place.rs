@@ -1990,23 +1990,25 @@ fn place_from_bindings_impl<'db>(
 
             first_definition.get_or_insert(binding);
             provenance = provenance.or(Provenance::SingleDefinition(binding));
-            let binding_ty = binding_type(db, binding);
             let narrowed = match narrowing_constraint.constraint() {
-                ScopedNarrowingConstraint::ALWAYS_TRUE => binding_ty,
+                ScopedNarrowingConstraint::ALWAYS_TRUE => binding_type(db, binding),
                 ScopedNarrowingConstraint::ALWAYS_FALSE => Type::Never,
-                constraint => narrowing_projector
-                    .get_or_insert_with(|| {
-                        NarrowingProjector::new(
-                            db,
-                            env,
-                            narrowing_constraint.narrowing_constraints(),
-                            predicates,
-                            narrowing_constraint.predicate_narrowing_targets(),
-                            binding.place(db),
-                            binding_ty,
-                        )
-                    })
-                    .narrow(constraint, binding_ty),
+                constraint => {
+                    let binding_ty = binding_type(db, binding);
+                    narrowing_projector
+                        .get_or_insert_with(|| {
+                            NarrowingProjector::new(
+                                db,
+                                env,
+                                narrowing_constraint.narrowing_constraints(),
+                                predicates,
+                                narrowing_constraint.predicate_narrowing_targets(),
+                                binding.place(db),
+                                binding_ty,
+                            )
+                        })
+                        .narrow(constraint, binding_ty)
+                }
             };
             Some((narrowed, static_reachability))
         },

@@ -7868,6 +7868,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        let mut direct_element_mappings = [false; N];
+        if !elts.is_empty() {
+            for (can_map_directly, typevar) in
+                direct_element_mappings.iter_mut().zip(elt_tys.clone())
+            {
+                *can_map_directly = !typevar.is_paramspec(db)
+                    && !typevar.is_typevartuple(db)
+                    && typevar.typevar(db).bound_or_constraints(db, env).is_none();
+            }
+        }
+
         for (elts_index, elts) in elts.iter().enumerate() {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value_expr)] = elts.as_slice() {
@@ -7985,9 +7996,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     inferred_type_for_typevar,
                 );
 
-                builder
-                    .infer(Type::TypeVar(elt_ty), inferred_type_for_typevar)
-                    .ok()?;
+                let formal = Type::TypeVar(elt_ty);
+                if direct_element_mappings[i]
+                    && !inferred_type_for_typevar.resolve_type_alias(db).is_union()
+                {
+                    // Inference for a bare, unbounded element type variable records the actual
+                    // type as a lower bound. A union still goes through general inference, which
+                    // expands aliases among its members before recording the mapping.
+                    if formal != inferred_type_for_typevar {
+                        builder.add_type_mapping(
+                            elt_ty,
+                            inferred_type_for_typevar,
+                            TypeVarVariance::Covariant,
+                        );
+                    }
+                } else {
+                    builder.infer(formal, inferred_type_for_typevar).ok()?;
+                }
             }
         }
 
