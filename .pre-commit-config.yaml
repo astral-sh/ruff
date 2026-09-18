@@ -72,6 +72,8 @@ repos:
     rev: 12e63946db2c5cfcc9030fac21c3883ba88c6ed8 # frozen: 0.38.0
     hooks:
       - id: check-github-workflows
+        # The validator's shared schema cache is not safe for concurrent writes.
+        require_serial: true
         # The bundled schema predates GitHub's cache-mode feature. Use a pinned
         # upstream schema until check-jsonschema includes it in a release.
         entry: >-
