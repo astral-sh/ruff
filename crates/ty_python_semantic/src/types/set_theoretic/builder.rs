@@ -141,6 +141,66 @@ fn merge_truthiness_guarded_pair<'db>(
     }
 }
 
+/// Fold `(T & ~A) | (T & ~B)` to `T` when `A` and `B` are disjoint.
+///
+/// The common part can itself contain exclusions. For example,
+/// `(Unknown & ~str & ~A) | (Unknown & ~str & ~B)` simplifies to `Unknown & ~str`.
+/// `A` and `B` can each be unions: all exclusions unique to one side must be disjoint
+/// from every exclusion unique to the other side.
+fn merge_disjoint_exclusions<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> Option<Type<'db>> {
+    let (Type::Intersection(left), Type::Intersection(right)) = (left, right) else {
+        return None;
+    };
+    let left_positive = left.positive(db);
+    let left_negative = left.negative(db);
+    let right_negative = right.negative(db);
+
+    if !left_positive.set_eq(right.positive(db)) {
+        return None;
+    }
+
+    let (common_negative, left_only): (SmallVec<[_; 2]>, SmallVec<[_; 2]>) = left_negative
+        .iter()
+        .copied()
+        .partition(|ty| right_negative.contains(ty));
+
+    // Leave trivially redundant operands to the usual union simplification, which preserves
+    // their order. This only checks exact containment, not redundancy through subtyping.
+    if left_only.is_empty() || common_negative.len() == right_negative.len() {
+        return None;
+    }
+
+    for right_exclusion in right_negative
+        .iter()
+        .filter(|ty| !left_negative.contains(ty))
+    {
+        for left_exclusion in &left_only {
+            if simplify_intersection_pair(
+                db,
+                env,
+                *left_exclusion,
+                *right_exclusion,
+                IntersectionPolarity::Positive,
+            ) != IntersectionSimplification::Disjoint
+            {
+                return None;
+            }
+        }
+    }
+
+    let mut common =
+        IntersectionBuilder::new(db, env).positive_elements(left_positive.iter().copied());
+    for negative in common_negative {
+        common.add_negative_in_place(negative);
+    }
+    Some(common.build())
+}
+
 /// Return `true` if union simplification should preserve this pair because one element is
 /// `Hashable` and the other is a non-final nominal instance.
 ///
@@ -1087,6 +1147,15 @@ impl<'db> UnionBuilder<'db> {
                         .any(|ty| any_over_type(db, &self.env, ty, false, Type::is_alias_like))
                 {
                     continue;
+                }
+                if let Some(merged) = merge_disjoint_exclusions(db, &self.env, ty, element_type) {
+                    to_remove.push(i);
+                    for index in to_remove.into_iter().rev() {
+                        self.elements.swap_remove(index);
+                    }
+                    // The common part can also subsume elements we already visited.
+                    self.add_in_place_impl(merged, seen_aliases);
+                    return;
                 }
                 if ty.is_redundant_with(db, &self.env, element_type) {
                     return;
