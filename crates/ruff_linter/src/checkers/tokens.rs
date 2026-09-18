@@ -147,6 +147,7 @@ pub(crate) fn check_tokens(
 
     if context.any_rule_enabled(&[
         Rule::MissingTrailingComma,
+        Rule::MissingTrailingCommaInMultilineList,
         Rule::TrailingCommaOnBareTuple,
         Rule::ProhibitedTrailingComma,
     ]) {
