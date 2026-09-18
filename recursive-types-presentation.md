@@ -128,8 +128,8 @@ Wherever this type appears, it represents a recursion of the outer `RecursiveTyp
 matching `cycle` ID.
 
 So the `body` of a `RecursiveType` should be an open type with one or more occurrences of a
-`RecursiveVar` with the same `cycle` ID. The `RecursiveType` itself is a closed type: it binds the
-recursive variables within it. It is semantically meaningful and can be used anywhere.
+`RecursiveVar` with the same `cycle` ID. The `RecursiveType` itself can be a closed type: it binds
+the recursive variables within it. It is semantically meaningful and can be used anywhere.
 
 This means that `Type` can now represent both open and closed types. That is, we now have a `Type`
 variant, `RecursiveVar`, which has no type semantics of its own. It represents only a recursive
@@ -213,7 +213,8 @@ would repeat the same call forever. Instead, `|| Ok(value_ty)` returns the origi
 the provisional subscript result. It just preserves the recursive reference while inference is still
 resolving the cycle.
 
-Ensuring that \`
+In general, we ensure the invariant that semantic operations never encounter open types by having
+`RecursiveType` match arms always use unfolding operations like `RecursiveType::map_or_else`.
 
 Callers can also request the unfolded type directly:
 
@@ -333,12 +334,11 @@ lists, so `[int]` means `T := int`):
 | `RecursiveVar.arguments = [list[T]]` | The recursive occurrence applies the constructor to `list[T]`. |
 
 The stored body of a `RecursiveType` is kept unspecialized! So for `Tree[int]`, the body is still
-just `T | tuple["Tree[list[T]]"]`. The fact that we've specialized it to `int` is stored only in the
-`arguments` of the outer `RecursiveType`. This avoids the infinitely-growing expansion that would
-have to occur if we eagerly specialized.
+just `T | tuple[F[list[T]]]` (where `F[list[T]]` represents a `RecursiveVar` with `arguments:
+list[T]`). The fact that we've specialized it to `int` is stored only in the `arguments` of the
+outer `RecursiveType`. This avoids an infinitely-growing eager expansion.
 
-We don't actually apply the specialization until we unfold. If we use `F[list[T]]` to represent a
-`RecursiveVar` with `arguments: list[T]`, unfolding would look like this:
+We don't actually apply the specialization until we unfold:
 
 ```text
 Stored body:             T | tuple[F[list[T]]]
@@ -354,7 +354,7 @@ At the next layer down, unfolding works the same, except now `T` is `list[int]`:
 ```text
 Stored body:             T | tuple[F[list[T]]]
 1. Close the body:       T | tuple[Tree[list[T]]]
-2. Apply T := int:       list[int] | tuple[Tree[list[list[int]]]]
+2. Apply T := list[int]: list[int] | tuple[Tree[list[list[int]]]]
 ```
 
 [Generic recursive types][recursive-source] · [Close, then specialize][unfold-source]
@@ -373,9 +373,8 @@ The landed PR just adds the `RecursiveType/RecursiveVar` machinery, and uses it 
 implicit and PEP 613 (`TypeAlias`) aliases.
 
 PEP 695 aliases don't yet use this new approach; they still use `Type::TypeAlias` with implicit
-recursive nesting. This works fine until we need to apply a type mapping to them, at which point the
-recursion collapses to `Divergent`. A future PR should also use the new representation for recursive
-PEP 695 aliases.
+recursive nesting. This mostly works fine but sometimes collapses to `Divergent`. A future PR should
+also use the new representation for recursive PEP 695 aliases.
 
 Recursive protocols should also be adapted to use `RecursiveType`; this isn't done yet.
 
