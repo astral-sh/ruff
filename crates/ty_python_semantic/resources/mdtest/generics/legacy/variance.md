@@ -394,6 +394,40 @@ class ClassMethods(Generic[T_co]):
     def static_accepts(value: T_co) -> None: ...
 ```
 
+## Variance in composed return types
+
+A mutable member makes a union or intersection return type invariant. A union of read-only types can
+remain covariant.
+
+```py
+from typing import Callable, Generic, TypeVar
+from ty_extensions import Intersection
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Marker: ...
+
+class Returns(Generic[T_co]):
+    # error: [invalid-generic-class]
+    def union(self) -> list[T_co] | tuple[T_co, ...]:
+        raise NotImplementedError
+    # error: [invalid-generic-class]
+    def intersection(self) -> Intersection[list[T_co], Marker]:
+        raise NotImplementedError
+    def readonly(self) -> tuple[T_co, ...] | None:
+        raise NotImplementedError
+```
+
+Returning a tuple of consumers requires contravariance: tuples preserve the variance of their
+elements, and the callables consume `T_co`.
+
+```py
+class Callbacks(Generic[T_co]):
+    # error: [invalid-generic-class]
+    def callbacks(self) -> tuple[Callable[[T_co], None], ...]:
+        raise NotImplementedError
+```
+
 ## Variance in generic methods
 
 A method's independent type variable can accept arguments outside the class's covariant value type.
@@ -546,10 +580,70 @@ class Redundant(Generic[T_co]):
     def accepts(self: "Redundant[int]", value: T_co | int) -> None: ...
 ```
 
+## Variance in `Self` types
+
+`Self` represents the receiver's type, including subclasses. A covariant class can accept `Self` in
+a method parameter. This also holds for class methods and for `Self` nested in a container.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Generic, Self, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Covariant(Generic[T_co]):
+    def combine(self, other: Self) -> None: ...
+    def nested(self, others: list[Self]) -> None: ...
+    @classmethod
+    def combine_class(cls, other: Self) -> None: ...
+```
+
+Likewise, a contravariant class can return `Self`.
+
+```py
+class Contravariant(Generic[T_contra]):
+    def copy(self) -> Self:
+        return self
+```
+
+Property accessors follow the same rules: a covariant class can have a setter accepting `Self`.
+
+```py
+class WithProperty(Generic[T_co]):
+    @property
+    def value(self) -> Self:
+        return self
+
+    @value.setter
+    def value(self, other: Self) -> None: ...
+```
+
+An explicit use of `T_co` still constrains variance, even in a method that also uses `Self`.
+
+```py
+class InvalidParameter(Generic[T_co]):
+    # error: [invalid-generic-class]
+    def consume(self, other: Self, value: T_co) -> None: ...
+```
+
+Accepting `InvalidCovariant[T_co]` also constrains variance, unlike accepting `Self`.
+
+```py
+class InvalidCovariant(Generic[T_co]):
+    # error: [invalid-generic-class]
+    def consume_class(self, other: "InvalidCovariant[T_co]") -> Self:
+        return self
+```
+
 ## Variance in decorated methods
 
-A decorator can replace a method with a value that does not consume the class's type variable.
-Variance checking should account for the exposed attribute, rather than the original signature.
+A decorator can replace a method with a value that does not consume the class's type variable. The
+original signature does not constrain the class's variance once it has been replaced.
 
 ```py
 from typing import Generic, TypeVar
@@ -561,11 +655,349 @@ def replace(func: object) -> int:
 
 class Decorated(Generic[T_co]):
     @replace
-    # TODO: Do not report an error; the decorator replaces the method with an `int`.
+    def method(self, value: T_co) -> None: ...
+```
+
+A decorator that preserves the method's signature also preserves its variance requirements.
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def preserve_signature(func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+class PreservedSignature(Generic[T_co]):
+    @preserve_signature
     # error: [invalid-generic-class]
     def method(self, value: T_co) -> None: ...
+```
 
-reveal_type(Decorated[int].method)  # revealed: int
+A preserved return type permits covariance. Declared-method validation checks the exposed method; it
+does not infer variance from whether an attribute can be reassigned.
+
+```py
+class PreservedReturn(Generic[T_co]):
+    @preserve_signature
+    def method(self) -> T_co:
+        raise NotImplementedError
+```
+
+A decorator can instead replace the signature with a callable that accepts any value. The original
+use of `T_co` no longer affects variance.
+
+```py
+def replace_signature(func: object) -> Callable[[object, object], None]:
+    raise NotImplementedError
+
+class ReplacedSignature(Generic[T_co]):
+    @replace_signature
+    def method(self, value: T_co) -> None: ...
+```
+
+A decorator can also introduce an invalid parameter. This decorator returns a callable that accepts
+the original return type. Accepting `T_co` is incompatible with the class's covariance.
+
+```py
+def consume_result(func: Callable[..., R]) -> Callable[[object, R], None]:
+    raise NotImplementedError
+
+class Consumer(Generic[T_co]):
+    @consume_result
+    # snapshot: invalid-generic-class
+    def method(self) -> T_co:
+        raise NotImplementedError
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `method`
+  --> src/mdtest_snippet.py:39:9
+   |
+39 |     def method(self) -> T_co:
+   |         ^^^^^^
+info: Type variable `T_co` is declared as covariant, but this method requires it to be contravariant
+```
+
+A decorator can replace a method with a property whose getter belongs to another class. The original
+method's parameters do not constrain variance because the property replaces that method entirely.
+
+```py
+F = TypeVar("F")
+
+class Other:
+    @property
+    def value(self) -> int:
+        return 0
+
+def replace_with(value: F) -> Callable[[object], F]:
+    return lambda _: value
+
+class ReplacedWithProperty(Generic[T_co]):
+    @replace_with(Other.value)
+    def value(self, value: T_co) -> None: ...
+```
+
+## Variance in decorators returning non-callables
+
+A decorator returning `list[T_co]` makes covariance invalid, even though the original method's
+return type permits covariance.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+R = TypeVar("R")
+T_co = TypeVar("T_co", covariant=True)
+
+def mutable(func: Callable[..., R]) -> list[R]:
+    raise NotImplementedError
+
+class Covariant(Generic[T_co]):
+    @mutable
+    # error: [invalid-generic-class]
+    def mutable(self) -> T_co:
+        raise NotImplementedError
+```
+
+## Variance in optional methods
+
+A decorator can return either the original method or `None`. The method's receiver does not
+constrain variance, even when it is annotated with the class's type variable.
+
+```py
+from typing import Generic, TypeVar
+
+F = TypeVar("F")
+T_co = TypeVar("T_co", covariant=True)
+
+def optional(func: F) -> F | None:
+    return func
+
+class OptionalMethod(Generic[T_co]):
+    @optional
+    def value(self: "OptionalMethod[T_co]") -> T_co:
+        raise NotImplementedError
+```
+
+An ordinary parameter accepting `T_co` still makes covariance invalid.
+
+```py
+class OptionalConsumer(Generic[T_co]):
+    @optional
+    # error: [invalid-generic-class]
+    def value(self: "OptionalConsumer[T_co]", value: T_co) -> None: ...
+```
+
+## Variance with conditional `no_type_check` methods
+
+`no_type_check` suppresses variance errors for the method it decorates. Here, the first branch
+produces a covariant tuple. Only the second branch produces an invariant list, and that branch has
+`no_type_check`, so the class is accepted.
+
+```py
+from typing import Callable, Generic, TypeVar, no_type_check
+
+R = TypeVar("R")
+T_co = TypeVar("T_co", covariant=True)
+
+def readonly(func: Callable[..., R]) -> tuple[R, ...]:
+    raise NotImplementedError
+
+def mutable(func: Callable[..., R]) -> list[R]:
+    raise NotImplementedError
+
+def condition() -> bool:
+    return True
+
+class Conditional(Generic[T_co]):
+    if condition():
+        @readonly
+        def value(self) -> T_co:
+            raise NotImplementedError
+
+    else:
+        @no_type_check
+        @mutable
+        def value(self) -> T_co:
+            raise NotImplementedError
+```
+
+The exemption should not apply to other definitions of the same method. The second branch below
+returns `T_contra` without `no_type_check`, which is invalid in a contravariant class.
+
+```py
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Contravariant(Generic[T_contra]):
+    if condition():
+        @no_type_check
+        def value(self) -> T_contra:
+            raise NotImplementedError
+
+    else:
+        # error: [invalid-generic-class]
+        def value(self) -> T_contra:
+            raise NotImplementedError
+```
+
+Even a suppressed definition with a valid signature does not exempt another branch. This holds
+regardless of the order of the branches.
+
+```py
+class UncheckedFirst(Generic[T_co]):
+    if condition():
+        @no_type_check
+        def method(self, value: object) -> None: ...
+
+    else:
+        # error: [invalid-generic-class]
+        def method(self, value: T_co) -> None: ...
+
+class UncheckedLast(Generic[T_co]):
+    if condition():
+        # error: [invalid-generic-class]
+        def method(self, value: T_co) -> None: ...
+
+    else:
+        @no_type_check
+        def method(self, value: object) -> None: ...
+```
+
+## Variance in read-only descriptors
+
+A descriptor whose `__get__` returns `T_co` preserves covariance.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+R_co = TypeVar("R_co", covariant=True)
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Descriptor(Generic[R_co]):
+    def __init__(self, func: Callable[..., R_co]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> R_co:
+        raise NotImplementedError
+
+class Covariant(Generic[T_co]):
+    @Descriptor
+    def value(self) -> T_co:
+        raise NotImplementedError
+```
+
+Returning `T_contra` is invalid in a contravariant class, just as it would be for an ordinary
+method.
+
+```py
+class Contravariant(Generic[T_contra]):
+    @Descriptor
+    # error: [invalid-generic-class]
+    def value(self) -> T_contra:
+        raise NotImplementedError
+```
+
+## Variance in writable descriptors
+
+A descriptor whose `__get__` returns `T_co` and whose `__set__` accepts `T_co` requires invariance.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+R = TypeVar("R")
+T_co = TypeVar("T_co", covariant=True)
+
+class Writable(Generic[R]):
+    def __init__(self, func: Callable[..., R]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> R:
+        raise NotImplementedError
+    def __set__(self, instance: object, value: R) -> None: ...
+
+class Covariant(Generic[T_co]):
+    @Writable
+    # error: [invalid-generic-class]
+    def value(self) -> T_co:
+        raise NotImplementedError
+```
+
+A setter accepting any `object` does not constrain variance. The getter below returns `T_co`, so the
+class can be covariant even though the descriptor's own type variable is invariant.
+
+```py
+class Permissive(Generic[R]):
+    def __init__(self, func: Callable[..., R]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> R:
+        raise NotImplementedError
+    def __set__(self, instance: object, value: object) -> None: ...
+
+class AlsoCovariant(Generic[T_co]):
+    @Permissive
+    def value(self) -> T_co:
+        raise NotImplementedError
+```
+
+## Variance with unresolved descriptor setters
+
+A descriptor's read type constrains variance even when its variadic setter prevents us from
+determining a write domain. Returning `T_contra` is still invalid in a contravariant class.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+R = TypeVar("R")
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Descriptor(Generic[R]):
+    def __init__(self, func: Callable[..., R]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> R:
+        raise NotImplementedError
+    def __set__(self, *args: object) -> None: ...
+
+class Contravariant(Generic[T_contra]):
+    @Descriptor
+    # error: [invalid-generic-class]
+    def value(self) -> T_contra:
+        raise NotImplementedError
+```
+
+## Variance in cached methods and properties
+
+`cached_property` preserves the decorated method's return type. Returning `T_contra` is invalid in a
+contravariant class.
+
+```py
+from functools import cached_property
+from typing import Generic, TypeVar, no_type_check
+
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class WithCachedProperty(Generic[T_contra]):
+    @cached_property
+    # error: [invalid-generic-class]
+    def value(self) -> T_contra:
+        raise NotImplementedError
+```
+
+`cache` also preserves the return type, so we reject the same use of `T_contra` in a cached method.
+
+```py
+from functools import cache
+
+class WithCachedMethod(Generic[T_contra]):
+    @cache
+    # error: [invalid-generic-class]
+    def cached(self) -> T_contra:
+        raise NotImplementedError
+```
+
+`no_type_check` suppresses variance checking for a cached property.
+
+```py
+class Unchecked(Generic[T_contra]):
+    @no_type_check
+    @cached_property
+    def value(self) -> T_contra:
+        raise NotImplementedError
 ```
 
 ## Variance in deleted methods
@@ -584,6 +1016,307 @@ class Deleted(Generic[T_co]):
     def method(self, value: T_co) -> None: ...
 
     del method
+```
+
+## Variance in overwritten methods
+
+When a later definition replaces a method, only the final definition constrains the class's
+variance.
+
+```py
+from typing import Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Overwritten(Generic[T_co]):
+    def method(self, value: T_co) -> None: ...
+    def method(self, value: object) -> None: ...
+```
+
+If a branch replaces the method with `object`, we infer `object` for that attribute. The method's
+signature no longer constrains the class's variance.
+
+```py
+def condition() -> bool:
+    return True
+
+class Widened(Generic[T_co]):
+    if condition():
+        def method(self, value: T_co) -> None: ...
+
+    else:
+        method = object()
+```
+
+## Variance in conditional method definitions
+
+When conditional branches define different methods, either method can be exposed. Consuming `T_co`
+in one branch makes covariance invalid. The diagnostic points to that definition's parameter.
+
+```py
+from typing import Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+def condition() -> bool:
+    return True
+
+class Conditional(Generic[T_co]):
+    if condition():
+        # snapshot: invalid-generic-class
+        def method(self, value: T_co) -> None: ...
+
+    else:
+        def method(self, value: object) -> None: ...
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `method`
+  --> src/mdtest_snippet.py:11:33
+   |
+11 |         def method(self, value: T_co) -> None: ...
+   |                                 ^^^^
+info: Type variable `T_co` is declared as covariant, but this method requires it to be contravariant
+```
+
+The diagnostic still points to the incompatible parameter when the valid definition comes first.
+
+```py
+class Reversed(Generic[T_co]):
+    if condition():
+        def method(self, value: object) -> None: ...
+
+    else:
+        # snapshot: invalid-generic-class
+        def method(self, value: T_co) -> None: ...
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `method`
+  --> src/mdtest_snippet.py:21:33
+   |
+21 |         def method(self, value: T_co) -> None: ...
+   |                                 ^^^^
+info: Type variable `T_co` is declared as covariant, but this method requires it to be contravariant
+```
+
+## Variance in aliased methods
+
+Overwriting the original name does not remove a method assigned to another name. `Aliased.alias`
+still accepts `T_co`, which makes covariance invalid.
+
+```py
+from typing import Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Aliased(Generic[T_co]):
+    # error: [invalid-generic-class]
+    def method(self, value: T_co) -> None: ...
+
+    alias = method
+    def method(self, value: object) -> None: ...
+```
+
+Multiple aliases of the same method produce only one diagnostic, whether or not the original name is
+overwritten.
+
+```py
+class MultipleAliases(Generic[T_co]):
+    # error: [invalid-generic-class]
+    def method(self, value: T_co) -> None: ...
+
+    first = method
+    second = method
+```
+
+Aliases also retain method-specific exclusions.
+
+```py
+from typing import no_type_check
+
+class UncheckedAlias(Generic[T_co]):
+    @no_type_check
+    def method(self, value: T_co) -> None: ...
+
+    alias = method
+    def method(self, value: object) -> None: ...
+```
+
+## Variance in property accessors
+
+A covariant class can return `T_co` from a property getter, but cannot accept it in the setter.
+
+```py
+from typing import Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Covariant(Generic[T_co]):
+    @property
+    def value(self) -> T_co:
+        raise NotImplementedError
+
+    @value.setter
+    # error: [invalid-generic-class]
+    def value(self, value: T_co) -> None: ...
+```
+
+A contravariant class can accept `T_contra` in the setter, but cannot return it from the getter.
+
+```py
+class Contravariant(Generic[T_contra]):
+    @property
+    # error: [invalid-generic-class]
+    def value(self) -> T_contra:
+        raise NotImplementedError
+
+    @value.setter
+    def value(self, value: T_contra) -> None: ...
+```
+
+`no_type_check` on the setter does not suppress an error in the getter.
+
+```py
+from typing import no_type_check
+
+class UncheckedSetter(Generic[T_contra]):
+    @property
+    # error: [invalid-generic-class]
+    def value(self) -> T_contra:
+        raise NotImplementedError
+
+    @value.setter
+    @no_type_check
+    def value(self, value: list[T_contra]) -> None: ...
+```
+
+Likewise, `no_type_check` on the getter does not suppress an error in the setter.
+
+```py
+class UncheckedGetter(Generic[T_co]):
+    @property
+    @no_type_check
+    def value(self) -> list[T_co]:
+        raise NotImplementedError
+
+    @value.setter
+    # error: [invalid-generic-class]
+    def value(self, value: T_co) -> None: ...
+```
+
+## Variance in decorated property accessors
+
+A decorated property getter still produces its exposed return type, even when the decorator replaces
+the function with a callable object.
+
+```py
+from functools import cache
+from typing import Callable, Generic, ParamSpec, TypeVar, no_type_check
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+def preserve(func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+class Cached(Generic[T_contra]):
+    @property
+    @cache
+    # error: [invalid-generic-class]
+    def value(self) -> T_contra:
+        raise NotImplementedError
+
+class Preserved(Generic[T_contra]):
+    @property
+    @preserve
+    # error: [invalid-generic-class]
+    def value(self) -> T_contra:
+        raise NotImplementedError
+
+class Covariant(Generic[T_co]):
+    @property
+    @preserve
+    def value(self: "Covariant[T_co]") -> T_co:
+        raise NotImplementedError
+```
+
+The same applies to a decorated setter's input. Suppressing the getter does not suppress the
+setter's variance check.
+
+```py
+class Setter(Generic[T_co]):
+    @property
+    @no_type_check
+    @preserve
+    def value(self) -> list[T_co]:
+        raise NotImplementedError
+
+    @value.setter
+    @preserve
+    # error: [invalid-generic-class]
+    def value(self, value: T_co) -> None: ...
+```
+
+The decorated signature determines variance. Replacing the getter's return type with `int` removes
+its variance requirement, while replacing a setter's parameter with `list[T_co]` introduces one.
+
+```py
+def replace_getter(func: object) -> Callable[[object], int]:
+    raise NotImplementedError
+
+def replace_setter(func: Callable[..., R]) -> Callable[[object, list[R]], None]:
+    raise NotImplementedError
+
+class Changed(Generic[T_co]):
+    @property
+    @replace_getter
+    def value(self) -> list[T_co]:
+        raise NotImplementedError
+
+    @value.setter
+    @replace_setter
+    # error: [invalid-generic-class]
+    def value(self, value: object) -> T_co:
+        raise NotImplementedError
+```
+
+Replacing a decorated getter also removes its original variance requirement.
+
+```py
+class Replaced(Generic[T_contra]):
+    @property
+    @preserve
+    def value(self) -> T_contra:
+        raise NotImplementedError
+
+    @value.getter
+    @preserve
+    def value(self) -> int:
+        return 0
+```
+
+## Variance in replaced property getters
+
+Replacing a getter removes its variance requirements. The replacement returns `int`, so it does not
+constrain the class's variance.
+
+```py
+from typing import Generic, TypeVar
+
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class ReplacedGetter(Generic[T_contra]):
+    @property
+    def value(self) -> T_contra:
+        raise NotImplementedError
+
+    @value.getter
+    def value(self) -> int:
+        return 0
 ```
 
 ## Generic protocol variance

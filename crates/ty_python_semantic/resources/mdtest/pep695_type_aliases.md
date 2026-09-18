@@ -1034,6 +1034,80 @@ cycle.
 type ThroughIdentity = Identity[ThroughIdentity]
 ```
 
+Subsequent operations recover from these cycles. Repeated applications of the helper have the same
+result.
+
+```py
+type RepeatedIdentity = Identity[Identity[RepeatedIdentity]]  # error: [cyclic-type-alias-definition]
+
+def inspect_identity(direct: ThroughIdentity, repeated: RepeatedIdentity):
+    reveal_type(direct)  # revealed: Divergent
+    reveal_type(repeated)  # revealed: Divergent
+    direct[0]
+    repeated[0]
+```
+
+A non-recursive union member remains available for recovery.
+
+```py
+type WithLeaf = int | Identity[WithLeaf]  # error: [cyclic-type-alias-definition]
+
+def inspect_union(value: WithLeaf):
+    reveal_type(value)  # revealed: int
+    value[0]  # error: [not-subscriptable]
+```
+
+### Subscribing to an unguarded recursive alias
+
+Using an invalid alias directly in an expression does not prevent reporting its cyclic definition.
+
+```py
+type Identity[T] = T
+type Cyclic = Identity[Cyclic]  # error: [cyclic-type-alias-definition]
+
+def use(value: Cyclic):
+    value[0]
+```
+
+### Subscribing to an unguarded manual alias
+
+The same recovery applies to `TypeAliasType`. Its non-recursive union member determines the
+diagnostic for the subscription.
+
+```py
+from typing_extensions import TypeAliasType
+
+Cycle = TypeAliasType("Cycle", "int | Cycle")  # error: [cyclic-type-alias-definition]
+
+def use(value: Cycle):
+    value[0]  # error: [not-subscriptable]
+```
+
+### Recursive arguments inside implicit containers
+
+An implicit recursive alias can keep an enclosing alias's self-reference inside a container. These
+references are valid even when they occur in the implicit alias's type arguments.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Lists = list["Lists[T]"]
+type Recursive = Lists[Recursive]
+type Nested = list[Lists[Nested]]
+
+recursive: Recursive = []
+nested: Nested = []
+```
+
+The argument can also occur directly as a tuple element: the tuple still separates successive
+recursive references.
+
+```py
+Pairs = tuple[T, list["Pairs[T]"]]
+type RecursivePair = Pairs[RecursivePair]
+```
+
 ### Finite nested applications of recursive aliases
 
 A recursive alias can appear in its own type arguments without creating a cycle in its expansion.
@@ -1064,6 +1138,43 @@ RepeatedFunctional = TypeAliasType("RepeatedFunctional", Functional[Functional[i
 
 functional_value: RepeatedFunctional = 1
 FunctionalCycle = TypeAliasType("FunctionalCycle", Functional["FunctionalCycle"])  # error: [cyclic-type-alias-definition]
+```
+
+### Cycles through implicit recursive alias arguments
+
+A type argument exposed outside containers can close an invalid cycle, even when the wrapper's own
+recursive reference is inside a list. Rejecting that cycle preserves the other union alternatives.
+
+```py
+from typing import TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+Wrapper = T | list["Wrapper[T]"]
+
+type Cycle = Wrapper[Cycle]  # error: [cyclic-type-alias-definition]
+type WithLeaf = int | Wrapper[WithLeaf]  # error: [cyclic-type-alias-definition]
+
+valid: WithLeaf = 1
+invalid: WithLeaf = "wrong"  # error: [invalid-assignment]
+
+FunctionalCycle = TypeAliasType("FunctionalCycle", Wrapper["FunctionalCycle"])  # error: [cyclic-type-alias-definition]
+```
+
+### Finite nested applications of implicit recursive aliases
+
+Nested applications of the same wrapper are finite. Recursion beneath `list` does not make the
+exposed argument recursive, even when successive list elements have different type arguments.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Wrapper = T | list["Wrapper[list[T]]"]
+type Nested = Wrapper[Wrapper[int]]
+
+valid: Nested = 1
+invalid: Nested = "wrong"  # error: [invalid-assignment]
 ```
 
 ### With legacy generic
@@ -1525,6 +1636,32 @@ def f(x: A):
     reveal_type(x)  # revealed: list[A | str | None]
     for item in x:
         reveal_type(item)  # revealed: list[A | str | None] | str | None
+```
+
+### Recursive alias contexts in generic calls
+
+When a recursive alias appears inside a list parameter, the argument's elements supply the type
+argument for the enclosing generic function.
+
+```py
+from typing import TypeVar
+
+W = TypeVar("W")
+type Tree[T] = T | tuple[Tree[T]]
+
+def first_list(value: list[Tree[W]]) -> W:
+    raise NotImplementedError
+
+def modern_first_list[W](value: list[Tree[W]]) -> W:
+    raise NotImplementedError
+
+reveal_type(first_list([1]))  # revealed: int | tuple[Tree[int]]
+reveal_type(modern_first_list([1]))  # revealed: int | tuple[Tree[int]]
+
+# revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
+reveal_type(first_list([((1,),)]))
+# revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
+reveal_type(modern_first_list([((1,),)]))
 ```
 
 ### Tuple comparison

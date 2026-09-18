@@ -1227,6 +1227,81 @@ class C:
 C().value
 ```
 
+### Recursive metaclass declarations containing dynamic types
+
+A recursive declaration containing `Any` can describe a data descriptor. Assignments to a class
+attribute must still satisfy the setter stored on its metaclass.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> str:
+        return "value"
+
+    def __set__(self, instance: object, value: int) -> None: ...
+
+Implicit = Any | list["Implicit"]
+type Explicit = Any | list[Explicit]
+
+class ImplicitMeta(type):
+    value: Implicit = Descriptor()
+
+class ExplicitMeta(type):
+    value: Explicit = Descriptor()
+
+class ImplicitOwner(metaclass=ImplicitMeta):
+    value: str = ""
+
+class ExplicitOwner(metaclass=ExplicitMeta):
+    value: str = ""
+
+ImplicitOwner.value = "bad"  # error: [invalid-assignment] "Expected `int`"
+ExplicitOwner.value = "bad"  # error: [invalid-assignment] "Expected `int`"
+```
+
+### Recursive metaclass declarations containing non-descriptors
+
+A recursive union can contain both descriptors and ordinary values. A valid assignment is checked
+against the descriptor actually stored on the metaclass, even when the class has an attribute with
+the same name.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> str:
+        return "value"
+
+    def __set__(self, instance: object, value: str) -> None: ...
+
+Implicit = Descriptor | list["Implicit"]
+type Explicit = Descriptor | list[Explicit]
+
+class ImplicitMeta(type):
+    value: Implicit = Descriptor()
+
+class ExplicitMeta(type):
+    value: Explicit = Descriptor()
+
+class ImplicitOwner(metaclass=ImplicitMeta):
+    value: str = ""
+
+class ExplicitOwner(metaclass=ExplicitMeta):
+    value: str = ""
+
+ImplicitOwner.value = "accepted"
+ExplicitOwner.value = "accepted"
+```
+
 ### Property getters do not infer fixed owner type variables
 
 A property getter treats type variables fixed by the owner specialization as evidence, not as

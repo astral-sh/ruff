@@ -715,6 +715,31 @@ LaxNestedList(value=1)  # error: [invalid-argument-type]
 LaxNestedList(value=[1, [2, None]])
 ```
 
+Implicit recursive aliases also retain their outer input requirements in lax mode, including when
+recursive specializations grow. As with PEP 695 aliases above, nested recursive values are currently
+approximated by `Any` during input conversion.
+
+```py
+from typing import TypeVar
+
+Tree = int | list["Tree"]
+T = TypeVar("T")
+Growing = T | list["Growing[list[T]]"]
+
+class LaxTree(BaseModel):
+    value: Tree
+
+class LaxGrowing(BaseModel):
+    value: Growing[int]
+
+LaxTree(value="1")
+LaxTree(value=["1", [2]])
+LaxTree(value=object())  # error: [invalid-argument-type]
+LaxGrowing(value="1")
+LaxGrowing(value=[[1]])
+LaxGrowing(value=object())  # error: [invalid-argument-type]
+```
+
 We support validation of `JsonValue` fields in lax mode:
 
 ```py

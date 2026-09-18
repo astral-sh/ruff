@@ -1364,7 +1364,7 @@ fn ordinary_files_do_not_initialize_scripts() -> anyhow::Result<()> {
     assert_cmd_snapshot!(
         case.command()
             .arg("ordinary.py")
-            .env(EnvVars::TY_UV, "1")
+            .env(EnvVars::TY_UV, "scripts")
             .env(EnvVars::UV, "missing-uv-executable"),
         @"
     success: true
@@ -1417,7 +1417,7 @@ fn excluded_scripts_do_not_initialize_their_environments() -> anyhow::Result<()>
         case.command()
             .arg(".")
             .args(["--config-file", "ty.toml"])
-            .env(EnvVars::TY_UV, "1")
+            .env(EnvVars::TY_UV, "scripts")
             .env(EnvVars::UV, "missing-uv-executable"),
         @"
     success: true
@@ -1479,7 +1479,7 @@ mod uv_metadata {
         # requires-python = ">=3.12"
         # dependencies = ["attrs==25.4.0"]
         # [tool.ty.environment]
-        # python-version = "3.10"
+        # python-version = "3.11"
         # ///
 
         import sys
@@ -1493,8 +1493,7 @@ mod uv_metadata {
         reveal_type(User(1).value)
         reveal_type(sys.version_info[:2])
         "#,
-        )?
-        .with_filter(r"Literal\[(?:1[2-9]|[2-9][0-9])\]", "Literal[<uv-minor>]");
+        )?;
 
         assert_cmd_snapshot!(command_with_script_uv(&case).arg("script.py"), @"
         success: true
@@ -1510,7 +1509,7 @@ mod uv_metadata {
           --> script.py:18:13
            |
         18 | reveal_type(sys.version_info[:2])
-           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[<uv-minor>]]`
+           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[11]]`
 
         Found 2 diagnostics
 
@@ -1520,7 +1519,7 @@ mod uv_metadata {
         assert_cmd_snapshot!(
             command_with_script_uv(&case)
                 .arg("script.py")
-                .args(["--python-version", "3.11"]),
+                .args(["--python-version", "3.12"]),
             @"
         success: true
         exit_code: 0
@@ -1535,7 +1534,7 @@ mod uv_metadata {
           --> script.py:18:13
            |
         18 | reveal_type(sys.version_info[:2])
-           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[11]]`
+           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[12]]`
 
         Found 2 diagnostics
 
@@ -1691,12 +1690,13 @@ mod uv_metadata {
                 from typing import Literal, assert_type
 
                 foo = 1
-                assert_type(sys.version_info[:2], tuple[Literal[3], Literal[12]])
+                assert_type(sys.version_info[:2], tuple[Literal[3], Literal[11]])
                 "#,
             ),
         ])?;
 
-        // The script uses uv's Python version even when its importer is checked first.
+        // Same as for regular projects. An explicit `python-version` takes precedence
+        // over a `requires-python` constraint.
         assert_cmd_snapshot!(
             command_with_script_uv(&case)
                 .args(["a.py", "b.py"])
@@ -1769,6 +1769,7 @@ mod uv_metadata {
         assert_cmd_snapshot!(
             command_with_script_uv(&case)
                 .args(["first.py", "second.py"])
+                .env(EnvVars::TY_UV, "scripts")
                 .env(EnvVars::TY_MAX_PARALLELISM, "1"),
             @"
         success: true
@@ -1811,6 +1812,9 @@ mod uv_metadata {
 
         // The CLI environment selects uv's interpreter, but the script's dependencies must still
         // come from the separate environment that uv creates for the script.
+        // As for projects, `requires-python` takes precedence over the virtual environment because
+        // it defines the minimum Python version the script must support. This allows ty to detect
+        // accidental use of newer language features.
         let environment = case.root().join(".venv");
         let output = Command::new("uv")
             .env_clear()
@@ -1843,7 +1847,7 @@ mod uv_metadata {
           --> scripts/script.py:16:13
            |
         16 | reveal_type(sys.version_info[:2])
-           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[12]]`
+           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[11]]`
 
         Found 2 diagnostics
 

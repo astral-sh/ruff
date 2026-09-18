@@ -244,7 +244,22 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             function: FunctionType<'db>,
         ) -> FunctionType<'db> {
-            FunctionType::new(db, function.literal(db), None)
+            function.without_updated_signatures(db)
+        }
+
+        fn upcast_bound_method<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            method: BoundMethodType<'db>,
+            visitor: &UpcastingVisitor<'db>,
+        ) -> BoundMethodType<'db> {
+            method
+                .with_func(db, upcast(db, env, method.func(db), visitor).ty)
+                .with_constrained_receiver(
+                    db,
+                    upcast(db, env, method.self_instance(db), visitor).ty,
+                    method.signature_receiver(db),
+                )
         }
 
         fn upcast_property<'db>(
@@ -295,6 +310,14 @@ impl<'db> Type<'db> {
             visitor: &UpcastingVisitor<'db>,
         ) -> UpcastResult<'db> {
             match ty {
+                Type::Recursive(recursive) => visit_type(db, ty, visitor, || {
+                    recursive.map_or(db, env, UpcastResult::unstable(ty), |unfolded| {
+                        upcast(db, env, unfolded, visitor)
+                    })
+                }),
+                Type::RecursiveVar(_) => {
+                    unreachable!("semantic operation on an unbound recursive variable")
+                }
                 Type::TypeAlias(alias) => visit_type(db, ty, visitor, || {
                     upcast(db, env, alias.value_type(db), visitor)
                 }),
@@ -307,24 +330,29 @@ impl<'db> Type<'db> {
                     unspecialized_function(db, function),
                 )),
                 Type::BoundMethod(method) => visit_type(db, ty, visitor, || {
-                    UpcastResult::unstable(Type::BoundMethod(BoundMethodType::from_callable(
-                        db,
-                        upcast(db, env, method.func(db), visitor).ty,
-                        upcast(db, env, method.self_instance(db), visitor).ty,
-                        method.signature_receiver(db),
+                    UpcastResult::unstable(Type::BoundMethod(upcast_bound_method(
+                        db, env, method, visitor,
                     )))
                 }),
                 Type::KnownBoundMethod(method) => visit_type(db, ty, visitor, || {
                     let (method, retention) = match method {
                         KnownBoundMethodType::FunctionTypeDunderGet(function) => (
-                            KnownBoundMethodType::FunctionTypeDunderGet(unspecialized_function(
-                                db, function,
+                            KnownBoundMethodType::FunctionTypeDunderGet(InternedType::new(
+                                db,
+                                upcast(db, env, function.inner(db), visitor).ty,
                             )),
                             NegativeRetention::Unstable,
                         ),
-                        KnownBoundMethodType::FunctionTypeDunderCall(function) => (
-                            KnownBoundMethodType::FunctionTypeDunderCall(unspecialized_function(
-                                db, function,
+                        KnownBoundMethodType::DunderCall(callable) => (
+                            KnownBoundMethodType::DunderCall(InternedType::new(
+                                db,
+                                upcast(db, env, callable.inner(db), visitor).ty,
+                            )),
+                            NegativeRetention::Unstable,
+                        ),
+                        KnownBoundMethodType::MethodTypeDunderGet(method) => (
+                            KnownBoundMethodType::MethodTypeDunderGet(upcast_bound_method(
+                                db, env, method, visitor,
                             )),
                             NegativeRetention::Unstable,
                         ),
@@ -916,27 +944,31 @@ fn infer_binary_type_comparison_inner<'db>(
             }),
         ),
 
-        (Type::TypeAlias(alias), right) => Some(visitor.visit(db, (left, op, right), || {
-            infer_binary_type_comparison_inner(
-                context,
-                alias.value_type(db),
-                op,
-                right,
-                range,
-                visitor,
-            )
-        })),
+        (Type::TypeAlias(_) | Type::Recursive(_), right) => {
+            Some(visitor.visit(db, (left, op, right), || {
+                infer_binary_type_comparison_inner(
+                    context,
+                    left.resolve_type_alias(db),
+                    op,
+                    right,
+                    range,
+                    visitor,
+                )
+            }))
+        }
 
-        (left, Type::TypeAlias(alias)) => Some(visitor.visit(db, (left, op, right), || {
-            infer_binary_type_comparison_inner(
-                context,
-                left,
-                op,
-                alias.value_type(db),
-                range,
-                visitor,
-            )
-        })),
+        (left, Type::TypeAlias(_) | Type::Recursive(_)) => {
+            Some(visitor.visit(db, (left, op, right), || {
+                infer_binary_type_comparison_inner(
+                    context,
+                    left,
+                    op,
+                    right.resolve_type_alias(db),
+                    range,
+                    visitor,
+                )
+            }))
+        }
 
         // `try_dunder` works for almost all `NewType`s, but not for `NewType`s of `float` and
         // `complex`, where the concrete base type is a union. In that case it turns out the

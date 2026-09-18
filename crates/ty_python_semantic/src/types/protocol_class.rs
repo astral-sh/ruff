@@ -32,7 +32,7 @@ use crate::{
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
         generics::Specialization,
-        signatures::walk_signature,
+        signatures::{CallableSignature, walk_signature},
         variance::infer_protocol_variance,
     },
 };
@@ -180,7 +180,12 @@ impl<'db> ProtocolClass<'db> {
             }
 
             for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations() {
-                let place_result = place_from_declarations(db, env, declarations);
+                let place_result = place_from_declarations(db, env, declarations)
+                    .with_imported_final(
+                        db,
+                        env,
+                        use_def_map.end_of_scope_imported_final_candidates(symbol_id.into()),
+                    );
                 let first_declaration = place_result.first_declaration;
                 let place = place_result.ignore_conflicting_declarations();
                 if let Some(ty) = place.place.ignore_possibly_undefined() {
@@ -2488,9 +2493,31 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .when_some_and(db, self.constraints, |callables| {
                     callables.iter().when_all(db, self.constraints, |callable| {
                         if callable.is_function_like(db) {
+                            // Require a positional receiver before binding: a zero-argument static
+                            // method otherwise loses no parameters while the protocol loses `self`.
+                            let signatures = CallableSignature::from_overloads(
+                                callable
+                                    .signatures(db)
+                                    .iter()
+                                    .filter(|signature| {
+                                        let parameters = signature.parameters();
+                                        parameters.get_positional(0).is_some()
+                                            || parameters.variadic().is_some()
+                                    })
+                                    .map(|signature| {
+                                        signature.bind_self(
+                                            db,
+                                            env,
+                                            Some(implementation_self_binding_ty),
+                                        )
+                                    }),
+                            );
+                            if signatures.overloads.is_empty() {
+                                return self.never();
+                            }
                             self.check_callable_pair(
                                 db,
-                                callable.bind_self(db, env, Some(implementation_self_binding_ty)),
+                                callable.with_signatures(db, signatures),
                                 protocol_bind_self(
                                     db,
                                     env.program(db),

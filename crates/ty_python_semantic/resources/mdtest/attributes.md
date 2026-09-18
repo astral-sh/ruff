@@ -2975,29 +2975,10 @@ def _(a_and_b: Intersection[type[A], type[B]]):
     a_and_b.x = R()
 ```
 
-### Method binding uses the full intersection type
-
-For `Intersection[A, B]`, member lookup searches `A` and `B` separately to find the method. Once
-found, however, `Self` must be bound using the full `A & B` receiver.
-
-```py
-from typing_extensions import Self
-from ty_extensions import Intersection
-
-class A:
-    def method(self) -> Self:
-        return self
-
-class B: ...
-
-def _(a_and_b: Intersection[A, B]):
-    reveal_type(a_and_b.method())  # revealed: A & B
-```
-
 ### Descriptor binding uses the full intersection type
 
-Descriptors found while searching the individual elements of an intersection must also be bound
-using the full intersection as the receiver.
+Descriptors found while searching the individual elements of an intersection use the full
+intersection as the receiver.
 
 ```py
 from typing import TypeVar
@@ -3014,8 +2995,9 @@ class A:
 
 class B: ...
 
-def _(a_and_b: Intersection[A, B]):
+def _(a_and_b: Intersection[A, B], b_and_a: Intersection[B, A]):
     reveal_type(a_and_b.desc)  # revealed: A & B
+    reveal_type(b_and_a.desc)  # revealed: B & A
 ```
 
 ### Negation types

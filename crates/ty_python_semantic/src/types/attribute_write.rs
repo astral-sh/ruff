@@ -1,4 +1,4 @@
-//! Attribute-write resolution shared by assignment inference and protocol compatibility.
+//! Attribute-write resolution shared by assignment inference, protocol compatibility, and variance.
 //!
 //! This module resolves the Python lookup semantics for `object.attribute = value` into an
 //! [`AttributeWriteRequirement`]. The requirement retains alternatives such as union elements,
@@ -278,6 +278,9 @@ pub(super) fn attribute_write_requirement<'db>(
     attribute: &str,
 ) -> AttributeWriteRequirement<'db> {
     match object_ty {
+        Type::RecursiveVar(_) => {
+            unreachable!("semantic operation on an unbound recursive variable")
+        }
         Type::Union(union) => AttributeWriteRequirement::All {
             object_ty,
             element_tys: union.elements(db),
@@ -301,6 +304,12 @@ pub(super) fn attribute_write_requirement<'db>(
         Type::TypeAlias(alias) => {
             attribute_write_requirement(db, env, alias.value_type(db), attribute)
         }
+        Type::Recursive(recursive) => recursive.map_or(
+            db,
+            env,
+            AttributeWriteRequirement::Unconstrained,
+            |unfolded| attribute_write_requirement(db, env, unfolded, attribute),
+        ),
 
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
             AttributeWriteRequirement::CannotAssign
@@ -733,6 +742,12 @@ fn effective_write_type<'db>(
     attribute: &str,
     attr_ty: Type<'db>,
 ) -> Type<'db> {
+    // An instance shadows a staticmethod with the function returned by its getter.
+    if matches!(object_ty, Type::NominalInstance(_))
+        && attr_ty.function_like_kind(db) == Some(CallableTypeKind::StaticMethodLike)
+    {
+        return attr_ty.underlying_function(db);
+    }
     if let Type::NominalInstance(instance) = object_ty
         && let Some(converter_ty) = instance
             .class(db, env)
@@ -873,6 +888,9 @@ pub(super) fn assignment_attribute_members<'db>(
     );
     let receiver_fallback = if needs_receiver_fallback {
         Some(match object_ty {
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
             | Type::LiteralValue(..)
@@ -902,6 +920,7 @@ pub(super) fn assignment_attribute_members<'db>(
             Type::Union(..)
             | Type::Intersection(..)
             | Type::TypeAlias(..)
+            | Type::Recursive(_)
             | Type::Dynamic(..)
             | Type::Divergent(_)
             | Type::Never

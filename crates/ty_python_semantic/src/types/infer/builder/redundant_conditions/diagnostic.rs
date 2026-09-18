@@ -23,7 +23,6 @@ use ty_python_core::{
     definition::DefinitionKind,
     place::PlaceExpr,
     predicate::{Predicate, PredicateNode},
-    scope::{NodeWithScopeKind, ScopeKind},
 };
 
 use crate::{
@@ -31,6 +30,7 @@ use crate::{
     importer::ImportRequest,
     place::{Place, PlaceAndQualifiers},
     place_load::{PlaceLoadMode, PlaceLoadResolutionStep, resolve_place_load},
+    reachability::is_range_reachable,
     types::{
         KnownClass, LintDiagnosticGuard, LintDiagnosticGuardBuilder, MemberLookupPolicy, Type,
         TypeContext,
@@ -38,7 +38,12 @@ use crate::{
         diagnostic::typing_module_for_fix,
         enum_metadata,
         function::KnownFunction,
-        infer::TypeInferenceBuilder,
+        infer::{
+            TypeInferenceBuilder,
+            builder::redundant_conditions::{
+                SuiteExitKind, is_trivial_statement, suite_ends_with_exit,
+            },
+        },
         infer_definition_types, infer_scope_types,
         narrow::{NarrowingConstraint, infer_narrowing_constraints},
         signatures::CallableSignature,
@@ -56,7 +61,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         #[derive(Debug)]
         enum FunctionInfo<'db> {
             Function(&'db CallableSignature<'db>, &'db str),
-            Method(&'db CallableSignature<'db>, Cow<'db, str>),
+            Method(&'db CallableSignature<'db>, Option<Cow<'db, str>>),
             Lambda(&'db CallableSignature<'db>),
         }
 
@@ -81,7 +86,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self {
                     FunctionInfo::Function(_, name) => write!(f, "Function `{name}`"),
-                    FunctionInfo::Method(_, name) => write!(f, "Method `{name}`"),
+                    FunctionInfo::Method(_, Some(name)) => write!(f, "Method `{name}`"),
+                    FunctionInfo::Method(_, None) => write!(f, "Method"),
                     FunctionInfo::Lambda(_) => write!(f, "Function object"),
                 }
             }
@@ -105,10 +111,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         let annotate_inferred_type = |diagnostic: &mut LintDiagnosticGuard| {
-            diagnostic.set_primary_annotation_message(format_args!(
-                "Inferred type is `{}`",
-                test_type.display(db, env)
-            ));
+            if test_type.is_bool_literal() || test_type.bool(db, env).is_ambiguous() {
+                diagnostic.set_primary_annotation_message(format_args!(
+                    "Inferred type is `{}`",
+                    test_type.display(db, env)
+                ));
+            } else {
+                let is_truthy = if *is_truthy { "truthy" } else { "falsy" };
+                diagnostic.set_primary_annotation_message(format_args!(
+                    "Inferred type `{}` is always {is_truthy}",
+                    test_type.display(db, env)
+                ));
+            }
         };
 
         let describe_condition = |diagnostic: &mut LintDiagnosticGuard| {
@@ -206,18 +220,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     function.signature(db),
                     function.name(db),
                 )),
-                Type::BoundMethod(method) if let Some(function) = method.function(db) => {
+                Type::BoundMethod(method) if let Some(signatures) = method.bound_signatures(db) => {
                     Some(FunctionInfo::Method(
-                        function.bound_signatures(
-                            db,
-                            method.signature_receiver(db),
-                            method.typing_self_type(db),
-                        ),
-                        CallableDescription::defining_class(db, *test_type)
-                            .map(|class| {
-                                Cow::Owned(format!("{}.{}", class.name(db), function.name(db)))
-                            })
-                            .unwrap_or(Cow::Borrowed(&**function.name(db))),
+                        signatures,
+                        method.function(db).map(|function| {
+                            CallableDescription::defining_class(db, *test_type)
+                                .map(|class| {
+                                    Cow::Owned(format!("{}.{}", class.name(db), function.name(db)))
+                                })
+                                .unwrap_or(Cow::Borrowed(&**function.name(db)))
+                        }),
                     ))
                 }
                 Type::Callable(callable) if callable.is_function_like(db) => {
@@ -455,18 +467,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut diagnostic = builder.into_diagnostic("Condition is always truthy");
                 add_always_truthy_concise_message(&mut diagnostic);
                 annotate_inferred_type(&mut diagnostic);
-                if test_type.try_await(db, env).is_ok() && self.can_await_here(test) {
+                if test_type.try_await(db, env).is_ok()
+                    && let Some(fix) = self.await_expression_fix(test)
+                {
                     diagnostic.help("Did you mean to `await` this expression?");
-
-                    let fix = if test.precedence() <= ast::OperatorPrecedence::Await {
-                        Fix::unsafe_edits(
-                            Edit::insertion("await (".to_string(), test.start()),
-                            [Edit::insertion(")".to_string(), test.end())],
-                        )
-                    } else {
-                        Fix::unsafe_edit(Edit::insertion("await ".to_string(), test.start()))
-                    };
-
                     diagnostic.set_fix(fix);
                 } else if let Type::NominalInstance(instance) = test_type {
                     let class = instance.class(db, env);
@@ -794,103 +798,311 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    /// Returns `true` if adding `await` at `expression` would produce valid Python.
+    /// Return a [`TextRange`] spanning from `branch_start` up to and including
+    /// the offset of the first newline character after the start of `first_statement`.
     ///
-    /// Accounts for asynchronous functions, notebook cells, annotation restrictions, enclosing
-    /// scopes, and the different scoping behavior of comprehensions and generator expressions.
-    fn can_await_here(&self, expression: &ast::Expr) -> bool {
-        let Some(expression_scope) = self.index.try_expression_scope_id(expression) else {
-            return false;
-        };
-        let annotation_parent_scope = self
-            .index
-            .annotation_parent_scope_id(self.module(), expression);
-
-        let db = self.db();
-
-        let mut in_eager_comprehension = false;
-
-        for (scope_id, scope) in self.index.ancestor_scopes(expression_scope) {
-            // The first iterable of a comprehension stays in the annotation's enclosing scope.
-            // Eager comprehensions also inherit the restriction, but a generator body can allow
-            // `await` before we reach the scope enclosing its annotation.
-            // Conservatively reject annotations on every Python version, even though some allow
-            // `await` before Python 3.14 without `from __future__ import annotations`. Avoiding
-            // invalid syntax matters more than offering every possible fix in this rare context.
-            if Some(scope_id) == annotation_parent_scope {
-                return false;
-            }
-
-            // Before Python 3.11, awaiting in a nested list, set, or dict comprehension cannot
-            // implicitly make its containing comprehension or generator expression asynchronous.
-            if in_eager_comprehension
-                && scope.kind() == ScopeKind::Comprehension
-                && self.program_environment().python_version(db) < PythonVersion::PY311
-                && !scope_id.is_async_comprehension(self.index)
-            {
-                return false;
-            }
-
-            match scope.node() {
-                NodeWithScopeKind::Function(function) => {
-                    return function.node(self.module()).is_async;
-                }
-                NodeWithScopeKind::Lambda(_)
-                | NodeWithScopeKind::Class(_)
-                | NodeWithScopeKind::ClassTypeParameters(_)
-                | NodeWithScopeKind::FunctionTypeParameters(_)
-                | NodeWithScopeKind::TypeAliasTypeParameters(_)
-                | NodeWithScopeKind::TypeAlias(_) => {
-                    return false;
-                }
-                NodeWithScopeKind::GeneratorExpression(_) => {
-                    return true;
-                }
-                NodeWithScopeKind::Module => {
-                    return source_text(db, self.file()).is_notebook();
-                }
-                NodeWithScopeKind::DictComprehension(_)
-                | NodeWithScopeKind::ListComprehension(_)
-                | NodeWithScopeKind::SetComprehension(_) => {
-                    in_eager_comprehension = true;
-                }
-            }
-        }
-
-        false
+    /// For example, given this code:
+    ///
+    /// ```py
+    /// if foo:                       # line 1
+    ///     pass                      # line 2
+    /// elif bar:                     # line 3
+    ///     for i in range(10):       # line 4
+    ///         for j in range(5):    # line 5
+    ///             pass              # line 6
+    /// ```
+    ///
+    /// if this method is passed `branch_start` pointing to the start of the `elif`
+    /// node on line 3, and `first_statement` pointing to the start of the `for` loop
+    /// on line 4, this method would return a [`TextRange`] spanning from the start of
+    /// line 3 up to the end of line 4.
+    fn branch_range_until_first_newline(
+        &self,
+        branch_start: TextSize,
+        first_statement: &ast::Stmt,
+    ) -> TextRange {
+        TextRange::new(
+            branch_start,
+            source_text(self.db(), self.file()).line_end(first_statement.start()),
+        )
     }
 
-    pub(super) fn annotate_redundant_if_or_elif(
+    fn is_unreachable(&self, stmt: &ast::Stmt) -> bool {
+        !is_range_reachable(
+            self.db(),
+            self.index,
+            self.scope().file_scope_id(self.db()),
+            stmt.range(),
+        )
+    }
+
+    pub(super) fn add_secondary_annotations_for_redundant_while(
+        &self,
+        diagnostic: &mut Diagnostic,
+        full_condition_truthiness: Truthiness,
+        while_statement: &ast::StmtWhile,
+        following_suite: &[ast::Stmt],
+    ) {
+        if full_condition_truthiness.is_always_true() {
+            let mut else_branch_is_unreachable = false;
+
+            if let Some(stmt) = first_nontrivial_statement(&while_statement.orelse)
+                && self.is_unreachable(stmt)
+            {
+                // E.g. for
+                //
+                // ```py
+                // def example(nonempty: tuple[int, int]):
+                //     while nonempty:
+                //         break
+                //     else:
+                //         print("unreachable")
+                // ```
+                //
+                // Since `nonempty` is always truthy, the loop can *only* ever terminate due to
+                // control flow encountering a `break` statement in the loop body. This means
+                // that the `else` suite is unreachable, since `else` suites for `while` and `for`
+                // statements are *only* executed if the control flow never hit a `break`.
+                diagnostic.annotate(
+                    self.context
+                        .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                        .message("This statement is unreachable"),
+                );
+                else_branch_is_unreachable = true;
+            }
+
+            if !suite_ends_with_exit(self, following_suite, SuiteExitKind::Defensive)
+                && let Some(stmt) = first_nontrivial_statement(following_suite)
+                && self.is_unreachable(stmt)
+            {
+                // E.g. in both cases here, the statement after the `while` loop is unreachable:
+                // the loop condition is always truthy and the loop contains no `break`, so it
+                // can never terminate.
+                //
+                // ```py
+                // def example(nonempty: tuple[int, int]):
+                //     while nonempty:
+                //         print("loop body")
+                //
+                //     print("unreachable")
+                //
+                // def example2(nonempty: tuple[int, int]):
+                //     while nonempty:
+                //         print("loop body")
+                //     else:
+                //         print("unreachable else")
+                //
+                //     print("unreachable following statement")
+                // ```
+                diagnostic.annotate(
+                    self.context
+                        .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                        .message(if else_branch_is_unreachable {
+                            "This following statement is also unreachable"
+                        } else {
+                            "This following statement is unreachable"
+                        }),
+                );
+            }
+        } else if full_condition_truthiness.is_always_false()
+            && let Some(stmt) = first_nontrivial_statement(&while_statement.body)
+            && self.is_unreachable(stmt)
+        {
+            // The body of the `while` loop here is unreachable due to the condition being always falsy:
+            //
+            // ```py
+            // def example(empty: tuple[()]):
+            //     while empty:
+            //         print("unreachable")
+            // ```
+            diagnostic.annotate(
+                self.context
+                    .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                    .message("This statement is unreachable"),
+            );
+        }
+    }
+
+    pub(super) fn add_secondary_annotations_for_redundant_assert(
+        &self,
+        diagnostic: &mut Diagnostic,
+        full_condition_truthiness: Truthiness,
+        following_suite: &[ast::Stmt],
+    ) {
+        if full_condition_truthiness.is_always_false()
+            && let Some(stmt) = first_nontrivial_statement(following_suite)
+            && self.is_unreachable(stmt)
+        {
+            diagnostic.annotate(
+                self.context
+                    .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                    .message("This following statement is unreachable"),
+            );
+        }
+    }
+
+    pub(super) fn add_secondary_annotations_for_redundant_match(
+        &self,
+        diagnostic: &mut Diagnostic,
+        full_condition_truthiness: Truthiness,
+        case: &ast::MatchCase,
+        following_cases: &[ast::MatchCase],
+    ) {
+        if full_condition_truthiness.is_always_true()
+            && case.pattern.is_irrefutable()
+            && let Some((next_case, stmt)) = following_cases
+                .iter()
+                .find_map(|case| first_nontrivial_statement(&case.body).map(|stmt| (case, stmt)))
+            && self.is_unreachable(stmt)
+        {
+            // The second `case` branch here is unreachable because the first `case`
+            // has an irrefutable pattern with an always-truthy guard:
+            //
+            // ```py
+            // def example(value: object, nonempty: tuple[int, int]):
+            //     match value:
+            //         case _ if nonempty:
+            //             print("selected")
+            //         case str():
+            //             print("unreachable")
+            // ```
+            diagnostic.annotate(
+                self.context
+                    .secondary(self.branch_range_until_first_newline(next_case.start(), stmt))
+                    .message("This following branch is unreachable"),
+            );
+        } else if full_condition_truthiness.is_always_false()
+            && let Some(stmt) = first_nontrivial_statement(&case.body)
+            && self.is_unreachable(stmt)
+        {
+            // The `case` body here is unreachable due to the always-falsy guard:
+            //
+            // ```py
+            // def example(value: object, empty: tuple[()]):
+            //     match value:
+            //         case str() if empty:
+            //             print("unreachable")
+            // ```
+            diagnostic.annotate(
+                self.context
+                    .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                    .message("This statement is unreachable"),
+            );
+        }
+    }
+
+    pub(super) fn add_secondary_annotations_for_redundant_if_or_elif(
         &self,
         condition: &RedundantCondition<'_, 'db>,
         diagnostic: &mut Diagnostic,
+        full_condition_truthiness: Truthiness,
         if_stmt: &ast::StmtIf,
+        branch_index: usize,
+        following_suite: &[ast::Stmt],
     ) {
+        if full_condition_truthiness.is_ambiguous() {
+            return;
+        }
+
         let RedundantCondition {
             expression: test,
             value_type: _,
-            is_truthy,
+            is_truthy: _,
             kind,
         } = condition;
 
-        if *is_truthy
-            && *kind == ConditionKind::Boolean
-            && let Some(clause) = if_stmt.elif_else_clauses.last()
-            && clause.test.as_ref() == Some(test)
-            && !diagnostic.has_applicable_fix(Applicability::DisplayOnly)
-        {
-            if let Some(fix) = self.add_assert_never_else(clause, test) {
-                diagnostic.help("Add an `else` branch that calls `assert_never`");
-                diagnostic.set_fix(fix);
-            } else {
-                diagnostic.help(
-                    "Replace this `elif` with an `else` branch \
-                that asserts the condition to be `True`",
+        let if_elif_else_suites: Vec<&[ast::Stmt]> = std::iter::once(&*if_stmt.body)
+            .chain(if_stmt.elif_else_clauses.iter().map(|clause| &*clause.body))
+            .collect();
+
+        if full_condition_truthiness.is_always_true() {
+            let mut implicit_else_is_unreachable = false;
+
+            // The branch index includes the initial `if`, but `elif_else_clauses` does not.
+            if let Some((next_branch, stmt)) = if_stmt.elif_else_clauses[branch_index..]
+                .iter()
+                .find_map(|clause| {
+                    first_nontrivial_statement(&clause.body).map(|stmt| (clause, stmt))
+                })
+                && self.is_unreachable(stmt)
+            {
+                // The `elif` branch here is unreachable because the preceding `if` condition is always true:
+                //
+                // ```py
+                // def example(nonempty: tuple[int, int], flag: bool):
+                //     if nonempty:
+                //         print("selected")
+                //     elif flag:
+                //         print("unreachable")
+                // ```
+                diagnostic.annotate(
+                    self.context
+                        .secondary(self.branch_range_until_first_newline(next_branch.start(), stmt))
+                        .message("This following branch is unreachable"),
                 );
-                if let Some(fix) = self.replace_redundant_elif_with_assertion(clause, test) {
+            } else if branch_index == if_stmt.elif_else_clauses.len()
+                && if_elif_else_suites
+                    .iter()
+                    .all(|suite| suite_ends_with_exit(self, suite, SuiteExitKind::Any))
+                && !suite_ends_with_exit(self, following_suite, SuiteExitKind::Defensive)
+                && let Some(stmt) = first_nontrivial_statement(following_suite)
+                && self.is_unreachable(stmt)
+            {
+                // The suite following the `if`/`elif`/`else` chain here is unreachable because the final
+                // condition in the chain is always true, and every branch exits.
+                // This leaves no path to the following suite:
+                //
+                // ```py
+                // def example(value: int | str):
+                //     if isinstance(value, int):
+                //         return
+                //     elif isinstance(value, str):
+                //         return
+                //
+                //     print("unreachable")
+                // ```
+                implicit_else_is_unreachable = true;
+                diagnostic.annotate(
+                    self.context
+                        .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                        .message("This following statement is unreachable"),
+                );
+            }
+
+            if !implicit_else_is_unreachable
+                && *kind == ConditionKind::Boolean
+                && let Some(clause) = if_stmt.elif_else_clauses.last()
+                && clause.test.as_ref() == Some(test)
+                && !diagnostic.has_applicable_fix(Applicability::DisplayOnly)
+            {
+                if let Some(fix) = self.add_assert_never_else(clause, test) {
+                    diagnostic.help("Add an `else` branch that calls `assert_never`");
                     diagnostic.set_fix(fix);
+                } else {
+                    diagnostic.help(
+                        "Replace this `elif` with an `else` branch \
+                        that asserts the condition to be `True`",
+                    );
+                    if let Some(fix) = self.replace_redundant_elif_with_assertion(clause, test) {
+                        diagnostic.set_fix(fix);
+                    }
                 }
             }
+        } else if let Some(stmt) = first_nontrivial_statement(if_elif_else_suites[branch_index])
+            && self.is_unreachable(stmt)
+        {
+            // The `if` body here is unreachable because the condition is always false:
+            //
+            // ```py
+            // def example(empty: tuple[()]):
+            //     if empty:
+            //         print("unreachable")
+            // ```
+            diagnostic.annotate(
+                self.context
+                    .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                    .message("This statement is unreachable"),
+            );
         }
     }
 
@@ -1117,4 +1329,11 @@ fn logical_line_end(source: &str, tokens: &Tokens, offset: TextSize) -> TextSize
         .iter()
         .find(|token| token.kind() == TokenKind::Newline)
         .map_or_else(|| source.full_line_end(offset), Ranged::end)
+}
+
+/// Return the first "nontrivial" statement in `suite`, if any.
+///
+/// See [`is_trivial_statement`] for the definition of a trivial statement.
+fn first_nontrivial_statement(suite: &[ast::Stmt]) -> Option<&ast::Stmt> {
+    suite.iter().find(|stmt| !is_trivial_statement(stmt))
 }

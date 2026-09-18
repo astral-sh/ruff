@@ -28,6 +28,7 @@ use crate::{
         Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
         SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance, TypingModule,
         UnionBuilder, UnionType,
+        attribute_write::DescriptorSetterDomain,
         bound_super::BoundSuperType,
         call::{CallError, CallErrorKind},
         callable::CallableTypeKind,
@@ -52,7 +53,7 @@ use crate::{
         signatures::CallableSignature,
         tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, TypedDictType, typed_dict_params_from_class_def},
-        variance::{VarianceInferable, VarianceOrigin, VarianceTerm},
+        variance::{MemberVariance, VarianceInferable, VarianceOrigin, VarianceTerm},
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
 };
@@ -2948,8 +2949,13 @@ impl<'db> StaticClassLiteral<'db> {
             let use_def = use_def_map(db, body_scope);
 
             let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
-            let declared_and_qualifiers =
-                place_from_declarations(db, env, declarations).ignore_conflicting_declarations();
+            let declared_and_qualifiers = place_from_declarations(db, env, declarations)
+                .with_imported_final(
+                    db,
+                    env,
+                    use_def.end_of_scope_imported_final_candidates(symbol_id.into()),
+                )
+                .ignore_conflicting_declarations();
 
             match declared_and_qualifiers {
                 PlaceAndQualifiers {
@@ -3479,7 +3485,7 @@ impl<'db> StaticClassLiteral<'db> {
                     RequiresExplicitReExport::No,
                     ConsideredDefinitions::EndOfScope,
                 );
-                Some((name.to_string(), place_and_qualifiers))
+                Some((name.to_string(), place_and_qualifiers, true))
             });
 
         // Dataclasses can have some additional synthesized methods (`__eq__`, `__hash__`,
@@ -3498,14 +3504,15 @@ impl<'db> StaticClassLiteral<'db> {
             })
             .dedup();
 
+        let receiver = self.variance_receiver(db, &env);
         let attribute_variances = attribute_names
             .map(|name| {
                 let place_and_quals = self.own_instance_member(db, &env, &name).inner;
-                (name, place_and_quals)
+                (name, place_and_quals, false)
             })
             .chain(attribute_places_and_qualifiers)
             .dedup()
-            .filter_map(|(name, place_and_qual)| {
+            .filter_map(|(name, place_and_qual, is_class_member)| {
                 place_and_qual.ignore_possibly_undefined().map(|ty| {
                     let variance = if place_and_qual
                         .qualifiers
@@ -3530,7 +3537,49 @@ impl<'db> StaticClassLiteral<'db> {
                     } else {
                         default_attribute_variance
                     };
-                    ty.with_polarity(variance).variance_of(db, &env, typevar)
+                    if !is_class_member {
+                        return ty.with_polarity(variance).variance_of(db, &env, typevar);
+                    }
+
+                    if let Type::PropertyInstance(property) = ty {
+                        // A property subclass can also expose mutable state on the descriptor
+                        // itself, independently of its getter and setter.
+                        let instance_variance = property
+                            .instance_fallback(db, &env)
+                            .variance_of(db, &env, typevar);
+                        let accessor_variances = [
+                            property.getter(db),
+                            property.setter(db),
+                            property.deleter(db),
+                        ]
+                        .into_iter()
+                        .flatten()
+                        .map(|accessor| {
+                            MemberVariance::accessor(db, &env, accessor, receiver)
+                                .variance_of(db, &env, typevar)
+                        });
+                        return VarianceTerm::join(
+                            db,
+                            std::iter::once(instance_variance).chain(accessor_variances),
+                        );
+                    }
+                    let member = MemberVariance::of(db, &env, ty, receiver);
+                    let exposed_variance = member.variance_of(db, &env, typevar);
+                    match member.write_domain {
+                        DescriptorSetterDomain::Known(_) => exposed_variance,
+                        // Keep the ordinary attribute contribution when a descriptor's write
+                        // domain cannot be represented, without dropping the known read type.
+                        DescriptorSetterDomain::Deferred => VarianceTerm::join(
+                            db,
+                            [
+                                exposed_variance,
+                                ty.with_polarity(variance).variance_of(db, &env, typevar),
+                            ],
+                        ),
+                        DescriptorSetterDomain::Missing => {
+                            VarianceTerm::from(variance).compose_thunk(db, || exposed_variance)
+                        }
+                    }
                 })
             });
 

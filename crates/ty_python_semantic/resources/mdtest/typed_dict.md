@@ -2529,6 +2529,8 @@ def _(
     # No error here:
     reveal_type(person[unknown_key])  # revealed: Unknown
 
+    # error: [invalid-key] "got key of type `list[RecursiveKey | None]`"
+    # error: [invalid-key] "got key of type `None`"
     reveal_type(movie[recursive_key[0]])  # revealed: Unknown
 
     # error: [invalid-key] "Unknown key "anything" for TypedDict `Animal`"
@@ -2840,7 +2842,7 @@ def _(v: OptionalX | RequiredX) -> None:
     # but this is a terrible error message:
     #
     # error: [call-non-callable] "Object of type `Overload[]` is not callable"
-    reveal_type(v.pop("x"))  # revealed: Unknown
+    reveal_type(v.pop("x"))  # revealed: int | Unknown
 
 def union_pop_with_default(u: OptionalX | OptStrX) -> None:
     # `Literal[0]` is assignable to `int`, so `OptionalX` arm returns `int`; `OptStrX` arm
@@ -4296,6 +4298,58 @@ type AliasNodeChild[T] = AliasNode[T] | None
 
 # TODO: Infer `AliasNode[int]`.
 reveal_type(AliasNode(child=AliasNode(value=1)))  # revealed: AliasNode[Unknown]
+```
+
+### Constructor inference through recursive aliases
+
+A generic `TypedDict` inside a recursive alias does not acquire an incompatible type argument from
+another constructor field. Both alias syntaxes preserve the unresolved outer type argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict, TypeVar
+
+T = TypeVar("T")
+
+class Item[T](TypedDict):
+    value: T
+
+Tree = Item[T] | list["Tree[T]"]
+type ExplicitTree[T] = Item[T] | list[ExplicitTree[T]]
+
+class Box[T](TypedDict):
+    data: Tree[T]
+    marker: T
+
+class ExplicitBox[T](TypedDict):
+    data: ExplicitTree[T]
+    marker: T
+
+reveal_type(Box(data={"value": 1}, marker="x"))  # revealed: Box[Unknown]
+reveal_type(ExplicitBox(data={"value": 1}, marker="x"))  # revealed: ExplicitBox[Unknown]
+reveal_type(Box(data=Item(value=1), marker="x"))  # revealed: Box[Unknown]
+reveal_type(ExplicitBox(data=Item(value=1), marker="x"))  # revealed: ExplicitBox[Unknown]
+```
+
+Aliases whose type arguments change at every recursive step also keep constructor inference
+conservative.
+
+```py
+Growing = tuple[T, "Growing[list[T]] | None"]
+type ExplicitGrowing[T] = tuple[T, ExplicitGrowing[list[T]] | None]
+
+class GrowingBox[T](TypedDict):
+    data: Growing[T]
+
+class ExplicitGrowingBox[T](TypedDict):
+    data: ExplicitGrowing[T]
+
+reveal_type(GrowingBox(data=(1, None)))  # revealed: GrowingBox[Unknown]
+reveal_type(ExplicitGrowingBox(data=(1, None)))  # revealed: ExplicitGrowingBox[Unknown]
 ```
 
 ### Constructor inference from nested values

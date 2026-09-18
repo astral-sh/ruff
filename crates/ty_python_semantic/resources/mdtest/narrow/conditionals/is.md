@@ -154,6 +154,32 @@ def discard_newtype_tag(value: object, user_id: UserId) -> None:
         reveal_type(user_id)  # revealed: UserId
 ```
 
+## `is` with recursive aliases containing `NewType`
+
+A recursive alias can contain a `NewType` tag. Identity establishes that two views share the same
+runtime object, but does not transfer that tag. This applies to both implicit and PEP 695 aliases.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import NewType, Union
+
+UserId = NewType("UserId", int)
+Legacy = Union[UserId, list["Legacy"]]
+type Modern = UserId | list[Modern]
+
+def compare_legacy(value: object, tagged: Legacy):
+    if value is tagged:
+        reveal_type(value)  # revealed: int | list[Legacy]
+
+def compare_modern(value: object, tagged: Modern):
+    if value is tagged:
+        reveal_type(value)  # revealed: int | list[Modern]
+```
+
 ## `is` with unconstrained type variables
 
 An unconstrained type variable can hold a `NewType`. Identity therefore cannot transfer the type

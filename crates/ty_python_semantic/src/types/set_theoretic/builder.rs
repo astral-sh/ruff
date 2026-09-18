@@ -53,7 +53,7 @@ use crate::types::{
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
     StringLiteralType, SubclassOfType, Type, TypePair, TypeVarBoundOrConstraints, UnionType,
 };
-use crate::{Db, FxOrderMap, FxOrderSet, ProgramEnvironment};
+use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
@@ -654,6 +654,7 @@ impl<'db> UnionBuilder<'db> {
 
     /// Adds a type to this union.
     pub(crate) fn add_in_place(&mut self, ty: Type<'db>) {
+        ty.assert_not_recursive_var();
         self.add_in_place_impl(ty, &mut vec![]);
     }
 
@@ -695,13 +696,13 @@ impl<'db> UnionBuilder<'db> {
             }
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
-            Type::TypeAlias(alias) if self.unpack_aliases => {
+            Type::TypeAlias(_) if self.unpack_aliases => {
                 if seen_aliases.contains(&ty) {
                     // Union contains itself recursively via a type alias. This is an error, just
                     // leave out the recursive alias. TODO surface this error.
                 } else {
                     seen_aliases.push(ty);
-                    self.add_in_place_impl(alias.value_type(db), seen_aliases);
+                    self.add_in_place_impl(ty.resolve_type_alias(db), seen_aliases);
                 }
             }
             Type::LiteralValue(literal) => {
@@ -996,7 +997,7 @@ impl<'db> UnionBuilder<'db> {
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery;
+        let should_simplify_full = !ty.is_alias_like() && !self.cycle_recovery;
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
@@ -1077,15 +1078,13 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
+            if should_simplify_full && !element_type.is_alias_like() {
                 // Preserving aliases also excludes comparisons that expand aliases nested in
                 // type arguments. A recursive alias can rebuild this union during specialization.
                 if !self.unpack_aliases
-                    && [ty, element_type].into_iter().any(|ty| {
-                        any_over_type(db, &self.env, ty, false, |ty| {
-                            matches!(ty, Type::TypeAlias(_))
-                        })
-                    })
+                    && [ty, element_type]
+                        .into_iter()
+                        .any(|ty| any_over_type(db, &self.env, ty, false, Type::is_alias_like))
                 {
                     continue;
                 }
@@ -1260,26 +1259,18 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
-    fn empty(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
-        Self {
-            db,
-            env: env.clone(),
-            intersections: vec![],
-            has_disjunction: false,
-        }
-    }
-
-    /// Add DNF branches, dropping those that have already collapsed to `Never` so that later
-    /// union distribution does not multiply dead branches.
-    fn extend<L: IntersectionLimits>(
-        &mut self,
+    /// Add DNF branches, dropping `Never` and duplicate branches so later distribution does not
+    /// multiply dead or repeated branches.
+    fn extend_distributed<L: IntersectionLimits>(
+        &self,
+        distributed: &mut FxIndexSet<InnerIntersectionBuilder<'db>>,
         other: Self,
         check_budget: bool,
     ) -> ControlFlow<L::Break> {
         // Retain the whole first disjunction: a later factor can eliminate all but a few of its
         // alternatives, including alternatives that occur beyond the budget's position.
         if !L::BOUNDED || !check_budget {
-            self.intersections.extend(
+            distributed.extend(
                 other
                     .intersections
                     .into_iter()
@@ -1295,19 +1286,19 @@ impl<'db> IntersectionBuilder<'db> {
             // type variable has no remaining constraints. Those do not consume the budget.
             let candidate_type = candidate.clone().build(db, env);
             if candidate_type.is_never()
-                || self.intersections.iter().any(|old| {
+                || distributed.iter().any(|old| {
                     candidate_type.is_redundant_with(db, env, old.clone().build(db, env))
                 })
             {
                 continue;
             }
-            self.intersections.retain(|old| {
+            distributed.retain(|old| {
                 !old.clone()
                     .build(db, env)
                     .is_redundant_with(db, env, candidate_type)
             });
-            L::check_terms(self.intersections.len() + 1)?;
-            self.intersections.push(candidate);
+            L::check_terms(distributed.len() + 1)?;
+            distributed.insert(candidate);
         }
         ControlFlow::Continue(())
     }
@@ -1356,9 +1347,9 @@ impl<'db> IntersectionBuilder<'db> {
         let mut seen_aliases = FxHashSet::default();
         while let Some((ty, negated)) = pending.pop() {
             match ty {
-                Type::TypeAlias(alias) => {
-                    if seen_aliases.insert((alias, negated)) {
-                        pending.push((alias.value_type(db), negated));
+                Type::TypeAlias(_) | Type::Recursive(_) => {
+                    if seen_aliases.insert((ty, negated)) {
+                        pending.push((ty.resolve_type_alias(db), negated));
                     }
                 }
                 Type::Union(union) => {
@@ -1402,7 +1393,7 @@ impl<'db> IntersectionBuilder<'db> {
     ) -> ControlFlow<L::Break> {
         let db = self.db;
         match ty {
-            Type::TypeAlias(alias) => {
+            Type::TypeAlias(_) | Type::Recursive(_) => {
                 if seen_aliases.contains(&ty) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
@@ -1411,7 +1402,7 @@ impl<'db> IntersectionBuilder<'db> {
                     return ControlFlow::Continue(());
                 }
                 seen_aliases.push(ty);
-                let value_type = alias.value_type(db);
+                let value_type = ty.resolve_type_alias(db);
                 self.add_positive_impl::<L>(value_type, seen_aliases)?;
             }
             Type::Union(union) => {
@@ -1423,13 +1414,13 @@ impl<'db> IntersectionBuilder<'db> {
                 // (T2 & T4)`. If `self` is already a union-of-intersections `(T1 & T2) | (T3 & T4)`
                 // and we add `T5 | T6` to it, that flattens all the way out to `(T1 & T2 & T5) | (T1 &
                 // T2 & T6) | (T3 & T4 & T5) ...` -- you get the idea.
-                let mut distributed = IntersectionBuilder::empty(db, &self.env);
+                let mut distributed = FxIndexSet::default();
                 for elem in union.elements(db) {
                     let mut branch = self.clone();
                     branch.add_positive_impl::<L>(*elem, seen_aliases)?;
-                    distributed.extend::<L>(branch, self.has_disjunction)?;
+                    self.extend_distributed::<L>(&mut distributed, branch, self.has_disjunction)?;
                 }
-                self.intersections = distributed.intersections;
+                self.intersections = distributed.into_iter().collect();
                 self.has_disjunction = true;
             }
             // `(A & B & ~C) & (D & E & ~F)` -> `A & B & D & E & ~C & ~F`
@@ -1474,7 +1465,7 @@ impl<'db> IntersectionBuilder<'db> {
         let db = self.db;
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
-            Type::TypeAlias(alias) => {
+            Type::TypeAlias(_) | Type::Recursive(_) => {
                 if seen_aliases.contains(&ty) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
@@ -1483,7 +1474,7 @@ impl<'db> IntersectionBuilder<'db> {
                     return ControlFlow::Continue(());
                 }
                 seen_aliases.push(ty);
-                let value_type = alias.value_type(db);
+                let value_type = ty.resolve_type_alias(db);
                 self.add_negative_impl::<L>(value_type, seen_aliases)?;
             }
             Type::Union(union) => {
@@ -1499,7 +1490,7 @@ impl<'db> IntersectionBuilder<'db> {
                 // and negative constraints D, then our new intersection
                 // is (existing & ~C) | (existing & D)
 
-                let mut distributed = IntersectionBuilder::empty(db, &self.env);
+                let mut distributed = FxIndexSet::default();
                 // A single negative element can encode double negation. It only introduces a
                 // disjunction if expanding that element does, for example `~~Alias` for a union.
                 let branches = intersection.positive(db).len() + intersection.negative(db).len();
@@ -1510,16 +1501,16 @@ impl<'db> IntersectionBuilder<'db> {
                     let mut branch = self.clone();
                     branch.add_negative_impl::<L>(*elem, &mut seen_aliases.clone())?;
                     has_disjunction |= branch.has_disjunction;
-                    distributed.extend::<L>(branch, check_budget)?;
+                    self.extend_distributed::<L>(&mut distributed, branch, check_budget)?;
                 }
                 // All negative constraints end up becoming positive constraints.
                 for elem in intersection.negative(db) {
                     let mut branch = self.clone();
                     branch.add_positive_impl::<L>(*elem, &mut seen_aliases.clone())?;
                     has_disjunction |= branch.has_disjunction;
-                    distributed.extend::<L>(branch, check_budget)?;
+                    self.extend_distributed::<L>(&mut distributed, branch, check_budget)?;
                 }
-                self.intersections = distributed.intersections;
+                self.intersections = distributed.into_iter().collect();
                 self.has_disjunction = has_disjunction;
             }
             Type::EnumComplement(complement) => {
@@ -1695,7 +1686,7 @@ fn simplify_intersection_pair_impl<'db>(
     IntersectionSimplification::Unchanged
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 struct InnerIntersectionBuilder<'db> {
     positive: FxOrderSet<Type<'db>>,
     negative: NegativeIntersectionElements<'db>,
@@ -2313,7 +2304,7 @@ mod tests {
     use crate::types::type_alias::TypeAliasType;
     use crate::types::{
         BytesLiteralType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
-        StringLiteralType, Truthiness, TypePair,
+        Signature, StringLiteralType, Truthiness, TypePair,
     };
 
     use ruff_db::system::DbWithWritableSystem as _;
@@ -2707,6 +2698,42 @@ mod tests {
 
         assert_eq!(intersection.intersections.len(), 1);
         assert_eq!(intersection.build(), int);
+    }
+
+    #[test]
+    fn build_intersection_deduplicates_dnf_branches() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let callable = Type::single_callable(db, Signature::dynamic(Type::object()));
+        let intersection = IntersectionBuilder::new(db, &env)
+            .add_positive(callable)
+            .add_negative(callable)
+            .build();
+        let negated = intersection.negate(db, &env);
+
+        let mut negative_builder = IntersectionBuilder::new(db, &env);
+        let mut positive_builder = IntersectionBuilder::new(db, &env);
+        for _ in 0..8 {
+            negative_builder.add_negative_in_place(intersection);
+            positive_builder.add_positive_in_place(negated);
+        }
+
+        // A gradual callable C can overlap its negation, so distribution retains C & ~C
+        // alongside C and ~C. Repeating the same clause must not multiply these alternatives.
+        assert!(
+            negative_builder.intersections.len() <= 3,
+            "{:?}",
+            negative_builder.intersections,
+        );
+        assert!(
+            positive_builder.intersections.len() <= 3,
+            "{:?}",
+            positive_builder.intersections,
+        );
+
+        assert!(negative_builder.build().is_equivalent_to(db, &env, negated));
+        assert!(positive_builder.build().is_equivalent_to(db, &env, negated));
     }
 
     #[test]

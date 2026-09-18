@@ -465,6 +465,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         match (left_ty, right_ty, op) {
+            (Type::RecursiveVar(_), _, _) | (_, Type::RecursiveVar(_), _) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             (Type::Union(lhs_union), rhs, _) => state
                 .try_map_union(db, env, lhs_union, |lhs_element, state| {
                     self.infer_binary_expression_type_impl(
@@ -491,6 +494,36 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .ok_or(())
                 })
                 .ok(),
+
+            (Type::Recursive(recursive), rhs, _) => {
+                visitor.visit(db, (left_ty, op, right_ty), || {
+                    recursive.map_or_else(
+                        db,
+                        env,
+                        || None,
+                        |unfolded| {
+                            self.infer_binary_expression_type_impl(
+                                node, unfolded, rhs, op, visitor, state,
+                            )
+                        },
+                    )
+                })
+            }
+
+            (lhs, Type::Recursive(recursive), _) => {
+                visitor.visit(db, (left_ty, op, right_ty), || {
+                    recursive.map_or_else(
+                        db,
+                        env,
+                        || None,
+                        |unfolded| {
+                            self.infer_binary_expression_type_impl(
+                                node, lhs, unfolded, op, visitor, state,
+                            )
+                        },
+                    )
+                })
+            }
 
             (Type::TypeAlias(alias), rhs, _) => visitor.visit(db, (left_ty, op, right_ty), || {
                 self.infer_binary_expression_type_impl(

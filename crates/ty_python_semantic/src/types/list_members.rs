@@ -6,7 +6,9 @@
 //! listing all members in the class's body scope.
 
 use std::cmp::Ordering;
+use std::convert::identity;
 
+use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
@@ -19,7 +21,7 @@ use crate::{
     reachability::ReachabilityConstraintsExtension,
     types::{
         ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, StaticClassLiteral,
-        SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
+        SubclassOfInner, Type, TypeVarBoundOrConstraints, UnionType, class::CodeGeneratorKind,
         function::FunctionType, infer_definition_types, may_exist_at_runtime,
     },
 };
@@ -174,6 +176,9 @@ impl<'db> AllMembers<'db> {
 
     fn extend_with_type(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
         match ty {
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             Type::Union(union) => {
                 fn is_dynamic(db: &dyn Db, ty: Type<'_>) -> bool {
                     // We don't need to use recursion here because
@@ -332,6 +337,11 @@ impl<'db> AllMembers<'db> {
 
             Type::TypeAlias(alias) => {
                 self.extend_with_type(db, env, alias.value_type(db));
+            }
+
+            Type::Recursive(recursive) => {
+                let unfolded = recursive.map_or(db, env, Type::object(), identity);
+                self.extend_with_type(db, env, unfolded);
             }
 
             Type::TypeVar(bound_typevar) => {
@@ -719,7 +729,48 @@ pub struct Member<'db> {
 }
 
 impl<'db> Member<'db> {
-    /// Recover local functions retained in the exposed type, including property accessors.
+    /// Pairs source methods with the alternatives that remain in this member's exposed type.
+    ///
+    /// Keeping definitions separate lets callers apply exclusions without exempting other
+    /// definitions of the same name. Alternatives absorbed by a wider type, such as `object`,
+    /// no longer contribute a method signature.
+    pub(super) fn local_function_bindings(
+        &self,
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+    ) -> impl Iterator<Item = (FunctionType<'db>, Type<'db>)> {
+        let env = ProgramEnvironment::from_scope(scope);
+        let functions = self.local_functions(db, scope);
+        let retained = self.local_functions_from_type(db, scope);
+        let exposed = self.ty;
+        functions
+            .into_iter()
+            .chain(retained)
+            .unique()
+            .filter_map(move |function| {
+                let definition = function.definition(db);
+                let binding = infer_definition_types(db, definition)
+                    .binding_type(definition)
+                    .resolve_type_alias(db);
+                let exposed_union = exposed.as_union_like(db);
+                let exposed_alternatives = exposed_union
+                    .map_or(std::slice::from_ref(&exposed), |union| union.elements(db));
+                let binding_union = binding.as_union_like(db);
+                let binding_alternatives = binding_union
+                    .map_or(std::slice::from_ref(&binding), |union| union.elements(db));
+                let retained = UnionType::from_elements(
+                    db,
+                    &env,
+                    binding_alternatives
+                        .iter()
+                        .copied()
+                        .filter(|ty| exposed_alternatives.contains(ty)),
+                );
+                (!retained.is_never()).then_some((function, retained))
+            })
+    }
+
+    /// Recover local functions retained in the exposed type, including aliases and property accessors.
     /// Unlike [`Self::local_functions`], this does not recover definitions replaced by decorators.
     fn local_functions_from_type(
         &self,
@@ -754,7 +805,7 @@ impl<'db> Member<'db> {
 
         functions
             .into_iter()
-            .filter(|function| is_local_member_function(db, *function, &self.name, scope))
+            .filter(|function| function.definition(db).scope(db) == scope)
             .collect()
     }
 
@@ -769,7 +820,8 @@ impl<'db> Member<'db> {
         db: &'db dyn Db,
         scope: ScopeId<'db>,
     ) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
-        let member_functions = self.local_functions_from_type(db, scope);
+        let mut member_functions = self.local_functions_from_type(db, scope);
+        member_functions.retain(|function| function.name(db) == &self.name);
         let mut functions = smallvec::SmallVec::<[FunctionType<'db>; 1]>::new();
         for definition in end_of_scope_function_definitions(db, scope, &self.name) {
             let function = member_functions
@@ -786,11 +838,11 @@ impl<'db> Member<'db> {
         }
 
         // A property can retain a getter even though only its setter is an end-of-scope binding.
-        let additional_functions: smallvec::SmallVec<[_; 1]> = member_functions
-            .into_iter()
-            .filter(|function| !functions.contains(function))
-            .collect();
-        functions.extend(additional_functions);
+        for function in member_functions {
+            if !functions.contains(&function) {
+                functions.push(function);
+            }
+        }
         functions
     }
 }
@@ -848,17 +900,6 @@ fn end_of_scope_function_definitions<'db>(
             Some(definition)
         })
         .collect()
-}
-
-fn is_local_member_function<'db>(
-    db: &'db dyn Db,
-    function: FunctionType<'db>,
-    member_name: &Name,
-    member_scope: ScopeId<'db>,
-) -> bool {
-    function.python_file(db) == member_scope.python_file(db)
-        && function.definition(db).scope(db) == member_scope
-        && function.name(db) == member_name
 }
 
 /// Extract callable functions represented by a type.

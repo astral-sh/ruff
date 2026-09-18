@@ -23,8 +23,8 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
-    PathBounds, Solutions,
+    CandidateSolutions, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    OwnedConstraintSet, Solutions,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -323,7 +323,7 @@ impl<'db> CallableSignature<'db> {
                         .iter()
                         .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
                         .collect::<Vec<_>>();
-                    let parameters = if prefix_parameters.is_empty() {
+                    let mut parameters = if prefix_parameters.is_empty() {
                         Parameters::paramspec(db, typevar)
                     } else {
                         Parameters::concatenate(
@@ -332,6 +332,16 @@ impl<'db> CallableSignature<'db> {
                             ConcatenateTail::ParamSpec(typevar),
                         )
                     };
+
+                    // The synthesized ParamSpec parameters still correspond to the original
+                    // `*args` and `**kwargs` annotations. Keep their positions for diagnostics.
+                    for (parameter, source) in Arc::make_mut(&mut parameters.data)
+                        .value
+                        .iter_mut()
+                        .zip(self_signature.parameters.iter())
+                    {
+                        parameter.source_parameter_index = source.source_parameter_index;
+                    }
 
                     let env = visitor.env;
                     Some(CallableSignature::single(Signature {
@@ -1331,7 +1341,7 @@ impl<'db> Signature<'db> {
         let inferable = self.inferable_typevars(db);
 
         match when.solutions(db, env, inferable) {
-            Ok(Solutions::Unsatisfiable) => return None,
+            Ok(Solutions::Unsatisfiable(_)) => return None,
             Ok(Solutions::Unconstrained) | Err(_) => {
                 return Some(CallableSignature::single(self.clone()));
             }
@@ -1358,7 +1368,8 @@ impl<'db> Signature<'db> {
                 && let Some(upper) = bounds.as_single_upper_bound(db, env)
                 && lower.is_equivalent_to(db, env, upper)
                 && let Some(solution) =
-                    PathBounds::default_solve(db, env, &constraints, bounds).as_type()
+                    CandidateSolutions::default_solve(db, env, &constraints, inferable, bounds)
+                        .as_type()
             {
                 return Some(solution);
             }
@@ -1373,7 +1384,8 @@ impl<'db> Signature<'db> {
                     .evidence_lower()
                     .is_some_and(|lower| !lower.is_never())
                 && let Some(solution) =
-                    PathBounds::default_solve(db, env, &constraints, bounds).as_type()
+                    CandidateSolutions::default_solve(db, env, &constraints, inferable, bounds)
+                        .as_type()
             {
                 return Some(solution);
             }
@@ -1554,6 +1566,80 @@ impl<'db> Signature<'db> {
         self.parameters
             .get(0)
             .is_some_and(|parameter| parameter.is_positional() && parameter.inferred_annotation)
+    }
+
+    /// Binds the `Self` receiver if it is unused in the rest of the signature.
+    ///
+    /// This is purely a performance optimization. Eagerly binding the type of `Self` prevents
+    /// unnecessary work from being performed by the constraint solver.
+    pub(super) fn bind_unused_self(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        self_type: Type<'db>,
+    ) -> Option<Self> {
+        let context = self.generic_context?;
+        let receiver = self.parameters.get(0)?;
+
+        // Ensure `Self` is not used elsewhere in the signature, in which case eagerly binding it
+        // would be unsound.
+        if !receiver.is_positional() || self.needs_self_mapping(db, env, true) {
+            return None;
+        }
+
+        // Extract the `Self` type variable.
+        let self_typevar = match receiver.annotated_type() {
+            Type::TypeVar(typevar) => typevar,
+            Type::SubclassOf(subclass) => subclass.into_type_var()?,
+            _ => return None,
+        };
+        if !self_typevar.typevar(db).is_self(db) {
+            return None;
+        }
+
+        // Also ensure that the receiver satisfies the upper bound of `Self`.
+        let bound = self_typevar.typevar(db).upper_bound(db, env)?;
+        if !self_type.is_assignable_to(db, env, bound) {
+            return None;
+        }
+
+        // And that `Self` is not referenced by any other type variable, in which case removing it
+        // from the generic context may leave it unspecialized.
+        //
+        // TODO: References to `Self` inside of bounds or defaults should not generally be permitted
+        // in the first place, but we still avoid leaving dangling references to `Self` out of principle.
+        for typevar in context.variables(db) {
+            if typevar.identity(db) == self_typevar.identity(db) {
+                continue;
+            }
+
+            let bound = typevar.typevar(db).bound_or_constraints(db, env);
+            if bound.is_some_and(|bound| match bound {
+                TypeVarBoundOrConstraints::UpperBound(bound) => bound.contains_self(db, env),
+                TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                    .elements(db)
+                    .iter()
+                    .any(|constraint| constraint.contains_self(db, env)),
+            }) {
+                return None;
+            }
+
+            if typevar
+                .default_type(db)
+                .is_some_and(|ty| ty.contains_self(db, env))
+            {
+                return None;
+            }
+        }
+
+        let mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::Single(self_typevar, self_type));
+        Some(self.apply_type_mapping_impl(
+            db,
+            &mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(env),
+        ))
     }
 
     fn apply_self_with_receiver(
@@ -6191,6 +6277,46 @@ mod tests {
                 parameter.definition().is_some(),
                 "source-backed parameter should have a definition"
             );
+        }
+    }
+
+    #[test]
+    fn paramspec_identity_specialization_preserves_source_positions() {
+        for prefix in ["", "first: int, "] {
+            let mut db = setup_db();
+            db.write_dedented(
+                "/src/a.py",
+                &format!("def f[**P]({prefix}*args: P.args, **kwargs: P.kwargs) -> None: ..."),
+            )
+            .unwrap();
+            let signature = get_function_f(&db, "/src/a.py")
+                .literal(&db)
+                .last_definition
+                .signature(&db);
+            let generic_context = signature.generic_context.expect("f has a ParamSpec");
+            let expected_positions = (0..signature.parameters.len())
+                .map(Some)
+                .collect::<Vec<_>>();
+            let specialized = CallableSignature::single(signature).apply_type_mapping_impl(
+                &db,
+                &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
+                    generic_context.identity_specialization(&db),
+                )),
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::new(&db.program_environment()),
+            );
+
+            assert_eq!(specialized.overloads.len(), 1);
+            for signature in &specialized.overloads {
+                assert_eq!(
+                    signature
+                        .parameters()
+                        .iter()
+                        .map(Parameter::source_parameter_index)
+                        .collect::<Vec<_>>(),
+                    expected_positions,
+                );
+            }
         }
     }
 

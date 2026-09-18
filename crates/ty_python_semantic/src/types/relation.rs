@@ -217,7 +217,7 @@ impl TypeRelation {
         matches!(self, TypeRelation::Subtyping)
     }
 
-    const fn can_safely_assume_reflexivity(self, ty: Type) -> bool {
+    const fn can_safely_assume_reflexivity(self, ty: Type<'_>) -> bool {
         match self {
             TypeRelation::Assignability | TypeRelation::Redundancy { .. } => true,
             TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
@@ -259,14 +259,12 @@ impl<'db> Type<'db> {
     /// a cheap shallow check, not an exhaustive recursive check.
     const fn subtyping_is_always_reflexive(self) -> bool {
         match self {
+            Type::RecursiveVar(_) => panic!("semantic operation on an unbound recursive variable"),
             Type::Never
             | Type::FunctionLiteral(..)
-            | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(
-                KnownBoundMethodType::FunctionTypeDunderGet(_)
-                | KnownBoundMethodType::FunctionTypeDunderCall(_)
-                | KnownBoundMethodType::StrStartswith(_)
+                KnownBoundMethodType::StrStartswith(_)
                 | KnownBoundMethodType::ConstraintSetLowerBound
                 | KnownBoundMethodType::ConstraintSetUpperBound
                 | KnownBoundMethodType::ConstraintSetEquality
@@ -297,8 +295,10 @@ impl<'db> Type<'db> {
             // might inherit `Any`, but subtyping is still reflexive
             Type::ClassLiteral(_) => true,
 
-            Type::Dynamic(_)
+            Type::BoundMethod(_)
+            | Type::Dynamic(_)
             | Type::Divergent(_)
+            | Type::Recursive(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
             | Type::GenericAlias(_)
@@ -308,7 +308,10 @@ impl<'db> Type<'db> {
             | Type::EnumComplement(_)
             | Type::Callable(_)
             | Type::KnownBoundMethod(
-                KnownBoundMethodType::PropertyDunderGet(_)
+                KnownBoundMethodType::MethodTypeDunderGet(_)
+                | KnownBoundMethodType::DunderCall(_)
+                | KnownBoundMethodType::FunctionTypeDunderGet(_)
+                | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::PropertyDunderDelete(_),
             )
@@ -1671,6 +1674,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // Reflexivity and lazy constraints can bypass the RecursiveVar match arm below.
+        source.assert_not_recursive_var();
+        target.assert_not_recursive_var();
         if let Some(source) = source.materialized_divergent_fallback() {
             return self.check_type_pair(db, source, target);
         }
@@ -1684,7 +1690,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         //
         // Note that we could do a full equivalence check here, but that would be both expensive
         // and unnecessary. This early return is only an optimisation.
-        if self.relation.can_safely_assume_reflexivity(source) && source == target {
+        if source == target && self.relation.can_safely_assume_reflexivity(source) {
             return self.always();
         }
 
@@ -1738,6 +1744,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         match (source, target) {
+            (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(target)) if target.is_object() => self.always(),
             (_, Type::ProtocolInstance(target)) if target.is_equivalent_to_object(db) => {
@@ -1759,6 +1768,50 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // "too many cycle iterations" panics).
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+            }
+
+            (Type::Recursive(source_recursive), _) => {
+                // Both comparing arguments and unfolding can revisit this pair.
+                self.with_recursion_guard(db, source, target, || {
+                    let by_arguments = if let Type::Recursive(target_recursive) = target {
+                        self.when_recursive_types_relate_by_arguments(
+                            db,
+                            source_recursive,
+                            target_recursive,
+                        )
+                    } else {
+                        self.never()
+                    };
+                    by_arguments.or(db, self.constraints, || {
+                        source_recursive.map_or_else(
+                            db,
+                            self.env,
+                            || {
+                                ConstraintSet::from_bool(
+                                    self.constraints,
+                                    self.relation.is_assignability(),
+                                )
+                            },
+                            |source_unfolded| self.check_type_pair(db, source_unfolded, target),
+                        )
+                    })
+                })
+            }
+
+            (_, Type::Recursive(target_recursive)) => {
+                self.with_recursion_guard(db, source, target, || {
+                    target_recursive.map_or_else(
+                        db,
+                        self.env,
+                        || {
+                            ConstraintSet::from_bool(
+                                self.constraints,
+                                self.relation.is_assignability(),
+                            )
+                        },
+                        |target_unfolded| self.check_type_pair(db, source, target_unfolded),
+                    )
+                })
             }
 
             // Instances of classes that inherit from an explicit `Any` base retain their nominal
@@ -1878,7 +1931,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             //     3. If neither a converter nor a default value is provided, we allow the field to be
             //        considered assignable to any type.
             (Type::KnownInstance(KnownInstanceType::Field(field)), _)
-                if self.is_eager_assignability() =>
+                if self.relation.is_assignability() =>
             {
                 field
                     .default_type(db)
@@ -2060,7 +2113,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
             (Type::Intersection(intersection), _)
-                if self.is_eager_assignability()
+                if self.relation.is_assignability()
                     && intersection.positive(db).iter().any(Type::is_dynamic) =>
             {
                 // If the intersection contains `Any`/`Unknown`/`@Todo`, it is assignable to any type.
@@ -2379,6 +2432,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::Callable(target_callable)) => {
                 self.with_recursion_guard(db, source, target, || {
+                    // Bound methods can be assigned to inferred function-like callback types,
+                    // but are not nominal subtypes of functions.
+                    let target_callable = if self.relation.is_assignability()
+                        && matches!(source, Type::BoundMethod(_))
+                        && target_callable.is_function_like(db)
+                    {
+                        target_callable.into_regular(db)
+                    } else {
+                        target_callable
+                    };
                     let Some(callables) = source.try_upcast_to_callable_with_policy(
                         db,
                         env,
@@ -2676,18 +2739,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, KnownClass::Bool.to_instance(db, env), target)
             }
 
-            // Function-like callables are subtypes of `FunctionType`
-            (Type::Callable(callable), _) if callable.is_function_like(db) => {
-                self.check_type_pair(db, KnownClass::FunctionType.to_instance(db, env), target)
+            (Type::Callable(callable), _) if let Some(class) = callable.runtime_class(db) => {
+                self.check_type_pair(db, class.to_instance(db, env), target)
             }
-
-            // Method-wrapper callables are subtypes of `MethodWrapperType`.
-            (Type::Callable(callable), _) if callable.is_method_wrapper(db) => self
-                .check_type_pair(
-                    db,
-                    KnownClass::MethodWrapperType.to_instance(db, env),
-                    target,
-                ),
 
             (Type::Callable(_), _) => self.never(),
 
@@ -2795,16 +2849,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::SubclassOf(subclass_of_ty), _) if subclass_of_ty.is_dynamic() => self
                 .check_type_pair(db, KnownClass::Type.to_instance(db, env), target)
                 .or(db, self.constraints, || {
-                    ConstraintSet::from_bool(self.constraints, self.is_eager_assignability()).and(
-                        db,
-                        self.constraints,
-                        || self.check_type_pair(db, target, KnownClass::Type.to_instance(db, env)),
-                    )
+                    ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+                        .and(db, self.constraints, || {
+                            self.check_type_pair(db, target, KnownClass::Type.to_instance(db, env))
+                        })
                 }),
 
             // Any `type[...]` type is assignable to `type[Any]`
             (_, Type::SubclassOf(subclass_of_ty))
-                if subclass_of_ty.is_dynamic() && self.is_eager_assignability() =>
+                if subclass_of_ty.is_dynamic() && self.relation.is_assignability() =>
             {
                 self.check_type_pair(db, source, KnownClass::Type.to_instance(db, env))
             }
@@ -2900,7 +2953,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         })
     }
 
-    fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
+    pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
             env: self.env,
             constraints: self.constraints,
@@ -3285,10 +3338,35 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         let env = self.env;
 
         match (left, right) {
+            (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             (Type::Never, _) | (_, Type::Never) => self.always(),
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
+
+            (Type::Recursive(left_recursive), _) => left_recursive.map_or_else(
+                db,
+                env,
+                || self.never(),
+                |left_unfolded| {
+                    self.with_recursion_guard(db, left, right, || {
+                        self.check_type_pair(db, left_unfolded, right)
+                    })
+                },
+            ),
+
+            (_, Type::Recursive(right_recursive)) => right_recursive.map_or_else(
+                db,
+                env,
+                || self.never(),
+                |right_unfolded| {
+                    self.with_recursion_guard(db, left, right, || {
+                        self.check_type_pair(db, left, right_unfolded)
+                    })
+                },
+            ),
 
             (Type::TypeAlias(alias), _) => nontrivial_check(self, || {
                 let left_alias_ty = alias.value_type(db);
@@ -3517,6 +3595,24 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             ) => nontrivial_check(self, || self.check_property_instance_pair(db, left, right)),
 
             (
+                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(left)),
+                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(right)),
+            )
+            | (
+                Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(left)),
+                Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(right)),
+            ) => nontrivial_check(self, || {
+                self.check_type_pair(db, left.inner(db), right.inner(db))
+            }),
+
+            (
+                Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(left)),
+                Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(right)),
+            ) => nontrivial_check(self, || {
+                self.check_type_pair(db, Type::BoundMethod(left), Type::BoundMethod(right))
+            }),
+
+            (
                 Type::KnownInstance(KnownInstanceType::Sentinel(left_sentinel)),
                 Type::KnownInstance(KnownInstanceType::Sentinel(right_sentinel)),
             ) => ConstraintSet::from_bool(
@@ -3532,6 +3628,23 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             ) if left_wrapper.kind(db) == right_wrapper.kind(db) => nontrivial_check(self, || {
                 self.with_recursion_guard(db, left, right, || {
                     self.check_type_pair(db, left_wrapper.wrapped(db), right_wrapper.wrapped(db))
+                })
+            }),
+
+            (
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(left_partial)),
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(right_partial)),
+            )
+            | (
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(left_partial)),
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(right_partial)),
+            ) => nontrivial_check(self, || {
+                self.with_recursion_guard(db, left, right, || {
+                    self.check_type_pair(
+                        db,
+                        left_partial.wrapped(db).inner(db),
+                        right_partial.wrapped(db).inner(db),
+                    )
                 })
             }),
 
@@ -3944,14 +4057,31 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
-            (Type::FunctionLiteral(..), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::FunctionLiteral(..)) => {
-                // A `Type::FunctionLiteral()` must be an instance of exactly `types.FunctionType`
-                // (it cannot be an instance of a `types.FunctionType` subclass)
+            (Type::FunctionLiteral(function), Type::NominalInstance(instance))
+            | (Type::NominalInstance(instance), Type::FunctionLiteral(function)) => {
+                // Function literals and their descriptor wrappers have an exact runtime class.
                 nontrivial_check(self, || {
-                    KnownClass::FunctionType
+                    function
+                        .runtime_class(db)
                         .when_subclass_of(db, env, instance.class(db, env), self.constraints)
                         .negate(db, self.constraints)
+                })
+            }
+
+            (Type::Callable(callable), other) | (other, Type::Callable(callable))
+                if let Some(class) = callable.runtime_class(db) =>
+            {
+                let other = match other {
+                    Type::Callable(other_callable) => {
+                        let Some(other_class) = other_callable.runtime_class(db) else {
+                            return self.never();
+                        };
+                        other_class.to_instance(db, env)
+                    }
+                    _ => other,
+                };
+                nontrivial_check(self, || {
+                    self.check_type_pair(db, class.to_instance(db, env), other)
                 })
             }
 

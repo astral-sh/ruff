@@ -389,6 +389,18 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 wrong_innards: C[int] = C("five")
 ```
 
+An explicit `cls: type[Self]` annotation does not affect the inferred type:
+
+```py
+from typing import Self
+
+class Explicit[T]:
+    def __new__(cls: type[Self], x: T) -> "Explicit[T]":
+        return object.__new__(cls)
+
+reveal_type(Explicit(1))  # revealed: Explicit[Literal[1]]
+```
+
 ### `__init__` only
 
 ```py
@@ -406,6 +418,17 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 
 # error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
+```
+
+An explicit `self: Self` annotation does not affect the inferred type:
+
+```py
+from typing import Self
+
+class Explicit[T]:
+    def __init__(self: Self, x: T) -> None: ...
+
+reveal_type(Explicit(1))  # revealed: Explicit[Literal[1]]
 ```
 
 ### Failed constructor inference
@@ -1833,6 +1856,46 @@ def stringify(value: int) -> str:
 function = unwrap(staticmethod(stringify))
 reveal_type(function(1))  # revealed: str
 function("wrong")  # error: [invalid-argument-type]
+```
+
+## Inferring constructor type arguments through growing recursive aliases
+
+A constructor infers its type argument from an already-annotated recursive value. Each level of
+children wraps the leaf type in another list, but the root's leaf type determines the
+specialization.
+
+```py
+type Growing[T] = tuple[T, list[Growing[list[T]]]]
+
+class Root[U]:
+    def __init__(self, value: Growing[U]) -> None:
+        self.value = value[0]
+
+def probe(value: Growing[int]):
+    root = Root(value)
+    reveal_type(root)  # revealed: Root[int]
+    reveal_type(root.value)  # revealed: int
+```
+
+## Inferring constructor type arguments from recursive children
+
+Each child swaps the two payload types and wraps its new payload in a sequence. A constructor that
+reads a child's payload infers its type argument from beyond the root, even as the payload types
+become increasingly nested.
+
+```py
+from collections.abc import Sequence
+
+type Tree[T, U] = tuple[T, Sequence[Tree[Sequence[U], T]]]
+
+class FirstChild[V]:
+    def __init__(self, value: Tree[int, V]) -> None:
+        self.value = value[1][0][0][0]
+
+def probe(value: Tree[int, str]):
+    child = FirstChild(value)
+    reveal_type(child)  # revealed: FirstChild[str]
+    reveal_type(child.value)  # revealed: str
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

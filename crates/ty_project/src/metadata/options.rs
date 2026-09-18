@@ -16,7 +16,7 @@ use ruff_db::diagnostic::{
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_macros::{Combine, OptionsMetadata, RustDoc};
-use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
+use ruff_options_metadata::{OptionSet, OptionSetKind, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use ruff_text_size::TextRange;
@@ -600,19 +600,24 @@ impl<'a> OptionsContext<'a> {
 fn python_version_from_config(
     ranged_version: &RangedValue<SupportedPythonVersion>,
 ) -> PythonVersionWithSource {
+    let source = match ranged_version.source() {
+        ValueSource::Cli => PythonVersionSource::Cli,
+        ValueSource::File(path) => PythonVersionSource::ConfigFile(PythonVersionFileSource::new(
+            path.clone(),
+            ranged_version.range(),
+        )),
+        ValueSource::ScriptMetadata(file) => PythonVersionSource::ScriptMetadata(
+            Span::from(*file).with_optional_range(ranged_version.range()),
+        ),
+        ValueSource::Editor => PythonVersionSource::Editor,
+        ValueSource::UvMetadata => {
+            unreachable!("uv metadata does not provide a configured Python version")
+        }
+    };
+
     PythonVersionWithSource {
         version: PythonVersion::from(**ranged_version),
-        source: match ranged_version.source() {
-            ValueSource::Cli => PythonVersionSource::Cli,
-            ValueSource::File(path) => PythonVersionSource::ConfigFile(
-                PythonVersionFileSource::new(path.clone(), ranged_version.range()),
-            ),
-            ValueSource::ScriptMetadata(file) => PythonVersionSource::ScriptMetadata(
-                Span::from(*file).with_optional_range(ranged_version.range()),
-            ),
-            ValueSource::Editor => PythonVersionSource::Editor,
-            ValueSource::UvMetadata => PythonVersionSource::UvMetadata,
-        },
+        source,
     }
 }
 
@@ -740,10 +745,6 @@ fn unsupported_inferred_python_version_diagnostic(
         PythonVersionSource::Editor => diagnostic.sub(SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             "The version was inferred from your editor.",
-        )),
-        PythonVersionSource::UvMetadata => diagnostic.sub(SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            "The version was provided by uv metadata.",
         )),
         PythonVersionSource::Default => diagnostic.sub(SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
@@ -1866,6 +1867,12 @@ pub struct OverridesOptions(Vec<RangedValue<OverrideOptions>>);
 impl OptionsMetadata for OverridesOptions {
     fn documentation() -> Option<&'static str> {
         Some(<Self as RustDoc>::rust_doc())
+    }
+
+    fn kind() -> OptionSetKind {
+        OptionSetKind::Array {
+            example: r#"include = ["src"]"#,
+        }
     }
 
     fn record(visit: &mut dyn Visit) {

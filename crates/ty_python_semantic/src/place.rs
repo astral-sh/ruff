@@ -30,8 +30,8 @@ use ty_python_core::reachability_constraints::{
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
-    DeclarationWithConstraint, DeclarationsIterator, ProgramFile, Truthiness, global_scope,
-    place_table, use_def_map,
+    DeclarationWithConstraint, DeclarationsIterator, ImportedFinalCandidatesIterator, ProgramFile,
+    Truthiness, global_scope, place_table, use_def_map,
 };
 
 pub(crate) use implicit_globals::{
@@ -863,6 +863,10 @@ pub(crate) struct PlaceFromDeclarationsResult<'db> {
 }
 
 impl<'db> PlaceFromDeclarationsResult<'db> {
+    pub(crate) fn qualifiers(&self) -> TypeQualifiers {
+        self.place_and_quals.qualifiers
+    }
+
     fn conflict(
         place_and_quals: PlaceAndQualifiers<'db>,
         conflicting_types: Box<indexmap::set::Slice<Type<'db>>>,
@@ -873,6 +877,145 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
             conflicting_types: Some(conflicting_types),
             first_declaration,
         }
+    }
+
+    /// Add any reachable imported `Final` qualifier without establishing a declared type.
+    #[must_use]
+    pub(crate) fn with_imported_final(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        candidates: ImportedFinalCandidatesIterator<'_, 'db>,
+    ) -> Self {
+        self.with_imported_final_impl(
+            db,
+            env,
+            candidates,
+            RequiresExplicitReExport::No,
+            None,
+            false,
+        )
+    }
+
+    /// Also use an imported `Final`'s source type to constrain an assignment when the target has
+    /// no declared type. An existing annotation always takes precedence over that source type.
+    #[must_use]
+    pub(crate) fn with_imported_final_for_assignment(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        candidates: ImportedFinalCandidatesIterator<'_, 'db>,
+        reachability_cache: &ReachabilityEvaluationCache<'db>,
+    ) -> Self {
+        self.with_imported_final_impl(
+            db,
+            env,
+            candidates,
+            RequiresExplicitReExport::No,
+            Some(reachability_cache),
+            true,
+        )
+    }
+
+    /// This can be called cross-module, so resolve imports through semantic queries without
+    /// reading AST nodes from the file containing the candidate definitions.
+    fn with_imported_final_impl(
+        mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        candidates: ImportedFinalCandidatesIterator<'_, 'db>,
+        requires_explicit_reexport: RequiresExplicitReExport,
+        reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
+        fallback_to_imported_type: bool,
+    ) -> Self {
+        let predicates = candidates.predicates();
+        let reachability_constraints = candidates.reachability_constraints();
+        let fallback_to_imported_type =
+            fallback_to_imported_type && self.place_and_quals.place.is_undefined();
+
+        let mut first_imported_type = None;
+        let mut imported_type_builder: Option<PublicTypeBuilder<'db>> = None;
+        let mut imported_provenance = Provenance::Unknown;
+        let mut imported_reachability = Truthiness::AlwaysFalse;
+
+        for candidate in candidates {
+            let definition = candidate.definition;
+
+            // A genuine stub annotation can export its symbol even when an import omits the
+            // redundant alias normally required for re-export. The import itself remains private.
+            // TODO: Preserve `Final` when a later public assignment re-exports a private import,
+            // without leaking qualifiers from a private branch.
+            if self.first_declaration.is_none()
+                && is_non_exported(db, definition, requires_explicit_reexport)
+            {
+                continue;
+            }
+
+            let static_reachability = evaluate_reachability_with_cache(
+                db,
+                reachability_cache,
+                reachability_constraints,
+                predicates,
+                candidate.reachability_constraint,
+            );
+            if static_reachability.is_always_false() {
+                continue;
+            }
+
+            let Some(declared_type) = inferred_declaration(db, definition).declared() else {
+                continue;
+            };
+            if !declared_type.qualifiers().contains(TypeQualifiers::FINAL) {
+                continue;
+            }
+
+            self.place_and_quals
+                .qualifiers
+                .insert(TypeQualifiers::FINAL);
+
+            // Public lookup must still regard this symbol as undeclared. Only assignment
+            // inference without an annotation needs the imported source type as a constraint.
+            if !fallback_to_imported_type {
+                return self;
+            }
+
+            imported_reachability = imported_reachability.or(static_reachability);
+            let source_provenance = match declared_type.provenance() {
+                Provenance::Unknown => Provenance::SingleDefinition(definition),
+                provenance => provenance,
+            };
+            imported_provenance = imported_provenance.or(source_provenance);
+
+            let imported_type = declared_type.inner_type();
+            if let Some(builder) = &mut imported_type_builder {
+                builder.add(imported_type, static_reachability);
+            } else if let Some((first, first_reachability)) = first_imported_type {
+                let mut builder = PublicTypeBuilder::new(db, env);
+                builder.add(first, first_reachability);
+                builder.add(imported_type, static_reachability);
+                imported_type_builder = Some(builder);
+            } else {
+                first_imported_type = Some((imported_type, static_reachability));
+            }
+        }
+
+        if let Some((first, _)) = first_imported_type {
+            let imported_type = imported_type_builder
+                .map(PublicTypeBuilder::build)
+                .unwrap_or(first);
+            let definedness = if imported_reachability.is_always_true() {
+                Definedness::AlwaysDefined
+            } else {
+                Definedness::PossiblyUndefined
+            };
+            self.place_and_quals.place = Place::Defined(
+                DefinedPlace::new(imported_type)
+                    .with_definedness(definedness)
+                    .with_provenance(imported_provenance),
+            );
+        }
+
+        self
     }
 
     pub(crate) fn ignore_conflicting_declarations(self) -> PlaceAndQualifiers<'db> {
@@ -1140,13 +1283,27 @@ pub(crate) fn place_by_id<'db>(
     // If the place is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
 
-    let declarations = match considered_definitions {
-        ConsideredDefinitions::EndOfScope => use_def.end_of_scope_declarations(place_id),
-        ConsideredDefinitions::AllReachable => use_def.reachable_declarations(place_id),
+    let (declarations, imported_final) = match considered_definitions {
+        ConsideredDefinitions::EndOfScope => (
+            use_def.end_of_scope_declarations(place_id),
+            use_def.end_of_scope_imported_final_candidates(place_id),
+        ),
+        ConsideredDefinitions::AllReachable => (
+            use_def.reachable_declarations(place_id),
+            use_def.reachable_imported_final_candidates(place_id),
+        ),
     };
 
     let declared =
         place_from_declarations_impl(db, &env, declarations, requires_explicit_reexport, None)
+            .with_imported_final_impl(
+                db,
+                &env,
+                imported_final,
+                requires_explicit_reexport,
+                None,
+                false,
+            )
             .ignore_conflicting_declarations();
 
     let all_considered_bindings = || match considered_definitions {
@@ -1270,7 +1427,7 @@ pub(crate) fn place_by_id<'db>(
         // Place is undeclared, infer the type from bindings
         PlaceAndQualifiers {
             place: Place::Undefined,
-            qualifiers: _,
+            qualifiers,
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
@@ -1318,20 +1475,18 @@ pub(crate) fn place_by_id<'db>(
             // We generally trust undeclared places in stubs and expose the raw type.
             let in_stub_file = scope.file(db).is_stub(db);
 
-            if is_considered_non_modifiable
+            if !(is_considered_non_modifiable
                 || is_module_global
                 || scope_has_private_visibility
-                || in_stub_file
+                || in_stub_file)
             {
-                inferred.into()
-            } else {
                 // Public inferred types should expose a promoted view rather than their raw
                 // inferred literal form. The adjustment is applied lazily when converting to
                 // `LookupResult` via `into_lookup_result`.
-                inferred
-                    .with_public_type_policy(PublicTypePolicy::Promote)
-                    .into()
+                inferred = inferred.with_public_type_policy(PublicTypePolicy::Promote);
             }
+
+            inferred.with_qualifiers(qualifiers)
         }
     }
 

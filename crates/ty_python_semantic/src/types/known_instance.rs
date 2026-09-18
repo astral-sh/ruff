@@ -9,7 +9,7 @@ use crate::{
         ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
         PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
         TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
-        callable::CallableTypes,
+        callable::{CallableTypeKind, CallableTypes},
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
         dedicated::pydantic::ConfigBoolean,
@@ -105,9 +105,8 @@ impl<'db> MethodWrapper<'db> {
         kind: MethodWrapperKind,
     ) -> Type<'db> {
         match wrapped {
-            // Function definitions already record built-in method decorators, including their
-            // consistency across overloads. Keep that representation for overload validation.
-            // A replacement function without this metadata needs its own descriptor.
+            // Descriptor access can expose the ordinary function while retaining its declaration
+            // metadata. Reapplying the declared wrapper restores its descriptor state.
             Type::FunctionLiteral(function)
                 if function.has_known_decorator(
                     db,
@@ -115,9 +114,22 @@ impl<'db> MethodWrapper<'db> {
                         MethodWrapperKind::Classmethod => FunctionDecorators::CLASSMETHOD,
                         MethodWrapperKind::Staticmethod => FunctionDecorators::STATICMETHOD,
                     },
-                ) =>
+                ) && match function.callable_type_kind(db) {
+                    CallableTypeKind::FunctionLike => true,
+                    CallableTypeKind::ClassMethodLike => kind == MethodWrapperKind::Classmethod,
+                    CallableTypeKind::StaticMethodLike => kind == MethodWrapperKind::Staticmethod,
+                    CallableTypeKind::Regular
+                    | CallableTypeKind::DunderParamSpec
+                    | CallableTypeKind::ParamSpecValue => false,
+                } =>
             {
-                wrapped
+                Type::FunctionLiteral(function.with_descriptor_kind(
+                    db,
+                    match kind {
+                        MethodWrapperKind::Classmethod => CallableTypeKind::ClassMethodLike,
+                        MethodWrapperKind::Staticmethod => CallableTypeKind::StaticMethodLike,
+                    },
+                ))
             }
             // These callables already encode the matching descriptor behavior in their kind,
             // so they do not need another method wrapper.
@@ -585,7 +597,8 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::Materialize(_)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
-                | TypeMapping::RescopeReturnCallables(_) => Type::KnownInstance(self),
+                | TypeMapping::RescopeReturnCallables(_)
+                | TypeMapping::ApplyRecursiveSubstitution(_) => Type::KnownInstance(self),
             },
             KnownInstanceType::UnionType(instance) => {
                 Type::KnownInstance(KnownInstanceType::UnionType(
@@ -848,9 +861,17 @@ impl<'db> UnionTypeInstance<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         if let Ok(union_type) = self.union_type(db) {
+            let value_expr_types = match *self._value_expr_types(db) {
+                Some([first, second]) if type_mapping.is_structural() => Some([
+                    first.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    second.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ]),
+                value_expr_types => value_expr_types,
+            };
+
             UnionTypeInstance::new(
                 db,
-                self._value_expr_types(db),
+                value_expr_types,
                 Ok(union_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
             )
         } else {

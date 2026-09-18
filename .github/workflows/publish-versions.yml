@@ -11,7 +11,8 @@ on:
         required: true
         type: string
 
-permissions: {}
+permissions:
+  contents: read
 
 env:
   UV_LOCKED: 1

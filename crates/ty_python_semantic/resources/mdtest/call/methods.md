@@ -170,25 +170,297 @@ def f(t: tuple[int, str]) -> None:
     reveal_type(t.index("a"))  # revealed: int
 ```
 
-## Method calls on unions
+## Method calls on unions and intersections
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+### Method defined on multiple elements
+
+#### Instance methods
+
+When the called method is defined on multiple elements `E1`, `E2` of the union or intersection, the
+return types are combined accordingly. Note that the method receiver is narrowed to `E1 & E2` for
+the intersection case, which allows us to infer the return type as `list[E1 & E2]` instead of
+`list[E1] & list[E2]`, which would be uninhabited. Doing the same for unions would be wrong though,
+since `E1 | E2` is not a valid receiver for `E1.f` and `E2.f`, individually.
 
 ```py
-from typing import Any
+from typing import Self
 
-class A:
-    def f(self) -> int:
-        return 1
+class E1:
+    def f(self) -> list[Self]:
+        return [self]
 
-class B:
-    def f(self) -> str:
-        return "a"
+class E2:
+    def f(self) -> list[Self]:
+        return [self]
 
-def f(a_or_b: A | B, any_or_a: Any | A):
-    reveal_type(a_or_b.f)  # revealed: (bound method A.f() -> int) | (bound method B.f() -> str)
-    reveal_type(a_or_b.f())  # revealed: int | str
+def _(union: E1 | E2, intersection: E1 & E2):
+    reveal_type(union.f)  # revealed: (bound method E1.f() -> list[E1]) | (bound method E2.f() -> list[E2])
+    reveal_type(union.f())  # revealed: list[E1] | list[E2]
 
-    reveal_type(any_or_a.f)  # revealed: Any | (bound method A.f() -> int)
-    reveal_type(any_or_a.f())  # revealed: Any | int
+    # revealed: (bound method (E1 & E2).f() -> list[E1 & E2]) & (bound method (E1 & E2).f() -> list[E1 & E2])
+    reveal_type(intersection.f)
+    reveal_type(intersection.f())  # revealed: list[E1 & E2]
+```
+
+Analogous tests for method calls on objects of a generic type which is bounded by a union or
+intersection:
+
+```py
+def generic_bounds[U: E1 | E2, I: E1 & E2](union: U, intersection: I):
+    # revealed: (bound method U@generic_bounds.f() -> list[U@generic_bounds]) | (bound method U@generic_bounds.f() -> list[U@generic_bounds])
+    reveal_type(union.f)
+    # TODO: This call should be accepted without errors. Pyright and mypy reveal `list[E1] | list[E2]` here, but
+    # `list[U@generic_bounds]` seems more accurate.
+    # error: [invalid-argument-type] "`U@generic_bounds` does not satisfy upper bound `E2` of type variable `Self`"
+    # error: [invalid-argument-type] "`U@generic_bounds` does not satisfy upper bound `E1` of type variable `Self`"
+    reveal_type(union.f())  # revealed: list[Unknown]
+
+    # revealed: (bound method I@generic_bounds.f() -> list[I@generic_bounds]) & (bound method I@generic_bounds.f() -> list[I@generic_bounds])
+    reveal_type(intersection.f)
+    reveal_type(intersection.f())  # revealed: list[I@generic_bounds]
+```
+
+#### Classmethods
+
+The same works for classmethods, when accessed on unions or intersections of `type[..]` types:
+
+```py
+from typing import Self
+
+class E1:
+    @classmethod
+    def f(cls: type[Self]) -> list[Self]:
+        return [cls()]
+
+class E2:
+    @classmethod
+    def f(cls: type[Self]) -> list[Self]:
+        return [cls()]
+
+def _(
+    union_external: type[E1] | type[E2],
+    union_internal: type[E1 | E2],
+    intersection_external: type[E1] & type[E2],
+    intersection_internal: type[E1 & E2],
+):
+    # revealed: (bound method type[E1].f() -> list[E1]) | (bound method type[E2].f() -> list[E2])
+    reveal_type(union_external.f)
+    reveal_type(union_external.f())  # revealed: list[E1] | list[E2]
+
+    # revealed: (bound method type[E1].f() -> list[E1]) | (bound method type[E2].f() -> list[E2])
+    reveal_type(union_internal.f)
+    reveal_type(union_internal.f())  # revealed: list[E1] | list[E2]
+
+    # revealed: (bound method (type[E1] & type[E2]).f() -> list[E1 & E2]) & (bound method (type[E1] & type[E2]).f() -> list[E1 & E2])
+    reveal_type(intersection_external.f)
+    # TODO: this should be `list[E1 & E2]`
+    reveal_type(intersection_external.f())  # revealed: Never
+
+    # TODO: this should reveal the same type as `intersection_external.f` above
+    # revealed: Never
+    reveal_type(intersection_internal.f)
+    # TODO: this should be `list[E1 & E2]`
+    reveal_type(intersection_internal.f())  # revealed: Never
+```
+
+This also works with protocols:
+
+```py
+from typing import Protocol
+
+class G1[T]: ...
+class G2[T]: ...
+
+class P1(Protocol):
+    @classmethod
+    def f(cls: type[Self]) -> G1[Self]: ...
+
+class P2(Protocol):
+    @classmethod
+    def f(cls: type[Self]) -> G2[Self]: ...
+
+def _(
+    union_external: type[P1] | type[P2],
+    union_internal: type[P1 | P2],
+    intersection_external: type[P1] & type[P2],
+    intersection_internal: type[P1 & P2],
+):
+    # revealed: (() -> G1[P1]) | (() -> G2[P2])
+    reveal_type(union_external.f)
+    reveal_type(union_external.f())  # revealed: G1[P1] | G2[P2]
+
+    # revealed: (() -> G1[P1]) | (() -> G2[P2])
+    reveal_type(union_internal.f)
+    reveal_type(union_internal.f())  # revealed: G1[P1] | G2[P2]
+
+    # TODO: this should not leak the Self@f type variables
+    # revealed: (() -> G1[Self@f]) & (() -> G2[Self@f])
+    reveal_type(intersection_external.f)
+    # TODO: this should be `G1[P1 & P2] & G2[P1 & P2]`
+    reveal_type(intersection_external.f())  # revealed: G1[Self@f] & G2[Self@f]
+
+    # TODO: this should not leak the Self@f type variables
+    # revealed: (() -> G1[Self@f]) & (() -> G2[Self@f])
+    reveal_type(intersection_internal.f)
+    # TODO: this should be `G1[P1 & P2] & G2[P1 & P2]`
+    reveal_type(intersection_internal.f())  # revealed: G1[Self@f] & G2[Self@f]
+```
+
+### Method defined on a single element
+
+#### Instance methods
+
+If the called method is defined on only one element, attribute access fails on the union, but still
+succeeds on the intersection type:
+
+```py
+from typing import Self
+
+class E1:
+    def f(self) -> list[Self]:
+        return [self]
+
+class E2: ...
+
+def _(union_12: E1 | E2, union_21: E2 | E1, intersection_12: E1 & E2, intersection_21: E2 & E1):
+    # error: [unresolved-attribute]
+    reveal_type(union_12.f)  # revealed: bound method E1.f() -> list[E1]
+    # error: [unresolved-attribute]
+    reveal_type(union_12.f())  # revealed: list[E1]
+
+    # error: [unresolved-attribute]
+    reveal_type(union_21.f)  # revealed: bound method E1.f() -> list[E1]
+    # error: [unresolved-attribute]
+    reveal_type(union_21.f())  # revealed: list[E1]
+
+    reveal_type(intersection_12.f)  # revealed: bound method (E1 & E2).f() -> list[E1 & E2]
+    reveal_type(intersection_12.f())  # revealed: list[E1 & E2]
+
+    reveal_type(intersection_21.f)  # revealed: bound method (E2 & E1).f() -> list[E2 & E1]
+    reveal_type(intersection_21.f())  # revealed: list[E2 & E1]
+```
+
+Analogous tests for method calls on objects of a generic type which is bounded by a union or
+intersection:
+
+```py
+def generic_bounds[U: E1 | E2, I: E1 & E2](union: U, intersection: I):
+    # revealed: bound method U@generic_bounds.f() -> list[U@generic_bounds]
+    # error: [unresolved-attribute]
+    reveal_type(union.f)
+    # TODO: Ideally, this would not emit the `invalid-argument-type` error and reveal `list[U@generic_bounds]`
+    # error: [invalid-argument-type] "`U@generic_bounds` does not satisfy upper bound `E1` of type variable `Self`"
+    # error: [unresolved-attribute]
+    reveal_type(union.f())  # revealed: list[Unknown]
+
+    # revealed: bound method I@generic_bounds.f() -> list[I@generic_bounds]
+    reveal_type(intersection.f)
+    reveal_type(intersection.f())  # revealed: list[I@generic_bounds]
+```
+
+#### Classmethods
+
+Same for classmethods:
+
+```py
+from typing import Self
+
+class E1:
+    @classmethod
+    def f(cls: type[Self]) -> list[Self]:
+        return [cls()]
+
+class E2: ...
+
+def _(
+    union_external: type[E1] | type[E2],
+    union_internal: type[E1 | E2],
+    intersection_external: type[E1] & type[E2],
+    intersection_internal: type[E1 & E2],
+):
+    # error: [unresolved-attribute]
+    reveal_type(union_external.f)  # revealed: bound method type[E1].f() -> list[E1]
+    # error: [unresolved-attribute]
+    reveal_type(union_external.f())  # revealed: list[E1]
+
+    # error: [unresolved-attribute]
+    reveal_type(union_internal.f)  # revealed: bound method type[E1].f() -> list[E1]
+    # error: [unresolved-attribute]
+    reveal_type(union_internal.f())  # revealed: list[E1]
+
+    # revealed: bound method (type[E1] & type[E2]).f() -> list[E1 & E2]
+    reveal_type(intersection_external.f)
+    # TODO: This should be list[E1 & E2]
+    reveal_type(intersection_external.f())  # revealed: list[E1]
+
+    # revealed: bound method (type[E1] & type[E2]).f() -> list[E1 & E2]
+    reveal_type(intersection_internal.f)
+    # TODO: This should be list[E1 & E2]
+    reveal_type(intersection_internal.f())  # revealed: list[E1]
+```
+
+This also works with protocols:
+
+```py
+from typing import Protocol
+
+class P1(Protocol):
+    @classmethod
+    def f(cls: type[Self]) -> list[Self]: ...
+
+class Other: ...
+
+def _(
+    union_external: type[P1] | type[Other],
+    union_internal: type[P1 | Other],
+    intersection_external: type[P1] & type[Other],
+    intersection_internal: type[P1 & Other],
+):
+    # error: [unresolved-attribute]
+    # revealed: () -> list[P1]
+    reveal_type(union_external.f)
+    # error: [unresolved-attribute]
+    reveal_type(union_external.f())  # revealed: list[P1]
+
+    # error: [unresolved-attribute]
+    # revealed: () -> list[P1]
+    reveal_type(union_internal.f)
+    # error: [unresolved-attribute]
+    reveal_type(union_internal.f())  # revealed: list[P1]
+
+    # TODO: this should not leak the Self@f type variable
+    # revealed: () -> list[Self@f]
+    reveal_type(intersection_external.f)
+    # TODO: this should be list[P1 & Other]
+    reveal_type(intersection_external.f())  # revealed: list[Self@f]
+
+    # TODO: this should not leak the Self@f type variable
+    # revealed: () -> list[Self@f]
+    reveal_type(intersection_internal.f)
+    # TODO: this should be list[P1 & Other]
+    reveal_type(intersection_internal.f())  # revealed: list[Self@f]
+```
+
+### Method defined on a single element and a dynamic type
+
+```py
+from typing import Self, Any
+
+class E1:
+    def f(self) -> list[Self]:
+        return [self]
+
+def _(union: E1 | Any, intersection: E1 & Any):
+    reveal_type(union.f)  # revealed: (bound method E1.f() -> list[E1]) | Any
+    reveal_type(union.f())  # revealed: list[E1] | Any
+
+    reveal_type(intersection.f)  # revealed: (bound method (E1 & Any).f() -> list[E1 & Any]) & Any
+    reveal_type(intersection.f())  # revealed: list[E1 & Any] & Any
 ```
 
 ## Stored protocol-bound methods
@@ -1193,6 +1465,44 @@ def narrowed_bound_method_attribute():
     if isinstance(method, ReturnsStr):
         reveal_type(method)  # revealed: (bound method C.f(x: int) -> str) & ReturnsStr
         reveal_type(method.__globals__)  # revealed: dict[str, Any]
+```
+
+## Decorated functions and bound methods
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+We treat the result of a callable-returning decorator as a function descriptor. This means that
+`C().decorated_method` is also a `BoundMethod`, and that we can access its `__self__` and `__func__`
+attributes.
+
+```py
+from typing import Callable
+
+def identity[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class C:
+    def plain_method(self, value: int) -> str:
+        return str(value)
+
+    @identity
+    def decorated_method(self, value: int) -> str:
+        return str(value)
+
+reveal_type(type(C().plain_method))  # revealed: <class 'MethodType'>
+reveal_type(type(C().decorated_method))  # revealed: <class 'MethodType'>
+
+decorated = C().decorated_method
+
+reveal_type(decorated.__self__)  # revealed: C
+reveal_type(decorated.__func__)  # revealed: (self, value: int) -> str
+reveal_type(decorated(1))  # revealed: str
+reveal_type(decorated.__call__(1))  # revealed: str
+decorated("wrong")  # error: [invalid-argument-type]
+callback: Callable[[int], str] = decorated
 ```
 
 ## Receiver rebinding does not shadow methods

@@ -39,8 +39,17 @@
 //! The data structures use `IndexVec` arenas to store all data compactly and contiguously, while
 //! supporting very cheap clones.
 //!
-//! Tracking live declarations is simpler, since constraints are not involved, but otherwise very
-//! similar to tracking live bindings.
+//! Tracking live declarations is simpler, since narrowing constraints are not involved, but
+//! otherwise very similar to tracking live bindings.
+//!
+//! We also store tagged entries for member and wildcard imports, whose source might be `Final`.
+//! Semantic indexing cannot determine whether the imported value is actually `Final`, so type
+//! inference checks these entries later. Imports are bindings, not type declarations, but an
+//! inherited `Final` constrains later assignments even after an ordinary assignment replaces the
+//! imported value binding. Reusing declaration flow preserves this metadata and gives it the same
+//! reachability and branch-merging behavior without another flow channel. These entries neither
+//! establish nor shadow a declared type, and the use-def map exposes them through separate
+//! imported-`Final` queries.
 
 use itertools::{EitherOrBoth, Itertools};
 use ruff_index::newtype_index;
@@ -73,16 +82,74 @@ impl ScopedDefinitionId {
 /// corresponding reachability constraints.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) struct Declarations {
-    /// A list of live declarations for this place, sorted by their `ScopedDefinitionId`
+    /// A list of live declarations for this place, sorted by their `ScopedDefinitionId`.
     live_declarations: SmallVec<[LiveDeclaration; 2]>,
 }
 
 /// One of the live declarations for a single place at some point in control flow.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) struct LiveDeclaration {
-    pub(super) declaration: ScopedDefinitionId,
+    declaration: PackedDeclarationId,
     pub(super) reachability_constraint: ScopedReachabilityConstraintId,
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
+struct PackedDeclarationId(u32);
+
+impl PackedDeclarationId {
+    // Use the high bit to distinguish imported qualifiers without increasing the size of every
+    // declaration. Scope-local IDs retain 31 bits.
+    const IMPORTED_QUALIFIER: u32 = 1 << 31;
+    const DEFINITION_MASK: u32 = !Self::IMPORTED_QUALIFIER;
+
+    fn new(declaration: ScopedDefinitionId, is_imported_qualifier: bool) -> Self {
+        let declaration = declaration.as_u32();
+        assert_eq!(
+            declaration & Self::IMPORTED_QUALIFIER,
+            0,
+            "scopes cannot contain more than 2^31 definitions"
+        );
+
+        let qualifier_bit = if is_imported_qualifier {
+            Self::IMPORTED_QUALIFIER
+        } else {
+            0
+        };
+
+        Self(declaration | qualifier_bit)
+    }
+
+    const fn definition(self) -> ScopedDefinitionId {
+        ScopedDefinitionId::from_u32(self.0 & Self::DEFINITION_MASK)
+    }
+
+    const fn is_imported_qualifier(self) -> bool {
+        self.0 & Self::IMPORTED_QUALIFIER != 0
+    }
+}
+
+impl LiveDeclaration {
+    fn new(
+        declaration: ScopedDefinitionId,
+        reachability_constraint: ScopedReachabilityConstraintId,
+        is_imported_qualifier: bool,
+    ) -> Self {
+        Self {
+            declaration: PackedDeclarationId::new(declaration, is_imported_qualifier),
+            reachability_constraint,
+        }
+    }
+
+    pub(super) const fn declaration(&self) -> ScopedDefinitionId {
+        self.declaration.definition()
+    }
+
+    pub(super) const fn is_imported_qualifier(&self) -> bool {
+        self.declaration.is_imported_qualifier()
+    }
+}
+
+static_assertions::assert_eq_size!(LiveDeclaration, [u32; 2]);
 
 pub(super) type LiveDeclarationsIterator<'a> = std::slice::Iter<'a, LiveDeclaration>;
 
@@ -115,16 +182,12 @@ impl Declarations {
     pub(super) fn undeclared_reachability_constraint(
         &self,
     ) -> Option<ScopedReachabilityConstraintId> {
-        let [
-            LiveDeclaration {
-                declaration: ScopedDefinitionId::UNBOUND,
-                reachability_constraint,
-            },
-        ] = self.live_declarations.as_slice()
-        else {
+        let [declaration] = self.live_declarations.as_slice() else {
             return None;
         };
-        Some(*reachability_constraint)
+
+        (declaration.declaration() == ScopedDefinitionId::UNBOUND)
+            .then_some(declaration.reachability_constraint)
     }
 
     pub(super) fn is_always_undeclared(&self) -> bool {
@@ -133,10 +196,8 @@ impl Declarations {
     }
 
     pub(super) fn undeclared(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
-        let initial_declaration = LiveDeclaration {
-            declaration: ScopedDefinitionId::UNBOUND,
-            reachability_constraint,
-        };
+        let initial_declaration =
+            LiveDeclaration::new(ScopedDefinitionId::UNBOUND, reachability_constraint, false);
         Self {
             live_declarations: smallvec![initial_declaration],
         }
@@ -150,13 +211,40 @@ impl Declarations {
         previous_definitions: PreviousDefinitions,
     ) {
         if previous_definitions.are_shadowed() {
-            // The new declaration replaces all previous live declaration in this path.
+            // A real declaration replaces all earlier declarations, including imported qualifiers.
             self.live_declarations.clear();
         }
-        self.live_declarations.push(LiveDeclaration {
+        self.live_declarations.push(LiveDeclaration::new(
             declaration,
             reachability_constraint,
-        });
+            false,
+        ));
+    }
+
+    /// Record an import that may contribute qualifiers without declaring a type.
+    ///
+    /// Imports replace earlier imported qualifiers, but keep real declarations and the undeclared
+    /// sentinel so that an existing annotation or the absence of one remains visible.
+    pub(super) fn record_imported_qualifier(
+        &mut self,
+        declaration: ScopedDefinitionId,
+        reachability_constraint: ScopedReachabilityConstraintId,
+        previous_definitions: PreviousDefinitions,
+    ) {
+        if previous_definitions.are_shadowed() {
+            self.clear_imported_qualifiers();
+        }
+
+        self.live_declarations.push(LiveDeclaration::new(
+            declaration,
+            reachability_constraint,
+            true,
+        ));
+    }
+
+    fn clear_imported_qualifiers(&mut self) {
+        self.live_declarations
+            .retain(|declaration| !declaration.is_imported_qualifier());
     }
 
     /// Add given reachability constraint to all live declarations.
@@ -189,14 +277,15 @@ impl Declarations {
         // path, it is used as-is.
         let a = a.live_declarations.into_iter();
         let b = b.live_declarations.into_iter();
-        for zipped in a.merge_join_by(b, |a, b| a.declaration.cmp(&b.declaration)) {
+        for zipped in a.merge_join_by(b, |a, b| a.declaration().cmp(&b.declaration())) {
             match zipped {
                 EitherOrBoth::Both(a, b) => {
                     let reachability_constraint = reachability_constraints
                         .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
+                    debug_assert_eq!(a.is_imported_qualifier(), b.is_imported_qualifier());
                     self.live_declarations.push(LiveDeclaration {
-                        declaration: a.declaration,
                         reachability_constraint,
+                        ..a
                     });
                 }
 
@@ -577,6 +666,23 @@ impl PlaceState {
         );
     }
 
+    /// Record an import that may contribute qualifiers independently of a declared type.
+    pub(super) fn record_imported_qualifier(
+        &mut self,
+        declaration_id: ScopedDefinitionId,
+        reachability_constraint: ScopedReachabilityConstraintId,
+    ) {
+        self.declarations.record_imported_qualifier(
+            declaration_id,
+            reachability_constraint,
+            PreviousDefinitions::AreShadowed,
+        );
+    }
+
+    pub(super) fn clear_imported_qualifiers(&mut self) {
+        self.declarations.clear_imported_qualifiers();
+    }
+
     /// Merge another [`PlaceState`] into this one.
     pub(super) fn merge(
         &mut self,
@@ -630,18 +736,16 @@ mod tests {
         let actual = place
             .declarations()
             .iter()
-            .map(
-                |LiveDeclaration {
-                     declaration,
-                     reachability_constraint: _,
-                 }| {
-                    if *declaration == ScopedDefinitionId::UNBOUND {
-                        "undeclared".into()
-                    } else {
-                        declaration.as_u32().to_string()
-                    }
-                },
-            )
+            .map(|live_declaration| {
+                let declaration = live_declaration.declaration();
+                if declaration == ScopedDefinitionId::UNBOUND {
+                    "undeclared".into()
+                } else if live_declaration.is_imported_qualifier() {
+                    format!("{} (imported qualifier)", declaration.as_u32())
+                } else {
+                    declaration.as_u32().to_string()
+                }
+            })
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
     }
@@ -890,6 +994,57 @@ mod tests {
         );
 
         assert_declarations(&sym, &["2"]);
+    }
+
+    #[test]
+    fn imported_qualifier_preserves_existing_declaration() {
+        let mut sym = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        sym.record_declaration(
+            ScopedDefinitionId::from_u32(1),
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+        );
+        sym.record_imported_qualifier(
+            ScopedDefinitionId::from_u32(2),
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+        );
+
+        assert_declarations(&sym, &["1", "2 (imported qualifier)"]);
+
+        sym.record_imported_qualifier(
+            ScopedDefinitionId::from_u32(3),
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+        );
+
+        assert_declarations(&sym, &["1", "3 (imported qualifier)"]);
+
+        sym.clear_imported_qualifiers();
+
+        assert_declarations(&sym, &["1"]);
+    }
+
+    #[test]
+    fn imported_qualifier_merge_preserves_alternative_declaration() {
+        let mut narrowing_constraints = NarrowingConstraintsBuilder::default();
+        let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
+        let mut imported = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        imported.record_imported_qualifier(
+            ScopedDefinitionId::from_u32(1),
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+        );
+
+        let mut declared = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        declared.record_declaration(
+            ScopedDefinitionId::from_u32(2),
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+        );
+
+        imported.merge(
+            declared,
+            &mut narrowing_constraints,
+            &mut reachability_constraints,
+        );
+
+        assert_declarations(&imported, &["undeclared", "1 (imported qualifier)", "2"]);
     }
 
     #[test]

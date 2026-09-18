@@ -4,8 +4,8 @@ use std::ops::ControlFlow;
 use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintId, ConstraintSetStorage, NodeId, PathBoundBuilder,
-    PathBounds, SolutionLimits,
+    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, ConstraintId,
+    ConstraintSetStorage, NodeId, PathBoundBuilder, SolutionLimits,
 };
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
@@ -95,9 +95,9 @@ impl<'db> SolutionWalker<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-    ) -> PathBounds<'db> {
+    ) -> CandidateSolutions<'db> {
         if self.sorted_paths.is_empty() {
-            return PathBounds::Unsatisfiable;
+            return CandidateSolutions::Unsatisfiable;
         }
 
         self.sorted_paths.sort_by(|path1, path2| {
@@ -146,13 +146,14 @@ impl<'db> SolutionWalker<'db> {
                 }
             }
 
-            let path_bounds = mappings
+            let typevars = mappings
                 .drain(..)
                 .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
                 .collect();
-            result.push(path_bounds);
+            let candidate = CandidateSolution { typevars };
+            result.push(candidate);
         }
 
-        PathBounds::Constrained(result.into_boxed_slice())
+        CandidateSolutions::Constrained(result.into_boxed_slice())
     }
 }

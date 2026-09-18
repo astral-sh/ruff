@@ -24,7 +24,9 @@ const SPACER: &str = "&nbsp;&nbsp;&nbsp;&nbsp;";
 /// Style for the rule's default selection, fixability, and status icons.
 const SYMBOL_STYLE: &str = "style='width: 1em; display: inline-block;'";
 /// Style for the container wrapping the default selection, fixability, and status icons.
-const SYMBOLS_CONTAINER: &str = "style='display: flex; gap: 0.5rem; justify-content: end;'";
+/// Keep the absolutely positioned screen-reader labels inside the table's scroll area.
+const SYMBOLS_CONTAINER: &str =
+    "style='position: relative; display: flex; gap: 0.5rem; justify-content: end;'";
 
 fn generate_table(
     table_out: &mut String,

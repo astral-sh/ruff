@@ -1641,6 +1641,40 @@ reveal_type(narrow(1))  # revealed: int
 reveal_type(narrow("hello"))  # revealed: str
 ```
 
+## Selecting constraints for narrowed caller type variables
+
+Caller type variables are not inferable when selecting a constraint for a callee's type variable:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+ReversedT = TypeVar("ReversedT", str, int)
+S = TypeVar("S")
+
+def constrained(value: T) -> T:
+    return value
+
+def reversed_constraints(value: ReversedT) -> ReversedT:
+    return value
+
+def narrowed(value: S) -> None:
+    if isinstance(value, str):
+        reveal_type(constrained(value))  # revealed: str
+        reveal_type(reversed_constraints(value))  # revealed: str
+```
+
+The caller's variable also remains fixed when the narrowed value is nested in a tuple:
+
+```py
+def constrained_tuple(value: tuple[T]) -> T:
+    return value[0]
+
+def narrowed_tuple(value: S) -> None:
+    if isinstance(value, str):
+        reveal_type(constrained_tuple((value,)))  # revealed: str
+```
+
 ## Redundant callback bounds preserve constrained type-variable relationships
 
 A contravariant callback can contribute both another constrained type variable and a redundant
@@ -1857,4 +1891,57 @@ def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     # TODO: We only report the first error here, but we should report both.
     # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1` does not satisfy upper bound `Base` of type variable `T`"
     reveal_type(first(x))  # revealed: Unknown
+```
+
+## Inferring type arguments through recursive aliases
+
+Generic calls infer leaf types from already-annotated recursive values. The argument can use a
+structurally equivalent alias or spell out the outer tuple. A tuple parameter can also receive a
+recursive alias, and separate occurrences of an alias contribute their own leaf types.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+Tree = tuple[T, "Tree[T] | None"]
+OtherTree = tuple[T, "OtherTree[T] | None"]
+
+def leaf(value: Tree[U]) -> U:
+    return value[0]
+
+def first(value: tuple[U, object]) -> U:
+    return value[0]
+
+def either_leaf(value: tuple[Tree[U], Tree[U]]) -> U:
+    return value[0][0]
+
+def probe(value: Tree[int], other: OtherTree[str], plain: tuple[bytes, Tree[bytes] | None]):
+    reveal_type(leaf(value))  # revealed: int
+    reveal_type(leaf(other))  # revealed: str
+    reveal_type(leaf(plain))  # revealed: bytes
+    reveal_type(first(value))  # revealed: int
+    reveal_type(either_leaf((value, other)))  # revealed: int | str
+```
+
+## Inferring type arguments from deeper recursive levels
+
+These trees have distinct types at their first three levels and integer values at every level
+afterward. A function selecting a grandchild infers its type from the third level, even though its
+parameter does not constrain the first two levels.
+
+```py
+from collections.abc import Sequence
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+Levels = tuple[T, Sequence["Levels[U, V, int]"]]
+
+def grandchild_value(value: Levels[object, object, U]) -> U:
+    return value[1][0][1][0][0]
+
+def probe(value: Levels[int, str, bytes]):
+    reveal_type(grandchild_value(value))  # revealed: bytes
 ```
