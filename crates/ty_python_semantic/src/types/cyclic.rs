@@ -58,33 +58,14 @@ pub enum TypeIdentity<'db> {
 }
 
 impl<'db> Type<'db> {
-    /// Uses definition identity only when expanding `__call__` can grow the specialization.
-    /// Finite chains such as `Wrapper[Wrapper[Callable[[], int]]]` retain exact identities.
-    ///
-    /// ```python
-    /// class Growing[T]:
-    ///     __call__: "Growing[list[T]]"
-    ///
-    /// class Wrapper[T]:
-    ///     __call__: T
-    /// ```
-    ///
-    /// The specializations of `Growing` share an identity so expansion terminates. Distinct
-    /// specializations of `Wrapper` can lead to different signatures and must remain separate.
-    pub(super) fn callable_recursion_identity(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> TypeIdentity<'db> {
-        if let Some(reference) = RecursiveDefinition::from_callable_type(db, env, self)
-            && matches!(reference.target, RecursiveDefinition::Callable(_))
-            && reference.target.generic_context(db).is_some()
-            && reference.target.may_have_unbounded_specialization(db)
-        {
-            TypeIdentity::GrowingCallable(reference.target.definition(db))
-        } else {
-            TypeIdentity::Other(self)
-        }
+    /// Whether binding this attribute can invoke user-defined `__get__` behavior, rather than
+    /// ordinary function, staticmethod, or classmethod binding.
+    fn is_custom_descriptor(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        self.function_like_kind(db).is_none()
+            && !self
+                .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
+                .place
+                .is_undefined()
     }
 
     pub(crate) fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
@@ -257,6 +238,8 @@ struct SpecializationFlowGraph<'db> {
     inconclusive_definitions: FxHashSet<Definition<'db>>,
     /// Whether a definition body or its formal parameters could not be inspected.
     inconclusive: bool,
+    /// A custom descriptor can select different expansion paths for different specializations.
+    descriptor_dependent: bool,
 }
 
 /// Walks one identity-specialized definition body and records references as graph edges.
@@ -270,6 +253,7 @@ struct SpecializationFlowVisitor<'db> {
     edges: RefCell<Vec<FlowEdge<'db>>>,
     referenced_definitions: RefCell<Vec<RecursiveDefinition<'db>>>,
     inconclusive: Cell<bool>,
+    descriptor_dependent: Cell<bool>,
 }
 
 /// Finds which parameters of the current source definition occur in one actual argument.
@@ -414,21 +398,55 @@ impl<'db> RecursiveDefinition<'db> {
     }
 
     fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
+        self.specialization_growth(db).unwrap_or(true)
+    }
+
+    /// Whether specialization may grow without bound. Returns `None` when callable expansion
+    /// depends on custom descriptor dispatch: the identity-specialized body cannot establish
+    /// how other specializations expand.
+    fn specialization_growth(self, db: &'db dyn Db) -> Option<bool> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _, ()| true,
+            cycle_initial=|_, _, _, ()| None,
             heap_size=ruff_memory_usage::heap_size,
         )]
-        fn may_have_unbounded_specialization_inner<'db>(
+        fn specialization_growth_inner<'db>(
             db: &'db dyn Db,
             root: RecursiveDefinition<'db>,
             _: (),
-        ) -> bool {
+        ) -> Option<bool> {
             let graph = SpecializationFlowGraph::build(db, root);
-            graph.root_may_have_unbounded_specialization(db, root)
+            (!graph.descriptor_dependent)
+                .then(|| graph.root_may_have_unbounded_specialization(db, root))
         }
 
-        may_have_unbounded_specialization_inner(db, self, ())
+        specialization_growth_inner(db, self, ())
+    }
+
+    /// Whether looking up `__call__` invokes a custom descriptor. Ordinary function binding is
+    /// independent of overload selection, but a custom `__get__` can dispatch on the receiver's
+    /// specialization and change the next callable in the chain.
+    fn callable_is_descriptor_dependent(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        let Self::Callable(origin) = self else {
+            return false;
+        };
+        let Some(instance) =
+            Type::from(origin.identity_specialization(db)).to_instance_approximation(db, env)
+        else {
+            return true;
+        };
+        let Some(member) = instance
+            .class_member(db, env, "__call__")
+            .place
+            .ignore_possibly_undefined()
+        else {
+            return false;
+        };
+        member.is_custom_descriptor(db, env)
     }
 
     /// Returns the type to expand with each formal parameter mapped to itself. Classes contribute
@@ -454,6 +472,7 @@ impl<'db> RecursiveDefinition<'db> {
 
     /// Returns, in declaration order, parameters that can become the next callable in an expansion.
     /// Parameters used only in a signature or in an ignored type argument are excluded.
+    /// Custom descriptors conservatively expose all parameters, since dispatch can depend on them.
     ///
     /// ```python
     /// class First[T, U]:
@@ -478,6 +497,10 @@ impl<'db> RecursiveDefinition<'db> {
                 env: ProgramEnvironment::from_definition(source.definition(db)),
                 found: RefCell::default(),
             };
+            if source.callable_is_descriptor_dependent(db, &visitor.env) {
+                // Any parameter could affect descriptor overload selection or its result.
+                return source.parameters(db).collect();
+            }
             if let Some(body) = source.callable_body(db, &visitor.env) {
                 visitor.visit_type(db, body);
             }
@@ -533,9 +556,14 @@ impl<'db> SpecializationFlowGraph<'db> {
                 graph.inconclusive = true;
                 continue;
             };
+            if visitor.callable && source.callable_is_descriptor_dependent(db, &visitor.env) {
+                graph.descriptor_dependent = true;
+                continue;
+            }
             if !visitor.visit_definition_body(db, source) {
                 graph.inconclusive = true;
             }
+            graph.descriptor_dependent |= visitor.descriptor_dependent.get();
             let (edges, referenced_definitions, inconclusive) = visitor.finish();
             graph.edges.extend(edges);
             if inconclusive {
@@ -717,6 +745,7 @@ impl<'db> SpecializationFlowVisitor<'db> {
             edges: RefCell::default(),
             referenced_definitions: RefCell::default(),
             inconclusive: Cell::default(),
+            descriptor_dependent: Cell::default(),
         })
     }
 
@@ -820,6 +849,12 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
         }
 
         if self.callable {
+            // Exposed type arguments can themselves be descriptors when substituted into an
+            // attribute such as `Wrapper[T].__call__: T`.
+            if ty.is_custom_descriptor(db, &self.env) {
+                self.descriptor_dependent.set(true);
+                return;
+            }
             if let Some(reference) = RecursiveDefinition::from_callable_type(db, &self.env, ty) {
                 self.record_reference(db, reference);
                 reference.walk_callable_arguments(db, self);
@@ -866,7 +901,11 @@ impl<'db> TypeVisitor<'db> for CallableParameterCollector<'db> {
                 .borrow_mut()
                 .insert(RecursiveDefinition::parameter_identity(db, typevar));
         } else if let Some(reference) = RecursiveDefinition::from_callable_type(db, &self.env, ty) {
-            reference.walk_callable_arguments(db, self);
+            if ty.is_custom_descriptor(db, &self.env) {
+                reference.walk_arguments(db, self);
+            } else {
+                reference.walk_callable_arguments(db, self);
+            }
         } else {
             walk_callable_expansion(db, ty, self);
         }
@@ -1400,6 +1439,55 @@ impl<T, R> CycleDetectorCache<T, R> {
     #[cfg(test)]
     const fn is_spilled(&self) -> bool {
         matches!(self, Self::Spilled(_))
+    }
+}
+
+/// Guards callable expansion while preserving specialization-dependent descriptor dispatch.
+/// Plain growing annotations, such as `__call__: Growing[list[T]]`, share definition identity.
+/// Finite chains such as `Wrapper[Wrapper[Callable[[], int]]]` retain exact identities.
+///
+/// Custom descriptors also retain exact identities: an overloaded `__get__` can return another
+/// specialization for one receiver and a callable signature for another. Their expansion is
+/// bounded separately; exhausting that bound establishes neither a cycle nor non-callability.
+#[derive(Debug, Default)]
+pub(super) struct CallableRecursionDetector<'db> {
+    active: ActiveRecursionDetector<TypeIdentity<'db>>,
+}
+
+impl<'db> CallableRecursionDetector<'db> {
+    pub(super) fn visit<R>(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        on_cycle: impl FnOnce() -> R,
+        on_limit: impl FnOnce() -> R,
+        func: impl FnOnce() -> R,
+    ) -> R {
+        let mut identity = TypeIdentity::Other(ty);
+        let mut descriptor_dependent = false;
+        if let Some(reference) = RecursiveDefinition::from_callable_type(db, env, ty)
+            && matches!(reference.target, RecursiveDefinition::Callable(_))
+            && reference.target.generic_context(db).is_some()
+        {
+            match reference.target.specialization_growth(db) {
+                Some(true) => {
+                    identity = TypeIdentity::GrowingCallable(reference.target.definition(db));
+                }
+                Some(false) => {}
+                None => descriptor_dependent = true,
+            }
+        }
+        self.active.visit(&identity, on_cycle, || {
+            // Descriptor dispatch can keep growing without ever repeating an exact type. Leave
+            // ordinary finite chains unrestricted, but bound paths we cannot analyze statically.
+            const MAX_DESCRIPTOR_EXPANSION: usize = 64;
+            if descriptor_dependent && self.active.seen.borrow().len() > MAX_DESCRIPTOR_EXPANSION {
+                on_limit()
+            } else {
+                func()
+            }
+        })
     }
 }
 

@@ -11,7 +11,7 @@ use crate::{
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
-        cyclic::{ActiveRecursionDetector, TypeIdentity},
+        cyclic::CallableRecursionDetector,
         function::OverloadLiteral,
         known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
         relation::{TypeRelation, TypeRelationChecker},
@@ -243,8 +243,11 @@ impl<'db> Type<'db> {
                     context
                         .active_instances
                         .visit(
-                            &self.callable_recursion_identity(db, env),
+                            db,
+                            env,
+                            self,
                             || None,
+                            || Some(CallableTypes::one(CallableType::unknown(db))),
                             || {
                                 place.ty.try_upcast_to_callable_with_policy_and_context(
                                     db, env, policy, context,
@@ -433,7 +436,7 @@ impl<'db> Type<'db> {
 #[derive(Debug, Default)]
 struct CallableUpcastContext<'db> {
     recursive_definition: Option<Definition<'db>>,
-    active_instances: ActiveRecursionDetector<TypeIdentity<'db>>,
+    active_instances: CallableRecursionDetector<'db>,
 }
 
 impl<'db> CallableUpcastContext<'db> {

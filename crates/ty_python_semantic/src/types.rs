@@ -29,7 +29,7 @@ pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
-use self::cyclic::{ActiveRecursionDetector, HasIdentity, TypeIdentity};
+use self::cyclic::{ActiveRecursionDetector, CallableRecursionDetector, HasIdentity, TypeIdentity};
 pub use self::dedicated::pytest::{
     FixtureBinding, FixtureExposure, FixtureNameSource, PytestTest, fixture_bindings_for_parameter,
     fixture_exposures_for_definition, pytest_global_plugin_files, pytest_tests_in_file,
@@ -431,7 +431,7 @@ struct TypeRecursionContext<'db> {
 /// retain a nominal return type, whereas a pure instance cycle provides no callable signature.
 struct BindingsRecursionContext<'a, 'db> {
     constructors: &'a ActiveRecursionDetector<Type<'db>>,
-    instances: ActiveRecursionDetector<TypeIdentity<'db>>,
+    instances: CallableRecursionDetector<'db>,
 }
 
 impl<'a, 'db> BindingsRecursionContext<'a, 'db> {
@@ -440,7 +440,7 @@ impl<'a, 'db> BindingsRecursionContext<'a, 'db> {
     fn new(constructors: &'a ActiveRecursionDetector<Type<'db>>) -> Self {
         Self {
             constructors,
-            instances: ActiveRecursionDetector::default(),
+            instances: CallableRecursionDetector::default(),
         }
     }
 }
@@ -6948,8 +6948,11 @@ impl<'db> Type<'db> {
                         // A recursive `__call__` annotation can keep expanding without reaching
                         // a signature, even if its specialization changes at each step.
                         let mut bindings = recursion_guard.instances.visit(
-                            &self.callable_recursion_identity(db, env),
+                            db,
+                            env,
+                            self,
                             || CallableBinding::not_callable(self).into(),
+                            || Binding::single(self, Signature::unknown()).into(),
                             || dunder_callable.bindings_impl(db, env, recursion_guard),
                         );
                         bindings.replace_callable_type(dunder_callable, self);
