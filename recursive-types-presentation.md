@@ -100,9 +100,8 @@ implementation is that **semantic type operations can only ever see closed types
 Let's look at the Rust-level implementation. We have two new `Type` variants, `Type::Recursive`
 and `Type::RecursiveVar`.
 
-`Type::Recursive` is the outer "binder", `μr.`. It wraps the entire body of our recursive type. (We
-can also call it a "recursive application" of `r`). It carries a struct with these fields (plus some
-others we can ignore for now):
+`Type::Recursive` carries a `RecursiveType` that stores the binder, `μr.`, and its body. The struct
+has these fields (plus some others we can ignore for now):
 
 ```rust
 struct RecursiveType<'db> {
@@ -124,8 +123,8 @@ struct RecursiveVar<'db> {
 }
 ```
 
-Wherever this type appears, it represents a recursion of the outer `RecursiveType` body with
-matching `cycle` ID.
+This variable refers to the whole recursive type bound by the nearest enclosing `RecursiveType`
+with the matching `cycle` ID.
 
 So the `body` of a `RecursiveType` should be an open type with one or more occurrences of a
 `RecursiveVar` with the same `cycle` ID. The `RecursiveType` itself can be a closed type: it binds
@@ -256,21 +255,21 @@ For `Tree = int | tuple["Tree"]`, the process looks like this:
    μr. (int | tuple[r])
 ```
 
-The "bind" operation in step 3 is a type mapping. Given a cycle identity `r` and a type (in this
-case `int | tuple[P]`, where `P` is a `RecursiveType` for cycle `r`), binding transforms that type
-by finding any `RecursiveType` for `r` and replacing them with a `RecursiveVar` for `r`, and then
-wrapping the entire resulting type in a `RecursiveType` for `r`. So this transforms `int | tuple[P]`
-to `μr. (int | tuple[r])`.
+The `RecursiveType::bind` operation in step 3 uses a type mapping. Given a cycle identity `r` and a
+type (in this case `int | tuple[P]`, where `P` is a `RecursiveType` for cycle `r`), the mapping finds
+matching `RecursiveType` occurrences and replaces each with a `RecursiveVar` for `r`. This produces
+the open body `int | tuple[r]`. After checking the result, the `bind` method wraps this body in a
+new `RecursiveType` for `r`, producing `μr. (int | tuple[r])`.
 
 The "original" `P` was simply `μr. r`, the provisional cycle-initial type, but after cycle iteration
 it may have gained a layer of recursion, so it may be a more complex `RecursiveType`. The "bind"
 operation doesn't actually care about its internal structure: as long as it has cycle identity `r`,
 "bind" will replace it with a `RecursiveVar` for `r`.
 
-Binding and unfolding go in opposite directions: binding replaces applications of `r` with
-variables; unfolding replaces those variables with applications.
+Binding and unfolding go in opposite directions: binding replaces matching recursive types with
+variables; unfolding replaces those variables with the whole recursive type.
 
-Both binding and unfolding are implemented as `TypeMapping::ApplyRecursiveSubstitution`, which
+The substitutions in both operations use `TypeMapping::ApplyRecursiveSubstitution`, which
 carries a `RecursiveSubstitution` enum with `Bind` and `Unfold` variants.
 
 [Salsa query][inference-source] · [Initial value and cycle recovery][binding-source]
@@ -334,8 +333,8 @@ lists, so `[int]` means `T := int`):
 | `RecursiveVar.arguments = [list[T]]` | The recursive occurrence applies the constructor to `list[T]`. |
 
 The stored body of a `RecursiveType` is kept unspecialized! So for `Tree[int]`, the body is still
-just `T | tuple[F[list[T]]]` (where `F[list[T]]` represents a `RecursiveVar` with `arguments:
-list[T]`). The fact that we've specialized it to `int` is stored only in the `arguments` of the
+just `T | tuple[F[list[T]]]` (where `F[list[T]]` represents a `RecursiveVar` with
+`arguments: list[T]`). The fact that we've specialized it to `int` is stored only in the `arguments` of the
 outer `RecursiveType`. This avoids an infinitely-growing eager expansion.
 
 We don't actually apply the specialization until we unfold:
