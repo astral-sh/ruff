@@ -1,6 +1,7 @@
 name: Run memory report
 
-permissions: {}
+permissions:
+  contents: read
 
 # Third-party builds must not write caches consumed by other jobs.
 # GitHub-hosted runners use GitHub's cache service, which enforces this mode.

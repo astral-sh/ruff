@@ -671,6 +671,47 @@ def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
         reveal_type(x)  # revealed: str | None
 ```
 
+## Combining `not in` conditions
+
+When either of two membership exclusions can hold, only the values excluded by both conditions
+remain excluded. The earlier `bytes` exclusion is preserved:
+
+```py
+def disjoint_groups(value):
+    if isinstance(value, bytes):
+        return
+    if value not in (10, 11) or value not in (20, 21):
+        reveal_type(value)  # revealed: Unknown & ~bytes
+
+def overlapping_groups(value):
+    if isinstance(value, bytes):
+        return
+    if value not in (10, 11) or value not in (11, 12, 13):
+        reveal_type(value)  # revealed: Unknown & ~bytes & ~Literal[11]
+```
+
+Conjoining several disjoint groups still retains only the original `bytes` exclusion, without
+multiplying the redundant alternatives at each condition:
+
+```py
+def repeated_groups(value):
+    if isinstance(value, bytes):
+        return
+    if (
+        (value not in (10, 11) or value not in (12, 13))
+        and (value not in (14, 15) or value not in (16, 17))
+        and (value not in (18, 19) or value not in (20, 21))
+        and (value not in (22, 23) or value not in (24, 25))
+        and (value not in (26, 27) or value not in (28, 29))
+        and (value not in (30, 31) or value not in (32, 33))
+        and (value not in (34, 35) or value not in (36, 37))
+        and (value not in (38, 39) or value not in (40, 41))
+        and (value not in (42, 43) or value not in (44, 45))
+        and (value not in (46, 47) or value not in (48, 49))
+    ):
+        reveal_type(value)  # revealed: Unknown & ~bytes
+```
+
 ## Recursive tuple slots
 
 ```toml

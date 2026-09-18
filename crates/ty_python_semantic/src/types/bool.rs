@@ -246,9 +246,7 @@ impl<'db> Type<'db> {
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
-            Type::Callable(callable)
-                if callable.is_function_like(db) || callable.is_method_wrapper(db) =>
-            {
+            Type::Callable(callable) if callable.runtime_class(db).is_some() => {
                 Truthiness::AlwaysTrue
             }
 
@@ -260,12 +258,10 @@ impl<'db> Type<'db> {
             | Type::TypeGuard(_)
             | Type::TypeForm(_) => Truthiness::Ambiguous,
 
-            Type::Recursive(recursive) => recursive.map_or_else(
-                db,
-                env,
-                || Ok(Truthiness::Ambiguous),
-                |unfolded| unfolded.try_bool_impl(db, env, allow_short_circuit, visitor),
-            )?,
+            Type::Recursive(recursive) => recursive
+                .unfold(db, env)
+                .map(|unfolded| unfolded.try_bool_impl(db, env, allow_short_circuit, visitor))
+                .unwrap_or(Ok(Truthiness::Ambiguous))?,
 
             Type::TypedDict(td) => {
                 if td.items(db).values().any(TypedDictField::is_required) {

@@ -389,6 +389,18 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 wrong_innards: C[int] = C("five")
 ```
 
+An explicit `cls: type[Self]` annotation does not affect the inferred type:
+
+```py
+from typing import Self
+
+class Explicit[T]:
+    def __new__(cls: type[Self], x: T) -> "Explicit[T]":
+        return object.__new__(cls)
+
+reveal_type(Explicit(1))  # revealed: Explicit[Literal[1]]
+```
+
 ### `__init__` only
 
 ```py
@@ -406,6 +418,17 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 
 # error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
+```
+
+An explicit `self: Self` annotation does not affect the inferred type:
+
+```py
+from typing import Self
+
+class Explicit[T]:
+    def __init__(self: Self, x: T) -> None: ...
+
+reveal_type(Explicit(1))  # revealed: Explicit[Literal[1]]
 ```
 
 ### Failed constructor inference

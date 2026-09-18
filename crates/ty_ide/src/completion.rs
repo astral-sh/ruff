@@ -3349,7 +3349,7 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             Type::Recursive(recursive) => visitor.visit(db, ty, || {
                 imp(
                     db,
-                    recursive.unfold(db, &recursive.environment(db)),
+                    recursive.unfold(db, &recursive.environment(db)).into_type(),
                     visitor,
                 )
             })?,

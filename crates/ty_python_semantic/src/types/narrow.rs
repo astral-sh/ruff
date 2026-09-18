@@ -17,7 +17,7 @@ use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType, CycleDetector,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
+    Type, TypeContext, TypeVarBoundOrConstraints, UnfoldResult, UnionBuilder, binding_type,
     class_pattern_positional_sources, definite_match_pattern_type_for_subject,
     exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
     pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
@@ -549,7 +549,7 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
             }
             Type::TypeAlias(alias) => self.generate(db, alias.value_type(db)),
             Type::Recursive(recursive) => {
-                recursive.map_or_else(db, env, || None, |unfolded| self.generate(db, unfolded))
+                self.generate(db, recursive.unfold(db, env).into_unfolded()?)
             }
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
@@ -1016,14 +1016,10 @@ fn specialize_generic_class_for_subject<'db>(
     };
 
     let constraints = ConstraintSetBuilder::new();
+    let inferable = generic_context.inferable_typevars(db);
     let solutions = Type::instance(db, env, source)
-        .assignable_solutions_with_inferable(
-            db,
-            env,
-            Type::instance(db, env, target),
-            generic_context.inferable_typevars(db),
-        )
-        .solve(db, env, &constraints);
+        .assignable_solutions_with_inferable(db, env, Type::instance(db, env, target), inferable)
+        .solve(db, env, &constraints, inferable);
 
     specialize_generic_class_from_solutions(db, env, target_class, solutions)
 }
@@ -5279,11 +5275,9 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
             .iter()
             .any(|union_member_ty| is_or_contains_typeddict(db, *union_member_ty)),
         Type::TypeAlias(alias) => is_or_contains_typeddict(db, alias.value_type(db)),
-        Type::Recursive(recursive) => {
-            recursive.map_or(db, &recursive.environment(db), false, |unfolded| {
-                is_or_contains_typeddict(db, unfolded)
-            })
-        }
+        Type::Recursive(recursive) => recursive
+            .unfold(db, &recursive.environment(db))
+            .is_unfolded_and(|unfolded| is_or_contains_typeddict(db, unfolded)),
 
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -5428,14 +5422,10 @@ fn visit_matching_typeddict_field_types<'db>(
             );
         }
         Type::Recursive(recursive) => {
-            return recursive.map_or_else(
-                db,
-                env,
-                || (),
-                |unfolded| {
-                    visit_matching_typeddict_field_types(db, env, unfolded, field_name, visit);
-                },
-            );
+            if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db, env) {
+                visit_matching_typeddict_field_types(db, env, unfolded, field_name, visit);
+            }
+            return;
         }
         Type::Union(union) => Either::Left(union.elements(db).iter()),
         Type::Intersection(intersection) => Either::Right(intersection.positive(db).iter()),

@@ -307,12 +307,10 @@ pub(super) fn attribute_write_requirement<'db>(
         Type::DataclassDecorator(decorator) => {
             attribute_write_requirement(db, env, decorator.callable(db), attribute)
         }
-        Type::Recursive(recursive) => recursive.map_or(
-            db,
-            env,
-            AttributeWriteRequirement::Unconstrained,
-            |unfolded| attribute_write_requirement(db, env, unfolded, attribute),
-        ),
+        Type::Recursive(recursive) => recursive
+            .unfold(db, env)
+            .map(|unfolded| attribute_write_requirement(db, env, unfolded, attribute))
+            .unwrap_or(AttributeWriteRequirement::Unconstrained),
 
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
             AttributeWriteRequirement::CannotAssign
@@ -744,6 +742,12 @@ fn effective_write_type<'db>(
     attribute: &str,
     attr_ty: Type<'db>,
 ) -> Type<'db> {
+    // An instance shadows a staticmethod with the function returned by its getter.
+    if matches!(object_ty, Type::NominalInstance(_))
+        && attr_ty.function_like_kind(db) == Some(CallableTypeKind::StaticMethodLike)
+    {
+        return attr_ty.underlying_function(db);
+    }
     if let Type::NominalInstance(instance) = object_ty
         && let Some(converter_ty) = instance
             .class(db, env)

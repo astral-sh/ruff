@@ -1368,7 +1368,8 @@ impl<'db> Signature<'db> {
                 && let Some(upper) = bounds.as_single_upper_bound(db, env)
                 && lower.is_equivalent_to(db, env, upper)
                 && let Some(solution) =
-                    CandidateSolutions::default_solve(db, env, &constraints, bounds).as_type()
+                    CandidateSolutions::default_solve(db, env, &constraints, inferable, bounds)
+                        .as_type()
             {
                 return Some(solution);
             }
@@ -1383,7 +1384,8 @@ impl<'db> Signature<'db> {
                     .evidence_lower()
                     .is_some_and(|lower| !lower.is_never())
                 && let Some(solution) =
-                    CandidateSolutions::default_solve(db, env, &constraints, bounds).as_type()
+                    CandidateSolutions::default_solve(db, env, &constraints, inferable, bounds)
+                        .as_type()
             {
                 return Some(solution);
             }
@@ -1564,6 +1566,80 @@ impl<'db> Signature<'db> {
         self.parameters
             .get(0)
             .is_some_and(|parameter| parameter.is_positional() && parameter.inferred_annotation)
+    }
+
+    /// Binds the `Self` receiver if it is unused in the rest of the signature.
+    ///
+    /// This is purely a performance optimization. Eagerly binding the type of `Self` prevents
+    /// unnecessary work from being performed by the constraint solver.
+    pub(super) fn bind_unused_self(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        self_type: Type<'db>,
+    ) -> Option<Self> {
+        let context = self.generic_context?;
+        let receiver = self.parameters.get(0)?;
+
+        // Ensure `Self` is not used elsewhere in the signature, in which case eagerly binding it
+        // would be unsound.
+        if !receiver.is_positional() || self.needs_self_mapping(db, env, true) {
+            return None;
+        }
+
+        // Extract the `Self` type variable.
+        let self_typevar = match receiver.annotated_type() {
+            Type::TypeVar(typevar) => typevar,
+            Type::SubclassOf(subclass) => subclass.into_type_var()?,
+            _ => return None,
+        };
+        if !self_typevar.typevar(db).is_self(db) {
+            return None;
+        }
+
+        // Also ensure that the receiver satisfies the upper bound of `Self`.
+        let bound = self_typevar.typevar(db).upper_bound(db, env)?;
+        if !self_type.is_assignable_to(db, env, bound) {
+            return None;
+        }
+
+        // And that `Self` is not referenced by any other type variable, in which case removing it
+        // from the generic context may leave it unspecialized.
+        //
+        // TODO: References to `Self` inside of bounds or defaults should not generally be permitted
+        // in the first place, but we still avoid leaving dangling references to `Self` out of principle.
+        for typevar in context.variables(db) {
+            if typevar.identity(db) == self_typevar.identity(db) {
+                continue;
+            }
+
+            let bound = typevar.typevar(db).bound_or_constraints(db, env);
+            if bound.is_some_and(|bound| match bound {
+                TypeVarBoundOrConstraints::UpperBound(bound) => bound.contains_self(db, env),
+                TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                    .elements(db)
+                    .iter()
+                    .any(|constraint| constraint.contains_self(db, env)),
+            }) {
+                return None;
+            }
+
+            if typevar
+                .default_type(db)
+                .is_some_and(|ty| ty.contains_self(db, env))
+            {
+                return None;
+            }
+        }
+
+        let mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::Single(self_typevar, self_type));
+        Some(self.apply_type_mapping_impl(
+            db,
+            &mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(env),
+        ))
     }
 
     fn apply_self_with_receiver(
@@ -2826,6 +2902,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             context.push(ErrorContext::IncompatibleReturnTypes {
                 source: source.return_ty,
                 target: target.return_ty,
+                source_definition: source.definition,
+                target_definition: target.definition,
             });
         }
 

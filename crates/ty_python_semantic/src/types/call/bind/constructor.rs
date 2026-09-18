@@ -13,6 +13,29 @@ use crate::types::{
     TypeMapping,
 };
 
+impl<'db> CallableBinding<'db> {
+    pub(crate) fn typing_self_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.bound_type.map(|bound_type| match self.signature_type {
+            Type::BoundMethod(method) => method.typing_self_type(db),
+            _ => bound_type,
+        })
+    }
+
+    pub(crate) fn bind_unused_self(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        self_type: Type<'db>,
+    ) {
+        for overload in &mut self.overloads {
+            if let Some(signature) = overload.signature.bind_unused_self(db, env, self_type) {
+                overload.signature = signature;
+                overload.return_ty = overload.initial_return_type(db);
+            }
+        }
+    }
+}
+
 /// Bindings for a constructor call.
 ///
 /// The `entry` is the first-called constructor method (could be a metaclass `__call__`, a

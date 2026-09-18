@@ -497,31 +497,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             (Type::Recursive(recursive), rhs, _) => {
                 visitor.visit(db, (left_ty, op, right_ty), || {
-                    recursive.map_or_else(
-                        db,
-                        env,
-                        || None,
-                        |unfolded| {
-                            self.infer_binary_expression_type_impl(
-                                node, unfolded, rhs, op, visitor, state,
-                            )
-                        },
-                    )
+                    let unfolded = recursive.unfold(db, env).into_unfolded()?;
+                    self.infer_binary_expression_type_impl(node, unfolded, rhs, op, visitor, state)
                 })
             }
 
             (lhs, Type::Recursive(recursive), _) => {
                 visitor.visit(db, (left_ty, op, right_ty), || {
-                    recursive.map_or_else(
-                        db,
-                        env,
-                        || None,
-                        |unfolded| {
-                            self.infer_binary_expression_type_impl(
-                                node, lhs, unfolded, op, visitor, state,
-                            )
-                        },
-                    )
+                    let unfolded = recursive.unfold(db, env).into_unfolded()?;
+                    self.infer_binary_expression_type_impl(node, lhs, unfolded, op, visitor, state)
                 })
             }
 
