@@ -111,10 +111,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         let annotate_inferred_type = |diagnostic: &mut LintDiagnosticGuard| {
-            diagnostic.set_primary_annotation_message(format_args!(
-                "Inferred type is `{}`",
-                test_type.display(db, env)
-            ));
+            if test_type.is_bool_literal() || test_type.bool(db, env).is_ambiguous() {
+                diagnostic.set_primary_annotation_message(format_args!(
+                    "Inferred type is `{}`",
+                    test_type.display(db, env)
+                ));
+            } else {
+                let is_truthy = if *is_truthy { "truthy" } else { "falsy" };
+                diagnostic.set_primary_annotation_message(format_args!(
+                    "Inferred type `{}` is always {is_truthy}",
+                    test_type.display(db, env)
+                ));
+            }
         };
 
         let describe_condition = |diagnostic: &mut LintDiagnosticGuard| {

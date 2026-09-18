@@ -92,7 +92,7 @@ warning[redundant-condition]: A generator is always truthy
   --> src/mdtest_snippet.py:14:8
    |
 14 |     if filtered:  # snapshot: redundant-condition
-   |        ^^^^^^^^ Inferred type is `GeneratorType[int, None, None]`
+   |        ^^^^^^^^ Inferred type `GeneratorType[int, None, None]` is always truthy
 help: Did you mean to use `any()`?
    |
 13 |     filtered = (item for item in items if item < 42)
@@ -117,7 +117,7 @@ warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:20:8
    |
 20 |     if coroutine():  # snapshot: redundant-condition
-   |        ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |        ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 help: Did you mean to `await` this expression?
    |
 19 | async def main():
@@ -159,28 +159,28 @@ warning[redundant-condition]: A 2-element tuple is always truthy
   --> src/mdtest_snippet.py:30:12
    |
 30 |         if self.two_element_tuple:  # snapshot: redundant-condition
-   |            ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `tuple[int, int]`
+   |            ^^^^^^^^^^^^^^^^^^^^^^ Inferred type `tuple[int, int]` is always truthy
 
 
 warning[redundant-condition]: A tuple with >=1 element is always truthy
   --> src/mdtest_snippet.py:32:12
    |
 32 |         if self.at_least_one_element:  # snapshot: redundant-condition
-   |            ^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `tuple[int, *tuple[int, ...]]`
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type `tuple[int, *tuple[int, ...]]` is always truthy
 
 
 warning[redundant-condition]: A tuple with >=2 elements is always truthy
   --> src/mdtest_snippet.py:34:12
    |
 34 |         if self.at_least_two_elements:  # snapshot: redundant-condition
-   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `tuple[int, int, *tuple[int, ...]]`
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type `tuple[int, int, *tuple[int, ...]]` is always truthy
 
 
 warning[redundant-condition]: An empty tuple is always falsy
   --> src/mdtest_snippet.py:36:12
    |
 36 |         if self.no_elements:  # snapshot: redundant-condition
-   |            ^^^^^^^^^^^^^^^^ Inferred type is `tuple[()]`
+   |            ^^^^^^^^^^^^^^^^ Inferred type `tuple[()]` is always falsy
 ```
 
 Annotating a variable as `tuple[X]` is almost always a mistake (the user almost always meant to
@@ -207,7 +207,7 @@ warning[redundant-condition]: A 1-element tuple is always truthy
   --> src/mdtest_snippet.py:51:12
    |
 51 |         if self.single_element_tuple:  # snapshot: redundant-condition
-   |            ^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `tuple[int]`
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type `tuple[int]` is always truthy
    |
   ::: src/mdtest_snippet.py:45:36
    |
@@ -230,7 +230,7 @@ warning[redundant-condition]: A 1-element tuple is always truthy
 52 |             pass
 53 |
 54 |         if y:  # snapshot: redundant-condition
-   |            ^ Inferred type is `tuple[str]`
+   |            ^ Inferred type `tuple[str]` is always truthy
 ```
 
 If the original tuple annotation was variadic, our suggested hint suggests a variadic replacement:
@@ -251,7 +251,7 @@ warning[redundant-condition]: A 1-element tuple is always truthy
    |              Inferred as a 1-element tuple due to this annotation
    |              Did you mean `*tuple[int, ...]`?
 57 |     if args:  # snapshot: redundant-condition
-   |        ^^^^ Inferred type is `tuple[int]`
+   |        ^^^^ Inferred type `tuple[int]` is always truthy
 ```
 
 And testing `None`:
@@ -298,14 +298,14 @@ warning[redundant-condition]: A nonempty string is always truthy
   --> src/mdtest_snippet.py:66:4
    |
 66 | if x:  # snapshot: redundant-condition
-   |    ^ Inferred type is `Literal["foo"]`
+   |    ^ Inferred type `Literal["foo"]` is always truthy
 
 
 warning[redundant-condition]: An empty string is always falsy
   --> src/mdtest_snippet.py:69:4
    |
 69 | if y:  # snapshot: redundant-condition
-   |    ^ Inferred type is `Literal[""]`
+   |    ^ Inferred type `Literal[""]` is always falsy
 ```
 
 or even a union of strings that is known to always be truthy:
@@ -323,7 +323,7 @@ warning[redundant-condition]: A nonempty string is always truthy
   --> src/mdtest_snippet.py:83:8
    |
 83 |     if x:  # snapshot: redundant-condition
-   |        ^ Inferred type is `Literal["a", "b"]`
+   |        ^ Inferred type `Literal["a", "b"]` is always truthy
 ```
 
 and testing a `TypedDict` that is known to always be truthy:
@@ -373,7 +373,7 @@ warning[redundant-condition]: A TypedDict with 2 required fields is always truth
    --> src/mdtest_snippet.py:106:8
     |
 106 |     if never_empty:  # snapshot: redundant-condition
-    |        ^^^^^^^^^^^ Inferred type is `NeverEmpty`
+    |        ^^^^^^^^^^^ Inferred type `NeverEmpty` is always truthy
     |
    ::: src/mdtest_snippet.py:87:7
     |
@@ -387,7 +387,7 @@ warning[redundant-condition]: A TypedDict with 1 required field is always truthy
    --> src/mdtest_snippet.py:109:8
     |
 109 |     if also_never_empty:  # snapshot: redundant-condition
-    |        ^^^^^^^^^^^^^^^^ Inferred type is `AlsoNeverEmpty`
+    |        ^^^^^^^^^^^^^^^^ Inferred type `AlsoNeverEmpty` is always truthy
     |
    ::: src/mdtest_snippet.py:91:7
     |
@@ -413,7 +413,7 @@ warning[redundant-condition]: Condition is always truthy
    --> src/mdtest_snippet.py:125:8
     |
 125 |     if x:  # snapshot: redundant-condition
-    |        ^ Inferred type is `Pattern[str]`
+    |        ^ Inferred type `Pattern[str]` is always truthy
 info: `Pattern` instances are always truthy because `Pattern` cannot be subclassed and does not define `__bool__` or `__len__`
    --> stdlib/re.pyi:285:1
     |
@@ -461,7 +461,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:8:8
   |
 8 |     if choice:  # snapshot: redundant-condition
-  |        ^^^^^^ Inferred type is `Choice`
+  |        ^^^^^^ Inferred type `Choice` is always truthy
 info: `Choice` instances are always truthy because `Choice` cannot be subclassed and does not define `__bool__` or `__len__`
  --> src/mdtest_snippet.py:3:7
   |
@@ -503,7 +503,7 @@ warning[redundant-condition]: A TypedDict with 1 required field is always truthy
  --> src/child.py:7:8
   |
 7 |     if value:  # snapshot: redundant-condition
-  |        ^^^^^ Inferred type is `Child`
+  |        ^^^^^ Inferred type `Child` is always truthy
   |
  ::: src/child.py:3:7
   |
@@ -560,7 +560,7 @@ warning[redundant-condition]: A 1-element tuple is always truthy
   --> src/mdtest_snippet.py:10:8
    |
 10 |     if record:  # snapshot: redundant-condition
-   |        ^^^^^^ Inferred type is `Record`
+   |        ^^^^^^ Inferred type `Record` is always truthy
    |
   ::: src/mdtest_snippet.py:3:7
    |
@@ -572,7 +572,7 @@ warning[redundant-condition]: A 1-element tuple is always truthy
   --> src/mdtest_snippet.py:12:8
    |
 12 |     if single:  # snapshot: redundant-condition
-   |        ^^^^^^ Inferred type is `SingleTuple`
+   |        ^^^^^^ Inferred type `SingleTuple` is always truthy
    |
   ::: src/mdtest_snippet.py:6:7
    |
@@ -601,7 +601,7 @@ warning[redundant-condition]: A 1-element tuple is always truthy
    |                        Inferred as a 1-element tuple due to this annotation
    |                        Did you mean `tuple[int, ...]`?
 17 |     if value:  # snapshot: redundant-condition
-   |        ^^^^^ Inferred type is `tuple[int]`
+   |        ^^^^^ Inferred type `tuple[int]` is always truthy
 ```
 
 The diagnostic still explains the one-element annotation when the suggested replacement would
@@ -626,7 +626,7 @@ warning[redundant-condition]: A 1-element tuple is always truthy
 19 | def check_generic[T](value: tuple[T]):
    |                             -------- Inferred as a 1-element tuple due to this annotation
 20 |     if value:  # snapshot: redundant-condition
-   |        ^^^^^ Inferred type is `tuple[T@check_generic]`
+   |        ^^^^^ Inferred type `tuple[T@check_generic]` is always truthy
 
 
 warning[redundant-condition]: A 1-element tuple is always truthy
@@ -635,7 +635,7 @@ warning[redundant-condition]: A 1-element tuple is always truthy
 23 | def check_nested_generic[T](value: tuple[list[T]]):
    |                                    -------------- Inferred as a 1-element tuple due to this annotation
 24 |     if value:  # snapshot: redundant-condition
-   |        ^^^^^ Inferred type is `tuple[list[T@check_nested_generic]]`
+   |        ^^^^^ Inferred type `tuple[list[T@check_nested_generic]]` is always truthy
 ```
 
 ## Tuple annotations in dependencies
@@ -668,7 +668,7 @@ warning[redundant-condition]: A 1-element tuple is always truthy
  --> src/main.py:3:4
   |
 3 | if records.values:  # snapshot: redundant-condition
-  |    ^^^^^^^^^^^^^^ Inferred type is `tuple[str]`
+  |    ^^^^^^^^^^^^^^ Inferred type `tuple[str]` is always truthy
   |
  ::: .venv/<path-to-site-packages>/records.pyi:1:9
   |
@@ -757,7 +757,7 @@ warning[redundant-condition]: An empty tuple is always falsy
   --> src/mdtest_snippet.py:47:23
    |
 47 |         case str() if empty:  # snapshot: redundant-condition
-   |                       ^^^^^ Inferred type is `tuple[()]`
+   |                       ^^^^^ Inferred type `tuple[()]` is always falsy
 48 |             pass
 49 |             print(
    |             ------ This statement is unreachable
@@ -797,7 +797,7 @@ warning[redundant-condition]: An empty tuple is always falsy
   --> src/mdtest_snippet.py:55:11
    |
 55 |     while empty:  # snapshot: redundant-condition
-   |           ^^^^^ Inferred type is `tuple[()]`
+   |           ^^^^^ Inferred type `tuple[()]` is always falsy
 56 |         pass
 57 |         print(
    |         ------ This statement is unreachable
@@ -817,7 +817,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
   --> src/mdtest_snippet.py:65:23
    |
 65 |         case _ if not nonempty:  # snapshot: redundant-condition
-   |                       ^^^^^^^^ Inferred type is `tuple[str, str]`
+   |                       ^^^^^^^^ Inferred type `tuple[str, str]` is always truthy
 66 |             print("unreachable")
    |             -------------------- This statement is unreachable
 ```
@@ -837,7 +837,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
   --> src/mdtest_snippet.py:68:15
    |
 68 |     while not nonempty:  # snapshot: redundant-condition
-   |               ^^^^^^^^ Inferred type is `tuple[str, str]`
+   |               ^^^^^^^^ Inferred type `tuple[str, str]` is always truthy
 69 |         print("unreachable")
    |         -------------------- This statement is unreachable
 ```
@@ -857,7 +857,7 @@ warning[redundant-condition]: An empty tuple is always falsy
   --> src/mdtest_snippet.py:71:15
    |
 71 |     while not empty:  # snapshot: redundant-condition
-   |               ^^^^^ Inferred type is `tuple[()]`
+   |               ^^^^^ Inferred type `tuple[()]` is always falsy
 72 |         print("reachable")
 73 |     print("unreachable")
    |     -------------------- This following statement is unreachable
@@ -1143,8 +1143,16 @@ def negated_condition(value: Comparable):
     reveal_type(bool(not (value < 1 < 0)))  # revealed: bool
 
     # Short-circuiting makes the direct condition always true, despite the standalone types above.
-    if not (value < 1 < 0):  # error: [redundant-condition-strict]
+    if not (value < 1 < 0):  # snapshot: redundant-condition-strict
         pass
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:17:8
+   |
+17 |     if not (value < 1 < 0):  # snapshot: redundant-condition-strict
+   |        ^^^^^^^^^^^^^^^^^^^ Inferred type is `bool`
 ```
 
 Calling a `lambda` to obtain the first operand does not change the comparison chain's outcome. Both
@@ -1636,14 +1644,14 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:3:8
   |
 3 |     if coroutine():  # snapshot: redundant-condition
-  |        ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |        ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:7:28
   |
 7 |     return lambda: True if coroutine() else False  # snapshot: redundant-condition
-  |                            ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |                            ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 ```
 
 ### `await` fixes in comprehensions and generator expressions
@@ -1665,7 +1673,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:3:44
   |
 3 |     return [value for value in range(1) if coroutine()]  # snapshot: redundant-condition
-  |                                            ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |                                            ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 help: Did you mean to `await` this expression?
   |
 2 | async def inspect_comprehension_awaitable():
@@ -1680,7 +1688,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:6:44
   |
 6 |     return (value for value in range(1) if coroutine())  # snapshot: redundant-condition
-  |                                            ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |                                            ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 help: Did you mean to `await` this expression?
   |
 5 | def inspect_generator_awaitable():
@@ -1706,7 +1714,7 @@ error[redundant-condition-strict]: Condition is always truthy
  --> src/mdtest_snippet.py:3:8
   |
 3 |     if value := coroutine():  # snapshot: redundant-condition-strict
-  |        ^^^^^^^^^^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |        ^^^^^^^^^^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 help: Did you mean to `await` this expression?
   |
 2 | async def inspect_named_awaitable():
@@ -1742,7 +1750,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:9:8
   |
 9 |     if -value:  # snapshot: redundant-condition
-  |        ^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+  |        ^^^^^^ Inferred type `CoroutineType[Any, Any, bool]` is always truthy
 help: Did you mean to `await` this expression?
    |
 8  | async def inspect_awaitable_operations(value: AwaitableOperations):
@@ -1757,7 +1765,7 @@ warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:12:8
    |
 12 |     if value + value:  # snapshot: redundant-condition
-   |        ^^^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+   |        ^^^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, bool]` is always truthy
 help: Did you mean to `await` this expression?
    |
 11 |
@@ -1789,7 +1797,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:4:9
   |
 4 |         coroutine()  # snapshot: redundant-condition
-  |         ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |         ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 help: Did you mean to `await` this expression?
   |
 3 |     if (
@@ -1804,7 +1812,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:6:14
   |
 6 |         else coroutine()  # snapshot: redundant-condition
-  |              ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |              ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 help: Did you mean to `await` this expression?
   |
 5 |         if flag
@@ -1837,7 +1845,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:9:8
   |
 9 |     if await nested_coroutine():  # snapshot: redundant-condition
-  |        ^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, bool]` is always truthy
 help: Did you mean to `await` this expression?
    |
 8  | async def inspect_nested_awaitable():
@@ -1919,119 +1927,119 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:8:38
   |
 8 |     type Alias = Annotated[int, 1 if coroutine() else 0]  # snapshot: redundant-condition
-  |                                      ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |                                      ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:10:42
    |
 10 |     class Generic[T: Annotated[int, 1 if coroutine() else 0]]:  # snapshot: redundant-condition
-   |                                          ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                          ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:13:40
    |
 13 |     def generic[T: Annotated[int, 1 if coroutine() else 0]]():  # snapshot: redundant-condition
-   |                                        ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                        ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:16:46
    |
 16 |     type GenericAlias[T: Annotated[int, 1 if coroutine() else 0]] = list[T]  # snapshot: redundant-condition
-   |                                              ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                              ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:18:34
    |
 18 |     class GenericBase[T](Base if coroutine() else Base):  # snapshot: redundant-condition
-   |                                  ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                  ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:21:43
    |
 21 |     def nested(value: Annotated[int, 1 if coroutine() else 0]):  # snapshot: redundant-condition
-   |                                           ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                           ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:24:43
    |
 24 |     def returned() -> Annotated[int, 1 if coroutine() else 0]:  # snapshot: redundant-condition
-   |                                           ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                           ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:27:35
    |
 27 |     variable: Annotated[int, 1 if coroutine() else 0]  # snapshot: redundant-condition
-   |                                   ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                   ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:28:64
    |
 28 |     first_iterable: Annotated[int, [value for value in ([1] if coroutine() else [])]]  # snapshot: redundant-condition
-   |                                                                ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                                                ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:30:72
    |
 30 |     list_comprehension: Annotated[int, [value for value in range(1) if coroutine()]]  # snapshot: redundant-condition
-   |                                                                        ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                                                        ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:31:71
    |
 31 |     set_comprehension: Annotated[int, {value for value in range(1) if coroutine()}]  # snapshot: redundant-condition
-   |                                                                       ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                                                       ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:32:79
    |
 32 |     dict_comprehension: Annotated[int, {value: value for value in range(1) if coroutine()}]  # snapshot: redundant-condition
-   |                                                                               ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                                                               ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:35:61
    |
 35 |         value: Annotated[int, [item for item in range(1) if coroutine()]],  # snapshot: redundant-condition
-   |                                                             ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                                             ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:40:57
    |
 40 |         value: Annotated[int, [item for item in ([1] if coroutine() else [])]],  # snapshot: redundant-condition
-   |                                                         ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                                         ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:45:46
    |
 45 |         int, [value for value in range(1) if coroutine()]  # snapshot: redundant-condition
-   |                                              ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                              ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:50:42
    |
 50 |         int, (value for value in ([1] if coroutine() else []))  # snapshot: redundant-condition
-   |                                          ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                          ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:56:41
    |
 56 |         self.value: Annotated[int, 1 if coroutine() else 0]  # snapshot: redundant-condition
-   |                                         ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |                                         ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 ```
 
 ### `await` fixes in generator expressions inside annotations
@@ -2054,7 +2062,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:5:60
   |
 5 |     direct: Annotated[int, (value for value in range(1) if coroutine())]  # snapshot: redundant-condition
-  |                                                            ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |                                                            ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 help: Did you mean to `await` this expression?
   |
 4 | async def inspect_generator_annotations():
@@ -2069,7 +2077,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:6:57
   |
 6 |     nested: Annotated[int, ([value for value in ([1] if coroutine() else [])] for _ in range(1))]  # snapshot: redundant-condition
-  |                                                         ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |                                                         ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 help: Did you mean to `await` this expression?
   |
 5 |     direct: Annotated[int, (value for value in range(1) if coroutine())]  # snapshot: redundant-condition
@@ -2102,7 +2110,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:6:34
   |
 6 |     class NongenericBase(Base if coroutine() else Base):  # snapshot: redundant-condition
-  |                                  ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |                                  ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 help: Did you mean to `await` this expression?
   |
 5 | async def inspect_allowed_definition_awaitables():
@@ -2117,7 +2125,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:9:46
   |
 9 |     def generic_default[T](value: int = 1 if coroutine() else 0):  # snapshot: redundant-condition
-  |                                              ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |                                              ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 help: Did you mean to `await` this expression?
    |
 8  |
@@ -2147,7 +2155,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:5:38
   |
 5 |     alias = list[Annotated[int, 1 if coroutine() else 0]]  # snapshot: redundant-condition
-  |                                      ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |                                      ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 help: Did you mean to `await` this expression?
   |
 4 | async def inspect_runtime_type_expressions():
@@ -2162,7 +2170,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:6:23
   |
 6 |     value: int = 1 if coroutine() else 0  # snapshot: redundant-condition
-  |                       ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |                       ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 help: Did you mean to `await` this expression?
   |
 5 |     alias = list[Annotated[int, 1 if coroutine() else 0]]  # snapshot: redundant-condition
@@ -2189,7 +2197,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:3:17
   |
 3 |     if flag and coroutine():  # snapshot: redundant-condition
-  |                 ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |                 ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 help: Did you mean to `await` this expression?
   |
 2 | async def inspect_compound_awaitable(flag: bool):
@@ -2217,7 +2225,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:3:4
   |
 3 | if coroutine():  # snapshot: redundant-condition
-  |    ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |    ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 ```
 
 ## `await` fixes in nested comprehensions before Python 3.11
@@ -2253,28 +2261,28 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:5:39
   |
 5 |     lists = ([item for item in [1] if predicate()] for _ in [1])  # snapshot: redundant-condition
-  |                                       ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+  |                                       ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, bool]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:6:38
   |
 6 |     sets = ({item for item in [1] if predicate()} for _ in [1])  # snapshot: redundant-condition
-  |                                      ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+  |                                      ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, bool]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:7:45
   |
 7 |     dicts = ({item: item for item in [1] if predicate()} for _ in [1])  # snapshot: redundant-condition
-  |                                             ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+  |                                             ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, bool]` is always truthy
 
 
 warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:10:38
    |
 10 |     return [[item for item in [1] if predicate()] for _ in [1]]  # snapshot: redundant-condition
-   |                                      ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+   |                                      ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, bool]` is always truthy
 ```
 
 A containing generator that already uses `await` is asynchronous, so awaiting a nested condition is
@@ -2293,7 +2301,7 @@ warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:12:38
    |
 12 |     return ([item for item in [1] if predicate()] for _ in [1] if await predicate())  # snapshot: redundant-condition
-   |                                      ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+   |                                      ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, bool]` is always truthy
 help: Did you mean to `await` this expression?
    |
 11 | def already_async_generator():
@@ -2308,7 +2316,7 @@ warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:15:37
    |
 15 |     return (item for item in [1] if predicate())  # snapshot: redundant-condition
-   |                                     ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+   |                                     ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, bool]` is always truthy
 help: Did you mean to `await` this expression?
    |
 14 | def direct_generator():
@@ -2348,7 +2356,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:5:38
   |
 5 |     return ([item for item in [1] if predicate()] for _ in [1])  # snapshot: redundant-condition
-  |                                      ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+  |                                      ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, bool]` is always truthy
 help: Did you mean to `await` this expression?
   |
 4 | def nested_in_generator():
@@ -2363,7 +2371,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.py:8:38
   |
 8 |     return [[item for item in [1] if predicate()] for _ in [1]]  # snapshot: redundant-condition
-  |                                      ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+  |                                      ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, bool]` is always truthy
 help: Did you mean to `await` this expression?
   |
 7 | async def nested_in_list():
@@ -2405,7 +2413,7 @@ warning[redundant-condition]: Condition is always truthy
  --> src/mdtest_snippet.ipynb:cell 1:4:4
   |
 4 | if coroutine():  # snapshot: redundant-condition
-  |    ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+  |    ^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, bool]` is always truthy
 help: Did you mean to `await` this expression?
  ::: cell 1
   |
@@ -2443,7 +2451,7 @@ error[redundant-condition-strict]: Condition is always truthy
  --> src/mdtest_snippet.py:7:8
   |
 7 |     if x:  # snapshot: redundant-condition-strict
-  |        ^ Inferred type is `Literal[1, 2]`
+  |        ^ Inferred type `Literal[1, 2]` is always truthy
 
 
 error[redundant-condition-strict]: Condition is always false
@@ -2717,7 +2725,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
   --> src/mdtest_snippet.py:87:12
    |
 87 |     if not x:  # snapshot: redundant-condition
-   |            ^ Inferred type is `tuple[str, str]`
+   |            ^ Inferred type `tuple[str, str]` is always truthy
 88 |         print("unreachable")
    |         -------------------- This statement is unreachable
 ```
@@ -2737,7 +2745,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
   --> src/mdtest_snippet.py:90:16
    |
 90 |       if not not x:  # snapshot: redundant-condition
-   |                  ^ Inferred type is `tuple[str, str]`
+   |                  ^ Inferred type `tuple[str, str]` is always truthy
 91 |           pass
 92 | /     else:
 93 | |         print("unreachable")
@@ -3047,8 +3055,16 @@ not guarantee that truthiness:
 def short_circuit_operands(value: object, enabled: bool):
     if enabled and (value or True):  # error: [redundant-condition-strict] "Condition `value or True` is always true"
         pass
-    if enabled or (value and False):  # error: [redundant-condition-strict] "Condition `value and False` is always false"
+    if enabled or (value and False):  # snapshot: redundant-condition-strict
         pass
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always false
+  --> src/mdtest_snippet.py:43:20
+   |
+43 |     if enabled or (value and False):  # snapshot: redundant-condition-strict
+   |                    ^^^^^^^^^^^^^^^ Inferred type is `~AlwaysTruthy`
 ```
 
 The strict rule also checks the body and `else` expression of a conditional expression used as a
@@ -3156,7 +3172,7 @@ warning[redundant-condition]: An empty tuple is always falsy
  --> src/mdtest_snippet.py:2:23
   |
 2 |     while enabled and empty:  # snapshot: redundant-condition
-  |                       ^^^^^ Inferred type is `tuple[()]`
+  |                       ^^^^^ Inferred type `tuple[()]` is always falsy
 3 |         print("unreachable")
   |         -------------------- This statement is unreachable
 ```
@@ -3175,7 +3191,7 @@ warning[redundant-condition]: An empty tuple is always falsy
  --> src/mdtest_snippet.py:6:31
   |
 6 |         case _ if enabled and empty:  # snapshot: redundant-condition
-  |                               ^^^^^ Inferred type is `tuple[()]`
+  |                               ^^^^^ Inferred type `tuple[()]` is always falsy
 7 |             print("unreachable")
   |             -------------------- This statement is unreachable
 ```
@@ -3195,7 +3211,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
   --> src/mdtest_snippet.py:9:16
    |
  9 |       if flag or nonempty:  # snapshot: redundant-condition
-   |                  ^^^^^^^^ Inferred type is `tuple[str, str]`
+   |                  ^^^^^^^^ Inferred type `tuple[str, str]` is always truthy
 10 |           pass
 11 | /     else:
 12 | |         print("unreachable")
@@ -3215,7 +3231,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
   --> src/mdtest_snippet.py:14:21
    |
 14 |     if not (flag or nonempty):  # snapshot: redundant-condition
-   |                     ^^^^^^^^ Inferred type is `tuple[str, str]`
+   |                     ^^^^^^^^ Inferred type `tuple[str, str]` is always truthy
 15 |         print("unreachable")
    |         -------------------- This statement is unreachable
 ```
@@ -3236,14 +3252,14 @@ warning[redundant-condition]: A 2-element tuple is always truthy
   --> src/mdtest_snippet.py:19:8
    |
 19 |     if nonempty and empty:
-   |        ^^^^^^^^ Inferred type is `tuple[str, str]`
+   |        ^^^^^^^^ Inferred type `tuple[str, str]` is always truthy
 
 
 warning[redundant-condition]: An empty tuple is always falsy
   --> src/mdtest_snippet.py:19:21
    |
 19 |     if nonempty and empty:
-   |                     ^^^^^ Inferred type is `tuple[()]`
+   |                     ^^^^^ Inferred type `tuple[()]` is always falsy
 20 |         print("unreachable")
    |         -------------------- This statement is unreachable
 ```
@@ -3265,14 +3281,14 @@ warning[redundant-condition]: An empty tuple is always falsy
   --> src/mdtest_snippet.py:24:8
    |
 24 |     if empty or nonempty:
-   |        ^^^^^ Inferred type is `tuple[()]`
+   |        ^^^^^ Inferred type `tuple[()]` is always falsy
 
 
 warning[redundant-condition]: A 2-element tuple is always truthy
   --> src/mdtest_snippet.py:24:17
    |
 24 |       if empty or nonempty:
-   |                   ^^^^^^^^ Inferred type is `tuple[str, str]`
+   |                   ^^^^^^^^ Inferred type `tuple[str, str]` is always truthy
 25 |           pass
 26 | /     else:
 27 | |         print("unreachable")
@@ -3297,14 +3313,14 @@ warning[redundant-condition]: A 2-element tuple is always truthy
   --> src/mdtest_snippet.py:31:8
    |
 31 |     if first and second:
-   |        ^^^^^ Inferred type is `tuple[str, str]`
+   |        ^^^^^ Inferred type `tuple[str, str]` is always truthy
 
 
 warning[redundant-condition]: A 2-element tuple is always truthy
   --> src/mdtest_snippet.py:31:18
    |
 31 |     if first and second:
-   |                  ^^^^^^ Inferred type is `tuple[int, int]`
+   |                  ^^^^^^ Inferred type `tuple[int, int]` is always truthy
 ```
 
 ## Boolean tests inside value expressions
@@ -4903,7 +4919,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
   --> src/mdtest_snippet.py:41:16
    |
 41 |     assert not nonempty  # snapshot: redundant-condition
-   |                ^^^^^^^^ Inferred type is `tuple[str, str]`
+   |                ^^^^^^^^ Inferred type `tuple[str, str]` is always truthy
 42 |     print("unreachable")
    |     -------------------- This following statement is unreachable
 ```
@@ -4922,7 +4938,7 @@ warning[redundant-condition]: An empty tuple is always falsy
   --> src/mdtest_snippet.py:44:24
    |
 44 |     assert enabled and empty  # snapshot: redundant-condition
-   |                        ^^^^^ Inferred type is `tuple[()]`
+   |                        ^^^^^ Inferred type `tuple[()]` is always falsy
 45 |     print("unreachable")
    |     -------------------- This following statement is unreachable
 ```

@@ -2993,6 +2993,17 @@ impl<'db> Type<'db> {
         }
     }
 
+    const fn as_bool_literal(self) -> Option<bool> {
+        match self {
+            Type::LiteralValue(literal) => literal.as_bool(),
+            _ => None,
+        }
+    }
+
+    const fn is_bool_literal(&self) -> bool {
+        self.as_bool_literal().is_some()
+    }
+
     pub(crate) fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
         match self {
             Type::LiteralValue(literal) => literal.as_enum(),
