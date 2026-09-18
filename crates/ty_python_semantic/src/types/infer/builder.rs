@@ -3050,7 +3050,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         match object_ty {
-            Type::Recursive(recursive) => recursive.map_or(db, env, true, |unfolded| {
+            Type::Recursive(recursive) => recursive.unfold(db, env).is_unchanged_or(|unfolded| {
                 self.validate_attribute_deletion(target, unfolded, attribute, emit_diagnostics)
             }),
             Type::RecursiveVar(_) => {
@@ -5510,9 +5510,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             kind: CallableTypeKind,
         ) -> Option<Type<'d>> {
             match ty {
-                Type::Recursive(recursive) => recursive.map_or(db, env, None, |unfolded| {
+                Type::Recursive(recursive) => {
+                    let unfolded = recursive.unfold(db, env).into_unfolded()?;
                     propagate_callable_kind(db, env, unfolded, kind)
-                }),
+                }
                 Type::RecursiveVar(_) => {
                     unreachable!("semantic operation on an unbound recursive variable")
                 }

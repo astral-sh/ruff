@@ -304,12 +304,10 @@ pub(super) fn attribute_write_requirement<'db>(
         Type::TypeAlias(alias) => {
             attribute_write_requirement(db, env, alias.value_type(db), attribute)
         }
-        Type::Recursive(recursive) => recursive.map_or(
-            db,
-            env,
-            AttributeWriteRequirement::Unconstrained,
-            |unfolded| attribute_write_requirement(db, env, unfolded, attribute),
-        ),
+        Type::Recursive(recursive) => recursive
+            .unfold(db, env)
+            .map(|unfolded| attribute_write_requirement(db, env, unfolded, attribute))
+            .unwrap_or(AttributeWriteRequirement::Unconstrained),
 
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
             AttributeWriteRequirement::CannotAssign

@@ -580,19 +580,19 @@ impl<'db> Type<'db> {
             }
             (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
 
-            (Type::Recursive(recursive), _) => Some(recursive.map_or_else(
-                db,
-                env,
-                || Ok(value_ty),
-                |unfolded| unfolded.subscript(db, env, slice_ty, expr_context),
-            )),
+            (Type::Recursive(recursive), _) => Some(
+                recursive
+                    .unfold(db, env)
+                    .map(|unfolded| unfolded.subscript(db, env, slice_ty, expr_context))
+                    .unwrap_or(Ok(value_ty)),
+            ),
 
-            (_, Type::Recursive(recursive)) => Some(recursive.map_or_else(
-                db,
-                env,
-                || Ok(value_ty),
-                |unfolded| value_ty.subscript(db, env, unfolded, expr_context),
-            )),
+            (_, Type::Recursive(recursive)) => Some(
+                recursive
+                    .unfold(db, env)
+                    .map(|unfolded| value_ty.subscript(db, env, unfolded, expr_context))
+                    .unwrap_or(Ok(value_ty)),
+            ),
 
             (Type::TypeAlias(alias), _) => Some(alias.value_type(db).subscript(
                 db,
