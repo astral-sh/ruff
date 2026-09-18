@@ -530,7 +530,7 @@ impl<'db> UnfoldResult<'db> {
     }
 
     /// Return the unfolded type only if it differs from the original recursive type.
-    pub fn into_unfolded(self) -> Option<Type<'db>> {
+    pub(crate) fn into_unfolded(self) -> Option<Type<'db>> {
         match self {
             Self::Unfolded(ty) => Some(ty),
             Self::Unchanged(_) => None,

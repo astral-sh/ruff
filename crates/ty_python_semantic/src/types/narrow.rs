@@ -17,7 +17,7 @@ use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType, CycleDetector,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
+    Type, TypeContext, TypeVarBoundOrConstraints, UnfoldResult, UnionBuilder, binding_type,
     class_pattern_positional_sources, definite_match_pattern_type_for_subject,
     exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
     pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
@@ -5426,7 +5426,7 @@ fn visit_matching_typeddict_field_types<'db>(
             );
         }
         Type::Recursive(recursive) => {
-            if let Some(unfolded) = recursive.unfold(db, env).into_unfolded() {
+            if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db, env) {
                 visit_matching_typeddict_field_types(db, env, unfolded, field_name, visit);
             }
             return;

@@ -3683,7 +3683,7 @@ impl<'db> Type<'db> {
                         .value_type(db)
                         .visit_specialization_impl(db, env, polarity, f, visitor),
                     Type::Recursive(recursive) => {
-                        if let Some(unfolded) = recursive.unfold(db, env).into_unfolded() {
+                        if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db, env) {
                             unfolded.visit_specialization_impl(db, env, polarity, f, visitor);
                         }
                     }
@@ -9589,7 +9589,7 @@ impl<'db> Type<'db> {
                         visitor,
                     );
                 }
-                if let Some(unfolded) = recursive.unfold(db, env).into_unfolded() {
+                if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db, env) {
                     unfolded.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
                 }
             }),
