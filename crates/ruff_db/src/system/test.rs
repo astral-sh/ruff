@@ -102,7 +102,8 @@ impl TestSystem {
         self.inner = Arc::new(system);
     }
 
-    fn system(&self) -> &dyn WritableSystem {
+    /// Returns the system wrapped by this test system.
+    pub fn system(&self) -> &dyn WritableSystem {
         &*self.inner
     }
 }
