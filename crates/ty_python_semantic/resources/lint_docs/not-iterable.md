@@ -34,7 +34,7 @@ from collections.abc import AsyncIterator
 async def values() -> AsyncIterator[int]: ...
 ```
 
-Iterating over the coroutine is an error. An `async for` loop awaits each next item; it does not
+Iterating over the coroutine is an error. An `async for` loop awaits each item; it does not
 automatically await a coroutine to obtain the iterator:
 
 `main.py`:
@@ -44,11 +44,13 @@ from stubs import values
 
 
 async def consume() -> None:
-    async for value in values():  # error
+    # error: "Object of type `CoroutineType[Any, Any, AsyncIterator[int]]` is not async-iterable"
+    async for value in values():
         print(value)
 ```
 
-To declare a function that directly produces an async iterator, use `def` in the stub:
+To declare a function that directly produces an async iterator, use `def` rather than `async def` in
+the stub:
 
 `with_def.pyi`:
 
@@ -58,7 +60,6 @@ from collections.abc import AsyncIterator
 def values() -> AsyncIterator[int]: ...
 ```
 
-This describes what callers receive. The implementation can still use `async def` and `yield`.
 Alternatively, keep `async def` and include a `yield` expression in the stub body:
 
 `with_yield.pyi`:

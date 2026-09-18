@@ -16,6 +16,8 @@ use compact_str::ToCompactString;
 use ruff_db::diagnostic::{Annotation, Span};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
+use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 use std::borrow::Cow;
 use ty_module_resolver::{SearchPath, file_to_module};
@@ -28,7 +30,7 @@ pub(super) fn add_async_generator_stub_help<'db>(
     diagnostic: &mut LintDiagnosticGuard<'_, '_>,
     definition: Definition<'db>,
 ) {
-    let Some(span) = async_generator_stub_span(db, definition) else {
+    let Some((span, name)) = async_generator_stub_declaration(db, definition) else {
         return;
     };
     let is_first_party = diagnostic
@@ -40,10 +42,12 @@ pub(super) fn add_async_generator_stub_help<'db>(
 
     diagnostic.annotate(
         Annotation::secondary(span.clone())
-            .message("Without `yield`, this function returns a coroutine"),
+            .message("Without `yield` in the function body this function returns a coroutine"),
     );
     if is_first_party {
-        diagnostic.help("To declare an async generator, use `def` or add `yield`");
+        diagnostic.help(format_args!(
+            "To declare `{name}` as an async generator, use `def` rather than `async def` or add `yield` to the body"
+        ));
     } else {
         diagnostic.help(
             "If an async generator was intended, report this stub to the library maintainers",
@@ -54,19 +58,33 @@ pub(super) fn add_async_generator_stub_help<'db>(
 /// Only stub-like bodies warrant advice about changing the declaration. A coroutine with an
 /// implementation can intentionally return an async iterator, which its caller must await.
 #[salsa::tracked]
-fn async_generator_stub_span<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Option<Span> {
+fn async_generator_stub_declaration<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<(Span, Name)> {
     let DefinitionKind::Function(function) = definition.kind(db) else {
         return None;
     };
     let module = parsed_module(db, definition.program_file(db).python_file(db)).load(db);
     let node = function.node(&module);
-    (node.is_async && function_has_stub_body(node)).then(|| {
-        let end = node
-            .returns
-            .as_ref()
-            .map_or(node.parameters.end(), |returns| returns.end());
-        Span::from(definition.file(db)).with_range(TextRange::new(node.name.start(), end))
-    })
+    if !node.is_async || !function_has_stub_body(node) {
+        return None;
+    }
+    // Start at `async`, excluding any decorators from the declaration's range.
+    let start = module
+        .tokens()
+        .in_range(TextRange::new(node.start(), node.name.start()))
+        .iter()
+        .rfind(|token| token.kind() == TokenKind::Async)?
+        .start();
+    let end = node
+        .returns
+        .as_ref()
+        .map_or(node.parameters.end(), |returns| returns.end());
+    Some((
+        Span::from(definition.file(db)).with_range(TextRange::new(start, end)),
+        node.name.id.clone(),
+    ))
 }
 
 /// Finds the declaration for a directly called, non-overloaded iterable factory.

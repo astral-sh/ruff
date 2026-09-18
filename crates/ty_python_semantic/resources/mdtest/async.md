@@ -309,13 +309,13 @@ error[not-iterable]: Object of type `CoroutineType[Any, Any, AsyncIterator[int]]
 5 |     async for value in values():
   |                        ^^^^^^^^
   |
- ::: src/stubs.pyi:3:11
+ ::: src/stubs.pyi:3:1
   |
 3 | async def values() -> AsyncIterator[int]: ...
-  |           ------------------------------ Without `yield`, this function returns a coroutine
+  | ---------------------------------------- Without `yield` in the function body this function returns a coroutine
 info: It has no `__aiter__` method
 help: `await` the coroutine before iterating over its result
-help: To declare an async generator, use `def` or add `yield`
+help: To declare `values` as an async generator, use `def` rather than `async def` or add `yield` to the body
 ```
 
 `callable.py`:
@@ -335,13 +335,13 @@ error[not-iterable]: Object of type `CoroutineType[Any, Any, AsyncGenerator[int,
 5 |     [value async for value in Values()()]
   |                               ^^^^^^^^^^
   |
- ::: src/stubs.pyi:6:15
+ ::: src/stubs.pyi:6:5
   |
 6 |     async def __call__(self) -> AsyncGenerator[int, None]: ...
-  |               ------------------------------------------- Without `yield`, this function returns a coroutine
+  |     ----------------------------------------------------- Without `yield` in the function body this function returns a coroutine
 info: It has no `__aiter__` method
 help: `await` the coroutine before iterating over its result
-help: To declare an async generator, use `def` or add `yield`
+help: To declare `__call__` as an async generator, use `def` rather than `async def` or add `yield` to the body
 ```
 
 ### Overriding a stubbed async generator
@@ -368,17 +368,17 @@ error[invalid-method-override]: Invalid override of method `values`
   --> src/mdtest_snippet.py:10:15
    |
  6 |     async def values(self) -> AsyncIterator[int]: ...
-   |               ----------------------------------
-   |               |
-   |               Without `yield`, this function returns a coroutine
-   |               `Base.values` defined here
+   |     --------------------------------------------
+   |     |         |
+   |     |         `Base.values` defined here
+   |     Without `yield` in the function body this function returns a coroutine
  7 |
  8 | class Derived(Base):
  9 |     # snapshot
 10 |     async def values(self) -> AsyncIterator[int]:
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Base.values`
 info: incompatible return types: `AsyncIterator[int]` is not assignable to `CoroutineType[Any, Any, AsyncIterator[int]]`
-help: To declare an async generator, use `def` or add `yield`
+help: To declare `values` as an async generator, use `def` rather than `async def` or add `yield` to the body
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -402,7 +402,7 @@ error[invalid-assignment]: Object of type `def values() -> CoroutineType[Any, An
  --> src/declarations-script.pyi:6:45
   |
 3 | async def values() -> AsyncIterator[int]: ...
-  |           ------------------------------ Without `yield`, this function returns a coroutine
+  | ---------------------------------------- Without `yield` in the function body this function returns a coroutine
 4 |
 5 | # snapshot
 6 | factory: Callable[[], AsyncIterator[int]] = values
@@ -412,7 +412,7 @@ error[invalid-assignment]: Object of type `def values() -> CoroutineType[Any, An
 info: incompatible return types: `CoroutineType[Any, Any, AsyncIterator[int]]` is not assignable to `AsyncIterator[int]`
 info: └── type `CoroutineType[Any, Any, AsyncIterator[int]]` is not assignable to protocol `AsyncIterator[int]`
 info:     └── protocol member `__aiter__` is not defined on type `CoroutineType[Any, Any, AsyncIterator[int]]`
-help: To declare an async generator, use `def` or add `yield`
+help: To declare `values` as an async generator, use `def` rather than `async def` or add `yield` to the body
 ```
 
 ### Correct async generator declarations
@@ -540,10 +540,10 @@ error[not-iterable]: Object of type `CoroutineType[Any, Any, AsyncIterator[int]]
 5 |     async for value in values():
   |                        ^^^^^^^^
   |
- ::: .venv/<path-to-site-packages>/dependency.pyi:3:11
+ ::: .venv/<path-to-site-packages>/dependency.pyi:3:1
   |
 3 | async def values() -> AsyncIterator[int]: ...
-  |           ------------------------------ Without `yield`, this function returns a coroutine
+  | ---------------------------------------- Without `yield` in the function body this function returns a coroutine
 info: It has no `__aiter__` method
 help: `await` the coroutine before iterating over its result
 help: If an async generator was intended, report this stub to the library maintainers
@@ -568,10 +568,10 @@ error[invalid-assignment]: Object of type `def values() -> CoroutineType[Any, An
   |          |
   |          Declared type
   |
- ::: .venv/<path-to-site-packages>/dependency.pyi:3:11
+ ::: .venv/<path-to-site-packages>/dependency.pyi:3:1
   |
 3 | async def values() -> AsyncIterator[int]: ...
-  |           ------------------------------ Without `yield`, this function returns a coroutine
+  | ---------------------------------------- Without `yield` in the function body this function returns a coroutine
 info: incompatible return types: `CoroutineType[Any, Any, AsyncIterator[int]]` is not assignable to `AsyncIterator[int]`
 info: └── type `CoroutineType[Any, Any, AsyncIterator[int]]` is not assignable to protocol `AsyncIterator[int]`
 info:     └── protocol member `__aiter__` is not defined on type `CoroutineType[Any, Any, AsyncIterator[int]]`
@@ -597,13 +597,13 @@ error[invalid-method-override]: Invalid override of method `values`
 6 |     async def values(self) -> AsyncIterator[int]:
   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Base.values`
   |
- ::: .venv/<path-to-site-packages>/dependency.pyi:6:15
+ ::: .venv/<path-to-site-packages>/dependency.pyi:6:5
   |
 6 |     async def values(self) -> AsyncIterator[int]: ...
-  |               ----------------------------------
-  |               |
-  |               Without `yield`, this function returns a coroutine
-  |               `Base.values` defined here
+  |     --------------------------------------------
+  |     |         |
+  |     |         `Base.values` defined here
+  |     Without `yield` in the function body this function returns a coroutine
 info: incompatible return types: `AsyncIterator[int]` is not assignable to `CoroutineType[Any, Any, AsyncIterator[int]]`
 help: If an async generator was intended, report this stub to the library maintainers
 info: This violates the Liskov Substitution Principle
