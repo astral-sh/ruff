@@ -887,7 +887,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
  --> src/mdtest_snippet.py:2:11
   |
 2 |     while nonempty:  # snapshot: redundant-condition
-  |           ^^^^^^^^ Inferred type is `tuple[int, int]`
+  |           ^^^^^^^^ Inferred type `tuple[int, int]` is always truthy
 3 |         break
 4 |     else:
 5 |         "Some documentation about this branch"
@@ -940,7 +940,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
   --> src/mdtest_snippet.py:19:11
    |
 19 |     while nonempty and enabled:  # snapshot: redundant-condition
-   |           ^^^^^^^^ Inferred type is `tuple[int, int]`
+   |           ^^^^^^^^ Inferred type `tuple[int, int]` is always truthy
 ```
 
 ## Unreachable cases after always-true match guards
@@ -969,7 +969,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
  --> src/mdtest_snippet.py:3:19
   |
 3 |           case _ if nonempty:  # snapshot: redundant-condition
-  |                     ^^^^^^^^ Inferred type is `tuple[int, int]`
+  |                     ^^^^^^^^ Inferred type `tuple[int, int]` is always truthy
 4 |               print("selected")
 5 |           case str():
 6 |               pass
@@ -1019,7 +1019,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
   --> src/mdtest_snippet.py:21:23
    |
 21 |         case int() if nonempty:  # snapshot: redundant-condition
-   |                       ^^^^^^^^ Inferred type is `tuple[int, int]`
+   |                       ^^^^^^^^ Inferred type `tuple[int, int]` is always truthy
 ```
 
 An irrefutable pattern can also fall through when its guard has ambiguous truthiness. We do not
@@ -1040,7 +1040,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
   --> src/mdtest_snippet.py:27:19
    |
 27 |         case _ if nonempty and enabled:  # snapshot: redundant-condition
-   |                   ^^^^^^^^ Inferred type is `tuple[int, int]`
+   |                   ^^^^^^^^ Inferred type `tuple[int, int]` is always truthy
 ```
 
 ## Always truthy values appearing later in compound conditions
@@ -2852,7 +2852,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
  --> src/mdtest_snippet.py:4:10
   |
 4 |       elif nonempty:  # snapshot: redundant-condition
-  |            ^^^^^^^^ Inferred type is `tuple[int, int]`
+  |            ^^^^^^^^ Inferred type `tuple[int, int]` is always truthy
 5 |           print("second branch")
 6 |       elif flag:
 7 |           pass
@@ -2882,7 +2882,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
  --> src/mdtest_snippet.py:3:12
   |
 3 |         if nonempty:  # snapshot: redundant-condition
-  |            ^^^^^^^^ Inferred type is `tuple[int, int]`
+  |            ^^^^^^^^ Inferred type `tuple[int, int]` is always truthy
 4 |             break
 5 |
 6 |         print("unreachable", item)
