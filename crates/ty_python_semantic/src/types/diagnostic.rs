@@ -3165,7 +3165,7 @@ pub(super) fn autofix_with_literal(
         return;
     };
     let source = source_text(context.db(), context.file());
-    diagnostic.help("Wrap in `Literal[...]`");
+    diagnostic.help_with_fix_title("Wrap in `Literal[...]`");
     diagnostic.set_fix(Fix::unsafe_edits(
         Edit::range_replacement(
             format!("{}[{}]", action.symbol_text(), &source[node.range()]),
