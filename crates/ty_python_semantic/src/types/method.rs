@@ -186,43 +186,17 @@ impl<'db> BoundMethodType<'db> {
     }
 
     /// Returns the type that replaces any `typing.Self` annotations in the bound method signature.
-    /// This is normally the bound-instance type. Classmethod binding and a `type[Self]`
-    /// receiver annotation instead use an instance of the captured class.
     pub(crate) fn typing_self_type(self, db: &'db dyn Db) -> Type<'db> {
-        let mut self_instance = self.self_instance(db);
-        let is_class_method = self.class_method(db);
-        // Extracting a classmethod's `__func__` removes its descriptor behavior, but its
-        // `type[Self]` receiver annotation still relates `Self` to an instance of the class.
-        let has_class_self_receiver = is_class_method
-            || self.unbound_signatures(db).is_some_and(|signatures| {
-                signatures
-                    .overloads
-                    .iter()
-                    .filter_map(|signature| signature.parameters().get(0))
-                    .filter(|parameter| parameter.is_positional())
-                    .any(|parameter| {
-                        matches!(
-                            parameter.annotated_type().resolve_type_alias(db),
-                            Type::SubclassOf(subclass)
-                                if subclass.into_type_var().is_some_and(|typevar| typevar.typevar(db).is_self(db))
-                        )
-                    })
-            });
-        if has_class_self_receiver {
+        let self_instance = self.self_instance(db);
+
+        if self.class_method(db) {
             let env = ProgramEnvironment::from_program(self.program(db));
-            self_instance = self_instance
+            self_instance
                 .to_instance_approximation(db, &env)
-                .unwrap_or_else(|| {
-                    // Constructor callables can already carry an instance as their `Self`
-                    // substitution, even when the function's receiver is `type[Self]`.
-                    if is_class_method {
-                        Type::unknown()
-                    } else {
-                        self_instance
-                    }
-                });
+                .unwrap_or(Type::unknown())
+        } else {
+            self_instance
         }
-        self_instance
     }
 
     pub(crate) fn map_self_type(
