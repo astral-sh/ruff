@@ -3075,11 +3075,15 @@ impl<'db> PathBoundBuilder<'db> {
         self.upper.add_clause(provenance, ty);
     }
 
+    /// Finalizes the lower and upper bounds that have been accumulated for this typevar. Returns
+    /// `None` if the accumulated bounds are not compatible with each other (e.g. if the lower
+    /// bound is not assignable to the upper bound).
     fn finish(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-    ) -> CandidateTypeVarRangeSolution<'db> {
+        storage: &mut ConstraintSetStorage<'db>,
+    ) -> Option<CandidateTypeVarRangeSolution<'db>> {
         let Self {
             evidence_lower,
             mixed_lower,
@@ -3110,13 +3114,25 @@ impl<'db> PathBoundBuilder<'db> {
             UnionType::from_elements(db, env, validity_lower)
         };
         upper.shrink_to_fit();
-        CandidateTypeVarRangeSolution {
+
+        let range = CandidateTypeVarRangeSolution {
             evidence_lower,
             mixed_lower,
             validity_lower,
             upper,
             has_only_gradual_evidence,
+        };
+        let lower = range.effective_lower(db, env);
+        if !range.upper.is_satisfied_by(db, env, lower) {
+            let (when_upper, source_order) = range.upper.when_satisfied_by(db, env, storage, lower);
+            if when_upper.is_never_satisfied(db, env, storage, source_order) {
+                // This path does not satisfy the accumulated upper bound, and is
+                // therefore not a valid specialization.
+                return None;
+            }
         }
+
+        Some(range)
     }
 }
 
@@ -3760,27 +3776,19 @@ impl<'db> CandidateSolutions<'db> {
         }
 
         limits.satisfied_path()?;
-        let mut any_unsatisfied = false;
-        let typevars = mappings
-            .drain(..)
-            .map(|(bound_typevar, bounds)| {
-                let range = bounds.finish(db, env);
-                let lower = range.effective_lower(db, env);
-                if !range.upper.is_satisfied_by(db, env, lower) {
-                    any_unsatisfied = true;
-                }
-                CandidateTypeVarSolution::range(bound_typevar, range)
-            })
-            .collect();
-        if any_unsatisfied {
-            // If any of the typevars doesn't have a solution (either because the constraint set is
-            // overly restrictive, or because a candidate solution doesn't satisfy the declared
-            // upper bounds), fall back on the slow path to construct useful diagnostics.
-            return ControlFlow::Continue(None);
+        let mut typevars = Vec::with_capacity(mappings.len());
+        for (bound_typevar, bounds) in mappings {
+            let Some(range) = bounds.finish(db, env, storage) else {
+                // If any of the typevars doesn't have a solution (either because the constraint set is
+                // overly restrictive, or because a candidate solution doesn't satisfy the declared
+                // upper bounds), fall back on the slow path to construct useful diagnostics.
+                return ControlFlow::Continue(None);
+            };
+            typevars.push(CandidateTypeVarSolution::range(bound_typevar, range));
         }
 
         let candidate = CandidateSolution {
-            typevars,
+            typevars: typevars.into_boxed_slice(),
             validity: SolutionValidity::Valid,
         };
         ControlFlow::Continue(Some(CandidateSolutions::Constrained(Box::new([candidate]))))
@@ -5835,18 +5843,12 @@ mod tests {
             ConstraintProvenance::Evidence,
             known_instance(db, KnownClass::Str),
         );
-        let invalid = bounds.finish(db, &env);
-        let invalid = CandidateTypeVarSolution::range(t, invalid);
+        let mut storage = builder.storage.borrow_mut();
+        let invalid = bounds.finish(db, &env, &mut storage);
+        assert_eq!(invalid, None);
+        drop(storage);
         let inferable = TypeVarSet::from_typevars(db, [t]);
 
-        assert_eq!(
-            CandidateSolutions::preliminary_solve(db, &env, &builder, inferable, &invalid),
-            PathBoundSolution::Unsatisfiable
-        );
-        assert_eq!(
-            CandidateSolutions::default_solve(db, &env, &builder, inferable, &invalid),
-            PathBoundSolution::Unsatisfiable
-        );
         assert_eq!(PathBoundSolution::Unsatisfiable.as_type(), None);
         assert_eq!(
             CandidateSolutions::default_solve(
@@ -5889,7 +5891,11 @@ mod tests {
                 } else {
                     bounds.add_upper(ConstraintProvenance::Evidence, upper);
                 }
-                let path_bound = bounds.finish(db, &env);
+                let mut storage = builder.storage.borrow_mut();
+                let path_bound = bounds
+                    .finish(db, &env, &mut storage)
+                    .expect("expected a valid solution");
+                drop(storage);
                 let path_bound = CandidateTypeVarSolution::range(t, path_bound);
 
                 // Choosing `int` requires narrowing E for `E & str <= T`, or widening E for
@@ -5947,7 +5953,11 @@ mod tests {
         // to equal both int and str. Neither declared constraint satisfies the whole path.
         let mut bounds = PathBoundBuilder::default();
         bounds.add_lower(ConstraintProvenance::Evidence, lower);
-        let bounds = bounds.finish(db, &env);
+        let mut storage = builder.storage.borrow_mut();
+        let bounds = bounds
+            .finish(db, &env, &mut storage)
+            .expect("expected a valid solution");
+        drop(storage);
         let bounds = CandidateTypeVarSolution::range(t, bounds);
         assert_eq!(
             CandidateSolutions::default_solve(db, &env, &builder, inferable, &bounds,),
@@ -6038,8 +6048,12 @@ class E: ...
             }
             bounds.add_upper(ConstraintProvenance::Evidence, left);
             bounds.add_upper(ConstraintProvenance::Evidence, right);
-            let exhausted = bounds.finish(db, &env);
+            let mut storage = builder.storage.borrow_mut();
+            let exhausted = bounds
+                .finish(db, &env, &mut storage)
+                .expect("expected a valid solution");
             let exhausted = CandidateTypeVarSolution::range(t, exhausted);
+            drop(storage);
             let expected = PathBoundSolution::BudgetExceeded { fallback: lower };
             assert_eq!(
                 CandidateSolutions::preliminary_solve(db, &env, &builder, inferable, &exhausted),
@@ -6079,35 +6093,6 @@ class E: ...
                     Solutions::Constrained(SolutionPaths::BudgetExceeded(expected_paths))
                 );
             }
-
-            // A later contradiction rejects the entire path, including its exhausted binding.
-            let mut invalid = PathBoundBuilder::default();
-            invalid.add_lower(ConstraintProvenance::Evidence, int);
-            invalid.add_upper(ConstraintProvenance::Evidence, str);
-            let invalid = invalid.finish(db, &env);
-            let invalid = CandidateTypeVarSolution::range(u, invalid);
-            for invalid_first in [false, true] {
-                let mut rejected = vec![exhausted.clone(), invalid.clone()];
-                if invalid_first {
-                    rejected.reverse();
-                }
-                let paths = CandidateSolutions::Constrained(Box::new([
-                    CandidateSolution {
-                        typevars: rejected.into_boxed_slice(),
-                        validity: SolutionValidity::Valid,
-                    },
-                    CandidateSolution {
-                        typevars: Box::new([CandidateTypeVarSolution::exact(t, int)]),
-                        validity: SolutionValidity::Valid,
-                    },
-                ]));
-                assert_eq!(
-                    paths.solve(db, &env, &builder, inferable),
-                    Solutions::Constrained(SolutionPaths::Complete(vec![solution([binding(
-                        t, int
-                    )])]))
-                );
-            }
         }
 
         // Gradual upper bounds can admit multiple declared constraints while still exceeding
@@ -6124,7 +6109,11 @@ class E: ...
         for upper in gradual_upper {
             bounds.add_upper(ConstraintProvenance::Evidence, upper);
         }
-        let exhausted = bounds.finish(db, &env);
+        let mut storage = builder.storage.borrow_mut();
+        let exhausted = bounds
+            .finish(db, &env, &mut storage)
+            .expect("expected a valid solution");
+        drop(storage);
         assert!(exhausted.has_only_gradual_evidence);
         let exhausted = CandidateTypeVarSolution::range(constrained, exhausted);
         let inferable = TypeVarSet::from_typevars(db, [constrained]);

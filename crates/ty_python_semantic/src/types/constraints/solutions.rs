@@ -377,18 +377,7 @@ impl<'db> SolutionWalker<'db> {
         let typevars: Option<Box<[_]>> = mappings
             .into_iter()
             .map(|(bound_typevar, bounds)| {
-                let range = bounds.finish(db, env);
-
-                let lower = range.effective_lower(db, env);
-                if !range.upper.is_satisfied_by(db, env, lower) {
-                    let (when_upper, source_order) =
-                        range.upper.when_satisfied_by(db, env, storage, lower);
-                    if when_upper.is_never_satisfied(db, env, storage, source_order) {
-                        // This path does not satisfy the accumulated upper bound, and is
-                        // therefore not a valid specialization.
-                        return None;
-                    }
-                }
+                let range = bounds.finish(db, env, storage)?;
 
                 if let Some(upper_bound_violations) = upper_bound_violations
                     && upper_bound_violations.contains(&bound_typevar)
