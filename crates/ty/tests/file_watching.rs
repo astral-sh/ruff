@@ -3204,6 +3204,8 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
 
 #[cfg(feature = "test-uv")]
 mod uv_metadata {
+    use std::fs::File as StdFile;
+    use std::io::Write as _;
     use std::time::Duration;
 
     use anyhow::Context;
@@ -3216,6 +3218,7 @@ mod uv_metadata {
     use ty_project::{Db, ScriptEnvironmentAvailability, UseUv, UvSyncChanges, uv_test_env_vars};
     use ty_python_semantic::Db as _;
     use ty_static::EnvVars;
+    use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
     use super::{
         ChangeEvent, Setup, SetupContext, TestCase, event_for_file, setup_with_system, update_file,
@@ -3502,6 +3505,221 @@ mod uv_metadata {
 
         let events = case.take_watch_changes(event_for_file("uv.lock"));
         assert!(case.apply_changes(&events).project_sync_path().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn selected_environment_changes_request_metadata_refresh() -> anyhow::Result<()> {
+        let mut case = setup_uv(UseUv::On, &[("pyproject.toml", MANIFEST)])?;
+        let project_root = case.db().project().root(case.db()).to_path_buf();
+        let lockfile = std::fs::read(case.project_path("uv.lock").as_std_path())?;
+        let pyvenv_cfg = case.project_path(".venv/pyvenv.cfg");
+        let config = std::fs::read_to_string(&pyvenv_cfg)?;
+        update_file(&pyvenv_cfg, &format!("{config}\nprompt = refreshed\n"))?;
+        let changed = case.take_watch_changes(event_for_file("pyvenv.cfg"));
+        assert_eq!(
+            case.apply_changes(&changed).project_sync_path(),
+            Some(project_root.as_path())
+        );
+
+        std::fs::remove_dir_all(case.project_path(".venv").as_std_path())?;
+
+        let deleted = case.take_watch_changes(|event: &ChangeEvent| {
+            event.is_deleted() && event.file_name() == Some(".venv")
+        });
+        assert_eq!(
+            case.apply_changes(&deleted).project_sync_path(),
+            Some(project_root.as_path())
+        );
+
+        run_uv(&case, &["venv", "--offline"])?;
+        assert_eq!(
+            std::fs::read(case.project_path("uv.lock").as_std_path())?,
+            lockfile
+        );
+        let created = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Created { .. }) && event.file_name() == Some(".venv")
+        });
+        assert_eq!(
+            case.apply_changes(&created).project_sync_path(),
+            Some(project_root.as_path())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn unrelated_distributions_do_not_request_project_metadata() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                ("pyproject.toml", MANIFEST),
+                ("other/.venv/site-packages/.keep", ""),
+            ],
+        )?;
+        let distribution = case.project_path("other/.venv/site-packages/example-0.1.0.dist-info");
+
+        std::fs::create_dir(&distribution)?;
+        let created = case.take_watch_changes(event_for_file("example-0.1.0.dist-info"));
+        assert!(case.apply_changes(&created).project_sync_path().is_none());
+
+        std::fs::remove_dir(&distribution)?;
+        let deleted = case.take_watch_changes(event_for_file("example-0.1.0.dist-info"));
+        assert!(case.apply_changes(&deleted).project_sync_path().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn unrelated_site_packages_do_not_request_project_metadata() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                ("pyproject.toml", MANIFEST),
+                ("other/.venv/lib/python3.12/.keep", ""),
+            ],
+        )?;
+        let site_packages = case.project_path("other/.venv/lib/python3.12/site-packages");
+
+        std::fs::create_dir(&site_packages)?;
+        let created = case.take_watch_changes(event_for_file("site-packages"));
+        assert!(case.apply_changes(&created).project_sync_path().is_none());
+
+        std::fs::remove_dir(&site_packages)?;
+        let deleted = case.take_watch_changes(event_for_file("site-packages"));
+        assert!(case.apply_changes(&deleted).project_sync_path().is_none());
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn symlinked_environment_distributions_request_project_metadata() -> anyhow::Result<()> {
+        let mut case = setup_uv_with(UseUv::On, &[("pyproject.toml", MANIFEST)], |context| {
+            let environment = context.join_root_path("environment");
+            run_uv_with_system(
+                context.system(),
+                context.project_path(),
+                &["venv", "--offline", environment.as_str()],
+            )?;
+            std::os::unix::fs::symlink(&environment, context.join_project_path(".venv"))?;
+            Ok(())
+        })?;
+        let project = case.db().project();
+        let project_root = project.root(case.db()).to_path_buf();
+        let environment = project.program(case.db()).resolver_environment(case.db());
+        let site_packages = system_module_search_paths(case.db(), environment)
+            .find(|path| path.file_name() == Some("site-packages"))
+            .context("environment has no site-packages")?
+            .to_path_buf();
+        assert!(site_packages.starts_with(case.root_path().join("environment")));
+        let distribution = site_packages.join("example-0.1.0.dist-info");
+
+        std::fs::create_dir(&distribution)?;
+        let mut created = case.take_watch_changes(event_for_file("example-0.1.0.dist-info"));
+        created.retain(
+            |event| matches!(event, ChangeEvent::Created { path, .. } if path == &distribution),
+        );
+        assert!(!created.is_empty());
+        assert_eq!(
+            case.apply_changes(&created).project_sync_path(),
+            Some(project_root.as_path())
+        );
+
+        std::fs::remove_dir(&distribution)?;
+        let mut deleted = case.take_watch_changes(event_for_file("example-0.1.0.dist-info"));
+        deleted.retain(
+            |event| matches!(event, ChangeEvent::Deleted { path, .. } if path == &distribution),
+        );
+        assert!(!deleted.is_empty());
+        assert_eq!(
+            case.apply_changes(&deleted).project_sync_path(),
+            Some(project_root.as_path())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn changing_a_uv_installed_package_refreshes_module_owners() -> anyhow::Result<()> {
+        let mut case = setup_uv_with(
+            UseUv::On,
+            &[
+                (
+                    "pyproject.toml",
+                    r#"
+                    [project]
+                    name = "example"
+                    version = "0.1.0"
+                    requires-python = ">=3.8"
+                    dependencies = ["example-dependency"]
+
+                    [tool.uv]
+                    no-index = true
+                    find-links = ["wheels"]
+                    "#,
+                ),
+                ("main.py", "import example_module\n"),
+            ],
+            |context| {
+                let wheel =
+                    context.join_project_path("wheels/example_dependency-0.1.0-py3-none-any.whl");
+                std::fs::create_dir_all(wheel.parent().context("wheel has no parent")?)?;
+                let mut wheel = ZipWriter::new(StdFile::create(wheel.as_std_path())?);
+                let options =
+                    SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
+                for (path, contents) in [
+                    ("example_module.py", "value = 1\n"),
+                    (
+                        "example_dependency-0.1.0.dist-info/METADATA",
+                        "Metadata-Version: 2.1\nName: example-dependency\nVersion: 0.1.0\n",
+                    ),
+                    (
+                        "example_dependency-0.1.0.dist-info/WHEEL",
+                        "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+                    ),
+                    (
+                        "example_dependency-0.1.0.dist-info/RECORD",
+                        "example_module.py,,\nexample_dependency-0.1.0.dist-info/RECORD,,\n",
+                    ),
+                ] {
+                    wheel.start_file(path, options)?;
+                    wheel.write_all(contents.as_bytes())?;
+                }
+                wheel.finish()?;
+                Ok(())
+            },
+        )?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        let lockfile = std::fs::read(case.project_path("uv.lock").as_std_path())?;
+        run_uv(
+            &case,
+            &[
+                "pip",
+                "uninstall",
+                "--python",
+                ".venv",
+                "example-dependency",
+            ],
+        )?;
+        assert_eq!(
+            std::fs::read(case.project_path("uv.lock").as_std_path())?,
+            lockfile
+        );
+
+        let events = case.take_watch_changes(|event: &ChangeEvent| {
+            event.is_deleted() && event.file_name() == Some("example_dependency-0.1.0.dist-info")
+        });
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+
+        assert_snapshot!(case.render_diagnostics(&case.db().check()), @"
+        main.py:1:8: error[unresolved-import] Cannot resolve imported module `example_module`
+        pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: uv metadata has no module ownership or editable source paths
+        ");
+
+        run_uv(&case, &["sync", "--frozen", "--offline"])?;
+        let events = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Created { .. })
+                && event.file_name() == Some("example_dependency-0.1.0.dist-info")
+        });
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
         Ok(())
     }
 
