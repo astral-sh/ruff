@@ -469,6 +469,50 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
+    /// Binds a known receiver, specializing receiver-dependent type variables and filtering
+    /// incompatible overloads.
+    pub(super) fn bind_receiver(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> Self {
+        let [signature] = self.overloads.as_slice() else {
+            if !self
+                .overloads
+                .iter()
+                .any(Signature::has_explicit_positional_receiver_annotation)
+            {
+                return self.bind_self_with_receiver(
+                    db,
+                    env,
+                    Some(receiver_type),
+                    Some(typing_self_type),
+                );
+            }
+
+            return Self::from_overloads(
+                self.overloads
+                    .iter()
+                    .filter_map(|signature| {
+                        signature.bind_self_if_compatible(db, env, receiver_type, typing_self_type)
+                    })
+                    .flat_map(|signature| signature.overloads),
+            );
+        };
+
+        let specialized = if signature.has_receiver_determined_method_typevar(db, env) {
+            signature.specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
+        } else {
+            None
+        };
+
+        specialized
+            .unwrap_or_else(|| Self::single(signature.clone()))
+            .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type))
+    }
+
     /// Binds the receiver using its runtime type while using `typing_self_type` to replace
     /// occurrences of `typing.Self`.
     ///
@@ -1214,13 +1258,17 @@ impl<'db> Signature<'db> {
     /// Make an implicit receiver explicit when comparing it with a protocol's receiver domain.
     /// For example, a method declared on `C` cannot accept an unrelated `str` receiver.
     pub(super) fn with_explicit_receiver(&self, receiver_type: Type<'db>) -> Self {
+        if !self.has_implicit_positional_receiver_annotation() {
+            return self.clone();
+        }
+
         let parameters = self.parameters.with_transformed_parameters(
             self.parameters
                 .iter()
                 .cloned()
                 .enumerate()
                 .map(|(index, mut parameter)| {
-                    if index == 0 && parameter.is_positional() && parameter.inferred_annotation {
+                    if index == 0 {
                         parameter.annotated_type = receiver_type;
                         parameter.inferred_annotation = false;
                     }
