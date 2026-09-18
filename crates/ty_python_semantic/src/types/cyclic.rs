@@ -225,7 +225,7 @@ struct SpecializationFlowGraph<'db> {
     edges: FxHashSet<FlowEdge<'db>>,
     /// Definition references used to decide whether an unresolved flow can return to the root.
     definition_edges: Vec<(Definition<'db>, Definition<'db>)>,
-    /// Definitions whose captured outer parameters cannot be mapped to their parent specialization.
+    /// Definitions whose parameter flow depends on type variables from another generic scope.
     inconclusive_definitions: FxHashSet<Definition<'db>>,
     /// Whether a definition body or its formal parameters could not be inspected.
     inconclusive: bool,
@@ -254,6 +254,7 @@ struct SourceParameterCollector<'a, 'db> {
     found: RefCell<FxHashMap<BoundTypeVarIdentity<'db>, bool>>,
     visited_types: TypeCollector<'db>,
     in_nested_type: Cell<bool>,
+    inconclusive: Cell<bool>,
 }
 
 impl<'db> RecursiveDefinition<'db> {
@@ -865,9 +866,16 @@ impl<'db> SpecializationFlowVisitor<'db> {
         }
 
         for (target, argument) in target_parameters.into_iter().zip(arguments.iter().copied()) {
-            for (from, kind) in
-                SourceParameterCollector::classify(db, &self.env, &self.source_parameters, argument)
-            {
+            let Some(flows) = SourceParameterCollector::classify(
+                db,
+                &self.env,
+                &self.source_parameters,
+                argument,
+            ) else {
+                self.inconclusive.set(true);
+                continue;
+            };
+            for (from, kind) in flows {
                 self.edges.borrow_mut().push(FlowEdge {
                     from,
                     to: target,
@@ -891,8 +899,8 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
         if let Type::TypeVar(typevar) = ty {
             let identity = RecursiveDefinition::parameter_identity(db, typevar);
             if !self.source_parameters.contains(&identity) {
-                // Nested definitions can capture a type variable from an outer generic scope.
-                // Specialization does not yet retain the parent mapping needed to model it.
+                // A type variable from another scope needs a specialization that is unavailable
+                // here, such as a captured outer parameter or a generic descriptor's parameter.
                 self.inconclusive.set(true);
             }
             return;
@@ -1078,21 +1086,28 @@ fn walk_callable_expansion<'db>(
 }
 
 impl<'a, 'db> SourceParameterCollector<'a, 'db> {
+    /// Classifies parameter flow, or returns `None` if an argument contains an unmapped type
+    /// variable. For example, `__get__[U](..., obj: C[U]) -> C[list[U]]` grows the receiver's
+    /// argument, but the getter's `U` has not been mapped to the class's parameter here.
     fn classify(
         db: &'db dyn Db,
         env: &'a ProgramEnvironment<'db>,
         source_parameters: &'a FxHashSet<BoundTypeVarIdentity<'db>>,
         argument: Type<'db>,
-    ) -> impl Iterator<Item = (BoundTypeVarIdentity<'db>, FlowKind)> {
+    ) -> Option<impl Iterator<Item = (BoundTypeVarIdentity<'db>, FlowKind)>> {
         let collector = Self {
             source_parameters,
             env,
             found: RefCell::default(),
             visited_types: TypeCollector::default(),
             in_nested_type: Cell::default(),
+            inconclusive: Cell::default(),
         };
         collector.visit_type(db, argument);
-        collector
+        if collector.inconclusive.get() {
+            return None;
+        }
+        let flows = collector
             .found
             .into_inner()
             .into_iter()
@@ -1105,7 +1120,8 @@ impl<'a, 'db> SourceParameterCollector<'a, 'db> {
                         FlowKind::Direct
                     },
                 )
-            })
+            });
+        Some(flows)
     }
 }
 
@@ -1127,6 +1143,8 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
                     .entry(identity)
                     .and_modify(|nested| *nested |= self.in_nested_type.get())
                     .or_insert_with(|| self.in_nested_type.get());
+            } else {
+                self.inconclusive.set(true);
             }
             return;
         }

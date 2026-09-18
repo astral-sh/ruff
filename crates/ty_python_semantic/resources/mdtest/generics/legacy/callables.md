@@ -1107,6 +1107,30 @@ def check_property(wrapper: PropertyWrapper[PropertyWrapper[Callable[[], str]]])
     callback: Callable[[], str] = wrapper
 ```
 
+## Finite callable chains through a generic descriptor method
+
+A generic `__get__` method can also expose the receiver's type argument directly. This removes one
+wrapper at each step, so the chain retains the final callable's signature.
+
+```py
+from typing import Callable, ClassVar, Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Descriptor:
+    def __get__(self, obj: "Wrapper[U]", owner: object) -> U:
+        raise NotImplementedError
+
+class Wrapper(Generic[T]):
+    __call__: ClassVar[Descriptor] = Descriptor()
+
+def check(wrapper: Wrapper[Wrapper[Callable[[], str]]]):
+    reveal_type(wrapper())  # revealed: str
+    wrapper(1)  # error: [too-many-positional-arguments]
+    callback: Callable[[], str] = wrapper
+```
+
 ## Growing callable specializations
 
 Wrapping a type argument in `list` on every step produces infinitely many specializations without
@@ -1269,6 +1293,31 @@ class Descriptor(Generic[T]):
 
 class C(Generic[T]):
     __call__: Descriptor[T]
+
+def check(c: C[int]):
+    reveal_type(c())  # revealed: Unknown
+    callback: Callable[[], str] = c
+```
+
+## Growing callable specializations through a generic descriptor method
+
+A generic `__get__` method can infer its type argument from the receiver and wrap it in `list` on
+each access. Its type parameter belongs to the method, so analyzing the class declaration alone
+cannot establish how that parameter changes. We use `Unknown` when this unresolved flow returns to
+the same class, both for calls and for compatibility with `Callable`.
+
+```py
+from typing import Callable, ClassVar, Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Descriptor:
+    def __get__(self, obj: "C[U]", owner: object) -> "C[list[U]]":
+        raise NotImplementedError
+
+class C(Generic[T]):
+    __call__: ClassVar[Descriptor] = Descriptor()
 
 def check(c: C[int]):
     reveal_type(c())  # revealed: Unknown
