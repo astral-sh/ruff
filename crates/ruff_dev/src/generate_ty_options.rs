@@ -183,7 +183,7 @@ fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
     let header = if header.is_empty() {
         String::new()
     } else {
-        format!("\n    {header}")
+        format!("\n{}", textwrap::indent(header, "    "))
     };
     format!(
         "=== \"{}\"\n\n    ```toml{}\n{}\n    ```\n",
@@ -227,6 +227,20 @@ fn format_snippet<'a>(
 
     if header.is_empty() {
         (String::new(), example)
+    } else if parents
+        .iter()
+        .any(|parent| parent.name() == Some("overrides"))
+    {
+        // Nested tables must follow an array entry to keep `overrides` a list.
+        let overrides = configuration
+            .parent_table()
+            .into_iter()
+            .chain(["overrides"])
+            .join(".");
+        (
+            format!("[[{overrides}]]\ninclude = [\"src\"]\n\n[{header}]"),
+            example,
+        )
     } else {
         (format!("[{header}]"), example)
     }
