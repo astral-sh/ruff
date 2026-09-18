@@ -1386,7 +1386,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if self
                         .type_expression_flags(element)
                         .contains(TypeExpressionFlags::UNPACK)
-                        && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple)
+                        && let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, ellipsis)
                     {
                         let mut diagnostic =
                             builder.into_diagnostic("Invalid `tuple` specialization");
@@ -1405,7 +1406,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 for element in elements {
                     if element.is_ellipsis_literal_expr() {
-                        if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple) {
+                        if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, element)
+                        {
                             let mut diagnostic =
                                 builder.into_diagnostic("Invalid `tuple` specialization");
                             diagnostic.set_primary_annotation_message(
@@ -1500,7 +1502,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             single_element => {
                 if single_element.is_ellipsis_literal_expr() {
-                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple) {
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_TYPE_FORM, single_element)
+                    {
                         let mut diagnostic =
                             builder.into_diagnostic("Invalid `tuple` specialization");
                         diagnostic.set_primary_annotation_message(
