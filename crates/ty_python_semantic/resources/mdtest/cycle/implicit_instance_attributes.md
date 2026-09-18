@@ -75,7 +75,7 @@ class Recursive:
         self.callback = c.method if flag else other.callback
 
 def check(value: Recursive):
-    reveal_type(value.callback)  # revealed: bound method C[Any].method(*args: Any, **kwargs: Any) -> None
+    reveal_type(value.callback)  # revealed: (*args: Any, **kwargs: Any) -> None
     static_assert(is_subtype_of(TypeOf[value.callback], Callable[[], None]))
 ```
 

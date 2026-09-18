@@ -45,7 +45,6 @@ pub(crate) use self::infer::{
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
-use self::known_instance::MethodWrapperKind;
 pub(crate) use self::match_pattern::{
     ClassPatternPositionalSource, class_pattern_positional_sources, definite_match_pattern_type,
     definite_match_pattern_type_for_subject, exact_sequence_pattern_type, mapping_pattern_type,
@@ -1094,13 +1093,12 @@ fn distribute_member_lookup_over_bound_or_constraints<'db>(
                     policy,
                     Some(*constraint),
                 );
-                let result =
-                    map_member_lookup_type(db, result, |ty| match ty {
-                        Type::BoundMethod(method) => Type::BoundMethod(
-                            method.with_signature_receiver(db, symbolic_receiver, *constraint),
-                        ),
-                        _ => ty,
-                    });
+                let result = map_member_lookup_type(db, result, |ty| match ty {
+                    Type::BoundMethod(method) => Type::BoundMethod(
+                        method.with_constrained_receiver(db, symbolic_receiver, *constraint),
+                    ),
+                    _ => ty,
+                });
                 error = error.or_else(|| result.err().map(|error| error.kind(db)));
                 let member = result.unwrap_or_else(|error| error.fallback_member(db));
                 properties =
@@ -2302,11 +2300,7 @@ impl<'db> Type<'db> {
     fn supports_self_binding(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         match self {
             Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => false,
-            Type::Callable(callable)
-                if callable.is_function_like(db) || callable.is_method_wrapper(db) =>
-            {
-                false
-            }
+            Type::Callable(callable) if callable.is_function_like(db) => false,
             _ => self.contains_self(db, env),
         }
     }
@@ -3372,7 +3366,9 @@ impl<'db> Type<'db> {
         // report look better until we have proper bidirectional type inference.
         match self {
             Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db, env)),
-            Type::FunctionLiteral(_) => Some(KnownClass::FunctionType.to_instance(db, env)),
+            Type::FunctionLiteral(function) => {
+                Some(function.runtime_class(db).to_instance(db, env))
+            }
             Type::LiteralValue(literal) => Some(literal.fallback_instance(db, env)),
             _ => None,
         }
@@ -4510,7 +4506,8 @@ impl<'db> Type<'db> {
 
             Type::ProtocolInstance(protocol) => protocol.instance_member(db, env, name),
 
-            Type::FunctionLiteral(_) => KnownClass::FunctionType
+            Type::FunctionLiteral(function) => function
+                .runtime_class(db)
                 .to_instance(db, env)
                 .instance_member(db, env, name),
 
@@ -4805,19 +4802,6 @@ impl<'db> Type<'db> {
                 };
             }
 
-            if let Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) = ty {
-                let return_type = match wrapper.kind(db) {
-                    MethodWrapperKind::Staticmethod => wrapper.wrapped(db),
-                    MethodWrapperKind::Classmethod => Type::BoundMethod(
-                        BoundMethodType::from_callable(db, wrapper.wrapped(db), owner, owner),
-                    ),
-                };
-                return Ok(Some(DescriptorGetResult {
-                    return_type,
-                    kind: AttributeKind::NormalOrNonDataDescriptor,
-                }));
-            }
-
             let Place::Defined(DefinedPlace {
                 ty: concrete_descr_get,
                 ..
@@ -4889,69 +4873,17 @@ impl<'db> Type<'db> {
             owner.display(db, env)
         );
 
+        // Function descriptors have fixed binding behavior, so avoid retaining a tracked query
+        // for every function and access context.
+        if matches!(self, Type::BoundMethod(_)) {
+            // A stored bound method keeps its receiver. In Python 3.13+ its native `__get__`
+            // returns the method itself; older versions have no descriptor slot on MethodType.
+            return Ok(None);
+        }
         // Bind known callable descriptors outside the tracked lookup. Checking a protocol
         // receiver can recursively access this method; the lookup's `None` cycle value would
         // leave it unbound and falsely reject the protocol match.
-        match self {
-            Type::Callable(callable) if callable.is_staticmethod_like(db) => {
-                // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
-                // The underlying function is returned as-is, without binding self.
-                return Ok(Some(DescriptorGetResult {
-                    return_type: self,
-                    kind: AttributeKind::NormalOrNonDataDescriptor,
-                }));
-            }
-            Type::Callable(callable)
-                if let is_function_like = callable.is_function_like(db)
-                    && (is_function_like || callable.is_classmethod_like(db)) =>
-            {
-                // For "function-like" or "classmethod-like" callables, model the behavior of
-                // `FunctionType.__get__` or `classmethod.__get__`.
-                //
-                // It is a shortcut to model this in `try_call_dunder_get`. If we
-                // want to be really precise, we should instead return a new method-wrapper
-                // type variant for the synthesized `__get__` method of these synthesized
-                // functions. The method-wrapper would then be returned from
-                // `find_name_in_mro` when called on function-like `Callable`s. This would
-                // allow us to correctly model the behavior of *explicit*
-                // `SomeDataclass.__init__.__get__` calls.
-                let return_type = if is_function_like {
-                    instance.map_or(self, |instance| {
-                        Type::Callable(callable.bind_self(db, env, Some(instance)))
-                    })
-                } else {
-                    // Class methods receive the owner class even through an instance, while
-                    // `typing.Self` denotes an instance of that class.
-                    let typing_self = owner.to_instance_approximation(db, env).unwrap_or(owner);
-                    Type::Callable(callable.bind_self_with_receiver(
-                        db,
-                        env,
-                        Some(owner),
-                        Some(typing_self),
-                    ))
-                };
-
-                return Ok(Some(DescriptorGetResult {
-                    return_type,
-                    kind: AttributeKind::NormalOrNonDataDescriptor,
-                }));
-            }
-            _ => {}
-        }
-
-        // Function descriptors have fixed binding behavior, so avoid retaining a tracked query
-        // for every function and access context.
-        if let Type::FunctionLiteral(function) = self {
-            let return_type = if function.is_classmethod(db) {
-                Type::BoundMethod(BoundMethodType::new(db, function, owner, owner))
-            } else if let Some(instance) = instance
-                && !function.is_staticmethod(db)
-            {
-                Type::BoundMethod(BoundMethodType::new(db, function, instance, instance))
-            } else {
-                self
-            };
-
+        if let Some(return_type) = self.function_like_dunder_get(db, env, instance, Some(owner)) {
             return Ok(Some(DescriptorGetResult {
                 return_type,
                 kind: AttributeKind::NormalOrNonDataDescriptor,
@@ -5827,14 +5759,24 @@ impl<'db> Type<'db> {
 
                 Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),
 
-                Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
-                    Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
-                )
-                .into(),
-                Type::FunctionLiteral(function) if name == "__call__" => Place::bound(
-                    Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)),
-                )
-                .into(),
+                _ if name == "__get__" && this.function_like_kind(db).is_some() => {
+                    Place::bound(Type::KnownBoundMethod(
+                        KnownBoundMethodType::FunctionTypeDunderGet(InternedType::new(db, this)),
+                    ))
+                    .into()
+                }
+                Type::FunctionLiteral(_) if name == "__call__" => {
+                    Place::bound(Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(
+                        InternedType::new(db, this),
+                    )))
+                    .into()
+                }
+                Type::FunctionLiteral(function)
+                    if matches!(name_str, "__func__" | "__wrapped__")
+                        && (function.is_staticmethod(db) || function.is_classmethod(db)) =>
+                {
+                    Place::bound(this.underlying_function(db)).into()
+                }
                 Type::PropertyInstance(property) if name == "__get__" => Place::bound(
                     Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(property)),
                 )
@@ -5981,12 +5923,12 @@ impl<'db> Type<'db> {
                 }
                 Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => match name_str {
                     "__func__" | "__wrapped__" => Place::bound(wrapper.wrapped(db)).into(),
-                    "__call__" if let Some(callables) = wrapper.callables(db, env) => Place::bound(
-                        callables
-                            .map(|callable| callable.into_method_wrapper(db))
-                            .into_type(db, env),
-                    )
-                    .into(),
+                    "__call__" if wrapper.class(db) == KnownClass::Staticmethod => {
+                        Place::bound(Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(
+                            InternedType::new(db, this),
+                        )))
+                        .into()
+                    }
                     _ => wrapper
                         .instance_fallback(db, env)
                         .member_lookup_with_policy_and_receiver(
@@ -5994,18 +5936,18 @@ impl<'db> Type<'db> {
                         ),
                 },
                 Type::BoundMethod(bound_method) => match name_str {
-                    "__self__" => Place::bound(bound_method.self_instance(db)).into(),
-                    "__func__" => Place::bound(bound_method.func(db)).into(),
-                    "__call__" if let Some(callables) = bound_method.callables(db, env) => {
-                        // The extracted method wrapper does not bind another receiver when
-                        // stored on a class, even if the underlying callable is function-like.
-                        Place::bound(
-                            callables
-                                .map(|callable| callable.into_method_wrapper(db))
-                                .into_type(db, env),
-                        )
+                    "__call__" => Place::bound(Type::KnownBoundMethod(
+                        KnownBoundMethodType::DunderCall(InternedType::new(db, this)),
+                    ))
+                    .into(),
+                    "__get__" if env.python_version(db) >= ast::PythonVersion::PY313 => {
+                        Place::bound(Type::KnownBoundMethod(
+                            KnownBoundMethodType::MethodTypeDunderGet(bound_method),
+                        ))
                         .into()
                     }
+                    "__self__" => Place::bound(bound_method.self_instance(db)).into(),
+                    "__func__" => Place::bound(bound_method.func(db)).into(),
                     _ => {
                         let result = KnownClass::MethodType
                             .to_instance(db, env)
@@ -6036,21 +5978,29 @@ impl<'db> Type<'db> {
                     .to_instance(db, env)
                     .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
 
+                Type::Callable(callable)
+                    if name_str == "__call__"
+                        && (callable.is_function_like(db) || callable.is_staticmethod_like(db)) =>
+                {
+                    Place::bound(Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(
+                        InternedType::new(db, this),
+                    )))
+                    .into()
+                }
                 Type::Callable(_) | Type::DataclassTransformer(_) if name_str == "__call__" => {
                     Place::bound(this).into()
                 }
 
-                Type::Callable(callable) if callable.is_function_like(db) => {
-                    KnownClass::FunctionType
-                        .to_instance(db, env)
-                        .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver)
+                Type::Callable(callable)
+                    if matches!(name_str, "__func__" | "__wrapped__")
+                        && (callable.is_staticmethod_like(db)
+                            || callable.is_classmethod_like(db)) =>
+                {
+                    Place::bound(this.underlying_function(db)).into()
                 }
-
-                Type::Callable(callable) if callable.is_method_wrapper(db) => {
-                    KnownClass::MethodWrapperType
-                        .to_instance(db, env)
-                        .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver)
-                }
+                Type::Callable(callable) if let Some(class) = callable.runtime_class(db) => class
+                    .to_instance(db, env)
+                    .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
 
                 Type::Callable(_) | Type::DataclassTransformer(_) => Type::object()
                     .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
@@ -6610,7 +6560,7 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                let Some(function) = bound_method.function(db) else {
+                let Some(signature) = bound_method.unbound_signatures(db) else {
                     return bound_method
                         .func(db)
                         .try_upcast_to_callable(db, env)
@@ -6633,7 +6583,6 @@ impl<'db> Type<'db> {
                             },
                         );
                 };
-                let signature = function.signature(db);
                 let self_instance = bound_method.self_instance(db);
                 let signature_receiver = bound_method.signature_receiver(db);
                 // Class-based protocol member lookup has already specialized the method for this
@@ -6646,7 +6595,12 @@ impl<'db> Type<'db> {
                         .overloads
                         .iter()
                         .all(Signature::has_implicit_positional_receiver_annotation);
-                if protocol_receiver_is_specialized || signature_receiver != self_instance {
+                // Synthesized signatures can contain `Self` without a function's generic
+                // context, so substitute it when capturing the receiver.
+                if bound_method.function(db).is_none()
+                    || protocol_receiver_is_specialized
+                    || signature_receiver != self_instance
+                {
                     let mut binding =
                         CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
                             .with_bound_type(signature_receiver);
@@ -6676,9 +6630,26 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::KnownBoundMethod(method) => {
-                CallableBinding::from_overloads(self, method.signatures(db, env)).into()
-            }
+            // Keep the receiver constraints and known-function handling of a direct call.
+            Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(callable)) => callable
+                .inner(db)
+                .bindings_impl(db, env, recursion_guard)
+                .with_callable_type(self),
+            Type::KnownBoundMethod(method) => method.callables(db, env).map_or_else(
+                || CallableBinding::not_callable(self).into(),
+                |callables| {
+                    Bindings::from_union(
+                        self,
+                        callables.iter().map(|callable| {
+                            CallableBinding::from_overloads(
+                                self,
+                                callable.signatures(db).iter().cloned(),
+                            )
+                            .into()
+                        }),
+                    )
+                },
+            ),
 
             Type::WrapperDescriptor(wrapper_descriptor) => {
                 CallableBinding::from_overloads(self, wrapper_descriptor.signatures(db, env)).into()
@@ -8766,18 +8737,17 @@ impl<'db> Type<'db> {
                         KnownClass::Str.to_class_literal(db, env)
                     }
                 },
-                Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db, env),
+                Type::FunctionLiteral(function) => {
+                    function.runtime_class(db).to_class_literal(db, env)
+                }
                 Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db, env),
                 Type::KnownBoundMethod(method) => method.class().to_class_literal(db, env),
                 Type::WrapperDescriptor(_) => {
                     KnownClass::WrapperDescriptorType.to_class_literal(db, env)
                 }
                 Type::DataclassDecorator(_) => KnownClass::FunctionType.to_class_literal(db, env),
-                Type::Callable(callable) if callable.is_function_like(db) => {
-                    KnownClass::FunctionType.to_class_literal(db, env)
-                }
-                Type::Callable(callable) if callable.is_method_wrapper(db) => {
-                    KnownClass::MethodWrapperType.to_class_literal(db, env)
+                Type::Callable(callable) if let Some(class) = callable.runtime_class(db) => {
+                    class.to_class_literal(db, env)
                 }
                 Type::Callable(_) | Type::DataclassTransformer(_) => {
                     KnownClass::Type.to_instance(db, env)
@@ -9166,7 +9136,16 @@ impl<'db> Type<'db> {
 
             let signatures = match self {
                 Type::FunctionLiteral(function) => function_signatures(function),
-                Type::BoundMethod(method) => method.function(db).and_then(function_signatures),
+                Type::BoundMethod(method)
+                | Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(method)) => {
+                    match method.function(db) {
+                        Some(function) => function_signatures(function),
+                        None => method
+                            .func(db)
+                            .as_callable()
+                            .map(|callable| callable.signatures(db)),
+                    }
+                }
                 Type::Callable(callable) => Some(callable.signatures(db)),
                 _ => None,
             };
@@ -9280,26 +9259,9 @@ impl<'db> Type<'db> {
                 }
             }),
 
-            Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::from_callable(
-                db,
-                match method.func(db) {
-                    // The method retains its function identity even when types in the signature
-                    // are promoted. Promoting the function itself would erase its attributes.
-                    Type::FunctionLiteral(function) => Type::FunctionLiteral(
-                        function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                    ),
-                    func => func.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                },
-                method
-                    .self_instance(db)
-                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                method.signature_receiver(db).apply_type_mapping_impl(
-                    db,
-                    type_mapping,
-                    tcx,
-                    visitor,
-                ),
-            )),
+            Type::BoundMethod(method) => {
+                Type::BoundMethod(method.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            }
 
             Type::NominalInstance(instance)
                 if matches!(
@@ -9343,13 +9305,30 @@ impl<'db> Type<'db> {
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
-                    function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    InternedType::new(
+                        db,
+                        function
+                            .inner(db)
+                            .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    ),
                 ))
             }
 
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
-                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(
-                    function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(callable)) => {
+                let callable = match callable.inner(db) {
+                    Type::FunctionLiteral(function) => Type::FunctionLiteral(
+                        function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    ),
+                    callable => callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                };
+                Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(InternedType::new(
+                    db, callable,
+                )))
+            }
+
+            Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(method)) => {
+                Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(
+                    method.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
 
@@ -9648,10 +9627,28 @@ impl<'db> Type<'db> {
 
             Type::KnownBoundMethod(
                 KnownBoundMethodType::FunctionTypeDunderGet(function)
-                | KnownBoundMethodType::FunctionTypeDunderCall(function),
-            ) => visitor.visit(db, self, || {
-                function.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
-            }),
+                | KnownBoundMethodType::DunderCall(function),
+            ) => {
+                visitor.visit(db, self, || {
+                    function.inner(db).find_legacy_typevars_impl(
+                        db,
+                        env,
+                        binding_context,
+                        typevars,
+                        visitor,
+                    );
+                });
+            }
+            Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(method)) => visitor
+                .visit(db, self, || {
+                    Type::BoundMethod(method).find_legacy_typevars_impl(
+                        db,
+                        env,
+                        binding_context,
+                        typevars,
+                        visitor,
+                    );
+                }),
 
             Type::KnownBoundMethod(
                 KnownBoundMethodType::PropertyDunderGet(property)
@@ -10480,14 +10477,8 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             }
 
             Type::BoundMethod(method_type) => {
-                if let Some(function) = method_type.function(db) {
-                    function
-                        .bound_signatures(
-                            db,
-                            method_type.signature_receiver(db),
-                            method_type.typing_self_type(db),
-                        )
-                        .variance_of(db, env, typevar)
+                if let Some(signatures) = method_type.bound_signatures(db) {
+                    signatures.variance_of(db, env, typevar)
                 } else {
                     // A callable object's type does not include the additional receiver bound
                     // by classmethod, which is also exposed through `__self__`.

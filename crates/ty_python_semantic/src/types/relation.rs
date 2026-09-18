@@ -217,7 +217,7 @@ impl TypeRelation {
         matches!(self, TypeRelation::Subtyping)
     }
 
-    const fn can_safely_assume_reflexivity(self, ty: Type) -> bool {
+    const fn can_safely_assume_reflexivity(self, ty: Type<'_>) -> bool {
         match self {
             TypeRelation::Assignability | TypeRelation::Redundancy { .. } => true,
             TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
@@ -262,12 +262,9 @@ impl<'db> Type<'db> {
             Type::RecursiveVar(_) => panic!("semantic operation on an unbound recursive variable"),
             Type::Never
             | Type::FunctionLiteral(..)
-            | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(
-                KnownBoundMethodType::FunctionTypeDunderGet(_)
-                | KnownBoundMethodType::FunctionTypeDunderCall(_)
-                | KnownBoundMethodType::StrStartswith(_)
+                KnownBoundMethodType::StrStartswith(_)
                 | KnownBoundMethodType::ConstraintSetLowerBound
                 | KnownBoundMethodType::ConstraintSetUpperBound
                 | KnownBoundMethodType::ConstraintSetEquality
@@ -298,7 +295,8 @@ impl<'db> Type<'db> {
             // might inherit `Any`, but subtyping is still reflexive
             Type::ClassLiteral(_) => true,
 
-            Type::Dynamic(_)
+            Type::BoundMethod(_)
+            | Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Recursive(_)
             | Type::NominalInstance(_)
@@ -310,7 +308,10 @@ impl<'db> Type<'db> {
             | Type::EnumComplement(_)
             | Type::Callable(_)
             | Type::KnownBoundMethod(
-                KnownBoundMethodType::PropertyDunderGet(_)
+                KnownBoundMethodType::MethodTypeDunderGet(_)
+                | KnownBoundMethodType::DunderCall(_)
+                | KnownBoundMethodType::FunctionTypeDunderGet(_)
+                | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::PropertyDunderDelete(_),
             )
@@ -1689,7 +1690,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         //
         // Note that we could do a full equivalence check here, but that would be both expensive
         // and unnecessary. This early return is only an optimisation.
-        if self.relation.can_safely_assume_reflexivity(source) && source == target {
+        if source == target && self.relation.can_safely_assume_reflexivity(source) {
             return self.always();
         }
 
@@ -2431,6 +2432,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::Callable(target_callable)) => {
                 self.with_recursion_guard(db, source, target, || {
+                    // Bound methods can be assigned to inferred function-like callback types,
+                    // but are not nominal subtypes of functions.
+                    let target_callable = if self.relation.is_assignability()
+                        && matches!(source, Type::BoundMethod(_))
+                        && target_callable.is_function_like(db)
+                    {
+                        target_callable.into_regular(db)
+                    } else {
+                        target_callable
+                    };
                     let Some(callables) = source.try_upcast_to_callable_with_policy(
                         db,
                         env,
@@ -2728,18 +2739,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, KnownClass::Bool.to_instance(db, env), target)
             }
 
-            // Function-like callables are subtypes of `FunctionType`
-            (Type::Callable(callable), _) if callable.is_function_like(db) => {
-                self.check_type_pair(db, KnownClass::FunctionType.to_instance(db, env), target)
+            (Type::Callable(callable), _) if let Some(class) = callable.runtime_class(db) => {
+                self.check_type_pair(db, class.to_instance(db, env), target)
             }
-
-            // Method-wrapper callables are subtypes of `MethodWrapperType`.
-            (Type::Callable(callable), _) if callable.is_method_wrapper(db) => self
-                .check_type_pair(
-                    db,
-                    KnownClass::MethodWrapperType.to_instance(db, env),
-                    target,
-                ),
 
             (Type::Callable(_), _) => self.never(),
 
@@ -3593,6 +3595,24 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             ) => nontrivial_check(self, || self.check_property_instance_pair(db, left, right)),
 
             (
+                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(left)),
+                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(right)),
+            )
+            | (
+                Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(left)),
+                Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(right)),
+            ) => nontrivial_check(self, || {
+                self.check_type_pair(db, left.inner(db), right.inner(db))
+            }),
+
+            (
+                Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(left)),
+                Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(right)),
+            ) => nontrivial_check(self, || {
+                self.check_type_pair(db, Type::BoundMethod(left), Type::BoundMethod(right))
+            }),
+
+            (
                 Type::KnownInstance(KnownInstanceType::Sentinel(left_sentinel)),
                 Type::KnownInstance(KnownInstanceType::Sentinel(right_sentinel)),
             ) => ConstraintSet::from_bool(
@@ -4037,14 +4057,31 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
-            (Type::FunctionLiteral(..), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::FunctionLiteral(..)) => {
-                // A `Type::FunctionLiteral()` must be an instance of exactly `types.FunctionType`
-                // (it cannot be an instance of a `types.FunctionType` subclass)
+            (Type::FunctionLiteral(function), Type::NominalInstance(instance))
+            | (Type::NominalInstance(instance), Type::FunctionLiteral(function)) => {
+                // Function literals and their descriptor wrappers have an exact runtime class.
                 nontrivial_check(self, || {
-                    KnownClass::FunctionType
+                    function
+                        .runtime_class(db)
                         .when_subclass_of(db, env, instance.class(db, env), self.constraints)
                         .negate(db, self.constraints)
+                })
+            }
+
+            (Type::Callable(callable), other) | (other, Type::Callable(callable))
+                if let Some(class) = callable.runtime_class(db) =>
+            {
+                let other = match other {
+                    Type::Callable(other_callable) => {
+                        let Some(other_class) = other_callable.runtime_class(db) else {
+                            return self.never();
+                        };
+                        other_class.to_instance(db, env)
+                    }
+                    _ => other,
+                };
+                nontrivial_check(self, || {
+                    self.check_type_pair(db, class.to_instance(db, env), other)
                 })
             }
 
