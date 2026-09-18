@@ -228,9 +228,9 @@ def simplifications_for_same_elements(
 
 ### Union of intersections with disjoint exclusions
 
-When two intersections differ only by one exclusion each and those exclusions are disjoint, their
-union is just the common part. Every value in the common part must satisfy at least one of the two
-exclusions. This also preserves shared exclusions and gradual types:
+When two intersections have the same positive elements and disjoint sets of differing exclusions,
+their union is just the common part. Every value in the common part must satisfy at least one of the
+two sets of exclusions. This also preserves shared exclusions and gradual types:
 
 ```py
 from typing import Any, Literal
@@ -246,6 +246,20 @@ def disjoint(
     reveal_type(earlier)  # revealed: ~str
 ```
 
+Each side can exclude several values, and the two sets need not have the same size. Only shared
+exclusions remain after merging:
+
+```py
+def groups(
+    disjoint: (Unknown & ~str & ~Literal[10, 11]) | (Unknown & ~Literal[20, 21] & ~str),
+    unequal: (Any & ~Literal[10]) | (Any & ~Literal[20, 21]),
+    shared: (Unknown & ~str & ~Literal[10, 11]) | (Unknown & ~str & ~Literal[11, 12, 13]),
+):
+    reveal_type(disjoint)  # revealed: Unknown & ~str
+    reveal_type(unequal)  # revealed: Any
+    reveal_type(shared)  # revealed: Unknown & ~str & ~Literal[11]
+```
+
 If the exclusions might overlap, a value in both excluded types is still absent from the union, so
 we keep the exclusions:
 
@@ -253,8 +267,8 @@ we keep the exclusions:
 class P: ...
 class Q: ...
 
-def overlapping(value: (Any & ~str & ~P) | (Any & ~str & ~Q)):
-    reveal_type(value)  # revealed: (Any & ~str & ~P) | (Any & ~str & ~Q)
+def overlapping(value: (Any & ~str & ~Literal[10] & ~P) | (Any & ~str & ~Literal[20] & ~Q)):
+    reveal_type(value)  # revealed: (Any & ~str & ~Literal[10] & ~P) | (Any & ~str & ~Literal[20] & ~Q)
 ```
 
 ### Negation distributes over union

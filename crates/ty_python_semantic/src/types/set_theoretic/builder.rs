@@ -43,8 +43,6 @@ use std::convert::Infallible;
 use std::hint::cold_path;
 use std::ops::ControlFlow;
 
-use itertools::Itertools;
-
 use super::RecursivelyDefined;
 use super::generic_gradual_intersections::{GenericIntersection, generic_gradual_intersection};
 use crate::types::enums::EnumComplement;
@@ -147,6 +145,8 @@ fn merge_truthiness_guarded_pair<'db>(
 ///
 /// The common part can itself contain exclusions. For example,
 /// `(Unknown & ~str & ~A) | (Unknown & ~str & ~B)` simplifies to `Unknown & ~str`.
+/// `A` and `B` can each be unions: all exclusions unique to one side must be disjoint
+/// from every exclusion unique to the other side.
 fn merge_disjoint_exclusions<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -160,34 +160,42 @@ fn merge_disjoint_exclusions<'db>(
     let left_negative = left.negative(db);
     let right_negative = right.negative(db);
 
-    if left_negative.len() != right_negative.len() || !left_positive.set_eq(right.positive(db)) {
+    if !left_positive.set_eq(right.positive(db)) {
         return None;
     }
 
-    let left_exclusion = *left_negative
-        .iter()
-        .filter(|ty| !right_negative.contains(ty))
-        .exactly_one()
-        .ok()?;
-    let right_exclusion = *right_negative
-        .iter()
-        .find(|ty| !left_negative.contains(ty))?;
-
-    if simplify_intersection_pair(
-        db,
-        env,
-        left_exclusion,
-        right_exclusion,
-        IntersectionPolarity::Positive,
-    ) != IntersectionSimplification::Disjoint
+    // Leave redundant operands to the usual union simplification, which preserves their order.
+    if left_negative.iter().all(|ty| right_negative.contains(ty))
+        || right_negative.iter().all(|ty| left_negative.contains(ty))
     {
         return None;
+    }
+
+    for left_exclusion in left_negative
+        .iter()
+        .filter(|ty| !right_negative.contains(ty))
+    {
+        for right_exclusion in right_negative
+            .iter()
+            .filter(|ty| !left_negative.contains(ty))
+        {
+            if simplify_intersection_pair(
+                db,
+                env,
+                *left_exclusion,
+                *right_exclusion,
+                IntersectionPolarity::Positive,
+            ) != IntersectionSimplification::Disjoint
+            {
+                return None;
+            }
+        }
     }
 
     let mut common =
         IntersectionBuilder::new(db, env).positive_elements(left_positive.iter().copied());
     for negative in left_negative {
-        if *negative != left_exclusion {
+        if right_negative.contains(negative) {
             common.add_negative_in_place(*negative);
         }
     }

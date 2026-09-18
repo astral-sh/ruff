@@ -1446,6 +1446,57 @@ fn benchmark_literal_equality_fallthrough_guarded_any(criterion: &mut Criterion)
     );
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4514>.
+///
+/// Each failed comparison against a union of enum members introduces two disjoint exclusions.
+/// Without simplifying their union, successive comparisons double the number of alternatives.
+fn benchmark_enum_union_equality(criterion: &mut Criterion) {
+    let mut code = String::from("from enum import Enum\n\n");
+    for name in ["First", "Second"] {
+        writeln!(&mut code, "class {name}(Enum):").ok();
+        for index in 0..10 {
+            writeln!(&mut code, "    m{index} = {index}").ok();
+        }
+        code.push('\n');
+    }
+    code.push_str(
+        "def check(value, choice: bool) -> None:\n    enum = First if choice else Second\n    if isinstance(value, str):\n        return\n",
+    );
+    for index in 0..10 {
+        let keyword = if index == 0 { "if" } else { "elif" };
+        writeln!(
+            &mut code,
+            "    {keyword} value == enum.m{index}:\n        pass"
+        )
+        .ok();
+    }
+    code.push_str("    else:\n        repr(value)\n");
+
+    benchmark_literal_fallthrough(criterion, "ty_micro[enum_union_equality]", &code);
+}
+
+/// Each condition introduces alternatives with several disjoint exclusions, which must be
+/// simplified before the next condition to avoid multiplying the number of alternatives.
+fn benchmark_disjoint_membership_exclusions(criterion: &mut Criterion) {
+    let mut code = String::from(
+        "def check(value) -> None:\n    if isinstance(value, bytes):\n        return\n",
+    );
+    for index in 0..10 {
+        let start = 10 + index * 4;
+        writeln!(
+            &mut code,
+            "    if value not in ({start}, {}) or value not in ({}, {}):\n        pass\n    else:\n        return",
+            start + 1,
+            start + 2,
+            start + 3,
+        )
+        .ok();
+    }
+    code.push_str("    repr(value)\n");
+
+    benchmark_literal_fallthrough(criterion, "ty_micro[disjoint_membership_exclusions]", &code);
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/4256>.
 ///
 /// Excluding rejected gradual string literals must not expand the complement of each intersection
@@ -1955,6 +2006,8 @@ criterion_group!(
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
+    benchmark_enum_union_equality,
+    benchmark_disjoint_membership_exclusions,
     benchmark_gradual_literal_union_equality,
     benchmark_gradual_intersection_negation,
     benchmark_literal_or_pattern_reachability,
