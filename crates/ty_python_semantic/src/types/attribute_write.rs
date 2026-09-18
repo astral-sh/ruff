@@ -306,9 +306,8 @@ pub(super) fn attribute_write_requirement<'db>(
         }
         Type::Recursive(recursive) => recursive
             .unfold(db, env)
-            .map_or(AttributeWriteRequirement::Unconstrained, |unfolded| {
-                attribute_write_requirement(db, env, unfolded, attribute)
-            }),
+            .map(|unfolded| attribute_write_requirement(db, env, unfolded, attribute))
+            .unwrap_or(AttributeWriteRequirement::Unconstrained),
 
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
             AttributeWriteRequirement::CannotAssign

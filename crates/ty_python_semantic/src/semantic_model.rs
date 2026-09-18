@@ -675,7 +675,8 @@ impl<'db> SemanticModel<'db> {
                 Type::Recursive(recursive) => visitor.visit(db, ty, || {
                     recursive
                         .unfold(db, &recursive.environment(db))
-                        .map_or_else(Vec::new, |unfolded| collect(db, unfolded, visitor))
+                        .map(|unfolded| collect(db, unfolded, visitor))
+                        .unwrap_or_else(Vec::new)
                 }),
                 _ => Vec::new(),
             }

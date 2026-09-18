@@ -2041,9 +2041,8 @@ fn is_instance_truthiness<'db>(
     match ty {
         Type::Recursive(recursive) => recursive
             .unfold(db, env)
-            .map_or(Truthiness::Ambiguous, |unfolded| {
-                is_instance_truthiness(db, env, unfolded, class)
-            }),
+            .map(|unfolded| is_instance_truthiness(db, env, unfolded, class))
+            .unwrap_or(Truthiness::Ambiguous),
         Type::RecursiveVar(_) => {
             unreachable!("semantic operation on an unbound recursive variable")
         }

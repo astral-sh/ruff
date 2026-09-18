@@ -260,9 +260,8 @@ impl<'db> Type<'db> {
 
             Type::Recursive(recursive) => recursive
                 .unfold(db, env)
-                .map_or(Ok(Truthiness::Ambiguous), |unfolded| {
-                    unfolded.try_bool_impl(db, env, allow_short_circuit, visitor)
-                })?,
+                .map(|unfolded| unfolded.try_bool_impl(db, env, allow_short_circuit, visitor))
+                .unwrap_or(Ok(Truthiness::Ambiguous))?,
 
             Type::TypedDict(td) => {
                 if td.items(db).values().any(TypedDictField::is_required) {

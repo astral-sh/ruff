@@ -449,30 +449,36 @@ impl<'db> RecursiveType<'db> {
             }
             TypeMapping::Materialize(kind) => {
                 visitor.visit(db, Type::Recursive(self), mapping, || {
-                    self.unfold(db, visitor.env).map(|unfolded| {
-                        let mapped = unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
-                        // Preserve static aliases, including recursive references that the
-                        // visitor leaves unchanged while materializing their enclosing body.
-                        Type::Recursive(if mapped == unfolded {
-                            self
-                        } else {
-                            self.with_materialization(db, Some(*kind))
+                    self.unfold(db, visitor.env)
+                        .map(|unfolded| {
+                            let mapped =
+                                unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
+                            // Preserve static aliases, including recursive references that the
+                            // visitor leaves unchanged while materializing their enclosing body.
+                            Type::Recursive(if mapped == unfolded {
+                                self
+                            } else {
+                                self.with_materialization(db, Some(*kind))
+                            })
                         })
-                    })
+                        .into_type()
                 })
             }
             TypeMapping::EagerExpansion => {
                 visitor.visit(db, Type::Recursive(self), mapping, || {
                     // Expand arguments only where the body exposes them. Expanding stored arguments
                     // first can feed a recursive alias's previous approximation into its own arguments.
-                    self.unfold(db, visitor.env).map(|unfolded| {
-                        let mapped = unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
-                        if mapped == unfolded {
-                            Type::Recursive(self)
-                        } else {
-                            mapped
-                        }
-                    })
+                    self.unfold(db, visitor.env)
+                        .map(|unfolded| {
+                            let mapped =
+                                unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
+                            if mapped == unfolded {
+                                Type::Recursive(self)
+                            } else {
+                                mapped
+                            }
+                        })
+                        .into_type()
                 })
             }
             _ => visitor.visit(db, Type::Recursive(self), mapping, || {
@@ -482,14 +488,17 @@ impl<'db> RecursiveType<'db> {
                     .arguments(db)
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
                 let recursive = self.with_arguments(db, arguments);
-                recursive.unfold(db, visitor.env).map(|unfolded| {
-                    let mapped = unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
-                    if mapped == unfolded {
-                        Type::Recursive(recursive)
-                    } else {
-                        mapped
-                    }
-                })
+                recursive
+                    .unfold(db, visitor.env)
+                    .map(|unfolded| {
+                        let mapped = unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
+                        if mapped == unfolded {
+                            Type::Recursive(recursive)
+                        } else {
+                            mapped
+                        }
+                    })
+                    .into_type()
             }),
         }
     }
@@ -501,24 +510,26 @@ impl<'db> RecursiveType<'db> {
     ) -> VarianceTerm<'db> {
         let env = self.environment(db);
         self.unfold(db, &env)
-            .map_or(VarianceTerm::BIVARIANT, |unfolded| {
-                unfolded.variance_of(db, &env, typevar)
-            })
+            .map(|unfolded| unfolded.variance_of(db, &env, typevar))
+            .unwrap_or(VarianceTerm::BIVARIANT)
     }
 }
 
 /// The outcome of unfolding one layer of a [`RecursiveType`].
+///
+/// Mapping transforms the unfolded value while retaining the original recursive type
+/// when unfolding made no progress.
 #[derive(Debug, Clone, Copy)]
 #[must_use]
-pub enum UnfoldResult<'db> {
-    /// A closed type that differs from the original recursive type.
-    Unfolded(Type<'db>),
+pub enum UnfoldResult<'db, T = Type<'db>> {
+    /// The unfolded type, or a value produced by mapping it.
+    Unfolded(T),
     /// Unfolding returns the original recursive type, for example for `μa. a`.
     Unchanged(RecursiveType<'db>),
 }
 
-impl<'db> UnfoldResult<'db> {
-    /// Return the unfolded type, or the original recursive type if unfolding made no progress.
+impl<'db> UnfoldResult<'db, Type<'db>> {
+    /// Return the unfolded or mapped type, or the original recursive type if unfolding made no progress.
     ///
     /// Callers that recursively process the returned type must use their own recursion guards.
     /// Unfolding one layer does not eliminate cycles, even when it makes progress.
@@ -529,61 +540,67 @@ impl<'db> UnfoldResult<'db> {
             Self::Unchanged(recursive) => Type::Recursive(recursive),
         }
     }
+}
 
-    /// Return the unfolded type only if it differs from the original recursive type.
+impl<'db, T> UnfoldResult<'db, T> {
+    /// Return the contained value if unfolding made progress.
     #[inline]
-    pub(crate) fn into_unfolded(self) -> Option<Type<'db>> {
+    pub(crate) fn into_unfolded(self) -> Option<T> {
         match self {
-            Self::Unfolded(ty) => Some(ty),
+            Self::Unfolded(value) => Some(value),
             Self::Unchanged(_) => None,
         }
     }
 
-    /// Return whether unfolding made progress and the unfolded type satisfies `predicate`.
+    /// Return whether unfolding made progress and the contained value satisfies `predicate`.
     #[inline]
-    pub(crate) fn is_unfolded_and(self, predicate: impl FnOnce(Type<'db>) -> bool) -> bool {
+    #[expect(
+        clippy::wrong_self_convention,
+        reason = "Like Option::is_some_and, the predicate consumes the contained value."
+    )]
+    pub(crate) fn is_unfolded_and(self, predicate: impl FnOnce(T) -> bool) -> bool {
         match self {
-            Self::Unfolded(ty) => predicate(ty),
+            Self::Unfolded(value) => predicate(value),
             Self::Unchanged(_) => false,
         }
     }
 
-    /// Return whether unfolding made no progress or the unfolded type satisfies `predicate`.
+    /// Return whether unfolding made no progress or the contained value satisfies `predicate`.
     #[inline]
-    pub(crate) fn is_unchanged_or(self, predicate: impl FnOnce(Type<'db>) -> bool) -> bool {
+    #[expect(
+        clippy::wrong_self_convention,
+        reason = "Like Option::is_none_or, the predicate consumes the contained value."
+    )]
+    pub(crate) fn is_unchanged_or(self, predicate: impl FnOnce(T) -> bool) -> bool {
         match self {
-            Self::Unfolded(ty) => predicate(ty),
+            Self::Unfolded(value) => predicate(value),
             Self::Unchanged(_) => true,
         }
     }
 
-    /// Transform the unfolded type, preserving the original recursive type if unfolding made no progress.
+    /// Transform the contained value, preserving the original recursive type if unfolding made no progress.
     #[inline]
-    pub(crate) fn map(self, operation: impl FnOnce(Type<'db>) -> Type<'db>) -> Type<'db> {
+    pub(crate) fn map<U>(self, operation: impl FnOnce(T) -> U) -> UnfoldResult<'db, U> {
         match self {
-            Self::Unfolded(ty) => operation(ty),
-            Self::Unchanged(recursive) => Type::Recursive(recursive),
+            Self::Unfolded(value) => UnfoldResult::Unfolded(operation(value)),
+            Self::Unchanged(recursive) => UnfoldResult::Unchanged(recursive),
         }
     }
 
-    /// Apply `operation` to the unfolded type, or call `fallback` if unfolding made no progress.
+    /// Return the contained value, or call `fallback` if unfolding made no progress.
     #[inline]
-    pub(crate) fn map_or_else<T>(
-        self,
-        fallback: impl FnOnce() -> T,
-        operation: impl FnOnce(Type<'db>) -> T,
-    ) -> T {
+    pub(crate) fn unwrap_or_else(self, fallback: impl FnOnce() -> T) -> T {
         match self {
-            Self::Unfolded(ty) => operation(ty),
+            Self::Unfolded(value) => value,
             Self::Unchanged(_) => fallback(),
         }
     }
 
-    /// Apply `operation` to the unfolded type, or return `fallback` if unfolding made no progress.
+    /// Return the contained value, or return `fallback` if unfolding made no progress.
     #[inline]
-    pub(crate) fn map_or<T>(self, fallback: T, operation: impl FnOnce(Type<'db>) -> T) -> T {
+    pub(crate) fn unwrap_or(self, fallback: T) -> T {
         match self {
-            Self::Unfolded(ty) => operation(ty),
+            Self::Unfolded(value) => value,
             Self::Unchanged(_) => fallback,
         }
     }

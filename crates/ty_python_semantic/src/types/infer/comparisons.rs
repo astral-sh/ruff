@@ -313,9 +313,8 @@ impl<'db> Type<'db> {
                 Type::Recursive(recursive) => visit_type(db, ty, visitor, || {
                     recursive
                         .unfold(db, env)
-                        .map_or(UpcastResult::unstable(ty), |unfolded| {
-                            upcast(db, env, unfolded, visitor)
-                        })
+                        .map(|unfolded| upcast(db, env, unfolded, visitor))
+                        .unwrap_or(UpcastResult::unstable(ty))
                 }),
                 Type::RecursiveVar(_) => {
                     unreachable!("semantic operation on an unbound recursive variable")
