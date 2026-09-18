@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io;
-use std::io::{BufWriter, Write, stderr, stdout};
+use std::io::{Write, stderr};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -74,6 +74,7 @@ pub(crate) fn format(
     cli: FormatArguments,
     config_arguments: &ConfigArguments,
     root_project: &RootProject,
+    writer: &mut dyn Write,
 ) -> Result<ExitStatus> {
     let mode = FormatMode::from_cli(&cli);
     let files = resolve_default_files(cli.files, false);
@@ -206,11 +207,10 @@ pub(crate) fn format(
 
     let results = FormatResults::new(results.as_slice(), mode);
     if config_arguments.log_level > LogLevel::Silent && !mode.is_write() {
-        let mut writer = BufWriter::new(stdout().lock());
         if mode.is_check() {
-            results.write_changed(&mut writer, output_format, &errors)?;
+            results.write_changed(writer, output_format, &errors)?;
         } else {
-            results.write_diff(&mut writer)?;
+            results.write_diff(writer)?;
         }
         writer.flush()?;
     }
@@ -221,9 +221,11 @@ pub(crate) fn format(
             // Allow piping the diff to e.g. a file by writing the summary to stderr
             results.write_summary(&mut stderr().lock())?;
         } else if output_format.is_human_readable() {
-            results.write_summary(&mut stdout().lock())?;
+            results.write_summary(writer)?;
         }
     }
+
+    writer.flush()?;
 
     match mode {
         FormatMode::Write => {
@@ -576,7 +578,7 @@ impl<'a> FormatResults<'a> {
     }
 
     /// Write a diff of the formatting changes to the given writer.
-    fn write_diff(&self, f: &mut impl Write) -> io::Result<()> {
+    fn write_diff(&self, f: &mut dyn Write) -> io::Result<()> {
         for (path, unformatted, formatted) in self
             .results
             .iter()
@@ -602,7 +604,7 @@ impl<'a> FormatResults<'a> {
     /// Write a list of the files that would be changed and any errors to the given writer.
     fn write_changed(
         &self,
-        f: &mut impl Write,
+        f: &mut dyn Write,
         output_format: OutputFormat,
         errors: &[FormatCommandError],
     ) -> io::Result<()> {
@@ -640,7 +642,7 @@ impl<'a> FormatResults<'a> {
     }
 
     /// Write a summary of the formatting results to the given writer.
-    fn write_summary(&self, f: &mut impl Write) -> io::Result<()> {
+    fn write_summary(&self, f: &mut dyn Write) -> io::Result<()> {
         // Compute the number of changed and unchanged files.
         let mut changed = 0u32;
         let mut unchanged = 0u32;

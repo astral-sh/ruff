@@ -73,8 +73,9 @@ For example, to run `ruff check --select B ./src` using Ruff version `0.8.0`:
 
 ## GitLab CI/CD
 
-Add the following configuration to `.gitlab-ci.yml` to run `ruff format` in parallel with
-`ruff check`, which produces a report compatible with GitLab's code quality report.
+Add the following configuration to `.gitlab-ci.yml` to run `ruff check` and
+`ruff format --check` in parallel. Both jobs produce reports compatible with GitLab's code
+quality report.
 
 ```yaml
 .base_ruff:
@@ -97,7 +98,10 @@ Ruff Check:
 Ruff Format:
   extends: .base_ruff
   script:
-    - ruff format --diff
+    - ruff format --check --output-format=gitlab --output-file=format-code-quality-report.json
+  artifacts:
+    reports:
+      codequality: $CI_PROJECT_DIR/format-code-quality-report.json
 ```
 
 ## pre-commit
