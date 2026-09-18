@@ -7,6 +7,7 @@ thread_local! {
     // one pool per worker.
     static RAYON_POOL: rayon::ThreadPool = rayon::ThreadPoolBuilder::new()
         .num_threads(1)
+        .stack_size(ruff_db::STACK_SIZE)
         .build()
         .unwrap();
 }

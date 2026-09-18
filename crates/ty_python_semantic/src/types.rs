@@ -29,7 +29,7 @@ pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
-use self::cyclic::{ActiveRecursionDetector, HasIdentity, TypeIdentity};
+use self::cyclic::{ActiveRecursionDetector, CallableRecursionDetector, HasIdentity, TypeIdentity};
 pub use self::dedicated::pytest::{
     FixtureBinding, FixtureExposure, FixtureNameSource, PytestTest, fixture_bindings_for_parameter,
     fixture_exposures_for_definition, pytest_global_plugin_files, pytest_tests_in_file,
@@ -425,6 +425,24 @@ fn definition_expression_annotation<'db>(
 #[derive(Default)]
 struct TypeRecursionContext<'db> {
     meta_type: MetaTypeRecursion<'db>,
+}
+
+/// Call expansion distinguishes constructor cycles from instance `__call__` cycles: constructors
+/// retain a nominal return type, whereas a pure instance cycle provides no callable signature.
+struct BindingsRecursionContext<'a, 'db> {
+    constructors: &'a ActiveRecursionDetector<Type<'db>>,
+    instances: CallableRecursionDetector<'db>,
+}
+
+impl<'a, 'db> BindingsRecursionContext<'a, 'db> {
+    /// Starts a fresh instance expansion while retaining the active constructor path, so a cycle
+    /// crossing a constructor uses the constructor fallback instead of rejecting the instance.
+    fn new(constructors: &'a ActiveRecursionDetector<Type<'db>>) -> Self {
+        Self {
+            constructors,
+            instances: CallableRecursionDetector::default(),
+        }
+    }
 }
 
 /// Guards shared by meta-type projections and the specializations they trigger.
@@ -6527,14 +6545,18 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Bindings<'db> {
-        self.bindings_impl(db, env, &ActiveRecursionDetector::default())
+        self.bindings_impl(
+            db,
+            env,
+            &BindingsRecursionContext::new(&ActiveRecursionDetector::default()),
+        )
     }
 
     fn bindings_impl(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        recursion_guard: &ActiveRecursionDetector<Type<'db>>,
+        recursion_guard: &BindingsRecursionContext<'_, 'db>,
     ) -> Bindings<'db> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
             return fallback.bindings_impl(db, env, recursion_guard);
@@ -6923,7 +6945,22 @@ impl<'db> Type<'db> {
                         definedness: boundness,
                         ..
                     }) => {
-                        let mut bindings = dunder_callable.bindings_impl(db, env, recursion_guard);
+                        // A recursive `__call__` annotation can keep expanding without reaching
+                        // a signature, even if its specialization changes at each step.
+                        let mut bindings = recursion_guard.instances.visit(
+                            db,
+                            env,
+                            self,
+                            || CallableBinding::not_callable(self).into(),
+                            |callable| {
+                                CallableBinding::from_overloads(
+                                    self,
+                                    callable.signatures(db).iter().cloned(),
+                                )
+                                .into()
+                            },
+                            || dunder_callable.bindings_impl(db, env, recursion_guard),
+                        );
                         bindings.replace_callable_type(dunder_callable, self);
                         if boundness == Definedness::PossiblyUndefined {
                             bindings.set_dunder_call_is_possibly_unbound();
@@ -7416,7 +7453,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         class: ClassType<'db>,
-        recursion_guard: &ActiveRecursionDetector<Type<'db>>,
+        recursion_guard: &BindingsRecursionContext<'_, 'db>,
     ) -> Bindings<'db> {
         fn resolve_dunder_new_callable<'db>(
             db: &'db dyn Db,
@@ -7551,7 +7588,13 @@ impl<'db> Type<'db> {
         // Key recursion by the full receiver type. Descriptor overloads can distinguish `C` from
         // `type[C]`, and different specializations need separate expansion even if one contains
         // the other, because a constructor may ignore its nested type arguments.
-        recursion_guard.visit(&self_type, on_cycle, || {
+        let constructors = recursion_guard.constructors;
+        constructors.visit(&self_type, on_cycle, || {
+            // A cycle passing through a constructor uses the constructor fallback above, even
+            // if it also revisits an instance. Only detect pure instance cycles within this
+            // constructor's expansion.
+            let recursion_guard = &BindingsRecursionContext::new(constructors);
+
             // Check for a custom `__call__` on the metaclass (excluding `type.__call__`).
             // We preserve its full overload set here and defer constructor branching decisions
             // until call-time overload resolution.

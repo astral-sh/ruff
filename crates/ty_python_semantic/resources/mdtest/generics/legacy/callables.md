@@ -1041,3 +1041,311 @@ callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
+
+## Recursive callable instances
+
+A `__call__` annotation that refers to the same specialization does not provide a callable
+signature.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Loop(Generic[T]):
+    __call__: "Loop[T]"
+
+def check(loop: Loop[int]):
+    loop()  # error: [call-non-callable]
+    callback: Callable[[], int] = loop  # error: [invalid-assignment]
+```
+
+## Finite chains of callable instances
+
+Revisiting a generic class with a different specialization can reach a callable signature. Each
+specialization needs to be expanded before deciding whether the instance is callable.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Wrapper(Generic[T]):
+    __call__: T
+
+def check(wrapper: Wrapper[Wrapper[Callable[[], int]]]):
+    reveal_type(wrapper())  # revealed: int
+    callback: Callable[[], int] = wrapper
+```
+
+Long finite chains also retain their signatures. These aliases describe sixty-five nested wrappers,
+each of which removes one layer before reaching the callable.
+
+```py
+from typing import TypeAlias
+
+Four: TypeAlias = Wrapper[Wrapper[Wrapper[Wrapper[T]]]]
+Sixteen: TypeAlias = Four[Four[Four[Four[T]]]]
+SixtyFour: TypeAlias = Sixteen[Sixteen[Sixteen[Sixteen[T]]]]
+
+def check_long(wrapper: Wrapper[SixtyFour[Callable[[], str]]]):
+    reveal_type(wrapper())  # revealed: str
+    wrapper(1)  # error: [too-many-positional-arguments]
+    callback: Callable[[], str] = wrapper
+```
+
+A property can expose the next callable through its return type. Each access removes one wrapper.
+
+```py
+class PropertyWrapper(Generic[T]):
+    @property
+    def __call__(self) -> T:
+        raise NotImplementedError
+
+def check_property(wrapper: PropertyWrapper[PropertyWrapper[Callable[[], str]]]):
+    reveal_type(wrapper())  # revealed: str
+    callback: Callable[[], str] = wrapper
+```
+
+## Finite callable chains through a generic descriptor method
+
+A generic `__get__` method can also expose the receiver's type argument directly. This removes one
+wrapper at each step, so the chain retains the final callable's signature.
+
+```py
+from typing import Callable, ClassVar, Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Descriptor:
+    def __get__(self, obj: "Wrapper[U]", owner: object) -> U:
+        raise NotImplementedError
+
+class Wrapper(Generic[T]):
+    __call__: ClassVar[Descriptor] = Descriptor()
+
+def check(wrapper: Wrapper[Wrapper[Callable[[], str]]]):
+    reveal_type(wrapper())  # revealed: str
+    wrapper(1)  # error: [too-many-positional-arguments]
+    callback: Callable[[], str] = wrapper
+```
+
+## Growing callable specializations
+
+Wrapping a type argument in `list` on every step produces infinitely many specializations without
+ever reaching a signature. We detect the growing parameter flow and approximate the unresolved
+callable with `Unknown`. This also applies to protocols and property getters.
+
+```py
+from typing import Callable, Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Growing(Generic[T]):
+    __call__: "Growing[list[T]]"
+
+T_co = TypeVar("T_co", covariant=True)
+
+class GrowingProtocol(Protocol[T_co]):
+    __call__: "GrowingProtocol[list[T_co]]"
+
+class GrowingProperty(Generic[T]):
+    @property
+    def __call__(self) -> "GrowingProperty[list[T]]":
+        raise NotImplementedError
+
+def check(c: Growing[int], p: GrowingProtocol[int], prop: GrowingProperty[int]):
+    reveal_type(c())  # revealed: Unknown
+    reveal_type(p())  # revealed: Unknown
+    reveal_type(prop())  # revealed: Unknown
+    f: Callable[[], int] = c
+    g: Callable[[], int] = p
+    h: Callable[[], int] = prop
+```
+
+Growth can also pass through another class's type parameter before returning to the original class.
+
+```py
+class Wrapper(Generic[T]):
+    __call__: T
+
+class Indirect(Generic[T]):
+    __call__: "Wrapper[Indirect[list[T]]]"
+
+def check_indirect(c: Indirect[int]):
+    reveal_type(c())  # revealed: Unknown
+    callback: Callable[[], int] = c
+```
+
+## Callable specialization resets
+
+A recursive reference with a fixed type argument eventually repeats an exact specialization. We
+retain the signatures encountered before that repetition, including the signature in the reset
+argument.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Reset(Generic[T]):
+    __call__: "Reset[Callable[[], str]] | T"
+
+def check(c: Reset[Callable[[], int]]):
+    # error: [call-non-callable]
+    reveal_type(c())  # revealed: Unknown | str | int
+```
+
+## Unused callable type arguments
+
+Only type arguments exposed by `__call__` participate in callable expansion. The unused second
+argument of `First` refers to a growing specialization, but the first argument leads to a signature.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class First(Generic[T, U]):
+    __call__: T
+
+class Outer(Generic[T]):
+    __call__: "First[T, Outer[list[T]]]"
+
+def check(c: Outer[Outer[Callable[[], int]]]):
+    reveal_type(c())  # revealed: int
+    callback: Callable[[], int] = c
+```
+
+## Callable descriptors with growing specializations
+
+A descriptor can select a different overload for each specialization of its receiver. This chain
+grows the type argument twice, then reaches a callable returning `str`.
+
+```py
+from typing import Callable, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    @overload
+    def __get__(self, obj: "C[list[list[int]]]", owner: object) -> Callable[[int], str]: ...
+    @overload
+    def __get__(self, obj: "C[T]", owner: object) -> "C[list[T]]": ...
+    def __get__(self, obj: object, owner: object) -> object:
+        raise NotImplementedError
+
+class C(Generic[T]):
+    __call__: Descriptor[T]
+
+def check(c: C[int]):
+    reveal_type(c(1))  # revealed: str
+    c("wrong")  # error: [invalid-argument-type]
+    c()  # error: [missing-argument]
+    callback: Callable[[int], str] = c
+```
+
+## Callable descriptors exposed by type arguments
+
+A descriptor passed as a type argument is bound when it becomes another class's `__call__`
+attribute. Its `__get__` overload can end a chain of growing specializations.
+
+```py
+from typing import Callable, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Wrapper(Generic[T]):
+    __call__: T
+
+class C(Generic[T]):
+    __call__: Wrapper["C[list[T]]"]
+
+    @overload
+    def __get__(self: "C[list[list[int]]]", obj: object, owner: object) -> Callable[[], str]: ...
+    @overload
+    def __get__(self, obj: object, owner: object) -> "C[T]": ...
+    def __get__(self, obj: object, owner: object) -> object:
+        raise NotImplementedError
+
+def check(c: C[int]):
+    reveal_type(c())  # revealed: str
+    c(1)  # error: [too-many-positional-arguments]
+    callback: Callable[[], str] = c
+```
+
+## Unbounded callable descriptor expansion
+
+Custom descriptor expansion can also keep growing without reaching a signature. We stop exploring
+these chains when their parameter flow repeats and use `Unknown` when no independent signature can
+be recovered.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    def __get__(self, obj: object, owner: object) -> "C[list[T]]":
+        raise NotImplementedError
+
+class C(Generic[T]):
+    __call__: Descriptor[T]
+
+def check(c: C[int]):
+    reveal_type(c())  # revealed: Unknown
+    callback: Callable[[], str] = c
+```
+
+## Growing callable specializations through a generic descriptor method
+
+A generic `__get__` method can infer its type argument from the receiver and wrap it in `list` on
+each access. Its type parameter belongs to the method, so analyzing the class declaration alone
+cannot establish how that parameter changes. We use `Unknown` when this unresolved flow returns to
+the same class, both for calls and for compatibility with `Callable`.
+
+```py
+from typing import Callable, ClassVar, Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Descriptor:
+    def __get__(self, obj: "C[U]", owner: object) -> "C[list[U]]":
+        raise NotImplementedError
+
+class C(Generic[T]):
+    __call__: ClassVar[Descriptor] = Descriptor()
+
+def check(c: C[int]):
+    reveal_type(c())  # revealed: Unknown
+    callback: Callable[[], str] = c
+```
+
+## Callable signatures that depend on growing type arguments
+
+A growing descriptor chain can reach signatures whose parameters and return types depend on the
+expanding type argument. We approximate these dependent types with `Unknown` instead of exposing an
+unspecialized type variable from the declaration.
+
+```py
+from typing import Callable, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    @overload
+    def __get__(self, obj: "C[list[list[int]]]", owner: object) -> Callable[[T], T]: ...
+    @overload
+    def __get__(self, obj: "C[T]", owner: object) -> "C[list[T]]": ...
+    def __get__(self, obj: object, owner: object) -> object:
+        raise NotImplementedError
+
+class C(Generic[T]):
+    __call__: Descriptor[T]
+
+def check(c: C[int], value: object):
+    reveal_type(c(value))  # revealed: Unknown
+```
