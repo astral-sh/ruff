@@ -438,6 +438,33 @@ my_isinstance(1, 1)
 my_isinstance(1, (int, (str, 1)))
 ```
 
+## Stringified recursive aliases
+
+Quoting an entire recursive alias preserves its string value at runtime and its recursive type when
+used in an annotation.
+
+```py
+from typing import TypeAlias
+
+Nested: TypeAlias = "list[Nested]"
+reveal_type(Nested)  # revealed: str
+
+def inspect(value: Nested):
+    reveal_type(value)  # revealed: Nested
+```
+
+## Specializing non-generic recursive aliases
+
+A recursive alias without type variables cannot be specialized. Quoting the entire definition does
+not make the recursive reference generic. The alias still has a string value at runtime.
+
+```py
+from typing import TypeAlias
+
+Invalid: TypeAlias = "list[Invalid[int]]"  # error: [not-subscriptable]
+reveal_type(Invalid)  # revealed: str
+```
+
 ## Type parameters used only in recursive references
 
 A PEP 613 alias remains generic when its type variable appears only in a recursive reference.
@@ -457,6 +484,33 @@ def inspect(value: NestedDict[int]):
     local: NestedDict[int] = value
     reveal_type(local["nested"])  # revealed: NestedDict[int]
     invalid_local: NestedDict[int] = {"nested": {"leaf": 1}}  # error: [invalid-assignment]
+```
+
+The type variable also binds the alias when its entire definition is quoted.
+
+```py
+QuotedDict: TypeAlias = "dict[str, QuotedDict[T]]"
+reveal_type(QuotedDict)  # revealed: str
+
+def inspect_quoted(value: QuotedDict[int]):
+    reveal_type(value["nested"])  # revealed: QuotedDict[int]
+```
+
+## Mutually recursive stringified aliases
+
+Two quoted aliases can refer to each other. Each retains its string value, while their annotations
+describe the alternating containers.
+
+```py
+from typing import TypeAlias
+
+First: TypeAlias = "list[Second]"
+Second: TypeAlias = "tuple[First]"
+reveal_type(First)  # revealed: str
+reveal_type(Second)  # revealed: str
+
+def inspect(value: First):
+    reveal_type(value[0])  # revealed: tuple[First]
 ```
 
 ## Materialization of self-referential generic PEP 613 type aliases
