@@ -27,10 +27,10 @@ impl<'db> TupleSizePromotionConstraints<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar_identity: BoundTypeVarIdentity<'db>,
-        expression: &ast::Expr,
+        expression: Option<&ast::Expr>,
         ty: Type<'db>,
     ) {
-        if !Self::allows_expression(db, env, Some(expression), ty) {
+        if !Self::allows_expression(db, env, expression, ty) {
             self.blocked_typevars.insert(typevar_identity);
         }
     }
@@ -44,9 +44,7 @@ impl<'db> TupleSizePromotionConstraints<'db> {
         typevar_identity: BoundTypeVarIdentity<'db>,
         ty: Type<'db>,
     ) {
-        if !Self::allows_expression(db, env, None, ty) {
-            self.blocked_typevars.insert(typevar_identity);
-        }
+        self.record_inferred_expression_type(db, env, typevar_identity, None, ty);
     }
 
     /// Reports whether or not tuple size promotion is allowed for the given typevar in light
