@@ -5,7 +5,7 @@ use std::{fmt::Write, path::PathBuf};
 
 use anyhow::bail;
 use itertools::Itertools;
-use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
+use ruff_options_metadata::{OptionField, OptionSet, OptionSetKind, OptionsMetadata, Visit};
 use ruff_python_trivia::textwrap;
 use ty_project::metadata::Options;
 
@@ -215,35 +215,44 @@ fn format_snippet<'a>(
         example = example.replace("[tool.ty.", "[").into();
     }
 
-    // Ex) `[[tool.ty.xx]]`
-    if example.starts_with(&format!("[[{header}")) {
-        return (String::new(), example);
-    }
+    let mut headers = Vec::new();
+    for (index, parent) in parents.iter().enumerate() {
+        let OptionSetKind::Array { example: fields } = parent.metadata().kind() else {
+            continue;
+        };
 
-    // Ex) `[tool.ty.rules]`
-    if example.starts_with(&format!("[{header}")) {
-        return (String::new(), example);
-    }
-
-    if header.is_empty() {
-        (String::new(), example)
-    } else if parents
-        .iter()
-        .any(|parent| parent.name() == Some("overrides"))
-    {
-        // Nested tables must follow an array entry to keep `overrides` a list.
-        let overrides = configuration
+        let array = configuration
             .parent_table()
             .into_iter()
-            .chain(["overrides"])
+            .chain(parents[..=index].iter().filter_map(|parent| parent.name()))
             .join(".");
-        (
-            format!("[[{overrides}]]\ninclude = [\"src\"]\n\n[{header}]"),
-            example,
-        )
-    } else {
-        (format!("[{header}]"), example)
+
+        // Explicit examples can supply the array entry and its nested tables themselves.
+        if example.starts_with(&format!("[[{array}]]")) {
+            return (headers.join("\n\n"), example);
+        }
+
+        if (index + 1 == parents.len() && scope.is_none()) || fields.is_empty() {
+            headers.push(format!("[[{array}]]"));
+        } else {
+            headers.push(format!("[[{array}]]\n{fields}"));
+        }
     }
+
+    let is_array_entry = scope.is_none()
+        && parents
+            .last()
+            .is_some_and(|parent| matches!(parent.metadata().kind(), OptionSetKind::Array { .. }));
+
+    if !header.is_empty()
+        && !is_array_entry
+        && !example.starts_with(&format!("[{header}"))
+        && !example.starts_with(&format!("[[{header}"))
+    {
+        headers.push(format!("[{header}]"));
+    }
+
+    (headers.join("\n\n"), example)
 }
 
 #[derive(Default)]
@@ -287,10 +296,104 @@ impl ConfigurationFile {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use ruff_options_metadata::{OptionSet, OptionSetKind, OptionsMetadata, Visit};
 
     use crate::generate_all::Mode;
 
-    use super::{Args, main};
+    use super::{Args, ConfigurationFile, Set, format_snippet, main};
+
+    struct Table;
+
+    impl OptionsMetadata for Table {
+        fn record(_: &mut dyn Visit) {}
+    }
+
+    struct Array;
+
+    impl OptionsMetadata for Array {
+        fn record(_: &mut dyn Visit) {}
+
+        fn kind() -> OptionSetKind {
+            OptionSetKind::Array {
+                example: "name = \"example\"",
+            }
+        }
+    }
+
+    fn parse_example(
+        parents: &[Set],
+        scope: Option<&str>,
+        example: &str,
+        configuration: ConfigurationFile,
+    ) -> Result<toml::Value> {
+        let (header, example) = format_snippet(scope, example, parents, configuration);
+        let parsed: toml::Value = toml::from_str(&format!("{header}\n{example}"))?;
+        Ok(match configuration {
+            ConfigurationFile::PyprojectToml => parsed["tool"]["ty"].clone(),
+            ConfigurationFile::TyToml => parsed,
+        })
+    }
+
+    #[test]
+    fn nested_array_examples() -> Result<()> {
+        let parents = [
+            Set::Toplevel(Table::metadata()),
+            Set::Named {
+                name: "profiles".into(),
+                set: OptionSet::of::<Option<Array>>(),
+            },
+            Set::Named {
+                name: "targets".into(),
+                set: Array::metadata(),
+            },
+        ];
+
+        for configuration in [ConfigurationFile::PyprojectToml, ConfigurationFile::TyToml] {
+            for scope in [None, Some("analysis")] {
+                let parsed = parse_example(&parents, scope, "name = \"custom\"", configuration)?;
+                let profile = &parsed["profiles"][0];
+                assert_eq!(profile["name"].as_str(), Some("example"));
+                let target = &profile["targets"][0];
+                let settings = if let Some(scope) = scope {
+                    assert_eq!(target["name"].as_str(), Some("example"));
+                    &target[scope]
+                } else {
+                    target
+                };
+                assert_eq!(settings["name"].as_str(), Some("custom"));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn explicit_table_examples() -> Result<()> {
+        let parents = [
+            Set::Toplevel(Table::metadata()),
+            Set::Named {
+                name: "profiles".into(),
+                set: Array::metadata(),
+            },
+            Set::Named {
+                name: "analysis".into(),
+                set: Table::metadata(),
+            },
+        ];
+
+        for configuration in [ConfigurationFile::PyprojectToml, ConfigurationFile::TyToml] {
+            for example in [
+                "[tool.ty.profiles.analysis]\nenabled = true",
+                "[[tool.ty.profiles]]\nname = \"custom\"\n[tool.ty.profiles.analysis]\nenabled = true",
+            ] {
+                let parsed = parse_example(&parents, None, example, configuration)?;
+                assert_eq!(
+                    parsed["profiles"][0]["analysis"]["enabled"].as_bool(),
+                    Some(true)
+                );
+            }
+        }
+        Ok(())
+    }
 
     #[test]
     fn ty_configuration_markdown_up_to_date() -> Result<()> {
