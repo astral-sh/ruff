@@ -191,9 +191,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 continue;
             }
 
-            if let Type::DataclassDecorator(params) = decorator_ty {
-                dataclass_params = Some(params);
-                continue;
+            if let Type::DataclassDecorator(decorator) = decorator_ty {
+                dataclass_params = Some(decorator.params(db));
             }
 
             if decorator_ty.is_unknown()
@@ -240,12 +239,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // overload, or an overload and the implementation both. Nevertheless, this is not
                 // allowed. We do not try to treat the offenders intelligently -- just use the
                 // params of the last seen usage of `@dataclass_transform`.
-                //
-                // In class-decorator position, dataclass-transform metadata shapes the
-                // original class object. We keep it metadata-only here because the call path
-                // uses synthetic dataclass-transform return types to model decorator factories;
-                // treating this as an ordinary replacement-returning class decorator would
-                // conflate those two cases.
                 let transformer_params = f
                     .iter_overloads_and_implementation(db)
                     .rev()
@@ -255,7 +248,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         db,
                         transformer_params,
                     ));
-                    continue;
                 }
             }
 
@@ -322,7 +314,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             };
             let decorated_ty = match decorated_ty {
-                Type::DataclassDecorator(_) | Type::DataclassTransformer(_) => Type::unknown(),
+                Type::DataclassDecorator(decorator) => decorator.callable(db),
+                Type::DataclassTransformer(_) => Type::unknown(),
                 decorated_ty => decorated_ty,
             };
             inferred_ty = if is_unknown_decorator_result(db, decorated_ty) {
@@ -523,6 +516,9 @@ fn type_retains_original_class<'db>(
 /// results do not trigger this fallback.
 fn is_unknown_decorator_result<'db>(db: &'db dyn Db, result_ty: Type<'db>) -> bool {
     match result_ty.resolve_type_alias(db) {
+        Type::DataclassDecorator(decorator) => {
+            is_unknown_decorator_result(db, decorator.callable(db))
+        }
         Type::SubclassOf(subclass_of) => subclass_of
             .subclass_of()
             .into_dynamic()

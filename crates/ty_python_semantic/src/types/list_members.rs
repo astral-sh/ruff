@@ -363,6 +363,10 @@ impl<'db> AllMembers<'db> {
                 }
             }
 
+            Type::DataclassDecorator(decorator) => {
+                self.extend_with_type(db, env, decorator.callable(db));
+            }
+
             Type::LiteralValue(_)
             | Type::PropertyInstance(_)
             | Type::SlotDescriptor(_)
@@ -370,7 +374,6 @@ impl<'db> AllMembers<'db> {
             | Type::BoundMethod(_)
             | Type::KnownBoundMethod(_)
             | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::Callable(_)
             | Type::ProtocolInstance(_)
