@@ -318,7 +318,7 @@ where
         let uri = R::document_uri(&params);
 
         let Ok(document) = session.snapshot_document(&uri) else {
-            let reason = format!("Document {uri} is not open in the session");
+            let reason = format!("Document {uri} is neither open nor a supported closed file");
             tracing::warn!(
                 "Ignoring request id={id} method={} because {reason}",
                 R::METHOD
@@ -441,7 +441,10 @@ where
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         let uri = N::document_uri(&params);
-        let Ok(snapshot) = session.snapshot_document(&uri) else {
+        let Ok(snapshot) = session
+            .document_handle(&uri)
+            .and_then(|_| session.snapshot_document(&uri))
+        else {
             let reason = format!("Document {uri} is not open in the session");
             tracing::warn!(
                 "Ignoring notification id={id} method={} because {reason}",

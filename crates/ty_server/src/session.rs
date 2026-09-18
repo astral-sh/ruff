@@ -19,7 +19,7 @@ use lsp_types::{
     UnregistrationRequest, WorkspaceDiagnosticRequest,
 };
 use ruff_db::Db;
-use ruff_db::files::{File, system_path_to_file};
+use ruff_db::files::{File, system_path_to_file, vendored_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
@@ -1296,17 +1296,34 @@ impl Session {
 
     /// Creates a document snapshot with the URI referencing the document to snapshot.
     pub(crate) fn snapshot_document(&self, uri: &Uri) -> Result<DocumentSnapshot, DocumentError> {
-        let index = self.index();
-        let document_handle = index.document_handle(uri)?;
+        let document = match self.index().document_handle(uri) {
+            Ok(handle) => DocumentTarget::Open(handle),
+            Err(error) => {
+                let key = DocumentKey::from_uri(uri);
+                let DocumentKey::File(path) = &key else {
+                    return Err(error);
+                };
+                // Closed notebooks lack the client's cell URI and position mappings.
+                if PySourceType::try_from_path(path) == Some(PySourceType::Ipynb)
+                    || self.project_root_for_path(path).is_none()
+                {
+                    return Err(error);
+                }
+                DocumentTarget::Closed {
+                    uri: uri.clone(),
+                    path: key.into_file_path(),
+                }
+            }
+        };
 
         Ok(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
             global_settings: self.global_settings.clone(),
             workspace_settings: self
-                .workspace_settings_for_document(document_handle.notebook_or_file_path())
+                .workspace_settings_for_document(document.notebook_or_file_path())
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
-            document: document_handle,
+            document,
             client_name: self.client_name,
         })
     }
@@ -1588,7 +1605,7 @@ pub(crate) struct DocumentSnapshot {
     global_settings: Arc<GlobalSettings>,
     workspace_settings: Arc<WorkspaceSettings>,
     position_encoding: PositionEncoding,
-    document: DocumentHandle,
+    document: DocumentTarget,
     client_name: ClientName,
 }
 
@@ -1613,17 +1630,30 @@ impl DocumentSnapshot {
         &self.workspace_settings
     }
 
-    /// Returns the result of the document query for this snapshot.
-    pub(crate) fn document(&self) -> &DocumentHandle {
-        &self.document
+    /// Returns whether the target is a cell in a client-opened notebook.
+    pub(crate) fn is_cell(&self) -> bool {
+        matches!(&self.document, DocumentTarget::Open(handle) if handle.is_cell())
     }
 
     pub(crate) fn uri(&self) -> &lsp_types::Uri {
         self.document.uri()
     }
 
-    pub(crate) fn to_notebook_or_file(&self, db: &dyn Db) -> Option<File> {
-        let file = self.document.notebook_or_file(db);
+    pub(crate) fn to_notebook_or_file(&self, db: &ProjectDatabase) -> Option<File> {
+        let file = match &self.document {
+            DocumentTarget::Open(handle) => handle.notebook_or_file(db),
+            DocumentTarget::Closed { path, .. } => {
+                let path = path.as_system()?;
+                // Use the canonical bundled file when closed; open targets use client contents.
+                if let Some(root) = ty_ide::cached_vendored_root(db)
+                    && let Some(vendored) = ty_ide::map_system_to_vendored(&root, path)
+                {
+                    vendored_path_to_file(db, vendored).ok()
+                } else {
+                    system_path_to_file(db, path).ok()
+                }
+            }
+        };
         if file.is_none() {
             tracing::debug!(
                 "Failed to resolve file: file not found for `{}`",
@@ -1639,6 +1669,29 @@ impl DocumentSnapshot {
 
     pub(crate) fn client_name(&self) -> ClientName {
         self.client_name
+    }
+}
+
+/// A request target, without introducing client ownership for closed files.
+#[derive(Debug)]
+enum DocumentTarget {
+    Open(DocumentHandle),
+    Closed { uri: Uri, path: AnySystemPath },
+}
+
+impl DocumentTarget {
+    fn uri(&self) -> &Uri {
+        match self {
+            Self::Open(handle) => handle.uri(),
+            Self::Closed { uri, .. } => uri,
+        }
+    }
+
+    fn notebook_or_file_path(&self) -> &AnySystemPath {
+        match self {
+            Self::Open(handle) => handle.notebook_or_file_path(),
+            Self::Closed { path, .. } => path,
+        }
     }
 }
 
@@ -2016,7 +2069,7 @@ impl DocumentHandle {
         }
     }
 
-    pub(crate) fn is_cell(&self) -> bool {
+    fn is_cell(&self) -> bool {
         matches!(self, Self::Cell { .. })
     }
 
