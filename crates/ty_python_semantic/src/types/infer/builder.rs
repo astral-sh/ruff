@@ -4758,6 +4758,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // RHS (`list[T] | None`), in order to bind `T` to `OptionalList`.
             let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
 
+            let previous_alias_runtime_value = self.context.inference_flags.replace(
+                InferenceFlags::IN_PEP_613_ALIAS_RUNTIME_VALUE,
+                is_pep_613_type_alias,
+            );
             let inferred_ty = self.infer_maybe_standalone_expression(
                 value,
                 TypeContext::new(Some(declared.inner_type())),
@@ -4785,6 +4789,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             self.typevar_binding_context = previous_typevar_binding_context;
             self.deferred_state = previous_deferred_state;
+            self.context.inference_flags.set(
+                InferenceFlags::IN_PEP_613_ALIAS_RUNTIME_VALUE,
+                previous_alias_runtime_value,
+            );
             self.dataclass_field_specifiers.clear();
 
             let inferred_ty = if target

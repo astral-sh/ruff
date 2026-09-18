@@ -400,14 +400,14 @@ ClassInfo: TypeAlias = type | UnionType | tuple["ClassInfo", ...]
 reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[ClassInfo, ...]'>
 ```
 
-TODO: The following alias is invalid because its cycle passes through no containing type. Until it
-is diagnosed, it falls back to `Divergent` so it cannot produce a usable recursive definition.
+The following alias is invalid because its cycle passes through no containing type. It falls back to
+`Unknown` when used in an annotation.
 
 ```py
-Unguarded: TypeAlias = "int | Unguarded"
+Unguarded: TypeAlias = "int | Unguarded"  # error: [cyclic-type-alias-definition]
 
 def unguarded(value: Unguarded):
-    reveal_type(value)  # revealed: Divergent
+    reveal_type(value)  # revealed: Unknown
 
 def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
     reveal_type(classinfo)  # revealed: ClassInfo
@@ -463,6 +463,109 @@ from typing import TypeAlias
 
 Invalid: TypeAlias = "list[Invalid[int]]"  # error: [not-subscriptable]
 reveal_type(Invalid)  # revealed: str
+```
+
+## Invalid cycles
+
+An alias cannot expand directly to itself. Adding another member to a union does not make a cycle
+valid.
+
+```py
+from typing import TypeAlias, Union
+
+Itself: TypeAlias = "Itself"  # error: [cyclic-type-alias-definition] "Cyclic definition of `Itself`"
+IntOr: TypeAlias = Union[int, "IntOr"]  # error: [cyclic-type-alias-definition] "Cyclic definition of `IntOr`"
+```
+
+Both direct cycles and unions recover as `Unknown` in annotations.
+
+```py
+def inspect(itself: Itself, int_or: IntOr):
+    reveal_type(itself)  # revealed: Unknown
+    reveal_type(int_or)  # revealed: Unknown
+```
+
+Mutually recursive aliases are also invalid when their cycle passes through no containing type. Each
+alias in the cycle receives a diagnostic and recovers as `Unknown` in annotations.
+
+```py
+First: TypeAlias = Union[int, "Second"]  # error: [cyclic-type-alias-definition] "Cyclic definition of `First`"
+Second: TypeAlias = Union[str, "First"]  # error: [cyclic-type-alias-definition] "Cyclic definition of `Second`"
+
+def inspect_mutual(first: First, second: Second):
+    reveal_type(first)  # revealed: Unknown
+    reveal_type(second)  # revealed: Unknown
+```
+
+## Invalid generic cycles
+
+Specializing a recursive reference does not guard its cycle. A generic alias cannot include a
+specialization of itself as a union member. The quoted alias still has a string value at runtime.
+
+```py
+from typing import TypeAlias, TypeVar, Union
+
+T = TypeVar("T")
+Alias: TypeAlias = Union[T, "Alias[T]"]  # error: [cyclic-type-alias-definition]
+Growing: TypeAlias = "T | Growing[list[T]]"  # error: [cyclic-type-alias-definition]
+reveal_type(Growing)  # revealed: str
+```
+
+Invalid generic aliases recover as `Unknown` with or without type arguments.
+
+```py
+def inspect(bare: Alias, specialized: Alias[int], growing: Growing[int]):
+    reveal_type(bare)  # revealed: Unknown
+    reveal_type(specialized)  # revealed: Unknown
+    reveal_type(growing)  # revealed: Unknown
+```
+
+The same restriction applies when generic aliases refer to each other, even when neither is used in
+an annotation.
+
+```py
+First: TypeAlias = Union[T, "Second[T]"]  # error: [cyclic-type-alias-definition]
+Second: TypeAlias = Union[str, "First[T]"]  # error: [cyclic-type-alias-definition]
+```
+
+Putting the recursive reference inside a container guards the cycle and preserves specialization.
+
+```py
+Valid: TypeAlias = Union[T, list["Valid[T]"]]
+
+valid: Valid[int] = [1, [2]]
+invalid: Valid[int] = ["bad"]  # error: [invalid-assignment]
+```
+
+## A cycle guarded by another alias
+
+A direct reference to another alias is valid when the return path passes through a container. The
+intermediate alias preserves its type argument.
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+Forward: TypeAlias = "Container[T]"
+Container: TypeAlias = tuple[T, "Forward[T] | None"]
+
+valid: Forward[int] = (1, (2, None))
+invalid: Forward[int] = (1, ("bad", None))  # error: [invalid-assignment]
+```
+
+## Direct and mutual recursion
+
+An alias can combine a direct recursive member with a reference to another alias, provided both
+paths pass through a containing type.
+
+```py
+from typing import TypeAlias, Union
+
+Tree: TypeAlias = Union[list["Tree"], "Branch"]
+Branch: TypeAlias = tuple[Tree]
+
+valid: Tree = [([],)]
+invalid: Tree = 1  # error: [invalid-assignment]
 ```
 
 ## Type parameters used only in recursive references

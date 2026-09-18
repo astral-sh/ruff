@@ -14,15 +14,16 @@ use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
 use crate::types::definition_resolution::{ImportAliasResolution, resolve_definition};
 use crate::types::diagnostic::{
-    self, EXPERIMENTAL_SYNTAX, INVALID_INIT_TYPE_VARIABLE, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE,
+    self, CYCLIC_TYPE_ALIAS_DEFINITION, EXPERIMENTAL_SYNTAX, INVALID_INIT_TYPE_VARIABLE,
+    INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE,
     UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
     report_missing_type_arguments, report_unsupported_binary_operation,
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{
-    ImplicitAliasInference, InferenceFlags, TypeExpressionFlags, implicit_alias_parameters,
-    infer_implicit_alias_type,
+    CyclicTypeAliasError, ImplicitAliasInference, InferenceFlags, TypeExpressionFlags,
+    implicit_alias_parameters, infer_implicit_alias_type,
 };
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
@@ -50,23 +51,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Option<(Type<'db>, Option<GenericContext<'db>>)> {
         let db = self.db();
         let mut definition = definition?;
-        // A resolved non-recursive value already describes the alias. Gradual types and
-        // invalid unions can hide recursive references, so they still need inference.
-        if !any_over_type(
-            db,
-            self.program_environment(),
-            value_ty,
-            false,
-            |ty| match ty {
-                Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::TypeAlias(_) => {
-                    true
-                }
-                Type::KnownInstance(KnownInstanceType::UnionType(union)) => {
-                    union.union_type(db).is_err()
-                }
-                _ => false,
-            },
-        ) {
+        // A resolved non-recursive value already describes the alias. Gradual types, unions,
+        // and quoted aliases can hide recursive references, so they still need inference.
+        // Even a valid union can have lost a cyclic member during value inference.
+        if !any_over_type(db, self.program_environment(), value_ty, false, |ty| {
+            matches!(
+                ty,
+                Type::Dynamic(_)
+                    | Type::Divergent(_)
+                    | Type::Recursive(_)
+                    | Type::TypeAlias(_)
+                    | Type::KnownInstance(
+                        KnownInstanceType::UnionType(_) | KnownInstanceType::LiteralStringAlias(_)
+                    )
+            )
+        }) {
             return None;
         }
         if definition.kind(db).is_import() {
@@ -109,12 +108,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             _ => return None,
         }
         let parameters = implicit_alias_parameters(db, definition);
-        let ty = infer_implicit_alias_type(db, definition, parameters).ty;
-        if !any_over_type(db, self.program_environment(), ty, false, |ty| {
-            matches!(ty, Type::Recursive(_))
-        }) {
-            return None;
-        }
+        // Keep cycle errors visible to enclosing alias definitions. PEP 613 aliases have a
+        // diagnostic at their definition, so recover as `Unknown` at ordinary uses. Inferring
+        // their runtime value still needs provisional recursive types to converge. For
+        // implicit aliases, the runtime value may retain non-recursive union members.
+        let ty = match infer_implicit_alias_type(db, definition, parameters).ty {
+            Err(error)
+                if self.inference_flags().intersects(
+                    InferenceFlags::IN_TYPE_ALIAS | InferenceFlags::IN_PEP_613_ALIAS_RUNTIME_VALUE,
+                ) =>
+            {
+                error.fallback_type
+            }
+            Err(_) if matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_)) => {
+                Type::unknown()
+            }
+            result => {
+                let ty = result.unwrap_or_else(|error| error.fallback_type);
+                if !any_over_type(db, self.program_environment(), ty, false, |ty| {
+                    matches!(ty, Type::Recursive(_))
+                }) {
+                    return None;
+                }
+                ty
+            }
+        };
 
         // Diagnostics and suppression usage belong to the file defining the alias.
         if definition.program_file(db) == self.program_file()
@@ -133,6 +151,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.typevar_binding_context = Some(definition);
         self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
         let ty = self.infer_type_expression(value);
+        let db = self.db();
+        let ty = if ty.has_unguarded_alias_cycle(db) {
+            if let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db)
+                && let Some(name) = assignment.target(self.module()).as_name_expr()
+                && let Some(diagnostic) = self
+                    .context
+                    .report_lint(&CYCLIC_TYPE_ALIAS_DEFINITION, name)
+            {
+                diagnostic.into_diagnostic(format_args!("Cyclic definition of `{}`", name.id));
+            }
+            Err(CyclicTypeAliasError { fallback_type: ty })
+        } else {
+            Ok(ty)
+        };
         ImplicitAliasInference {
             ty,
             diagnostics: self.context.finish(),
