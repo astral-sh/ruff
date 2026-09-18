@@ -2826,6 +2826,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             context.push(ErrorContext::IncompatibleReturnTypes {
                 source: source.return_ty,
                 target: target.return_ty,
+                source_definition: source.definition,
+                target_definition: target.definition,
             });
         }
 

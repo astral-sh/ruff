@@ -4340,8 +4340,9 @@ This distinction matters in stub files, where replacing the implementation with 
 `yield`. For example, this stub describes a coroutine function, even though its return annotation is
 `AsyncIterator[int]`:
 
+`stubs.pyi`:
+
 ```pyi
-# stubs.pyi
 from collections.abc import AsyncIterator
 
 async def values() -> AsyncIterator[int]: ...
@@ -4349,6 +4350,8 @@ async def values() -> AsyncIterator[int]: ...
 
 Iterating over the coroutine is an error. An `async for` loop awaits each next item; it does not
 automatically await a coroutine to obtain the iterator:
+
+`main.py`:
 
 ```python
 from stubs import values
@@ -4361,14 +4364,22 @@ async def consume() -> None:
 
 To declare a function that directly produces an async iterator, use `def` in the stub:
 
+`with_def.pyi`:
+
 ```pyi
+from collections.abc import AsyncIterator
+
 def values() -> AsyncIterator[int]: ...
 ```
 
 This describes what callers receive. The implementation can still use `async def` and `yield`.
 Alternatively, keep `async def` and include a `yield` expression in the stub body:
 
+`with_yield.pyi`:
+
 ```pyi
+from collections.abc import AsyncIterator
+
 async def values() -> AsyncIterator[int]:
     yield 1
 ```

@@ -7,16 +7,88 @@ use crate::types::{
     call::CallErrorKind,
     context::InferContext,
     diagnostic::NOT_ITERABLE,
+    function::function_has_stub_body,
+    infer::infer_expression_types,
     todo_type,
     tuple::{TupleSpec, TupleSpecBuilder},
 };
 use compact_str::ToCompactString;
+use ruff_db::diagnostic::{Annotation, Span};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
+use ruff_text_size::{Ranged, TextRange};
 use std::borrow::Cow;
-use ty_python_core::EvaluationMode;
+use ty_module_resolver::{SearchPath, file_to_module};
+use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::{EvaluationMode, semantic_index};
 
-pub(super) const ASYNC_GENERATOR_STUB_HELP: &str = "To declare an async generator in a stub, use `def` instead of `async def`, \
-     or add a `yield` expression to the body";
+/// Points to a coroutine declaration that may have been intended to describe an async generator.
+pub(super) fn add_async_generator_stub_help<'db>(
+    db: &'db dyn Db,
+    diagnostic: &mut LintDiagnosticGuard<'_, '_>,
+    definition: Definition<'db>,
+) {
+    let Some(span) = async_generator_stub_span(db, definition) else {
+        return;
+    };
+    let is_first_party = diagnostic
+        .primary_span()
+        .is_some_and(|primary| primary.file() == span.file())
+        || file_to_module(db, definition.program_file(db).resolver_file(db))
+            .and_then(|module| module.search_path(db))
+            .is_some_and(SearchPath::is_first_party);
+
+    diagnostic.annotate(
+        Annotation::secondary(span.clone())
+            .message("Without `yield`, this function returns a coroutine"),
+    );
+    if is_first_party {
+        diagnostic.help("To declare an async generator, use `def` or add `yield`");
+    } else {
+        diagnostic.help(
+            "If an async generator was intended, report this stub to the library maintainers",
+        );
+    }
+}
+
+/// Only stub-like bodies warrant advice about changing the declaration. A coroutine with an
+/// implementation can intentionally return an async iterator, which its caller must await.
+#[salsa::tracked]
+fn async_generator_stub_span<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Option<Span> {
+    let DefinitionKind::Function(function) = definition.kind(db) else {
+        return None;
+    };
+    let module = parsed_module(db, definition.program_file(db).python_file(db)).load(db);
+    let node = function.node(&module);
+    (node.is_async && function_has_stub_body(node)).then(|| {
+        let end = node
+            .returns
+            .as_ref()
+            .map_or(node.parameters.end(), |returns| returns.end());
+        Span::from(definition.file(db)).with_range(TextRange::new(node.name.start(), end))
+    })
+}
+
+/// Finds the declaration for a directly called, non-overloaded iterable factory.
+///
+/// The iterable has already been inferred as a standalone expression. Reuse that result rather
+/// than inferring its enclosing scope while that scope's diagnostics are still being collected.
+fn iterable_factory_definition<'db>(
+    context: &InferContext<'db, '_>,
+    iterable_node: ast::AnyNodeRef,
+) -> Option<Definition<'db>> {
+    let call = *iterable_node.as_expr_call()?;
+    let db = context.db();
+    let expression = semantic_index(db, context.program_file()).try_expression(call)?;
+    let inference = infer_expression_types(db, expression, TypeContext::default());
+    let bindings = inference
+        .expression_type(call.func.as_ref())
+        .bindings(db, context.program_environment());
+    let [overload] = bindings.single_element()?.overloads() else {
+        return None;
+    };
+    overload.signature.definition()
+}
 
 /// Extract the element types from an expression with a statically known fixed-length iteration.
 ///
@@ -1104,8 +1176,10 @@ impl<'db> IterationError<'db> {
                     .coroutine_returning_async_iterable(db, env)
                     .is_some()
                 {
-                    diagnostic.help("Await the coroutine before iterating over its result");
-                    diagnostic.help(ASYNC_GENERATOR_STUB_HELP);
+                    diagnostic.help("`await` the coroutine before iterating over its result");
+                    if let Some(definition) = iterable_factory_definition(context, iterable_node) {
+                        add_async_generator_stub_help(db, &mut diagnostic, definition);
+                    }
                 }
             }
         }
