@@ -3423,6 +3423,159 @@ mod uv_metadata {
     }
 
     #[test]
+    fn editing_then_moving_a_file_out_does_not_request_uv_metadata() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                ("pyproject.toml", MANIFEST),
+                ("module.py", "x: int = 'invalid'"),
+            ],
+        )?;
+        assert_snapshot!(case.render_diagnostics(&case.db().check()), @r#"module.py:1:10: error[invalid-assignment] Object of type `Literal["invalid"]` is not assignable to `int`"#);
+
+        // Editing immediately before moving can produce multiple events for the same path.
+        // Moving to an unwatched directory can leave the deletion's file kind unknown.
+        update_file(case.project_path("module.py"), "x: int = 1\n")?;
+        std::fs::rename(
+            case.project_path("module.py"),
+            case.root_path().join("module.py"),
+        )?;
+        let changes = case.stop_watch(event_for_file("module.py"));
+        assert!(
+            case.apply_changes(&changes).project_sync_path().is_none(),
+            "{changes:?}"
+        );
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
+    fn search_path_directory_changes_request_uv_metadata() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "../pyproject.toml",
+                    r#"
+                    [tool.uv.workspace]
+                    members = ["project"]
+                    "#,
+                ),
+                ("pyproject.toml", MANIFEST),
+                (
+                    "ty.toml",
+                    r#"
+                    [environment]
+                    extra-paths = ["../dependency/src"]
+
+                    [src]
+                    include = ["src"]
+                    "#,
+                ),
+                ("src/main.py", "value = 1\n"),
+                ("../dependency/src/.keep", ""),
+            ],
+        )?;
+        let project_root = case.project_path("");
+        let dependency = case.root_path().join("dependency");
+        assert!(!dependency.starts_with(&project_root));
+
+        // Changes within a search path outside `src.include` do not affect dependency projects.
+        std::fs::create_dir(dependency.join("src/package"))?;
+        let created = case.take_watch_changes(event_for_file("package"));
+        assert!(case.apply_changes(&created).project_sync_path().is_none());
+
+        std::fs::remove_dir_all(&dependency)?;
+        let deleted = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Deleted { path, .. } if path.starts_with(&dependency))
+        });
+        assert_eq!(
+            case.apply_changes(&deleted).project_sync_path(),
+            Some(project_root.as_path())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_member_moves_outside_checked_paths_request_metadata_refresh() -> anyhow::Result<()>
+    {
+        let mut case = setup_uv_with(
+            UseUv::On,
+            &[
+                (
+                    "pyproject.toml",
+                    r#"
+                    [tool.uv.workspace]
+                    members = ["packages/*"]
+                    "#,
+                ),
+                ("packages/.keep", ""),
+                ("src/main.py", "value = 1\n"),
+                ("../incoming/pyproject.toml", MANIFEST),
+            ],
+            |context| {
+                context.set_included_paths(vec![context.join_project_path("src")]);
+                Ok(())
+            },
+        )?;
+        let project_root = case.project_path("");
+        let incoming = case.root_path().join("incoming");
+        let member = case.project_path("packages/member");
+        let lockfile = std::fs::read(case.project_path("uv.lock"))?;
+
+        std::fs::rename(&incoming, &member)?;
+        let created = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Created { path, .. } if path.starts_with(&member))
+        });
+        assert_eq!(std::fs::read(case.project_path("uv.lock"))?, lockfile);
+        assert_eq!(
+            case.apply_changes(&created).project_sync_path(),
+            Some(project_root.as_path())
+        );
+
+        std::fs::rename(&member, &incoming)?;
+        let deleted = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Deleted { path, .. } if path.starts_with(&member))
+        });
+        assert_eq!(
+            case.apply_changes(&deleted).project_sync_path(),
+            Some(project_root.as_path())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn deleting_a_broken_member_retries_failed_metadata() -> anyhow::Result<()> {
+        let mut case = setup_uv_with_system(
+            UseUv::On,
+            [
+                (
+                    "pyproject.toml",
+                    r#"
+                    [tool.uv.workspace]
+                    members = ["packages/*"]
+                    "#,
+                ),
+                ("packages/broken/pyproject.toml", "[project"),
+            ],
+        )?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+
+        let broken = case.project_path("packages/broken");
+        std::fs::remove_dir_all(&broken)?;
+        let deleted = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Deleted { path, .. } if path.starts_with(&broken))
+        });
+        assert_eq!(
+            case.apply_changes(&deleted).project_sync_path(),
+            Some(case.db().project().root(case.db()))
+        );
+        Ok(())
+    }
+
+    #[test]
     fn creating_python_version_file_requests_metadata_refresh() -> anyhow::Result<()> {
         let mut case = setup_uv(UseUv::On, &[("pyproject.toml", MANIFEST)])?;
 

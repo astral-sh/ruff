@@ -200,6 +200,8 @@ impl WatchPaths {
 ///
 /// # Known limitations
 ///
+/// ## Virtual environments
+///
 /// These limitations apply to virtual environments outside the project directory unless another
 /// watch already covers the relevant paths. Environments inside the project are covered by the project watch.
 ///
@@ -214,6 +216,31 @@ impl WatchPaths {
 ///   directory, or even be the user's home directory. We accept this limitation to avoid watching
 ///   those unrelated directories. A nonrecursive parent watch would need additional logic to
 ///   register the environment watch again after recreation.
+///
+/// ## uv workspace metadata
+///
+/// Metadata refreshes use the existing workspace, project, environment, and module search-path
+/// watches. We do not register additional watches for every local dependency's source directory.
+///
+/// - Non-editable local dependencies: For a dependency installed from `../helper`, the search
+///   path points to its installed copy in `site-packages`. Moving or deleting `../helper` can
+///   affect uv's resolution without producing an event on a watched path.
+/// - Initial metadata failure: uv may fail before reporting the workspace root or dependencies.
+///   Creating or repairing an external dependency then goes unnoticed unless an existing watch
+///   covers it. Directory changes under ty's project root can still request a retry.
+/// - Excluded workspace members: We use `src.include` and `src.exclude` to avoid refreshing uv
+///   metadata for unrelated directory changes, such as creating a package directory inside `.venv`.
+///   We intentionally make an exception for directories containing a module search path:
+///   excluding a dependency from checking does not stop the application from importing it.
+///   For example, an app can import an editable dependency at `packages/lib/src` while
+///   `src.include` selects only `packages/app`. Deleting `packages/lib` removes dependency
+///   sources and can change uv's resolution, so it should trigger a refresh.
+///   For excluded members with no module search path, a directory event alone does not trigger
+///   a refresh, so the cached uv member list can become stale. A separate event for the member's
+///   `pyproject.toml` or the workspace's `uv.lock` still triggers a refresh.
+///
+/// We accept these gaps to avoid retaining additional dependency paths, repeating uv's discovery
+/// after errors, or refreshing metadata for every directory change under the workspace root.
 #[salsa::tracked(returns(ref))]
 pub fn watch_paths(db: &dyn Db, project: Project) -> WatchPaths {
     let project_path = project.root(db);
