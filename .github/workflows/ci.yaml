@@ -36,6 +36,8 @@ env:
 jobs:
   determine_changes:
     name: "Determine changes"
+    # CI on main is redundant in the security repository.
+    if: ${{ github.repository != 'astral-sh/ruff-security' || github.ref != 'refs/heads/main' }}
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     outputs:
       comparison_base: ${{ steps.merge_base.outputs.sha }}
@@ -276,6 +278,7 @@ jobs:
   cargo-fmt:
     name: "cargo fmt"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    needs: determine_changes
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -288,6 +291,7 @@ jobs:
   shellcheck:
     name: "shellcheck"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    needs: determine_changes
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -940,6 +944,7 @@ jobs:
   python-package:
     name: "python package"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    needs: determine_changes
     timeout-minutes: 20
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') }}
     steps:
@@ -992,6 +997,7 @@ jobs:
   prek:
     name: "prek"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
+    needs: determine_changes
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1024,6 +1030,7 @@ jobs:
   docs:
     name: "mkdocs"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    needs: determine_changes
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1469,8 +1476,9 @@ jobs:
 
   required-checks-passed:
     name: "all required checks passed"
-    if: always()
+    if: ${{ always() && github.ref != 'refs/heads/main' }}
     needs:
+      - determine_changes
       - cargo-fmt
       - cargo-clippy
       - cargo-deny
