@@ -3189,8 +3189,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 paths.into_vec().into_iter().map(|path| {
                                     let path: Box<[_]> = path
-                                        .solved_typevars
-                                        .into_iter()
+                                        .resolved_typevars(db, env, inferable)
                                         .filter(|binding| binding.bound_typevar == typevar)
                                         .collect();
                                     Type::KnownInstance(KnownInstanceType::ConstraintSetSolution(
@@ -3259,7 +3258,8 @@ impl<'db> Bindings<'db> {
                                     Type::KnownInstance(KnownInstanceType::ConstraintSetSolution(
                                         InternedConstraintSetSolution::new(
                                             db,
-                                            path.solved_typevars.into_boxed_slice(),
+                                            path.resolved_typevars(db, env, inferable)
+                                                .collect::<Box<[_]>>(),
                                         ),
                                     ))
                                 }),

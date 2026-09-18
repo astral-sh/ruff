@@ -32,6 +32,62 @@ impl<'db> Type<'db> {
     pub(super) fn has_unguarded_alias_cycle(self, db: &'db dyn Db) -> bool {
         AliasCycleSummary::from_type(db, self).cycle.is_some()
     }
+
+    /// The type variables that occur outside of every type constructor, such as `T` but not `U`
+    /// in `T | list[U]`.
+    pub(super) fn unguarded_typevars(self, db: &'db dyn Db) -> Box<[BoundTypeVarInstance<'db>]> {
+        AliasCycleSummary::from_type(db, self).typevars
+    }
+
+    /// Substitutes types for the unguarded occurrences of type variables. Returns `None` if
+    /// one occurs where it cannot be replaced in place: in a type alias, whose definition is
+    /// fixed, or negated in an intersection.
+    pub(super) fn replace_unguarded_typevars(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        replacements: &[(BoundTypeVarInstance<'db>, Type<'db>)],
+    ) -> Option<Type<'db>> {
+        let exposes_replaced = |ty: Type<'db>| {
+            ty.unguarded_typevars(db).iter().any(|exposed| {
+                replacements
+                    .iter()
+                    .any(|(variable, _)| variable.is_same_typevar_as(db, *exposed))
+            })
+        };
+        match self {
+            _ if replacements.is_empty() => Some(self),
+            Type::TypeVar(exposed) => Some(
+                replacements
+                    .iter()
+                    .find(|(variable, _)| variable.is_same_typevar_as(db, exposed))
+                    .map_or(self, |(_, replacement)| *replacement),
+            ),
+            Type::Union(union) => {
+                let elements: Option<Vec<_>> = union
+                    .elements(db)
+                    .iter()
+                    .map(|element| element.replace_unguarded_typevars(db, env, replacements))
+                    .collect();
+                Some(UnionType::from_elements(db, env, elements?))
+            }
+            Type::Intersection(intersection) => {
+                if intersection.iter_negative(db).any(exposes_replaced) {
+                    return None;
+                }
+                let positive: Option<Vec<_>> = intersection
+                    .iter_positive(db)
+                    .map(|element| element.replace_unguarded_typevars(db, env, replacements))
+                    .collect();
+                let mut positive = positive?.into_iter();
+                Some(
+                    intersection
+                        .map_positive(db, env, |_| positive.next().unwrap_or_else(Type::object)),
+                )
+            }
+            _ => (!exposes_replaced(self)).then_some(self),
+        }
+    }
 }
 
 /// An alias's cycles and the type variables exposed outside containers and other enclosing types.

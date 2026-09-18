@@ -46,7 +46,6 @@ def grounded[X, A]() -> None:
 
     # revealed: tuple[Solution[X=int, A=Invariant[int]]]
     reveal_type(body.solutions(inferable=tuple[X, A]))
-    # TODO: revealed: tuple[Solution[A=list[int]]]
     # revealed: tuple[Solution[A=Invariant[int]]]
     reveal_type(quantified.solutions(inferable=tuple[A]))
 
