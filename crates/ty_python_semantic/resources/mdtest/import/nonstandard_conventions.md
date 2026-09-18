@@ -13,12 +13,16 @@ This file currently covers the following details:
     means imports at the start of a file work as you'd expect, while imports in a function don't
     introduce submodule attributes.
 
-- **first from first serve**: only the *first* `from..import` in an `__init__.py(i)` that imports a
-    particular direct submodule of the current package introduces that submodule as a local.
-    Subsequent imports of the submodule will not introduce that local. This reflects the fact that
-    in actual python only the first import of a submodule (in the entire execution of the program)
-    introduces it as an attribute of the package. By "first" we mean "the first time in global
-    scope".
+- **implicit imports fill missing bindings**: a `from..import` in an `__init__.py(i)` introduces a
+    direct submodule as a local only on control-flow paths where that name has not been bound.
+    Existing bindings and explicit deletions are preserved. In particular, an import in one
+    conditional branch does not prevent another branch from introducing the same submodule.
+
+- **explicit bindings take precedence**: an implicitly introduced submodule does not overwrite an
+    existing explicit binding with the same name. The submodule might already have been loaded by
+    another import, in which case loading it again would not overwrite that binding at runtime. We
+    preserve the explicit binding without tracking import order across modules, even when the
+    submodule is actually loaded for the first time.
 
 - **dot re-exports**: `from . import a` in an `__init__.pyi` is considered a re-export of `a`
     (equivalent to `from . import a as a`). This is required to properly handle many stubs in the
@@ -1011,11 +1015,10 @@ def funcmod(x: int) -> int:
     return x
 ```
 
-## LHS `from` Imports Overwrite Locals
+## RHS `from` Imports Overwrite Locals
 
-The LHS of a `from..import` introduces a local symbol that overwrites any local with the same name.
-This reflects actual runtime behaviour, although we're kinda assuming it hasn't been imported
-already.
+The explicitly imported name on the RHS of a `from..import` overwrites an earlier binding with the
+same name, even when that name also matches the submodule being imported.
 
 `mypackage/__init__.py`:
 
@@ -1141,10 +1144,10 @@ from mypackage import funcmod
 x = funcmod(1)
 ```
 
-## LHS `from` Imports Only Apply The First Time
+## LHS `from` Imports Preserve Re-exports On Repeated Imports
 
-The LHS of a `from..import` of a submodule introduces a local symbol only the first time it
-introduces a direct submodule. The second time does nothing.
+After explicitly importing a function with the same name as its submodule, a later import from that
+submodule preserves the function binding.
 
 ### In Stub
 
@@ -1195,4 +1198,435 @@ def funcmod(x: int) -> int:
 from mypackage import funcmod
 
 x = funcmod(1)
+```
+
+## LHS `from` Imports Preserve Explicit Bindings
+
+### Local Assignment
+
+An implicit submodule binding does not overwrite an earlier assignment. At runtime, this import
+overwrites `funcmod` if the submodule has not already been loaded. We intentionally preserve the
+explicit binding rather than track import order across modules.
+
+`mypackage/__init__.py`:
+
+```py
+funcmod = 0
+from .funcmod import other
+
+reveal_type(funcmod)  # revealed: Literal[0]
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other = 1
+```
+
+### Conditional Assignment
+
+An implicit submodule binding also preserves earlier assignments in conditional branches.
+
+`mypackage/__init__.py`:
+
+```py
+def choose() -> bool:
+    return True
+
+if choose():
+    funcmod = 0
+else:
+    funcmod = 1
+
+from .funcmod import other
+
+reveal_type(funcmod)  # revealed: Literal[0, 1]
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other = 2
+```
+
+### Narrowed Member
+
+Preserving an explicit binding also preserves narrowing of its members.
+
+`mypackage/__init__.py`:
+
+```py
+class Value:
+    attr: int | str = 0
+
+funcmod = Value()
+
+if isinstance(funcmod.attr, int):
+    from .funcmod import other
+
+    reveal_type(funcmod.attr)  # revealed: int
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other = 0
+```
+
+### Imported Function
+
+Importing `helpers` loads `funcmod` before the package binds that name to the exported function. The
+later import from the already loaded submodule preserves the function, both at runtime and when type
+checking.
+
+`mypackage/__init__.py`:
+
+```py
+from mypackage.helpers import funcmod
+from mypackage.funcmod import other
+
+reveal_type(funcmod)  # revealed: def funcmod() -> int
+funcmod()
+```
+
+`mypackage/helpers.py`:
+
+```py
+import mypackage.funcmod
+
+def funcmod() -> int:
+    return 1
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other = 0
+```
+
+### Relative Imports In Stubs
+
+Relative imports in stubs also preserve an explicitly re-exported function when a later import
+implicitly introduces a submodule with the same name.
+
+`mypackage/__init__.pyi`:
+
+```pyi
+from .helpers import funcmod as funcmod
+from .funcmod import other
+```
+
+`mypackage/helpers.pyi`:
+
+```pyi
+def funcmod() -> int: ...
+```
+
+`mypackage/funcmod.pyi`:
+
+```pyi
+other: int
+```
+
+`main.py`:
+
+```py
+from mypackage import funcmod
+
+reveal_type(funcmod)  # revealed: def funcmod() -> int
+funcmod()
+```
+
+## LHS `from` Imports After An Unbound Use
+
+An earlier reference to an unbound name does not prevent an import from implicitly binding that name
+to the submodule.
+
+`mypackage/__init__.py`:
+
+```py
+# error: [unresolved-reference]
+funcmod
+
+from .funcmod import other
+
+reveal_type(funcmod)  # revealed: <module 'mypackage.funcmod'>
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other = 0
+```
+
+## LHS `from` Imports Fill Missing Bindings
+
+These examples enable possibly-unresolved-reference diagnostics to check that implicit imports bind
+a submodule on every path where its name has not already been bound.
+
+```toml
+[rules]
+possibly-unresolved-reference = "error"
+```
+
+### Single Conditional Assignment
+
+An implicit import preserves the explicit value on the branch where it was assigned and binds the
+submodule on the other branch. The name is definitely bound after the import.
+
+`mypackage/__init__.py`:
+
+```py
+def choose() -> bool:
+    return True
+
+if choose():
+    funcmod = 0
+
+from .funcmod import other
+
+reveal_type(funcmod)  # revealed: Literal[0] | <module 'mypackage.funcmod'>
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other = 1
+```
+
+### Conditional Imported Final
+
+Filling an undefined path does not discard the `Final` qualifier of a binding imported on another
+path. The implicit import is allowed, but a subsequent explicit reassignment is rejected.
+
+`mypackage/__init__.py`:
+
+```py
+def choose() -> bool:
+    return True
+
+if choose():
+    from .helpers import funcmod
+
+from .funcmod import other
+
+reveal_type(funcmod)  # revealed: Literal[1] | <module 'mypackage.funcmod'>
+# error: [invalid-assignment] "Reassignment of `Final` symbol `funcmod` is not allowed"
+funcmod = 1
+```
+
+`mypackage/helpers.py`:
+
+```py
+from typing import Final
+
+funcmod: Final = 1
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other = 0
+```
+
+### Member Assignment In A Statically True Branch
+
+An implicit import preserves a member assignment on the branch where its receiver is explicitly
+bound. Since this condition is always true, the assigned member value remains visible after the
+import.
+
+`mypackage/__init__.py`:
+
+```py
+class Value:
+    attr: int | str = 0
+
+if 1 == 1:
+    funcmod = Value()
+    funcmod.attr = 1
+
+from .funcmod import other
+
+reveal_type(funcmod.attr)  # revealed: Literal[1]
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other = 0
+attr = "module"
+```
+
+### Imports In Both Branches
+
+Both branches independently introduce the submodule binding, so it is available after the
+conditional.
+
+`mypackage/__init__.py`:
+
+```py
+def choose() -> bool:
+    return True
+
+if choose():
+    from .funcmod import other
+else:
+    from .funcmod import other
+
+reveal_type(funcmod)  # revealed: <module 'mypackage.funcmod'>
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other = 0
+```
+
+### Unreachable Earlier Import
+
+An unreachable import does not prevent a later import from introducing the submodule binding.
+
+`mypackage/__init__.py`:
+
+```py
+if False:
+    from .funcmod import other
+
+from .funcmod import other
+
+reveal_type(funcmod)  # revealed: <module 'mypackage.funcmod'>
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other = 0
+```
+
+### Repeated Imports In A Loop
+
+The first iteration implicitly binds the submodule. Subsequent iterations preserve the explicit
+assignment from the preceding iteration, so the name is always bound after the import.
+
+`mypackage/__init__.py`:
+
+```py
+for _ in range(2):
+    from .funcmod import other
+
+    reveal_type(funcmod)  # revealed: Literal[0] | <module 'mypackage.funcmod'>
+    funcmod = 0
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other = 1
+```
+
+### Implicit Bindings Across Loop Iterations
+
+An implicit submodule binding can come from an earlier loop iteration. The name is still possibly
+unbound because the first iteration can use it before taking the branch that imports it.
+
+`mypackage/__init__.py`:
+
+```py
+def choose() -> bool:
+    return True
+
+for _ in range(2):
+    if choose():
+        # error: [possibly-unresolved-reference]
+        reveal_type(funcmod)  # revealed: <module 'mypackage.funcmod'>
+    else:
+        from .funcmod import other
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other = 0
+```
+
+### Narrowing Of Builtin Members
+
+An implicit submodule binding replaces a builtin name when there is no local binding. Narrowing of a
+member on the builtin does not apply to the newly bound module.
+
+`mypackage/__init__.py`:
+
+```py
+if str.__name__ == "str":
+    from .str import other
+
+    reveal_type(str.__name__)  # revealed: str
+```
+
+`mypackage/str.py`:
+
+```py
+other = 0
+```
+
+## LHS `from` Imports Preserve Deletions
+
+Deleting a binding differs from a name that has never been bound: an implicit import does not
+restore an explicitly deleted name.
+
+```toml
+[rules]
+possibly-unresolved-reference = "error"
+```
+
+### Conditional Deletion
+
+The first import loads the submodule. Importing it again does not recreate the package attribute if
+it was subsequently deleted, so the name remains possibly unbound.
+
+`mypackage/__init__.py`:
+
+```py
+def choose() -> bool:
+    return True
+
+from .funcmod import other
+
+if choose():
+    del funcmod
+
+from .funcmod import other
+
+# error: [possibly-unresolved-reference]
+reveal_type(funcmod)  # revealed: <module 'mypackage.funcmod'>
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other = 0
+```
+
+### Deletion Before The First Import
+
+Deleting an explicit value also prevents an implicit import from binding that name. This is an
+intentional approximation: at runtime, the first load of the submodule would recreate the deleted
+attribute, but a repeated import would not.
+
+`mypackage/__init__.py`:
+
+```py
+funcmod = 0
+del funcmod
+
+from .funcmod import other
+
+# error: [unresolved-reference]
+reveal_type(funcmod)  # revealed: Unknown
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other = 1
 ```

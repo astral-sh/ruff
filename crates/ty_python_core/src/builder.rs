@@ -90,6 +90,11 @@ struct Loop {
     continue_states: Vec<FlowSnapshot>,
 }
 
+enum PackageImport {
+    SelfImport,
+    Submodule { name: Name, module_index: usize },
+}
+
 /// A narrowing alias: a variable whose RHS is a narrowing expression
 /// (e.g., `is_none = x is None`).
 #[derive(Clone, Debug)]
@@ -288,7 +293,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     condition_flow_snapshots_by_node: FxHashMap<ExpressionNodeKey, ConditionFlowSnapshots>,
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
     imported_modules: FxHashSet<ModuleName>,
-    seen_submodule_imports: FxHashSet<String>,
     // A map from a lambda expression to its enclosing statement.
     enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
     // A map from a constraining use of a collection initializer to its definition.
@@ -355,7 +359,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             collections_by_use: FxHashMap::default(),
             uses_by_collection: FxHashMap::default(),
 
-            seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
             async_comprehensions: FxHashSet::default(),
@@ -1648,15 +1651,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     DefinitionKind::ImportFrom(_) | DefinitionKind::StarImport(_) => {
                         ImportedQualifierAction::Record
                     }
-                    DefinitionKind::Import(_) | DefinitionKind::ImportFromSubmodule(_) => {
-                        ImportedQualifierAction::Clear
-                    }
+                    DefinitionKind::Import(_) => ImportedQualifierAction::Clear,
                     _ => ImportedQualifierAction::Preserve,
                 };
-                let previous = previous_definitions.unwrap_or(if kind.is_loop_header() {
-                    PreviousDefinitions::AreKept
-                } else {
-                    PreviousDefinitions::AreShadowed
+                let previous = previous_definitions.unwrap_or(match kind {
+                    DefinitionKind::LoopHeader(_) => PreviousDefinitions::AreKept,
+                    DefinitionKind::ImportFromSubmodule(_) => {
+                        PreviousDefinitions::OnlyUnboundAreShadowed
+                    }
+                    _ => PreviousDefinitions::AreShadowed,
                 });
                 self.record_binding_with(definition, |use_def, place| {
                     use_def.record_binding(
@@ -1715,7 +1718,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         record: impl FnOnce(&mut UseDefMapBuilder<'db>, ScopedPlaceId),
     ) {
         let place = definition.place(self.db);
-        let is_loop_header = definition.kind(self.db).is_loop_header();
+        let kind = definition.kind(self.db);
+        let is_loop_header = kind.is_loop_header();
+        let submodule_binding_reachability =
+            if matches!(kind, DefinitionKind::ImportFromSubmodule(_)) {
+                self.current_use_def_map_mut()
+                    .current_bindings(place)
+                    .find(|binding| binding.binding().is_unbound())
+                    .map(|binding| binding.reachability_constraint())
+            } else {
+                None
+            };
 
         // We need to avoid marking places as bound as soon as we encounter a loop header
         // definition for them, because that would lead to false-positive semantic syntax errors in
@@ -1733,7 +1746,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let definition_id = self.current_use_def_map().next_definition_id();
         record(self.current_use_def_map_mut(), place);
 
-        if !is_loop_header {
+        if let Some(reachability) = submodule_binding_reachability {
+            // The implicit module binding leaves existing values intact. Invalidate their
+            // members only on paths where the module supplies a previously missing name.
+            let scope = self.current_scope();
+            for associated_place in self.place_tables[scope].associated_place_ids(place) {
+                self.use_def_maps[scope]
+                    .delete_binding_conditionally((*associated_place).into(), reachability);
+            }
+        } else if !is_loop_header {
             self.delete_associated_bindings(place);
         }
 
@@ -1830,6 +1851,53 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     assignment,
                 );
             }
+        }
+    }
+
+    /// Classify imports of the current package or one of its submodules.
+    ///
+    /// Both normal indexing and the loop pre-walk need to recognize the implicit global binding
+    /// introduced by importing a submodule from a package initializer.
+    fn package_import(&self, node: &ast::StmtImportFrom) -> Option<PackageImport> {
+        let source_file = self.file.file(self.db);
+        if !source_file.is_package(self.db) {
+            return None;
+        }
+
+        let importing_file = ImportingFile::File(source_file, self.resolver_environment);
+        let module_name = ModuleName::from_identifier_parts(
+            self.db,
+            importing_file,
+            node.module.as_deref(),
+            node.level,
+        )
+        .ok()?;
+        let package_name = ModuleName::package_for_file(self.db, importing_file).ok()?;
+
+        if module_name == package_name {
+            return Some(PackageImport::SelfImport);
+        }
+        if node.module.is_none() || !self.current_scope().is_global() {
+            return None;
+        }
+
+        let relative_submodule = module_name.relative_to(&package_name)?;
+        let name = Name::new(relative_submodule.components().next()?);
+        let module_index = if node.level == 0 {
+            // In `from package.x.y import z`, select `x`.
+            package_name.components().count()
+        } else {
+            // In `from .x.y import z`, select `x`; in `from ..x.y import z`, select `y`.
+            // The identifier excludes the leading dots.
+            node.level as usize - 1
+        };
+        Some(PackageImport::Submodule { name, module_index })
+    }
+
+    fn implicit_submodule_name(&self, node: &ast::StmtImportFrom) -> Option<Name> {
+        match self.package_import(node)? {
+            PackageImport::SelfImport => None,
+            PackageImport::Submodule { name, .. } => Some(name),
         }
     }
 
@@ -4031,71 +4099,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Stmt::ImportFrom(node) => {
                 self.record_exception_checkpoint();
 
-                // If we see:
-                //
-                // * `from .x.y import z` (or `from whatever.thispackage.x.y`)
-                // * And we are in an `__init__.py(i)` (hereafter `thispackage`)
-                // * And this is the first time we've seen `from .x` in this module
-                // * And we're in the global scope
-                //
-                // We introduce a local definition `x = <module 'thispackage.x'>` that occurs
-                // before the `z = ...` binding the import introduces. This models the fact
-                // that the *first* time that you import 'thispackage.x' the python runtime creates
-                // `x` as a variable in the global scope of `thispackage`.
-                //
-                // This is not a perfect simulation of actual runtime behaviour for *various*
-                // reasons but it works well for most practical purposes. In particular it's nice
-                // that `x` can be freely overwritten, and that we don't assume that an import
-                // in one function is visible in another function.
-                let mut is_self_import = false;
                 let source_file = self.file.file(self.db);
                 let resolver_environment = self.resolver_environment;
-                if source_file.is_package(self.db)
-                    && let Ok(module_name) = ModuleName::from_identifier_parts(
-                        self.db,
-                        ImportingFile::File(source_file, resolver_environment),
-                        node.module.as_deref(),
-                        node.level,
-                    )
-                    && let Ok(thispackage) = ModuleName::package_for_file(
-                        self.db,
-                        ImportingFile::File(source_file, resolver_environment),
-                    )
-                {
-                    // Record whether this is equivalent to `from . import ...`
-                    is_self_import = module_name == thispackage;
+                let package_import = self.package_import(node);
+                let is_self_import = matches!(package_import, Some(PackageImport::SelfImport));
+                if let Some(PackageImport::Submodule { name, module_index }) = package_import {
+                    let is_immediately_shadowed = node.names.iter().any(|alias| {
+                        let bound_name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        alias.name.as_str() != "*" && bound_name.id == name
+                    });
 
-                    if node.module.is_some()
-                        && let Some(relative_submodule) = module_name.relative_to(&thispackage)
-                        && let Some(direct_submodule) = relative_submodule.components().next()
-                        && !self.seen_submodule_imports.contains(direct_submodule)
-                        && self.current_scope().is_global()
-                    {
-                        self.seen_submodule_imports
-                            .insert(direct_submodule.to_owned());
-
-                        let is_immediately_shadowed = node.names.iter().any(|alias| {
-                            if &alias.name == "*" {
-                                return false;
-                            }
-
-                            let bound_name = alias.asname.as_ref().unwrap_or(&alias.name);
-                            bound_name.id.as_str() == direct_submodule
-                        });
-
-                        if !is_immediately_shadowed {
-                            let direct_submodule_name = Name::new(direct_submodule);
-                            let symbol = self.add_symbol(direct_submodule_name);
-
-                            let module_index = if node.level == 0 {
-                                // "whatever.thispackage.x.y" we want `x`
-                                thispackage.components().count()
-                            } else {
-                                // ".x.y" we want `x` (level 1 => index 0)
-                                // "..x.y" we want `y` (level 2 => index 1)
-                                // (The Identifier doesn't include the prefix dots)
-                                node.level as usize - 1
-                            };
+                    if !is_immediately_shadowed {
+                        let symbol = self.add_symbol(name);
+                        let has_unbound_path = self
+                            .current_use_def_map_mut()
+                            .current_bindings(symbol.into())
+                            .any(|binding| {
+                                binding.binding().is_unbound()
+                                    && binding.reachability_constraint()
+                                        != ScopedReachabilityConstraintId::ALWAYS_FALSE
+                            });
+                        if has_unbound_path {
+                            // In a package initializer, `from .x import y` can introduce `x`
+                            // as a module. Another import may already have loaded that module,
+                            // so preserve existing bindings and deletions rather than trying to
+                            // reconstruct import order across files. The synthetic definition
+                            // fills only paths where `x` has no binding, before binding `y`.
                             self.add_definition(
                                 symbol.into(),
                                 ImportFromSubmoduleDefinitionNodeRef { node, module_index },
@@ -4582,7 +4611,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // definition for each bound place. See `struct LoopHeader` for more on this. Loop
                 // header definitions store the ID of a reserved `LoopHeader` that we populate
                 // after walking the body.
-                let bound_places = loop_bindings_visitor::collect_while_loop_bindings(while_stmt);
+                let bound_places =
+                    loop_bindings_visitor::collect_while_loop_bindings(while_stmt, |import| {
+                        self.implicit_submodule_name(import)
+                    });
                 let mut maybe_loop_header_info = None;
                 // Avoid allocating a `LoopHeader` if there are no bound places in this loop.
                 if !bound_places.is_empty() {
@@ -4798,7 +4830,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // definition for each bound place. See `struct LoopHeader` for more on this. Loop
                 // header definitions store the ID of a reserved `LoopHeader` that we populate
                 // after walking the body.
-                let bound_places = loop_bindings_visitor::collect_for_loop_bindings(for_stmt);
+                let bound_places =
+                    loop_bindings_visitor::collect_for_loop_bindings(for_stmt, |import| {
+                        self.implicit_submodule_name(import)
+                    });
                 let mut maybe_loop_header_info = None;
                 // Avoid allocating a `LoopHeader` if there are no bound places in this loop.
                 if !bound_places.is_empty() {
