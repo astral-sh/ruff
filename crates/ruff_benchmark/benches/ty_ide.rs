@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::fmt::{self, Write as _};
 use std::hint::black_box;
+use std::io::{self, Write as _};
+use std::time::Instant;
 
 use divan::Bencher;
 use ruff_db::files::{File, system_path_to_file};
@@ -11,15 +13,16 @@ use ty_ide::{Completion, CompletionCapabilities, CompletionSettings};
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::RelativePathBuf;
-use ty_project::{ProjectDatabase, ProjectMetadata, SemanticDb as _};
+use ty_project::{Db as _, ProjectDatabase, ProjectMetadata, SemanticDb as _};
 
 mod auto_import {
     //! Auto-import benchmarks using `ty_ide::completion`.
     //!
-    //! The timer covers the API call and disposal of its results, without an LSP server.
+    //! Divan timers cover the API call and disposal of its results, without an LSP server.
     //! Each input owns a fresh project and database, with warm filesystem caches.
     //! Fixture generation, warm-up requests, edits, database notifications, validation,
     //! and project/database teardown are outside the timed region.
+    //! The latency experiment also measures database updates and background reclamation.
 
     use super::*;
 
@@ -158,6 +161,15 @@ BENCHMARK_CONSTANT_{index:03} = {index}
     impl Fixture {
         /// Creates the selected layout and records its expected modules and matching symbols.
         fn new(layout: Layout) -> Self {
+            let payloads: usize = if std::env::args().any(|arg| arg == "--latency-experiment") {
+                std::env::args()
+                    .nth(4)
+                    .unwrap_or("64".to_owned())
+                    .parse()
+                    .expect("Payload count must be an integer")
+            } else {
+                0
+            };
             let directory = tempfile::tempdir().expect("Create fixture directory");
             let project_root = SystemPathBuf::from_path_buf(
                 directory
@@ -229,6 +241,24 @@ BENCHMARK_CONSTANT_{index:03} = {index}
                     .replace("{symbol}", &symbol)
                     .replace("{index:03}", &format!("{index:03}"))
                     .replace("{index}", &index.to_string());
+                let mut source = source;
+                for function in 0..payloads {
+                    writeln!(
+                        source,
+                        r#"
+def payload_{function}(items: list[int], limit: int = 10) -> dict[str, int]:
+    result = {{}}
+    for item in items:
+        if item > limit:
+            values = [item + offset for offset in range(5)]
+            result[str(item)] = sum(values)
+        else:
+            result[str(item)] = item * 2
+    return result
+"#
+                    )
+                    .expect("Write payload");
+                }
                 if index == LEAVES - 1 {
                     target.clone_from(&name);
                     target_directory.clone_from(&path);
@@ -331,10 +361,11 @@ BENCHMARK_CONSTANT_{index:03} = {index}
                 }),
                 ..Options::default()
             });
-            let db =
+            let mut db =
                 ProjectDatabase::fallible(metadata, system).expect("Create benchmark database");
             let client = system_path_to_file(&db, fixture.project_root.join("app/main.py"))
                 .expect("Find client file");
+            db.project().open_file(&mut db, client);
             // Initialize the resolver environment without warming completion queries.
             let _ = db.program_file(client).resolver_environment(&db);
             Self {
@@ -478,6 +509,96 @@ BENCHMARK_CONSTANT_{index:03} = {index}
         std::fs::write(path, source).expect("Write fixture file");
     }
 
+    /// Measures an update after auto-imports for the selected fixture layout.
+    pub(super) fn latency_experiment() {
+        let output = std::env::args().nth(2).expect("Output prefix");
+        let samples: usize = std::env::args()
+            .nth(3)
+            .unwrap_or("20".to_owned())
+            .parse()
+            .expect("Sample count must be an integer");
+        let layout = if std::env::args().nth(5).as_deref() == Some("namespace") {
+            Layout::NamespaceSplit
+        } else {
+            Layout::RegularDeep
+        };
+        let mut preflight = Case::new(layout);
+        drop(preflight.completions());
+        std::fs::write(
+            format!("{output}-before.json"),
+            preflight.db.salsa_memory_dump().to_json(),
+        )
+        .expect("Write memory report before the update");
+        let path = preflight.fixture.added_path();
+        write_source(
+            &path,
+            &format!(
+                "class {ADDED_SYMBOL}:
+    pass
+",
+            ),
+        );
+        File::sync_path(&mut preflight.db, &path);
+        preflight.added = true;
+        std::fs::write(
+            format!("{output}-after.json"),
+            preflight.db.salsa_memory_dump().to_json(),
+        )
+        .expect("Write memory report after the update");
+        preflight.validate();
+        drop(preflight);
+        wait_for_deferred_drops();
+        writeln!(io::stderr().lock(), "Preflight passed").expect("Write preflight status");
+
+        let mut stdout = io::stdout().lock();
+        writeln!(
+            stdout,
+            "sample,warm_ms,update_ms,completion_ms,total_ms,reclaimed_ms"
+        )
+        .expect("Write CSV header");
+        for sample in 0..samples {
+            wait_for_deferred_drops();
+            let mut case = Case::new(layout);
+            let start = Instant::now();
+            drop(black_box(case.completions()));
+            let warm = start.elapsed();
+            let path = case.fixture.added_path();
+            write_source(
+                &path,
+                &format!(
+                    "class {ADDED_SYMBOL}:
+    pass
+",
+                ),
+            );
+            let start = Instant::now();
+            File::sync_path(&mut case.db, &path);
+            let update = start.elapsed();
+            drop(black_box(case.completions()));
+            let total = start.elapsed();
+            wait_for_deferred_drops();
+            let reclaimed = start.elapsed();
+            writeln!(
+                stdout,
+                "{sample},{:.6},{:.6},{:.6},{:.6},{:.6}",
+                warm.as_secs_f64() * 1000.,
+                update.as_secs_f64() * 1000.,
+                total
+                    .checked_sub(update)
+                    .expect("Update duration fits in total duration")
+                    .as_secs_f64()
+                    * 1000.,
+                total.as_secs_f64() * 1000.,
+                reclaimed.as_secs_f64() * 1000.
+            )
+            .expect("Write CSV row");
+        }
+        wait_for_deferred_drops();
+    }
+
+    // Synchronous destruction has no pending queue to drain.
+    fn wait_for_deferred_drops() {}
+
     #[divan::bench(
         name = "auto_imports",
         args = MODES.map(|mode| Scenario { layout: Layout::RegularDeep, mode }),
@@ -507,5 +628,9 @@ fn main() {
         .use_current_thread()
         .build_global()
         .expect("Initialize benchmark worker pool");
+    if std::env::args().any(|arg| arg == "--latency-experiment") {
+        auto_import::latency_experiment();
+        return;
+    }
     divan::main();
 }

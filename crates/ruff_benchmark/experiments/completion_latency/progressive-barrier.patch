@@ -1,0 +1,73 @@
+diff --git a/crates/ruff_db/src/parsed/deferred_drop.rs b/crates/ruff_db/src/parsed/deferred_drop.rs
+index 7b0c3bd6b9..ee049df9b7 100644
+--- a/crates/ruff_db/src/parsed/deferred_drop.rs
++++ b/crates/ruff_db/src/parsed/deferred_drop.rs
+@@ -15,7 +15,7 @@
+ }
+ 
+ /// Waits for destruction of all ASTs queued before this call.
+-#[cfg(test)]
++#[cfg(any(test, feature = "testing"))]
+ pub(super) fn wait() {
+     if let Some(queue) = queue() {
+         queue.wait();
+@@ -45,7 +45,7 @@
+                 for message in receiver {
+                     match message {
+                         Message::Drop(parsed) => drop(parsed),
+-                        #[cfg(test)]
++                        #[cfg(any(test, feature = "testing"))]
+                         Message::Barrier(sender) => {
+                             let _ = sender.send(());
+                         }
+@@ -60,7 +60,7 @@
+         let _ = self.sender.try_send(Message::Drop(parsed));
+     }
+ 
+-    #[cfg(test)]
++    #[cfg(any(test, feature = "testing"))]
+     fn wait(&self) {
+         let (done, receiver) = mpsc::channel();
+         if self.sender.send(Message::Barrier(done)).is_ok() {
+@@ -71,7 +71,7 @@
+ 
+ enum Message {
+     Drop(Arc<IndexedModule>),
+-    #[cfg(test)]
++    #[cfg(any(test, feature = "testing"))]
+     Barrier(mpsc::Sender<()>),
+ }
+ 
+diff --git a/crates/ruff_db/src/parsed.rs b/crates/ruff_db/src/parsed.rs
+index d53bf0bb31..d246eee56f 100644
+--- a/crates/ruff_db/src/parsed.rs
++++ b/crates/ruff_db/src/parsed.rs
+@@ -235,6 +235,12 @@
+     }
+ }
+ 
++/// Waits for previously queued AST destruction to finish.
++#[cfg(feature = "testing")]
++pub fn wait_for_deferred_drops() {
++    deferred_drop::wait();
++}
++
+ mod deferred_drop;
+ 
+ mod indexed {
+diff --git a/crates/ruff_benchmark/benches/ty_ide.rs b/crates/ruff_benchmark/benches/ty_ide.rs
+index 953c5ac85e..7cdbcc2646 100644
+--- a/crates/ruff_benchmark/benches/ty_ide.rs
++++ b/crates/ruff_benchmark/benches/ty_ide.rs
+@@ -596,8 +596,9 @@
+         wait_for_deferred_drops();
+     }
+ 
+-    // Synchronous destruction has no pending queue to drain.
+-    fn wait_for_deferred_drops() {}
++    fn wait_for_deferred_drops() {
++        ruff_db::parsed::wait_for_deferred_drops();
++    }
+ 
+     #[divan::bench(
+         name = "auto_imports",
