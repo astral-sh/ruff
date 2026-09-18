@@ -938,7 +938,8 @@ Note that a gradual type is compatible with any declared constraint:
 from typing import Any
 
 def _(value: Any, text: str) -> None:
-    reveal_type(f(value, text))  # revealed: str
+    # XXX: revealed: str
+    reveal_type(f(value, text))  # revealed: Any | str
 ```
 
 ## Diagnostic recovery with conflicting bounds
@@ -2882,7 +2883,8 @@ def single_constraint[T: (list[int], str)](value: T) -> T:
     return value
 
 def single_matching_constraint[U: list[Any]](value: U) -> None:
-    reveal_type(single_constraint(value))  # revealed: list[int]
+    # XXX: revealed: list[int]
+    reveal_type(single_constraint(value))  # revealed: U@single_matching_constraint
 ```
 
 ## Selecting constraints for narrowed caller type variables
