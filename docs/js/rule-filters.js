@@ -28,7 +28,6 @@
         category: category.textContent.trim(),
         linter: linter.dataset.linter,
         status: status.dataset.status,
-        fixable: status.dataset.fixable === "true",
       };
     });
 
@@ -168,10 +167,7 @@
         const matches =
           categories.includes(row.category) &&
           selectedLinters.includes(row.linter) &&
-          statuses.some(
-            (value) =>
-              value === row.status || (value === "fixable" && row.fixable),
-          ) &&
+          statuses.includes(row.status) &&
           terms.every((term) => row.text.includes(term));
 
         row.element.hidden = !matches;
@@ -234,7 +230,6 @@
 
       history.replaceState(history.state, "", url);
       updateFragmentLinks();
-      window.dispatchEvent(new Event("rule-filter-change"));
     }
 
     restoreFilters = () => {

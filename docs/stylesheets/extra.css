@@ -87,6 +87,11 @@
   display: inline; /* Show dark images in dark mode */
 }
 
+/* Keep absolutely positioned screen-reader labels inside the table scroll area. */
+.md-typeset__scrollwrap {
+  position: relative;
+}
+
 /* See: https://github.com/squidfunk/mkdocs-material/issues/175#issuecomment-616694465 */
 .md-typeset__table {
   min-width: 100%;

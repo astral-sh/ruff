@@ -110,8 +110,8 @@ impl serde::Serialize for NoqaCode {
 /// ```
 ///
 /// Variants are ordered by descending severity, with error categories first, followed by warning,
-/// and then by off-by-default categories. The rule documentation uses this order for category
-/// filtering and sorting.
+/// and then by off-by-default categories. The rule documentation lists category filter options
+/// in this order.
 ///
 /// See our [rule categorization guidelines] for more information on assigning categories.
 ///

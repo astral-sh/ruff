@@ -71,11 +71,10 @@ fn generate_table(
             }
         };
 
-        let fixable = matches!(
+        let fix_token = if matches!(
             rule.fixable(),
             FixAvailability::Always | FixAvailability::Sometimes
-        );
-        let fix_token = if fixable {
+        ) {
             format!(
                 "<span aria-hidden='true' {SYMBOL_STYLE} title='Automatic fix available'>{FIX_SYMBOL}</span><span class='sr-only'>Automatic fix available</span>"
             )
@@ -175,7 +174,7 @@ fn generate_table(
             "| <span class='rule-identity'>{ss}{explanation}<br>{message}{se}</span> \
              | {ss}{category}{se} {{ .rule-category }} \
              | {ss}{linter_name}{se} {{ {linter_anchor} .rule-linter data-linter='{linter_slug}' }} \
-             | <div {SYMBOLS_CONTAINER}>{status_token}{fix_token}{default_token}</div> {{ .rule-status data-status='{status}' data-fixable='{fixable}' }} |",
+             | <div {SYMBOLS_CONTAINER}>{status_token}{fix_token}{default_token}</div> {{ .rule-status data-status='{status}' }} |",
             category = rule.category(),
             explanation = rule
                 .explanation()
