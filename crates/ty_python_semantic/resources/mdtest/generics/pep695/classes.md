@@ -778,16 +778,13 @@ wrong_innards: C[int] = C("five", 1)
 
 ### Class-scoped type variables in `__init__` receiver annotations
 
-The opt-in `invalid-init-type-variable` rule rejects class-scoped type variables in explicit
-`__init__` receiver annotations, including when the variables occur inside another type. Ordinary
-methods can use those variables in their receiver annotations.
+The `invalid-init-type-variable` rule rejects class-scoped type variables in explicit `__init__`
+receiver annotations, including when the variables occur inside another type. Ordinary methods can
+use those variables in their receiver annotations.
 
 ```toml
 [environment]
 python-version = "3.13"
-
-[rules]
-invalid-init-type-variable = "error"
 ```
 
 ```py
@@ -839,15 +836,12 @@ reveal_type(Remapped(1))  # revealed: Remapped[list[Literal[1]]]
 
 ### Some `__init__` overloads only apply to certain specializations
 
-With `invalid-init-type-variable` disabled (the default), an overload can partially specialize the
-receiver while retaining other class-scoped type variables.
+An overload can specialize the receiver. Retaining other class-scoped type variables is rejected,
+but the receiver annotation still participates in overload resolution.
 
 ```toml
 [environment]
 python-version = "3.13"
-
-[rules]
-invalid-init-type-variable = "ignore"
 ```
 
 ```py
@@ -893,6 +887,7 @@ C[None](12)
 
 class D[T, U]:
     @overload
+    # error: [invalid-init-type-variable]
     def __init__(self: "D[str, U]", u: U) -> None: ...
     @overload
     def __init__(self, t: T, u: U) -> None: ...

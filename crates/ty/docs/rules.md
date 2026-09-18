@@ -2230,7 +2230,7 @@ a = 20 / 0  # type: ignore
 ## `invalid-init-type-variable`
 
 <small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.83">0.0.83</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22invalid-init-type-variable%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L730" target="_blank">View source</a>
@@ -2277,13 +2277,6 @@ If the receiver annotation does not change the class's type arguments, it can be
 class Box[T]:
     def __init__(self, value: T) -> None: ...
 ```
-
-**Default level**
-
-
-This rule is disabled by default because existing code often uses class-scoped type variables to
-partially specialize a constructor's receiver. Enabling the rule enforces the typing specification's
-restriction without changing the inferred types.
 
 **References**
 

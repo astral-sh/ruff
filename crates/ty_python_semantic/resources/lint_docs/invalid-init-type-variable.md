@@ -36,12 +36,6 @@ class Box[T]:
     def __init__(self, value: T) -> None: ...
 ```
 
-## Default level
-
-This rule is disabled by default because existing code often uses class-scoped type variables to
-partially specialize a constructor's receiver. Enabling the rule enforces the typing specification's
-restriction without changing the inferred types.
-
 ## References
 
 - [Typing specification: `__init__` method](https://typing.python.org/en/latest/spec/constructors.html#init-method)

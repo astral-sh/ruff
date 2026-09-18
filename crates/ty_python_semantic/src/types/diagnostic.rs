@@ -732,7 +732,7 @@ declare_lint! {
     pub(crate) static INVALID_INIT_TYPE_VARIABLE = {
         summary: "detects class-scoped type variables in `__init__` receiver annotations",
         status: LintStatus::stable("0.0.83"),
-        default_level: Level::Ignore,
+        default_level: Level::Error,
     }
 }
 
