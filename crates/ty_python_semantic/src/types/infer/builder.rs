@@ -62,7 +62,9 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, MethodDecorator,
 };
-use crate::types::constraints::{CandidateSolutions, ConstraintSetBuilder, Solutions};
+use crate::types::constraints::{
+    CandidateSolutions, CandidateTypeVarSolutionKind, ConstraintSetBuilder, Solutions,
+};
 use crate::types::context::InferContext;
 use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
@@ -8025,7 +8027,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .origin(self.db())
             .apply_specialization(db, |_| {
                 builder.build_merged_with(|current_typevar, bounds| {
-                    let lower = bounds?.inference_lower(db, env)?;
+                    let lower = match &bounds?.kind {
+                        CandidateTypeVarSolutionKind::Range(range) => {
+                            range.inference_lower(db, env)?
+                        }
+                        CandidateTypeVarSolutionKind::Exact(ty) => *ty,
+                    };
 
                     let lower = lower.promote_collection_element_type(
                         db,

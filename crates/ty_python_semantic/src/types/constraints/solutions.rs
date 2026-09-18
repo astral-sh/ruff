@@ -9,9 +9,9 @@ use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{Constraint, ConstraintProvenance};
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, ConstraintAssignment,
-    ConstraintId, ConstraintSetStorage, NodeId, PathBoundBuilder, SolutionLimits, SolutionValidity,
-    SolutionViolation, SolutionViolationKind,
+    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, CandidateTypeVarSolution,
+    ConstraintAssignment, ConstraintId, ConstraintSetStorage, NodeId, PathBoundBuilder,
+    SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
 };
 use crate::types::typevar::TypeVarBoundOrConstraints;
 use crate::types::{BoundTypeVarInstance, Type};
@@ -377,12 +377,12 @@ impl<'db> SolutionWalker<'db> {
         let typevars: Option<Box<[_]>> = mappings
             .into_iter()
             .map(|(bound_typevar, bounds)| {
-                let path_bound = bounds.finish(db, env, bound_typevar);
+                let range = bounds.finish(db, env);
 
-                let lower = path_bound.effective_lower(db, env);
-                if !path_bound.upper.is_satisfied_by(db, env, lower) {
+                let lower = range.effective_lower(db, env);
+                if !range.upper.is_satisfied_by(db, env, lower) {
                     let (when_upper, source_order) =
-                        path_bound.upper.when_satisfied_by(db, env, storage, lower);
+                        range.upper.when_satisfied_by(db, env, storage, lower);
                     if when_upper.is_never_satisfied(db, env, storage, source_order) {
                         // This path does not satisfy the accumulated upper bound, and is
                         // therefore not a valid specialization.
@@ -395,13 +395,13 @@ impl<'db> SolutionWalker<'db> {
                 {
                     violations.push(SolutionViolation {
                         bound_typevar,
-                        argument: path_bound.inference_lower(db, env),
-                        variance: path_bound.variance(),
+                        argument: range.inference_lower(db, env),
+                        variance: range.variance(),
                         kind: SolutionViolationKind::UpperBound,
                     });
                 }
 
-                Some(path_bound)
+                Some(CandidateTypeVarSolution::range(bound_typevar, range))
             })
             .collect();
         let typevars = typevars?;
