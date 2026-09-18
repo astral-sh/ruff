@@ -84,7 +84,6 @@ UP036 Version check is outdated for minimum Python version
 22 |
 23 | supported = [feature for feature in features if sys.version_info >= (3, 8)]
    |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 UP036 Version check is outdated for minimum Python version
   --> UP036_6.py:26:14
@@ -100,7 +99,6 @@ UP036 Version check is outdated for minimum Python version
 26 | def f(legacy=sys.version_info < (3, 8)):
 27 |     return sys.version_info < (3, 8)
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 UP036 Version check is outdated for minimum Python version
   --> UP036_6.py:31:14
@@ -108,7 +106,6 @@ UP036 Version check is outdated for minimum Python version
 30 | class C:
 31 |     LEGACY = sys.version_info < (3, 8)
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 UP036 Version check is outdated for minimum Python version
   --> UP036_6.py:39:13
@@ -332,7 +329,6 @@ UP036 Version specifier is invalid
 103 |
 104 | also_mistake = 10000000 is sys.version_info[0]
     |                ^^^^^^^^
-    |
 
 UP036 Version check is outdated for minimum Python version
    --> UP036_6.py:111:16
