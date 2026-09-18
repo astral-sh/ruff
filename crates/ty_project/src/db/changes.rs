@@ -1,7 +1,7 @@
 use crate::db::{Db, ProjectDatabase};
 use crate::script::script_tag;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
-use crate::{ProjectMetadata, ProjectReloadResult};
+use crate::{GlobFilterCheckMode, ProjectMetadata, ProjectReloadResult};
 use std::collections::BTreeSet;
 
 use crate::walk::{ProjectFilesWalker, create_walker_builder};
@@ -9,6 +9,7 @@ use ruff_db::Db as _;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
+use ty_module_resolver::system_module_search_paths;
 use ty_python_core::program::FallibleStrategy;
 use ty_python_semantic::PythonEnvironment;
 
@@ -156,7 +157,7 @@ impl ProjectDatabase {
             // module ownership without changing the lockfile.
             if uv_enabled
                 && !reload_project
-                && (environment_changed || affects_uv_metadata(change))
+                && (environment_changed || affects_uv_metadata(self, change))
             {
                 reload_project = true;
             }
@@ -571,7 +572,7 @@ fn affects_python_environment(
     }
 }
 
-fn affects_uv_metadata(change: &ChangeEvent) -> bool {
+fn affects_uv_metadata(db: &dyn Db, change: &ChangeEvent) -> bool {
     // `uv workspace metadata` checks and may update the lockfile before exporting it. It also
     // reads the selected environment:
     // - `pyproject.toml` defines workspace membership and dependencies, which affect
@@ -619,6 +620,43 @@ fn affects_uv_metadata(change: &ChangeEvent) -> bool {
             true
         }
 
+        // Moving a workspace member can produce only a directory event, with no separate
+        // event for its `pyproject.toml`. Refresh metadata because adding or removing a member
+        // can change `members` and `resolution`:
+        // - Check directories in the uv workspace against ty's include/exclude settings. A member
+        //   can affect resolution even when it is outside the paths passed to `ty check`.
+        //   If metadata loading failed, use ty's project root so directory changes can trigger a retry.
+        // - Check directories that contain a search path to detect changes to local dependencies.
+        //   For example, deleting `/dependency` removes the sources at `/dependency/src`.
+        //
+        // Using the project's include/exclude settings avoids reading ignore files on each
+        // event, at the cost of occasionally requesting unchanged metadata.
+        ChangeEvent::Created {
+            path,
+            kind: CreatedKind::Directory | CreatedKind::Any,
+        }
+        | ChangeEvent::Deleted {
+            path,
+            kind: DeletedKind::Directory | DeletedKind::Any,
+        } => {
+            let project = db.project();
+            let workspace_root = project
+                .metadata(db)
+                .uv_workspace()
+                .map_or(project.root(db), |workspace| workspace.workspace_root());
+            let is_included_workspace_directory = path.starts_with(workspace_root)
+                && project
+                    .settings(db)
+                    .src()
+                    .files
+                    .is_directory_maybe_included(path, GlobFilterCheckMode::Adhoc)
+                    .is_included();
+            let environment = project.program(db).resolver_environment(db);
+            let contains_search_path = system_module_search_paths(db, environment)
+                .any(|search_path| search_path.starts_with(path));
+
+            is_included_workspace_directory || contains_search_path
+        }
         _ => false,
     }
 }

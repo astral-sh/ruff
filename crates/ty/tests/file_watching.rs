@@ -3651,6 +3651,297 @@ mod uv_metadata {
         Ok(())
     }
 
+    /// Moving a Python file out of the project clears its diagnostic without refreshing uv
+    /// metadata, even when the file is edited immediately before the move.
+    #[test]
+    fn editing_then_moving_a_file_out_does_not_request_uv_metadata() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                ("pyproject.toml", MANIFEST),
+                ("module.py", "x: int = 'invalid'"),
+            ],
+        )?;
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @r#"module.py:1:10: error[invalid-assignment] Object of type `Literal["invalid"]` is not assignable to `int`"#
+        );
+
+        // Keep the assignment invalid so the diagnostic only clears when the file is removed.
+        update_file(case.project_path("module.py"), "x: int = 'still invalid'\n")?;
+        std::fs::rename(
+            case.project_path("module.py"),
+            case.root_path().join("module.py"),
+        )?;
+        // Wait for the move; the preceding edit alone is not enough to clear the diagnostic.
+        let changes = case.stop_watch(|event: &ChangeEvent| {
+            event.is_deleted() && event.file_name() == Some("module.py")
+        });
+        assert!(
+            case.apply_changes(&changes).project_sync_path().is_none(),
+            "{changes:?}"
+        );
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    /// Creating a package directory inside a dependency's source directory does not refresh
+    /// uv metadata when that directory is outside `src.include`.
+    ///
+    /// ```text
+    /// <temp_dir>/
+    /// |-- project/                # ty project and uv workspace root
+    /// |   |-- pyproject.toml
+    /// |   |-- ty.toml             # includes src; adds ../dependency/src as a search path
+    /// |   `-- src/main.py
+    /// `-- dependency/src/         # module search path
+    ///     `-- package/            # created during the test
+    /// ```
+    #[test]
+    fn creating_directory_in_excluded_search_path_does_not_request_uv_metadata()
+    -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                ("pyproject.toml", MANIFEST),
+                (
+                    "ty.toml",
+                    r#"
+                    [environment]
+                    extra-paths = ["../dependency/src"]
+
+                    [src]
+                    include = ["src"]
+                    "#,
+                ),
+                ("src/main.py", ""),
+                ("../dependency/src/.keep", ""),
+            ],
+        )?;
+
+        // Changes within a search path outside `src.include` do not affect dependency projects.
+        std::fs::create_dir(case.root_path().join("dependency/src/package"))?;
+        let created = case.take_watch_changes(event_for_file("package"));
+        assert!(case.apply_changes(&created).project_sync_path().is_none());
+        Ok(())
+    }
+
+    /// The library member is outside ty's `src.include`, but its source directory is a
+    /// search path. Removing it produces deletion events for directories and their contents;
+    /// processing that batch must refresh uv metadata and report the broken dependency.
+    ///
+    /// ```text
+    /// <temp_dir>/                 # uv workspace root
+    /// |-- pyproject.toml          # members = ["project", "packages/*"]
+    /// |-- project/                # ty project root
+    /// |   |-- pyproject.toml      # depends on the workspace member "library"
+    /// |   |-- ty.toml             # includes src; adds ../packages/library/src as a search path
+    /// |   `-- src/main.py
+    /// `-- packages/library/       # deleted during the test
+    ///     |-- pyproject.toml
+    ///     `-- src/library/__init__.py
+    /// ```
+    #[test]
+    fn deleting_excluded_workspace_dependency_reports_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "../pyproject.toml",
+                    r#"
+                    [tool.uv.workspace]
+                    members = ["project", "packages/*"]
+                    "#,
+                ),
+                (
+                    "pyproject.toml",
+                    r#"
+                    [project]
+                    name = "example"
+                    version = "0.1.0"
+                    requires-python = ">=3.8"
+                    dependencies = ["library"]
+
+                    [tool.uv.sources]
+                    library = { workspace = true }
+                    "#,
+                ),
+                (
+                    "ty.toml",
+                    r#"
+                    [environment]
+                    extra-paths = ["../packages/library/src"]
+
+                    [src]
+                    include = ["src"]
+                    "#,
+                ),
+                ("src/main.py", ""),
+                (
+                    "../packages/library/pyproject.toml",
+                    r#"
+                    [project]
+                    name = "library"
+                    version = "0.1.0"
+
+                    # Use uv's bundled backend so setup works offline with an empty cache.
+                    [build-system]
+                    requires = ["uv_build"]
+                    build-backend = "uv_build"
+                    "#,
+                ),
+                ("../packages/library/src/library/__init__.py", ""),
+            ],
+        )?;
+        let library = case.root_path().join("packages/library");
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        // Although `src.include` excludes the member, its source directory is a search path,
+        // so removing it must refresh uv metadata. Use deletion because on Windows the watch
+        // on `library/src` holds a directory handle that prevents renaming `library`.
+        std::fs::remove_dir_all(&library).context("Failed to delete the workspace dependency")?;
+        let changes = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Deleted { path, .. } if path.starts_with(&library))
+        });
+        apply_changes_and_synchronize_project(&mut case, &changes)?;
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"<temp_dir>/pyproject.toml: warning[uv-metadata] Failed to load uv metadata: Failed to build `example @ file://<temp_dir>/project`"
+        );
+        Ok(())
+    }
+
+    /// Moving a missing member into the workspace clears the uv error, even when the member
+    /// is outside the paths selected by `ty check src`.
+    ///
+    /// ```text
+    /// <temp_dir>/
+    /// |-- incoming/               # moved to project/package
+    /// |   `-- pyproject.toml      # valid member manifest
+    /// `-- project/                # ty project and uv workspace root
+    ///     |-- pyproject.toml      # requires the member at package/, initially missing
+    ///     |-- .venv/
+    ///     `-- src/main.py         # src is the only path selected for checking
+    /// ```
+    #[test]
+    fn moving_missing_member_into_workspace_outside_checked_paths_clears_uv_error()
+    -> anyhow::Result<()> {
+        let mut case = setup_uv_with_system(UseUv::On, |context: &mut SetupContext| {
+            // Create the environment before declaring the member that is still missing.
+            run_uv_with_system(
+                context.system(),
+                context.project_path(),
+                &["venv", "--offline"],
+            )?;
+            context.write_project_file(
+                "pyproject.toml",
+                r#"
+                [project]
+                name = "example"
+                version = "0.1.0"
+                requires-python = ">=3.8"
+                dependencies = ["member"]
+
+                [tool.uv.sources]
+                member = { workspace = true }
+
+                [tool.uv.workspace]
+                members = ["package"]
+                "#,
+            )?;
+            context.write_project_file("src/main.py", "")?;
+            context.write_project_file(
+                "../incoming/pyproject.toml",
+                r#"
+                [project]
+                name = "member"
+                version = "0.1.0"
+
+                [tool.uv]
+                package = false
+                "#,
+            )?;
+            // Restrict checked files, as with `ty check src`, without excluding workspace members.
+            context.set_included_paths(vec![context.join_project_path("src")]);
+            Ok(())
+        })?;
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"pyproject.toml: warning[uv-metadata] Failed to load uv metadata: Failed to build `example @ file://<temp_dir>/project`"
+        );
+
+        // Move the complete member into place without editing either manifest.
+        std::fs::rename(
+            case.root_path().join("incoming"),
+            case.project_path("package"),
+        )?;
+        let created = case.take_watch_changes(event_for_file("package"));
+        apply_changes_and_synchronize_project(&mut case, &created)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    /// Moving an explicitly listed member out of the workspace reports that uv cannot load
+    /// the missing member.
+    ///
+    /// ```text
+    /// <temp_dir>/
+    /// `-- project/                # ty project and uv workspace root
+    ///     |-- pyproject.toml      # requires the member at packages/member/
+    ///     |-- .venv/
+    ///     `-- packages/member/    # moved to <temp_dir>/member
+    ///         `-- pyproject.toml  # valid member manifest
+    /// ```
+    #[test]
+    fn moving_required_member_out_reports_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "pyproject.toml",
+                    r#"
+                    [project]
+                    name = "example"
+                    version = "0.1.0"
+                    requires-python = ">=3.8"
+                    dependencies = ["member"]
+
+                    [tool.uv.sources]
+                    member = { workspace = true }
+
+                    [tool.uv.workspace]
+                    members = ["packages/member"]
+                    "#,
+                ),
+                (
+                    "packages/member/pyproject.toml",
+                    r#"
+                    [project]
+                    name = "member"
+                    version = "0.1.0"
+
+                    [tool.uv]
+                    package = false
+                    "#,
+                ),
+            ],
+        )?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        // The workspace still requires this member after its directory is moved away.
+        std::fs::rename(
+            case.project_path("packages/member"),
+            case.root_path().join("member"),
+        )?;
+        let deleted = case.take_watch_changes(event_for_file("member"));
+        apply_changes_and_synchronize_project(&mut case, &deleted)?;
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"pyproject.toml: warning[uv-metadata] Failed to load uv metadata: Failed to build `example @ file://<temp_dir>/project`"
+        );
+        Ok(())
+    }
+
     /// Creating `.python-version` refreshes workspace membership to include a newly added member.
     #[test]
     fn creating_python_version_file_refreshes_workspace_members() -> anyhow::Result<()> {
@@ -4190,6 +4481,14 @@ mod uv_metadata {
         })?;
 
         let mut settings = insta::Settings::clone_current();
+        // File URLs use forward slashes and include a slash before Windows drive letters.
+        settings.add_filter(
+            &format!(
+                "file:///?{}",
+                regex::escape(&case.root_path().as_str().replace('\\', "/"))
+            ),
+            "file://<temp_dir>",
+        );
         settings.add_filter(&regex::escape(case.root_path().as_str()), "<temp_dir>");
         settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
         settings.add_filter(r"exit code: (\d+)", "exit status: $1");
