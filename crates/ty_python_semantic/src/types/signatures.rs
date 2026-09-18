@@ -5747,18 +5747,7 @@ impl<'db> Parameter<'db> {
                 (
                     function_signature_expression_type(db, function_definition, annotation),
                     false,
-                    if matches!(
-                        &kind,
-                        ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. }
-                    ) {
-                        function_signature_type_expression_flags(
-                            db,
-                            function_definition,
-                            annotation,
-                        )
-                    } else {
-                        TypeExpressionFlags::empty()
-                    },
+                    function_signature_type_expression_flags(db, function_definition, annotation),
                     annotation.is_starred_expr(),
                 )
             } else {

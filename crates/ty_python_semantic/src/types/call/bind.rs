@@ -12,7 +12,7 @@ mod constructor;
 mod property;
 
 use std::borrow::Cow;
-use std::cell::{Cell, OnceCell, RefCell};
+use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::fmt;
 
@@ -4893,7 +4893,7 @@ struct ArgumentMatcher<'a, 'db> {
     ///
     /// This is used to prevent variadic arguments from greedily matching parameters that will be
     /// explicitly provided via keyword arguments.
-    explicit_keyword_parameters: OnceCell<FxHashSet<usize>>,
+    explicit_keyword_parameters: FxHashSet<usize>,
 }
 
 impl<'a, 'db> ArgumentMatcher<'a, 'db> {
@@ -4902,6 +4902,17 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         parameters: &'a Parameters<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
+        let explicit_keyword_parameters: FxHashSet<usize> = arguments
+            .iter()
+            .filter_map(|(argument, _)| {
+                if let Argument::Keyword(name) = argument {
+                    parameters.keyword_by_name(name).map(|(idx, _)| idx)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         Self {
             arguments,
             parameters,
@@ -4913,27 +4924,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             num_synthetic_args: 0,
             variable_length_positional_arguments: SmallVec::new(),
             variadic_argument_matched_to_variadic_parameter: false,
-            explicit_keyword_parameters: OnceCell::new(),
+            explicit_keyword_parameters,
         }
-    }
-
-    /// Whether a named argument reserves a parameter that an unpacked positional argument could
-    /// otherwise consume. Ordinary calls and fixed-length unpacks do not need this information.
-    fn has_explicit_keyword_for_parameter(&self, parameter_index: usize) -> bool {
-        self.explicit_keyword_parameters
-            .get_or_init(|| {
-                self.arguments
-                    .iter()
-                    .filter_map(|(argument, _)| match argument {
-                        Argument::Keyword(name) => self
-                            .parameters
-                            .keyword_by_name(name)
-                            .map(|(index, _)| index),
-                        _ => None,
-                    })
-                    .collect()
-            })
-            .contains(&parameter_index)
     }
 
     fn has_later_positional_input(&self, argument_index: usize) -> bool {
@@ -5256,7 +5248,10 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // positional parameter, because the shorter members would still be missing that argument.
         if has_fixed_union_tail {
             while let Some(parameter) = self.parameters.get_positional(self.next_positional) {
-                if self.has_explicit_keyword_for_parameter(self.next_positional) {
+                if self
+                    .explicit_keyword_parameters
+                    .contains(&self.next_positional)
+                {
                     break;
                 }
                 let Some(argument_type) = argument_types.next() else {
@@ -5277,7 +5272,10 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 .get_positional(self.next_positional)
                 .is_some()
             {
-                if self.has_explicit_keyword_for_parameter(self.next_positional) {
+                if self
+                    .explicit_keyword_parameters
+                    .contains(&self.next_positional)
+                {
                     break;
                 }
                 let arg_type = argument_types.next().or(variable_element);
@@ -5668,40 +5666,6 @@ impl<'db> ArgumentRelation<'db> {
                 .unwrap_or_else(|| parameter.annotated_type()),
             argument_type,
             has_starred_annotation: parameter.has_starred_annotation(),
-        }
-    }
-
-    /// Returns whether specialization inference cannot learn anything from this relation.
-    /// Ordinary argument checking still validates the types and reports mismatches.
-    fn cannot_constrain_typevars(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
-        let is_leaf = |ty| {
-            matches!(
-                ty,
-                Type::Never
-                    | Type::AlwaysFalsy
-                    | Type::AlwaysTruthy
-                    | Type::Dynamic(_)
-                    | Type::LiteralValue(_)
-                    | Type::ModuleLiteral(_)
-                    | Type::ClassLiteral(_)
-                    | Type::SpecialForm(_)
-                    | Type::DataclassDecorator(_)
-                    | Type::DataclassTransformer(_)
-                    | Type::WrapperDescriptor(_)
-            )
-        };
-
-        match (self.declared_type, self.argument_type) {
-            (formal, actual) if is_leaf(formal) => {
-                is_leaf(actual) || matches!(actual, Type::NominalInstance(_))
-            }
-            (Type::NominalInstance(formal), Type::NominalInstance(_) | Type::LiteralValue(_)) => {
-                // A nominal formal can expose type variables through either its specialization
-                // or the fields of a tuple subclass, even without a specialization of its own.
-                !formal.is_definition_generic(db) && formal.tuple_spec(db, env).is_none()
-            }
-            (Type::NominalInstance(_), actual) => is_leaf(actual),
-            _ => false,
         }
     }
 }
@@ -6602,10 +6566,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 continue;
             }
 
-            if relation.cannot_constrain_typevars(db, self.env) {
-                continue;
-            }
-
             if let Err(error) = builder.infer(relation.declared_type, relation.argument_type) {
                 self.constraint_set_errors[relation.argument_index] = true;
                 specialization_errors.push(BindingError::SpecializationError {
@@ -7216,7 +7176,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
     }
 
-    fn finish(self) -> (TypeVarSet<'db>, Option<TypeVarInference<'db>>, Type<'db>) {
+    fn check(
+        mut self,
+        constraints: &ConstraintSetBuilder<'db>,
+    ) -> (TypeVarSet<'db>, Option<TypeVarInference<'db>>, Type<'db>) {
+        // If this overload is generic, first see if we can infer a specialization of the function
+        // from the arguments that were passed in.
+        self.infer_specialization(constraints);
+        self.check_argument_types(constraints);
+
         for (parameter_ty, builder) in self
             .parameter_tys
             .iter_mut()
@@ -7395,37 +7363,11 @@ fn inferable_typevar_occurrences<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
-    generic_context: GenericContext<'db>,
-) -> usize {
-    // These cases need neither a traversal nor a cached query. Bare type variables and
-    // non-generic nominal instances are common parameter annotations on generic functions.
-    match ty {
-        Type::TypeVar(typevar) => {
-            return usize::from(generic_context.contains(db, typevar.identity(db)));
-        }
-        Type::NominalInstance(nominal) if !nominal.is_definition_generic(db) => return 0,
-        // Occurrence counting does not visit lazily-inferred types.
-        Type::TypeAlias(_) | Type::Recursive(_) => return 0,
-        _ => {}
-    }
-    if matches!(TypeKind::from(ty), TypeKind::Atomic) {
-        return 0;
-    }
-
-    inferable_typevar_occurrences_impl(db, env.program(db), ty, generic_context)
-}
-
-/// Reuses the traversal of a composite parameter annotation across calls to a generic function.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| 0)]
-fn inferable_typevar_occurrences_impl<'db>(
-    db: &'db dyn Db,
-    program: Program<'db>,
-    ty: Type<'db>,
-    generic_context: GenericContext<'db>,
+    inferable: TypeVarSet<'db>,
 ) -> usize {
     struct InferableTypeVarVisitor<'a, 'db> {
         env: &'a ProgramEnvironment<'db>,
-        generic_context: GenericContext<'db>,
+        inferable: TypeVarSet<'db>,
         count: Cell<usize>,
         stack: RefCell<SmallVec<[Type<'db>; 8]>>,
     }
@@ -7441,7 +7383,12 @@ fn inferable_typevar_occurrences_impl<'db>(
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
             if let Type::TypeVar(typevar) = ty {
-                if self.generic_context.contains(db, typevar.identity(db)) {
+                let identity = if typevar.is_paramspec(db) {
+                    typevar.without_paramspec_attr(db).identity(db)
+                } else {
+                    typevar.identity(db)
+                };
+                if identity.is_inferable(db, self.inferable) {
                     self.count.set(self.count.get() + 1);
                 }
                 return;
@@ -7461,8 +7408,8 @@ fn inferable_typevar_occurrences_impl<'db>(
     }
 
     let visitor = InferableTypeVarVisitor {
-        env: &ProgramEnvironment::from_program(program),
-        generic_context,
+        env,
+        inferable,
         count: Cell::new(0),
         stack: RefCell::default(),
     };
@@ -7570,14 +7517,8 @@ enum CachedBindingTypeError<'db> {
         provided_ty: Type<'db>,
         provenance: InvalidArgumentTypeProvenance,
     },
-    MismatchedBound {
-        bound_typevar: BoundTypeVarInstance<'db>,
-        argument: Type<'db>,
-        argument_index: Option<usize>,
-    },
-    MismatchedConstraint {
-        bound_typevar: BoundTypeVarInstance<'db>,
-        argument: Type<'db>,
+    SpecializationError {
+        error: SpecializationError<'db>,
         argument_index: Option<usize>,
     },
 }
@@ -7602,27 +7543,10 @@ impl<'db> CachedBindingTypeError<'db> {
                 provenance,
             }),
             BindingError::SpecializationError {
-                error:
-                    SpecializationError::MismatchedBound {
-                        bound_typevar,
-                        argument,
-                    },
+                error,
                 argument_index,
-            } => Some(Self::MismatchedBound {
-                bound_typevar,
-                argument,
-                argument_index,
-            }),
-            BindingError::SpecializationError {
-                error:
-                    SpecializationError::MismatchedConstraint {
-                        bound_typevar,
-                        argument,
-                    },
-                argument_index,
-            } => Some(Self::MismatchedConstraint {
-                bound_typevar,
-                argument,
+            } => Some(Self::SpecializationError {
+                error,
                 argument_index,
             }),
             _ => None,
@@ -7647,26 +7571,11 @@ impl<'db> CachedBindingTypeError<'db> {
                 provenance,
                 parameter_source: None,
             },
-            Self::MismatchedBound {
-                bound_typevar,
-                argument,
+            Self::SpecializationError {
+                error,
                 argument_index,
             } => BindingError::SpecializationError {
-                error: SpecializationError::MismatchedBound {
-                    bound_typevar,
-                    argument,
-                },
-                argument_index,
-            },
-            Self::MismatchedConstraint {
-                bound_typevar,
-                argument,
-                argument_index,
-            } => BindingError::SpecializationError {
-                error: SpecializationError::MismatchedConstraint {
-                    bound_typevar,
-                    argument,
-                },
+                error,
                 argument_index,
             },
         }
@@ -7711,7 +7620,7 @@ fn cached_binding_type_check<'db>(
         return None;
     }
 
-    let mut checker = ArgumentTypeChecker::new(
+    let checker = ArgumentTypeChecker::new(
         db,
         &env,
         signature_type,
@@ -7726,9 +7635,7 @@ fn cached_binding_type_check<'db>(
         false,
     );
     let constraints = ConstraintSetBuilder::new();
-    checker.infer_specialization(&constraints);
-    checker.check_argument_types(&constraints);
-    let (inferable_typevars, inference, return_ty) = checker.finish();
+    let (inferable_typevars, inference, return_ty) = checker.check(&constraints);
     let errors = binding
         .errors
         .into_iter()
@@ -7758,7 +7665,21 @@ fn is_cacheable_call_type<'db>(
         | Type::ModuleLiteral(_)
         | Type::ClassLiteral(_) => true,
         Type::NominalInstance(instance) => {
-            !instance.is_definition_generic(db) && instance.tuple_spec(db, env).is_none()
+            if !instance.is_definition_generic(db) {
+                return instance.tuple_spec(db, env).is_none();
+            }
+
+            instance
+                .class(db, env)
+                .into_generic_alias()
+                .is_some_and(|alias| {
+                    instance.tuple_spec(db, env).is_none()
+                        && alias
+                            .specialization(db)
+                            .types(db)
+                            .iter()
+                            .all(|ty| is_cacheable_call_type(db, env, *ty))
+                })
         }
         Type::Union(union) => union
             .elements(db)
@@ -7874,6 +7795,7 @@ impl<'db> Binding<'db> {
             return 0;
         };
 
+        let inferable_typevars = generic_context.inferable_typevars(db);
         argument
             .parameters
             .iter()
@@ -7882,7 +7804,7 @@ impl<'db> Binding<'db> {
                     db,
                     env,
                     self.signature.parameters()[parameter.index].annotated_type(),
-                    generic_context,
+                    inferable_typevars,
                 )
             })
             .sum()
@@ -8397,6 +8319,8 @@ impl<'db> Binding<'db> {
             return;
         }
 
+        // Keep cache keys small. Context-dependent or provisional types, unsupported argument
+        // shapes, and recursive queries use ordinary checking.
         if (1..=4).contains(&arguments.len())
             && !self.is_partial_application
             && self.errors.is_empty()
@@ -8427,8 +8351,18 @@ impl<'db> Binding<'db> {
                 true
             });
 
+            // An ordinary method's receiver can determine its result even without explicit arguments.
             if all_concrete
-                && argument_types.len() > synthetic_count
+                && (argument_types.len() > synthetic_count
+                    || (synthetic_count == 1
+                        && match self.signature_type {
+                            Type::BoundMethod(method) => {
+                                method.function(db).is_some_and(|function| {
+                                    !ast::helpers::is_dunder(function.name(db).as_str())
+                                })
+                            }
+                            _ => false,
+                        }))
                 && call_expression_tcx
                     .annotation
                     .is_none_or(|ty| is_cacheable_call_type(db, env, ty))
@@ -8463,7 +8397,7 @@ impl<'db> Binding<'db> {
             }
         }
 
-        let mut checker = ArgumentTypeChecker::new(
+        let checker = ArgumentTypeChecker::new(
             db,
             env,
             self.signature_type,
@@ -8478,12 +8412,7 @@ impl<'db> Binding<'db> {
             self.is_partial_application,
         );
 
-        // If this overload is generic, first see if we can infer a specialization of the function
-        // from the arguments that were passed in.
-        checker.infer_specialization(constraints);
-        checker.check_argument_types(constraints);
-
-        (self.inferable_typevars, self.inference, self.return_ty) = checker.finish();
+        (self.inferable_typevars, self.inference, self.return_ty) = checker.check(constraints);
     }
 
     fn check_keyword_unpack_key_types(
@@ -10539,6 +10468,18 @@ mod tests {
     use crate::types::constraints::resolution::SolutionType::Resolved;
     use crate::types::generics::TypeVarInferenceSolutions;
 
+    fn executed_type_check(db: &mut TestDb, context: &str) -> anyhow::Result<salsa::Id> {
+        let events = db.take_salsa_events();
+        let Some(salsa::Event {
+            kind: salsa::EventKind::WillExecute { database_key },
+            ..
+        }) = find_will_execute_event_by_name(db, "cached_binding_type_check", None, &events)
+        else {
+            anyhow::bail!("{context}");
+        };
+        Ok(database_key.key_index())
+    }
+
     #[test]
     fn fixed_type_checks_reuse_equal_arguments() -> anyhow::Result<()> {
         fn call(db: &TestDb, argument: &str, keyword: Option<&str>) -> anyhow::Result<bool> {
@@ -10579,15 +10520,7 @@ mod tests {
         db.clear_salsa_events();
 
         assert!(!call(&db, "bad", None)?);
-        let events = db.take_salsa_events();
-        let Some(salsa::Event {
-            kind: salsa::EventKind::WillExecute { database_key },
-            ..
-        }) = find_will_execute_event_by_name(&db, "cached_binding_type_check", None, &events)
-        else {
-            anyhow::bail!("the first positional type check should execute");
-        };
-        let first = database_key.key_index();
+        let first = executed_type_check(&mut db, "the first positional type check should execute")?;
 
         assert!(!call(&db, "bad", None)?);
         let events = db.take_salsa_events();
@@ -10599,26 +10532,17 @@ mod tests {
         );
 
         assert!(!call(&db, "different", None)?);
-        let events = db.take_salsa_events();
-        let Some(salsa::Event {
-            kind: salsa::EventKind::WillExecute { database_key },
-            ..
-        }) = find_will_execute_event_by_name(&db, "cached_binding_type_check", None, &events)
-        else {
-            anyhow::bail!("a different positional type should execute a new check");
-        };
-        assert_ne!(first, database_key.key_index());
+        assert_ne!(
+            first,
+            executed_type_check(
+                &mut db,
+                "a different positional type should execute a new check"
+            )?
+        );
 
         assert!(!call(&db, "bad", Some("value"))?);
-        let events = db.take_salsa_events();
-        let Some(salsa::Event {
-            kind: salsa::EventKind::WillExecute { database_key },
-            ..
-        }) = find_will_execute_event_by_name(&db, "cached_binding_type_check", None, &events)
-        else {
-            anyhow::bail!("a keyword argument should execute a new check");
-        };
-        let keyword = database_key.key_index();
+        let keyword =
+            executed_type_check(&mut db, "a keyword argument should execute a new check")?;
         assert_ne!(first, keyword);
 
         assert!(!call(&db, "bad", Some("value"))?);
@@ -10631,15 +10555,99 @@ mod tests {
         );
 
         assert!(!call(&db, "bad", Some("other"))?);
+        assert_ne!(
+            keyword,
+            executed_type_check(&mut db, "a different keyword should execute a new check")?
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn receiver_only_type_checks_reuse_ordinary_methods() -> anyhow::Result<()> {
+        fn call(db: &TestDb, name: &str) -> anyhow::Result<bool> {
+            let env = db.program_environment();
+            let file = system_path_to_file(db, "/src/a.py")?;
+            let file = ProgramFile::new(db, file, env.program(db));
+            let callable = global_symbol(db, file, name).place.expect_type();
+            assert!(matches!(callable, Type::BoundMethod(_)));
+            let arguments = CallArguments::none();
+            let constraints = ConstraintSetBuilder::new();
+            Ok(callable
+                .bindings(db, &env)
+                .match_parameters(db, &env, &arguments)
+                .check_types(
+                    db,
+                    &env,
+                    &constraints,
+                    &arguments,
+                    TypeContext::default(),
+                    &[],
+                )
+                .is_ok())
+        }
+
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            class Plain:
+                def read(self) -> int: return 0
+                def __len__(self) -> int: return 0
+
+            class Box[T]:
+                def read(self) -> T: raise NotImplementedError
+
+            plain = Plain()
+            box = Box[int]()
+            read = plain.read
+            dunder = plain.__len__
+            generic_read = box.read
+            "#,
+        )?;
+        {
+            let env = db.program_environment();
+            let file = system_path_to_file(&db, "/src/a.py")?;
+            let file = ProgramFile::new(&db, file, env.program(&db));
+            for name in ["read", "dunder", "generic_read"] {
+                global_symbol(&db, file, name).place.expect_type();
+            }
+        }
+        db.clear_salsa_events();
+
+        assert!(call(&db, "read")?);
+        let query = executed_type_check(
+            &mut db,
+            "the receiver-only ordinary method should execute the cache query",
+        )?;
+
+        assert!(call(&db, "read")?);
         let events = db.take_salsa_events();
-        let Some(salsa::Event {
-            kind: salsa::EventKind::WillExecute { database_key },
-            ..
-        }) = find_will_execute_event_by_name(&db, "cached_binding_type_check", None, &events)
-        else {
-            anyhow::bail!("a different keyword should execute a new check");
-        };
-        assert_ne!(keyword, database_key.key_index());
+        assert_function_query_was_not_run_by_name(
+            &db,
+            "cached_binding_type_check",
+            Some(query),
+            &events,
+        );
+
+        assert!(call(&db, "generic_read")?);
+        let generic_query = executed_type_check(
+            &mut db,
+            "the specialized method receiver should execute a new cache query",
+        )?;
+        assert_ne!(query, generic_query);
+
+        assert!(call(&db, "generic_read")?);
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run_by_name(
+            &db,
+            "cached_binding_type_check",
+            Some(generic_query),
+            &events,
+        );
+
+        assert!(call(&db, "dunder")?);
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run_by_name(&db, "cached_binding_type_check", None, &events);
         Ok(())
     }
 

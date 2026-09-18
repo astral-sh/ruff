@@ -2099,6 +2099,22 @@ mixed(text="bad", number="bad")  # error: [invalid-argument-type]
 mixed("bad", text="bad")  # error: [invalid-argument-type]
 ```
 
+The element type of a list is checked on every call, whether the list is passed positionally or by
+keyword. Repeating an invalid call reports each argument separately.
+
+```py
+def accepts_ints(values: list[int]) -> int:
+    return len(values)
+
+def check_lists(texts: list[str], numbers: list[int]) -> None:
+    accepts_ints(texts)  # error: [invalid-argument-type]
+    accepts_ints(texts)  # error: [invalid-argument-type]
+    accepts_ints(values=texts)  # error: [invalid-argument-type]
+    accepts_ints(values=texts)  # error: [invalid-argument-type]
+    reveal_type(accepts_ints(numbers))  # revealed: int
+    reveal_type(accepts_ints(values=numbers))  # revealed: int
+```
+
 Repeating a keyword remains a syntax error at each call, even when both arguments have valid types.
 
 ```py

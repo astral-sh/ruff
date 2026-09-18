@@ -1765,12 +1765,12 @@ impl PendingReachability {
         }
     }
 
-    fn materialize_reachability(
+    fn materialize_reachability<'a>(
         &self,
-        pending: &mut PendingPlaceState,
+        pending: &'a mut PendingPlaceState,
         target: PendingReachabilityId,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) {
+    ) -> &'a mut PlaceState {
         if pending.reachability != target {
             let mut unapplied = SmallVec::<[ScopedReachabilityConstraintId; 4]>::new();
             let mut current = target;
@@ -1790,12 +1790,15 @@ impl PendingReachability {
             }
             pending.reachability = target;
         }
+
+        Rc::make_mut(&mut pending.state)
     }
 
     /// Returns the materialized place state for immutable access.
     ///
-    /// Call this instead of [`Self::materialize`] when the state will only be read. Once pending
-    /// reachability is applied, this preserves the shared [`Rc`] unless narrowing also changes it.
+    /// Call this instead of [`Self::materialize`] when the state will only be read. If the pending
+    /// constraints are already materialized, this preserves the shared [`Rc`] instead of making
+    /// the state uniquely owned.
     fn materialize_ref<'a>(
         &self,
         pending: &'a mut PendingPlaceState,
@@ -1803,8 +1806,14 @@ impl PendingReachability {
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) -> &'a PlaceState {
-        self.materialize_reachability(pending, target, reachability_constraints);
-        self.materialize_narrowing(pending, target, narrowing_constraints);
+        if pending.reachability != target || pending.narrowing != target {
+            self.materialize(
+                pending,
+                target,
+                narrowing_constraints,
+                reachability_constraints,
+            );
+        }
         &pending.state
     }
 
@@ -3471,67 +3480,5 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         interned_ids_by_snapshot
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn reading_pending_place_states_preserves_unchanged_snapshots() {
-        let mut pending = PendingReachability::default();
-        let mut reachability = ReachabilityConstraintsBuilder::default();
-        let mut narrowing = NarrowingConstraintsBuilder::default();
-        let root = pending.current;
-        let snapshot = PendingPlaceState::new(
-            PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE),
-            root,
-        );
-        let mut at_use = snapshot.clone();
-
-        pending.materialize_ref_at_use(&mut at_use, pending.current, &mut reachability);
-        assert!(Rc::ptr_eq(&at_use.state, &snapshot.state));
-
-        pending.materialize_ref(
-            &mut at_use,
-            pending.current,
-            &mut narrowing,
-            &mut reachability,
-        );
-        assert!(Rc::ptr_eq(&at_use.state, &snapshot.state));
-        assert_eq!(at_use.reachability, pending.current);
-        assert_eq!(at_use.narrowing, pending.current);
-
-        pending.push(
-            ScopedReachabilityConstraintId::ALWAYS_TRUE,
-            ScopedNarrowingConstraint::ALWAYS_FALSE,
-        );
-        pending.materialize_ref_at_use(&mut at_use, pending.current, &mut reachability);
-        assert_eq!(at_use.reachability, pending.current);
-        assert_eq!(at_use.narrowing, root);
-
-        let applied_reachability = at_use.state.clone();
-        pending.materialize_ref_at_use(&mut at_use, pending.current, &mut reachability);
-        assert!(Rc::ptr_eq(&at_use.state, &applied_reachability));
-
-        pending.materialize_ref(
-            &mut at_use,
-            pending.current,
-            &mut narrowing,
-            &mut reachability,
-        );
-        assert!(!Rc::ptr_eq(&at_use.state, &applied_reachability));
-        assert_eq!(at_use.narrowing, pending.current);
-
-        let mut unreachable = snapshot.clone();
-        pending.push(
-            ScopedReachabilityConstraintId::ALWAYS_FALSE,
-            ScopedNarrowingConstraint::ALWAYS_TRUE,
-        );
-        pending.materialize_ref_at_use(&mut unreachable, pending.current, &mut reachability);
-        assert!(!Rc::ptr_eq(&unreachable.state, &snapshot.state));
-        assert_eq!(unreachable.reachability, pending.current);
-        assert_eq!(unreachable.narrowing, root);
     }
 }

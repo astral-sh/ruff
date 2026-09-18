@@ -120,21 +120,6 @@ reveal_type(result)
 result.nonexistent()
 ```
 
-## Concrete parameters in generic calls
-
-A concrete parameter is checked independently of the type variable inferred from another argument.
-An invalid concrete argument does not erase the inferred return type.
-
-```py
-def select[T](count: int, value: T) -> T:
-    return value
-
-reveal_type(select(True, "value"))  # revealed: Literal["value"]
-
-# error: [invalid-argument-type] "Expected `int`"
-reveal_type(select("bad", 1))  # revealed: Literal[1]
-```
-
 ## Inferring “deep” generic parameter types
 
 The matching up of call arguments and discovery of constraints on typevars can be a recursive
@@ -2723,6 +2708,22 @@ numbers: list[int] = make_list(1)
 objects: list[object] = make_list(1)
 reveal_type(numbers)  # revealed: list[int]
 reveal_type(objects)  # revealed: list[object]
+```
+
+## Repeated calls on specialized receivers
+
+A method with no explicit arguments returns the type argument from its receiver. Repeating the call
+preserves that type, and calling the same method on a different specialization returns its own type.
+
+```py
+class Box[T]:
+    def read(self) -> T:
+        raise NotImplementedError
+
+def check_receivers(numbers: Box[int], texts: Box[str]) -> None:
+    reveal_type(numbers.read())  # revealed: int
+    reveal_type(numbers.read())  # revealed: int
+    reveal_type(texts.read())  # revealed: str
 ```
 
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md

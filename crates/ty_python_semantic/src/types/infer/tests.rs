@@ -6,7 +6,6 @@ use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::lint::{LintSource, RuleSelection};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
-use crate::types::list_members::unique_end_of_scope_members;
 use crate::types::{KnownClass, KnownInstanceType, check_types};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
@@ -1071,50 +1070,6 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
         x_ty_2.display(&db, &db.program_environment()).to_string(),
         "bool"
     );
-
-    Ok(())
-}
-
-#[test]
-fn cached_override_members_follow_dependency_type_changes() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    db.write_files([
-        (
-            "/src/parent.py",
-            "from fields import payload\nclass Parent:\n    attribute = payload",
-        ),
-        ("/src/fields.py", "payload: int = 0"),
-    ])?;
-
-    let attribute = |db: &TestDb| {
-        let file = system_path_to_file(db, "/src/parent.py").expect("file to exist");
-        let file = program_file(db, file);
-        let index = semantic_index(db, file);
-        let (class_scope, _) = index
-            .child_scopes(FileScopeId::global())
-            .next()
-            .expect("class scope to exist");
-        let member = unique_end_of_scope_members(db, class_scope.to_scope_id(db, file))
-            .find(|member| member.member.name == "attribute")
-            .expect("class attribute to exist");
-        (
-            member
-                .member
-                .ty
-                .display(db, &db.program_environment())
-                .to_string(),
-            member.first_reachable_definition.as_id(),
-        )
-    };
-
-    let (ty, definition) = attribute(&db);
-    assert_eq!(ty, "int");
-
-    db.write_file("/src/fields.py", "payload: str = ''")?;
-    assert_eq!(attribute(&db), ("str".to_owned(), definition));
-
-    db.write_file("/src/fields.py", "payload: int = 0")?;
-    assert_eq!(attribute(&db), ("int".to_owned(), definition));
 
     Ok(())
 }

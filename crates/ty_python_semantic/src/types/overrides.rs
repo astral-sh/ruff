@@ -37,7 +37,7 @@ use crate::{
         enums::{EnumMetadata, enum_metadata, is_enum_class_by_inheritance},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
         list_members::{
-            Member, MemberWithDefinition, extract_underlying_functions, unique_end_of_scope_members,
+            Member, MemberWithDefinition, all_end_of_scope_members, extract_underlying_functions,
         },
         signatures::CallableSignature,
         tuple::Tuple,
@@ -83,15 +83,10 @@ pub(super) fn check_class<'db>(
     }
 
     let scope = class.body_scope(db);
-    let own_class_members = unique_end_of_scope_members(db, scope);
+    let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
     let class_specialized = class.identity_specialization(db);
     if configuration.check_method_liskov_violations() && !inconsistent_generic_bases {
-        check_inherited_method_conflicts(
-            context,
-            class,
-            class_specialized,
-            own_class_members.clone(),
-        );
+        check_inherited_method_conflicts(context, class, class_specialized, &own_class_members);
     }
     let enum_info = enum_metadata(db, class.into());
 
@@ -120,6 +115,10 @@ pub(super) fn check_class<'db>(
         }
     }
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each class member is checked independently"
+    )]
     for member in own_class_members {
         check_class_declaration(
             context,
@@ -155,17 +154,13 @@ fn check_inherited_method_conflicts<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
     class_specialized: ClassType<'db>,
-    own_class_members: impl Iterator<Item = MemberWithDefinition<'db>>,
+    own_class_members: &FxHashSet<MemberWithDefinition<'db>>,
 ) {
     let db = context.db();
-    let explicit_bases = class.explicit_bases(db);
-    if explicit_bases.len() < 2 {
-        return;
-    }
     let env = &context.program_environment();
 
     let mut direct_bases = Vec::new();
-    for base in explicit_bases {
+    for base in class.explicit_bases(db) {
         match ClassBase::try_from_explicit_base(db, env, *base, Some(class.into())) {
             Some(ClassBase::Class(base)) if base.static_class_literal(db).is_some() => {
                 direct_bases.push(base);
@@ -207,7 +202,10 @@ fn check_inherited_method_conflicts<'db>(
         }
     }
     let receiver = Type::instance(db, env, class_specialized);
-    let mut seen_names: FxHashSet<_> = own_class_members.map(|member| member.member.name).collect();
+    let mut seen_names: FxHashSet<_> = own_class_members
+        .iter()
+        .map(|member| member.member.name.clone())
+        .collect();
 
     for (index, owner) in mro.iter().copied().enumerate() {
         if first_dynamic_base.is_some_and(|dynamic_index| index >= dynamic_index) {
@@ -232,7 +230,13 @@ fn check_inherited_method_conflicts<'db>(
         //
         // class Conflict(Ordered, AcceptsObject): ...
         // ```
-        'members: for member in unique_end_of_scope_members(db, scope) {
+        let members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
+
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "each class member is checked independently"
+        )]
+        'members: for member in members {
             let name = &member.member.name;
             if is_mangled_private(name.as_str())
                 || is_constructor_like_method(name.as_str())

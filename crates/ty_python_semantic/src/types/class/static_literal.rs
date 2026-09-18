@@ -1517,9 +1517,8 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         // Check if this class is dataclass-like (either via @dataclass or via dataclass_transform)
-        if matches!(name, "__dataclass_fields__" | "__dataclass_params__")
-            && CodeGeneratorKind::from_static_class(db, self)
-                .is_some_and(CodeGeneratorKind::is_dataclass_like)
+        if CodeGeneratorKind::from_class(db, self.into())
+            .is_some_and(CodeGeneratorKind::is_dataclass_like)
         {
             if name == "__dataclass_fields__" {
                 // Make this class look like a subclass of the `DataClassInstance` protocol
@@ -1542,23 +1541,21 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        // Only a class with `NamedTuple` as a direct base can introduce named-tuple fields.
-        if self.has_explicit_bases(db)
-            && self
-                .explicit_bases(db)
-                .contains(&Type::SpecialForm(SpecialFormType::NamedTuple))
-            && CodeGeneratorKind::NamedTuple.matches(db, self.into())
-            && let Some(field) = self
+        if CodeGeneratorKind::NamedTuple.matches(db, self.into()) {
+            if let Some(field) = self
                 .own_fields(db, specialization, CodeGeneratorKind::NamedTuple)
                 .get(name)
-        {
-            let property_getter_signature = Signature::new(
-                Parameters::standard([Parameter::positional_only(Some(Name::new_static("self")))]),
-                field.declared_ty,
-            );
-            let property_getter = Type::single_callable(db, property_getter_signature);
-            let property = PropertyInstanceType::new(db, Some(property_getter), None, None);
-            return Member::definitely_declared(Type::PropertyInstance(property));
+            {
+                let property_getter_signature = Signature::new(
+                    Parameters::standard([Parameter::positional_only(Some(Name::new_static(
+                        "self",
+                    )))]),
+                    field.declared_ty,
+                );
+                let property_getter = Type::single_callable(db, property_getter_signature);
+                let property = PropertyInstanceType::new(db, Some(property_getter), None, None);
+                return Member::definitely_declared(Type::PropertyInstance(property));
+            }
         }
 
         let body_scope = self.body_scope(db);
@@ -1683,8 +1680,8 @@ impl<'db> StaticClassLiteral<'db> {
         // Only synthesize methods that are not already defined in the MRO.
         // Note: We use direct scope lookups here to avoid infinite recursion
         // through `own_class_member` -> `own_synthesized_member`.
-        if matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__")
-            && self.total_ordering(db)
+        if self.total_ordering(db)
+            && matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__")
             && !self
                 .iter_mro(db, specialization)
                 .filter_map(ClassBase::into_class)
@@ -1735,21 +1732,19 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let field_policy = CodeGeneratorKind::from_class(db, self.into())?;
-        let instance_ty = || {
-            Type::instance(
-                db,
-                env,
-                self.apply_optional_specialization(db, specialization),
-            )
-        };
+        let pydantic_constructor_fields_are_keyword_only =
+            field_policy.is_pydantic() && pydantic::constructor_fields_are_keyword_only(db, self);
+        let pydantic_constructor_fields_are_optional = name == "__init__"
+            && field_policy.is_pydantic()
+            && pydantic::constructor_fields_are_optional(db, self);
+
+        let instance_ty = Type::instance(
+            db,
+            env,
+            self.apply_optional_specialization(db, specialization),
+        );
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Type<'db>| {
-            let pydantic_constructor_fields_are_keyword_only = field_policy.is_pydantic()
-                && pydantic::constructor_fields_are_keyword_only(db, self);
-            let pydantic_constructor_fields_are_optional = name == "__init__"
-                && field_policy.is_pydantic()
-                && pydantic::constructor_fields_are_optional(db, self);
-
             if name == "__init__" && field_policy.is_pydantic() {
                 pydantic::extend_settings_constructor_parameters(db, self, &mut parameters);
             }
@@ -1976,7 +1971,7 @@ impl<'db> StaticClassLiteral<'db> {
 
                 let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
                     // TODO: could be `Self`.
-                    .with_annotated_type(instance_ty());
+                    .with_annotated_type(instance_ty);
                 signature_from_fields(vec![self_parameter], Type::none(db, env))
             }
             (
@@ -1996,7 +1991,7 @@ impl<'db> StaticClassLiteral<'db> {
                             db,
                             env,
                             &TypeMapping::ReplaceSelf {
-                                new_upper_bound: instance_ty(),
+                                new_upper_bound: instance_ty,
                             },
                             TypeContext::default(),
                         )
@@ -2023,7 +2018,7 @@ impl<'db> StaticClassLiteral<'db> {
                     db,
                     env,
                     name,
-                    instance_ty(),
+                    instance_ty,
                     fields_iter,
                     specialization.map(|s| s.generic_context(db)),
                 )
@@ -2036,7 +2031,6 @@ impl<'db> StaticClassLiteral<'db> {
                     return None;
                 }
 
-                let instance_ty = instance_ty();
                 let signature = Signature::new(
                     Parameters::standard([
                         Parameter::positional_or_keyword(Name::new_static("self"))
@@ -2062,7 +2056,7 @@ impl<'db> StaticClassLiteral<'db> {
                         Parameters::standard([Parameter::positional_or_keyword(Name::new_static(
                             "self",
                         ))
-                        .with_annotated_type(instance_ty())]),
+                        .with_annotated_type(instance_ty)]),
                         KnownClass::Int.to_instance(db, env),
                     );
 
@@ -2127,7 +2121,6 @@ impl<'db> StaticClassLiteral<'db> {
                 CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Pydantic(_),
                 "__replace__",
             ) if env.python_version(db) >= PythonVersion::PY313 => {
-                let instance_ty = instance_ty();
                 let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
                     .with_annotated_type(instance_ty);
 
@@ -2138,7 +2131,7 @@ impl<'db> StaticClassLiteral<'db> {
                     let signature = Signature::new(
                         Parameters::standard([
                             Parameter::positional_or_keyword(Name::new_static("self"))
-                                .with_annotated_type(instance_ty()),
+                                .with_annotated_type(instance_ty),
                             Parameter::positional_or_keyword(Name::new_static("name")),
                             Parameter::positional_or_keyword(Name::new_static("value")),
                         ]),
@@ -2155,7 +2148,7 @@ impl<'db> StaticClassLiteral<'db> {
                 let signature = Signature::new(
                     Parameters::standard([
                         Parameter::positional_or_keyword(Name::new_static("self"))
-                            .with_annotated_type(instance_ty()),
+                            .with_annotated_type(instance_ty),
                         Parameter::positional_or_keyword(Name::new_static("name")),
                     ]),
                     Type::Never,
@@ -2184,7 +2177,7 @@ impl<'db> StaticClassLiteral<'db> {
             (CodeGeneratorKind::TypedDict, name) => synthesize_typed_dict_method(
                 db,
                 env,
-                instance_ty()
+                instance_ty
                     .as_typed_dict()
                     .expect("TypedDict code generation should use a TypedDict instance"),
                 name,
