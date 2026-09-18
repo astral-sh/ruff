@@ -6,6 +6,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -66,7 +67,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// [PIE800]: https://docs.astral.sh/ruff/rules/unnecessary-spread/
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Complexity)]
 pub(crate) struct UnnecessaryLiteralUnpacking {
     kind: SequenceKind,
 }
