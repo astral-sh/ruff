@@ -4949,8 +4949,9 @@ class F:
 reveal_type(F().x)  # revealed: tuple[Divergent, ...]
 ```
 
-A homogeneous tuple of `Divergent` has gradual length, so it is assignable to a fixed-length tuple.
-This allows a recursively inferred instance attribute to retain an empty tuple as its class default:
+An unannotated empty tuple used as a class default is promoted to `tuple[Unknown, ...]`. If the
+instance attribute is also inferred recursively, its type includes both the default and the
+recursive branch:
 
 ```py
 class G:
@@ -4959,7 +4960,7 @@ class G:
     def f(self):
         self.x = tuple(self.x)
 
-reveal_type(G().x)  # revealed: tuple[Divergent, ...]
+reveal_type(G().x)  # revealed: tuple[Unknown, ...] | tuple[Divergent, ...]
 ```
 
 ## Attributes of standard library modules that aren't yet defined
