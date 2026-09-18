@@ -217,7 +217,8 @@ fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitS
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
         commands::format_stdin::format_stdin(&cli, &config_arguments, &pyproject_config)
     } else {
-        commands::format::format(cli, &config_arguments, &pyproject_config)
+        let mut writer = output_writer(cli.output_file.as_deref())?;
+        commands::format::format(cli, &config_arguments, &pyproject_config, &mut *writer)
     }
 }
 
@@ -234,6 +235,24 @@ fn server(args: ServerCommand) -> Result<ExitStatus> {
     commands::server::run_server(args.resolve_preview())
 }
 
+/// Returns the writer for the `--output-file` option, or a buffered `stdout` writer if no
+/// output file was given.
+///
+/// Missing parent directories of the output file are created, and colored output is disabled
+/// because the file is unlikely to be viewed in a terminal.
+fn output_writer(output_file: Option<&Path>) -> Result<Box<dyn Write>> {
+    let Some(path) = output_file else {
+        return Ok(Box::new(BufWriter::new(io::stdout())));
+    };
+
+    colored::control::set_override(false);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let file = File::create(path)?;
+    Ok(Box::new(BufWriter::new(file)))
+}
+
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
     let (cli, config_arguments) = args.partition(global_options)?;
 
@@ -241,17 +260,10 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     // files are present, or files are injected from outside of the hierarchy.
     let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
 
-    let mut writer: Box<dyn Write> = match cli.output_file {
-        Some(path) if !cli.watch => {
-            colored::control::set_override(false);
-            if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-            let file = File::create(path)?;
-            Box::new(BufWriter::new(file))
-        }
-        _ => Box::new(BufWriter::new(io::stdout())),
-    };
+    // `--output-file` is ignored in watch mode, which clears the screen and re-renders the
+    // diagnostics on every file change.
+    let output_file = cli.output_file.as_deref().filter(|_| !cli.watch);
+    let mut writer = output_writer(output_file)?;
     let stderr_writer = Box::new(BufWriter::new(io::stderr()));
 
     let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());

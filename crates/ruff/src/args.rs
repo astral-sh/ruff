@@ -623,6 +623,10 @@ pub struct FormatCommand {
     /// The default serialization format is "full".
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
     output_format: Option<OutputFormat>,
+
+    /// Specify file to write the formatter output to (default: stdout).
+    #[arg(short, long, env = "RUFF_OUTPUT_FILE")]
+    output_file: Option<PathBuf>,
 }
 
 #[derive(Copy, Clone, Debug, clap::Parser)]
@@ -860,6 +864,7 @@ impl FormatCommand {
             stdin_filename: self.stdin_filename,
             range: self.range,
             exit_non_zero_on_format: self.exit_non_zero_on_format,
+            output_file: self.output_file,
         };
 
         let cli_overrides = ExplicitConfigOverrides {
@@ -1159,6 +1164,7 @@ pub struct FormatArguments {
     pub stdin_filename: Option<PathBuf>,
     pub range: Option<FormatRange>,
     pub exit_non_zero_on_format: bool,
+    pub output_file: Option<PathBuf>,
 }
 
 /// A text range specified by line and column numbers.
