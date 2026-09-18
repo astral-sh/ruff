@@ -1189,7 +1189,7 @@ fn method_override_types<'db>(
             if matches!(
                 subclass_method.func(db),
                 Type::FunctionLiteral(_) | Type::Callable(_)
-            ) && let Some(superclass_signature) = superclass_method.function_signatures(db) =>
+            ) && let Some(superclass_signature) = superclass_method.unbound_signatures(db) =>
         {
             let explicit_receiver = match superclass_signature.overloads.as_slice() {
                 [signature] => signature

@@ -2310,7 +2310,7 @@ impl<'db> Bindings<'db> {
                                     }
 
                                     Type::BoundMethod(bound_method) => bound_method
-                                        .function_signatures(db)
+                                        .unbound_signatures(db)
                                         .and_then(signature_generic_context),
 
                                     Type::Callable(callable) => {

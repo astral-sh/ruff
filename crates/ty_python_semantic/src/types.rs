@@ -6561,7 +6561,7 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                let Some(signature) = bound_method.function_signatures(db) else {
+                let Some(signature) = bound_method.unbound_signatures(db) else {
                     return bound_method
                         .func(db)
                         .try_upcast_to_callable(db, env)

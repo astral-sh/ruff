@@ -50,8 +50,6 @@ pub enum BoundMethodReceiver<'db> {
 
 impl<'db> BoundMethodReceiver<'db> {
     fn constrained(receiver: Type<'db>, constraint: Type<'db>) -> Self {
-        // Specialization can make the captured receiver equal to its constraint. Use the
-        // same representation as direct binding so equivalent bound methods stay identical.
         if receiver == constraint {
             Self::Instance(receiver)
         } else {
@@ -130,13 +128,9 @@ impl<'db> BoundMethodType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        // A bound method retains its function identity even when its receiver is promoted.
-        let func = match self.func(db) {
-            Type::FunctionLiteral(function) => Type::FunctionLiteral(
-                function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            ),
-            func => func.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-        };
+        let func = self
+            .func(db)
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
         Self::new_internal(
             db,
             func,
@@ -180,12 +174,10 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    /// The unbound signatures of an actual or synthesized function, or `None` for other payloads.
-    /// Use [`Self::callables`] to resolve the bound call interface of other wrapped callables.
-    pub(crate) fn function_signatures(
-        self,
-        db: &'db dyn Db,
-    ) -> Option<&'db CallableSignature<'db>> {
+    /// The unbound signatures stored directly on an actual or synthesized function.
+    /// Note that this function returns `None` for unions or intersections
+    /// of callables. These need to be handled by the caller.
+    pub(crate) fn unbound_signatures(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
         match self.func(db) {
             Type::FunctionLiteral(function) => Some(function.signature(db)),
             Type::Callable(callable) => Some(callable.signatures(db)),
@@ -202,7 +194,7 @@ impl<'db> BoundMethodType<'db> {
         // Extracting a classmethod's `__func__` removes its descriptor behavior, but its
         // `type[Self]` receiver annotation still relates `Self` to an instance of the class.
         let has_class_self_receiver = is_class_method
-            || self.function_signatures(db).is_some_and(|signatures| {
+            || self.unbound_signatures(db).is_some_and(|signatures| {
                 signatures
                     .overloads
                     .iter()
@@ -287,7 +279,7 @@ impl<'db> BoundMethodType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
-        let signatures = self.function_signatures(db)?;
+        let signatures = self.unbound_signatures(db)?;
         let env = ProgramEnvironment::from_program(self.program(db));
         let typing_self_type = self.typing_self_type(db);
         let receiver_type = self.signature_receiver(db);
@@ -311,7 +303,7 @@ impl<'db> BoundMethodType<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Option<CallableType<'db>> {
-        let signatures = self.function_signatures(db)?;
+        let signatures = self.unbound_signatures(db)?;
         Some(self.callable_with_signatures(
             db,
             Self::bound_signatures_with_receiver(

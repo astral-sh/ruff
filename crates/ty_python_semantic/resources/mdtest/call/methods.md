@@ -1202,7 +1202,7 @@ def narrowed_bound_method_attribute():
 python-version = "3.12"
 ```
 
-We treat the result of a callable-returning decorator as a function descriptor, this means that
+We treat the result of a callable-returning decorator as a function descriptor. This means that
 `C().decorated_method` is also a `BoundMethod`, and that we can access its `__self__` and `__func__`
 attributes.
 
