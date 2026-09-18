@@ -3,11 +3,11 @@ use ruff_python_ast::Stmt;
 use ruff_python_ast::identifier::Identifier;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::preview::is_pyi048_fix_enabled;
 use crate::rules::flake8_pie::rules::Placeholder;
 use crate::{Applicability, Fix, FixAvailability, Violation};
-use crate::codes::Category;
 
 /// ## What it does
 /// Checks for functions in stub (`.pyi`) files that contain multiple
