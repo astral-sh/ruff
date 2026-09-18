@@ -882,6 +882,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::TarfileUnsafeMembers) {
                 flake8_bandit::rules::tarfile_unsafe_members(checker, call);
             }
+            if checker.is_rule_enabled(Rule::TarfileIgnoreZerosTrue) {
+                flake8_bandit::rules::tarfile_ignore_zeros_true(checker, call);
+            }
             if checker.is_rule_enabled(Rule::UnnecessaryGeneratorList) {
                 flake8_comprehensions::rules::unnecessary_generator_list(checker, call);
             }

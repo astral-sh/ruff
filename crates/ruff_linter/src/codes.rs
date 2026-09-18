@@ -813,6 +813,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Bandit, "113") => rules::flake8_bandit::rules::RequestWithoutTimeout,
         (Flake8Bandit, "201") => rules::flake8_bandit::rules::FlaskDebugTrue,
         (Flake8Bandit, "202") => rules::flake8_bandit::rules::TarfileUnsafeMembers,
+        (Flake8Bandit, "203") => rules::flake8_bandit::rules::TarfileIgnoreZerosTrue,
         (Flake8Bandit, "301") => rules::flake8_bandit::rules::SuspiciousPickleUsage,
         (Flake8Bandit, "302") => rules::flake8_bandit::rules::SuspiciousMarshalUsage,
         (Flake8Bandit, "303") => rules::flake8_bandit::rules::SuspiciousInsecureHashUsage,
