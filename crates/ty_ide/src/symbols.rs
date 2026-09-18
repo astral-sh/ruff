@@ -419,12 +419,10 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: ProgramFile<'_>) -
     let mut visitor = SymbolVisitor::globals(db, file);
     visitor.visit_body(&module.syntax().body);
 
-    if source_file
-        .path(db)
-        .as_system_path()
-        .is_none_or(|path| !db.project().is_file_included(db, path).is_included())
-    {
-        // Eagerly clear ASTs of third party files.
+    if !db.is_open_file(source_file) {
+        // Auto-imports scan every module. Release ASTs of closed files as we go,
+        // so the next database update doesn't have to drop them all at once.
+        // Keep open files' ASTs for subsequent editor requests.
         parsed.clear();
     }
     visitor.into_flat_symbols()
@@ -1672,6 +1670,7 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ty_project::{ProjectMetadata, TestDb};
     use ty_python_core::ProgramFile;
+    use ty_python_semantic::Db as _;
 
     use super::symbols_for_file_global_only;
 
@@ -3275,6 +3274,31 @@ class C: ...
         let (_, c) = &syms[1];
         assert_eq!(&*c.name, "C");
         assert!(foo.deprecated);
+    }
+
+    #[test]
+    fn exports_from_a_closed_module_remain_accurate_after_edits() {
+        let mut test = PublicTestBuilder::default()
+            .source("test.py", "from provider import *")
+            .source("provider.py", "class Before: pass")
+            .build();
+        let provider = system_path_to_file(&test.db, "provider.py").expect("Provider exists");
+
+        assert!(!test.db.is_open_file(provider));
+        assert_eq!(
+            test.exports(),
+            "Before :: Class :: Re-exported from `provider`"
+        );
+
+        test.db
+            .write_file("provider.py", "class After: pass")
+            .expect("Edit closed provider");
+
+        assert!(!test.db.is_open_file(provider));
+        assert_eq!(
+            test.exports(),
+            "After :: Class :: Re-exported from `provider`"
+        );
     }
 
     fn matches(query: &str, symbol: &str) -> bool {
