@@ -548,6 +548,15 @@ impl<'db> UnfoldResult<'db> {
         }
     }
 
+    /// Return whether unfolding made no progress or the unfolded type satisfies `predicate`.
+    #[inline]
+    pub(crate) fn is_unchanged_or(self, predicate: impl FnOnce(Type<'db>) -> bool) -> bool {
+        match self {
+            Self::Unfolded(ty) => predicate(ty),
+            Self::Unchanged(_) => true,
+        }
+    }
+
     /// Transform the unfolded type, preserving the original recursive type if unfolding made no progress.
     #[inline]
     pub(crate) fn map(self, operation: impl FnOnce(Type<'db>) -> Type<'db>) -> Type<'db> {
