@@ -522,6 +522,7 @@ impl<'db> UnfoldResult<'db> {
     ///
     /// Callers that recursively process the returned type must use their own recursion guards.
     /// Unfolding one layer does not eliminate cycles, even when it makes progress.
+    #[inline]
     pub fn into_type(self) -> Type<'db> {
         match self {
             Self::Unfolded(ty) => ty,
@@ -530,6 +531,7 @@ impl<'db> UnfoldResult<'db> {
     }
 
     /// Return the unfolded type only if it differs from the original recursive type.
+    #[inline]
     pub(crate) fn into_unfolded(self) -> Option<Type<'db>> {
         match self {
             Self::Unfolded(ty) => Some(ty),
@@ -538,6 +540,7 @@ impl<'db> UnfoldResult<'db> {
     }
 
     /// Return whether unfolding made progress and the unfolded type satisfies `predicate`.
+    #[inline]
     pub(crate) fn is_unfolded_and(self, predicate: impl FnOnce(Type<'db>) -> bool) -> bool {
         match self {
             Self::Unfolded(ty) => predicate(ty),
@@ -546,6 +549,7 @@ impl<'db> UnfoldResult<'db> {
     }
 
     /// Transform the unfolded type, preserving the original recursive type if unfolding made no progress.
+    #[inline]
     pub(crate) fn map(self, operation: impl FnOnce(Type<'db>) -> Type<'db>) -> Type<'db> {
         match self {
             Self::Unfolded(ty) => operation(ty),
@@ -554,6 +558,7 @@ impl<'db> UnfoldResult<'db> {
     }
 
     /// Apply `operation` to the unfolded type, or call `fallback` if unfolding made no progress.
+    #[inline]
     pub(crate) fn map_or_else<T>(
         self,
         fallback: impl FnOnce() -> T,
@@ -566,6 +571,7 @@ impl<'db> UnfoldResult<'db> {
     }
 
     /// Apply `operation` to the unfolded type, or return `fallback` if unfolding made no progress.
+    #[inline]
     pub(crate) fn map_or<T>(self, fallback: T, operation: impl FnOnce(Type<'db>) -> T) -> T {
         match self {
             Self::Unfolded(ty) => operation(ty),
