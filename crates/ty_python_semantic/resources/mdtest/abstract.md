@@ -404,11 +404,12 @@ class Abstract(ABC):
     @abstractmethod
     def value(self, value: int) -> None: ...
 
+# no diagnostic: the abstract property is implemented by the slot
 @final
 class Concrete(Abstract):
     __slots__ = ("value",)
 
-Concrete()
+Concrete()  # no diagnostic
 ```
 
 ## Slots and abstract properties in the MRO
@@ -430,7 +431,7 @@ class SlotMixin:
 class Concrete(SlotMixin, Abstract): ...
 class StillAbstract(Abstract, SlotMixin): ...
 
-Concrete()
+Concrete()  # no diagnostic
 StillAbstract()  # error: [call-non-callable]
 ```
 
@@ -460,7 +461,7 @@ class Abstract(ABC):
 class Concrete(Abstract):
     value: int
 
-Concrete(1)
+Concrete(1)  # no diagnostic
 ```
 
 ## Methods in stub files
