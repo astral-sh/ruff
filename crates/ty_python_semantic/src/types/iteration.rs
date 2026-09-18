@@ -6,7 +6,7 @@ use crate::types::{
     UnionType,
     call::CallErrorKind,
     context::InferContext,
-    diagnostic::{ASYNC_GENERATOR_STUB_HELP, NOT_ITERABLE},
+    diagnostic::NOT_ITERABLE,
     todo_type,
     tuple::{TupleSpec, TupleSpecBuilder},
 };
@@ -14,6 +14,9 @@ use compact_str::ToCompactString;
 use ruff_python_ast as ast;
 use std::borrow::Cow;
 use ty_python_core::EvaluationMode;
+
+pub(super) const ASYNC_GENERATOR_STUB_HELP: &str = "To declare an async generator in a stub, use `def` instead of `async def`, \
+     or add a `yield` expression to the body";
 
 /// Extract the element types from an expression with a statically known fixed-length iteration.
 ///

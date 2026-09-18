@@ -9,8 +9,8 @@ use ruff_python_ast::name::Name;
 use ty_python_core::semantic_index;
 
 use crate::types::context::LintDiagnosticGuard;
-use crate::types::diagnostic::ASYNC_GENERATOR_STUB_HELP;
 use crate::types::infer::nearest_enclosing_class;
+use crate::types::iteration::ASYNC_GENERATOR_STUB_HELP;
 use crate::types::tuple::TupleLength;
 use crate::types::{DisplaySettings, Type, TypedDictType};
 use crate::{FxOrderSet, ProgramEnvironment};
