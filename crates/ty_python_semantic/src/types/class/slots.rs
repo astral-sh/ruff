@@ -220,7 +220,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Returns whether a binding for this name reaches the end of the class body.
-    pub(super) fn has_own_class_binding(self, db: &'db dyn Db, name: &str) -> bool {
+    fn has_own_class_binding(self, db: &'db dyn Db, name: &str) -> bool {
         let scope = self.body_scope(db);
         place_table(db, scope)
             .symbol_id(name)
