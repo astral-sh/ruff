@@ -87,7 +87,7 @@ use super::variance::{VarianceInferable, VarianceOrigin};
 use super::visitor::{TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard};
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, GenericContext,
-    MaterializationKind, Type, TypeContext, TypeMapping, UnionType, VarianceTerm,
+    MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, UnionType, VarianceTerm,
 };
 use crate::{Db, FxIndexSet, Program, ProgramEnvironment};
 
@@ -1274,6 +1274,13 @@ impl<'db> TypeVisitor<'db> for SolutionReferences<'_, 'db> {
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         walk_type_with_recursion_guard(db, ty, self, &self.seen);
+    }
+
+    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        // The display includes the arguments, not the alias's body.
+        if let Some(arguments) = alias.specialization(db) {
+            walk_specialization_types(db, arguments, self);
+        }
     }
 
     fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {

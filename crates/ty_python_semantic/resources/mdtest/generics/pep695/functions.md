@@ -2774,6 +2774,30 @@ def fixed_cycle[A, B, C, D](
 reveal_type(fixed_cycle(identity, identity, identity, identity))
 ```
 
+## Mutually recursive callback solutions through explicit aliases
+
+An alias can name each child of a recursive tuple. The display preserves the alias and names each
+recursive type once, so repeated children refer to the same type without repeating its definition.
+
+```py
+from typing import Callable
+
+type Alias[T] = T
+
+def identity[T](value: T) -> T:
+    return value
+
+def fixed[A, B, C](
+    first: Callable[[A], tuple[int, Alias[B], Alias[B]]],
+    second: Callable[[B], tuple[str, Alias[C], Alias[C]]],
+    third: Callable[[C], tuple[bytes, Alias[A], Alias[A]]],
+) -> A:
+    raise NotImplementedError
+
+# revealed: μ{$0; $1 = tuple[str, Alias[$2], Alias[$2]]; $2 = tuple[bytes, Alias[$0], Alias[$0]]}. tuple[int, Alias[$1], Alias[$1]]
+reveal_type(fixed(identity, identity, identity))
+```
+
 ## Recursive callback solutions with intersections
 
 A recursive tuple contains either a string or another such tuple, excluding integers from its child
