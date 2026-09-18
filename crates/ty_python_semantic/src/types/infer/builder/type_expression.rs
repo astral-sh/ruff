@@ -3372,6 +3372,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// invalid scope does not also make `Callable[P, R]` or `tuple[*Ts]` appear malformed.
     fn check_type_variable_scope(&self, expression: &ast::Expr, ty: Type<'db>) -> Type<'db> {
         let db = self.db();
+        if let Type::TypeVar(typevar) = ty
+            && !typevar.typevar(db).is_self(db)
+            && self
+                .inference_flags()
+                .contains(InferenceFlags::IN_INIT_RECEIVER_ANNOTATION)
+            && let Some(owner) = typevar.binding_context(db).definition()
+            && matches!(owner.kind(db), DefinitionKind::Class(_))
+        {
+            self.report_invalid_type_expression(
+                expression,
+                format_args!(
+                    "`__init__` receiver cannot use class-scoped type variable `{}`",
+                    typevar.name(db)
+                ),
+            );
+        }
+
         // Legacy aliases introduce independent type parameters. PEP 695 aliases can instead
         // capture their enclosing class's parameters.
         if let Type::TypeVar(typevar) = ty
