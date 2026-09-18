@@ -32,7 +32,9 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// Outside of [preview], only a body made up of a single statement is flagged. A longer body
 /// is left to [`stub-body-multiple-statements` (`PYI048`)][PYI048], which has no fix and isn't
 /// scoped to specifically handle non-empty statements. When preview is enabled, every statement in
-/// the body is flagged on its own, however many the body holds:
+/// the body that isn't `...`, `pass`, or a docstring is fixed, however many the body holds, and
+/// they are all reported as a single diagnostic spanning from the first such statement to the
+/// last:
 ///
 /// ```pyi
 /// def double(x: int) -> int:
@@ -55,6 +57,9 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// Deleting a statement deletes the line it sits on, so a comment trailing that statement
 /// goes with it. The fix is marked unsafe only in that case: replacing a
 /// statement with `...` keeps the trailing comment and stays safe.
+///
+/// When several statements are offending, they are all covered by a single diagnostic and
+/// fixed together, rather than being reported one by one.
 ///
 /// ## References
 /// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.python.org/en/latest/guides/writing_stubs.html)
@@ -79,19 +84,26 @@ impl AlwaysFixableViolation for NonEmptyStubBody {
     fn fix_title(&self) -> String {
         match self.fix_kind {
             FixKind::Replace => "Replace function body with `...`".to_string(),
-            FixKind::Remove => "Remove statement from function body".to_string(),
+            FixKind::Remove => "Remove statements from function body".to_string(),
+            FixKind::ReplaceAndRemove => {
+                "Replace and remove statements in function body".to_string()
+            }
         }
     }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum FixKind {
-    /// The statement is replaced by `...`, because nothing else in the body would
-    /// be left behind to stand in for it.
+    /// The single offending statement is replaced by `...`, because nothing else in the
+    /// body would be left behind to stand in for it.
     Replace,
-    /// The statement is deleted, because the body retains another statement (a
-    /// `pass`, a `...`, or a docstring).
+    /// Every offending statement is deleted, because the body retains another statement
+    /// (a `pass`, a `...`, or a docstring) that stands in for them.
     Remove,
+    /// The body has no surviving statement, so the first offending statement is replaced
+    /// by `...` and every other offending statement is removed, since the first one's
+    /// `...` already keeps the body non-empty.
+    ReplaceAndRemove,
 }
 
 /// PYI010
@@ -110,6 +122,14 @@ pub(crate) fn non_empty_stub_body(checker: &Checker, body: &[Stmt]) {
         .enumerate()
         .any(|(index, stmt)| is_permitted_stub_stmt(stmt, index == 0));
 
+    // All offending statements are collected before reporting, so that they can be covered
+    // by a single diagnostic and a single fix instead of one of each per statement.
+    let mut offending_range: Option<TextRange> = None;
+    let mut edits = Vec::new();
+    let mut has_replace = false;
+    let mut has_remove = false;
+    let mut removes_trailing_comment = false;
+
     for (index, stmt) in body.iter().enumerate() {
         if is_permitted_stub_stmt(stmt, index == 0) {
             continue;
@@ -117,52 +137,73 @@ pub(crate) fn non_empty_stub_body(checker: &Checker, body: &[Stmt]) {
 
         let previous = body[..index].last();
 
-        let fix_kind = if has_surviving_stmt {
-            FixKind::Remove
+        let edit = if has_surviving_stmt {
+            has_remove = true;
+
+            match previous {
+                // A statement that shares a line with the statement before it is separated
+                // from it by a semicolon, as in `def f(): x = 1; print(x)`. Delete back to
+                // the end of that statement so that the semicolon goes too, rather than
+                // leaving the stray `def f(): x = 1; ` that deleting the statement alone
+                // would produce.
+                Some(previous) if has_leading_content(stmt.start(), checker.source()) => {
+                    Edit::deletion(previous.end(), stmt.end())
+                }
+
+                // Passing `None` as the parent is safe here: `has_surviving_stmt` guarantees
+                // that this statement is not the only one in the body, so deleting it cannot
+                // leave behind an empty block.
+                _ => delete_stmt(stmt, None, checker.locator(), checker.indexer()),
+            }
         } else {
             has_surviving_stmt = true;
-            FixKind::Replace
-        };
-
-        let edit = match fix_kind {
-            FixKind::Replace => Edit::range_replacement("...".to_string(), stmt.range()),
-
-            // A statement that shares a line with the statement before it is separated from
-            // it by a semicolon, as in `def f(): x = 1; print(x)`. Delete back to the end of
-            // that statement so that the semicolon goes too, rather than leaving the stray
-            // `def f(): x = 1; ` that deleting the statement alone would produce.
-            FixKind::Remove
-                if let Some(previous) = previous
-                    && has_leading_content(stmt.start(), checker.source()) =>
-            {
-                Edit::deletion(previous.end(), stmt.end())
-            }
-
-            // Passing `None` as the parent is safe here: `has_surviving_stmt` guarantees
-            // that this statement is not the only one in the body, so deleting it cannot
-            // leave behind an empty block.
-            FixKind::Remove => delete_stmt(stmt, None, checker.locator(), checker.indexer()),
+            has_replace = true;
+            Edit::range_replacement("...".to_string(), stmt.range())
         };
 
         // Deleting a statement deletes the lines it sits on, which
         // takes a comment trailing the statement with it. A comment within the statement's
         // own range describes the statement and is meant to go with it, but one after the
         // statement ends may be about something else, so losing it makes the fix unsafe.
-        let removes_trailing_comment = edit.end() > stmt.end()
+        if edit.end() > stmt.end()
             && checker
                 .comment_ranges()
-                .intersects(TextRange::new(stmt.end(), edit.end()));
+                .intersects(TextRange::new(stmt.end(), edit.end()))
+        {
+            removes_trailing_comment = true;
+        }
 
-        let mut diagnostic = checker.report_diagnostic(NonEmptyStubBody { fix_kind }, stmt.range());
-        diagnostic.set_fix(Fix::applicable_edit(
-            edit,
-            if removes_trailing_comment {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
-            },
-        ));
+        offending_range = Some(match offending_range {
+            Some(range) => TextRange::new(range.start(), stmt.end()),
+            None => stmt.range(),
+        });
+        edits.push(edit);
     }
+
+    let Some(offending_range) = offending_range else {
+        return;
+    };
+    let mut edits_iter = edits.into_iter();
+    let Some(first_edit) = edits_iter.next() else {
+        return;
+    };
+
+    let fix_kind = match (has_replace, has_remove) {
+        (true, true) => FixKind::ReplaceAndRemove,
+        (true, false) => FixKind::Replace,
+        (false, _) => FixKind::Remove,
+    };
+
+    let mut diagnostic = checker.report_diagnostic(NonEmptyStubBody { fix_kind }, offending_range);
+    diagnostic.set_fix(Fix::applicable_edits(
+        first_edit,
+        edits_iter,
+        if removes_trailing_comment {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        },
+    ));
 }
 
 /// Returns `true` if the statement is one that a stub body may keep: `...`, `pass`, or a

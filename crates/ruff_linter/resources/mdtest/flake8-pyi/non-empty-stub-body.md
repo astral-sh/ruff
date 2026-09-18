@@ -7,10 +7,7 @@ select = ["PYI010"]
 
 ## Bodies that are already empty
 
-`...` is the form a stub body should take, so it is never flagged. `pass` and docstrings are owned
-by `pass-statement-stub-body` (`PYI009`) and `docstring-in-stub` (`PYI021`), and a body that piles
-several of these up is owned by `stub-body-multiple-statements` (`PYI048`) and
-`unnecessary-placeholder` (`PIE790`), so this rule leaves all of them to those rules.
+`...` is the form a stub body should take, so it is never flagged. `pass` and docstrings are owned by `pass-statement-stub-body` (`PYI009`) and `docstring-in-stub` (`PYI021`), and a body that piles several of these up is owned by `stub-body-multiple-statements` (`PYI048`) and `unnecessary-placeholder` (`PIE790`), so this rule leaves all of them to those rules.
 
 ```pyi
 def ellipsis(): ...
@@ -66,8 +63,7 @@ def double(x: int) -> int:
 
 ## Bodies with multiple statements
 
-Outside of preview, a body holding more than one statement is left to
-`stub-body-multiple-statements` (`PYI048`).
+Outside of preview, a body holding more than one statement is left to `stub-body-multiple-statements` (`PYI048`).
 
 ```pyi
 def double(x: int) -> int:
@@ -77,8 +73,7 @@ def double(x: int) -> int:
 
 ## Preview: every statement in the body
 
-In preview, each statement that is not `...`, `pass`, or a docstring is flagged on its own, however
-many of them the body holds.
+In preview, every statement in the body that is not `...`, `pass`, or a docstring is fixed, however many of them the body holds. They are covered by a single diagnostic, spanning from the first such statement to the last.
 
 ```toml
 [lint]
@@ -88,14 +83,12 @@ select = ["PYI010"]
 
 ### Several statements to remove
 
-The first statement is replaced with `...` so that the body does not become empty, and the rest are
-removed outright.
+The first statement is replaced with `...` so that the body does not become empty, and the rest are removed outright.
 
 ```pyi
 def double(x: int) -> int:
     # snapshot: non-empty-stub-body
     doubled = x * 2
-    # snapshot: non-empty-stub-body
     return doubled
 ```
 
@@ -103,26 +96,15 @@ def double(x: int) -> int:
 error[PYI010]: Function body must contain only `...`
  --> src/mdtest_snippet.pyi:3:5
   |
-3 |     doubled = x * 2
-  |     ^^^^^^^^^^^^^^^
-help: Replace function body with `...`
+3 | /     doubled = x * 2
+4 | |     return doubled
+  | |__________________^
+help: Replace and remove statements in function body
   |
 2 |     # snapshot: non-empty-stub-body
   -     doubled = x * 2
-3 +     ...
-4 |     # snapshot: non-empty-stub-body
-  |
-
-
-error[PYI010]: Function body must contain only `...`
- --> src/mdtest_snippet.pyi:5:5
-  |
-5 |     return doubled
-  |     ^^^^^^^^^^^^^^
-help: Remove statement from function body
-  |
-4 |     # snapshot: non-empty-stub-body
   -     return doubled
+3 +     ...
   |
 ```
 
@@ -135,14 +117,12 @@ def branching(x: int) -> int:
     # error: [non-empty-stub-body]
     if x:
         x += 1
-    # error: [non-empty-stub-body]
     return x
 ```
 
 ### Statements the fix keeps
 
-When the body already holds a `...`, a `pass`, or a docstring, that statement stands in for the
-removed ones, so nothing has to be replaced with `...`.
+When the body already holds a `...`, a `pass`, or a docstring, that statement stands in for the removed ones, so nothing has to be replaced with `...`. In `around_ellipsis`, the two offending statements are still reported as a single diagnostic, one that spans the `...` sitting between them.
 
 ```pyi
 def after_docstring():
@@ -159,51 +139,35 @@ def around_ellipsis():
     # error: [non-empty-stub-body]
     print("side effect")
     ...
-    # error: [non-empty-stub-body]
     print("side effect")
 ```
 
 ### Several statements on one line
 
-Statements separated by semicolons are flagged individually, and the fix rewrites the line in place.
+Statements separated by semicolons are covered by one diagnostic, and the fix rewrites the line in place.
 
 ```pyi
-# snapshot: non-empty-stub-body
 # snapshot: non-empty-stub-body
 def semicolons(): x = 123; print("side effect")
 ```
 
 ```snapshot
 error[PYI010]: Function body must contain only `...`
- --> src/mdtest_snippet.pyi:3:19
+ --> src/mdtest_snippet.pyi:2:19
   |
-3 | def semicolons(): x = 123; print("side effect")
-  |                   ^^^^^^^
-help: Replace function body with `...`
+2 | def semicolons(): x = 123; print("side effect")
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Replace and remove statements in function body
   |
-2 | # snapshot: non-empty-stub-body
+1 | # snapshot: non-empty-stub-body
   - def semicolons(): x = 123; print("side effect")
-3 + def semicolons(): ...; print("side effect")
-  |
-
-
-error[PYI010]: Function body must contain only `...`
- --> src/mdtest_snippet.pyi:3:28
-  |
-3 | def semicolons(): x = 123; print("side effect")
-  |                            ^^^^^^^^^^^^^^^^^^^^
-help: Remove statement from function body
-  |
-2 | # snapshot: non-empty-stub-body
-  - def semicolons(): x = 123; print("side effect")
-3 + def semicolons(): x = 123
+2 + def semicolons(): ...
   |
 ```
 
 ### A semicolon after the statement being removed
 
-When the statement being removed opens the body, the semicolon that separates it from the next
-statement goes with it, so the statement standing in for it is all that is left on the line.
+When the statement being removed opens the body, the semicolon that separates it from the next statement goes with it, so the statement standing in for it is all that is left on the line.
 
 ```pyi
 # snapshot: non-empty-stub-body
@@ -216,7 +180,7 @@ error[PYI010]: Function body must contain only `...`
   |
 2 | def leading_semicolon(): x = 123; pass
   |                          ^^^^^^^
-help: Remove statement from function body
+help: Remove statements from function body
   |
 1 | # snapshot: non-empty-stub-body
   - def leading_semicolon(): x = 123; pass
@@ -226,8 +190,7 @@ help: Remove statement from function body
 
 ### Strings that are not the docstring
 
-Only the statement that opens the body is a docstring. A second string is dead weight, so it is
-flagged and removed like any other statement.
+Only the statement that opens the body is a docstring. A second string is dead weight, so it is flagged and removed like any other statement.
 
 ```pyi
 def two_strings():
@@ -238,15 +201,12 @@ def two_strings():
 
 ### Trailing comments make the fix unsafe
 
-Deleting a statement deletes the line it sits on, so a comment trailing that statement goes with it
-and the fix is unsafe. Replacing a statement with `...` leaves the rest of the line alone, so the
-trailing comment survives and that fix stays safe.
+Deleting a statement deletes the line it sits on, so a comment trailing that statement goes with it and the fix is unsafe. Replacing a statement with `...` leaves the rest of the line alone, so the trailing comment survives and that fix stays safe.
 
 ```pyi
 def trailing(x: int) -> int:
     # snapshot: non-empty-stub-body
     doubled = x * 2  # keeps this
-    # snapshot: non-empty-stub-body
     return doubled  # loses this
 
 def multiline(x: int) -> int:
@@ -260,40 +220,29 @@ def multiline(x: int) -> int:
 error[PYI010]: Function body must contain only `...`
  --> src/mdtest_snippet.pyi:3:5
   |
-3 |     doubled = x * 2  # keeps this
-  |     ^^^^^^^^^^^^^^^
-help: Replace function body with `...`
+3 | /     doubled = x * 2  # keeps this
+4 | |     return doubled  # loses this
+  | |__________________^
+help: Replace and remove statements in function body
   |
 2 |     # snapshot: non-empty-stub-body
   -     doubled = x * 2  # keeps this
-3 +     ...  # keeps this
-4 |     # snapshot: non-empty-stub-body
-  |
-
-
-error[PYI010]: Function body must contain only `...`
- --> src/mdtest_snippet.pyi:5:5
-  |
-5 |     return doubled  # loses this
-  |     ^^^^^^^^^^^^^^
-help: Remove statement from function body
-  |
-4 |     # snapshot: non-empty-stub-body
   -     return doubled  # loses this
-5 |
+3 +     ...  # keeps this
+4 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
 
 error[PYI010]: Function body must contain only `...`
-  --> src/mdtest_snippet.pyi:10:5
+  --> src/mdtest_snippet.pyi:9:5
    |
-10 | /     if x:
-11 | |         x += 1  # loses this
+ 9 | /     if x:
+10 | |         x += 1  # loses this
    | |______________^
-help: Remove statement from function body
+help: Remove statements from function body
   |
-9 |     # snapshot: non-empty-stub-body
+8 |     # snapshot: non-empty-stub-body
   -     if x:
   -         x += 1  # loses this
   |
@@ -302,9 +251,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ### Comments inside and around removed statements
 
-A comment nested inside a removed statement describes that statement, so it goes with it. A comment
-on its own line is kept, because it may just as well be about the function or a surrounding
-statement as about the one being removed.
+A comment nested inside a removed statement describes that statement, so it goes with it. A comment on its own line is kept, because it may just as well be about the function or a surrounding statement as about the one being removed.
 
 ```pyi
 def commented(x: int) -> int:
@@ -314,7 +261,6 @@ def commented(x: int) -> int:
         # nested note
         x += 1
     # Explains the return.
-    # snapshot: non-empty-stub-body
     return x
 ```
 
@@ -325,8 +271,10 @@ error[PYI010]: Function body must contain only `...`
 4 | /     if x:  # why
 5 | |         # nested note
 6 | |         x += 1
-  | |______________^
-help: Replace function body with `...`
+7 | |     # Explains the return.
+8 | |     return x
+  | |____________^
+help: Replace and remove statements in function body
   |
 3 |     # snapshot: non-empty-stub-body
   -     if x:  # why
@@ -334,17 +282,6 @@ help: Replace function body with `...`
   -         x += 1
 4 +     ...
 5 |     # Explains the return.
-  |
-
-
-error[PYI010]: Function body must contain only `...`
- --> src/mdtest_snippet.pyi:9:5
-  |
-9 |     return x
-  |     ^^^^^^^^
-help: Remove statement from function body
-  |
-8 |     # snapshot: non-empty-stub-body
   -     return x
   |
 ```
