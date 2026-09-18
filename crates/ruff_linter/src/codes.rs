@@ -1,7 +1,7 @@
 /// In this module we generate [`Rule`], an enum of all rules, and [`RuleCodePrefix`], an enum of
 /// all linter groups. A linter group is something like `pyflakes` or `flake8-todos`. Each linter
 /// group contains all rules and their common prefixes, i.e. everything you can specify in
-/// `--select`. For `pylint` this is e.g. `C0414` and `E0118` but also `C` and `E01`.
+/// `--select`. For `pylint` this is e.g. `C0414` and `E0118` but also `C` and  `E01`.
 ///
 /// When [`crate::preview::is_rule_categories_enabled`] returns `true`, rules can also be selected by
 /// their [`Category`].
