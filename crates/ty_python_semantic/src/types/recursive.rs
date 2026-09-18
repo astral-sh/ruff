@@ -688,17 +688,67 @@ impl<'db> RecursiveType<'db> {
         })
     }
 
-    /// Closes the equations `variable = body`, whose bodies refer to each other's variables,
-    /// into recursive types. Returns `None` if some reference is not guarded by a type
-    /// constructor, as in `T = T | int`: unfolding it would never reach a type to inspect.
+    /// Solves the equations `variable = body`, whose bodies refer to each other's variables, by
+    /// closing them into recursive types. Returns `None` if some reference is not guarded by a
+    /// type constructor and cannot be eliminated, as in `T = T & tuple[T]`: unfolding it would
+    /// never reach a type to inspect.
     pub(super) fn from_equations(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         equations: &[(BoundTypeVarInstance<'db>, Type<'db>)],
     ) -> Option<Vec<Type<'db>>> {
-        let bodies = Self::inline_unguarded_references(db, env, equations)?;
-        let variables: Vec<_> = equations.iter().map(|(variable, _)| *variable).collect();
+        let UnguardedReferences { bodies, equal_to } =
+            Self::inline_unguarded_references(db, env, equations)?;
 
+        // Refer to variables that are equal by a single one of them, and solve for that one.
+        let is_retained = |entry: &usize| equal_to[*entry] == *entry;
+        let renamed: Vec<_> = (0..equations.len())
+            .filter(|entry| !is_retained(entry))
+            .collect();
+        let bodies = if renamed.is_empty() {
+            bodies
+        } else {
+            let context = GenericContext::from_typevar_instances(
+                db,
+                env,
+                renamed.iter().map(|entry| equations[*entry].0),
+            );
+            let names: Vec<_> = renamed
+                .iter()
+                .map(|entry| Type::TypeVar(equations[equal_to[*entry]].0))
+                .collect();
+            let renaming = TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
+                generic_context: context,
+                types: &names,
+                skip: None,
+            });
+            bodies
+                .iter()
+                .map(|body| body.apply_type_mapping(db, env, &renaming, TypeContext::default()))
+                .collect()
+        };
+        let retained: Vec<_> = (0..equations.len()).filter(is_retained).collect();
+        let variables: Vec<_> = retained.iter().map(|entry| equations[*entry].0).collect();
+        let bodies: Vec<_> = retained.iter().map(|entry| bodies[*entry]).collect();
+
+        let solution = Self::close_least_unrolled(db, env, &variables, &bodies)?;
+        (0..equations.len())
+            .map(|entry| {
+                let position = retained
+                    .iter()
+                    .position(|other| *other == equal_to[entry])?;
+                Some(solution[position])
+            })
+            .collect()
+    }
+
+    /// Closes `variables[i] = bodies[i]`, preferring the solution without unrolled bounds.
+    fn close_least_unrolled(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        variables: &[BoundTypeVarInstance<'db>],
+        bodies: &[Type<'db>],
+    ) -> Option<Vec<Type<'db>>> {
         // The bounds of a variable include those that transitivity derives by replacing other
         // variables with their own bounds: `A ≤ tuple[B]` and `B ≤ list[A]` also give
         // `A ≤ tuple[list[A]]`. Each of them denotes the same solution, so the least unrolled
@@ -706,14 +756,14 @@ impl<'db> RecursiveType<'db> {
         // Bounds that differ in any other way fail the verification of the smaller solution.
         let least_unrolled: Vec<_> = bodies
             .iter()
-            .map(|body| body.least_unrolled(db, env, &variables))
+            .map(|body| body.least_unrolled(db, env, variables))
             .collect();
         if least_unrolled != bodies
-            && let Some(solution) = Self::close(db, env, &variables, &least_unrolled, &bodies)
+            && let Some(solution) = Self::close(db, env, variables, &least_unrolled, bodies)
         {
             return Some(solution);
         }
-        Self::close(db, env, &variables, &bodies, &bodies)
+        Self::close(db, env, variables, bodies, bodies)
     }
 
     /// Closes `variables[i] = bodies[i]` into recursive types, and returns them if they solve
@@ -735,10 +785,17 @@ impl<'db> RecursiveType<'db> {
             types: &entries,
             skip: None,
         });
-        let closed = bodies
+        let closed: Vec<_> = bodies
             .iter()
-            .map(|body| body.apply_type_mapping(db, env, &substitution, TypeContext::default()));
-        let solution: Vec<_> = Self::bind_solution(db, env, placeholders, closed).collect();
+            .map(|body| body.apply_type_mapping(db, env, &substitution, TypeContext::default()))
+            .collect();
+        // Eliminating unguarded references can leave no reference to bind: `T = U | int`,
+        // `U = T` has the solution `T = U = int`.
+        if closed == bodies {
+            return Some(closed);
+        }
+        let solution: Vec<_> =
+            Self::bind_solution(db, env, placeholders, closed.into_iter()).collect();
         // An alias can still expose one of its arguments without a constructor.
         if solution
             .iter()
@@ -772,49 +829,114 @@ impl<'db> RecursiveType<'db> {
 
     /// Replaces each variable that a body exposes outside a type constructor, as `U` in
     /// `T = U | int`, with the body of its equation. Every remaining reference is then guarded.
-    /// Returns `None` if such references form a cycle, or pass through a type alias.
+    ///
+    /// Variables that expose each other, as in `T = U | int`, `U = T | str`, contain each other
+    /// and are therefore equal. The least type that solves their equations is the union of what
+    /// each of them contains besides the others: `T = U = int | str`.
+    ///
+    /// Returns `None` if an unguarded reference passes through a type alias, if variables
+    /// expose each other anywhere but in a union, or if they contain nothing else, as in
+    /// `T = U`, `U = T`, which every type solves.
     fn inline_unguarded_references(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         equations: &[(BoundTypeVarInstance<'db>, Type<'db>)],
-    ) -> Option<Vec<Type<'db>>> {
-        fn inline<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            equations: &[(BoundTypeVarInstance<'db>, Type<'db>)],
-            bodies: &mut [Option<Type<'db>>],
-            active: &mut Vec<usize>,
-            entry: usize,
-        ) -> Option<Type<'db>> {
-            if let Some(body) = bodies[entry] {
-                return Some(body);
-            }
-            if active.contains(&entry) {
-                return None;
-            }
-            active.push(entry);
-            let body = equations[entry].1;
-            let exposed = body.unguarded_typevars(db);
-            let mut replacements = Vec::new();
-            for variable in exposed {
-                let position = equations
+    ) -> Option<UnguardedReferences<'db>> {
+        let count = equations.len();
+        // The equations whose variables each body exposes.
+        let exposed: Vec<Vec<usize>> = equations
+            .iter()
+            .map(|(_, body)| {
+                body.unguarded_typevars(db)
                     .iter()
-                    .position(|(other, _)| other.is_same_typevar_as(db, variable));
-                if let Some(position) = position {
-                    let replacement = inline(db, env, equations, bodies, active, position)?;
-                    replacements.push((variable, replacement));
-                }
-            }
-            active.pop();
-            let body = body.replace_unguarded_typevars(db, env, &replacements)?;
-            bodies[entry] = Some(body);
-            Some(body)
+                    .filter_map(|variable| {
+                        equations
+                            .iter()
+                            .position(|(other, _)| other.is_same_typevar_as(db, *variable))
+                    })
+                    .collect()
+            })
+            .collect();
+        let mut references = UnguardedReferences {
+            bodies: equations.iter().map(|(_, body)| *body).collect(),
+            equal_to: (0..count).collect(),
+        };
+        if exposed.iter().all(Vec::is_empty) {
+            return Some(references);
         }
 
-        let mut bodies = vec![None; equations.len()];
-        (0..equations.len())
-            .map(|entry| inline(db, env, equations, &mut bodies, &mut Vec::new(), entry))
-            .collect()
+        // Whether following exposed variables leads from one equation to another. There are
+        // only as many equations as mutually dependent type variables in one call.
+        let mut reaches = vec![vec![false; count]; count];
+        for (from, exposed) in exposed.iter().enumerate() {
+            for to in exposed {
+                reaches[from][*to] = true;
+            }
+        }
+        for through in 0..count {
+            for from in 0..count {
+                for to in 0..count {
+                    reaches[from][to] |= reaches[from][through] && reaches[through][to];
+                }
+            }
+        }
+        let exposing_each_other = |entry: usize| -> Vec<usize> {
+            (0..count)
+                .filter(|other| {
+                    *other == entry || (reaches[entry][*other] && reaches[*other][entry])
+                })
+                .collect()
+        };
+
+        // Solve each group of variables once everything else that it exposes is solved. Such a
+        // group always exists, since the groups do not expose each other mutually.
+        let mut is_solved = vec![false; count];
+        while let Some(group) = (0..count)
+            .filter(|entry| !is_solved[*entry])
+            .map(exposing_each_other)
+            .find(|group| {
+                group.iter().all(|member| {
+                    exposed[*member]
+                        .iter()
+                        .all(|other| is_solved[*other] || group.contains(other))
+                })
+            })
+        {
+            let contents: Option<Vec<_>> = group
+                .iter()
+                .map(|member| {
+                    let replacements: Vec<_> = exposed[*member]
+                        .iter()
+                        .map(|other| {
+                            let replacement =
+                                (!group.contains(other)).then(|| references.bodies[*other]);
+                            (equations[*other].0, replacement)
+                        })
+                        .collect();
+                    equations[*member]
+                        .1
+                        .replace_unguarded_typevars(db, env, &replacements)
+                })
+                .collect();
+            let contents = contents?;
+            let first = *group.first()?;
+            if reaches[first][first] {
+                let body = UnionType::from_elements(db, env, contents);
+                if body.is_never() {
+                    return None;
+                }
+                for member in &group {
+                    references.bodies[*member] = body;
+                    references.equal_to[*member] = first;
+                }
+            } else {
+                references.bodies[first] = *contents.first()?;
+            }
+            for member in group {
+                is_solved[member] = true;
+            }
+        }
+        Some(references)
     }
 
     /// This solution, followed by every other recursive solution that its unfolding refers to,
@@ -1124,6 +1246,14 @@ impl<'db> VarianceInferable<'db> for RecursiveType<'db> {
     ) -> VarianceTerm<'db> {
         VarianceTerm::variable(db, VarianceOrigin::Recursive(self), typevar)
     }
+}
+
+/// The bodies of a group of equations once no variable of the group occurs outside of a type
+/// constructor.
+struct UnguardedReferences<'db> {
+    bodies: Vec<Type<'db>>,
+    /// For each equation, the first of the equations whose variables are equal to its own.
+    equal_to: Vec<usize>,
 }
 
 /// Collects the recursive solutions that a type refers to, without entering them.

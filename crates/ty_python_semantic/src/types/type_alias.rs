@@ -39,34 +39,39 @@ impl<'db> Type<'db> {
         AliasCycleSummary::from_type(db, self).typevars
     }
 
-    /// Substitutes types for the unguarded occurrences of type variables. Returns `None` if
-    /// one occurs where it cannot be replaced in place: in a type alias, whose definition is
-    /// fixed, or negated in an intersection.
+    /// Substitutes types for the unguarded occurrences of type variables. A variable without a
+    /// replacement is removed from the union that it is an element of. Returns `None` if a
+    /// variable occurs where that is not possible: in a type alias, whose definition is fixed,
+    /// negated in an intersection, or, for a variable to remove, anywhere but in a union.
     pub(super) fn replace_unguarded_typevars(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        replacements: &[(BoundTypeVarInstance<'db>, Type<'db>)],
+        replacements: &[(BoundTypeVarInstance<'db>, Option<Type<'db>>)],
     ) -> Option<Type<'db>> {
+        let replacement_of = |exposed: BoundTypeVarInstance<'db>| {
+            replacements
+                .iter()
+                .find(|(variable, _)| variable.is_same_typevar_as(db, exposed))
+                .map(|(_, replacement)| *replacement)
+        };
         let exposes_replaced = |ty: Type<'db>| {
-            ty.unguarded_typevars(db).iter().any(|exposed| {
-                replacements
-                    .iter()
-                    .any(|(variable, _)| variable.is_same_typevar_as(db, *exposed))
-            })
+            ty.unguarded_typevars(db)
+                .iter()
+                .any(|exposed| replacement_of(*exposed).is_some())
         };
         match self {
             _ if replacements.is_empty() => Some(self),
-            Type::TypeVar(exposed) => Some(
-                replacements
-                    .iter()
-                    .find(|(variable, _)| variable.is_same_typevar_as(db, exposed))
-                    .map_or(self, |(_, replacement)| *replacement),
-            ),
+            Type::TypeVar(exposed) => replacement_of(exposed).unwrap_or(Some(self)),
             Type::Union(union) => {
                 let elements: Option<Vec<_>> = union
                     .elements(db)
                     .iter()
+                    .filter(|element| {
+                        element
+                            .as_typevar()
+                            .is_none_or(|exposed| replacement_of(exposed) != Some(None))
+                    })
                     .map(|element| element.replace_unguarded_typevars(db, env, replacements))
                     .collect();
                 Some(UnionType::from_elements(db, env, elements?))

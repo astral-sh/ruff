@@ -1076,6 +1076,50 @@ def f[S, T, U]():
     ...
 ```
 
+## Variables that contain each other
+
+Type variables that are lower bounds of each other are equal. The smallest solution of their
+constraints contains whatever else each of them has to contain, and nothing more.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def equal[X, Y]():
+    constraints = ConstraintSet.equality(X, Y) & ConstraintSet.equality(Y, int)
+    reveal_type(constraints.solutions_for(X, inferable=tuple[X, Y]))  # revealed: tuple[Solution[X=int]]
+    reveal_type(constraints.solutions_for(Y, inferable=tuple[X, Y]))  # revealed: tuple[Solution[Y=int]]
+```
+
+A cycle of subtype relations makes its variables equal in the same way.
+
+```py
+def transitive[X, Y, Z]():
+    constraints = (
+        ConstraintSet.equality(X, int | str)
+        & ConstraintSet.upper_bound(X, Y)
+        & ConstraintSet.upper_bound(Y, Z)
+        & ConstraintSet.upper_bound(Z, X)
+    )
+    # revealed: tuple[Solution[X=int | str]]
+    reveal_type(constraints.solutions_for(X, inferable=tuple[X, Y, Z]))
+    # revealed: tuple[Solution[Y=int | str]]
+    reveal_type(constraints.solutions_for(Y, inferable=tuple[X, Y, Z]))
+    # revealed: tuple[Solution[Z=int | str]]
+    reveal_type(constraints.solutions_for(Z, inferable=tuple[X, Y, Z]))
+```
+
+If the variables do not have to contain anything else, every type is a solution, and they are left
+unsolved.
+
+```py
+def unconstrained[X, Y]():
+    constraints = ConstraintSet.equality(X, Y)
+    # revealed: tuple[Solution[X=Y@unconstrained]]
+    reveal_type(constraints.solutions_for(X, inferable=tuple[X, Y]))
+    # revealed: tuple[Solution[Y=X@unconstrained]]
+    reveal_type(constraints.solutions_for(Y, inferable=tuple[X, Y]))
+```
+
 ## Recursive solutions
 
 ### Direct recursion
@@ -1262,13 +1306,46 @@ def argument_guard[T]():
 ### References outside a type constructor
 
 A recursive type is only meaningful if each reference to it occurs inside a type constructor, such
-as `tuple`: unfolding `μ$0. $0 | tuple[$0]` would expose the same union again. A type alias can
-expose its argument this way. The equation is then left unsolved, along with everything that depends
-on it.
+as `tuple`: unfolding `μ$0. $0 | tuple[$0]` would expose the same union again. Such a reference adds
+nothing to a union, though: a type that contains `int` and every `tuple[T]` also contains itself.
 
 ```py
 from ty_extensions._internal import ConstraintSet
 
+def contains_itself[T]():
+    constraints = ConstraintSet.lower_bound(T | int | tuple[T], T)
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=μ$0. int | tuple[$0]]]
+```
+
+The same holds for variables that are equal to each other. `T`, `U`, and `V` share one solution.
+
+```py
+def equal_variables[T, U, V]():
+    constraints = ConstraintSet.equality(T, int | tuple[U]) & ConstraintSet.equality(U, V) & ConstraintSet.equality(V, T)
+    # revealed: tuple[Solution[T=μ$0. int | tuple[$0]]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T, U, V]))
+    # revealed: tuple[Solution[U=μ$0. int | tuple[$0]]]
+    reveal_type(constraints.solutions_for(U, inferable=tuple[T, U, V]))
+    # revealed: tuple[Solution[V=μ$0. int | tuple[$0]]]
+    reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))
+```
+
+A reference in an intersection restricts it instead, and the equations are left unsolved.
+
+```py
+from ty_extensions import Intersection
+
+def in_intersection[T, U, E]():
+    constraints = ConstraintSet.equality(T, Intersection[U, E]) & ConstraintSet.equality(U, T | int)
+    # TODO: `U = int` and `T = int & E` solve these equations.
+    # revealed: tuple[Solution[T=U@in_intersection & E@in_intersection, U=T@in_intersection | int]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+A type alias can also expose its argument outside of a type constructor. Its definition is fixed, so
+the equation is left unsolved, along with everything that depends on it.
+
+```py
 type Either[V, W] = V | W
 
 def exposed[T, U]():
