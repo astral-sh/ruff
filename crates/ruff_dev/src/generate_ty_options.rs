@@ -228,6 +228,7 @@ fn format_snippet<'a>(
             .join(".");
 
         // Explicit examples can supply the array entry and its nested tables themselves.
+        // Ex) `[[tool.ty.overrides]]` in the `overrides.rules` example.
         if example.starts_with(&format!("[[{array}]]")) {
             return (headers.join("\n\n"), example);
         }
@@ -235,15 +236,20 @@ fn format_snippet<'a>(
         if (index + 1 == parents.len() && scope.is_none()) || fields.is_empty() {
             headers.push(format!("[[{array}]]"));
         } else {
+            // Ex) `[[tool.ty.overrides]]` with `include = ["src"]` before
+            // `[tool.ty.overrides.analysis]`.
             headers.push(format!("[[{array}]]\n{fields}"));
         }
     }
 
+    // Ex) `overrides.include` belongs directly to `[[tool.ty.overrides]]`,
+    // so it must not also get a `[tool.ty.overrides]` header.
     let is_array_entry = scope.is_none()
         && parents
             .last()
             .is_some_and(|parent| matches!(parent.metadata().kind(), OptionSetKind::Array { .. }));
 
+    // Ex) `[tool.ty.rules]` is already part of the field example.
     if !header.is_empty()
         && !is_array_entry
         && !example.starts_with(&format!("[{header}"))
