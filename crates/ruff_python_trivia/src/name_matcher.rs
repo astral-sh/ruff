@@ -1,11 +1,11 @@
 use memchr::memmem::Finder;
-use unicode_normalization::{IsNormalized, is_nfkc_quick};
+use unicode_normalization::is_nfkc;
 
 /// A reusable text prefilter for an identifier or keyword.
 ///
 /// A match only indicates that a source may contain the name: matches in
 /// comments and strings are included. Matchers created with [`Self::new`] accept
-/// sources that may change under NFKC normalization because Python normalizes
+/// sources that change under NFKC normalization because Python normalizes
 /// identifiers this way. Matchers created with [`Self::keyword`] search their literal
 /// spelling instead. Callers should validate candidates using the AST or semantic analysis.
 ///
@@ -41,15 +41,12 @@ impl<'a> NameMatcher<'a> {
 
     /// Returns whether `source` may contain the configured identifier or keyword.
     ///
-    /// Identifier matchers conservatively return `true` if the source may change under
+    /// Identifier matchers conservatively return `true` if the source changes under
     /// NFKC normalization. Otherwise, searches for the literal spelling bounded by bytes
     /// other than ASCII letters, digits or `_`. Matches may occur in comments, strings,
     /// or Unicode identifiers.
     pub fn may_match(&self, source: &str) -> bool {
-        if !self.is_keyword
-            && !source.is_ascii()
-            && is_nfkc_quick(source.chars()) != IsNormalized::Yes
-        {
+        if !self.is_keyword && !source.is_ascii() && !is_nfkc(source) {
             return true;
         }
 
@@ -110,6 +107,8 @@ mod tests {
         assert!(!matcher.may_match("# 中文"));
         assert!(!matcher.may_match("# שלום"));
         assert!(!matcher.may_match("# 🦀"));
+        // There is no precomposed character for 'q' with an acute accent.
+        assert!(!matcher.may_match("# q\u{301}"));
         assert!(matcher.may_match("# café\nC = 1"));
         assert!(NameMatcher::new("café").may_match("café = 1"));
     }
