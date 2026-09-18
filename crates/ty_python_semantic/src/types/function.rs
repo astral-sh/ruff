@@ -1144,9 +1144,11 @@ pub struct FunctionType<'db> {
     #[returns(ref)]
     updated_signatures: Option<Box<UpdatedFunctionSignatures<'db>>>,
 
-    /// The runtime descriptor kind after applying decorators or descriptor access. The
-    /// declaration retains all decorators for signature inference and diagnostics, including
-    /// wrappers that have not yet been applied while checking an inner decorator.
+    /// This field is used to override the descriptor kind inferred from the function's declaration.
+    /// When it is set to `None`, the kind is inferred from the decorators on the function definition
+    /// (e.g. `@classmethod`). This field is set to `Some(..)` to override that kind after applying
+    /// decorators or descriptor access; for example, extracting a classmethod's `__func__` sets it
+    /// to `Some(CallableTypeKind::FunctionLike)`.
     #[returns(copy)]
     descriptor_kind: Option<CallableTypeKind>,
 }
