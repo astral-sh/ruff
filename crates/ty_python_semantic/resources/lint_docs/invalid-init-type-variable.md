@@ -7,7 +7,9 @@ Checks for class-scoped type variables in an explicit annotation of the `self` p
 
 An explicit `self` annotation on `__init__` can determine the type arguments of the constructed
 class. Referring to the class's own type variables in this annotation can make their meaning
-ambiguous. The typing specification requires function-scoped type variables instead.
+ambiguous. The
+[typing specification](https://typing.python.org/en/latest/spec/constructors.html#init-method)
+requires function-scoped type variables instead.
 
 ## Example
 
@@ -34,6 +36,19 @@ If the receiver annotation does not change the class's type arguments, it can be
 ```python
 class Box[T]:
     def __init__(self, value: T) -> None: ...
+```
+
+This restriction also applies to type variables declared with legacy syntax:
+
+```python
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+
+class LegacyContainer(Generic[T]):
+    # error: [invalid-init-type-variable]
+    def __init__(self: "LegacyContainer[list[T]]", value: T) -> None: ...
 ```
 
 ## References

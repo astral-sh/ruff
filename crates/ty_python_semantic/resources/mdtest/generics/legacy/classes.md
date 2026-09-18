@@ -1150,8 +1150,8 @@ U = TypeVar("U")
 V = TypeVar("V")
 
 class Swapped(Generic[T, U]):
-    # error: [invalid-init-type-variable] "`__init__`'s first parameter cannot use the class's type variable `U`"
-    # error: [invalid-init-type-variable] "`__init__`'s first parameter cannot use the class's type variable `T`"
+    # error: [invalid-init-type-variable] "First parameter of `__init__` cannot use the class's type variable `U`"
+    # error: [invalid-init-type-variable] "First parameter of `__init__` cannot use the class's type variable `T`"
     def __init__(self: "Swapped[U, T]") -> None: ...
 
 class Identity(Generic[T]):
@@ -1164,14 +1164,14 @@ class Nested(Generic[T]):
 ```
 
 ```snapshot
-error[invalid-init-type-variable]: `__init__`'s first parameter cannot use the class's type variable `T`
+error[invalid-init-type-variable]: First parameter of `__init__` cannot use the class's type variable `T`
   --> src/mdtest_snippet.py:18:37
    |
 16 | class Nested(Generic[T]):
    |       ------------------ `T` is a type parameter of this class
 17 |     # snapshot: invalid-init-type-variable
 18 |     def __init__(self: "Nested[list[T]]") -> None: ...
-   |                                     ^
+   |                                     ^ `T` used in the first parameter's annotation here
 info: Using a class's type variables here can make the constructed type ambiguous
 help: Use a new type variable, or omit the first parameter's annotation
 info: See https://typing.python.org/en/latest/spec/constructors.html#init-method

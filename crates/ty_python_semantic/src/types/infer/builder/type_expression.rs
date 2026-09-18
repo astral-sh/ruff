@@ -3385,7 +3385,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .report_lint(&INVALID_INIT_TYPE_VARIABLE, expression)
         {
             let mut diagnostic = builder.into_diagnostic(format_args!(
-                "`__init__`'s first parameter cannot use the class's type variable `{}`",
+                "First parameter of `__init__` cannot use the class's type variable `{}`",
+                typevar.name(db)
+            ));
+            diagnostic.set_concise_message(format_args!(
+                "First parameter of `__init__` cannot use the class's type variable `{}`",
+                typevar.name(db)
+            ));
+            diagnostic.set_primary_annotation_message(format_args!(
+                "`{}` used in the first parameter's annotation here",
                 typevar.name(db)
             ));
             if let Type::ClassLiteral(class) = binding_type(db, owner) {
