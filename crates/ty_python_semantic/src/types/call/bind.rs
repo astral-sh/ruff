@@ -5988,6 +5988,33 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         };
 
+        // `Self` is fixed by the class being constructed. Keep it in the inference context so
+        // class type arguments can still be solved, but do not widen it from other arguments.
+        let constructor_self_binding = matches!(
+            self.constructor_kind,
+            Some(ConstructorCallableKind::Init | ConstructorCallableKind::New)
+        )
+        .then(|| {
+            let receiver = self.argument_relations().find(|relation| {
+                relation.adjusted_argument_index.is_none() && relation.matched_parameter.index == 0
+            })?;
+            let (typevar, instance) = match receiver.declared_type {
+                Type::TypeVar(typevar) => (typevar, receiver.argument_type),
+                Type::SubclassOf(subclass) => (
+                    subclass.into_type_var()?,
+                    receiver
+                        .argument_type
+                        .to_instance_approximation(db, self.env)?,
+                ),
+                _ => return None,
+            };
+            typevar
+                .typevar(db)
+                .is_self(db)
+                .then_some((typevar, instance))
+        })
+        .flatten();
+
         let return_with_tcx = Some(self.return_ty).zip(self.call_expression_tcx.annotation);
 
         self.inferable_typevars = generic_context.inferable_typevars(db);
@@ -6159,6 +6186,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut specialization_errors = Vec::new();
         let assignable_to_declared_type = self.infer_argument_constraints(
             &mut builder,
+            constructor_self_binding,
             &preferred_type_mappings,
             &partially_specialized_declared_type,
             &mut specialization_errors,
@@ -6176,6 +6204,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             self.infer_argument_constraints(
                 &mut builder,
+                constructor_self_binding,
                 &FxHashMap::default(),
                 &FxHashSet::default(),
                 &mut specialization_errors,
@@ -6244,6 +6273,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         };
 
         let mut choose = |typevar: BoundTypeVarInstance<'db>, bounds: Option<&PathBound<'db>>| {
+            // Preserve the receiver binding even when conflicting arguments force diagnostic
+            // recovery. Merging their individual solutions would otherwise widen `Self` again.
+            if let Some((receiver, instance)) = constructor_self_binding
+                && typevar.is_same_typevar_as(db, receiver)
+            {
+                return Some(PathBoundSolution::Solved(instance));
+            }
+
             let preferred_ty = preferred_type_mappings.get(&typevar.identity(db)).copied();
 
             if let Some(bounds) = bounds {
@@ -6552,11 +6589,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     fn infer_argument_constraints<'c>(
         &mut self,
         builder: &mut SpecializationBuilder<'db, 'c>,
+        constructor_self_binding: Option<(BoundTypeVarInstance<'db>, Type<'db>)>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
         let db = self.db;
+        if let Some((typevar, instance)) = constructor_self_binding {
+            builder.add_type_mapping(typevar, instance, TypeVarVariance::Invariant);
+        }
         for relation in self.argument_relations() {
             // Fixed elements can infer normally; the complete variadic pack is inferred below.
             if relation.has_starred_annotation

@@ -17,11 +17,12 @@ use crate::{
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
         InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
-        Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
-        TypeVarVariance, UnionBuilder, UnionType, any_over_type,
+        Parameter, Parameters, RecursiveType, Specialization, Type, TypeAliasType, TypeContext,
+        TypeMapping, TypeVarVariance, UnionBuilder, UnionType, any_over_type,
         any_over_type_including_alias_arguments, binding_type,
         cyclic::TypeIdentity,
         definition_expression_type,
+        generics::walk_specialization_types,
         tuple::Tuple,
         variance::VarianceInferable,
         visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -1000,6 +1001,20 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+
+        // Alias arguments can carry a caller's type variables even though the alias body is
+        // lazy. Inspect those arguments without expanding potentially recursive definitions.
+        fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+            if let Some(arguments) = alias.specialization(db) {
+                walk_specialization_types(db, arguments, self);
+            }
+        }
+
+        fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+            if let Some(arguments) = recursive.arguments(db) {
+                walk_specialization_types(db, arguments, self);
+            }
         }
     }
 

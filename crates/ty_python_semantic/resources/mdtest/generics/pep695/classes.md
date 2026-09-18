@@ -451,6 +451,41 @@ def accepts_dog(value: Dog) -> None: ...
 consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [invalid-argument-type]
 ```
 
+### `Self` in inherited constructors
+
+A constructor binds `Self` to the class being constructed. An inherited constructor therefore
+accepts another instance of the subclass, but rejects an instance of its base or a sibling class.
+The class's type arguments can still be inferred from a parameter annotated with `Self`.
+
+```py
+from typing import Self
+
+class Base[T]:
+    def __init__(self, other: Self | None) -> None: ...
+
+class Child(Base[int]): ...
+class Sibling(Base[int]): ...
+
+reveal_type(Base(Base[int](None)))  # revealed: Base[int]
+reveal_type(Child(Child(None)))  # revealed: Child
+Child(Base(None))  # error: [invalid-argument-type]
+Child(Sibling(None))  # error: [invalid-argument-type]
+```
+
+The same binding applies to `__new__`, including an explicitly annotated `cls: type[Self]`.
+
+```py
+class New[T]:
+    def __new__(cls: type[Self], other: Self | None) -> Self:
+        return super().__new__(cls)
+
+class NewChild(New[int]): ...
+
+reveal_type(New(New[int](None)))  # revealed: New[int]
+reveal_type(NewChild(NewChild(None)))  # revealed: NewChild
+NewChild(New(None))  # error: [invalid-argument-type]
+```
+
 ### Constructing the class from its own type variable
 
 A constructor call inside a generic class can use a value whose type is one of the class's type
@@ -539,14 +574,18 @@ class Box[T: NamedTuple]:
 
 The recursive call in `__init__` shares a source-level `Self` binding with the constructor it calls,
 while `wrap` has a different `Self` binding. In both cases, freshening the constructor's type
-variables preserves the caller's `Self` argument. The result cannot be returned as `Box[T, T]`.
+variables preserves the caller's `Self` argument, including inside an alias. The result cannot be
+returned as `Box[T, T]`.
 
 ```py
 from typing import Self
 
+type Identity[V] = V
+
 class Box[T, U]:
     def __init__(self, value: T, receiver: U) -> None:
         reveal_type(Box[T, Self](value, self))  # revealed: Box[T@Box, Self@__init__]
+        reveal_type(Box[T, Identity[Self]](value, self))  # revealed: Box[T@Box, Identity[Self@__init__]]
 
     def wrap(self, value: T) -> "Box[T, Self]":
         result = Box[T, Self](value, self)

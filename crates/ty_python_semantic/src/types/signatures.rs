@@ -1018,25 +1018,71 @@ impl<'db> Signature<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         let env = visitor.env;
+        let freshened = if let TypeMapping::ApplySpecialization(specialization) = type_mapping
+            && specialization.specialize_self_domain()
+            && let Some(specialization) = specialization.as_specialization(db)
+            && let Some(context) = self.generic_context
+            && let Some(definition) = self.definition
+        {
+            // Specializing the owning class can introduce a caller's type variables into a
+            // method signature. Rename method-local variables first to avoid capturing them.
+            // For example, in `Box[T, Self](value, self)` inside `Box.__init__`, the caller's
+            // `Self` type argument must remain distinct from the new constructor's receiver.
+            let local_context = GenericContext::from_typevar_instances(
+                db,
+                env,
+                context
+                    .variables(db)
+                    .filter(|typevar| typevar.binding_context(db).definition() == Some(definition)),
+            );
+            max_typevar_freshness_matching_generic_context(
+                db,
+                specialization.types(db).iter().copied(),
+                local_context,
+            )
+            .filter(|freshness| {
+                local_context
+                    .variables(db)
+                    .any(|typevar| typevar.freshness(db) <= *freshness)
+            })
+            .map(|freshness| {
+                self.apply_type_mapping_impl(
+                    db,
+                    &TypeMapping::FreshenBoundTypeVars {
+                        generic_context: local_context,
+                        delta: freshness.increment().value(),
+                    },
+                    TypeContext::default(),
+                    &ApplyTypeMappingVisitor::new(env),
+                )
+            })
+        } else {
+            None
+        };
+        let signature = freshened.as_ref().unwrap_or(self);
         Self {
-            generic_context: self
+            generic_context: signature
                 .generic_context
                 .map(|context| type_mapping.update_signature_generic_context(db, env, context)),
-            definition: self.definition,
+            definition: signature.definition,
             extras: SignatureExtras::new(
-                self.source_overload_index_raw(),
-                self.map_receiver_constraints(db, type_mapping, tcx, visitor),
+                signature.source_overload_index_raw(),
+                signature.map_receiver_constraints(db, type_mapping, tcx, visitor),
             ),
-            parameters: self
-                .parameters
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            return_ty: if self.is_paramspec_value {
-                self.return_ty
+            parameters: signature.parameters.apply_type_mapping_impl(
+                db,
+                type_mapping,
+                tcx,
+                visitor,
+            ),
+            return_ty: if signature.is_paramspec_value {
+                signature.return_ty
             } else {
-                self.return_ty
+                signature
+                    .return_ty
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
-            is_paramspec_value: self.is_paramspec_value,
+            is_paramspec_value: signature.is_paramspec_value,
         }
     }
 
