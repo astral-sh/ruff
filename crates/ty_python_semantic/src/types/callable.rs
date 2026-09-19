@@ -874,12 +874,13 @@ impl<'db> CallableType<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> CallableType<'db> {
-        self.with_signatures(
+        Self::new_internal(
             db,
             self.signatures(db)
                 .bind_method_receiver(db, env, receiver_type, typing_self_type),
+            CallableTypeKind::Regular,
+            self.deprecated(db),
         )
-        .into_regular(db)
     }
 
     pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {

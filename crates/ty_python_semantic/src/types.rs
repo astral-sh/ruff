@@ -7607,38 +7607,31 @@ impl<'db> Type<'db> {
                     | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
             );
 
-            let (new_bindings, has_any_new) = match new_method.as_ref().map(|method| method.place) {
-                Some(place) => match self_type.resolve_dunder_new_callable(db, env, place) {
-                    Place::Defined(DefinedPlace {
-                        ty: new_callable,
-                        definedness,
-                        ..
-                    }) => {
-                        let bindings = new_callable.bindings_impl(db, env, recursion_guard);
-                        let mut bindings = bind_constructor_new(
-                            db,
-                            env,
-                            bindings,
-                            self_type,
-                            constructor_instance_ty,
-                        )
+            let new_bindings = if let Some(method) = &new_method
+                && let Place::Defined(DefinedPlace {
+                    ty: new_callable,
+                    definedness,
+                    ..
+                }) = self_type.resolve_dunder_new_callable(db, env, method.place)
+            {
+                let bindings = new_callable.bindings_impl(db, env, recursion_guard);
+                let mut bindings =
+                    bind_constructor_new(db, env, bindings, self_type, constructor_instance_ty)
                         .into_constructor_bindings(
                             constructor_instance_ty,
                             ConstructorCallableKind::New,
                         )
                         .with_constructed_instance_type(db, constructor_instance_ty);
-                        if definedness == Definedness::PossiblyUndefined {
-                            bindings.set_implicit_dunder_new_is_possibly_unbound();
-                        }
-                        (Some(bindings), true)
-                    }
-                    Place::Undefined => (None, false),
-                },
-                None => (None, false),
+                if definedness == Definedness::PossiblyUndefined {
+                    bindings.set_implicit_dunder_new_is_possibly_unbound();
+                }
+                Some(bindings)
+            } else {
+                None
             };
 
             // Only fall back to `object.__init__` when `__new__` is absent.
-            let init_bindings = match (&init_method_no_object.place, has_any_new) {
+            let init_bindings = match (&init_method_no_object.place, new_bindings.is_some()) {
                 (
                     Place::Defined(DefinedPlace {
                         ty: init_method,

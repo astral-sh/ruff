@@ -504,51 +504,45 @@ impl<'db> CallableSignature<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Self {
-        let [signature] = self.overloads.as_slice() else {
-            if !self
-                .overloads
-                .iter()
-                .any(Signature::has_explicit_positional_receiver_annotation)
-            {
-                return self.bind_self_with_receiver(
-                    db,
-                    env,
-                    Some(receiver_type),
-                    Some(typing_self_type),
-                );
+        let specialized = match self.overloads.as_slice() {
+            [signature] => {
+                if signature.has_receiver_determined_method_typevar(db, env) {
+                    signature.specialize_for_bound_receiver(
+                        db,
+                        env,
+                        receiver_type,
+                        typing_self_type,
+                    )
+                } else {
+                    None
+                }
             }
-
-            return Self::from_overloads(
-                self.overloads
+            signatures
+                if signatures
                     .iter()
-                    .filter_map(|signature| {
-                        if !signature.can_bind_self_to(db, env, receiver_type) {
-                            return None;
-                        }
-
-                        signature
-                            .specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
-                            .map(|signature| {
-                                signature.bind_self_with_receiver(
-                                    db,
-                                    env,
-                                    Some(receiver_type),
-                                    Some(typing_self_type),
-                                )
-                            })
-                    })
-                    .flat_map(|signature| signature.overloads),
-            );
-        };
-
-        let specialized = if signature.has_receiver_determined_method_typevar(db, env) {
-            signature.specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
-        } else {
-            None
+                    .any(Signature::has_explicit_positional_receiver_annotation) =>
+            {
+                Some(Self::from_overloads(
+                    signatures
+                        .iter()
+                        .filter(|signature| signature.can_bind_self_to(db, env, receiver_type))
+                        .filter_map(|signature| {
+                            signature.specialize_for_bound_receiver(
+                                db,
+                                env,
+                                receiver_type,
+                                typing_self_type,
+                            )
+                        })
+                        .flat_map(|signature| signature.overloads),
+                ))
+            }
+            _ => None,
         };
 
         specialized
-            .unwrap_or_else(|| Self::single(signature.clone()))
+            .as_ref()
+            .unwrap_or(self)
             .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type))
     }
 

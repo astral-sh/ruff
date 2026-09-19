@@ -5583,11 +5583,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .all_equal_value()
                         .ok()
                 })
-                .and_then(|kind| match kind {
-                    kind @ (CallableTypeKind::FunctionLike
-                    | CallableTypeKind::StaticMethodLike
-                    | CallableTypeKind::ClassMethodLike) => Some(kind),
-                    _ => None,
+                .filter(|kind| {
+                    matches!(
+                        kind,
+                        CallableTypeKind::FunctionLike
+                            | CallableTypeKind::StaticMethodLike
+                            | CallableTypeKind::ClassMethodLike
+                    )
                 }),
         };
 
