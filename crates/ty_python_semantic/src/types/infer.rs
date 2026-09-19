@@ -2106,7 +2106,7 @@ impl<'db> ExpressionInference<'db> {
             .get(&collection_def)
     }
 
-    fn fallback_type(&self) -> Option<Type<'db>> {
+    pub(super) fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
 }
