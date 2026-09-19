@@ -19,14 +19,7 @@ use super::{
 };
 
 /// Lists top-level modules or immediate children of a resolved or unresolved module name.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "Module listing is consumed by the next change's cached queries"
-    )
-)]
-fn list_modules<'db>(
+pub(crate) fn list_modules<'db>(
     context: &ResolverContext<'db>,
     target: &ListingTarget<'db>,
 ) -> ModuleListing<'db> {
@@ -55,11 +48,7 @@ fn list_modules<'db>(
 }
 
 /// The location whose immediate children should be enumerated.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "Constructed by the module-listing consumers")
-)]
-enum ListingTarget<'db> {
+pub(crate) enum ListingTarget<'db> {
     /// Enumerate top-level module names across the configured search paths.
     Root,
     /// Enumerate children of this resolved module.
@@ -76,20 +65,20 @@ enum ListingTarget<'db> {
 /// Hence recursive enumeration must search `acme.nested` even while import
 /// statement completion omits it.
 #[derive(Default)]
-struct ModuleListing<'db> {
+pub(crate) struct ModuleListing<'db> {
     /// Modules that resolve independently and are also eligible for enumeration.
-    modules: Vec<Module<'db>>,
+    pub(crate) modules: Vec<Module<'db>>,
     /// Unresolved module name prefixes that are nonetheless eligible for enumeration
     /// because they have eligible stub override candidates.
-    stub_override_prefixes: Vec<ModuleName>,
+    pub(crate) stub_override_prefixes: Vec<ModuleName>,
     /// Listed modules that may have descendants, including files with stub overrides.
-    modules_with_possible_children: Vec<Module<'db>>,
+    pub(crate) modules_with_possible_children: Vec<Module<'db>>,
 }
 
 impl<'db> ModuleSearchCursor<'_, 'db> {
     /// Given a module, lists immediate submodules of that module; otherwise
     /// lists top-level modules at the start of the search.
-    fn list_modules(&self) -> ModuleListing<'db> {
+    pub(crate) fn list_modules(&self) -> ModuleListing<'db> {
         let context = self.context;
         let db = context.db;
         let prefix = self.prefix();
