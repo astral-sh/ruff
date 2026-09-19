@@ -8,6 +8,7 @@ use ruff_python_ast::{self as ast, PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
+use crate::attribute_assignments;
 use crate::{
     FxOrderSet, TypeQualifiers,
     place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
@@ -19,7 +20,8 @@ use crate::{
         binding_type,
         call::Argument,
         class::{
-            CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind, expanded_class_base_entries,
+            CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind, MethodDecorator,
+            expanded_class_base_entries, method_matches_decorator,
         },
         context::InferContext,
         definition_expression_type,
@@ -46,7 +48,7 @@ use crate::{
         generics::enclosing_generic_contexts,
         infer::builder::post_inference::typed_dict::validate_typed_dict_class,
         infer_definition_types, inferred_declaration,
-        list_members::declared_instance_attribute_names,
+        list_members::declared_method_attribute_declarations,
         mro::StaticMroErrorKind,
         overrides,
         special_form::TypeQualifier,
@@ -56,9 +58,8 @@ use crate::{
         visitor::find_over_type,
     },
 };
-use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
-    DeclarationsIterator, SemanticIndex, attribute_scopes,
+    DeclarationsIterator, FileScopeId, SemanticIndex, attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState},
     scope::ScopeId,
     semantic_index,
@@ -153,10 +154,28 @@ fn add_declarations<'db>(
             continue;
         }
 
-        let Some(declared) = inferred_declaration(db, definition).declared() else {
-            continue;
-        };
-        definitions.push((definition, declared.inner_type()));
+        add_declaration(db, definition, definitions);
+    }
+}
+
+fn add_declaration<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    definitions: &mut Vec<(Definition<'db>, Type<'db>)>,
+) {
+    let Some(declared) = inferred_declaration(db, definition).declared() else {
+        return;
+    };
+    definitions.push((definition, declared.inner_type()));
+}
+
+fn add_definition_slice<'db>(
+    db: &'db dyn Db,
+    declarations: &[Definition<'db>],
+    definitions: &mut Vec<(Definition<'db>, Type<'db>)>,
+) {
+    for definition in declarations {
+        add_declaration(db, *definition, definitions);
     }
 }
 
@@ -181,48 +200,149 @@ fn add_class_body_declarations<'db>(
     );
 }
 
-fn check_conflicting_instance_attribute_declarations<'db>(
+fn report_conflicting_attribute_declarations<'db>(
+    context: &InferContext<'db, '_>,
+    name: &str,
+    definitions: &[(Definition<'db>, Type<'db>)],
+) -> bool {
+    let db = context.db();
+    let env = context.program_environment();
+    let Some((_, first_type)) = definitions.first() else {
+        return false;
+    };
+    let mut conflicting_types = FxOrderSet::default();
+    let mut conflicting_definition = None;
+    for (definition, ty) in definitions.iter().skip(1) {
+        if !first_type.is_equivalent_to(db, env, *ty) {
+            conflicting_types.insert(*ty);
+            conflicting_definition.get_or_insert(*definition);
+        }
+    }
+    let Some(conflicting_definition) = conflicting_definition else {
+        return false;
+    };
+    conflicting_types.insert_before(0, *first_type);
+
+    if let Some(builder) = context.report_lint(
+        &CONFLICTING_DECLARATIONS,
+        conflicting_definition.focus_range(db, context.module()),
+    ) {
+        builder.into_diagnostic(format_args!(
+            "Conflicting declared types for `{name}`: {}",
+            format_enumeration(conflicting_types.iter().map(|ty| ty.display(db, env)))
+        ));
+    }
+
+    true
+}
+
+fn attribute_scope_has_active_method<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    class_scope_id: FileScopeId,
+    mut scope_id: FileScopeId,
+) -> bool {
+    // Attribute scopes can include eager descendants of a method. Their declarations
+    // participate only if the enclosing method remains bound when the class body finishes.
+    while scope_id != class_scope_id {
+        let scope = index.scope(scope_id);
+        if let Some(function) = scope.node().as_function() {
+            let Some(definition) = index.try_definition(function) else {
+                return false;
+            };
+            let Some(symbol_id) = definition.place(db).as_symbol() else {
+                return false;
+            };
+            let use_def = index.use_def_map(class_scope_id);
+            return use_def
+                .end_of_scope_symbol_bindings(symbol_id)
+                .any(|binding| {
+                    binding
+                        .binding
+                        .is_defined_and(|binding| binding == definition)
+                        && !use_def
+                            .reachability_constraints()
+                            .evaluate(db, use_def.predicates(), binding.reachability_constraint)
+                            .is_always_false()
+                });
+        }
+        let Some(parent) = scope.parent() else {
+            return false;
+        };
+        scope_id = parent;
+    }
+    false
+}
+
+fn check_conflicting_attribute_declarations<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
     index: &SemanticIndex<'db>,
 ) {
     let db = context.db();
-    let env = context.program_environment();
     let class_body_scope = class.body_scope(db);
 
-    for name in declared_instance_attribute_names(db, class_body_scope) {
-        let mut definitions: Vec<(Definition<'db>, Type<'db>)> = Vec::new();
+    for (name, mut attribute_declarations) in
+        declared_method_attribute_declarations(db, class_body_scope)
+    {
+        attribute_declarations.retain(|declarations| {
+            attribute_scope_has_active_method(
+                db,
+                index,
+                class_body_scope.file_scope_id(db),
+                declarations.scope_id,
+            )
+        });
+        let mut class_body_definitions = Vec::new();
 
-        add_class_body_declarations(db, index, class_body_scope, &name, &mut definitions);
+        add_class_body_declarations(
+            db,
+            index,
+            class_body_scope,
+            &name,
+            &mut class_body_definitions,
+        );
 
-        for (declarations, _) in attribute_declarations(db, class_body_scope, &name) {
-            add_declarations(db, declarations, &mut definitions);
-        }
-
-        let Some((_, first_type)) = definitions.first() else {
-            continue;
-        };
-        let mut conflicting_types = FxOrderSet::default();
-        let mut conflicting_definition = None;
-        for (definition, ty) in definitions.iter().skip(1) {
-            if !first_type.is_equivalent_to(db, env, *ty) {
-                conflicting_types.insert(*ty);
-                conflicting_definition.get_or_insert(*definition);
+        if !class_body_definitions.is_empty() {
+            let mut definitions = class_body_definitions;
+            for declarations in &attribute_declarations {
+                let method_scope = index.scope(declarations.scope_id);
+                if method_matches_decorator(
+                    db,
+                    index,
+                    context.module(),
+                    method_scope,
+                    MethodDecorator::None,
+                ) || method_matches_decorator(
+                    db,
+                    index,
+                    context.module(),
+                    method_scope,
+                    MethodDecorator::ClassMethod,
+                ) {
+                    add_definition_slice(db, &declarations.reachable, &mut definitions);
+                }
             }
-        }
-        let Some(conflicting_definition) = conflicting_definition else {
+            report_conflicting_attribute_declarations(context, &name, &definitions);
             continue;
-        };
-        conflicting_types.insert_before(0, *first_type);
+        }
 
-        if let Some(builder) = context.report_lint(
-            &CONFLICTING_DECLARATIONS,
-            conflicting_definition.focus_range(db, context.module()),
-        ) {
-            builder.into_diagnostic(format_args!(
-                "Conflicting declared types for `{name}`: {}",
-                format_enumeration(conflicting_types.iter().map(|ty| ty.display(db, env)))
-            ));
+        for method_decorator in [MethodDecorator::None, MethodDecorator::ClassMethod] {
+            let mut definitions = Vec::new();
+            for declarations in &attribute_declarations {
+                if method_matches_decorator(
+                    db,
+                    index,
+                    context.module(),
+                    index.scope(declarations.scope_id),
+                    method_decorator,
+                ) {
+                    add_definition_slice(db, &declarations.at_end_of_scope, &mut definitions);
+                }
+            }
+            if report_conflicting_attribute_declarations(context, &name, &definitions) {
+                break;
+            }
         }
     }
 }
@@ -272,7 +392,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     let env = context.program_environment();
 
-    check_conflicting_instance_attribute_declarations(context, class, index);
+    check_conflicting_attribute_declarations(context, class, index);
 
     check_class_slots(context, class, index);
 

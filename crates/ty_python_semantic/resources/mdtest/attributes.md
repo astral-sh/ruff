@@ -242,6 +242,154 @@ reveal_type(c_instance.y)  # revealed: int
 reveal_type(c_instance.z)  # revealed: int
 ```
 
+#### Sequential declarations in one method
+
+Conflict checking uses the declarations active at method exit. A later declaration in the same
+method replaces the earlier declaration for this comparison, so the two declarations do not conflict
+with each other.
+
+```py
+class C:
+    def set_value(self) -> None:
+        self.x: int = 1
+        self.x: str = "a"
+```
+
+A declaration in the class body is still visible and conflicts with the declarations in the method.
+
+```py
+class C:
+    x: float
+
+    def set_value(self) -> None:
+        self.x: int = 1  # error: [conflicting-declarations]
+        self.x: str = "a"
+```
+
+Only the declaration that is active at the end of a method participates in comparisons with other
+methods. The two methods below therefore agree that `x` is a `str`.
+
+```py
+class C:
+    def set_value(self) -> None:
+        self.x: int = 1
+        self.x: str = "a"
+
+    def reset_value(self) -> None:
+        self.x: str = ""
+```
+
+Declarations on different control-flow paths can both be active at the end of a method, so they
+conflict with each other.
+
+```py
+class C:
+    def set_value(self, flag: bool) -> None:
+        if flag:
+            self.x: int = 1
+        else:
+            self.x: str = "a"  # error: [conflicting-declarations]
+```
+
+Statically unreachable declarations do not participate in conflict checking.
+
+```py
+class C:
+    def set_value(self) -> None:
+        if False:
+            self.x: int = 1
+        self.x: str = "a"
+```
+
+#### Method definitions active at class scope exit
+
+Declarations in a statically unreachable method definition do not participate in conflict checking.
+
+```py
+class C:
+    if 1 > 2:
+        def set_value(self) -> None:
+            self.x: int = 1
+
+    def reset_value(self) -> None:
+        self.x: str = "a"
+```
+
+A later method definition replaces an earlier method with the same name, so declarations in the
+replaced method do not participate in conflict checking.
+
+```py
+class C:
+    def set_value(self) -> None:
+        self.x: int = 1
+
+    def set_value(self) -> None:
+        self.x: str = "a"
+```
+
+A replaced method is also ignored when the class body declares the attribute.
+
+```py
+class C:
+    x: str
+
+    def set_value(self) -> None:
+        self.x: int = 1
+
+    def set_value(self) -> None:
+        self.x: str = "a"
+```
+
+Deleting a method name removes its declarations from conflict checking when no method binding
+remains at class scope exit.
+
+```py
+class C:
+    def set_value(self) -> None:
+        self.x: int = 1
+
+    del set_value
+
+    def reset_value(self) -> None:
+        self.x: str = "a"
+```
+
+When a condition is not statically known, either method definition can remain bound at class scope
+exit. Their declarations can therefore conflict.
+
+```py
+def flag() -> bool:
+    return True
+
+class C:
+    if flag():
+        def set_value(self) -> None:
+            self.x: int = 1
+
+    else:
+        def set_value(self) -> None:
+            self.x: str = "a"  # error: [conflicting-declarations]
+```
+
+#### Class-method declaration conflicts
+
+Declarations in class methods are compared with other class-method declarations, but not with
+instance-attribute declarations in ordinary methods.
+
+```py
+class C:
+    @classmethod
+    def set_class_value(cls) -> None:
+        cls.x: int = 1
+
+    @classmethod
+    def reset_class_value(cls) -> None:
+        cls.x: str = "a"  # error: [conflicting-declarations]
+
+    def set_instance_value(self) -> None:
+        self.x: bytes = b"a"
+```
+
 #### Singleton promotion happens after unioning implicit assignments
 
 ```py

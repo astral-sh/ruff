@@ -12,12 +12,12 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
 use crate::{
-    Db,
+    Db, FxOrderMap,
     place::{
         DefinedPlace, Place, PlaceWithDefinition, imported_symbol, place_from_bindings,
         place_from_declarations,
     },
-    reachability::{DeclarationsIteratorExtension, ReachabilityConstraintsExtension},
+    reachability::ReachabilityConstraintsExtension,
     types::{
         ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, StaticClassLiteral,
         SubclassOfInner, Type, TypeVarBoundOrConstraints, UnionType, class::CodeGeneratorKind,
@@ -25,23 +25,61 @@ use crate::{
     },
 };
 use ty_python_core::{
-    ProgramFile, attribute_scopes,
-    definition::{Definition, DefinitionKind},
-    global_scope, place_table,
+    DeclarationsIterator, FileScopeId, ProgramFile, attribute_scopes,
+    definition::{Definition, DefinitionKind, DefinitionState},
+    global_scope,
+    place::ScopedPlaceId,
+    place_table,
     scope::ScopeId,
     semantic_index, use_def_map,
 };
 
-/// Return the names of instance attributes declared in methods belonging to `class_body_scope`.
+pub(crate) struct MethodAttributeDeclarations<'db> {
+    /// The method scope containing these declarations.
+    pub(crate) scope_id: FileScopeId,
+    /// Every declaration that can be reached while executing the method.
+    pub(crate) reachable: Box<[Definition<'db>]>,
+    /// The declarations that can still be active when the method returns.
+    pub(crate) at_end_of_scope: Box<[Definition<'db>]>,
+}
+
+fn annotated_attribute_declarations<'db>(
+    db: &'db dyn Db,
+    declarations: DeclarationsIterator<'_, 'db>,
+) -> Box<[Definition<'db>]> {
+    let predicates = declarations.predicates();
+    let reachability_constraints = declarations.reachability_constraints();
+
+    declarations
+        .filter_map(|declaration| {
+            let DefinitionState::Defined(definition) = declaration.declaration else {
+                return None;
+            };
+            if !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_)) {
+                return None;
+            }
+
+            let reachability = reachability_constraints.evaluate(
+                db,
+                predicates,
+                declaration.reachability_constraint,
+            );
+            (!reachability.is_always_false()).then_some(definition)
+        })
+        .collect()
+}
+
+/// Return the attribute declarations in methods belonging to `class_body_scope`, grouped by
+/// attribute name and method scope.
 ///
 /// Only call this when doing type inference on the same file as `class_body_scope`, otherwise
 /// inspecting the declaration kinds introduces a direct dependency on that file's AST.
-pub(crate) fn declared_instance_attribute_names<'db>(
+pub(crate) fn declared_method_attribute_declarations<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
-) -> Vec<Name> {
+) -> FxOrderMap<Name, Vec<MethodAttributeDeclarations<'db>>> {
     let index = semantic_index(db, class_body_scope.program_file(db));
-    let mut names = Vec::new();
+    let mut declarations = Vec::new();
 
     for function_scope_id in attribute_scopes(db, class_body_scope) {
         let table = index.place_table(function_scope_id);
@@ -54,22 +92,41 @@ pub(crate) fn declared_instance_attribute_names<'db>(
             let Some(member_id) = table.member_id_by_instance_attribute_name(name) else {
                 continue;
             };
-            if use_def
-                .reachable_member_declarations(member_id)
-                .any_reachable(db, |declaration| {
-                    declaration.is_defined_and(|definition| {
-                        matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
-                    })
-                })
-            {
-                names.push(Name::new(name));
+
+            let reachable = annotated_attribute_declarations(
+                db,
+                use_def.reachable_member_declarations(member_id),
+            );
+            if reachable.is_empty() {
+                continue;
             }
+
+            let at_end_of_scope = annotated_attribute_declarations(
+                db,
+                use_def.end_of_scope_declarations(ScopedPlaceId::Member(member_id)),
+            );
+            declarations.push((
+                Name::new(name),
+                MethodAttributeDeclarations {
+                    scope_id: function_scope_id,
+                    reachable,
+                    at_end_of_scope,
+                },
+            ));
         }
     }
 
-    names.sort_unstable();
-    names.dedup();
-    names
+    declarations.sort_by(|(left, _), (right, _)| left.cmp(right));
+
+    let mut declarations_by_name: FxOrderMap<Name, Vec<MethodAttributeDeclarations<'db>>> =
+        FxOrderMap::default();
+    for (name, declarations) in declarations {
+        declarations_by_name
+            .entry(name)
+            .or_default()
+            .push(declarations);
+    }
+    declarations_by_name
 }
 
 /// Iterate over all declarations and bindings that exist at the end
