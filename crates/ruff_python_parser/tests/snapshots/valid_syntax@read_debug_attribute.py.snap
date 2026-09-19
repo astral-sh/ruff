@@ -1,0 +1,93 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/read_debug_attribute.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..36,
+        body: [
+            If(
+                StmtIf {
+                    node_index: NodeIndex(None),
+                    range: 0..19,
+                    test: Attribute(
+                        ExprAttribute {
+                            node_index: NodeIndex(None),
+                            range: 3..14,
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 3..4,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("__debug__"),
+                                range: 5..14,
+                                node_index: NodeIndex(None),
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 16..19,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 16..19,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    node_index: NodeIndex(None),
+                    range: 20..35,
+                    targets: [
+                        Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 20..21,
+                                id: Name("y"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Attribute(
+                        ExprAttribute {
+                            node_index: NodeIndex(None),
+                            range: 24..35,
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 24..25,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("__debug__"),
+                                range: 26..35,
+                                node_index: NodeIndex(None),
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
