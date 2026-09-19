@@ -1,20 +1,20 @@
 //! Resolve dependencies between the selected bindings of one solution alternative.
 
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 
 use rustc_hash::FxHashMap;
 
-use super::TypeVarSolution;
+use super::{TypeVarSolution, is_possibly_constraint_set_assignable};
 use crate::types::cyclic::CycleDetector;
 use crate::types::function::FunctionType;
 use crate::types::generics::{ApplySpecialization, GenericContext};
 use crate::types::known_instance::walk_known_instance_type;
 use crate::types::signatures::{Signature, walk_signature};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
+use crate::types::typevar::TypeVarSet;
 use crate::types::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
     BoundTypeVarInstance, CallableType, KnownInstanceType, RecursiveType, Type, TypeAliasType,
-    TypeContext, TypeMapping,
+    TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints,
 };
 use crate::{Db, FxOrderMap, ProgramEnvironment};
 
@@ -29,97 +29,252 @@ pub(crate) enum SolutionType<'db> {
     Unresolved(Type<'db>),
 }
 
-/// Resolves only dependencies with selected, acyclic solutions. The result has the same order as
-/// `solution`; references outside `inferable` retain their original bound-variable identity.
+/// The outcome of [`resolve_solution`], in the order of the solutions that it was given.
+pub(crate) struct Resolution<'db> {
+    pub(crate) types: Box<[SolutionType<'db>]>,
+    /// Whether some solutions referred to each other and were closed as recursive types.
+    pub(crate) is_recursive: bool,
+}
+
+/// Resolves dependencies between the selected solutions. Solutions that depend on each other, such
+/// as `T = int | tuple[T]`, are closed together as recursive types. References outside
+/// `inferable` retain their original bound-variable identity.
 pub(crate) fn resolve_solution<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     inferable: TypeVarSet<'db>,
     solution: &[TypeVarSolution<'db>],
-) -> Box<[SolutionType<'db>]> {
-    let resolver = Resolver {
+) -> Resolution<'db> {
+    // Most solutions mention no other variable, so the index is built on the first reference.
+    let indices = OnceCell::new();
+    let index_of = |variable: BoundTypeVarInstance<'db>| {
+        let indices: &FxHashMap<_, _> = indices.get_or_init(|| {
+            solution
+                .iter()
+                .enumerate()
+                .map(|(index, binding)| (binding.bound_typevar.identity(db), index))
+                .collect()
+        });
+        indices.get(&variable.identity(db)).copied()
+    };
+    let dependencies: Vec<_> = solution
+        .iter()
+        .map(|binding| {
+            // A dependency without a selected solution cannot be substituted.
+            let dependencies = RefCell::new(Some(Vec::new()));
+            Dependencies::check(db, env, inferable, [binding.solution], |dependency| {
+                let mut dependencies = dependencies.borrow_mut();
+                match index_of(dependency) {
+                    Some(index) => dependencies.iter_mut().for_each(|found| found.push(index)),
+                    None => *dependencies = None,
+                }
+                true
+            });
+            dependencies.into_inner()
+        })
+        .collect();
+    let is_independent =
+        |dependencies: &Option<Vec<usize>>| dependencies.as_ref().is_some_and(Vec::is_empty);
+    if dependencies.iter().all(is_independent) {
+        return Resolution {
+            types: solution
+                .iter()
+                .map(|binding| SolutionType::Resolved(binding.solution))
+                .collect(),
+            is_recursive: false,
+        };
+    }
+
+    let mut resolver = Resolver {
         env,
         inferable,
         solution,
-        indices: solution
-            .iter()
-            .enumerate()
-            .map(|(index, binding)| (binding.bound_typevar.identity(db), index))
-            .collect(),
-        resolved: CycleDetector::new(None),
+        dependencies,
+        resolved: vec![None; solution.len()],
+        visited: vec![None; solution.len()],
+        is_pending: vec![false; solution.len()],
+        pending: Vec::new(),
+        is_recursive: false,
     };
-    solution
-        .iter()
-        .enumerate()
-        .map(|(index, binding)| {
-            resolver.resolve(db, index).map_or(
-                SolutionType::Unresolved(binding.solution),
-                SolutionType::Resolved,
-            )
-        })
-        .collect()
+    for index in 0..solution.len() {
+        resolver.visit(db, index);
+    }
+    Resolution {
+        types: solution
+            .iter()
+            .zip(resolver.resolved)
+            .map(|(binding, resolved)| {
+                resolved.map_or(
+                    SolutionType::Unresolved(binding.solution),
+                    SolutionType::Resolved,
+                )
+            })
+            .collect(),
+        is_recursive: resolver.is_recursive,
+    }
 }
 
-struct ResolveBinding;
-
+/// Resolves each group of mutually dependent solutions once all of its dependencies are
+/// resolved, by finding the strongly connected components of the dependency graph.
 struct Resolver<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
     inferable: TypeVarSet<'db>,
     solution: &'a [TypeVarSolution<'db>],
-    indices: FxHashMap<BoundTypeVarIdentity<'db>, usize>,
-    resolved: CycleDetector<'db, ResolveBinding, Type<'db>, Option<Type<'db>>, 3>,
+    /// The solutions that each solution refers to, or `None` if one of them is missing.
+    dependencies: Vec<Option<Vec<usize>>>,
+    resolved: Vec<Option<Type<'db>>>,
+    /// The order in which each solution was first visited.
+    visited: Vec<Option<usize>>,
+    /// Visited solutions whose group is not complete yet, in the order of their visits.
+    pending: Vec<usize>,
+    is_pending: Vec<bool>,
+    is_recursive: bool,
 }
 
 impl<'db> Resolver<'_, 'db> {
-    fn resolve(&self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
-        let binding = &self.solution[index];
-        self.resolved
-            .visit(db, Type::TypeVar(binding.bound_typevar), || {
-                let original = binding.solution;
-                let replacements = RefCell::new(FxOrderMap::default());
-                if !Dependencies::check(db, self.env, self.inferable, original, |dependency| {
-                    let Some(&index) = self.indices.get(&dependency.identity(db)) else {
-                        return false;
-                    };
-                    let Some(ty) = self.resolve(db, index) else {
-                        return false;
-                    };
-                    replacements.borrow_mut().insert(index, ty);
-                    true
-                }) {
-                    return None;
-                }
-                let replacements = replacements.into_inner();
-                if replacements.is_empty() {
-                    return Some(original);
-                }
+    /// Returns the earliest visited solution that `index` can reach among the pending ones.
+    /// `index` completes a group if that is `index` itself.
+    fn visit(&mut self, db: &'db dyn Db, index: usize) -> usize {
+        if let Some(order) = self.visited[index] {
+            return order;
+        }
+        // Every solution is visited once, and stays pending until its group is complete.
+        let order = self.visited.iter().flatten().count();
+        self.visited[index] = Some(order);
+        self.pending.push(index);
+        self.is_pending[index] = true;
+        let mut earliest = order;
+        for dependency in self.dependencies[index].clone().unwrap_or_default() {
+            let reached = self.visit(db, dependency);
+            if self.is_pending[dependency] {
+                earliest = earliest.min(reached);
+            }
+        }
+        if earliest == order {
+            let start = self.pending.iter().rposition(|pending| *pending == index);
+            let group = self.pending.split_off(start.unwrap_or_default());
+            for member in &group {
+                self.is_pending[*member] = false;
+            }
+            self.resolve_group(db, &group);
+        }
+        earliest
+    }
 
-                // Every replacement is already closed. One simultaneous substitution therefore
-                // suffices, and never substitutes a cycle with an arbitrary representative.
-                let context = GenericContext::from_typevar_instances(
-                    db,
-                    self.env,
-                    replacements
-                        .keys()
-                        .map(|index| self.solution[*index].bound_typevar),
-                );
-                let types: Vec<_> = replacements.values().copied().collect();
-                let mapped = original.apply_type_mapping(
-                    db,
-                    self.env,
-                    &TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
-                        generic_context: context,
-                        types: &types,
-                        skip: None,
-                    }),
-                    TypeContext::default(),
-                );
-                // Some type forms preserve captured variables when specialized. For example, an
-                // alias changes its explicit arguments but can retain a free variable in its body.
-                // Verify closure on the actual result without performing further substitutions.
-                Dependencies::check(db, self.env, self.inferable, mapped, |_| false)
-                    .then_some(mapped)
+    fn resolve_group(&mut self, db: &'db dyn Db, group: &[usize]) {
+        // Most solutions mention no other variable, and need no substitution or verification.
+        if let [index] = group
+            && self.dependencies[*index]
+                .as_ref()
+                .is_some_and(Vec::is_empty)
+        {
+            self.resolved[*index] = Some(self.solution[*index].solution);
+            return;
+        }
+        let Some(equations) = group
+            .iter()
+            .map(|index| {
+                Some((
+                    self.solution[*index].bound_typevar,
+                    self.substitute(db, *index, group)?,
+                ))
             })
+            .collect::<Option<Vec<_>>>()
+        else {
+            return;
+        };
+        let is_recursive = group.iter().any(|index| {
+            self.dependencies[*index]
+                .iter()
+                .flatten()
+                .any(|dependency| group.contains(dependency))
+        });
+        let types = if is_recursive {
+            let Some(types) = RecursiveType::from_equations(db, self.env, &equations) else {
+                return;
+            };
+            // The bounds of each path were compared before the solutions referred to
+            // themselves. A variable's own declaration is checked again here: `T: int` does not
+            // admit `T = int | tuple[T]`, whose other members are tuples.
+            let satisfies_declaration = |(variable, _): &(BoundTypeVarInstance<'db>, _),
+                                         ty: &Type<'db>| {
+                let is_possibly_assignable = |source: Type<'db>, target: Type<'db>| {
+                    is_possibly_constraint_set_assignable(
+                        db,
+                        TypePair::new(db, self.env.program(db), source, target),
+                    )
+                };
+                match variable.require_bound_or_constraints(db, self.env) {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        bound.is_object()
+                            || is_possibly_assignable(*ty, bound.top_materialization(db, self.env))
+                    }
+                    TypeVarBoundOrConstraints::Constraints(choices) => {
+                        choices.elements(db).iter().any(|choice| {
+                            is_possibly_assignable(choice.bottom_materialization(db, self.env), *ty)
+                                && is_possibly_assignable(
+                                    *ty,
+                                    choice.top_materialization(db, self.env),
+                                )
+                        })
+                    }
+                }
+            };
+            if !equations
+                .iter()
+                .zip(&types)
+                .all(|(equation, ty)| satisfies_declaration(equation, ty))
+            {
+                return;
+            }
+            types
+        } else {
+            equations.into_iter().map(|(_, ty)| ty).collect()
+        };
+        // Some type forms preserve captured variables when specialized. For example, an alias
+        // changes its explicit arguments but can retain a free variable in its body. Verify
+        // closure on the actual results without performing further substitutions.
+        if Dependencies::check(db, self.env, self.inferable, types.iter().copied(), |_| {
+            false
+        }) {
+            for (index, ty) in group.iter().zip(types) {
+                self.resolved[*index] = Some(ty);
+            }
+            self.is_recursive |= is_recursive;
+        }
+    }
+
+    /// Substitutes the resolved dependencies outside of `group`. Every one of them is already
+    /// closed, so one simultaneous substitution suffices.
+    fn substitute(&self, db: &'db dyn Db, index: usize, group: &[usize]) -> Option<Type<'db>> {
+        let original = self.solution[index].solution;
+        let mut replacements = FxOrderMap::default();
+        for dependency in self.dependencies[index].as_ref()? {
+            if !group.contains(dependency) {
+                replacements.insert(*dependency, self.resolved[*dependency]?);
+            }
+        }
+        if replacements.is_empty() {
+            return Some(original);
+        }
+        let context = GenericContext::from_typevar_instances(
+            db,
+            self.env,
+            replacements
+                .keys()
+                .map(|index| self.solution[*index].bound_typevar),
+        );
+        let types: Vec<_> = replacements.values().copied().collect();
+        Some(original.apply_type_mapping(
+            db,
+            self.env,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
+                generic_context: context,
+                types: &types,
+                skip: None,
+            }),
+            TypeContext::default(),
+        ))
     }
 }
 
@@ -135,11 +290,13 @@ struct Dependencies<'a, 'db> {
 }
 
 impl<'db> Dependencies<'_, 'db> {
+    /// Whether `query` accepts every inferable variable that occurs in `types`. The types of a
+    /// recursive solution unfold to each other, and are visited once in total.
     fn check(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
-        ty: Type<'db>,
+        types: impl IntoIterator<Item = Type<'db>>,
         query: impl Fn(BoundTypeVarInstance<'db>) -> bool,
     ) -> bool {
         let visitor = Dependencies {
@@ -149,7 +306,9 @@ impl<'db> Dependencies<'_, 'db> {
             satisfied: Cell::new(true),
             visited: CycleDetector::new(()),
         };
-        visitor.visit_type(db, ty);
+        for ty in types {
+            visitor.visit_type(db, ty);
+        }
         visitor.satisfied.get()
     }
 
@@ -326,7 +485,8 @@ mod tests {
                     &env,
                     TypeVarSet::from_typevars(db, [t, u]),
                     &[binding(t, alias), binding(u, int)],
-                );
+                )
+                .types;
                 assert_eq!(
                     resolved.as_ref(),
                     [SolutionType::Unresolved(alias), SolutionType::Resolved(int)],
@@ -391,12 +551,14 @@ mod tests {
                 .expect_type();
             let inferable = TypeVarSet::from_typevars(db, [t, u]);
             assert_eq!(
-                resolve_solution(db, &env, inferable, &[binding(t, alias)]).as_ref(),
+                resolve_solution(db, &env, inferable, &[binding(t, alias)])
+                    .types
+                    .as_ref(),
                 [SolutionType::Unresolved(alias)],
                 "{name}: missing dependency"
             );
             let resolved =
-                resolve_solution(db, &env, inferable, &[binding(t, alias), binding(u, int)]);
+                resolve_solution(db, &env, inferable, &[binding(t, alias), binding(u, int)]).types;
             let [
                 SolutionType::Resolved(mapped),
                 SolutionType::Resolved(resolved_u),
@@ -413,6 +575,7 @@ mod tests {
                     TypeVarSet::from_typevars(db, [t]),
                     &[binding(t, alias)]
                 )
+                .types
                 .as_ref(),
                 [SolutionType::Resolved(alias)],
                 "{name}: non-inferable variable"
@@ -468,13 +631,16 @@ mod tests {
             let alias = parameter.annotated_type();
             let inferable = TypeVarSet::from_typevars(db, [t, u]);
             assert_eq!(
-                resolve_solution(db, &env, inferable, &[binding(t, alias)]).as_ref(),
+                resolve_solution(db, &env, inferable, &[binding(t, alias)])
+                    .types
+                    .as_ref(),
                 [SolutionType::Unresolved(alias)],
                 "{parameter:?}: missing captured dependency"
             );
             // Specializing an alias's arguments cannot replace a variable captured in its body.
             assert_eq!(
                 resolve_solution(db, &env, inferable, &[binding(t, alias), binding(u, int)])
+                    .types
                     .as_ref(),
                 [SolutionType::Unresolved(alias), SolutionType::Resolved(int)],
                 "{parameter:?}: retained captured dependency"
@@ -509,7 +675,8 @@ mod tests {
                 &env,
                 TypeVarSet::from_typevars(db, [t]),
                 &[binding(t, tree)],
-            );
+            )
+            .types;
             assert_eq!(resolved.as_ref(), [SolutionType::Resolved(tree)]);
 
             // A closed recursive alias does not prevent resolving an independent tuple element.
@@ -520,7 +687,8 @@ mod tests {
                 &env,
                 TypeVarSet::from_typevars(db, [t, u]),
                 &[binding(t, pair), binding(u, int)],
-            );
+            )
+            .types;
             assert_eq!(
                 resolved.as_ref(),
                 [
@@ -577,7 +745,8 @@ mod tests {
                 &env,
                 TypeVarSet::from_typevars(db, [t, u]),
                 &[binding(t, Type::KnownInstance(partial)), binding(u, int)],
-            );
+            )
+            .types;
             let [
                 SolutionType::Resolved(Type::KnownInstance(
                     KnownInstanceType::FunctoolsPartial(mapped)
