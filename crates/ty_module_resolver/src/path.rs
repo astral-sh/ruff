@@ -113,22 +113,20 @@ impl ModulePath {
                 system_path_is_directory(resolver.db, &search_path.join(relative_path))
             }
             SearchPathInner::StandardLibraryCustom(stdlib_root) => {
-                match query_stdlib_version(relative_path, resolver) {
-                    TypeshedVersionsQueryResult::DoesNotExist => false,
-                    TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => {
-                        system_path_is_directory(resolver.db, &stdlib_root.join(relative_path))
-                    }
-                }
+                system_path_is_directory(resolver.db, &stdlib_root.join(relative_path))
+                    && !matches!(
+                        query_stdlib_version(relative_path, resolver),
+                        TypeshedVersionsQueryResult::DoesNotExist
+                    )
             }
             SearchPathInner::StandardLibraryVendored(stdlib_root) => {
-                match query_stdlib_version(relative_path, resolver) {
-                    TypeshedVersionsQueryResult::DoesNotExist => false,
-                    TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => resolver
-                        .vendored()
-                        .is_directory(stdlib_root.join(relative_path)),
-                }
+                resolver
+                    .vendored()
+                    .is_directory(stdlib_root.join(relative_path))
+                    && !matches!(
+                        query_stdlib_version(relative_path, resolver),
+                        TypeshedVersionsQueryResult::DoesNotExist
+                    )
             }
         }
     }
@@ -181,41 +179,6 @@ impl ModulePath {
         }
     }
 
-    /// Get the `py.typed` info for this package (not considering parent packages)
-    pub(super) fn py_typed(&self, resolver: &ResolverContext) -> PyTyped {
-        let Some(py_typed_file) = self.to_system_path().and_then(|path| {
-            if !directory_contains_file(resolver.db, &path, &["py.typed"]) {
-                return None;
-            }
-            let py_typed_path = path.join("py.typed");
-            system_path_to_file(resolver.db, py_typed_path).ok()
-        }) else {
-            return PyTyped::Untyped;
-        };
-
-        // Different module names revisit the same package. Share the tracked contents instead of
-        // reading its marker from disk again for every module resolution.
-        let py_typed_contents = source_text(resolver.db, py_typed_file);
-        // If we fail to read it let's say that's like it doesn't exist
-        // (right now the difference between Untyped and Full is academic)
-        if py_typed_contents.read_error().is_some() {
-            return PyTyped::Untyped;
-        }
-
-        // The python typing spec says to look for "partial\n" but in the wild we've seen:
-        //
-        // * PARTIAL\n
-        // * partial\\n (as in they typed "\n")
-        // * partial/n
-        //
-        // since the py.typed file never really grew any other contents, let's be permissive
-        if py_typed_contents.to_ascii_lowercase().contains("partial") {
-            PyTyped::Partial
-        } else {
-            PyTyped::Full
-        }
-    }
-
     pub(super) fn to_system_path(&self) -> Option<SystemPathBuf> {
         let ModulePath {
             search_path,
@@ -232,6 +195,15 @@ impl ModulePath {
             }
             SearchPathInner::StandardLibraryVendored(_) => None,
         }
+    }
+
+    /// Returns the path within the vendored filesystem, if this is a vendored module.
+    fn to_vendored_path(&self) -> Option<VendoredPathBuf> {
+        Some(
+            self.search_path
+                .as_vendored_path()?
+                .join(&self.relative_path),
+        )
     }
 
     #[must_use]
@@ -283,6 +255,13 @@ impl ModulePath {
                 ModuleName::from_components(parent_components.chain([name]))
             }
         }
+    }
+}
+
+impl get_size2::GetSize for ModulePath {
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        let (size, tracker) = self.search_path.get_heap_size_with_tracker(tracker);
+        (size + self.relative_path.capacity(), tracker)
     }
 }
 
@@ -350,9 +329,59 @@ impl<'db> ModuleDirectory<'db> {
         context: &ResolverContext<'db>,
         name: &str,
     ) -> Option<Self> {
+        self.child_directory_path(context, name)
+            .map(|path| Self::new(context, path))
+    }
+
+    /// Returns an existing child directory's path without reading its contents.
+    pub(crate) fn child_directory_path(
+        &self,
+        context: &ResolverContext,
+        name: &str,
+    ) -> Option<ModulePath> {
+        if !self.path.search_path.is_standard_library() {
+            match self.listing.and_then(|listing| listing.file_type(name)) {
+                Some(FileType::Directory) => {
+                    let mut path = self.path.clone();
+                    path.push(name);
+                    return Some(path);
+                }
+                Some(FileType::Symlink) => {}
+                _ => return None,
+            }
+        }
         let mut path = self.path.clone();
         path.push(name);
-        path.is_directory(context).then(|| Self::new(context, path))
+        path.is_directory(context).then_some(path)
+    }
+
+    /// Returns whether the cached system listing identifies `path` as a non-symlink child directory.
+    pub(crate) fn is_child_directory(&self, path: &ModulePath) -> bool {
+        self.path.search_path == path.search_path
+            && path.relative_path.parent() == Some(self.path.relative_path.as_path())
+            && path.relative_path.file_name().is_some_and(|name| {
+                self.listing
+                    .is_some_and(|listing| listing.file_type(name) == Some(FileType::Directory))
+            })
+    }
+
+    /// Visits the names and file types of entries in a system or vendored directory.
+    pub(crate) fn for_each_entry(&self, db: &dyn Db, mut visit: impl FnMut(&str, FileType)) {
+        if let Some(listing) = self.system_listing() {
+            for (name, kind) in listing.iter() {
+                visit(name, kind);
+            }
+        } else if let Some(path) = self.path.to_vendored_path() {
+            for entry in db.vendored().read_directory(&path) {
+                if let Some(name) = entry.path().file_name() {
+                    let kind = match entry.file_type() {
+                        ruff_db::vendored::FileType::Directory => FileType::Directory,
+                        ruff_db::vendored::FileType::File => FileType::File,
+                    };
+                    visit(name, kind);
+                }
+            }
+        }
     }
 
     /// Returns the directory's path without permitting it to change.
@@ -435,6 +464,46 @@ impl<'db> ModuleDirectory<'db> {
                     }
                 }
             }
+        }
+    }
+
+    /// Reads this package's `py.typed` marker without considering parent packages.
+    pub(super) fn py_typed(&self, resolver: &ResolverContext) -> PyTyped {
+        if !matches!(
+            self.listing
+                .and_then(|listing| listing.file_type("py.typed")),
+            Some(FileType::File | FileType::Symlink)
+        ) {
+            return PyTyped::Untyped;
+        }
+        let Some(py_typed_file) = self
+            .path
+            .to_system_path()
+            .and_then(|path| system_path_to_file(resolver.db, path.join("py.typed")).ok())
+        else {
+            return PyTyped::Untyped;
+        };
+
+        // Different module names revisit the same package. Share the tracked contents instead of
+        // reading its marker from disk again for every module resolution.
+        let py_typed_contents = source_text(resolver.db, py_typed_file);
+        // If we fail to read it let's say that's like it doesn't exist
+        // (right now the difference between Untyped and Full is academic)
+        if py_typed_contents.read_error().is_some() {
+            return PyTyped::Untyped;
+        }
+
+        // The python typing spec says to look for "partial\n" but in the wild we've seen:
+        //
+        // * PARTIAL\n
+        // * partial\\n (as in they typed "\n")
+        // * partial/n
+        //
+        // since the py.typed file never really grew any other contents, let's be permissive
+        if py_typed_contents.to_ascii_lowercase().contains("partial") {
+            PyTyped::Partial
+        } else {
+            PyTyped::Full
         }
     }
 }
