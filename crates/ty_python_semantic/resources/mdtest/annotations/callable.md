@@ -667,6 +667,18 @@ def convert(callback: Callable[[int], str]) -> str:
 reveal_type(convert(Product))  # revealed: str
 ```
 
+### Classes with unknown bases
+
+In the example below, the unknown base class may provide a constructor that accepts an argument. We
+therefore allow the subclass to be passed to `map` as a callback.
+
+```py
+def example(base):
+    class ImportItem(base): ...
+
+    map(ImportItem, [])
+```
+
 ## Nested callable relations still reach the leaf mismatch
 
 ```py
