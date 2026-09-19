@@ -80,6 +80,16 @@ mod comparisons;
 #[cfg(test)]
 mod tests;
 
+/// The inferred alias type, or a cycle error retaining a type for recovery.
+pub(super) type ImplicitAliasResult<'db> = Result<Type<'db>, CyclicTypeAliasError<'db>>;
+
+/// An alias that reaches itself through aliases and unions without a containing type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct CyclicTypeAliasError<'db> {
+    /// The type available for recovery. Normalizing this type does not make the alias valid.
+    fallback_type: Type<'db>,
+}
+
 /// Infer the type denoted by an implicit or PEP 613 alias independently of its runtime value.
 ///
 /// `_parameters` supplies the formal type parameters collected by [`implicit_alias_parameters`].
@@ -91,17 +101,22 @@ mod tests;
 ///
 /// For generic aliases, the caller applies explicit type arguments or the default specialization.
 /// If inference does not encounter a cycle, the result need not contain a structural recursive type.
+/// Validation examines the inferred constructor before recovery, so diagnostics do not depend on
+/// which recursive references remain in the recovered type.
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
         ImplicitAliasInference {
-            ty: Type::Recursive(RecursiveType::initial(db, definition, id, parameters)),
+            ty: Ok(Type::Recursive(RecursiveType::initial(db, definition, id, parameters))),
             diagnostics: TypeCheckDiagnostics::default(),
             implicit_aliases: Box::default(),
         }
     },
     cycle_fn=|db, cycle: &salsa::Cycle, _: &ImplicitAliasInference<'db>, mut result: ImplicitAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
-        result.ty = RecursiveType::recover(db, definition, cycle.id(), parameters, result.ty);
+        let recover = |ty| RecursiveType::recover(db, definition, cycle.id(), parameters, ty);
+        result.ty = result.ty.map(recover).map_err(|error| CyclicTypeAliasError {
+            fallback_type: recover(error.fallback_type),
+        });
         result
     },
     heap_size=ruff_memory_usage::heap_size
@@ -116,7 +131,7 @@ pub(super) fn infer_implicit_alias_type<'db>(
     let module = parsed_module(db, python_file).load(db);
     let Some(value) = definition.kind(db).value(&module) else {
         return ImplicitAliasInference {
-            ty: Type::unknown(),
+            ty: Ok(Type::unknown()),
             diagnostics: TypeCheckDiagnostics::default(),
             implicit_aliases: Box::default(),
         };
@@ -142,7 +157,7 @@ pub(super) fn infer_implicit_alias_type<'db>(
 /// other's diagnostics during fixed-point iteration.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ImplicitAliasInference<'db> {
-    pub(super) ty: Type<'db>,
+    pub(super) ty: ImplicitAliasResult<'db>,
     pub(super) diagnostics: TypeCheckDiagnostics,
     pub(super) implicit_aliases: Box<[Definition<'db>]>,
 }
