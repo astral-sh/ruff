@@ -965,6 +965,133 @@ reveal_type(generic_context(into_regular_callable(D)))
 reveal_type(D())  # revealed: D[Unknown, Unknown]
 ```
 
+## Constructor overrides with conditionally specialized receivers
+
+A generic subclass must preserve each inherited `__new__` overload that applies to one of its
+specializations. An override can accept both argument types or keep their relationship with the
+class type parameter. The parent's use of `T` as both a parameter and return type makes it
+invariant:
+
+```pyi
+from typing_extensions import overload, override
+
+class Parent[T]:
+    @overload
+    def __new__(cls: type[Parent[int]], value: int) -> object: ...
+    @overload
+    def __new__(cls: type[Parent[str]], value: str) -> object: ...
+    def invariant(self, value: T) -> T: ...
+
+class AcceptsBoth[T](Parent[T]):
+    @override
+    def __new__(cls, value: int | str) -> object: ...
+
+class PreservesSpecialization[T](Parent[T]):
+    @override
+    def __new__(cls, value: T) -> object: ...
+```
+
+An overloaded override can also preserve the same receiver restrictions. Changing even one of the
+corresponding argument types violates the parent's contract:
+
+```pyi
+class Overloaded[T](Parent[T]):
+    @overload
+    @override
+    def __new__(cls: type[Overloaded[int]], value: int) -> object: ...
+    @overload
+    def __new__(cls: type[Overloaded[str]], value: str) -> object: ...
+
+class IncompatibleOverloaded[T](Parent[T]):
+    @overload
+    @override
+    def __new__(cls: type[IncompatibleOverloaded[str]], value: str) -> object: ...
+    @overload
+    def __new__(cls: type[IncompatibleOverloaded[int]], value: bytes) -> object: ...  # error: [invalid-method-override]
+```
+
+An unrelated argument type is incompatible with both specializations; accepting only `int` is
+incompatible with the `str` specialization. A subclass whose type parameter is bounded by `int` does
+not need to accept the `str` overload:
+
+```pyi
+class Incompatible[T](Parent[T]):
+    @override
+    def __new__(cls, value: bytes) -> object: ...  # error: [invalid-method-override]
+
+class AcceptsOnlyInt[T](Parent[T]):
+    @override
+    def __new__(cls, value: int) -> object: ...  # error: [invalid-method-override]
+
+class IntBounded[T: int](Parent[T]):
+    @override
+    def __new__(cls, value: int) -> object: ...
+```
+
+If the parent leaves its type parameter covariant, an unrelated argument still violates each
+applicable overload:
+
+```pyi
+class CovariantParent[T]:
+    @overload
+    def __new__(cls: type[CovariantParent[int]], value: int) -> object: ...
+    @overload
+    def __new__(cls: type[CovariantParent[str]], value: str) -> object: ...
+
+class CovariantIncompatible[T](CovariantParent[T]):
+    @override
+    def __new__(cls, value: bytes) -> object: ...  # error: [invalid-method-override]
+```
+
+The overriding method can introduce its own type parameter. An unbounded parameter or one
+constrained to `int` and `str` accepts both inherited overloads:
+
+```pyi
+class GenericMethod[T](Parent[T]):
+    @override
+    def __new__[U](cls, value: U) -> object: ...
+
+class ConstrainedMethod[T](Parent[T]):
+    @override
+    def __new__[U: (int, str)](cls, value: U) -> object: ...
+```
+
+A method type parameter bounded by `int` cannot accept the inherited `str` overload, and one bounded
+by `bytes` cannot accept either overload. We reject both generic and concrete subclasses:
+
+```pyi
+class IntBoundedMethod[T](Parent[T]):
+    @override
+    def __new__[U: int](cls, value: U) -> object: ...  # error: [invalid-method-override]
+
+class BytesBoundedMethod[T](Parent[T]):
+    @override
+    def __new__[U: bytes](cls, value: U) -> object: ...  # error: [invalid-method-override]
+
+class ConcreteBytesBoundedMethod(Parent[int]):
+    @override
+    def __new__[U: bytes](cls, value: U) -> object: ...  # error: [invalid-method-override]
+```
+
+A constrained method type parameter must also include a choice compatible with each inherited
+overload. A bound of `int | str` or `Any` permits both argument types:
+
+```pyi
+from typing import Any
+
+class IncompatibleConstrainedMethod[T](Parent[T]):
+    @override
+    def __new__[U: (int, bytes)](cls, value: U) -> object: ...  # error: [invalid-method-override]
+
+class UnionBoundedMethod[T](Parent[T]):
+    @override
+    def __new__[U: int | str](cls, value: U) -> object: ...
+
+class GradualBoundedMethod[T](Parent[T]):
+    @override
+    def __new__[U: Any](cls, value: U) -> object: ...
+```
+
 ## Generic subclass
 
 When a generic subclass fills its superclass's type parameter with one of its own, the actual types
