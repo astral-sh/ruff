@@ -94,6 +94,58 @@ def f():
         return True
 
 
+def f():
+    # SIM103
+    if not condition_a and condition_b:
+        return True
+    elif condition_a and condition_b:
+        return True
+    else:
+        return False
+
+
+def f():
+    # SIM103
+    if foo:
+        return False
+    elif bar:
+        return False
+    else:
+        return True
+
+
+def f():
+    # SIM103
+    if foo == 1:
+        return True
+    elif bar in baz:
+        return True
+    else:
+        return False
+
+
+def f():
+    # SIM103
+    if foo:
+        return True
+    elif bar:
+        return True
+    elif baz:
+        return True
+    else:
+        return False
+
+
+def f():
+    # OK
+    if foo:
+        return True
+    elif bar:
+        return False
+    else:
+        return False
+
+
 ###
 # Positive cases (preview)
 ###
