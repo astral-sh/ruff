@@ -17,9 +17,11 @@ mod tests {
     #[test_case(Rule::ShebangNotExecutable, Path::new("EXE001_1.py"))]
     #[test_case(Rule::ShebangNotExecutable, Path::new("EXE001_2.py"))]
     #[test_case(Rule::ShebangNotExecutable, Path::new("EXE001_3.py"))]
+    #[test_case(Rule::ShebangNotExecutable, Path::new("EXE001_4.py"))]
     #[test_case(Rule::ShebangMissingExecutableFile, Path::new("EXE002_1.py"))]
     #[test_case(Rule::ShebangMissingExecutableFile, Path::new("EXE002_2.py"))]
     #[test_case(Rule::ShebangMissingExecutableFile, Path::new("EXE002_3.py"))]
+    #[test_case(Rule::ShebangMissingExecutableFile, Path::new("EXE002_4.py"))]
     #[test_case(Rule::ShebangMissingPython, Path::new("EXE003.py"))]
     #[test_case(Rule::ShebangMissingPython, Path::new("EXE003_uv.py"))]
     #[test_case(Rule::ShebangMissingPython, Path::new("EXE003_uv_tool.py"))]
@@ -31,6 +33,7 @@ mod tests {
     #[test_case(Rule::ShebangNotFirstLine, Path::new("EXE005_1.py"))]
     #[test_case(Rule::ShebangNotFirstLine, Path::new("EXE005_2.py"))]
     #[test_case(Rule::ShebangNotFirstLine, Path::new("EXE005_3.py"))]
+    #[test_case(Rule::ShebangNotFirstLine, Path::new("EXE005_4.py"))]
     fn rules(rule: Rule, path: &Path) -> Result<()> {
         if super::helpers::is_wsl() {
             // these rules are always ignored on WSL, so skip testing them in a WSL environment
