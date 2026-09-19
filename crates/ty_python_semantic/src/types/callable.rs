@@ -890,15 +890,6 @@ impl<'db> CallableType<'db> {
         self.with_kind(db, CallableTypeKind::DunderParamSpec)
     }
 
-    pub(crate) fn apply_self(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        self_type: Type<'db>,
-    ) -> CallableType<'db> {
-        self.apply_self_with_receiver(db, env, self_type, self_type)
-    }
-
     pub(crate) fn apply_self_with_receiver(
         self,
         db: &'db dyn Db,
@@ -1004,10 +995,6 @@ impl<'db> CallableTypes<'db> {
             [single] => Some(*single),
             _ => None,
         }
-    }
-
-    pub(super) fn as_slice(&self) -> &[CallableType<'db>] {
-        &self.0
     }
 
     fn into_inner(self) -> SmallVec<[CallableType<'db>; 1]> {

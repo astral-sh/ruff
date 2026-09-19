@@ -3866,7 +3866,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
         let formal_signature = formal.signatures(db);
         let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
-        for actual_callable in actual_callables.as_slice() {
+        for actual_callable in &actual_callables {
             if formal_is_single_paramspec {
                 let when = actual_callable
                     .signatures(db)

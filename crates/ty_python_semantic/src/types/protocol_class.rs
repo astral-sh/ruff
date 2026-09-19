@@ -3420,11 +3420,7 @@ fn protocol_apply_self_with_receiver<'db>(
 ) -> CallableType<'db> {
     let env = ProgramEnvironment::from_program(program);
 
-    if receiver_type == self_type {
-        callable.apply_self(db, &env, self_type)
-    } else {
-        callable.apply_self_with_receiver(db, &env, receiver_type, self_type)
-    }
+    callable.apply_self_with_receiver(db, &env, receiver_type, self_type)
 }
 
 /// Return `true` if a callable has at least one overload and none return `Never`.

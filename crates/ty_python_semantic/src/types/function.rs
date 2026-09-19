@@ -533,7 +533,11 @@ impl<'db> OverloadLiteral<'db> {
 
         if function_node.is_async && !is_generator {
             let env = ProgramEnvironment::from_file(program_file);
-            signature = signature.wrap_coroutine_return_type(db, &env);
+            signature.return_ty = KnownClass::CoroutineType.to_specialized_instance(
+                db,
+                &env,
+                &[Type::any(), Type::any(), signature.return_ty],
+            );
         }
 
         signature
