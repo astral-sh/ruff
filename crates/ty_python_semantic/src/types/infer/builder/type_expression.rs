@@ -109,7 +109,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
         let parameters = implicit_alias_parameters(db, definition);
         let result = infer_implicit_alias_type(db, definition, parameters).ty;
-        // Preserve cycle errors even when recovery removes recursive union members.
+        // Preserve cycle errors even when recovery removes every recursive reference. Both
+        // runtime-value inference and enclosing aliases need the fallback type to converge.
         let ty = result.unwrap_or_else(|error| error.fallback_type);
         let is_recursive = any_over_type(db, self.program_environment(), ty, false, |ty| {
             matches!(ty, Type::Recursive(_))
@@ -124,17 +125,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             self.implicit_aliases.insert(definition);
         }
-        // Enclosing aliases need the recursive structure to detect their own cycles. Ordinary
-        // uses expand invalid aliases to a recovery type to avoid secondary errors.
-        let ty = if result.is_err()
-            && !self
-                .inference_flags()
-                .contains(InferenceFlags::IN_TYPE_ALIAS)
-        {
-            ty.expand_eagerly(db, self.program_environment())
-        } else {
-            ty
-        };
         Some((ty, parameters))
     }
 

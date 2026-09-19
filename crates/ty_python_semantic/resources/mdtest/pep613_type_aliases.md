@@ -497,6 +497,50 @@ def inspect_mutual(first: First, second: Second):
     reveal_type(second)  # revealed: str | Divergent
 ```
 
+## Recovery from nested invalid aliases
+
+An invalid alias uses a divergent type for recovery even when referenced inside another alias.
+Operations on that divergent type do not produce additional errors.
+
+```py
+from typing import TypeAlias
+
+Bad: TypeAlias = "Bad"  # error: [cyclic-type-alias-definition]
+Wrapped: TypeAlias = list[Bad]
+
+def inspect(values: Wrapped):
+    reveal_type(values[0])  # revealed: Divergent
+    values[0]()
+    values[0] + 1
+```
+
+## Cycles mixing alias syntaxes
+
+A cycle can cross module boundaries and mix PEP 613 and PEP 695 aliases. Both declarations receive a
+diagnostic when the cycle passes through no containing type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`b.py`:
+
+```py
+from typing import TypeAlias
+from a import A
+
+B: TypeAlias = "A"  # error: [cyclic-type-alias-definition]
+```
+
+`a.py`:
+
+```py
+from b import B
+
+type A = B  # error: [cyclic-type-alias-definition]
+```
+
 ## Invalid generic cycles
 
 Specializing a recursive reference does not guard its cycle. A generic alias cannot include a
