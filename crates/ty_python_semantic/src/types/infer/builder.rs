@@ -11658,14 +11658,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let range = TextRange::new(left.start(), right.end());
 
-                let ty = comparisons::infer_binary_type_comparison(
+                let literal_membership = comparisons::infer_literal_membership_comparison(
                     &builder.context,
                     left_ty,
                     *op,
-                    right_ty,
-                    range,
-                )
-                .unwrap_or_else(|error| {
+                    right,
+                    |element| builder.expression_type(element),
+                );
+
+                let comparison = literal_membership.map_or_else(
+                    || {
+                        comparisons::infer_binary_type_comparison(
+                            &builder.context,
+                            left_ty,
+                            *op,
+                            right_ty,
+                            range,
+                        )
+                    },
+                    Ok,
+                );
+                let ty = comparison.unwrap_or_else(|error| {
                     report_unsupported_comparison(
                         &builder.context,
                         &error,
