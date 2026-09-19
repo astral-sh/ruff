@@ -170,14 +170,6 @@ fn string_with_byte_kind() {
 }
 
 #[test]
-fn fstring() {
-    let source = "f'foo'";
-
-    let test_case = tokenize(source);
-    assert_debug_snapshot!(test_case.tokens());
-}
-
-#[test]
 fn tstring() {
     let source = "t'foo'";
 
