@@ -94,6 +94,7 @@ use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{
     InternedConstraintSet, InternedType, SentinelInstance, UnionTypeInstance,
 };
+use crate::types::member::MemberBinding;
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
@@ -3999,9 +4000,13 @@ impl<'db> Type<'db> {
                     .map_type(|member| property_wrapper_descriptor(db, env, name, member)),
             ),
 
-            Type::SubclassOf(subclass_of_ty) => {
-                subclass_of_ty.find_name_in_mro_with_policy(db, env, name, policy)
-            }
+            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.find_name_in_mro_with_policy(
+                db,
+                env,
+                name,
+                policy,
+                MemberBinding::Raw,
+            ),
 
             // Note: `super(pivot, owner).__class__` is `builtins.super`, not the owner's class.
             // `BoundSuper` should look up the name in the MRO of `builtins.super`.
@@ -4130,7 +4135,7 @@ impl<'db> Type<'db> {
         {
             let interface = protocol.interface(db);
             return if interface.includes_member(db, name) {
-                interface.instance_member(db, env, name)
+                interface.instance_member(db, env, name, MemberBinding::Raw)
             } else {
                 Type::instance(db, env, *origin).class_member_with_policy(db, env, name, policy)
             };
@@ -4202,7 +4207,7 @@ impl<'db> Type<'db> {
 
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => ty
                 .to_meta_type(db, env)
-                .class_object_member(db, env, name, policy),
+                .class_object_member(db, env, name, policy, MemberBinding::Raw),
 
             _ => ty
                 .to_meta_type(db, env)
@@ -4226,6 +4231,20 @@ impl<'db> Type<'db> {
         receiver: Type<'db>,
     ) -> PlaceAndQualifiers<'db> {
         let ty = key.ty(db);
+
+        if let Type::ProtocolInstance(protocol) = ty
+            && let Some(member) = protocol.materialized_interface_member(
+                db,
+                env,
+                key.name(db),
+                MemberBinding::WithReceiver {
+                    receiver: receiver.to_meta_type(db, env),
+                    self_type: receiver,
+                },
+            )
+        {
+            return member;
+        }
 
         // `object.__dict__` is a typeshed approximation: a concrete slotted instance without
         // dictionary storage does not inherit that attribute at runtime. Keep normal lookup for
@@ -4257,7 +4276,16 @@ impl<'db> Type<'db> {
             }
         }
 
-        Self::class_member_with_policy_inner(db, key)
+        let member = Self::class_member_with_policy_inner(db, key);
+        if ty.is_protocol_instance() {
+            MemberBinding::WithReceiver {
+                receiver: receiver.to_meta_type(db, env),
+                self_type: receiver,
+            }
+            .bind_attribute(db, env, member)
+        } else {
+            member
+        }
     }
 
     /// Look up attributes stored in the namespace of a class object.
@@ -4265,19 +4293,28 @@ impl<'db> Type<'db> {
     /// Besides attributes present in the class MRO, this includes attributes assigned to
     /// instances of its metaclass. For example, `cls.x = ...` in `Meta.__init__` stores `x`
     /// on each class object constructed by `Meta`.
+    ///
+    /// When binding a receiver, bind each candidate before combining it with its fallback.
+    /// Combining their types first would lose the distinction between a protocol classmethod
+    /// that needs receiver binding and a metaclass-provided value that does not.
     fn class_object_member(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
+        binding: MemberBinding<'db>,
     ) -> PlaceAndQualifiers<'db> {
-        let class_attr = self
-            .find_name_in_mro_with_policy(db, env, name, policy)
-            .expect(
-                "Calling `class_object_member` on class literals and subclass-of types \
-                should always find an MRO",
-            );
+        let class_attr = match self {
+            Type::SubclassOf(subclass) => {
+                subclass.find_name_in_mro_with_policy(db, env, name, policy, binding)
+            }
+            _ => self.find_name_in_mro_with_policy(db, env, name, policy),
+        }
+        .expect(
+            "Calling `class_object_member` on class literals and subclass-of types \
+            should always find an MRO",
+        );
 
         let own_class = match self {
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
@@ -4546,7 +4583,9 @@ impl<'db> Type<'db> {
                 .concrete_base_type(db)
                 .instance_member(db, env, name),
 
-            Type::ProtocolInstance(protocol) => protocol.instance_member(db, env, name),
+            Type::ProtocolInstance(protocol) => {
+                protocol.instance_member(db, env, name, MemberBinding::Raw)
+            }
 
             Type::FunctionLiteral(function) => function
                 .runtime_class(db)
@@ -5519,6 +5558,7 @@ impl<'db> Type<'db> {
             env,
             name,
             MemberLookupPolicy::default(),
+            MemberBinding::Raw,
         );
         let Place::Defined(DefinedPlace {
             ty,
@@ -5676,7 +5716,18 @@ impl<'db> Type<'db> {
                     .into();
                 }
 
-                let fallback = this.instance_member(db, env, name_str);
+                let fallback = match this {
+                    Type::ProtocolInstance(protocol) => protocol.instance_member(
+                        db,
+                        env,
+                        name_str,
+                        MemberBinding::WithReceiver {
+                            receiver: receiver.to_meta_type(db, env),
+                            self_type: receiver,
+                        },
+                    ),
+                    _ => this.instance_member(db, env, name_str),
+                };
 
                 let result = Type::invoke_descriptor_protocol(
                     db,
@@ -6302,12 +6353,20 @@ impl<'db> Type<'db> {
                         .into();
                     }
 
-                    let class_attr_plain = this.class_object_member(db, env, name_str, policy);
-
                     let self_instance = receiver.to_instance_approximation(db, env).expect(
                         "The receiver for a class-object lookup should always be instantiable",
                     );
-                    let class_attr_plain = class_attr_plain
+                    let class_attr_plain = this
+                        .class_object_member(
+                            db,
+                            env,
+                            name_str,
+                            policy,
+                            MemberBinding::WithReceiver {
+                                receiver,
+                                self_type: self_instance,
+                            },
+                        )
                         .map_type(|ty| ty.bind_self_typevars(db, env, self_instance));
 
                     let (class_attr_fallback, _, class_attr_error) =

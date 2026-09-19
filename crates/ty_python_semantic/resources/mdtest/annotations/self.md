@@ -795,6 +795,54 @@ def copy_sub(x: SubCopyable) -> None:
     reveal_type(x.copy())  # revealed: SubCopyable
 ```
 
+## Protocol attributes through intersections
+
+`Self` in a protocol attribute refers to the full receiver, including when the attribute is
+inherited from another protocol. Callable attributes substitute that same receiver into their
+parameter and return types.
+
+```py
+from collections.abc import Callable
+from typing import Protocol, Self
+from ty_extensions import Intersection
+
+class Linkable(Protocol):
+    next_node: Self
+    callback: Callable[[Self], Self]
+
+class Child(Linkable, Protocol): ...
+class Other: ...
+
+def read(base: Intersection[Linkable, Other], child: Intersection[Child, Other]):
+    reveal_type(base.next_node)  # revealed: Linkable & Other
+    reveal_type(child.next_node)  # revealed: Child & Other
+    reveal_type(child.callback)  # revealed: (Child & Other, /) -> Child & Other
+```
+
+## Materialized protocol properties through intersections
+
+Materializing a protocol preserves the binding context of its property getters. Their return types
+still substitute the full receiver for `Self` when the property is read. The `Any` attribute makes
+the top and bottom materializations differ from the original protocol.
+
+```py
+from typing import Any, Protocol, Self
+from ty_extensions import Bottom, Intersection, Top
+
+class P(Protocol):
+    value: Any
+
+    @property
+    def items(self) -> list[Self]: ...
+
+class Other: ...
+
+def read(plain: Intersection[P, Other], top: Intersection[Top[P], Other], bottom: Intersection[Bottom[P], Other]):
+    reveal_type(plain.items)  # revealed: list[P & Other]
+    reveal_type(top.items)  # revealed: list[Top[P] & Other]
+    reveal_type(bottom.items)  # revealed: list[Bottom[P] & Other]
+```
+
 ## Annotations
 
 ```py

@@ -3,6 +3,7 @@ use crate::place::{
     ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
     place_by_id, place_from_bindings,
 };
+use crate::types::protocol_class::ProtocolMemberType;
 use crate::types::{ProgramEnvironment, Type};
 use ty_python_core::{place_table, scope::ScopeId, use_def_map};
 
@@ -47,6 +48,69 @@ impl<'db> Member<'db> {
     pub(super) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         Self {
             inner: self.inner.map_type(f),
+        }
+    }
+}
+
+/// How to resolve receiver-dependent member types during lookup.
+#[derive(Debug, Clone, Copy)]
+pub(super) enum MemberBinding<'db> {
+    /// Resolve the member without binding it to a receiver.
+    Raw,
+    /// Bind to the receiver selected by the caller, which can be more precise than the type
+    /// being searched. For classmethods, `receiver` is the class object and `self_type` is its
+    /// instance type.
+    WithReceiver {
+        receiver: Type<'db>,
+        self_type: Type<'db>,
+    },
+}
+
+impl<'db> MemberBinding<'db> {
+    pub(super) fn apply(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        member: ProtocolMemberType<'db>,
+    ) -> Option<Type<'db>> {
+        match self {
+            Self::Raw => member.resolve(db, env).map(ProtocolMemberType::ty),
+            Self::WithReceiver { self_type, .. } => match member {
+                ProtocolMemberType::Value {
+                    ty,
+                    self_binding_context,
+                } if self_binding_context.is_none() || !ty.supports_self_binding(db, env) => {
+                    Some(ty)
+                }
+                _ => member.bind_self(db, env, self_type),
+            },
+        }
+    }
+
+    /// Bind an attribute's `Self` using its declaring class while preserving lookup metadata.
+    pub(super) fn bind_attribute(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        member: PlaceAndQualifiers<'db>,
+    ) -> PlaceAndQualifiers<'db> {
+        if matches!(self, Self::Raw) {
+            return member;
+        }
+        let Place::Defined(place) = member.place else {
+            return member;
+        };
+        if !place.ty.supports_self_binding(db, env) {
+            return member;
+        }
+        let member_type = ProtocolMemberType::with_attribute_definition(
+            db,
+            place.ty,
+            place.provenance.definition(),
+        );
+        match self.apply(db, env, member_type) {
+            Some(ty) => member.map_type(|_| ty),
+            None => Place::Undefined.with_qualifiers(member.qualifiers),
         }
     }
 }
