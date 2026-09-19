@@ -474,6 +474,9 @@ impl<'db> CallableSignature<'db> {
     ///
     /// These differ for class methods: the runtime receiver is a class object, while
     /// `typing.Self` denotes an instance of that class.
+    ///
+    /// Most callers should use [`Self::bind_method_receiver`] instead, which also specializes
+    /// type variables determined by the receiver and filters incompatible overloads.
     pub(crate) fn bind_self_with_receiver(
         &self,
         db: &'db dyn Db,
@@ -490,6 +493,63 @@ impl<'db> CallableSignature<'db> {
                 })
                 .collect(),
         }
+    }
+
+    /// Binds a method receiver after specializing type variables determined by it and filtering
+    /// overloads whose explicit receiver annotations are incompatible with it.
+    pub(super) fn bind_method_receiver(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> Self {
+        let [signature] = self.overloads.as_slice() else {
+            if !self
+                .overloads
+                .iter()
+                .any(Signature::has_explicit_positional_receiver_annotation)
+            {
+                return self.bind_self_with_receiver(
+                    db,
+                    env,
+                    Some(receiver_type),
+                    Some(typing_self_type),
+                );
+            }
+
+            return Self::from_overloads(
+                self.overloads
+                    .iter()
+                    .filter_map(|signature| {
+                        if !signature.can_bind_self_to(db, env, receiver_type) {
+                            return None;
+                        }
+
+                        signature
+                            .specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
+                            .map(|signature| {
+                                signature.bind_self_with_receiver(
+                                    db,
+                                    env,
+                                    Some(receiver_type),
+                                    Some(typing_self_type),
+                                )
+                            })
+                    })
+                    .flat_map(|signature| signature.overloads),
+            );
+        };
+
+        let specialized = if signature.has_receiver_determined_method_typevar(db, env) {
+            signature.specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
+        } else {
+            None
+        };
+
+        specialized
+            .unwrap_or_else(|| Self::single(signature.clone()))
+            .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type))
     }
 
     pub(crate) fn has_parameters(&self) -> bool {
@@ -1409,30 +1469,6 @@ impl<'db> Signature<'db> {
         }
 
         Some(specialized)
-    }
-
-    /// Returns this signature bound to `receiver_type` if its explicit receiver annotation is
-    /// compatible with the bound receiver.
-    pub(crate) fn bind_self_if_compatible(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        receiver_type: Type<'db>,
-        typing_self_type: Type<'db>,
-    ) -> Option<CallableSignature<'db>> {
-        if !self.can_bind_self_to(db, env, receiver_type) {
-            return None;
-        }
-
-        self.specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
-            .map(|signature| {
-                signature.bind_self_with_receiver(
-                    db,
-                    env,
-                    Some(receiver_type),
-                    Some(typing_self_type),
-                )
-            })
     }
 
     /// Returns `true` if this signature's first parameter can accept the bound `self` type.

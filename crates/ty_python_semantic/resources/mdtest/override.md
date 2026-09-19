@@ -636,6 +636,31 @@ class Child(Parent):
     def __new__(cls) -> Parent: ...  # error: [invalid-method-override]
 ```
 
+## Wrapped classmethods with inherited `Self` incompatibilities
+
+In the below example, `Parent.make` already violates `Grandparent.make`'s return contract: `Self`
+means `Parent` when accessed on `Parent`, but the wrapped factory returns `Grandparent`.
+`Child.make` preserves the parent's return type, so we do not report the inherited incompatibility
+on `Child`.
+
+```pyi
+from typing_extensions import Self
+
+class Grandparent:
+    @classmethod
+    def make(cls) -> Self: ...
+
+class Factory:
+    def __call__(self, cls: type[Grandparent]) -> Grandparent: ...
+
+class Parent(Grandparent):
+    make = classmethod(Factory())
+
+class Child(Parent):
+    @classmethod
+    def make(cls) -> Grandparent: ...
+```
+
 ## Missing `@override` decorator
 
 ```toml

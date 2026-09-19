@@ -675,6 +675,30 @@ Base.method("x")  # error: [no-matching-overload]
 Other.method(1)  # error: [no-matching-overload]
 ```
 
+The same overload selection applies when we pass these bound methods as callbacks. Here,
+`Executor.submit` forwards arguments to the supplied method and returns a future for its result, so
+the selected overload determines both the accepted arguments and the future's result type. The
+simplified definitions below are based on typeshed's `concurrent.futures` stubs.
+
+```py
+from typing import Callable, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+class Future(Generic[R]): ...
+
+class Executor:
+    def submit(self, fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> Future[R]:
+        raise NotImplementedError
+
+def check(executor: Executor):
+    reveal_type(executor.submit(Base.method, 1))  # revealed: Future[int]
+    reveal_type(executor.submit(Other.method, "x"))  # revealed: Future[str]
+    executor.submit(Base.method, "x")  # error: [invalid-argument-type] "Expected `int`"
+    executor.submit(Other.method, 1)  # error: [invalid-argument-type] "Expected `str`"
+```
+
 ## Extracted `__call__` methods do not bind again
 
 A bound method's `__call__` retains the method's signature. Storing it on another class does not

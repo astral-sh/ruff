@@ -7073,7 +7073,7 @@ impl<'db> Type<'db> {
                     || CallableBinding::not_callable(self).into(),
                     |callables| {
                         callables
-                            .into_type(db, env)
+                            .to_type(db, env)
                             .bindings_impl(db, env, recursion_guard)
                     },
                 )
@@ -10526,7 +10526,13 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             }
 
             Type::BoundMethod(method_type) => {
-                if let Some(signatures) = method_type.bound_signatures(db) {
+                // Function-backed methods contribute their bound signatures. Callable instances
+                // also expose attributes through `__func__`, so preserve their full variance.
+                if matches!(
+                    method_type.func(db),
+                    Type::FunctionLiteral(_) | Type::Callable(_)
+                ) && let Some(signatures) = method_type.bound_signatures(db)
+                {
                     signatures.variance_of(db, env, typevar)
                 } else {
                     // A callable object's type does not include the additional receiver bound

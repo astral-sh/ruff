@@ -1707,7 +1707,7 @@ impl<'db> StaticClassLiteral<'db> {
                 CallableType::new(db, signatures, CallableTypeKind::FunctionLike)
             });
 
-            return Some(synthesized_callables.into_type(db, env));
+            return Some(synthesized_callables.to_type(db, env));
         }
 
         // An ordinary subclass of a frozen dataclass is not itself dataclass-like, so the

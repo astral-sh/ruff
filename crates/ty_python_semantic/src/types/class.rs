@@ -2424,10 +2424,6 @@ impl<'db> ClassType<'db> {
             ty: Type::BoundMethod(metaclass_dunder_call_function),
             ..
         }) = metaclass_dunder_call_function_symbol
-            && matches!(
-                metaclass_dunder_call_function.func(db),
-                Type::FunctionLiteral(_) | Type::Callable(_)
-            )
         {
             // TODO: this intentionally diverges from step 1 in
             // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
@@ -2441,14 +2437,14 @@ impl<'db> ClassType<'db> {
             // for dynamic Enum creation.
             let is_actual_enum = enum_metadata(db, self.class_literal(db)).is_some();
             if !is_actual_enum
-                && let Some(callable) = if receiver == lookup_type {
-                    metaclass_dunder_call_function.into_callable_type(db)
+                && let Some(callables) = if receiver == lookup_type {
+                    metaclass_dunder_call_function.callables(db).cloned()
                 } else {
                     metaclass_dunder_call_function
-                        .into_callable_type_with_receiver(db, env, receiver, receiver)
+                        .callables_with_receiver(db, env, receiver, receiver)
                 }
             {
-                return CallableTypes::one(callable);
+                return callables;
             }
         }
 
@@ -2463,12 +2459,8 @@ impl<'db> ClassType<'db> {
             });
 
         let dunder_new_function = if let Some(dunder_new_signature) = dunder_new_signature {
-            let bound_signature = dunder_new_signature.bind_self_with_receiver(
-                db,
-                env,
-                Some(receiver),
-                Some(instance_type),
-            );
+            let bound_signature =
+                dunder_new_signature.bind_method_receiver(db, env, receiver, instance_type);
 
             // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
             // then we should ignore the `__init__` and just return the `__new__` method.

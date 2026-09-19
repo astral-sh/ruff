@@ -39,7 +39,6 @@ use crate::{
         list_members::{
             Member, MemberWithDefinition, all_end_of_scope_members, extract_underlying_functions,
         },
-        signatures::CallableSignature,
         tuple::Tuple,
     },
 };
@@ -1058,25 +1057,9 @@ fn bind_new_for_override<'db>(
     callables
         .map(|callable| {
             let signature = callable.signatures(db);
-            let bound_signature = if signature.overloads.len() > 1
-                && signature
-                    .overloads
-                    .iter()
-                    .any(Signature::has_explicit_positional_receiver_annotation)
-            {
-                // Overloads specialized for other subclasses do not constrain this override.
-                CallableSignature::from_overloads(
-                    signature
-                        .overloads
-                        .iter()
-                        .filter_map(|signature| {
-                            signature.bind_self_if_compatible(db, env, receiver, instance_of_class)
-                        })
-                        .flat_map(|signature| signature.overloads),
-                )
-            } else {
-                signature.bind_self_with_receiver(db, env, Some(receiver), Some(instance_of_class))
-            };
+            // Overloads specialized for other subclasses do not constrain this override.
+            let bound_signature =
+                signature.bind_method_receiver(db, env, receiver, instance_of_class);
             CallableType::new(
                 db,
                 bound_signature,
@@ -1084,7 +1067,7 @@ fn bind_new_for_override<'db>(
                 CallableTypeKind::Regular,
             )
         })
-        .into_type(db, env)
+        .to_type(db, env)
 }
 
 /// Returns whether the selected inherited method already violates this ancestor's contract.
@@ -1186,10 +1169,7 @@ fn method_override_types<'db>(
 ) -> Option<(Type<'db>, Type<'db>)> {
     let (subclass_type, superclass_type) = match (subclass_type, superclass_type) {
         (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method))
-            if matches!(
-                subclass_method.func(db),
-                Type::FunctionLiteral(_) | Type::Callable(_)
-            ) && let Some(superclass_signature) = superclass_method.unbound_signatures(db) =>
+            if let Some(superclass_signature) = superclass_method.unbound_signatures(db) =>
         {
             let explicit_receiver = match superclass_signature.overloads.as_slice() {
                 [signature] => signature
@@ -1217,27 +1197,22 @@ fn method_override_types<'db>(
             // Both signatures describe calls on the subclass. In particular, inherited `Self`
             // annotations refer to the subclass even when the receiver is implicitly annotated.
             (
-                Type::Callable(subclass_method.into_callable_type_with_receiver(
-                    db,
-                    env,
-                    receiver,
-                    typing_self_type,
-                )?),
-                Type::Callable(superclass_method.into_callable_type_with_receiver(
-                    db,
-                    env,
-                    receiver,
-                    typing_self_type,
-                )?),
+                subclass_method
+                    .callables_with_receiver(db, env, receiver, typing_self_type)?
+                    .to_type(db, env),
+                superclass_method
+                    .callables_with_receiver(db, env, receiver, typing_self_type)?
+                    .to_type(db, env),
             )
         }
         _ => (subclass_type, superclass_type),
     };
+
     let superclass_callable = superclass_type
         .try_upcast_to_callable(db, env)?
         .map(|callable| callable.into_regular(db));
 
-    Some((subclass_type, superclass_callable.into_type(db, env)))
+    Some((subclass_type, superclass_callable.to_type(db, env)))
 }
 
 /// Whether an attribute declaration is a class variable or an instance variable.

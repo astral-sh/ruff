@@ -3858,7 +3858,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         if !matches!(polarity, TypeVarVariance::Covariant) {
             let actual = actual_callables
                 .map(|callable| callable.into_regular(db))
-                .into_type(db, self.env);
+                .to_type(db, self.env);
             let formal = Type::Callable(formal.into_regular(db));
             let when = self.constraint_for_relation(formal, actual, polarity);
             return self.infer_from_constraint_set(when);

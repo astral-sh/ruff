@@ -201,8 +201,8 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableType, CallableTypes, ComparisonSoundnessPolicy, EnumClassLiteral,
-        KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
+        CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
+        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
         expand_type, infer_expression_types, infer_narrowing_constraints,
         infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
@@ -1782,7 +1782,7 @@ pub(crate) fn is_non_terminal_call<'db>(
 
     let overloads_iterator = if let Some(callable) = ty
         .try_upcast_to_callable(db, env)
-        .and_then(CallableTypes::exactly_one)
+        .and_then(|callables| callables.exactly_one())
     {
         callable.signatures(db).overloads.iter()
     } else {

@@ -136,6 +136,33 @@ reveal_type(generic_context(into_regular_callable(C)))
 reveal_type(into_regular_callable(C)(1))
 ```
 
+## Constructor callbacks with receiver-specific overloads
+
+In the below example, the applicable `__new__` overload for `Factory[int]` returns a `Factory[int]`,
+so construction also calls `__init__`. Callback compatibility therefore requires its `int` argument.
+The overload that returns `str` applies only to `Factory[str]` and cannot bypass this requirement.
+
+```py
+from __future__ import annotations
+from typing import Callable, overload
+
+class Factory[T]:
+    value: T
+
+    @overload
+    def __new__(cls: type[Factory[int]], *args: object) -> Factory[int]: ...
+    @overload
+    def __new__(cls: type[Factory[str]], *args: object) -> str: ...
+    def __new__(cls, *args: object) -> Factory[int] | str:
+        raise NotImplementedError
+
+    def __init__(self, value: int) -> None: ...
+
+valid: Callable[[int], Factory[int]] = Factory[int]
+missing_argument: Callable[[], Factory[int]] = Factory[int]  # error: [invalid-assignment]
+wrong_argument: Callable[[str], Factory[int]] = Factory[int]  # error: [invalid-assignment]
+```
+
 ## Generic `__iter__` methods with explicit receivers
 
 Binding `__iter__` to an `Unpacker[Iterable[int]]` infers `S` as `int` from the explicit

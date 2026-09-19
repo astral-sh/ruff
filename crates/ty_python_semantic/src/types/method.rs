@@ -228,38 +228,19 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    pub(crate) fn callables(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<CallableTypes<'db>> {
-        if let Some(callable) = self.into_callable_type(db) {
-            Some(CallableTypes::one(callable))
-        } else {
-            self.func(db)
-                .try_upcast_to_callable(db, env)
-                .map(|callables| {
-                    callables.map(|callable| {
-                        callable.bind_self(db, env, Some(self.signature_receiver(db)))
-                    })
-                })
-        }
-    }
-
-    /// Converts an actual or synthesized function into a callable with its receiver bound
+    /// Converts the wrapped value into callable types with the method's receiver bound
     /// and `typing.Self` substituted.
     ///
-    /// Returns `None` for other wrapped types, which require resolving their call interface
-    /// and may have multiple callable alternatives that a single [`CallableType`] cannot
-    /// represent. Use [`Self::callables`] to handle those types.
+    /// Unions retain separate callable alternatives, each of which may contain multiple overloads.
+    /// Returns `None` if the wrapped value cannot be converted to callables.
     #[salsa::tracked(
-        returns(copy),
-        cycle_initial=|db, _, _| Some(CallableType::bottom(db)),
+        returns(as_ref),
+        cycle_initial=|db, _, _| Some(CallableTypes::one(CallableType::bottom(db))),
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
+    pub(crate) fn callables(self, db: &'db dyn Db) -> Option<CallableTypes<'db>> {
         let env = ProgramEnvironment::from_program(self.program(db));
-        self.into_callable_type_with_receiver(
+        self.callables_with_receiver(
             db,
             &env,
             self.signature_receiver(db),
@@ -267,82 +248,28 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    pub(crate) fn into_callable_type_with_receiver(
+    pub(crate) fn callables_with_receiver(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
-    ) -> Option<CallableType<'db>> {
-        fn bound_signatures_with_receiver<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            function_signature: &CallableSignature<'db>,
-            receiver_type: Type<'db>,
-            typing_self_type: Type<'db>,
-        ) -> CallableSignature<'db> {
-            let [signature] = function_signature.overloads.as_slice() else {
-                if !function_signature
-                    .overloads
-                    .iter()
-                    .any(Signature::has_explicit_positional_receiver_annotation)
-                {
-                    return CallableSignature::from_overloads(
-                        function_signature.overloads.iter().map(|signature| {
-                            signature.bind_self_with_receiver(
-                                db,
-                                env,
-                                Some(receiver_type),
-                                Some(typing_self_type),
-                            )
-                        }),
-                    );
-                }
-
-                return CallableSignature::from_overloads(
-                    function_signature
-                        .overloads
-                        .iter()
-                        .filter_map(|signature| {
-                            signature.bind_self_if_compatible(
-                                db,
-                                env,
-                                receiver_type,
-                                typing_self_type,
-                            )
-                        })
-                        .flat_map(|signature| signature.overloads),
-                );
-            };
-
-            let specialized = if signature.has_receiver_determined_method_typevar(db, env) {
-                signature.specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
-            } else {
-                None
-            };
-
-            specialized
-                .unwrap_or_else(|| CallableSignature::single(signature.clone()))
-                .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type))
-        }
-
-        let callable = self.unbound_callable(db)?;
-        let signatures = bound_signatures_with_receiver(
-            db,
-            env,
-            callable.signatures(db),
-            receiver_type,
-            typing_self_type,
-        );
-        Some(callable.with_signatures(db, signatures).into_regular(db))
+    ) -> Option<CallableTypes<'db>> {
+        self.func(db)
+            .try_upcast_to_callable(db, env)
+            .map(|callables| {
+                callables
+                    .map(|callable| callable.bind_self(db, env, receiver_type, typing_self_type))
+            })
     }
 
-    fn unbound_callable(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
-        match self.func(db) {
-            Type::FunctionLiteral(function) => Some(function.into_callable_type(db)),
-            Type::Callable(callable) => Some(callable),
-            _ => None,
-        }
+    /// Converts the wrapped value into a single callable with its receiver bound
+    /// and `typing.Self` substituted.
+    ///
+    /// Returns `None` if the wrapped value cannot be converted to a callable or has multiple
+    /// callable alternatives. Use [`Self::callables`] to handle multiple alternatives.
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
+        self.callables(db).and_then(CallableTypes::exactly_one)
     }
 
     pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
@@ -402,16 +329,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
             })
             .and(db, self.constraints, || {
-                let (Some(source), Some(target)) = (
-                    source.callables(db, self.env),
-                    target.callables(db, self.env),
-                ) else {
+                let (Some(source), Some(target)) = (source.callables(db), target.callables(db))
+                else {
                     return self.never();
                 };
                 self.check_type_pair(
                     db,
-                    source.into_type(db, self.env),
-                    target.into_type(db, self.env),
+                    source.to_type(db, self.env),
+                    target.to_type(db, self.env),
                 )
             })
     }

@@ -435,8 +435,42 @@ class CallableObject:
 class C:
     method = classmethod(CallableObject())
 
-if C.method:  # error: [redundant-condition] "Object of type `MethodType[CallableObject]` is always truthy"
+if C.method:  # error: [redundant-condition] "Method is always truthy: Did you mean to call this method?"
     pass
+```
+
+## Classmethods wrapping async callable objects
+
+When the wrapped object's `__call__` is async, testing the bound method in an async function
+suggests calling and awaiting it.
+
+```py
+class CallableObject:
+    async def __call__(self, cls: type[object]) -> bool:
+        return False
+
+class C:
+    method = classmethod(CallableObject())
+
+async def check():
+    if C.method:  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: Method is always truthy
+ --> src/mdtest_snippet.py:9:8
+  |
+9 |     if C.method:  # snapshot: redundant-condition
+  |        ^^^^^^^^ Did you mean to `await` and call this method?
+help: Replace with `await C.method()`
+   |
+8  | async def check():
+   -     if C.method:  # snapshot: redundant-condition
+9  +     if await C.method():  # snapshot: redundant-condition
+10 |         pass
+   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Enum instances

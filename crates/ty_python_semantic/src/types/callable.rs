@@ -206,7 +206,7 @@ impl<'db> Type<'db> {
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
-            Type::BoundMethod(bound_method) => bound_method.callables(db, env),
+            Type::BoundMethod(bound_method) => bound_method.callables(db).cloned(),
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
@@ -795,7 +795,7 @@ impl<'db> CallableType<'db> {
         }
     }
 
-    fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
+    pub(super) fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::DunderParamSpec)
     }
 
@@ -864,22 +864,16 @@ impl<'db> CallableType<'db> {
         ))
     }
 
-    pub(crate) fn bind_self(
+    /// Binds a method receiver, specializing its signatures and removing incompatible overloads.
+    ///
+    /// `typing_self_type` is used to replace `typing.Self`, which differs from `receiver_type`
+    /// for class methods.
+    pub(super) fn bind_self(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        self_type: Option<Type<'db>>,
-    ) -> CallableType<'db> {
-        self.bind_self_with_receiver(db, env, self_type, self_type)
-    }
-
-    /// Binds the runtime receiver while using `typing_self_type` to replace `typing.Self`.
-    fn bind_self_with_receiver(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        receiver_type: Option<Type<'db>>,
-        typing_self_type: Option<Type<'db>>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
     ) -> CallableType<'db> {
         if self.is_dunder_paramspec(db) {
             return self.into_regular(db);
@@ -888,8 +882,9 @@ impl<'db> CallableType<'db> {
         self.with_signatures(
             db,
             self.signatures(db)
-                .bind_self_with_receiver(db, env, receiver_type, typing_self_type),
+                .bind_method_receiver(db, env, receiver_type, typing_self_type),
         )
+        .into_regular(db)
     }
 
     pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
@@ -1004,7 +999,7 @@ impl<'db> CallableTypes<'db> {
         CallableTypes(callables)
     }
 
-    pub(crate) fn exactly_one(self) -> Option<CallableType<'db>> {
+    pub(crate) fn exactly_one(&self) -> Option<CallableType<'db>> {
         match self.0.as_slice() {
             [single] => Some(*single),
             _ => None,
@@ -1023,9 +1018,9 @@ impl<'db> CallableTypes<'db> {
         self.0.iter()
     }
 
-    pub(crate) fn into_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    pub(crate) fn to_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         assert!(!self.0.is_empty(), "CallableTypes should not be empty");
-        UnionType::from_elements(db, env, self.0.into_iter().map(Type::Callable))
+        UnionType::from_elements(db, env, self.0.iter().copied().map(Type::Callable))
     }
 
     pub(crate) fn map(self, mut f: impl FnMut(CallableType<'db>) -> CallableType<'db>) -> Self {
