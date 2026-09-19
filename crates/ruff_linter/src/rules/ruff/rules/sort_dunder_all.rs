@@ -22,6 +22,12 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// a [natural sort](https://en.wikipedia.org/wiki/Natural_sort_order)
 /// is used to order the elements.
 ///
+/// This sorting style matches the type-based sorting isort applies to
+/// imported names (corresponding to isort's [`order-by-type`](https://pycqa.github.io/isort/docs/configuration/options.html#order-by-type)
+/// setting). Note that this differs from isort's [`sort-reexports`](https://pycqa.github.io/isort/docs/configuration/options.html#sort-re-exports)
+/// option, which sorts `__all__` definitions strictly alphabetically without
+/// grouping by casing.
+///
 /// ## Why is this bad?
 /// Consistency is good. Use a common convention for `__all__` to make your
 /// code more readable and idiomatic.
@@ -89,6 +95,10 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// could be read by code elsewhere that depends on the exact
 /// iteration order of the items in `__all__`, in which case this
 /// rule's fix could theoretically cause breakage.
+///
+/// ## References
+/// - [isort: `order-by-type`](https://pycqa.github.io/isort/docs/configuration/options.html#order-by-type)
+/// - [isort: `sort-reexports`](https://pycqa.github.io/isort/docs/configuration/options.html#sort-re-exports)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.8.0", category = Category::Style)]
 pub(crate) struct UnsortedDunderAll;
