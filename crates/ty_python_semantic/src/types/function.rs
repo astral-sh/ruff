@@ -2124,6 +2124,9 @@ fn is_instance_truthiness<'db>(
         }
 
         Type::TypeAlias(alias) => is_instance_truthiness(db, env, alias.value_type(db), class),
+        Type::DataclassDecorator(decorator) => {
+            is_instance_truthiness(db, env, decorator.callable(db), class)
+        }
 
         Type::TypeVar(bound_typevar) => match bound_typevar.require_bound_or_constraints(db, env) {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
@@ -2140,7 +2143,6 @@ fn is_instance_truthiness<'db>(
         Type::BoundMethod(..)
         | Type::KnownBoundMethod(..)
         | Type::WrapperDescriptor(..)
-        | Type::DataclassDecorator(..)
         | Type::DataclassTransformer(..)
         | Type::GenericAlias(..)
         | Type::SubclassOf(..)

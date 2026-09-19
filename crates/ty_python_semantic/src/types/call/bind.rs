@@ -71,11 +71,12 @@ use crate::types::visitor::{
 };
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
-    DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
-    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, TypeContext, TypeIdentity,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
-    UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
+    DATACLASS_FLAGS, DataclassDecorator, DataclassFlags, DataclassParams, DynamicType,
+    GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
+    SubclassOfType, TypeContext, TypeIdentity, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
+    is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -849,6 +850,15 @@ impl<'db> Bindings<'db> {
         self.callable_type = callable_type;
         for element in &mut self.elements {
             element.callable_type = callable_type;
+        }
+        self
+    }
+
+    pub(crate) fn with_dataclass_params(mut self, params: DataclassParams<'db>) -> Self {
+        for callable in self.iter_flat_mut() {
+            for overload in &mut callable.overloads {
+                overload.dataclass_params = Some(params);
+            }
         }
         self
     }
@@ -1909,31 +1919,6 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    Type::DataclassDecorator(params) => match overload.parameter_types() {
-                        [Some(Type::ClassLiteral(class_literal))] => {
-                            if let Some(target) = invalid_dataclass_target(db, class_literal) {
-                                overload
-                                    .errors
-                                    .push(BindingError::InvalidDataclassApplication(target));
-                            } else {
-                                overload.set_return_type(Type::from(
-                                    class_literal.with_dataclass_params(db, Some(params)),
-                                ));
-                            }
-                        }
-                        [Some(Type::GenericAlias(generic_alias))] => {
-                            let new_origin = generic_alias
-                                .origin(db)
-                                .with_dataclass_params(db, Some(params));
-                            overload.set_return_type(Type::GenericAlias(GenericAlias::new(
-                                db,
-                                new_origin,
-                                generic_alias.specialization(db),
-                            )));
-                        }
-                        _ => {}
-                    },
-
                     Type::BoundMethod(bound_method)
                         if let Type::PropertyInstance(property) =
                             bound_method.self_instance(db)
@@ -2622,7 +2607,9 @@ impl<'db> Bindings<'db> {
                                 let params = DataclassParams::from_flags(db, env, flags);
 
                                 if cls_argument.is_none_or(|cls_ty| cls_ty.is_none(db)) {
-                                    overload.set_return_type(Type::DataclassDecorator(params));
+                                    overload.set_return_type(Type::DataclassDecorator(
+                                        DataclassDecorator::new(db, overload.return_type(), params),
+                                    ));
                                 }
 
                                 if invalid_order {
@@ -2637,20 +2624,8 @@ impl<'db> Bindings<'db> {
                                 }
 
                                 // `dataclass` being used as a non-decorator (i.e., `dataclass(SomeClass)`).
-                                if let Some(Type::ClassLiteral(class_literal)) =
-                                    cls_argument.as_ref()
-                                {
-                                    if let Some(target) =
-                                        invalid_dataclass_target(db, class_literal)
-                                    {
-                                        overload.errors.push(
-                                            BindingError::InvalidDataclassApplication(target),
-                                        );
-                                    } else {
-                                        overload.set_return_type(Type::from(
-                                            class_literal.with_dataclass_params(db, Some(params)),
-                                        ));
-                                    }
+                                if cls_argument.is_some_and(|cls_ty| !cls_ty.is_none(db)) {
+                                    overload.apply_dataclass_params(db, env, params);
                                 }
                             }
                         }
@@ -2785,72 +2760,13 @@ impl<'db> Bindings<'db> {
                                     dataclass_params.field_specifiers(db),
                                 );
 
-                                // The dataclass_transform spec doesn't clarify how to tell whether
-                                // a decorated function is a decorator or a decorator factory. We
-                                // use heuristics based on the number and type of positional arguments:
-                                //
-                                // - Zero positional arguments: assume it's a decorator factory.
-                                // - More than one positional argument: assume it's a decorator factory.
-                                // - Exactly one positional argument that's a class: ambiguous, so check
-                                //   the return type to disambiguate (class-like means decorate directly).
-                                let mut positional_args = overload
-                                    .signature
-                                    .parameters()
-                                    .iter()
-                                    .zip(overload.parameter_types())
-                                    .filter(|(param, ty)| ty.is_some() && !param.is_keyword_only())
-                                    .map(|(_, ty)| ty);
-
-                                let first_positional = positional_args.next();
-                                let has_more = positional_args.next().is_some();
-
-                                // Only attempt direct decoration if exactly one positional argument.
-                                if !has_more {
-                                    // Helper to check if return type is class-like.
-                                    let returns_class = || {
-                                        matches!(
-                                            overload.return_type(),
-                                            Type::ClassLiteral(_)
-                                                | Type::GenericAlias(_)
-                                                | Type::SubclassOf(_)
-                                        )
-                                    };
-
-                                    match first_positional {
-                                        Some(Some(Type::ClassLiteral(class_literal)))
-                                            if returns_class() =>
-                                        {
-                                            overload.set_return_type(Type::from(
-                                                class_literal.with_dataclass_params(
-                                                    db,
-                                                    Some(dataclass_params),
-                                                ),
-                                            ));
-                                            continue;
-                                        }
-                                        Some(Some(Type::GenericAlias(generic_alias)))
-                                            if returns_class() =>
-                                        {
-                                            let new_origin = generic_alias
-                                                .origin(db)
-                                                .with_dataclass_params(db, Some(dataclass_params));
-                                            overload.set_return_type(Type::GenericAlias(
-                                                GenericAlias::new(
-                                                    db,
-                                                    new_origin,
-                                                    generic_alias.specialization(db),
-                                                ),
-                                            ));
-                                            continue;
-                                        }
-                                        _ => {}
-                                    }
-                                }
-
-                                // Zero or more than one positional argument, or the argument is
-                                // not a class: assume it's a decorator factory.
-                                overload
-                                    .set_return_type(Type::DataclassDecorator(dataclass_params));
+                                overload.apply_dataclass_params(db, env, dataclass_params);
+                                overload.set_return_type(dataclass_factory_result(
+                                    db,
+                                    env,
+                                    overload.return_type(),
+                                    dataclass_params,
+                                ));
                             }
                         }
                     },
@@ -3275,6 +3191,12 @@ impl<'db> Bindings<'db> {
                 }
             }
 
+            for (_, overload) in binding.matching_overloads_mut() {
+                if let Some(params) = overload.dataclass_params {
+                    overload.apply_dataclass_params(db, env, params);
+                }
+            }
+
             // Known method overrides can resolve ambiguous return types.
             if matches!(
                 binding.overload_call_result,
@@ -3290,6 +3212,24 @@ impl<'db> Bindings<'db> {
         }
 
         self.evaluate_property_calls(db, env, call_arguments);
+    }
+}
+
+/// A transform can return a decorator without declaring a synthetic signature for it. Retain
+/// its inferred type and carry the metadata separately until that decorator receives a class.
+fn dataclass_factory_result<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    return_type: Type<'db>,
+    params: DataclassParams<'db>,
+) -> Type<'db> {
+    if return_type.is_subtype_of(db, env, KnownClass::Type.to_instance(db, env)) {
+        return return_type;
+    }
+    if return_type.try_upcast_to_callable(db, env).is_some() {
+        Type::DataclassDecorator(DataclassDecorator::new(db, return_type, params))
+    } else {
+        return_type
     }
 }
 
@@ -7451,6 +7391,9 @@ pub(crate) struct Binding<'db> {
     /// Constructor metadata used to normalize the declared return type before type checking.
     constructor_context: Option<ConstructorContext<'db>>,
 
+    /// Dataclass metadata carried by a decorator factory, independent of its call signature.
+    dataclass_params: Option<DataclassParams<'db>>,
+
     /// The inferable typevars in this signature.
     inferable_typevars: TypeVarSet<'db>,
 
@@ -7477,6 +7420,53 @@ pub(crate) struct Binding<'db> {
 }
 
 impl<'db> Binding<'db> {
+    /// Enrich a class-preserving return with the methods and flags supplied by the decorator.
+    /// An explicit replacement type, including `Never`, remains authoritative. Nonliteral class
+    /// arguments do not identify a class definition to enrich, so ordinary inference is sufficient.
+    fn apply_dataclass_params(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        params: DataclassParams<'db>,
+    ) {
+        for argument in self.parameter_types().iter().flatten() {
+            let class_literal = match argument {
+                Type::ClassLiteral(class_literal) => *class_literal,
+                Type::GenericAlias(alias) => ClassLiteral::Static(alias.origin(db)),
+                _ => continue,
+            };
+            if self.return_type() != *argument
+                && !SubclassOfType::try_from_type(db, env, *argument).is_some_and(|class_type| {
+                    self.return_type().is_equivalent_to(db, env, class_type)
+                })
+            {
+                continue;
+            }
+
+            // Class-decorator syntax collects metadata before calling the decorator. Invalid
+            // applications are already diagnosed on that class definition.
+            if class_literal
+                .as_static()
+                .is_none_or(|class| class.dataclass_params(db).is_none())
+                && let Some(target) = invalid_dataclass_target(db, &class_literal)
+            {
+                self.errors
+                    .push(BindingError::InvalidDataclassApplication(target));
+                return;
+            }
+
+            self.set_return_type(match argument {
+                Type::GenericAlias(alias) => Type::GenericAlias(GenericAlias::new(
+                    db,
+                    alias.origin(db).with_dataclass_params(db, Some(params)),
+                    alias.specialization(db),
+                )),
+                _ => Type::from(class_literal.with_dataclass_params(db, Some(params))),
+            });
+            return;
+        }
+    }
+
     /// Checks the getter invoked by `property.__get__`, retaining its error and recovery type.
     fn check_property_getter(
         &mut self,
@@ -7542,6 +7532,7 @@ impl<'db> Binding<'db> {
             signature_type,
             return_ty,
             constructor_context: None,
+            dataclass_params: None,
             inferable_typevars: TypeVarSet::None,
             inference: None,
             is_partial_application: false,

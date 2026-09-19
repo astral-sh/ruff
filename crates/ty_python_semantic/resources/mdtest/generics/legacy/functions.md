@@ -1065,6 +1065,29 @@ reveal_type(invoke(identity, 1))  # revealed: Literal[1]
 reveal_type(invoke(head, [1, 2, 3]))  # revealed: Unknown
 ```
 
+## Calling dataclass transforms with generic class arguments
+
+Calling a dataclass transform with a generic class parameter preserves the wrapper's type variable.
+The result remains a class object that can be added to a set of classes and returned.
+
+```py
+from typing import TypeVar
+from typing_extensions import dataclass_transform
+
+T = TypeVar("T")
+
+@dataclass_transform()
+def record(cls: type[T]) -> type[T]:
+    return cls
+
+def wrapper(cls: type[T]) -> type[T]:
+    result = record(cls)
+    reveal_type(result)  # revealed: type[T@wrapper]
+    classes: set[type] = set()
+    classes.add(result)
+    return result
+```
+
 ## Opaque decorators don't affect typevar binding
 
 Inside the body of a generic function, we should be able to see that the typevars bound by that
