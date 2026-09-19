@@ -194,6 +194,35 @@ def use_constraints[T: (TypeForm[int], TypeForm[str])](form: T, value: int | str
     assert_type(value, form)
 ```
 
+## Loop-carried values in `TypeForm` contexts
+
+Passing a reassigned value to a `TypeForm` parameter does not make the assignment a type alias. Even
+when an attribute lookup fails during loop inference, we only report the missing attribute.
+
+```py
+from typing_extensions import TypeForm
+
+def unwrap(form: TypeForm):
+    while True:
+        # error: [unresolved-attribute]
+        form = form.__supertype__
+        unwrap(form)
+```
+
+The same applies when a loop returns a value from a function annotated with `TypeForm`. The
+placeholder class has no underlying type attribute, but the assignment does not define an alias.
+
+```py
+class Wrapper: ...
+
+def unwrap_alias(form: Wrapper) -> TypeForm:
+    while True:
+        # error: [unresolved-attribute]
+        form = form.__value__
+        if form:
+            return form
+```
+
 ## Recursive aliases of `TypeForm`
 
 A value whose type is a recursive alias of `TypeForm` represents the type inside that `TypeForm`.

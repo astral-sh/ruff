@@ -2235,6 +2235,14 @@ impl<'db> Type<'db> {
         Self::Divergent(DivergentType::new(id))
     }
 
+    /// Returns a divergent marker for a cycle in type alias inference.
+    fn divergent_alias(id: salsa::Id) -> Self {
+        Self::Divergent(DivergentType {
+            is_alias_cycle: true,
+            ..DivergentType::new(id)
+        })
+    }
+
     const fn is_divergent(&self) -> bool {
         matches!(self, Type::Divergent(_))
     }
@@ -10936,6 +10944,9 @@ impl<'db> TypeMapping<'_, 'db> {
 pub struct DivergentType {
     /// The query ID that caused the cycle.
     id: salsa::Id,
+    /// Whether the cycle comes from type alias inference. Value inference can also
+    /// diverge, for example when an assignment feeds into the next iteration of a loop.
+    is_alias_cycle: bool,
     /// If this divergent marker has been materialized, preserve whether it should behave like the
     /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
     materialization: Option<MaterializationKind>,
@@ -10948,6 +10959,7 @@ impl DivergentType {
     const fn new(id: salsa::Id) -> Self {
         Self {
             id,
+            is_alias_cycle: false,
             materialization: None,
         }
     }
@@ -10958,8 +10970,8 @@ impl DivergentType {
 
     const fn materialized(self, kind: MaterializationKind) -> Self {
         Self {
-            id: self.id,
             materialization: Some(kind),
+            ..self
         }
     }
 
