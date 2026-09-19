@@ -1472,25 +1472,7 @@ impl<'db> IntersectionBuilder<'db> {
                 }
                 seen_aliases.push(ty);
                 let value_type = ty.resolve_type_alias(db);
-                // Keep the recursive binder at a type constructor. Expanding it here would
-                // unroll another level every time an intersection is normalized.
-                // For `R = μa. tuple[a & ~int]`, keep `R` instead of `tuple[R & ~int]`.
-                if matches!(ty, Type::Recursive(_))
-                    && !matches!(
-                        value_type,
-                        Type::TypeAlias(_)
-                            | Type::Recursive(_)
-                            | Type::Union(_)
-                            | Type::Intersection(_)
-                            | Type::EnumComplement(_)
-                    )
-                {
-                    for inner in &mut self.intersections {
-                        inner.add_positive(db, &self.env, ty);
-                    }
-                } else {
-                    self.add_positive_impl::<L>(value_type, seen_aliases)?;
-                }
+                self.add_positive_impl::<L>(value_type, seen_aliases)?;
             }
             Type::Union(union) => {
                 // Distribute ourself over this union: for each union element, clone ourself and
@@ -1562,25 +1544,7 @@ impl<'db> IntersectionBuilder<'db> {
                 }
                 seen_aliases.push(ty);
                 let value_type = ty.resolve_type_alias(db);
-                // Keep the recursive binder at a type constructor. Expanding it here would
-                // unroll another level every time an intersection is normalized.
-                // For `R = μa. tuple[a & ~int]`, keep `~R` instead of `~tuple[R & ~int]`.
-                if matches!(ty, Type::Recursive(_))
-                    && !matches!(
-                        value_type,
-                        Type::TypeAlias(_)
-                            | Type::Recursive(_)
-                            | Type::Union(_)
-                            | Type::Intersection(_)
-                            | Type::EnumComplement(_)
-                    )
-                {
-                    for inner in &mut self.intersections {
-                        inner.add_negative(db, &self.env, ty);
-                    }
-                } else {
-                    self.add_negative_impl::<L>(value_type, seen_aliases)?;
-                }
+                self.add_negative_impl::<L>(value_type, seen_aliases)?;
             }
             Type::Union(union) => {
                 for elem in union.elements(db) {
