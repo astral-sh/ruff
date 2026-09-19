@@ -861,14 +861,9 @@ pub fn definitions_for_keyword_argument<'db>(
     let mut resolved_definitions = Vec::new();
     let env = &model.program_environment();
 
-    if let Some(callable_type) = func_type
-        .try_upcast_to_callable(db, env)
-        .and_then(|callables| callables.exactly_one())
-    {
-        let signatures = callable_type.signatures(db);
-
+    if let Some(callables) = func_type.try_upcast_to_callable(db, env) {
         // For each signature, find the parameter with the matching name
-        for signature in signatures {
+        for signature in callables.signatures(db) {
             if let Some((_param_index, param)) =
                 signature.parameters().keyword_by_name(keyword_name_str)
                 && let Some(definition) = param.definition()

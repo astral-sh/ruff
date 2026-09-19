@@ -1780,12 +1780,7 @@ pub(crate) fn is_non_terminal_call<'db>(
         return Truthiness::AlwaysTrue;
     }
 
-    let overloads_iterator = if let Some(callable) = ty
-        .try_upcast_to_callable(db, env)
-        .and_then(|callables| callables.exactly_one())
-    {
-        callable.signatures(db).overloads.iter()
-    } else {
+    let Some(callables) = ty.try_upcast_to_callable(db, env) else {
         return Truthiness::AlwaysTrue;
     };
 
@@ -1793,7 +1788,7 @@ pub(crate) fn is_non_terminal_call<'db>(
     let mut all_overloads_return_never = true;
     let mut any_overload_is_generic = false;
 
-    for overload in overloads_iterator {
+    for overload in callables.signatures(db) {
         let returns_never = overload.return_ty.is_equivalent_to(db, env, Type::Never);
         no_overloads_return_never &= !returns_never;
         all_overloads_return_never &= returns_never;

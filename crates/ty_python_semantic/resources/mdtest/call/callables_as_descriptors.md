@@ -526,6 +526,23 @@ reveal_type(D.class_method)  # revealed: ((int, /) -> int) | ((int, str, /) -> s
 reveal_type(D().class_method)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
 ```
 
+In the following example, both decorators return a union of callables with instance-method behavior.
+Stacking them preserves that behavior, so calling the method supplies the receiver to either
+alternative.
+
+```py
+def instance_decorator(function: object) -> Callable[[object, int], int] | Callable[[object, int], str]:
+    raise NotImplementedError
+
+class E:
+    @instance_decorator
+    @instance_decorator
+    def method(self, value: int) -> int:
+        return value
+
+reveal_type(E().method(1))  # revealed: int | str
+```
+
 ## Decorators returning a possibly non-callable value
 
 A decorator might return a non-callable value. We report an error when `staticmethod` is applied to

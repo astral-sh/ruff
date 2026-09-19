@@ -22,7 +22,6 @@ use crate::{
         MemberLookupPolicy, Parameter, Parameters, Signature, StaticClassLiteral, Type,
         TypeContext, TypeQualifiers,
         call::CallArguments,
-        callable::CallableTypeKind,
         class::{CodeGeneratorKind, FieldKind, MethodDecorator},
         constraints::ConstraintSetBuilder,
         context::InferContext,
@@ -1047,26 +1046,17 @@ fn bind_new_for_override<'db>(
     }
     let receiver = Type::from(class);
     let instance_of_class = Type::instance(db, env, class);
-    let Some(callables) = Place::bound(ty)
-        .try_call_dunder_get(db, env, receiver)
+    let Some(callables) = receiver
+        .resolve_dunder_new_callable(db, env, Place::bound(ty))
         .ignore_possibly_undefined()
         .and_then(|ty| ty.try_upcast_to_callable(db, env))
     else {
         return ty;
     };
+    // Overloads specialized for other subclasses do not constrain this override.
+    // Compare call signatures independently of descriptor behavior.
     callables
-        .map(|callable| {
-            let signature = callable.signatures(db);
-            // Overloads specialized for other subclasses do not constrain this override.
-            let bound_signature =
-                signature.bind_method_receiver(db, env, receiver, instance_of_class);
-            CallableType::new(
-                db,
-                bound_signature,
-                // Compare call signatures independently of descriptor behavior.
-                CallableTypeKind::Regular,
-            )
-        })
+        .map(|callable| callable.bind_self(db, env, receiver, instance_of_class))
         .to_type(db, env)
 }
 

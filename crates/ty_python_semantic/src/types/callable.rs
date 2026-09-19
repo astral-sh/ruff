@@ -564,7 +564,6 @@ pub enum CallableTypeKind {
     /// descriptors. The separate kind prevents the dunder descriptor heuristic from turning
     /// it into [`Self::FunctionLike`] after `P` is specialized: the specialized parameters
     /// already describe the callable's arguments.
-    /// Calling [`CallableType::bind_self`] removes this marker without removing a parameter.
     ///
     /// In the example below, specializing `P` to `[str]` gives `callback.__call__` the signature
     /// `(str, /) -> int`. Binding a receiver would incorrectly remove its `str` parameter:
@@ -875,10 +874,6 @@ impl<'db> CallableType<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> CallableType<'db> {
-        if self.is_dunder_paramspec(db) {
-            return self.into_regular(db);
-        }
-
         self.with_signatures(
             db,
             self.signatures(db)
@@ -984,8 +979,15 @@ impl<'db> CallableType<'db> {
 pub(crate) struct CallableTypes<'db>(SmallVec<[CallableType<'db>; 1]>);
 
 impl<'db> CallableTypes<'db> {
-    fn new(callables: SmallVec<[CallableType<'db>; 1]>) -> Self {
+    fn new(mut callables: SmallVec<[CallableType<'db>; 1]>) -> Self {
         assert!(!callables.is_empty(), "CallableTypes should not be empty");
+        // Repeated alternatives do not change a union. Removing them also lets recursive
+        // constructor queries converge when each iteration adds the same `__init__` callable.
+        if callables.len() > 1 {
+            let mut seen = FxHashSet::default();
+            callables.retain(|callable| seen.insert(*callable));
+            callables.shrink_to_fit();
+        }
         CallableTypes(callables)
     }
 
@@ -994,9 +996,7 @@ impl<'db> CallableTypes<'db> {
     }
 
     pub(crate) fn from_elements(callables: impl IntoIterator<Item = CallableType<'db>>) -> Self {
-        let callables: SmallVec<_> = callables.into_iter().collect();
-        assert!(!callables.is_empty(), "CallableTypes should not be empty");
-        CallableTypes(callables)
+        Self::new(callables.into_iter().collect())
     }
 
     pub(crate) fn exactly_one(&self) -> Option<CallableType<'db>> {
@@ -1016,6 +1016,14 @@ impl<'db> CallableTypes<'db> {
 
     pub(super) fn iter(&self) -> std::slice::Iter<'_, CallableType<'db>> {
         self.0.iter()
+    }
+
+    /// Iterates over every signature of every callable alternative without merging the
+    /// alternatives into an overloaded callable.
+    pub(crate) fn signatures(&self, db: &'db dyn Db) -> impl Iterator<Item = &'db Signature<'db>> {
+        self.0
+            .iter()
+            .flat_map(move |callable| callable.signatures(db))
     }
 
     pub(crate) fn to_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
