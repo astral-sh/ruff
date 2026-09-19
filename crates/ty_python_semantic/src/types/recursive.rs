@@ -179,7 +179,7 @@ impl<'db> RecursiveType<'db> {
     pub(super) fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|db, id, _, ()| AliasCycleSummary::from_type(db, Type::divergent_alias(id)),
+            cycle_initial=|_, id, _, ()| AliasCycleSummary::cycle_initial(id),
             heap_size=ruff_memory_usage::heap_size
         )]
         fn cycle_summary_impl<'db>(
@@ -191,7 +191,7 @@ impl<'db> RecursiveType<'db> {
             // Nested bodies can refer to an enclosing binder. Close only the cycle marker,
             // so recovery never exposes an unbound variable as a standalone type.
             if let Some(Type::RecursiveVar(variable)) = summary.cycle {
-                summary.cycle = Some(Type::divergent_alias(variable.cycle(db).0));
+                summary.cycle = Some(Type::divergent(variable.cycle(db).0));
             }
             summary
         }
@@ -238,6 +238,7 @@ impl<'db> RecursiveType<'db> {
 
     /// Bind references to this alias's query cycle in a closed inference result.
     /// Each bound occurrence retains its arguments and refers to this constructor's cycle.
+    /// `self` is the initial `μa. a` constructor created by [`Self::recover`].
     fn bind(
         self,
         db: &'db dyn Db,
@@ -254,7 +255,9 @@ impl<'db> RecursiveType<'db> {
         );
         // Alias arguments can expose a reference without introducing a container.
         if body.has_unguarded_alias_cycle(db) {
-            Type::divergent_alias(self.cycle(db).0)
+            // Keep the minimal self-cycle so enclosing aliases can still detect it. Retaining
+            // the full body could grow type arguments indefinitely, as in `A = A[list[T]]`.
+            Type::Recursive(self)
         } else if body == original {
             // Binding changes a closed type only by introducing references to this binder.
             body
@@ -478,7 +481,7 @@ impl<'db> RecursiveType<'db> {
                                 mapped
                             }
                         })
-                        .into_type()
+                        .unwrap_or(Type::divergent(self.cycle(db).0))
                 })
             }
             _ => visitor.visit(db, Type::Recursive(self), mapping, || {
