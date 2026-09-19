@@ -549,6 +549,13 @@ impl ProjectMetadata {
             .chain(self.fallback_options.as_deref())
     }
 
+    /// Returns the configured environment or interpreter path, without resolving the full merged options.
+    pub(crate) fn configured_python_path(&self, system: &dyn System) -> Option<SystemPathBuf> {
+        self.options_in_precedence_order(&self.options, self.uv_workspace_options.as_deref())
+            .find_map(|options| options.environment.as_ref()?.python.as_ref())
+            .map(|path| path.absolute(self.root(), system))
+    }
+
     /// Loads the lower-precedence options from configuration files.
     ///
     /// This includes:

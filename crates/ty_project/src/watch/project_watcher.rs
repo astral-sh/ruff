@@ -178,16 +178,43 @@ impl WatchPaths {
     }
 }
 
-/// Watches are registered in project, module, then configuration order. On Linux, the last
-/// registered watch determines the path reported for overlapping symlinks.
+/// Watches are registered in project, Python environment, module, then configuration order.
+/// On Linux, the last registered watch determines the path reported for overlapping symlinks.
 ///
 /// Project roots and explicitly included paths come first because project files are discovered
-/// by walking them. Module search paths come next so imports are reported relative to their
+/// by walking them. A virtual environment outside the project needs its own watch because
+/// `pyvenv.cfg` can change the inferred Python version and import search paths. Watching its
+/// `site-packages` alone does not cover that file. System environment roots are excluded to
+/// avoid recursively watching a system prefix such as `/usr`.
+///
+/// Module search paths follow the environment so imports are reported relative to their
 /// search roots, rather than through symlinks inside the project. Configuration paths come last
 /// so their events use the explicit paths checked for configuration changes.
+///
+/// # Known limitations
+///
+/// These limitations apply to virtual environments outside the project directory unless another
+/// watch already covers the relevant paths. Environments inside the project are covered by the project watch.
+///
+/// - Creating an initially missing environment: If environment resolution fails, there is no
+///   resolved root to add to the watch list. Supporting later creation would require choosing an
+///   existing ancestor to watch from an unresolved `environment.python` path, which can name
+///   either a directory or an interpreter. We accept this limitation to avoid additional path
+///   discovery and watch-registration logic for environments that could not be resolved.
+/// - Deleting and recreating an environment: Deleting the environment can remove its native
+///   watch, so its recreation goes unnoticed. Watching a surviving parent would cover this, but
+///   our watches are recursive: the parent could contain every environment in a shared Poetry
+///   directory, or even be the user's home directory. We accept this limitation to avoid watching
+///   those unrelated directories. A nonrecursive parent watch would need additional logic to
+///   register the environment watch again after recreation.
 #[salsa::tracked(returns(ref))]
 pub fn watch_paths(db: &dyn Db, project: Project) -> WatchPaths {
     let project_path = project.root(db);
+    let virtual_environment = project
+        .program_settings(db)
+        .virtual_environment
+        .as_deref()
+        .filter(|environment| !environment.starts_with(project_path));
 
     // Watch both the project root and any paths provided by the user on the CLI (removing any redundant nested paths).
     // This is necessary to observe changes to files that are outside the project root.
@@ -212,15 +239,16 @@ pub fn watch_paths(db: &dyn Db, project: Project) -> WatchPaths {
         }
     }
 
-    // The project watch covers search paths inside its root. Deduplicate the others so
-    // shared or nested search paths are registered once in stable order.
-    let unique_module_paths = ruff_db::system::deduplicate_nested_paths(
-        search_paths
-            .into_iter()
-            .filter(|path| !path.starts_with(project_path)),
-    );
+    // The project and virtual environment watches cover search paths inside their roots.
+    // Deduplicate the remaining paths so shared or nested search paths are registered once.
+    let unique_module_paths =
+        ruff_db::system::deduplicate_nested_paths(search_paths.into_iter().filter(|path| {
+            !path.starts_with(project_path)
+                && virtual_environment.is_none_or(|environment| !path.starts_with(environment))
+        }));
 
     let paths: Vec<_> = included_paths
+        .chain(virtual_environment)
         .chain(unique_module_paths)
         .chain(project.metadata(db).extra_configuration_paths())
         .map(SystemPath::to_path_buf)
