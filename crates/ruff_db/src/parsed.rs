@@ -161,6 +161,16 @@ impl ParsedModule {
         self.inner.store(None);
     }
 
+    /// Clears the cached AST, offloading large ASTs to a destruction worker.
+    ///
+    /// Live references keep the AST alive. Small ASTs, an unavailable worker, or
+    /// a full queue cause the cached reference to be dropped synchronously.
+    pub fn clear_deferred(&self) {
+        if let Some(parsed) = self.inner.swap(None) {
+            deferred_drop::enqueue(parsed);
+        }
+    }
+
     /// Returns the file to which this module belongs.
     pub fn file(&self) -> File {
         self.file
@@ -224,6 +234,8 @@ where
         0
     }
 }
+
+mod deferred_drop;
 
 mod indexed {
     use std::sync::Arc;
@@ -936,6 +948,8 @@ class C[T](Base, metaclass=Meta):
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use crate::Db;
     use crate::PythonFile;
     use crate::files::{system_path_to_file, vendored_path_to_file};
@@ -1076,5 +1090,30 @@ else:
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn loaded_module_survives_deferred_clear() {
+        // Cover both small synchronous drops and larger worker-queued drops.
+        for repetitions in [1, 32] {
+            let mut db = TestDb::new();
+            db.write_file("test.py", "value = [1, 2, 3]\n".repeat(repetitions))
+                .expect("Write module");
+            let file = system_path_to_file(&db, "test.py").expect("Find module");
+            let file = PythonFile::new(&db, file, PythonVersion::latest_ty());
+            let module = parsed_module(&db, file).clone();
+            let loaded = module.load(&db);
+            let weak = Arc::downgrade(&loaded.indexed);
+
+            module.clear_deferred();
+            super::deferred_drop::wait();
+            let reloaded = module.load(&db);
+            assert!(loaded.has_valid_syntax());
+            assert!(reloaded.has_valid_syntax());
+            assert_eq!(loaded.syntax().body, reloaded.syntax().body);
+
+            drop(loaded);
+            assert!(weak.upgrade().is_none());
+        }
     }
 }
