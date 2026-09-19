@@ -2,6 +2,7 @@ use ruff_python_ast::{PythonVersion, StmtFunctionDef};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 
 use crate::rules::flake8_type_checking;
+use crate::rules::flake8_type_checking::settings::RuntimeSemantics;
 use crate::settings::LinterSettings;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,6 +23,12 @@ pub(super) enum AnnotationContext {
     /// Python will evaluate the annotation at runtime, and it's required to be available at
     /// runtime, as a library (like Pydantic) needs access to it.
     RuntimeRequired,
+    /// Python may evaluate the annotation at runtime and may be required
+    /// but we are not allowed to make any assumptions about it. This is
+    /// necessary to support partially required annotations like SQLAlchemy's
+    /// `Mapped` which may contain forward references to models, which are not
+    /// available at runtime. We have to trust the code is already correct.
+    RuntimeAmbiguous,
     /// The annotation is only evaluated at type-checking time.
     TypingOnly,
 }
@@ -38,24 +45,33 @@ impl AnnotationContext {
         // class field) or a function scope, and that class or function is marked as
         // runtime-required, treat the annotation as runtime-required.
         match semantic.current_scope().kind {
-            ScopeKind::Class(class_def)
-                if flake8_type_checking::helpers::runtime_required_class(
-                    class_def,
-                    &settings.flake8_type_checking.runtime_required_base_classes,
-                    &settings.flake8_type_checking.runtime_required_decorators,
-                    semantic,
-                ) =>
-            {
-                return Self::RuntimeRequired;
+            ScopeKind::Class(class_def) => {
+                match flake8_type_checking::helpers::class_annotation_runtime_semantics(
+                    class_def, semantic, settings,
+                ) {
+                    RuntimeSemantics::Required => {
+                        return Self::RuntimeRequired;
+                    }
+                    RuntimeSemantics::Ambiguous => {
+                        return Self::RuntimeAmbiguous;
+                    }
+                    RuntimeSemantics::Default => {}
+                }
             }
-            ScopeKind::Function(function_def)
-                if flake8_type_checking::helpers::runtime_required_function(
+            ScopeKind::Function(function_def) => {
+                match flake8_type_checking::helpers::function_annotation_runtime_semantics(
                     function_def,
-                    &settings.flake8_type_checking.runtime_required_decorators,
                     semantic,
-                ) =>
-            {
-                return Self::RuntimeRequired;
+                    settings,
+                ) {
+                    RuntimeSemantics::Required => {
+                        return Self::RuntimeRequired;
+                    }
+                    RuntimeSemantics::Ambiguous => {
+                        return Self::RuntimeAmbiguous;
+                    }
+                    RuntimeSemantics::Default => {}
+                }
             }
             _ => {}
         }
@@ -87,16 +103,20 @@ impl AnnotationContext {
         settings: &LinterSettings,
         version: PythonVersion,
     ) -> Self {
-        if flake8_type_checking::helpers::runtime_required_function(
+        match flake8_type_checking::helpers::function_annotation_runtime_semantics(
             function_def,
-            &settings.flake8_type_checking.runtime_required_decorators,
             semantic,
+            settings,
         ) {
-            Self::RuntimeRequired
-        } else if semantic.future_annotations_or_stub() || version.defers_annotations() {
-            Self::TypingOnly
-        } else {
-            Self::RuntimeEvaluated
+            RuntimeSemantics::Required => Self::RuntimeRequired,
+            RuntimeSemantics::Ambiguous => Self::RuntimeAmbiguous,
+            RuntimeSemantics::Default => {
+                if semantic.future_annotations_or_stub() || version.defers_annotations() {
+                    Self::TypingOnly
+                } else {
+                    Self::RuntimeEvaluated
+                }
+            }
         }
     }
 }
