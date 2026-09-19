@@ -1909,8 +1909,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // "declared types is `Unknown` (e.g. due to a bad annotation, missing
                     // import, etc.)". Ideally we would still prefer `Unknown` declared type,
                     // but use inferred type if there is no declared type.
+                    // Keep the inferred value while a cyclic annotation is unresolved. For
+                    // `str: "str" = ""`, that value lets the next iteration reject the annotation
+                    // instead of leaving both the annotation and the binding divergent.
                     if !should_preserve_inferred_binding_type(inferred_ty)
-                        && !matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
+                        && !matches!(
+                            declared_type,
+                            Type::Dynamic(DynamicType::Unknown) | Type::Divergent(_)
+                        )
                         && declared_type.is_assignable_to(db, env, inferred_ty)
                     {
                         (declared_ty, declared_type)
