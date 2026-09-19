@@ -1255,19 +1255,18 @@ impl<'db> ConcreteLowerBound<'db> {
         // elements. (For instance, when processing `τ₁ & τ₂ ≤ T` and `τ₂ & τ₁ ≤ T`, these clauses
         // would add sequents for `(τ₁ & τ₂ ≤ T) → (τ₂ & τ₁ ≤ T)` and vice versa.)
 
+        // We use subtyping here, as a gradual range `Any <= T` permits materializations not implied
+        // by `int <= T`, despite `Any` and `int` being mutually assignable.
+        let lower = self.bound.bottom_materialization(db, env);
+        let other_lower = other.bound.bottom_materialization(db, env);
+
         // (β ≤ α) ⇒ ((α ≤ T) ⇒ (β ≤ T))
-        if other
-            .bound
-            .is_constraint_set_assignable_to(db, env, self.bound)
-        {
+        if other_lower.is_constraint_set_subtype_of(db, env, lower) {
             map.add_single_implication(self.into(), other.into());
         }
 
         // (α ≤ β) ⇒ ((β ≤ T) ⇒ (α ≤ T))
-        if self
-            .bound
-            .is_constraint_set_assignable_to(db, env, other.bound)
-        {
+        if lower.is_constraint_set_subtype_of(db, env, other_lower) {
             map.add_single_implication(other.into(), self.into());
         }
 
@@ -1484,19 +1483,18 @@ impl<'db> ConcreteUpperBound<'db> {
         // `T ≤ τ₂ | τ₁`, these clauses would add sequents for `(T ≤ τ₁ | τ₂) → (T ≤ τ₂ | τ₁)` and
         // vice versa.)
 
+        // We use subtyping here, as a gradual range `T <= Any` permits materializations not implied
+        // by `T <= int`, despite `Any` and `int` being mutually assignable.
+        let upper = self.bound.top_materialization(db, env);
+        let other_upper = other.bound.top_materialization(db, env);
+
         // (α ≤ β) ⇒ ((T ≤ α) ⇒ (T ≤ β))
-        if self
-            .bound
-            .is_constraint_set_assignable_to(db, env, other.bound)
-        {
+        if upper.is_constraint_set_subtype_of(db, env, other_upper) {
             map.add_single_implication(self.into(), other.into());
         }
 
         // (β ≤ α) ⇒ ((T ≤ β) ⇒ (T ≤ α))
-        if other
-            .bound
-            .is_constraint_set_assignable_to(db, env, self.bound)
-        {
+        if other_upper.is_constraint_set_subtype_of(db, env, upper) {
             map.add_single_implication(other.into(), self.into());
         }
 
