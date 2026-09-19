@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
-use std::ops::Deref;
+use std::ops::{Deref, Range};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::string::ToString;
@@ -203,25 +203,41 @@ pub enum FilePattern {
 }
 
 impl FilePattern {
-    pub fn add_to(self, builder: &mut GlobSetBuilder) -> Result<()> {
+    pub fn is_builtin(&self) -> bool {
+        matches!(self, Self::Builtin(_))
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Builtin(pattern) => pattern,
+            Self::Config(pattern) | Self::User(pattern, _) => pattern,
+        }
+    }
+
+    pub fn add_to(&self, builder: &mut GlobSetBuilder, next_index: usize) -> Result<Range<usize>> {
+        let start = next_index;
+        let mut count = 0;
         match self {
             FilePattern::Builtin(pattern) => {
                 builder.add(Glob::from_str(pattern)?);
+                count += 1;
             }
             FilePattern::Config(pattern) => {
-                builder.add(Glob::new(&pattern)?);
+                builder.add(Glob::new(pattern)?);
+                count += 1;
             }
             FilePattern::User(pattern, absolute) => {
                 // Add the absolute path.
                 builder.add(Glob::new(&absolute.to_string_lossy())?);
-
+                count += 1;
                 // Add basename path.
                 if !pattern.contains(std::path::MAIN_SEPARATOR) {
-                    builder.add(Glob::new(&pattern)?);
+                    builder.add(Glob::new(pattern)?);
+                    count += 1;
                 }
             }
         }
-        Ok(())
+        Ok(start..start + count)
     }
 }
 
@@ -253,14 +269,11 @@ impl FromStr for FilePattern {
 pub struct FilePatternSet {
     set: GlobSet,
     cache_key: u64,
-    // This field is only for displaying the internals
-    // of `set`.
-    #[expect(clippy::used_underscore_binding)]
-    _set_internals: Vec<FilePattern>,
+    pattern_ranges: Vec<Range<usize>>,
+    patterns: Vec<FilePattern>,
 }
 
 impl FilePatternSet {
-    #[expect(clippy::used_underscore_binding)]
     pub fn try_from_iter<I>(patterns: I) -> Result<Self, anyhow::Error>
     where
         I: IntoIterator<Item = FilePattern>,
@@ -268,12 +281,16 @@ impl FilePatternSet {
         let mut builder = GlobSetBuilder::new();
         let mut hasher = CacheKeyHasher::new();
 
-        let mut _set_internals = vec![];
+        let mut collected_patterns: Vec<FilePattern> = Vec::new();
+        let mut pattern_ranges = Vec::new();
+        let mut next_index = 0;
 
         for pattern in patterns {
-            _set_internals.push(pattern.clone());
             pattern.cache_key(&mut hasher);
-            pattern.add_to(&mut builder)?;
+            let range = pattern.add_to(&mut builder, next_index)?;
+            next_index = range.end;
+            pattern_ranges.push(range);
+            collected_patterns.push(pattern);
         }
 
         let set = builder.build()?;
@@ -281,18 +298,40 @@ impl FilePatternSet {
         Ok(FilePatternSet {
             set,
             cache_key: hasher.finish(),
-            _set_internals,
+            pattern_ranges,
+            patterns: collected_patterns,
         })
+    }
+
+    pub fn patterns(&self) -> &[FilePattern] {
+        &self.patterns
+    }
+
+    pub fn matches_pattern(&self, index: usize, path: &Path) -> bool {
+        let Some(range) = self.pattern_ranges.get(index) else {
+            return false;
+        };
+        let file_name = path.file_name();
+        self.set
+            .matches_candidate(&Candidate::new(path))
+            .iter()
+            .any(|matched| range.contains(matched))
+            || file_name.is_some_and(|name| {
+                self.set
+                    .matches_candidate(&Candidate::new(name))
+                    .iter()
+                    .any(|matched| range.contains(matched))
+            })
     }
 }
 
 impl Display for FilePatternSet {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self._set_internals.is_empty() {
+        if self.patterns.is_empty() {
             write!(f, "[]")?;
         } else {
             writeln!(f, "[")?;
-            for pattern in &self._set_internals {
+            for pattern in &self.patterns {
                 writeln!(f, "\t{pattern},")?;
             }
             write!(f, "]")?;
@@ -849,6 +888,21 @@ impl<T> CompiledPerFileList<T> {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.inner.is_empty()
+    }
+
+    pub fn patterns(&self) -> impl Iterator<Item = &str> {
+        self.inner
+            .iter()
+            .map(|entry| entry.basename_matcher.glob().glob())
+    }
+
+    pub fn matches_pattern(&self, index: usize, path: &Path) -> bool {
+        let Some(file_name) = path.file_name() else {
+            return false;
+        };
+        self.inner.get(index).is_some_and(|entry| {
+            entry.basename_matcher.is_match(file_name) || entry.absolute_matcher.is_match(path)
+        })
     }
 }
 
