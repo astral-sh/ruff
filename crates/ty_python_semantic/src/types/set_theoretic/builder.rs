@@ -1532,16 +1532,12 @@ impl<'db> IntersectionBuilder<'db> {
             _ => {
                 // If we are already a union-of-intersections, distribute the new intersected element
                 // across all of those intersections.
-                // Keep the recursive binder at a type constructor. Expanding it here would
-                // unroll another level every time an intersection is normalized.
-                // For `R = μa. tuple[a & ~int]`, keep `R` instead of `tuple[R & ~int]`.
-                let element = if matches!(original, Type::Recursive(_))
-                    || (self.preserve_positive_aliases && matches!(original, Type::TypeAlias(_)))
-                {
-                    original
-                } else {
-                    ty
-                };
+                let element =
+                    if self.preserve_positive_aliases && matches!(original, Type::TypeAlias(_)) {
+                        original
+                    } else {
+                        ty
+                    };
                 for inner in &mut self.intersections {
                     inner.add_positive(db, &self.env, element);
                 }
@@ -1630,7 +1626,7 @@ impl<'db> IntersectionBuilder<'db> {
                 // Pass the original alias to preserve recursive self-references.
                 // `InnerIntersectionBuilder::add_negative` resolves it for simplification
                 // (for example, `~Any` becomes `Any`) and stores it if it remains negative.
-                let element = if matches!(original, Type::TypeAlias(_) | Type::Recursive(_)) {
+                let element = if matches!(original, Type::TypeAlias(_)) {
                     original
                 } else {
                     ty
