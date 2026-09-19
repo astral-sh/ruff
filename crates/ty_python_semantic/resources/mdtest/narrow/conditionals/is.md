@@ -79,7 +79,84 @@ def overlapping_generic_types(integers: tuple[int, ...], strings: tuple[str, ...
         reveal_type(strings)  # revealed: tuple[str, ...] & tuple[int, ...]
 ```
 
+## `is` with a generic method
+
+The same function object can be accessed through different specializations of a generic class.
+Identity narrows an `object` reference to a callable that retains the signature of the expression
+being compared.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def method(self, value: T) -> T:
+        return value
+
+def generic_method(value: object) -> None:
+    if value is C[int].method:
+        reveal_type(value(C[int](), 1))  # revealed: int
+```
+
 ## `is` with `functools.partial`
+
+A partial of a concrete function retains its call signature when an identity check narrows a
+reference typed as `object` to it. The comparison works in either operand order.
+
+```py
+from functools import partial
+
+def integer() -> int:
+    return 1
+
+def string() -> str:
+    return ""
+
+pi = partial(integer)
+ps = partial(string)
+
+def concrete_partial(value: object) -> None:
+    if value is pi:
+        reveal_type(value)  # revealed: partial[() -> int]
+        reveal_type(value())  # revealed: int
+
+    if ps is value:
+        reveal_type(value())  # revealed: str
+```
+
+When the compared expression can be either partial, the reference accepts both possible return
+types.
+
+```py
+def partial_union(value: object, choose_integer: bool) -> None:
+    candidate = pi if choose_integer else ps
+    if value is candidate:
+        reveal_type(value())  # revealed: int | str
+```
+
+A partial that binds a generic function to a concrete argument also keeps its result type. The saved
+`__call__` method of a concrete partial behaves the same way.
+
+```py
+from typing import TypeVar
+
+PartialT = TypeVar("PartialT")
+
+def generic_identity(value: PartialT) -> PartialT:
+    return value
+
+bound = partial(generic_identity, 1)
+pi_call = pi.__call__
+
+def bound_generic(value: object) -> None:
+    if value is bound:
+        reveal_type(value())  # revealed: Literal[1]
+
+def partial_call(value: object) -> None:
+    if value is pi_call:
+        reveal_type(value())  # revealed: int
+```
 
 In the following example, the class body creates `callback` only once, so `C[int].callback` and
 `C[str].callback` refer to a single `functools.partial` object at a single runtime memory address.
@@ -111,6 +188,17 @@ if callback is C[str].callback:
     reveal_type(callback)  # revealed: partial[(self, value: int) -> int]
     reveal_type(callback(C[int](), 1))  # revealed: int
     callback(C[int](), "wrong")  # error: [invalid-argument-type] "Expected `int`"
+```
+
+An `object` reference narrowed to the `C[int]` view of the callback can use its specialized
+signature.
+
+```py
+def object_reference(value: object) -> None:
+    if value is C[int].callback:
+        reveal_type(value)  # revealed: partial[(self, value: int) -> int]
+        reveal_type(value(C[int](), 1))  # revealed: int
+        value(C[int](), "wrong")  # error: [invalid-argument-type] "Expected `int`"
 ```
 
 Passing a saved partial or its `__call__` wrapper through a generic identity function also preserves
