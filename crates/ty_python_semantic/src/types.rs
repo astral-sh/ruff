@@ -4202,7 +4202,7 @@ impl<'db> Type<'db> {
 
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => ty
                 .to_meta_type(db, env)
-                .class_object_member(db, env, name, policy),
+                .class_object_member(db, env, name, policy, None),
 
             _ => ty
                 .to_meta_type(db, env)
@@ -4271,13 +4271,27 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
+        receiver: Option<Type<'db>>,
     ) -> PlaceAndQualifiers<'db> {
-        let class_attr = self
-            .find_name_in_mro_with_policy(db, env, name, policy)
-            .expect(
-                "Calling `class_object_member` on class literals and subclass-of types \
+        let protocol_attr = if let Type::SubclassOf(subclass_of) = self
+            && let SubclassOfInner::Protocol(protocol) = subclass_of.subclass_of()
+        {
+            protocol.interface(db).meta_member(
+                db,
+                env,
+                name,
+                receiver.and_then(|ty| ty.to_instance_approximation(db, env)),
+            )
+        } else {
+            None
+        };
+        let class_attr = protocol_attr.unwrap_or_else(|| {
+            self.find_name_in_mro_with_policy(db, env, name, policy)
+                .expect(
+                    "Calling `class_object_member` on class literals and subclass-of types \
                 should always find an MRO",
-            );
+                )
+        });
 
         let own_class = match self {
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
@@ -5519,6 +5533,7 @@ impl<'db> Type<'db> {
             env,
             name,
             MemberLookupPolicy::default(),
+            None,
         );
         let Place::Defined(DefinedPlace {
             ty,
@@ -6302,7 +6317,8 @@ impl<'db> Type<'db> {
                         .into();
                     }
 
-                    let class_attr_plain = this.class_object_member(db, env, name_str, policy);
+                    let class_attr_plain =
+                        this.class_object_member(db, env, name_str, policy, Some(receiver));
 
                     let self_instance = receiver.to_instance_approximation(db, env).expect(
                         "The receiver for a class-object lookup should always be instantiable",

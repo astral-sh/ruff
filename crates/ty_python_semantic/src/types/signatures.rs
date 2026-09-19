@@ -469,6 +469,50 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
+    /// Binds a known receiver, specializing receiver-dependent type variables and filtering
+    /// incompatible overloads.
+    pub(super) fn bind_receiver(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> Self {
+        let [signature] = self.overloads.as_slice() else {
+            if !self
+                .overloads
+                .iter()
+                .any(Signature::has_explicit_positional_receiver_annotation)
+            {
+                return self.bind_self_with_receiver(
+                    db,
+                    env,
+                    Some(receiver_type),
+                    Some(typing_self_type),
+                );
+            }
+
+            return Self::from_overloads(
+                self.overloads
+                    .iter()
+                    .filter_map(|signature| {
+                        signature.bind_self_if_compatible(db, env, receiver_type, typing_self_type)
+                    })
+                    .flat_map(|signature| signature.overloads),
+            );
+        };
+
+        let specialized = if signature.has_receiver_determined_method_typevar(db, env) {
+            signature.specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
+        } else {
+            None
+        };
+
+        specialized
+            .unwrap_or_else(|| Self::single(signature.clone()))
+            .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type))
+    }
+
     /// Binds the receiver using its runtime type while using `typing_self_type` to replace
     /// occurrences of `typing.Self`.
     ///
@@ -1182,6 +1226,56 @@ impl<'db> Signature<'db> {
         self_type: Option<Type<'db>>,
     ) -> Self {
         self.bind_self_with_receiver(db, env, self_type, self_type)
+    }
+
+    /// The receiver domain declared by a protocol method, after substituting its `Self`.
+    /// An omitted annotation permits any instance of the implementing class.
+    pub(super) fn protocol_receiver_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        self_type: Type<'db>,
+    ) -> Type<'db> {
+        self.parameters
+            .get(0)
+            .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
+            .map_or(receiver_type, |parameter| {
+                parameter.annotated_type().apply_type_mapping(
+                    db,
+                    env,
+                    &TypeMapping::BindSelf(SelfBinding::new(
+                        db,
+                        env,
+                        self_type,
+                        self.definition.map(BindingContext::Definition),
+                    )),
+                    TypeContext::default(),
+                )
+            })
+    }
+
+    /// Make an implicit receiver explicit when comparing it with a protocol's receiver domain.
+    /// For example, a method declared on `C` cannot accept an unrelated `str` receiver.
+    pub(super) fn with_explicit_receiver(&self, receiver_type: Type<'db>) -> Self {
+        if !self.has_implicit_positional_receiver_annotation() {
+            return self.clone();
+        }
+
+        let parameters = self.parameters.with_transformed_parameters(
+            self.parameters
+                .iter()
+                .cloned()
+                .enumerate()
+                .map(|(index, mut parameter)| {
+                    if index == 0 {
+                        parameter.annotated_type = receiver_type;
+                        parameter.inferred_annotation = false;
+                    }
+                    parameter
+                }),
+        );
+        self.clone().with_parameters(parameters)
     }
 
     /// Binds the receiver while preserving the relation between its runtime type and annotation.
