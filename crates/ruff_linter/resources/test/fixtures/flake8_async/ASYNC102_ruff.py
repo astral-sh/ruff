@@ -355,3 +355,15 @@ async def assignment_target_order():
             scope.shield = (await factory()).field = False  # ASYNC102
         with Shield(shield=True) as scope:
             (scope.shield, (await factory()).field) = (False, value)  # ASYNC102
+
+
+async def async_for_target_state(source):
+    try:
+        pass
+    finally:
+        with Shield(shield=True) as scope:
+            async for scope.shield in source:  # ASYNC102: later iterations
+                pass
+        with Shield(shield=True) as scope:
+            async for scope in source:
+                pass

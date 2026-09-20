@@ -583,10 +583,12 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
                 self.visit_expr(&stmt.iter);
                 self.invalidate_assignments(&stmt.body);
                 if stmt.is_async {
+                    // A target write from one iteration affects the checkpoint
+                    // that starts the next iteration.
+                    self.assign(&stmt.target, None);
                     self.checkpoint(stmt.range());
                 }
-                self.visit_expr(&stmt.target);
-                self.assign(&stmt.target, None);
+                self.visit_assignment_target(&stmt.target, None);
                 let before = self.scopes.clone();
                 self.visit_body(&stmt.body);
                 self.merge_scopes(&before);

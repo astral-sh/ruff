@@ -730,3 +730,15 @@ ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel 
 356 |         with Shield(shield=True) as scope:
 357 |             (scope.shield, (await factory()).field) = (False, value)  # ASYNC102
     |                             ^^^^^^^^^^^^^^^
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:365:13
+    |
+363 |       finally:
+364 |           with Shield(shield=True) as scope:
+365 | /             async for scope.shield in source:  # ASYNC102: later iterations
+366 | |                 pass
+    | |____________________^
+367 |           with Shield(shield=True) as scope:
+368 |               async for scope in source:
+    |
