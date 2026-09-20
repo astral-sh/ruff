@@ -253,7 +253,7 @@ impl<'db> TypingModeResolver<'db> {
                     extra_stub_package_paths,
                 );
                 let stub_override_candidates =
-                    normalize_candidates(context.db, root_candidates.clone(), true);
+                    normalize_candidates(context, root_candidates.clone(), true);
                 Self {
                     prefix,
                     root_candidates_from_extra_paths: (!root_candidates.is_empty())
@@ -379,7 +379,7 @@ impl<'db> TypingModeResolver<'db> {
                     .skip_while(|path| path.is_extra()),
                 remaining_stub_package_paths,
             ));
-            candidates = normalize_candidates(context.db, candidates, true);
+            candidates = normalize_candidates(context, candidates, true);
 
             for component_name in self.prefix.components().skip(1) {
                 candidates = advance_candidates(
@@ -493,7 +493,7 @@ impl<'db> RootSearchPaths<'db> {
             stub_paths,
         );
 
-        normalize_candidates(context.db, candidates, for_module_name_prefix)
+        normalize_candidates(context, candidates, for_module_name_prefix)
     }
 
     fn iter(&self, context: &ResolverContext<'db>) -> impl Iterator<Item = &'db SearchPath> {
@@ -569,7 +569,7 @@ fn discover_roots<'db, 'a>(
             ComponentFileFilter::ByMode,
         )
         .is_ok();
-        let terminal = candidate.missing_submodule_is_terminal();
+        let terminal = candidate.missing_submodule_is_terminal(context);
         if resolved {
             cur_candidates.push(candidate);
         }
@@ -613,7 +613,9 @@ fn advance_candidates<'db>(
     component_name_is_prefix: bool,
 ) -> ResolvedNames<'db> {
     let mut remaining_are_shadowed = false;
+    let mut remaining = candidates.len();
     candidates.retain_mut(|candidate| {
+        remaining -= 1;
         if remaining_are_shadowed {
             return false;
         }
@@ -622,11 +624,11 @@ fn advance_candidates<'db>(
 
         // A terminal candidate shadows every lower-priority candidate, even if resolving
         // this component fails. Higher-priority candidates remain in play.
-        remaining_are_shadowed = candidate.missing_submodule_is_terminal();
+        remaining_are_shadowed = remaining > 0 && candidate.missing_submodule_is_terminal(context);
 
         resolved
     });
-    normalize_candidates(context.db, candidates, component_name_is_prefix)
+    normalize_candidates(context, candidates, component_name_is_prefix)
 }
 
 fn full_module_name(prefix: Option<&ModuleName>, component_name: &str) -> Option<ModuleName> {
