@@ -365,6 +365,26 @@ impl<'a> CleanupVisitor<'a, '_> {
         }
     }
 
+    fn visit_assignment_target(&mut self, target: &'a Expr, value: Option<&'a Expr>) {
+        match target {
+            Expr::Tuple(tuple) => {
+                for target in &tuple.elts {
+                    self.visit_assignment_target(target, None);
+                }
+            }
+            Expr::List(list) => {
+                for target in &list.elts {
+                    self.visit_assignment_target(target, None);
+                }
+            }
+            Expr::Starred(starred) => self.visit_assignment_target(&starred.value, None),
+            _ => {
+                self.visit_expr(target);
+                self.assign(target, value);
+            }
+        }
+    }
+
     fn merge_scopes(&mut self, other: &[CancelScope<'a>]) {
         for (scope, other) in self.scopes.iter_mut().zip(other) {
             scope.shielded &= other.shielded;
@@ -523,9 +543,9 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
                 self.scopes.truncate(count);
             }
             Stmt::Assign(assign) => {
-                visitor::walk_stmt(self, stmt);
+                self.visit_expr(&assign.value);
                 for target in &assign.targets {
-                    self.assign(target, Some(&assign.value));
+                    self.visit_assignment_target(target, Some(&assign.value));
                 }
             }
             Stmt::AnnAssign(stmt) => {

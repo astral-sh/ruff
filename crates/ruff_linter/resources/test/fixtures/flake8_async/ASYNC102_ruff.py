@@ -345,3 +345,13 @@ async def loop_else_shielding(items, flag):
             else:
                 scope.shield = True
             await cleanup()
+
+
+async def assignment_target_order():
+    try:
+        pass
+    finally:
+        with Shield(shield=True) as scope:
+            scope.shield = (await factory()).field = False  # ASYNC102
+        with Shield(shield=True) as scope:
+            (scope.shield, (await factory()).field) = (False, value)  # ASYNC102
