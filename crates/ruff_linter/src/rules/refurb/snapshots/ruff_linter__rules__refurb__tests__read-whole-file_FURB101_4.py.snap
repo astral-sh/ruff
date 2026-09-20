@@ -1,0 +1,40 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+assertion_line: 67
+---
+FURB101 [*] `open` and `read` should be replaced by `Path(b"file.txt").read_text()`
+ --> FURB101_4.py:1:6
+  |
+1 | with open(b"file.txt") as f:
+  |      ^^^^^^^^^^^^^^^^^^^^^^
+2 |     x = f.read()
+  |
+help: Replace with `Path(b"file.txt").read_text()`
+  |
+  - with open(b"file.txt") as f:
+  -     x = f.read()
+1 + import pathlib
+2 + x = pathlib.Path(b"file.txt").read_text()
+3 |
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB101 [*] `open` and `read` should be replaced by `Path("other.txt").read_text()`
+ --> FURB101_4.py:4:6
+  |
+2 |     x = f.read()
+3 |
+4 | with open("other.txt") as f:
+  |      ^^^^^^^^^^^^^^^^^^^^^^
+5 |     y = f.read()
+  |
+help: Replace with `Path("other.txt").read_text()`
+  |
+1 + import pathlib
+2 | with open(b"file.txt") as f:
+3 |     x = f.read()
+4 |
+  - with open("other.txt") as f:
+  -     y = f.read()
+5 + y = pathlib.Path("other.txt").read_text()
+  |

@@ -137,6 +137,19 @@ impl FileOpen<'_> {
     }
 }
 
+impl OpenArgument<'_> {
+    /// Whether the argument is known to hold `bytes`, in which case wrapping it in
+    /// `pathlib.Path` is unsound: `open` accepts bytes paths, but `Path` raises
+    /// `TypeError` for them.
+    pub(super) fn is_bytes(&self) -> bool {
+        match self {
+            OpenArgument::Builtin { filename } => filename.is_bytes_literal_expr(),
+            // The receiver of `Path.open` is already a `Path`, so it cannot be bytes.
+            OpenArgument::Pathlib { .. } => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub(super) enum OpenArgument<'a> {
     /// The filename argument to `open`, e.g. "foo.txt" in:

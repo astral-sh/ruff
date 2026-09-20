@@ -24,3 +24,14 @@ def _set():
         f.write("\n")
     g = {f.name for _ in [0]}
     return g
+
+
+# FURB103: a bytes path is accepted by `open` but rejected by `pathlib.Path`, so the
+# fix must be unsafe rather than safe.
+# https://github.com/astral-sh/ruff/issues/26922
+with open(b"out.txt", "w") as f:
+    f.write("data")
+
+# A str path remains a safe fix.
+with open("other.txt", "w") as f:
+    f.write("data")

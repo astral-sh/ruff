@@ -232,7 +232,12 @@ fn generate_fix(
 
     let replacement = format!("{target}.{suggestion}");
 
-    let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
+    // `pathlib.Path` rejects bytes paths, while `open` accepts them, so the rewrite is
+    // unsound for a bytes filename and must not be applied by default.
+    // https://github.com/astral-sh/ruff/issues/26922
+    let applicability = if checker.comment_ranges().intersects(with_stmt.range())
+        || open.argument.is_bytes()
+    {
         Applicability::Unsafe
     } else {
         Applicability::Safe

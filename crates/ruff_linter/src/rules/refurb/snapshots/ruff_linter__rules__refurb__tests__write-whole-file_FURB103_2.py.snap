@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+assertion_line: 66
 ---
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text("\n", encoding="utf-8")`
  --> FURB103_2.py:3:6
@@ -65,4 +66,47 @@ help: Replace with `Path("file.txt").write_text("\n")`
    -         f.write("\n")
 24 +     pathlib.Path("file.txt").write_text("\n")
 25 |     g = {f.name for _ in [0]}
+   |
+
+FURB103 [*] `open` and `write` should be replaced by `Path(b"out.txt").write_text("data")`
+  --> FURB103_2.py:32:6
+   |
+30 | # fix must be unsafe rather than safe.
+31 | # https://github.com/astral-sh/ruff/issues/26922
+32 | with open(b"out.txt", "w") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+33 |     f.write("data")
+   |
+help: Replace with `Path(b"out.txt").write_text("data")`
+   |
+2  | # should trigger
+3  + import pathlib
+4  | with open("file.txt", "w", encoding="utf-8") as f:
+--------------------------------------------------------------------------------
+32 | # https://github.com/astral-sh/ruff/issues/26922
+   - with open(b"out.txt", "w") as f:
+   -     f.write("data")
+33 + pathlib.Path(b"out.txt").write_text("data")
+34 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB103 [*] `open` and `write` should be replaced by `Path("other.txt").write_text("data")`
+  --> FURB103_2.py:36:6
+   |
+35 | # A str path remains a safe fix.
+36 | with open("other.txt", "w") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+37 |     f.write("data")
+   |
+help: Replace with `Path("other.txt").write_text("data")`
+   |
+2  | # should trigger
+3  + import pathlib
+4  | with open("file.txt", "w", encoding="utf-8") as f:
+--------------------------------------------------------------------------------
+36 | # A str path remains a safe fix.
+   - with open("other.txt", "w") as f:
+   -     f.write("data")
+37 + pathlib.Path("other.txt").write_text("data")
    |

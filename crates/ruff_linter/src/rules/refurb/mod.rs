@@ -18,6 +18,7 @@ mod tests {
     #[test_case(Rule::ReadWholeFile, Path::new("FURB101_0.py"))]
     #[test_case(Rule::ReadWholeFile, Path::new("FURB101_1.py"))]
     #[test_case(Rule::ReadWholeFile, Path::new("FURB101_2.py"))]
+    #[test_case(Rule::ReadWholeFile, Path::new("FURB101_4.py"))]
     #[test_case(Rule::RepeatedAppend, Path::new("FURB113.py"))]
     #[test_case(Rule::IfExpInsteadOfOrOperator, Path::new("FURB110.py"))]
     #[test_case(Rule::ReimplementedOperator, Path::new("FURB118.py"))]
