@@ -8,7 +8,7 @@ use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
-use ruff_python_trivia::{indentation_at_offset, textwrap};
+use ruff_python_trivia::indentation_at_offset;
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
@@ -180,10 +180,19 @@ fn move_initialization(
     }
 
     // Add an `if`, to set the argument to its original value if still `None`.
+    //
+    // The body indentation is applied to each generated line as it is written, rather
+    // than to the whole block afterwards. Indenting the assembled text would also
+    // re-indent the continuation lines *inside* a multiline string literal, changing
+    // the runtime value of the default. (github.com/astral-sh/ruff/issues/27022)
+    let indentation = indentation_at_offset(statement.start(), locator.contents())?;
+
     let mut content = String::new();
+    content.push_str(indentation);
     let _ = write!(&mut content, "if {} is None:", parameter.parameter.name());
     content.push_str(stylist.line_ending().as_str());
-    content.push_str(stylist.indentation());
+    content.push_str(indentation);
+    content.push_str(stylist.indentation().as_str());
     if is_b006_unsafe_fix_preserve_assignment_expr_enabled(checker.settings()) {
         let _ = write!(
             &mut content,
@@ -204,12 +213,6 @@ fn move_initialization(
     }
 
     content.push_str(stylist.line_ending().as_str());
-
-    // Determine the indentation depth of the function body.
-    let indentation = indentation_at_offset(statement.start(), locator.contents())?;
-
-    // Indent the edit to match the body indentation.
-    let mut content = textwrap::indent(&content, indentation).to_string();
 
     // Find the position to insert the initialization after docstring and imports
     let mut pos = locator.line_start(statement.start());

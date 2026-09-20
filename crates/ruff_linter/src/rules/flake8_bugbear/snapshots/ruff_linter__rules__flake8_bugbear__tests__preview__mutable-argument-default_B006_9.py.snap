@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+assertion_line: 107
 ---
 B006 [*] Do not use mutable data structures for argument defaults
  --> B006_9.py:1:10
@@ -87,5 +88,52 @@ help: Replace with `None`; initialize within function
 18 +     if x is None:
 19 +         x = ([1, ])
 20 |     print(x)
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_9.py:32:10
+   |
+30 |   # generated `if` block must not indent the string's own continuation lines.
+31 |   # https://github.com/astral-sh/ruff/issues/27022
+32 |   def m1(x=["""first
+   |  __________^
+33 | | second"""]):
+   | |__________^
+34 |       print(x)
+   |
+help: Replace with `None`; initialize within function
+   |
+31 | # https://github.com/astral-sh/ruff/issues/27022
+   - def m1(x=["""first
+   - second"""]):
+32 + def m1(x=None):
+33 +     if x is None:
+34 +         x = ["""first
+35 + second"""]
+36 |     print(x)
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_9.py:43:24
+   |
+42 |   class C:
+43 |       def method(self, x=["""line1
+   |  ________________________^
+44 | | line2"""]):
+   | |_________^
+45 |           print(x)
+   |
+help: Replace with `None`; initialize within function
+   |
+42 | class C:
+   -     def method(self, x=["""line1
+   - line2"""]):
+43 +     def method(self, x=None):
+44 +         if x is None:
+45 +             x = ["""line1
+46 + line2"""]
+47 |         print(x)
    |
 note: This is an unsafe fix and may change runtime behavior
