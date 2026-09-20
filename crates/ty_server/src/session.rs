@@ -1556,18 +1556,6 @@ impl DocumentSnapshot {
         &self.document
     }
 
-    pub(crate) fn uri(&self) -> &lsp_types::Uri {
-        self.document.uri()
-    }
-
-    pub(crate) fn to_notebook_or_file(&self, db: &ProjectDatabase) -> Option<File> {
-        self.document.to_notebook_or_file(db)
-    }
-
-    pub(crate) fn notebook_or_file_path(&self) -> &AnySystemPath {
-        self.document.notebook_or_file_path()
-    }
-
     pub(crate) fn client_name(&self) -> ClientName {
         self.client_name
     }
@@ -1594,7 +1582,7 @@ impl DocumentRequestTarget {
     /// Returns the database file for this document, or its containing notebook for a cell.
     ///
     /// Returns [`None`] if the file cannot be resolved.
-    fn to_notebook_or_file(&self, db: &ProjectDatabase) -> Option<File> {
+    pub(crate) fn to_notebook_or_file(&self, db: &ProjectDatabase) -> Option<File> {
         let file = match self {
             Self::Open(handle) => handle.notebook_or_file(db),
             Self::Closed { path, .. } => {
@@ -1624,14 +1612,16 @@ impl DocumentRequestTarget {
         matches!(self, Self::Open(handle) if handle.is_cell())
     }
 
-    fn uri(&self) -> &Uri {
+    /// Returns the document URI supplied by the client.
+    pub(crate) fn uri(&self) -> &Uri {
         match self {
             Self::Open(handle) => handle.uri(),
             Self::Closed { uri, .. } => uri,
         }
     }
 
-    fn notebook_or_file_path(&self) -> &AnySystemPath {
+    /// Returns the document's path, or its containing notebook's path for a cell.
+    pub(crate) fn notebook_or_file_path(&self) -> &AnySystemPath {
         match self {
             Self::Open(handle) => handle.notebook_or_file_path(),
             Self::Closed { path, .. } => path,

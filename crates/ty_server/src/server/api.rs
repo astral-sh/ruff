@@ -336,7 +336,7 @@ where
             });
         };
 
-        let path = document.notebook_or_file_path();
+        let path = document.document().notebook_or_file_path();
         let db = session.project_db(path).clone();
         let log_guidance = document.client_name().log_guidance();
 

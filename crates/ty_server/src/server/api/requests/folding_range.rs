@@ -39,7 +39,7 @@ impl BackgroundDocumentRequestHandler for FoldingRangeRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_notebook_or_file(db) else {
+        let Some(file) = snapshot.document().to_notebook_or_file(db) else {
             return Ok(None);
         };
 
@@ -52,7 +52,7 @@ impl BackgroundDocumentRequestHandler for FoldingRangeRequestHandler {
             && let Some(notebook_document) = db.notebook_document(file)
             && let Some(notebook) = source_text(db, file).as_notebook()
         {
-            let cell_index = notebook_document.cell_index_by_uri(snapshot.uri());
+            let cell_index = notebook_document.cell_index_by_uri(snapshot.document().uri());
             cell_range = cell_index.and_then(|index| notebook.cell_range(index));
         }
 

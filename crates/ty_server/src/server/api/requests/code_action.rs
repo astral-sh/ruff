@@ -38,7 +38,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
     ) -> Result<Option<Vec<CodeActionResponse>>> {
         let diagnostics = params.context.diagnostics;
 
-        let Some(file) = snapshot.to_notebook_or_file(db) else {
+        let Some(file) = snapshot.document().to_notebook_or_file(db) else {
             return Ok(None);
         };
         let program_file = db.program_file(file);
@@ -95,7 +95,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             // This is only for actions that are messy to compute at the time of the diagnostic.
             // For instance, suggesting imports requires finding symbols for the entire project,
             // which is dubious when you're in the middle of resolving symbols.
-            let uri = snapshot.uri();
+            let uri = snapshot.document().uri();
             let encoding = snapshot.encoding();
             if let Some(diagnostic_id) = diagnostic_id
                 && let Some(range) = diagnostic.range.to_text_range(db, file, uri, encoding)
