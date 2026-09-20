@@ -62,7 +62,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Avoid emitting the lint if `__await__` is only present on a dynamic base class
         // (the class inherits from `Any`) or an intersection with a dynamic type (`X & Unknown`)
         if ty
-            .try_await_with_policy(db, env, MemberLookupPolicy::REQUIRE_CONCRETE)
+            .try_await_with_policy(
+                db,
+                env,
+                MemberLookupPolicy::REQUIRE_CONCRETE
+                    | MemberLookupPolicy::REQUIRE_INHABITED
+                    | MemberLookupPolicy::NO_GETATTR_LOOKUP,
+            )
             .is_err()
         {
             return;

@@ -1275,6 +1275,10 @@ bitflags! {
         /// member, but that does not mean that every subclass should be treated as a descriptor.
         /// Likewise, a divergent marker from cyclic inference does not establish a concrete member.
         const REQUIRE_CONCRETE = 1 << 5;
+
+        /// Ignore members that are only available through attribute access on an uninhabited type
+        /// such as `Never`.
+        const REQUIRE_INHABITED = 1 << 6;
     }
 }
 
@@ -1313,6 +1317,11 @@ impl MemberLookupPolicy {
     /// Ignore members that are only available through a dynamic type.
     const fn require_concrete(self) -> bool {
         self.contains(Self::REQUIRE_CONCRETE)
+    }
+
+    /// Ignore members that are only available through an inhabited type such as `Never`.
+    const fn require_inhabited(self) -> bool {
+        self.contains(Self::REQUIRE_INHABITED)
     }
 }
 
@@ -3917,6 +3926,8 @@ impl<'db> Type<'db> {
                 Some(Place::Undefined.into())
             }
 
+            Type::Never if policy.require_inhabited() => Some(Place::Undefined.into()),
+
             Type::Recursive(recursive) => recursive
                 .unfold(db, env)
                 .map(|unfolded| unfolded.find_name_in_mro_with_policy(db, env, name, policy))
@@ -4365,7 +4376,7 @@ impl<'db> Type<'db> {
         else {
             return class_attr;
         };
-        let metaclass_member = metaclass.instance_member(db, env, name);
+        let metaclass_member = metaclass.instance_member_with_policy(db, env, name, policy);
         if metaclass_member.is_undefined() {
             return class_attr;
         }
@@ -4514,7 +4525,7 @@ impl<'db> Type<'db> {
 
             Type::Intersection(intersection) => {
                 if let Some(complement) = intersection.enum_complement(db, env) {
-                    enums::instance_member_for_enum_complement(db, env, complement, name)
+                    enums::instance_member_for_enum_complement(db, env, complement, name, policy)
                 } else {
                     intersection.map_with_boundness_and_qualifiers(db, env, |elem| {
                         elem.instance_member_with_policy(db, env, name, policy)
@@ -4523,7 +4534,7 @@ impl<'db> Type<'db> {
             }
 
             Type::EnumComplement(complement) => {
-                enums::instance_member_for_enum_complement(db, env, *complement, name)
+                enums::instance_member_for_enum_complement(db, env, *complement, name, policy)
             }
 
             Type::Recursive(recursive) => recursive
@@ -4535,18 +4546,18 @@ impl<'db> Type<'db> {
                 Place::bound(self).into()
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) => Place::Undefined.into(),
+            Type::Never if !policy.require_inhabited() => Place::bound(self).into(),
 
-            Type::Never => Place::bound(self).into(),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::Undefined.into(),
 
-            Type::NominalInstance(instance) => {
-                instance.class(db, env).instance_member(db, env, name)
-            }
+            Type::NominalInstance(instance) => instance
+                .class(db, env)
+                .instance_member_with_policy(db, env, name, policy),
             Type::NewTypeInstance(newtype) => newtype
                 .concrete_base_type(db)
                 .instance_member_with_policy(db, env, name, policy),
 
-            Type::ProtocolInstance(protocol) => protocol.instance_member(db, env, name),
+            Type::ProtocolInstance(protocol) => protocol.instance_member(db, env, name, policy),
 
             Type::FunctionLiteral(function) => function
                 .runtime_class(db)
@@ -5804,9 +5815,9 @@ impl<'db> Type<'db> {
                     Place::bound(this).into()
                 }
 
-                Type::Dynamic(..) | Type::Divergent(_) => Place::Undefined.into(),
+                Type::Never if !policy.require_inhabited() => Place::bound(this).into(),
 
-                Type::Never => Place::bound(this).into(),
+                Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::Undefined.into(),
 
                 _ if name == "__get__" && this.function_like_kind(db).is_some() => {
                     Place::bound(Type::KnownBoundMethod(
@@ -6403,7 +6414,7 @@ impl<'db> Type<'db> {
                 return Place::bound(self.dunder_class(db, env)).into();
             }
 
-            if self.is_never() {
+            if self.is_never() && !policy.require_inhabited() {
                 return Place::bound(self).into();
             }
 

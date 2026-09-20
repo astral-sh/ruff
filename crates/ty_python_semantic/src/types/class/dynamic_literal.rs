@@ -383,6 +383,7 @@ impl<'db> DynamicClassLiteral<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
+        policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         match MroLookup::new(db, env, self.iter_mro(db)).instance_member(name) {
             InstanceMemberResult::Done(result) => result,
@@ -390,7 +391,7 @@ impl<'db> DynamicClassLiteral<'db> {
                 // Simplified `TypedDict` handling without type mapping.
                 KnownClass::TypedDictFallback
                     .to_instance(db, env)
-                    .instance_member(db, env, name)
+                    .instance_member_with_policy(db, env, name, policy)
             }
         }
     }

@@ -2877,12 +2877,13 @@ impl<'db> StaticClassLiteral<'db> {
     /// Look up an instance attribute (available in `__dict__`) of the given name.
     ///
     /// See [`Type::instance_member`] for more details.
-    pub(super) fn instance_member(
+    pub(super) fn instance_member_with_policy(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         specialization: Option<Specialization<'db>>,
         name: &str,
+        policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         if self.is_typed_dict(db) || self.lacks_instance_storage(db, name) {
             return Place::Undefined.into();
@@ -2892,7 +2893,7 @@ impl<'db> StaticClassLiteral<'db> {
             InstanceMemberResult::Done(result) => result,
             InstanceMemberResult::TypedDict => KnownClass::TypedDictFallback
                 .to_instance(db, env)
-                .instance_member(db, env, name)
+                .instance_member_with_policy(db, env, name, policy)
                 .map_type(|ty| {
                     ty.apply_type_mapping(
                         db,

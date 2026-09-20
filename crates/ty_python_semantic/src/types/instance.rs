@@ -35,8 +35,8 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
-    FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
-    VarianceTerm,
+    FindLegacyTypeVarsVisitor, LiteralValueTypeKind, MemberLookupPolicy, TypeContext, TypeMapping,
+    VarianceInferable, VarianceTerm,
 };
 use crate::{Db, FxOrderSet};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -1595,15 +1595,20 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
+        policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         match self.inner {
-            Protocol::FromClass(class) => class.instance_member(db, env, name),
+            Protocol::FromClass(class) => class.instance_member_with_policy(db, env, name, policy),
             Protocol::Synthesized(synthesized) => {
                 synthesized.interface().instance_member(db, env, name)
             }
             Protocol::Materialized(materialized) => self
                 .materialized_interface_member(db, env, name)
-                .unwrap_or_else(|| materialized.origin(db).instance_member(db, env, name)),
+                .unwrap_or_else(|| {
+                    materialized
+                        .origin(db)
+                        .instance_member_with_policy(db, env, name, policy)
+                }),
         }
     }
 

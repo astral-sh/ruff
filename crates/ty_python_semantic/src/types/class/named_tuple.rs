@@ -307,6 +307,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
+        policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         // First check own instance members.
         let result = self.own_instance_member(db, name);
@@ -315,7 +316,8 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         }
 
         // Fall back to the tuple base type for other attributes.
-        Type::instance(db, env, self.tuple_base_class(db, env)).instance_member(db, env, name)
+        Type::instance(db, env, self.tuple_base_class(db, env))
+            .instance_member_with_policy(db, env, name, policy)
     }
 
     /// Look up a class-level member by name.
