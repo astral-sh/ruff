@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+assertion_line: 805
 ---
 RUF055 [*] Plain string pattern passed to `re` function
  --> RUF055_3.py:6:1
@@ -65,4 +66,73 @@ help: Replace with `b_src.split(rb"abc")`
    - re.split(rb"abc", b_src)
 17 + b_src.split(rb"abc")
 18 |
+   |
+
+RUF055 [*] Plain string pattern passed to `re` function
+  --> RUF055_3.py:33:8
+   |
+31 | # https://github.com/astral-sh/ruff/issues/27024
+32 | mv = memoryview(b"abc")
+33 | assert re.search(b"ab", mv)
+   |        ^^^^^^^^^^^^^^^^^^^^
+34 | assert re.search(b"ab", memoryview(b"abc"))
+   |
+help: Replace with `b"ab" in mv`
+   |
+32 | mv = memoryview(b"abc")
+   - assert re.search(b"ab", mv)
+33 + assert b"ab" in mv
+34 | assert re.search(b"ab", memoryview(b"abc"))
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF055 [*] Plain string pattern passed to `re` function
+  --> RUF055_3.py:34:8
+   |
+32 | mv = memoryview(b"abc")
+33 | assert re.search(b"ab", mv)
+34 | assert re.search(b"ab", memoryview(b"abc"))
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+35 |
+36 | # A `bytearray` target is also not a `bytes` for the purposes of `in`.
+   |
+help: Replace with `b"ab" in memoryview(b"abc")`
+   |
+33 | assert re.search(b"ab", mv)
+   - assert re.search(b"ab", memoryview(b"abc"))
+34 + assert b"ab" in memoryview(b"abc")
+35 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF055 [*] Plain string pattern passed to `re` function
+  --> RUF055_3.py:38:8
+   |
+36 | # A `bytearray` target is also not a `bytes` for the purposes of `in`.
+37 | ba = bytearray(b"abc")
+38 | assert re.search(b"ab", ba)
+   |        ^^^^^^^^^^^^^^^^^^^^
+39 |
+40 | # A `bytes`-literal target is still safely fixable.
+   |
+help: Replace with `b"ab" in ba`
+   |
+37 | ba = bytearray(b"abc")
+   - assert re.search(b"ab", ba)
+38 + assert b"ab" in ba
+39 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF055 [*] Plain string pattern passed to `re` function
+  --> RUF055_3.py:41:8
+   |
+40 | # A `bytes`-literal target is still safely fixable.
+41 | assert re.search(b"ab", b"abc")
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^
+help: Replace with `b"ab" in b"abc"`
+   |
+40 | # A `bytes`-literal target is still safely fixable.
+   - assert re.search(b"ab", b"abc")
+41 + assert b"ab" in b"abc"
    |

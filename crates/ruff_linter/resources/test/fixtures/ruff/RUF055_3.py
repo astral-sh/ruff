@@ -25,3 +25,17 @@ re.split(rb"ab[c]", b_src)
 
 # Empty pattern: re.split(rb"", b_src) should not be flagged
 re.split(rb"", b_src)
+
+# A buffer-protocol target is not a `bytes`. `re.search` searches any buffer,
+# but `in` only searches a real `bytes`, so the fix must be unsafe.
+# https://github.com/astral-sh/ruff/issues/27024
+mv = memoryview(b"abc")
+assert re.search(b"ab", mv)
+assert re.search(b"ab", memoryview(b"abc"))
+
+# A `bytearray` target is also not a `bytes` for the purposes of `in`.
+ba = bytearray(b"abc")
+assert re.search(b"ab", ba)
+
+# A `bytes`-literal target is still safely fixable.
+assert re.search(b"ab", b"abc")

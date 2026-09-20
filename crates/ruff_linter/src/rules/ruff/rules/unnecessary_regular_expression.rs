@@ -51,8 +51,11 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 ///
-/// This rule's fix is marked as unsafe if the affected expression contains comments. Otherwise,
-/// the fix can be applied safely.
+/// This rule's fix is marked as unsafe if the affected expression contains comments, or if the
+/// pattern is a `bytes` literal but the search target is not known to be a `bytes`/`bytearray`.
+/// In that case `re.search` accepts any buffer-protocol object (`memoryview`, `bytearray`, ...)
+/// while the `in` operator only searches a real `bytes`, so the rewrite could turn a passing
+/// check into a failing one. Otherwise, the fix can be applied safely.
 ///
 /// ## References
 /// - [Python Regular Expression HOWTO: Common Problems - Use String Methods](https://docs.python.org/3/howto/regex.html#use-string-methods)
@@ -139,15 +142,41 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
     );
 
     if let Some(repl) = repl {
+        // `re.search(b"ab", buf)` finds a byte subsequence in any buffer-protocol
+        // object, but `b"ab" in buf` only searches a real `bytes`/`bytearray`. Downgrade
+        // the fix when the target type is not known to be `bytes`, so we never silently
+        // change a passing check into a failing one (e.g. a `memoryview` target).
+        let bytes_pattern_unsafe = matches!(literal, Literal::Bytes(_))
+            && !is_known_bytes_target(re_func.string, semantic);
+
         diagnostic.set_fix(Fix::applicable_edit(
             Edit::range_replacement(repl, re_func.range),
-            if checker.comment_ranges().intersects(re_func.range) {
+            if checker.comment_ranges().intersects(re_func.range) || bytes_pattern_unsafe {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
             },
         ));
     }
+}
+
+/// Whether `expr` is known to hold a `bytes`/`bytearray` value, so that
+/// `pattern in expr` behaves like `re.search(pattern, expr)`.
+fn is_known_bytes_target(expr: &Expr, semantic: &SemanticModel) -> bool {
+    if expr.is_bytes_literal_expr() {
+        return true;
+    }
+    if let Some(name_expr) = expr.as_name_expr() {
+        if let Some(binding) = semantic
+            .only_binding(name_expr)
+            .map(|id| semantic.binding(id))
+        {
+            if let Some(value) = find_binding_value(binding, semantic) {
+                return value.is_bytes_literal_expr();
+            }
+        }
+    }
+    false
 }
 
 /// The `re` functions supported by this rule.
