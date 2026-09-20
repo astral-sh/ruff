@@ -18,7 +18,7 @@ use smallvec::{SmallVec, smallvec};
 
 use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
-use crate::{Binding, BindingKind, Modules};
+use crate::{Binding, BindingKind, Modules, Symbol};
 
 #[derive(Debug, Copy, Clone)]
 pub enum Callable {
@@ -295,8 +295,21 @@ pub fn is_immutable_annotation(
     semantic: &SemanticModel,
     extend_immutable_calls: &[QualifiedName],
 ) -> bool {
+    is_immutable_annotation_impl(expr, semantic, extend_immutable_calls, 0)
+}
+
+/// The maximum depth to which type aliases are resolved when checking for
+/// immutable annotations, e.g., `A = B`, `B = Mapping[str, str]`.
+const MAX_TYPE_ALIAS_DEPTH: u8 = 5;
+
+fn is_immutable_annotation_impl(
+    expr: &Expr,
+    semantic: &SemanticModel,
+    extend_immutable_calls: &[QualifiedName],
+    depth: u8,
+) -> bool {
     match expr {
-        Expr::Name(_) | Expr::Attribute(_) => {
+        Expr::Name(name) => {
             semantic
                 .resolve_qualified_name(expr)
                 .is_some_and(|qualified_name| {
@@ -304,7 +317,17 @@ pub fn is_immutable_annotation(
                         || is_immutable_generic_type(qualified_name.segments())
                         || extend_immutable_calls.contains(&qualified_name)
                 })
+                // The annotation may reference a type alias, e.g.,
+                // `CustomMapping = Mapping[str, str]`.
+                || is_immutable_type_alias(name, semantic, extend_immutable_calls, depth)
         }
+        Expr::Attribute(_) => semantic
+            .resolve_qualified_name(expr)
+            .is_some_and(|qualified_name| {
+                is_immutable_non_generic_type(qualified_name.segments())
+                    || is_immutable_generic_type(qualified_name.segments())
+                    || extend_immutable_calls.contains(&qualified_name)
+            }),
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => semantic
             .resolve_qualified_name(value)
             .is_some_and(|qualified_name| {
@@ -313,17 +336,27 @@ pub fn is_immutable_annotation(
                 } else if matches!(qualified_name.segments(), ["typing", "Union"]) {
                     if let Expr::Tuple(tuple) = &**slice {
                         tuple.iter().all(|element| {
-                            is_immutable_annotation(element, semantic, extend_immutable_calls)
+                            is_immutable_annotation_impl(
+                                element,
+                                semantic,
+                                extend_immutable_calls,
+                                depth,
+                            )
                         })
                     } else {
                         false
                     }
                 } else if matches!(qualified_name.segments(), ["typing", "Optional"]) {
-                    is_immutable_annotation(slice, semantic, extend_immutable_calls)
+                    is_immutable_annotation_impl(slice, semantic, extend_immutable_calls, depth)
                 } else if is_pep_593_generic_type(qualified_name.segments()) {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                         elts.first().is_some_and(|elt| {
-                            is_immutable_annotation(elt, semantic, extend_immutable_calls)
+                            is_immutable_annotation_impl(
+                                elt,
+                                semantic,
+                                extend_immutable_calls,
+                                depth,
+                            )
                         })
                     } else {
                         false
@@ -339,12 +372,44 @@ pub fn is_immutable_annotation(
             range: _,
             node_index: _,
         }) => {
-            is_immutable_annotation(left, semantic, extend_immutable_calls)
-                && is_immutable_annotation(right, semantic, extend_immutable_calls)
+            is_immutable_annotation_impl(left, semantic, extend_immutable_calls, depth)
+                && is_immutable_annotation_impl(right, semantic, extend_immutable_calls, depth)
         }
         Expr::NoneLiteral(_) => true,
         _ => false,
     }
+}
+
+/// Return `true` if `name` is bound to a type alias whose assigned value is an
+/// immutable type annotation.
+///
+/// For example:
+/// ```python
+/// from typing import Mapping
+///
+/// CustomMapping = Mapping[str, str]
+/// ```
+///
+/// Here, `name` would be `CustomMapping`.
+fn is_immutable_type_alias(
+    name: &ast::ExprName,
+    semantic: &SemanticModel,
+    extend_immutable_calls: &[QualifiedName],
+    depth: u8,
+) -> bool {
+    if depth >= MAX_TYPE_ALIAS_DEPTH {
+        return false;
+    }
+    // Look the name up directly: the annotation may not have been visited yet
+    // (e.g., when checked while visiting the enclosing function definition),
+    // so it may not be present in the resolved-names map.
+    let Symbol::Binding(binding_id) = semantic.lookup_symbol(name.id.as_str()) else {
+        return false;
+    };
+    let binding = semantic.binding(binding_id);
+    find_binding_value(binding, semantic).is_some_and(|value| {
+        is_immutable_annotation_impl(value, semantic, extend_immutable_calls, depth + 1)
+    })
 }
 
 /// Return `true` if `func` is a function that returns an immutable value.

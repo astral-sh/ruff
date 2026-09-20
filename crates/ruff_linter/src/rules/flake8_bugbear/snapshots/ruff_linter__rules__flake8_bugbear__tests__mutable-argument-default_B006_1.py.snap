@@ -19,3 +19,37 @@ help: Replace with `None`; initialize within function
 4 |     """
   |
 note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_1.py:28:35
+   |
+27 | # Error: the alias resolves to a mutable type.
+28 | def mutable_alias(d: CustomDict = {}):
+   |                                   ^^
+29 |     ...
+   |
+help: Replace with `None`; initialize within function
+   |
+27 | # Error: the alias resolves to a mutable type.
+   - def mutable_alias(d: CustomDict = {}):
+28 + def mutable_alias(d: CustomDict = None):
+29 |     ...
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_1.py:35:41
+   |
+34 | # Error: the alias is self-referential and cannot be resolved.
+35 | def self_referential_alias(d: SelfRef = {}):
+   |                                         ^^
+36 |     ...
+   |
+help: Replace with `None`; initialize within function
+   |
+34 | # Error: the alias is self-referential and cannot be resolved.
+   - def self_referential_alias(d: SelfRef = {}):
+35 + def self_referential_alias(d: SelfRef = None):
+36 |     ...
+   |
+note: This is an unsafe fix and may change runtime behavior
