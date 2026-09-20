@@ -20,15 +20,20 @@ use std::rc::Rc;
 
 use itertools::Either;
 
+use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::path::{ModuleDirectory, SearchPath};
+use crate::path::{ModuleDirectory, ModulePath, SearchPath};
 
 use super::{
-    ComponentFileFilter, ModuleResolutionCandidate, ResolvedNames, ResolverContext,
-    StubPackageIndex, StubPackagePaths, normalize_candidates, resolve_component,
-    resolve_stub_package_in_search_path, search_paths, stub_package_index,
+    CandidatePrecedence, ComponentFileFilter, ModuleNameIngredient, ModuleResolutionCandidate,
+    PyTyped, ResolvedModule, ResolvedNames, ResolverContext, StubPackageIndex, StubPackagePaths,
+    normalize_candidates, resolve_component, resolve_stub_package_in_search_path, search_paths,
+    stub_package_index,
 };
 
+/// Manages state and logic for advancing through the components of a dotted
+/// module name (i.e. `acme`, `tools`, and `power` in the name `acme.tools.power`)
+/// during module resolution or enumeration.
 pub(super) struct ModuleSearchCursor<'a, 'db> {
     context: &'a ResolverContext<'db>,
     position: Position<'db>,
@@ -48,10 +53,105 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
         Self::with_paths(context, RootSearchPaths::Supplied(search_paths))
     }
 
-    fn with_paths(context: &'a ResolverContext<'db>, search_paths: RootSearchPaths<'db>) -> Self {
+    /// Starts a search beneath the given (absolute) module name using the given root search paths.
+    fn for_module_name(
+        context: &'a ResolverContext<'db>,
+        name: &ModuleName,
+        paths: &RootSearchPaths<'db>,
+    ) -> Option<Self> {
+        match paths {
+            RootSearchPaths::Configured => {
+                // For a search under a configured root path, we can reload search
+                // state from Salsa.
+                Some(Self::from_snapshot(
+                    context,
+                    name,
+                    module_search_snapshot(
+                        context.db,
+                        ModuleNameIngredient::new(
+                            context.db,
+                            name,
+                            context.mode,
+                            context.resolver_environment,
+                        ),
+                    )?,
+                ))
+            }
+            RootSearchPaths::Supplied(paths) => {
+                // Searches under supplied paths are not cached, so we have to
+                // start from the root and advance the cursor to the right position.
+                let mut search = Self::with_supplied_search_paths(context, paths);
+                for component in name.components() {
+                    search = search.advance(component)?;
+                }
+                Some(search)
+            }
+        }
+    }
+
+    /// Saves candidates for the current module name, or returns `None` at the search roots.
+    fn to_snapshot(&self) -> Option<ModuleSearchSnapshot> {
+        match &self.position {
+            Position::Prefix(PrefixResolver::Typing(resolver)) => {
+                Some(ModuleSearchSnapshot::Typing {
+                    stub_override_candidates: resolver
+                        .stub_override_candidates
+                        .iter()
+                        .map(CachedCandidate::from)
+                        .collect(),
+                    full_search_candidates: resolver
+                        .full_search_candidates(self.context)
+                        .iter()
+                        .map(CachedCandidate::from)
+                        .collect(),
+                })
+            }
+            Position::Prefix(PrefixResolver::Runtime(resolver)) => {
+                Some(ModuleSearchSnapshot::Runtime(
+                    resolver
+                        .candidates
+                        .iter()
+                        .map(CachedCandidate::from)
+                        .collect(),
+                ))
+            }
+            Position::Root(_) => None,
+        }
+    }
+
+    /// Restores a cursor from a cached snapshot.
+    fn from_snapshot(
+        context: &'a ResolverContext<'db>,
+        name: &ModuleName,
+        snapshot: &ModuleSearchSnapshot,
+    ) -> Self {
+        let restore = |candidates: &[CachedCandidate]| {
+            candidates
+                .iter()
+                .map(|candidate| candidate.restore(context))
+                .collect()
+        };
+
+        let resolver = match snapshot {
+            ModuleSearchSnapshot::Typing {
+                stub_override_candidates,
+                full_search_candidates,
+            } => PrefixResolver::Typing(TypingModeResolver {
+                prefix: name.clone(),
+                root_candidates_from_extra_paths: None,
+                stub_override_candidates: restore(stub_override_candidates),
+                full_search_candidates: OnceCell::from(restore(full_search_candidates)),
+            }),
+            ModuleSearchSnapshot::Runtime(candidates) => {
+                PrefixResolver::Runtime(RuntimeModeResolver {
+                    prefix: name.clone(),
+                    candidates: restore(candidates),
+                })
+            }
+        };
         Self {
             context,
-            position: Position::Root(search_paths),
+            position: Position::Prefix(resolver),
         }
     }
 
@@ -106,6 +206,86 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
             Position::Prefix(resolver) => Some(resolver.prefix()),
         };
         full_module_name(prefix, component_name)
+    }
+
+    fn with_paths(context: &'a ResolverContext<'db>, search_paths: RootSearchPaths<'db>) -> Self {
+        Self {
+            context,
+            position: Position::Root(search_paths),
+        }
+    }
+}
+
+/// Caches the package locations and resolution metadata used when searching beneath this name.
+///
+/// For example, enumerating `acme.tools` and `acme.reports` both requires finding the portions
+/// of `acme` across search paths and applying package and stub precedence. Both searches reuse
+/// the cached candidates for `acme` before advancing through their own final component. Callers
+/// then enumerate children by reading the directory contents at the candidate locations.
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+fn module_search_snapshot<'db>(
+    db: &'db dyn Db,
+    name: ModuleNameIngredient<'db>,
+) -> Option<ModuleSearchSnapshot> {
+    let context = ResolverContext::new(db, name.resolver_environment(db), name.mode(db));
+    let module_name = name.name(db);
+
+    let search = match module_name.parent() {
+        Some(parent_name) => ModuleSearchCursor::for_module_name(
+            &context,
+            &parent_name,
+            &RootSearchPaths::Configured,
+        )?,
+        None => ModuleSearchCursor::with_configured_search_paths(&context),
+    };
+
+    let search = search.advance(module_name.last_component())?;
+
+    search.to_snapshot()
+}
+
+/// Cached state that we use to rehydrate a [`ModuleSearchCursor`].
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+enum ModuleSearchSnapshot {
+    Typing {
+        stub_override_candidates: Box<[CachedCandidate]>,
+        full_search_candidates: Box<[CachedCandidate]>,
+    },
+    Runtime(Box<[CachedCandidate]>),
+}
+
+/// An owned candidate description without a borrowed directory listing.
+///
+/// Salsa cannot retain the database-lifetime reference in `ModuleDirectory` across revisions.
+/// Restoring the directory reads its current listing; changes to unrelated entries can leave
+/// this cached description unchanged.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+struct CachedCandidate {
+    path: ModulePath,
+    module: ResolvedModule,
+    py_typed: PyTyped,
+    precedence: CandidatePrecedence,
+}
+
+impl CachedCandidate {
+    fn restore<'db>(&self, context: &ResolverContext<'db>) -> ModuleResolutionCandidate<'db> {
+        ModuleResolutionCandidate {
+            directory: ModuleDirectory::new(context, self.path.clone()),
+            module: self.module,
+            py_typed: self.py_typed,
+            precedence: self.precedence,
+        }
+    }
+}
+
+impl From<&ModuleResolutionCandidate<'_>> for CachedCandidate {
+    fn from(candidate: &ModuleResolutionCandidate<'_>) -> Self {
+        Self {
+            path: candidate.directory.path().clone(),
+            module: candidate.module,
+            py_typed: candidate.py_typed,
+            precedence: candidate.precedence,
+        }
     }
 }
 
