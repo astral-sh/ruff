@@ -342,6 +342,20 @@ class Interface(Generic[C]):
 
 ## Functions
 
+### Immediate list arguments
+
+The elements of a list constructed in the call retain their individual positions when inferring a
+variadic return. Elements consumed by an earlier parameter are excluded from the return.
+
+```py
+def tail[*Ts](head: int, *args: *Ts) -> tuple[*Ts]:
+    return args
+
+reveal_type(tail(*[1, "two", b"three"]))  # revealed: tuple[Literal["two"], Literal[b"three"]]
+reveal_type(tail(*[1], *["two", b"three"]))  # revealed: tuple[Literal["two"], Literal[b"three"]]
+reveal_type(tail(*[1]))  # revealed: tuple[()]
+```
+
 ### Multiple type variable tuples
 
 Generic functions can declare multiple type variable tuples because their type parameters are

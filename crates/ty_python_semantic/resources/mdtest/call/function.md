@@ -455,6 +455,62 @@ def _(args: tuple[int, str]) -> None:
     takes_at_least_two_positional_only(*args)  # error: [invalid-argument-type]
 ```
 
+### Immediate list and dictionary arguments
+
+Unpacking a list constructed in the call preserves its exact length and each element's type. The
+list's homogeneous element type does not describe these argument positions precisely enough.
+
+```py
+def pair(x: int, y: str) -> None: ...
+
+pair(*[1, "two"])
+pair(*[1], *["two"])
+pair(*(1, "two"))
+pair(*[])  # error: [missing-argument]
+pair(*[1])  # error: [missing-argument]
+pair(*[1, "two", 3, 4])  # error: [too-many-positional-arguments] "expected 2, got 4"
+pair(*["one", "two"])  # error: [invalid-argument-type]
+```
+
+An exact positional unpack still supplies a parameter that also has an explicit keyword, whether
+that keyword precedes or follows the unpack in the source.
+
+```py
+def f(x: int, *, y: int = 0) -> None: ...
+
+f(x=1, *[2])  # error: [parameter-already-assigned]
+f(*[2], x=1)  # error: [parameter-already-assigned]
+```
+
+A dictionary constructed directly in the call preserves each string key and its value type. A
+repeated key replaces the earlier value, as it does at runtime.
+
+```py
+def pair(x: int, *, y: str) -> None: ...
+
+pair(**{"y": "two", "x": 1})
+pair(**{})  # error: [missing-argument]
+pair(**{"y": "two"})  # error: [missing-argument]
+pair(**{"x": "one", "x": 1, "y": "two"})
+pair(**{"x": 1, "y": 2})  # error: [invalid-argument-type]
+pair(x=1, **{"x": 2, "y": "two"})  # error: [parameter-already-assigned]
+pair(**{"x": 1}, **{"x": 2, "y": "two"})  # error: [parameter-already-assigned]
+pair(**{"z": 3, "x": 1, "y": "two"})  # error: [unknown-argument]
+```
+
+### Mutable argument aliases
+
+A list passed through a name keeps its ordinary variable-length type, even when initialized from a
+literal.
+
+```py
+def pair(x: int, y: int) -> None: ...
+
+values = [1]
+values.clear()
+pair(*values)
+```
+
 ### Subclass of fixed-length tuple argument
 
 ```py
