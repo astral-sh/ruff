@@ -231,6 +231,12 @@ impl PlaceTable {
         self.symbols.iter()
     }
 
+    pub fn symbols_and_ids(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (ScopedSymbolId, &Symbol)> + ExactSizeIterator {
+        self.symbols.iter_enumerated()
+    }
+
     /// Iterator over all members in this scope.
     pub fn members(&self) -> std::slice::Iter<'_, Member> {
         self.members.iter()

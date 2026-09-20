@@ -1705,24 +1705,33 @@ Assignment expressions need parentheses so the assignment still happens before a
 ```py
 async def coroutine(): ...
 async def inspect_named_awaitable():
-    if value := coroutine():  # snapshot: redundant-condition-strict
+    # snapshot: unused-awaitable
+    # snapshot: redundant-condition-strict
+    if value := coroutine():
         pass
 ```
 
 ```snapshot
 error[redundant-condition-strict]: Condition is always truthy
- --> src/mdtest_snippet.py:3:8
+ --> src/mdtest_snippet.py:5:8
   |
-3 |     if value := coroutine():  # snapshot: redundant-condition-strict
+5 |     if value := coroutine():
   |        ^^^^^^^^^^^^^^^^^^^^ Inferred type `CoroutineType[Any, Any, Unknown]` is always truthy
 help: Did you mean to `await` this expression?
   |
-2 | async def inspect_named_awaitable():
-  -     if value := coroutine():  # snapshot: redundant-condition-strict
-3 +     if await (value := coroutine()):  # snapshot: redundant-condition-strict
-4 |         pass
+4 |     # snapshot: redundant-condition-strict
+  -     if value := coroutine():
+5 +     if await (value := coroutine()):
+6 |         pass
   |
 note: This is an unsafe fix and may change runtime behavior
+
+
+warning[unused-awaitable]: Coroutine assigned to `value` is never awaited
+ --> src/mdtest_snippet.py:5:8
+  |
+5 |     if value := coroutine():
+  |        ^^^^^
 ```
 
 ### `await` fixes for unary and binary operations
