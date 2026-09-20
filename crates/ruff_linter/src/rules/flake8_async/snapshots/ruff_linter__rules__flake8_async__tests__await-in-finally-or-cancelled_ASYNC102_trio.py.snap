@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC102 Cancellation point in a cancellation-catching exception handler must be protected by a shielded cancel scope
+  --> ASYNC102_trio.py:14:9
+   |
+12 |         ...
+13 |     except trio.Cancelled:
+14 |         await foo()  # error: 8, Statement("trio.Cancelled", lineno-1)
+   |         ^^^^^^^^^^^
+15 |     except:
+16 |         await foo()  # safe, since after trio.Cancelled
+   |
+
+ASYNC102 Cancellation point in a cancellation-catching exception handler must be protected by a shielded cancel scope
+  --> ASYNC102_trio.py:21:9
+   |
+19 |         ...
+20 |     except trio.Cancelled:
+21 |         await foo()  # error: 8, Statement("trio.Cancelled", lineno-1)
+   |         ^^^^^^^^^^^
+22 |     except BaseException:
+23 |         await foo()  # safe, since after trio.Cancelled
+   |

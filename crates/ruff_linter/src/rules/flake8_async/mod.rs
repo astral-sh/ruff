@@ -16,6 +16,13 @@ mod tests {
     use ruff_python_ast::PythonVersion;
 
     #[test_case(Rule::CancelScopeNoCheckpoint, Path::new("ASYNC100.py"))]
+    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102.py"))]
+    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_anyio.py"))]
+    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_trio.py"))]
+    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_except_star.py"))]
+    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_ruff.py"))]
+    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_asyncio.py"))]
+    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_no_import.py"))]
     #[test_case(Rule::TrioSyncCall, Path::new("ASYNC105.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_0.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_1.py"))]
@@ -51,6 +58,18 @@ mod tests {
                 .with_target_version(PythonVersion::PY310),
         )?;
         assert_diagnostics!(path.file_name().unwrap().to_str().unwrap(), diagnostics);
+        Ok(())
+    }
+
+    #[test_case(PythonVersion::PY313, "ASYNC102_annotations.py")]
+    #[test_case(PythonVersion::PY314, "ASYNC102_annotations.py")]
+    #[test_case(PythonVersion::PY313, "ASYNC102_future_annotations.py")]
+    fn async102_annotations(version: PythonVersion, path: &str) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_async").join(path),
+            &LinterSettings::for_rule(Rule::AwaitInFinallyOrCancelled).with_target_version(version),
+        )?;
+        assert_diagnostics!(format!("{path}_{version}"), diagnostics);
         Ok(())
     }
 }

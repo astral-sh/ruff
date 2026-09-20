@@ -1,0 +1,662 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+  --> ASYNC102_ruff.py:35:13
+   |
+33 |             await cleanup()
+34 |         with Shield(shield=False):
+35 |             await cleanup()  # ASYNC102
+   |             ^^^^^^^^^^^^^^^
+36 |         with Shield(shield=1):
+37 |             await cleanup()
+   |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+  --> ASYNC102_ruff.py:39:13
+   |
+37 |             await cleanup()
+38 |         with Shield(shield=0):
+39 |             await cleanup()  # ASYNC102
+   |             ^^^^^^^^^^^^^^^
+40 |         with Shield() as scope:
+41 |             scope.shield = 1
+   |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+  --> ASYNC102_ruff.py:44:13
+   |
+42 |             await cleanup()
+43 |             scope.shield = None
+44 |             await cleanup()  # ASYNC102
+   |             ^^^^^^^^^^^^^^^
+
+ASYNC102 Cancellation point in a cancellation-catching exception handler must be protected by a shielded cancel scope
+  --> ASYNC102_ruff.py:54:9
+   |
+52 |         raise  # Ordinary exceptions belong to ASYNC120.
+53 |     except cancelled():
+54 |         await cleanup()  # ASYNC102
+   |         ^^^^^^^^^^^^^^^
+55 |     except BaseException:
+56 |         await cleanup()  # Cancellation was already caught.
+   |
+
+ASYNC102 Cancellation point in a cancellation-catching exception handler must be protected by a shielded cancel scope
+  --> ASYNC102_ruff.py:61:9
+   |
+59 |         pass
+60 |     except* t.Cancelled:
+61 |         await cleanup()  # ASYNC102
+   |         ^^^^^^^^^^^^^^^
+62 |     except* BaseException:
+63 |         await cleanup()  # ASYNC102: another subgroup can contain cancellation.
+   |
+
+ASYNC102 Cancellation point in a cancellation-catching exception handler must be protected by a shielded cancel scope
+  --> ASYNC102_ruff.py:63:9
+   |
+61 |         await cleanup()  # ASYNC102
+62 |     except* BaseException:
+63 |         await cleanup()  # ASYNC102: another subgroup can contain cancellation.
+   |         ^^^^^^^^^^^^^^^
+64 |
+65 |     try:
+   |
+
+ASYNC102 Cancellation point in a cancellation-catching exception handler must be protected by a shielded cancel scope
+  --> ASYNC102_ruff.py:68:9
+   |
+66 |         pass
+67 |     except (ValueError, t.Cancelled):
+68 |         await cleanup()  # ASYNC102
+   |         ^^^^^^^^^^^^^^^
+69 |
+70 |     try:
+   |
+
+ASYNC102 Cancellation point in a cancellation-catching exception handler must be protected by a shielded cancel scope
+  --> ASYNC102_ruff.py:77:9
+   |
+75 |         await cleanup()
+76 |     except:
+77 |         await cleanup()  # ASYNC102
+   |         ^^^^^^^^^^^^^^^
+78 |
+79 |     try:
+   |
+
+ASYNC102 Cancellation point in a cancellation-catching exception handler must be protected by a shielded cancel scope
+  --> ASYNC102_ruff.py:82:9
+   |
+80 |         pass
+81 |     except asyncio.CancelledError:
+82 |         await cleanup()  # ASYNC102: AnyIO can use asyncio as its backend.
+   |         ^^^^^^^^^^^^^^^
+83 |
+84 |     try:
+   |
+
+ASYNC102 Cancellation point in a cancellation-catching exception handler must be protected by a shielded cancel scope
+  --> ASYNC102_ruff.py:87:9
+   |
+85 |         pass
+86 |     except t.Cancelled:
+87 |         await cleanup()  # ASYNC102
+   |         ^^^^^^^^^^^^^^^
+88 |     except asyncio.CancelledError:
+89 |         await cleanup()  # ASYNC102: a different cancellation family
+   |
+
+ASYNC102 Cancellation point in a cancellation-catching exception handler must be protected by a shielded cancel scope
+  --> ASYNC102_ruff.py:89:9
+   |
+87 |         await cleanup()  # ASYNC102
+88 |     except asyncio.CancelledError:
+89 |         await cleanup()  # ASYNC102: a different cancellation family
+   |         ^^^^^^^^^^^^^^^
+90 |     except BaseException:
+91 |         await cleanup()  # Both cancellation families were already caught.
+   |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:99:13
+    |
+ 97 |             pass
+ 98 |         finally:
+ 99 |             await cleanup()  # ASYNC102: the shield predates the cleanup.
+    |             ^^^^^^^^^^^^^^^
+100 |     try:
+101 |         pass
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:104:13
+    |
+102 |     finally:
+103 |         try:
+104 |             await cleanup()  # ASYNC102, once
+    |             ^^^^^^^^^^^^^^^
+105 |         except ValueError:
+106 |             await cleanup()  # ASYNC102, once
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:106:13
+    |
+104 |             await cleanup()  # ASYNC102, once
+105 |         except ValueError:
+106 |             await cleanup()  # ASYNC102, once
+    |             ^^^^^^^^^^^^^^^
+107 |         finally:
+108 |             await cleanup()  # ASYNC102, once
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:108:13
+    |
+106 |             await cleanup()  # ASYNC102, once
+107 |         finally:
+108 |             await cleanup()  # ASYNC102, once
+    |             ^^^^^^^^^^^^^^^
+109 |         with Shield(shield=True):
+110 |             try:
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:115:17
+    |
+113 |                 await cleanup()
+114 |             finally:
+115 |                 await cleanup()  # ASYNC102: a new cleanup context
+    |                 ^^^^^^^^^^^^^^^
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:122:20
+    |
+120 |         pass
+121 |     finally:
+122 |         async with cm:  # ASYNC102
+    |                    ^^
+123 |             pass
+124 |         async with cm, manager():  # ASYNC102 per item
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:124:20
+    |
+122 |         async with cm:  # ASYNC102
+123 |             pass
+124 |         async with cm, manager():  # ASYNC102 per item
+    |                    ^^
+125 |             pass
+126 |         async for item in items:  # ASYNC102
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:124:24
+    |
+122 |         async with cm:  # ASYNC102
+123 |             pass
+124 |         async with cm, manager():  # ASYNC102 per item
+    |                        ^^^^^^^^^
+125 |             pass
+126 |         async for item in items:  # ASYNC102
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:126:9
+    |
+124 |           async with cm, manager():  # ASYNC102 per item
+125 |               pass
+126 | /         async for item in items:  # ASYNC102
+127 | |             pass
+    | |________________^
+128 |           result = [item async for item in items]  # ASYNC102
+129 |           result = {item async for item in items}  # ASYNC102
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:128:24
+    |
+126 |         async for item in items:  # ASYNC102
+127 |             pass
+128 |         result = [item async for item in items]  # ASYNC102
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^
+129 |         result = {item async for item in items}  # ASYNC102
+130 |         result = {item: item async for item in items}  # ASYNC102
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:129:24
+    |
+127 |             pass
+128 |         result = [item async for item in items]  # ASYNC102
+129 |         result = {item async for item in items}  # ASYNC102
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^
+130 |         result = {item: item async for item in items}  # ASYNC102
+131 |         deferred = (item async for item in items)  # Evaluated on iteration.
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:130:30
+    |
+128 |         result = [item async for item in items]  # ASYNC102
+129 |         result = {item async for item in items}  # ASYNC102
+130 |         result = {item: item async for item in items}  # ASYNC102
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^
+131 |         deferred = (item async for item in items)  # Evaluated on iteration.
+132 |         deferred = (item async for item in await source())  # ASYNC102
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:132:44
+    |
+130 |         result = {item: item async for item in items}  # ASYNC102
+131 |         deferred = (item async for item in items)  # Evaluated on iteration.
+132 |         deferred = (item async for item in await source())  # ASYNC102
+    |                                            ^^^^^^^^^^^^^^
+133 |         await (await factory())()  # ASYNC102 twice
+134 |         with Shield(shield=await flag()):  # ASYNC102
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:133:9
+    |
+131 |         deferred = (item async for item in items)  # Evaluated on iteration.
+132 |         deferred = (item async for item in await source())  # ASYNC102
+133 |         await (await factory())()  # ASYNC102 twice
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+134 |         with Shield(shield=await flag()):  # ASYNC102
+135 |             await cleanup()  # ASYNC102
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:133:16
+    |
+131 |         deferred = (item async for item in items)  # Evaluated on iteration.
+132 |         deferred = (item async for item in await source())  # ASYNC102
+133 |         await (await factory())()  # ASYNC102 twice
+    |                ^^^^^^^^^^^^^^^
+134 |         with Shield(shield=await flag()):  # ASYNC102
+135 |             await cleanup()  # ASYNC102
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:134:28
+    |
+132 |         deferred = (item async for item in await source())  # ASYNC102
+133 |         await (await factory())()  # ASYNC102 twice
+134 |         with Shield(shield=await flag()):  # ASYNC102
+    |                            ^^^^^^^^^^^^
+135 |             await cleanup()  # ASYNC102
+136 |         async with t.open_nursery(), cm:  # ASYNC102 on cm only
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:135:13
+    |
+133 |         await (await factory())()  # ASYNC102 twice
+134 |         with Shield(shield=await flag()):  # ASYNC102
+135 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
+136 |         async with t.open_nursery(), cm:  # ASYNC102 on cm only
+137 |             pass
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:136:38
+    |
+134 |         with Shield(shield=await flag()):  # ASYNC102
+135 |             await cleanup()  # ASYNC102
+136 |         async with t.open_nursery(), cm:  # ASYNC102 on cm only
+    |                                      ^^
+137 |             pass
+138 |         async with aio.create_task_group() as group:
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:139:13
+    |
+137 |             pass
+138 |         async with aio.create_task_group() as group:
+139 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
+140 |             group.cancel_scope.shield = True
+141 |             await cleanup()
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:143:13
+    |
+141 |             await cleanup()
+142 |             group.cancel_scope.shield = False
+143 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:157:16
+    |
+155 |         await aio.lowlevel.cancel_shielded_checkpoint()
+156 |         await shielded_checkpoint()
+157 |         await (await resource()).aclose()  # ASYNC102 on the receiver's await
+    |                ^^^^^^^^^^^^^^^^
+158 |         await force_close(await resource())  # ASYNC102 on the argument's await
+159 |         await resource.aclose(**kwargs)  # ASYNC102
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:158:27
+    |
+156 |         await shielded_checkpoint()
+157 |         await (await resource()).aclose()  # ASYNC102 on the receiver's await
+158 |         await force_close(await resource())  # ASYNC102 on the argument's await
+    |                           ^^^^^^^^^^^^^^^^
+159 |         await resource.aclose(**kwargs)  # ASYNC102
+160 |         await shielded_checkpoint(1)  # ASYNC102
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:159:9
+    |
+157 |         await (await resource()).aclose()  # ASYNC102 on the receiver's await
+158 |         await force_close(await resource())  # ASYNC102 on the argument's await
+159 |         await resource.aclose(**kwargs)  # ASYNC102
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+160 |         await shielded_checkpoint(1)  # ASYNC102
+161 |         await aclose_forcefully(resource)  # ASYNC102: unresolved name
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:160:9
+    |
+158 |         await force_close(await resource())  # ASYNC102 on the argument's await
+159 |         await resource.aclose(**kwargs)  # ASYNC102
+160 |         await shielded_checkpoint(1)  # ASYNC102
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+161 |         await aclose_forcefully(resource)  # ASYNC102: unresolved name
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:161:9
+    |
+159 |         await resource.aclose(**kwargs)  # ASYNC102
+160 |         await shielded_checkpoint(1)  # ASYNC102
+161 |         await aclose_forcefully(resource)  # ASYNC102: unresolved name
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:174:13
+    |
+172 |         LocalShield = arbitrary
+173 |         with LocalShield(shield=True):
+174 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:183:13
+    |
+181 |         with Shield(shield=True) as scope:
+182 |             scope.shield = flag
+183 |             await cleanup()  # ASYNC102: unknown assignment invalidates True
+    |             ^^^^^^^^^^^^^^^
+184 |             scope.shield = True
+185 |             await cleanup()
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:187:13
+    |
+185 |             await cleanup()
+186 |             scope.shield: bool = False
+187 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
+188 |         with Shield() as scope:
+189 |             if flag:
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:191:13
+    |
+189 |             if flag:
+190 |                 scope.shield = True
+191 |             await cleanup()  # ASYNC102: not shielded on every path
+    |             ^^^^^^^^^^^^^^^
+192 |         with Shield() as scope:
+193 |             if flag:
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:203:13
+    |
+201 |             else:
+202 |                 await cleanup()  # The other branch remains shielded.
+203 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
+204 |         with Shield() as scope:
+205 |             scope = other
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:207:13
+    |
+205 |             scope = other
+206 |             scope.shield = True
+207 |             await cleanup()  # ASYNC102: the original handle was rebound
+    |             ^^^^^^^^^^^^^^^
+208 |         with Shield() as outer:
+209 |             with Shield():
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:216:13
+    |
+214 |                 inner.shield = True
+215 |                 await cleanup()
+216 |             await cleanup()  # ASYNC102: the inner shield has exited
+    |             ^^^^^^^^^^^^^^^
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:223:32
+    |
+221 |         pass
+222 |     finally:
+223 |         async def nested(value=await factory()):  # ASYNC102 on the default
+    |                                ^^^^^^^^^^^^^^^
+224 |             await cleanup()
+    |
+
+ASYNC102 Cancellation point in `__aexit__` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:231:17
+    |
+230 |             async def __aexit__(self, *args):
+231 |                 await cleanup()  # ASYNC102: an independent cleanup context
+    |                 ^^^^^^^^^^^^^^^
+232 |
+233 |         deferred = lambda: cleanup()
+    |
+
+ASYNC102 Cancellation point in `__aexit__` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:238:9
+    |
+236 | class Manager:
+237 |     async def __aexit__(self, *args):
+238 |         await cleanup()  # ASYNC102
+    |         ^^^^^^^^^^^^^^^
+239 |         with Shield(shield=True):
+240 |             await cleanup()
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:248:24
+    |
+246 |     finally:
+247 |         with Shield(shield=True) as scope:
+248 |             async with cm:  # ASYNC102: cancellation on exit
+    |                        ^^
+249 |                 scope.shield = False
+250 |         with Shield(shield=True) as scope:
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:251:13
+    |
+249 |                   scope.shield = False
+250 |           with Shield(shield=True) as scope:
+251 | /             async for item in source:  # ASYNC102: later iterations
+252 | |                 scope.shield = False
+    | |____________________________________^
+253 |           with Shield(shield=True) as scope:
+254 |               while flag:
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:255:17
+    |
+253 |         with Shield(shield=True) as scope:
+254 |             while flag:
+255 |                 await cleanup()  # ASYNC102: later iterations
+    |                 ^^^^^^^^^^^^^^^
+256 |                 scope.shield = False
+257 |         with Shield() as scope:
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:260:13
+    |
+258 |             for item in source:
+259 |                 scope.shield = True
+260 |             await cleanup()  # ASYNC102: the loop may be empty
+    |             ^^^^^^^^^^^^^^^
+261 |         with Shield() as scope:
+262 |             match flag:
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:266:21
+    |
+264 |                     scope.shield = True
+265 |                 case _:
+266 |                     await cleanup()  # ASYNC102
+    |                     ^^^^^^^^^^^^^^^
+267 |             await cleanup()  # ASYNC102
+268 |         with Shield(shield=True) as scope:
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:267:13
+    |
+265 |                 case _:
+266 |                     await cleanup()  # ASYNC102
+267 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
+268 |         with Shield(shield=True) as scope:
+269 |             scope.shield &= False
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:270:13
+    |
+268 |         with Shield(shield=True) as scope:
+269 |             scope.shield &= False
+270 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
+271 |         with Shield() as scope:
+272 |             (scope := other)
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:274:13
+    |
+272 |             (scope := other)
+273 |             scope.shield = True
+274 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
+275 |         with Shield() as scope:
+276 |             scope, = [other]
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:278:13
+    |
+276 |             scope, = [other]
+277 |             scope.shield = True
+278 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
+279 |         (await factory()).field: int = 1  # ASYNC102
+280 |         (await factory()).field: int  # ASYNC102
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:279:10
+    |
+277 |             scope.shield = True
+278 |             await cleanup()  # ASYNC102
+279 |         (await factory()).field: int = 1  # ASYNC102
+    |          ^^^^^^^^^^^^^^^
+280 |         (await factory()).field: int  # ASYNC102
+281 |         for (await factory()).field in items:  # ASYNC102
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:280:10
+    |
+278 |             await cleanup()  # ASYNC102
+279 |         (await factory()).field: int = 1  # ASYNC102
+280 |         (await factory()).field: int  # ASYNC102
+    |          ^^^^^^^^^^^^^^^
+281 |         for (await factory()).field in items:  # ASYNC102
+282 |             pass
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:281:14
+    |
+279 |         (await factory()).field: int = 1  # ASYNC102
+280 |         (await factory()).field: int  # ASYNC102
+281 |         for (await factory()).field in items:  # ASYNC102
+    |              ^^^^^^^^^^^^^^^
+282 |             pass
+283 |         with Shield(shield=True) as (await factory()).field:
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:285:20
+    |
+283 |         with Shield(shield=True) as (await factory()).field:
+284 |             await cleanup()
+285 |         async with cm as (await factory()).field:  # ASYNC102 twice
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+286 |             pass
+287 |         with Shield(shield=True) as scope:
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:285:27
+    |
+283 |         with Shield(shield=True) as (await factory()).field:
+284 |             await cleanup()
+285 |         async with cm as (await factory()).field:  # ASYNC102 twice
+    |                           ^^^^^^^^^^^^^^^
+286 |             pass
+287 |         with Shield(shield=True) as scope:
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:292:13
+    |
+290 |             except ValueError:
+291 |                 pass
+292 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
+293 |         with Shield(shield=True) as scope:
+294 |             try:
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:298:13
+    |
+296 |             finally:
+297 |                 scope.shield = False
+298 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^

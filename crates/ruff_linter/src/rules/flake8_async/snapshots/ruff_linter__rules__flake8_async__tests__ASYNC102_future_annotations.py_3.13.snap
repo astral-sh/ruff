@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+  --> ASYNC102_future_annotations.py:13:33
+   |
+11 |             await work()
+12 |
+13 |         async def default(value=await factory()):  # ASYNC102
+   |                                 ^^^^^^^^^^^^^^^
+14 |             await work()
+   |

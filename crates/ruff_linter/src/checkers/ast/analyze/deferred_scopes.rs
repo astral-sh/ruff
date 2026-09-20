@@ -4,14 +4,15 @@ use ruff_python_semantic::{Binding, ScopeKind};
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::rules::{
-    flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pep8_naming,
-    pyflakes, pylint, pyupgrade, ruff,
+    flake8_async, flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments,
+    pep8_naming, pyflakes, pylint, pyupgrade, ruff,
 };
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
 pub(crate) fn deferred_scopes(checker: &Checker) {
     if !checker.any_rule_enabled(&[
         Rule::AsyncioDanglingTask,
+        Rule::AwaitInFinallyOrCancelled,
         Rule::BadStaticmethodArgument,
         Rule::BuiltinAttributeShadowing,
         Rule::FunctionCallInDataclassDefaultArgument,
@@ -87,6 +88,12 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 
     for scope_id in checker.analyze.scopes.iter().rev().copied() {
         let scope = &checker.semantic.scopes[scope_id];
+
+        if checker.is_rule_enabled(Rule::AwaitInFinallyOrCancelled)
+            && let ScopeKind::Function(function) = scope.kind
+        {
+            flake8_async::rules::await_in_finally_or_cancelled(checker, function);
+        }
 
         if checker.is_rule_enabled(Rule::UndefinedLocal) {
             pyflakes::rules::undefined_local(checker, scope_id, scope);

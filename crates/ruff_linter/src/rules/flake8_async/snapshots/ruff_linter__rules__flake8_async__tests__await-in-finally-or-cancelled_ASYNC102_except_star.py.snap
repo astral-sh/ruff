@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC102 Cancellation point in a cancellation-catching exception handler must be protected by a shielded cancel scope
+  --> ASYNC102_except_star.py:21:9
+   |
+19 |         raise
+20 |     except* BaseException:
+21 |         await foo()  # ASYNC102: 8, Statement("BaseException", lineno-1)
+   |         ^^^^^^^^^^^
+22 |     finally:
+23 |         await foo()  # ASYNC102: 8, Statement("try/finally", lineno-8)
+   |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+  --> ASYNC102_except_star.py:23:9
+   |
+21 |         await foo()  # ASYNC102: 8, Statement("BaseException", lineno-1)
+22 |     finally:
+23 |         await foo()  # ASYNC102: 8, Statement("try/finally", lineno-8)
+   |         ^^^^^^^^^^^
+24 |
+25 |     try:
+   |
