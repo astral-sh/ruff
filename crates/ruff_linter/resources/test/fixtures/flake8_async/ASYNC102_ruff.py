@@ -387,3 +387,28 @@ async def class_body_control_flow(flag):
                     raise ValueError
             except ValueError:
                 await cleanup()  # ASYNC102
+
+
+async def class_body_nonlocal():
+    try:
+        pass
+    finally:
+        with Shield(shield=True) as scope:
+            class DisablesShield:
+                nonlocal scope
+                scope.shield = False
+
+            await cleanup()  # ASYNC102
+        with Shield() as scope:
+            class EnablesShield:
+                nonlocal scope
+                scope.shield = True
+
+            await cleanup()
+        with Shield() as scope:
+            class RebindsHandle:
+                nonlocal scope
+                scope = other
+                scope.shield = True
+
+            await cleanup()  # ASYNC102

@@ -297,6 +297,21 @@ impl<'a> CleanupVisitor<'a, '_> {
         })
     }
 
+    fn is_class_local(&self, name: &ast::ExprName) -> bool {
+        self.class_depth > 0
+            && self
+                .checker
+                .semantic()
+                .resolve_name(name)
+                .is_some_and(|binding_id| {
+                    let binding = self.checker.semantic().binding(binding_id);
+                    self.checker.semantic().scopes[binding.scope]
+                        .kind
+                        .is_class()
+                        && !binding.is_nonlocal()
+                })
+    }
+
     fn assign(&mut self, target: &Expr, value: Option<&Expr>) {
         match target {
             Expr::Tuple(tuple) => {
@@ -320,7 +335,7 @@ impl<'a> CleanupVisitor<'a, '_> {
         // Rebinding the handle does not change the original scope's shield,
         // but subsequent attribute writes must no longer modify that scope.
         if let Expr::Name(name) = target {
-            if self.class_depth > 0 {
+            if self.is_class_local(name) {
                 return;
             }
             for scope in &mut self.scopes {
@@ -343,18 +358,7 @@ impl<'a> CleanupVisitor<'a, '_> {
             expr => (expr, false),
         };
         if let Expr::Name(name) = receiver {
-            if self.class_depth > 0
-                && self
-                    .checker
-                    .semantic()
-                    .resolve_name(name)
-                    .is_some_and(|binding_id| {
-                        let binding = self.checker.semantic().binding(binding_id);
-                        self.checker.semantic().scopes[binding.scope]
-                            .kind
-                            .is_class()
-                    })
-            {
+            if self.is_class_local(name) {
                 return;
             }
             if let Some(scope) = self.scopes.iter_mut().rev().find(|scope| {

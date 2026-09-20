@@ -761,3 +761,22 @@ ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel 
 388 |             except ValueError:
 389 |                 await cleanup()  # ASYNC102
     |                 ^^^^^^^^^^^^^^^
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:401:13
+    |
+399 |                 scope.shield = False
+400 |
+401 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
+402 |         with Shield() as scope:
+403 |             class EnablesShield:
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:414:13
+    |
+412 |                 scope.shield = True
+413 |
+414 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
