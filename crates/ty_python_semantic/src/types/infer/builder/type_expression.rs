@@ -148,9 +148,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if let Some(name) = target.and_then(ast::Expr::as_name_expr)
                 && let Some(diagnostic) = self
                     .context
-                    .report_lint(&CYCLIC_TYPE_ALIAS_DEFINITION, name)
+                    .report_lint(&CYCLIC_TYPE_ALIAS_DEFINITION, value)
             {
-                diagnostic.into_diagnostic(format_args!("Cyclic definition of `{}`", name.id));
+                diagnostic.into_diagnostic(format_args!(
+                    "Type alias `{}` has a circular definition",
+                    name.id
+                ));
             }
             Err(CyclicTypeAliasError { fallback_type: ty })
         } else {

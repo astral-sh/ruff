@@ -2347,17 +2347,26 @@ reported once at the definition, even when the alias is used in multiple annotat
 ```py
 from typing import Union
 
-IntOr = Union[int, "IntOr"]  # error: [cyclic-type-alias-definition] "Cyclic definition of `IntOr`"
+# snapshot: cyclic-type-alias-definition
+IntOr = Union[int, "IntOr"]
 
 def first(value: IntOr): ...
 def second(value: IntOr): ...
 ```
 
+```snapshot
+error[cyclic-type-alias-definition]: Type alias `IntOr` has a circular definition
+ --> src/mdtest_snippet.py:4:9
+  |
+4 | IntOr = Union[int, "IntOr"]
+  |         ^^^^^^^^^^^^^^^^^^^
+```
+
 The same restriction applies to mutually recursive aliases.
 
 ```py
-First = Union[int, "Second"]  # error: [cyclic-type-alias-definition] "Cyclic definition of `First`"
-Second = Union[str, "First"]  # error: [cyclic-type-alias-definition] "Cyclic definition of `Second`"
+First = Union[int, "Second"]  # error: [cyclic-type-alias-definition] "Type alias `First` has a circular definition"
+Second = Union[str, "First"]  # error: [cyclic-type-alias-definition] "Type alias `Second` has a circular definition"
 
 def inspect(first: First, second: Second): ...
 ```

@@ -861,17 +861,29 @@ applies to aliases created by calling `TypeAliasType` as to aliases declared wit
 ```py
 from typing_extensions import TypeAliasType, TypeVar
 
-# error: [cyclic-type-alias-definition] "Cyclic definition of `Itself`"
+# snapshot: cyclic-type-alias-definition
 Itself = TypeAliasType("Itself", "Itself")
+```
 
-# error: [cyclic-type-alias-definition] "Cyclic definition of `First`"
+```snapshot
+error[cyclic-type-alias-definition]: Type alias `Itself` has a circular definition
+ --> src/mdtest_snippet.py:4:34
+  |
+4 | Itself = TypeAliasType("Itself", "Itself")
+  |                                  ^^^^^^^^
+```
+
+The same restriction applies to mutually recursive and generic aliases.
+
+```py
+# error: [cyclic-type-alias-definition] "Type alias `First` has a circular definition"
 First = TypeAliasType("First", "Second")
-# error: [cyclic-type-alias-definition] "Cyclic definition of `Second`"
+# error: [cyclic-type-alias-definition] "Type alias `Second` has a circular definition"
 Second = TypeAliasType("Second", First)
 
 T = TypeVar("T")
 
-# error: [cyclic-type-alias-definition] "Cyclic definition of `GenericCycle`"
+# error: [cyclic-type-alias-definition] "Type alias `GenericCycle` has a circular definition"
 GenericCycle = TypeAliasType("GenericCycle", "GenericCycle[T]", type_params=(T,))
 ```
 
@@ -885,11 +897,11 @@ from typing_extensions import TypeAliasType, TypeVar, Union
 
 T = TypeVar("T")
 
-# error: [cyclic-type-alias-definition] "Cyclic definition of `IntOr`"
+# error: [cyclic-type-alias-definition] "Type alias `IntOr` has a circular definition"
 IntOr = TypeAliasType("IntOr", "int | IntOr")
-# error: [cyclic-type-alias-definition] "Cyclic definition of `GenericCycle`"
+# error: [cyclic-type-alias-definition] "Type alias `GenericCycle` has a circular definition"
 GenericCycle = TypeAliasType("GenericCycle", T | "GenericCycle[str]", type_params=(T,))
-# error: [cyclic-type-alias-definition] "Cyclic definition of `UnionCycle`"
+# error: [cyclic-type-alias-definition] "Type alias `UnionCycle` has a circular definition"
 UnionCycle = TypeAliasType("UnionCycle", Union[int, "UnionCycle"])
 
 Tree = TypeAliasType("Tree", T | "list[Tree[T]]", type_params=(T,))
@@ -937,9 +949,22 @@ An alias cannot be a member of its own union. We still recover the non-recursive
 that uses of the invalid alias can be checked.
 
 ```py
-# error: [cyclic-type-alias-definition] "Cyclic definition of `IntOr`"
+# snapshot: cyclic-type-alias-definition
 type IntOr = int | IntOr
-# error: [cyclic-type-alias-definition] "Cyclic definition of `OrInt`"
+```
+
+```snapshot
+error[cyclic-type-alias-definition]: Type alias `IntOr` has a circular definition
+ --> src/mdtest_snippet.py:2:14
+  |
+2 | type IntOr = int | IntOr
+  |              ^^^^^^^^^^^
+```
+
+The order of the union members does not affect the diagnostic or recovery.
+
+```py
+# error: [cyclic-type-alias-definition] "Type alias `OrInt` has a circular definition"
 type OrInt = OrInt | int
 
 def f(x: IntOr, y: OrInt):
@@ -950,7 +975,7 @@ def f(x: IntOr, y: OrInt):
     if not isinstance(y, int):
         reveal_type(y)  # revealed: Never
 
-# error: [cyclic-type-alias-definition] "Cyclic definition of `Itself`"
+# error: [cyclic-type-alias-definition] "Type alias `Itself` has a circular definition"
 type Itself = Itself
 
 def foo(
@@ -964,28 +989,28 @@ def foo(
 foo(42)
 foo("hello")
 
-# error: [cyclic-type-alias-definition] "Cyclic definition of `A`"
+# error: [cyclic-type-alias-definition] "Type alias `A` has a circular definition"
 type A = B
-# error: [cyclic-type-alias-definition] "Cyclic definition of `B`"
+# error: [cyclic-type-alias-definition] "Type alias `B` has a circular definition"
 type B = A
 
 def bar(B: B):
     x: B
     reveal_type(B)  # revealed: Divergent
 
-# error: [cyclic-type-alias-definition] "Cyclic definition of `G`"
+# error: [cyclic-type-alias-definition] "Type alias `G` has a circular definition"
 type G[T] = G[T]
-# error: [cyclic-type-alias-definition] "Cyclic definition of `H`"
+# error: [cyclic-type-alias-definition] "Type alias `H` has a circular definition"
 type H[T] = I[T]
-# error: [cyclic-type-alias-definition] "Cyclic definition of `I`"
+# error: [cyclic-type-alias-definition] "Type alias `I` has a circular definition"
 type I[T] = H[T]
 
 # It's not possible to create an element of this type, but it's not an error for now
 type DirectRecursiveList[T] = list[DirectRecursiveList[T]]
 
-# error: [cyclic-type-alias-definition] "Cyclic definition of `Foo`"
+# error: [cyclic-type-alias-definition] "Type alias `Foo` has a circular definition"
 type Foo[T] = list[T] | Bar[T]
-# error: [cyclic-type-alias-definition] "Cyclic definition of `Bar`"
+# error: [cyclic-type-alias-definition] "Type alias `Bar` has a circular definition"
 type Bar[T] = int | Foo[T]
 
 def _(x: Bar[int]):
@@ -998,9 +1023,9 @@ Changing the type arguments on a recursive reference does not break a cycle thro
 also applies when the arguments become more deeply nested on each expansion.
 
 ```py
-# error: [cyclic-type-alias-definition] "Cyclic definition of `Cycle`"
+# error: [cyclic-type-alias-definition] "Type alias `Cycle` has a circular definition"
 type Cycle[T] = T | Cycle[str]
-# error: [cyclic-type-alias-definition] "Cyclic definition of `Growing`"
+# error: [cyclic-type-alias-definition] "Type alias `Growing` has a circular definition"
 type Growing[T] = T | Growing[list[T]]
 ```
 
@@ -1030,7 +1055,7 @@ A generic alias that returns its type argument does not introduce a container an
 cycle.
 
 ```py
-# error: [cyclic-type-alias-definition] "Cyclic definition of `ThroughIdentity`"
+# error: [cyclic-type-alias-definition] "Type alias `ThroughIdentity` has a circular definition"
 type ThroughIdentity = Identity[ThroughIdentity]
 ```
 

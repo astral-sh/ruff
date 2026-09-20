@@ -473,8 +473,22 @@ valid.
 ```py
 from typing import TypeAlias, Union
 
-Itself: TypeAlias = "Itself"  # error: [cyclic-type-alias-definition] "Cyclic definition of `Itself`"
-IntOr: TypeAlias = Union[int, "IntOr"]  # error: [cyclic-type-alias-definition] "Cyclic definition of `IntOr`"
+# snapshot: cyclic-type-alias-definition
+Itself: TypeAlias = "Itself"
+```
+
+```snapshot
+error[cyclic-type-alias-definition]: Type alias `Itself` has a circular definition
+ --> src/mdtest_snippet.py:4:21
+  |
+4 | Itself: TypeAlias = "Itself"
+  |                     ^^^^^^^^
+```
+
+Adding a union member still leaves a circular definition.
+
+```py
+IntOr: TypeAlias = Union[int, "IntOr"]  # error: [cyclic-type-alias-definition] "Type alias `IntOr` has a circular definition"
 ```
 
 Both direct cycles and unions use a divergent type for recovery in annotations.
@@ -489,8 +503,8 @@ Mutually recursive aliases are also invalid when their cycle passes through no c
 alias in the cycle receives a diagnostic.
 
 ```py
-First: TypeAlias = Union[int, "Second"]  # error: [cyclic-type-alias-definition] "Cyclic definition of `First`"
-Second: TypeAlias = Union[str, "First"]  # error: [cyclic-type-alias-definition] "Cyclic definition of `Second`"
+First: TypeAlias = Union[int, "Second"]  # error: [cyclic-type-alias-definition] "Type alias `First` has a circular definition"
+Second: TypeAlias = Union[str, "First"]  # error: [cyclic-type-alias-definition] "Type alias `Second` has a circular definition"
 
 def inspect_mutual(first: First, second: Second):
     reveal_type(first)  # revealed: Divergent
