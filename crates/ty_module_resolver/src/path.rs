@@ -5,6 +5,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use camino::{Utf8Path, Utf8PathBuf};
+use itertools::Either;
 use ruff_db::files::{
     DirectoryListing, File, FilePath, directory_listing, system_path_to_file, vendored_path_to_file,
 };
@@ -235,6 +236,15 @@ impl ModulePath {
         }
     }
 
+    /// Returns the path within the vendored filesystem, if this is a vendored module.
+    fn to_vendored_path(&self) -> Option<VendoredPathBuf> {
+        Some(
+            self.search_path
+                .as_vendored_path()?
+                .join(&self.relative_path),
+        )
+    }
+
     #[must_use]
     pub(crate) fn to_module_name(&self) -> Option<ModuleName> {
         fn strip_stubs(component: &str) -> &str {
@@ -360,6 +370,28 @@ impl<'db> ModuleDirectory<'db> {
         path.is_directory(context).then(|| Self::new(context, path))
     }
 
+    /// Iterates over entries in a system or vendored directory.
+    pub(crate) fn entries(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = ModuleDirectoryEntry<'db>> + use<'db> {
+        if let Some(listing) = self.system_listing() {
+            Either::Left(
+                listing
+                    .iter()
+                    .map(|(name, kind)| ModuleDirectoryEntry::System(name, kind)),
+            )
+        } else {
+            Either::Right(
+                self.path
+                    .to_vendored_path()
+                    .into_iter()
+                    .flat_map(move |path| db.vendored().read_directory(path))
+                    .map(ModuleDirectoryEntry::Vendored),
+            )
+        }
+    }
+
     /// Returns the directory's path without permitting it to change.
     pub(crate) fn path(&self) -> &ModulePath {
         &self.path
@@ -440,6 +472,35 @@ impl<'db> ModuleDirectory<'db> {
                     }
                 }
             }
+        }
+    }
+}
+
+/// A directory entry that borrows a system listing or owns a vendored entry's path.
+pub(crate) enum ModuleDirectoryEntry<'db> {
+    /// An entry from a cached system directory listing, with a borrowed name.
+    System(&'db str, FileType),
+    /// An owned entry from the vendored filesystem.
+    Vendored(ruff_db::vendored::DirectoryEntry),
+}
+
+impl ModuleDirectoryEntry<'_> {
+    /// Returns the entry's name without its parent directory.
+    pub(crate) fn file_name(&self) -> Option<&str> {
+        match self {
+            Self::System(name, _) => Some(name),
+            Self::Vendored(entry) => entry.path().file_name(),
+        }
+    }
+
+    /// Returns the entry's file type without following symlinks.
+    pub(crate) fn file_type(&self) -> FileType {
+        match self {
+            Self::System(_, kind) => *kind,
+            Self::Vendored(entry) => match entry.file_type() {
+                ruff_db::vendored::FileType::Directory => FileType::Directory,
+                ruff_db::vendored::FileType::File => FileType::File,
+            },
         }
     }
 }

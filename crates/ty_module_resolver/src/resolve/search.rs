@@ -32,7 +32,7 @@ use super::{
 };
 
 pub(super) struct ModuleSearchCursor<'a, 'db> {
-    pub(super) context: &'a ResolverContext<'db>,
+    context: &'a ResolverContext<'db>,
     position: Position<'db>,
 }
 
@@ -137,13 +137,43 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
         }
     }
 
-    #[cfg(test)]
-    fn full_module_name(&self, component_name: &str) -> Option<ModuleName> {
-        let prefix = match &self.position {
+    /// Returns the directories whose children can be enumerated at this position.
+    ///
+    /// Root searches use all search paths. Beneath a prefix, file modules are
+    /// excluded and `is_listable` decides which package locations to include.
+    pub(super) fn listing_directories(
+        &self,
+        is_listable: impl Fn(&ModuleResolutionCandidate<'db>) -> bool,
+    ) -> impl Iterator<Item = Cow<'_, ModuleDirectory<'db>>> {
+        match &self.position {
+            Position::Root(paths) => {
+                Either::Left(paths.iter(self.context).map(|path| {
+                    Cow::Owned(ModuleDirectory::new(self.context, path.to_module_path()))
+                }))
+            }
+            Position::Prefix(resolver) => Either::Right(
+                resolver
+                    .candidates(self.context)
+                    .filter(move |candidate| {
+                        !matches!(candidate.module, ResolvedModule::Module(_))
+                            && is_listable(candidate)
+                    })
+                    .map(|candidate| Cow::Borrowed(&candidate.directory)),
+            ),
+        }
+    }
+
+    /// Appends a component name to this search's module name prefix.
+    pub(super) fn full_module_name(&self, component_name: &str) -> Option<ModuleName> {
+        full_module_name(self.prefix(), component_name)
+    }
+
+    /// Returns the module name prefix, or `None` before the first component.
+    pub(super) fn prefix(&self) -> Option<&ModuleName> {
+        match &self.position {
             Position::Root(_) => None,
             Position::Prefix(resolver) => Some(resolver.prefix()),
-        };
-        full_module_name(prefix, component_name)
+        }
     }
 }
 
@@ -327,7 +357,16 @@ impl<'db> PrefixResolver<'db> {
         }
     }
 
-    #[cfg(test)]
+    fn candidates(
+        &self,
+        context: &ResolverContext<'db>,
+    ) -> impl Iterator<Item = &ModuleResolutionCandidate<'db>> {
+        match self {
+            Self::Typing(resolver) => Either::Left(resolver.candidates(context)),
+            Self::Runtime(resolver) => Either::Right(resolver.candidates.iter()),
+        }
+    }
+
     fn prefix(&self) -> &ModuleName {
         match self {
             Self::Typing(resolver) => &resolver.prefix,
@@ -513,6 +552,15 @@ impl<'db> TypingModeResolver<'db> {
             false,
         );
         (!candidates.is_empty()).then_some(candidates)
+    }
+
+    fn candidates(
+        &self,
+        context: &ResolverContext<'db>,
+    ) -> impl Iterator<Item = &ModuleResolutionCandidate<'db>> {
+        self.stub_override_candidates
+            .iter()
+            .chain(self.full_search_candidates(context))
     }
 
     /// Returns module candidates for the full search, initializing the candidates
@@ -804,23 +852,23 @@ fn full_module_name(prefix: Option<&ModuleName>, component_name: &str) -> Option
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::Db as _;
-    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use std::borrow::Cow;
+
+    use ruff_db::system::SystemPath;
 
     use crate::db::tests::TestDb;
     use crate::resolve::ModuleResolveMode;
-    use crate::settings::SearchPathSettings;
-    use crate::strategy::FallibleStrategy;
     use crate::testing::TestCaseBuilder;
 
     use super::{ModuleSearchCursor, ResolverContext};
 
     #[test]
     fn module_search_can_be_reused_across_sibling_module_resolutions() {
-        let db = search_db(
-            &["/src/acme/reports.py", "/site-packages/acme/tools.py"],
-            &[],
-        );
+        let db = TestCaseBuilder::new()
+            .with_src_files(&[("acme/reports.py", "")])
+            .with_site_packages_files(&[("acme/tools.py", "")])
+            .build()
+            .db;
         for mode in [ModuleResolveMode::Typing, ModuleResolveMode::Runtime] {
             let context = ResolverContext::new(&db, db.resolver_environment(), mode);
             let root = ModuleSearchCursor::with_configured_search_paths(&context);
@@ -837,15 +885,15 @@ mod tests {
 
     #[test]
     fn sibling_modules_can_be_resolved_correctly_in_any_order() {
-        let db = search_db(
-            &[
-                "/extra/acme/patched.pyi",
-                "/src/acme/__init__.py",
-                "/src/acme/patched.py",
-                "/src/acme/runtime.py",
-            ],
-            &["/extra"],
-        );
+        let db = TestCaseBuilder::new()
+            .with_src_files(&[
+                ("acme/__init__.py", ""),
+                ("acme/patched.py", ""),
+                ("acme/runtime.py", ""),
+            ])
+            .with_extra_path("/extra", &[("acme/patched.pyi", "")])
+            .build()
+            .db;
         for children in [["patched", "runtime"], ["runtime", "patched"]] {
             let context =
                 ResolverContext::new(&db, db.resolver_environment(), ModuleResolveMode::Typing);
@@ -864,17 +912,17 @@ mod tests {
 
     #[test]
     fn module_resolution_does_not_affect_nested_package_searches() {
-        let db = search_db(
-            &[
-                "/extra/acme/tools/patched.pyi",
-                "/src/acme/__init__.py",
-                "/src/acme/runtime.py",
-                "/src/acme/tools/__init__.py",
-                "/src/acme/tools/patched.py",
-                "/src/acme/tools/runtime.py",
-            ],
-            &["/extra"],
-        );
+        let db = TestCaseBuilder::new()
+            .with_src_files(&[
+                ("acme/__init__.py", ""),
+                ("acme/runtime.py", ""),
+                ("acme/tools/__init__.py", ""),
+                ("acme/tools/patched.py", ""),
+                ("acme/tools/runtime.py", ""),
+            ])
+            .with_extra_path("/extra", &[("acme/tools/patched.pyi", "")])
+            .build()
+            .db;
         let context =
             ResolverContext::new(&db, db.resolver_environment(), ModuleResolveMode::Typing);
         let acme = ModuleSearchCursor::with_configured_search_paths(&context)
@@ -893,29 +941,6 @@ mod tests {
         }
     }
 
-    fn search_db(paths: &[&str], extra_paths: &[&str]) -> TestDb {
-        let mut db = TestCaseBuilder::new().build().db;
-        db.write_files(paths.iter().map(|path| (*path, "")))
-            .expect("write search fixtures");
-        let settings = SearchPathSettings {
-            src_roots: vec![SystemPathBuf::from("/src")],
-            site_packages_paths: vec![SystemPathBuf::from("/site-packages")],
-            custom_typeshed: Some(SystemPathBuf::from("/typeshed")),
-            extra_paths: extra_paths
-                .iter()
-                .copied()
-                .map(SystemPathBuf::from)
-                .collect(),
-            ..SearchPathSettings::empty()
-        };
-        db.set_search_paths(
-            settings
-                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                .expect("configure search fixtures"),
-        );
-        db
-    }
-
     fn assert_resolves_to(
         db: &TestDb,
         search: &ModuleSearchCursor,
@@ -929,7 +954,7 @@ mod tests {
             .resolve_child(component)
             .and_then(|candidates| candidates.into_iter().next())
             .expect("child resolves");
-        let module = candidate.into_module(db, db.resolver_environment(), &name);
+        let module = candidate.into_module(db, db.resolver_environment(), Cow::Owned(name));
         let file = module.file(db).expect("child has a defining file");
         assert_eq!(
             file.path(db).as_system_path(),

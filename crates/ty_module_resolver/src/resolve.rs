@@ -32,6 +32,7 @@ For implementors, see `import-resolution-diagram.svg` for a flow diagram that
 specifies ty's implementation of Python's import resolution algorithm.
 */
 
+mod enumerate;
 mod search;
 
 use std::borrow::Cow;
@@ -46,7 +47,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_db::PythonFile;
 use ruff_db::files::{File, FilePath, FileRootKind, directory_listing, system_path_to_file};
 use ruff_db::source::source_text;
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_db::system::{FileType, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{
     self as ast, PySourceType,
@@ -272,7 +273,7 @@ fn resolve_module_query<'db>(
     resolved
         .into_iter()
         .next()
-        .map(|candidate| candidate.into_module(db, resolver_environment, name))
+        .map(|candidate| candidate.into_module(db, resolver_environment, Cow::Borrowed(name)))
 }
 
 /// Like `resolve_module_query` but for cases where it failed to resolve the module
@@ -315,7 +316,7 @@ fn desperately_resolve_module<'db>(
     resolved
         .into_iter()
         .next()
-        .map(|candidate| candidate.into_module(db, resolver_environment, name))
+        .map(|candidate| candidate.into_module(db, resolver_environment, Cow::Borrowed(name)))
 }
 
 /// Resolves the module for the given path.
@@ -1319,12 +1320,12 @@ impl<'db> ModuleResolutionCandidate<'db> {
         self,
         db: &'db dyn Db,
         resolver_environment: ResolverEnvironment<'db>,
-        name: &ModuleName,
+        name: Cow<'_, ModuleName>,
     ) -> Module<'db> {
         match self.module {
             ResolvedModule::NamespacePackage => {
                 tracing::trace!("Resolve namespace package `{name}`");
-                Module::namespace_package(db, resolver_environment, Cow::Borrowed(name))
+                Module::namespace_package(db, resolver_environment, name)
             }
             ResolvedModule::Package(file) => {
                 // Legacy namespace packages also use their defining file when resolved directly.
@@ -1336,7 +1337,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
                     db,
                     file,
                     resolver_environment,
-                    Cow::Borrowed(name),
+                    name,
                     ModuleKind::Package,
                     self.directory.into_search_path(),
                 )
@@ -1347,7 +1348,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
                     db,
                     file,
                     resolver_environment,
-                    Cow::Borrowed(name),
+                    name,
                     ModuleKind::Module,
                     self.directory.into_search_path(),
                 )
@@ -1380,6 +1381,38 @@ impl<'db> ModuleResolutionCandidate<'db> {
                 Cow::Borrowed(file.path(db).as_str())
             }
         }
+    }
+
+    /// Allows directory symlinks only at search roots and their immediate children.
+    ///
+    /// This supports symlinked search roots and top-level package aliases while preventing
+    /// recursive enumeration from following directory cycles indefinitely.
+    fn is_listable_location(&self, db: &dyn Db) -> bool {
+        let path = self.directory.path();
+        let Some(search_root) = path.search_path().as_system_path() else {
+            return true;
+        };
+        let Some(directory) = path.to_system_path() else {
+            return false;
+        };
+        let Ok(relative) = directory.strip_prefix(search_root) else {
+            return false;
+        };
+        let mut parent = search_root.to_path_buf();
+
+        for (depth, component) in relative.components().enumerate() {
+            if depth > 0
+                && directory_listing(db, &parent)
+                    .ok()
+                    .and_then(|listing| listing.file_type(component.as_str()))
+                    .is_none_or(FileType::is_symlink)
+            {
+                return false;
+            }
+            parent.push(component.as_str());
+        }
+
+        true
     }
 }
 

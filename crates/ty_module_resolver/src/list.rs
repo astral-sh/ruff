@@ -418,9 +418,8 @@ mod tests {
         reason = "These are tests, so it's fine to do I/O by-passing System."
     )]
 
-    use camino::{Utf8Component, Utf8Path};
     use ruff_db::Db as _;
-    use ruff_db::files::{File, FilePath, FileRootKind};
+    use ruff_db::files::{File, FileRootKind};
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_db::testing::{
         assert_function_query_was_not_run, assert_function_query_was_not_run_by_name,
@@ -428,65 +427,19 @@ mod tests {
     use ruff_python_ast::PythonVersion;
     use salsa::plumbing::AsId as _;
 
-    use crate::db::{Db, tests::TestDb};
+    use crate::db::tests::TestDb;
     use crate::module::Module;
     use crate::resolve::{
         ModuleResolveMode, ModuleResolveModeIngredient, dynamic_resolution_paths,
     };
     use crate::settings::SearchPathSettings;
     use crate::strategy::FallibleStrategy;
-    use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
+    use crate::testing::{
+        FileSpec, MockedTypeshed, ModuleDebugSnapshot, TestCase, TestCaseBuilder,
+    };
 
     fn list_modules(db: &TestDb) -> &[Module<'_>] {
         super::list_modules(db, db.resolver_environment())
-    }
-
-    struct ModuleDebugSnapshot<'db> {
-        db: &'db dyn Db,
-        module: Module<'db>,
-    }
-
-    impl std::fmt::Debug for ModuleDebugSnapshot<'_> {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            match self.module {
-                Module::Namespace(pkg) => {
-                    write!(f, "Module::Namespace({name:?})", name = pkg.name(self.db))
-                }
-                Module::File(module) => {
-                    // For snapshots, just normalize all paths to using
-                    // Unix slashes for simplicity.
-                    let path_components = match module.file(self.db).path(self.db) {
-                        FilePath::System(path) => path.components(),
-                        FilePath::Vendored(path) => path.components(),
-                        FilePath::SystemVirtual(path) => Utf8Path::new(path.as_str()).components(),
-                    };
-                    let nice_path = path_components
-                        // Avoid including a root component, since that
-                        // results in a platform dependent separator.
-                        // Convert to an empty string so that we get a
-                        // path beginning with `/` regardless of platform.
-                        .map(|component| {
-                            if let Utf8Component::RootDir = component {
-                                Utf8Component::Normal("")
-                            } else {
-                                component
-                            }
-                        })
-                        .map(|component| component.as_str())
-                        .collect::<Vec<&str>>()
-                        .join("/");
-                    write!(
-                        f,
-                        "Module::File({name:?}, {search_path:?}, {path:?}, {kind:?}, {known:?})",
-                        name = module.name(self.db).as_str(),
-                        search_path = module.search_path(self.db).debug_kind(),
-                        path = nice_path,
-                        kind = module.kind(self.db),
-                        known = module.known(self.db),
-                    )
-                }
-            }
-        }
     }
 
     fn sorted_list(db: &TestDb) -> Vec<Module<'_>> {
@@ -506,7 +459,7 @@ mod tests {
         sorted_list(db)
             .into_iter()
             .filter(predicate)
-            .map(|module| ModuleDebugSnapshot { db, module })
+            .map(|module| ModuleDebugSnapshot::new(db, module))
             .collect()
     }
 
