@@ -17,7 +17,7 @@ use ty_module_resolver::ModuleName;
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
-use ty_project::{ProjectDatabase, ProjectMetadata, SemanticDb as _};
+use ty_project::{Db as _, ProjectDatabase, ProjectMetadata, SemanticDb as _};
 
 #[derive(Debug, clap::Parser)]
 #[command(
@@ -287,7 +287,13 @@ impl Task {
             }),
             ..Options::default()
         });
-        let db = ProjectDatabase::fallible(project_metadata, system)?;
+        let mut db = ProjectDatabase::fallible(project_metadata, system)?;
+        let file = system_path_to_file(&db, &cursor.path)
+            .with_context(|| format!("failed to get database file for `{}`", cursor.path))?;
+        // Inference records expected types for string-literal completions only in open files.
+        // Open the cursor file to match editor behavior: `Literal` suggestions remain
+        // available, and declared `TypedDict` keys take precedence over initializer keys.
+        db.project().open_file(&mut db, file);
         Ok(Task {
             db,
             dir: project_path.to_path_buf(),

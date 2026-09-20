@@ -7989,6 +7989,262 @@ consume("<CURSOR>")
     }
 
     #[test]
+    fn string_literal_completions_dictionary_initializers() {
+        let cases: &[(&str, &[&str])] = &[
+            (
+                r#"
+d = {"b": 2, "a": 1, "b": 3}
+d["read_only"]
+d["<CURSOR>"]
+"#,
+                &["a", "b"],
+            ),
+            (
+                r#"
+d = {"old": 1}
+alias = d
+d = {"new": 2}
+alias["<CURSOR>"]
+"#,
+                &["old"],
+            ),
+            (
+                r#"
+d["<CURSOR>"]
+d = {"future": 1}
+"#,
+                &[],
+            ),
+            (
+                r#"
+d = {"old": 0}
+d = {"current": 1}
+d["<CURSOR>"]
+d = {"future": 2}
+"#,
+                &["current"],
+            ),
+            (
+                r#"
+d = {"global": 1}
+
+
+def f():
+    d["<CURSOR>"]
+    d = {"local": 2}
+"#,
+                &[],
+            ),
+            (
+                r#"
+d = {"current": 1}
+
+
+class C:
+    d["<CURSOR>"]
+
+
+d = {"future": 2}
+"#,
+                &["current"],
+            ),
+            (
+                r#"
+__module__ = {"shadowed": 1}
+
+
+class C:
+    __module__["<CURSOR>"]
+"#,
+                &[],
+            ),
+            (
+                r#"
+d = {"outer": {"nested": 1}}
+d["outer"]["<CURSOR>"]
+"#,
+                &["nested"],
+            ),
+            (
+                r#"
+d = {"a": 1}
+if False:
+    d = {"unreachable": 2}
+d["<CURSOR>"]
+"#,
+                &["a"],
+            ),
+            (
+                r#"
+def f(flag: bool):
+    d = {"initial": 1}
+    while flag:
+        d["<CURSOR>"]
+        d = {"later": 2}
+"#,
+                &["initial", "later"],
+            ),
+            (r#"(d := {"named": 1})["<CURSOR>"]"#, &[]),
+            (r#"missing.["<CURSOR>"]"#, &[]),
+            (
+                r#"
+d: dict[int, int] = {"invalid": 1}
+d["<CURSOR>"]
+"#,
+                &[],
+            ),
+            (
+                r#"
+d: dict[str, int] = {"invalid": "bad"}
+d["<CURSOR>"]
+"#,
+                &[],
+            ),
+            (
+                r#"
+original = {"invalid": 1}
+d: dict[int, int] = original
+d["<CURSOR>"]
+"#,
+                &[],
+            ),
+            (
+                r#"
+from typing import TypedDict
+
+
+class D(TypedDict):
+    pass
+
+
+d: D = {"invalid": 1}
+d["<CURSOR>"]
+"#,
+                &[],
+            ),
+        ];
+        for (source, expected) in cases {
+            let builder = completion_test_builder(source).skip_auto_import();
+            let completions = builder.build();
+            let actual: Vec<_> = completions
+                .completions()
+                .iter()
+                .map(Completion::label)
+                .collect();
+            assert_eq!(actual, *expected, "{source}");
+        }
+    }
+
+    #[test]
+    fn string_literal_completions_imported_dictionary_initializer() {
+        let builder = CursorTest::builder()
+            .source("origin.py", r#"d = {"original": 0}"#)
+            .source(
+                "values.py",
+                r#"
+from origin import d
+
+d = {"stale": 1}
+d = {"exported": 2}
+alias = d
+"#,
+            )
+            .source(
+                "main.py",
+                r#"
+from values import alias as d
+
+d["<CURSOR>"]
+"#,
+            )
+            .completion_test_builder()
+            .skip_auto_import();
+        let completions = builder.build();
+        let actual: Vec<_> = completions
+            .completions()
+            .iter()
+            .map(Completion::label)
+            .collect();
+        assert_eq!(actual, ["exported"]);
+    }
+
+    #[test]
+    fn string_literal_completions_relative_dictionary_reexports() {
+        let builder = CursorTest::builder()
+            .source("pkg/origin.py", r#"d = {"old": 1}"#)
+            .source(
+                "pkg/values.py",
+                r#"
+from .origin import d
+
+d = {"new": 2}
+"#,
+            )
+            .source("pkg/__init__.py", "from .values import *")
+            .source(
+                "main.py",
+                r#"
+from pkg import d as config
+
+config["<CURSOR>"]
+"#,
+            )
+            .completion_test_builder()
+            .skip_auto_import();
+        let completions = builder.build();
+        let actual: Vec<_> = completions
+            .completions()
+            .iter()
+            .map(Completion::label)
+            .collect();
+        assert_eq!(actual, ["new"]);
+    }
+
+    #[test]
+    fn string_literal_completions_cyclic_dictionary_imports() {
+        let builder = CursorTest::builder()
+            .source("a.py", "from b import d")
+            .source("b.py", "from a import d")
+            .source(
+                "main.py",
+                r#"
+from a import d
+
+d["<CURSOR>"]
+"#,
+            )
+            .completion_test_builder()
+            .skip_auto_import();
+        let completions = builder.build();
+        assert!(completions.completions().is_empty());
+    }
+
+    #[test]
+    fn string_literal_completions_declared_keys_override_initializer() {
+        let builder = completion_test_builder(
+            r#"
+from typing import TypedDict
+
+
+class D(TypedDict):
+    declared: int
+
+
+d: D = {"invalid": 1}
+d["<CURSOR>"]
+"#,
+        )
+        .skip_auto_import();
+        let completions = builder.build();
+        let actual: Vec<_> = completions
+            .completions()
+            .iter()
+            .map(Completion::label)
+            .collect();
+        assert_eq!(actual, ["declared"]);
+    }
+
+    #[test]
     fn string_literal_completions_typed_dict_keys() {
         let builder = completion_test_builder(
             r#"

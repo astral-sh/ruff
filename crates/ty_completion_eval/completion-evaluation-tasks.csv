@@ -10,6 +10,16 @@ class-arg-completion,main.py,1,1
 deprecated-deprioritized,main.py,0,1
 deprecated-deprioritized,main.py,1,1
 deprecated-deprioritized,main.py,2,1
+dict-key-completions,main.py,0,1
+dict-key-completions,main.py,1,1
+dict-key-completions,main.py,2,1
+dict-key-completions,main.py,3,1
+dict-key-completions,main.py,4,1
+dict-key-completions,main.py,5,1
+dict-key-completions,main.py,6,1
+dict-key-completions,main.py,7,1
+dict-key-completions,main.py,8,1
+dict-key-completions,main.py,9,1
 exact-over-fuzzy,main.py,0,1
 fstring-completions,main.py,0,1
 higher-level-symbols-preferred,main.py,0,
