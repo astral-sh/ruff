@@ -472,7 +472,13 @@ struct AssignmentVisitor<'a, 'b, 'c> {
 impl<'a> Visitor<'a> for AssignmentVisitor<'a, '_, '_> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => return,
+            Stmt::FunctionDef(_) => return,
+            Stmt::ClassDef(class) => {
+                self.visitor.class_depth += 1;
+                self.visit_body(&class.body);
+                self.visitor.class_depth -= 1;
+                return;
+            }
             Stmt::Assign(stmt) => {
                 for target in &stmt.targets {
                     self.visitor.assign(target, None);

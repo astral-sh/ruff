@@ -367,3 +367,23 @@ async def async_for_target_state(source):
         with Shield(shield=True) as scope:
             async for scope in source:
                 pass
+
+
+async def class_body_control_flow(flag):
+    try:
+        pass
+    finally:
+        with Shield(shield=True) as scope:
+            while flag:
+                await cleanup()  # ASYNC102: later iterations
+
+                class DisablesShield:
+                    scope.shield = False
+
+        with Shield(shield=True) as scope:
+            try:
+                class DisablesShieldAndRaises:
+                    scope.shield = False
+                    raise ValueError
+            except ValueError:
+                await cleanup()  # ASYNC102
