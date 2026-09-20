@@ -788,3 +788,10 @@ ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel 
 428 |                 scope.shield = True
 429 |             await cleanup()  # ASYNC102
     |             ^^^^^^^^^^^^^^^
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:441:13
+    |
+440 |             scope.shield = False
+441 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^

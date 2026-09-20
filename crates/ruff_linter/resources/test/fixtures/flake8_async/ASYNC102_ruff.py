@@ -427,3 +427,15 @@ async def nested_loop_else_break(items, flag):
             else:
                 scope.shield = True
             await cleanup()  # ASYNC102
+
+
+async def class_body_local_rebinding():
+    try:
+        pass
+    finally:
+        with Shield(shield=True) as scope:
+            class ShadowsOuterScope:
+                scope = other
+
+            scope.shield = False
+            await cleanup()  # ASYNC102

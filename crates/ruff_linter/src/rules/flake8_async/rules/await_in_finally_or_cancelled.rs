@@ -298,18 +298,22 @@ impl<'a> CleanupVisitor<'a, '_> {
     }
 
     fn is_class_local(&self, name: &ast::ExprName) -> bool {
-        self.class_depth > 0
-            && self
-                .checker
-                .semantic()
-                .resolve_name(name)
-                .is_some_and(|binding_id| {
-                    let binding = self.checker.semantic().binding(binding_id);
-                    self.checker.semantic().scopes[binding.scope]
-                        .kind
-                        .is_class()
-                        && !binding.is_nonlocal()
-                })
+        if self.class_depth == 0 {
+            return false;
+        }
+        let semantic = self.checker.semantic();
+        let binding = semantic
+            .resolve_name(name)
+            .map(|binding_id| semantic.binding(binding_id))
+            .or_else(|| {
+                semantic
+                    .bindings
+                    .iter()
+                    .find(|binding| binding.range() == name.range())
+            });
+        binding.is_some_and(|binding| {
+            semantic.scopes[binding.scope].kind.is_class() && !binding.is_nonlocal()
+        })
     }
 
     fn assign(&mut self, target: &Expr, value: Option<&Expr>) {
