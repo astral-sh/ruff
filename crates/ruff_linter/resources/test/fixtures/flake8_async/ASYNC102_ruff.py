@@ -303,3 +303,20 @@ async def handler_type_checkpoints():
         pass
     except (BaseException, await exception_type()):  # ASYNC102
         await cleanup()  # ASYNC102
+
+
+async def class_body_effects():
+    try:
+        pass
+    finally:
+        with Shield(shield=True) as scope:
+            class DisablesOuterShield:
+                scope.shield = False
+
+            await cleanup()  # ASYNC102
+        with Shield(shield=True) as scope:
+            class ShadowsOuterScope:
+                scope = other
+                scope.shield = False
+
+            await cleanup()

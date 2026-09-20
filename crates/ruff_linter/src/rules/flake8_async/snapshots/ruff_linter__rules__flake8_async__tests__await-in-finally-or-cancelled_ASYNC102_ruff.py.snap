@@ -678,3 +678,14 @@ ASYNC102 Cancellation point in a cancellation-catching exception handler must be
 304 |     except (BaseException, await exception_type()):  # ASYNC102
 305 |         await cleanup()  # ASYNC102
     |         ^^^^^^^^^^^^^^^
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:316:13
+    |
+314 |                 scope.shield = False
+315 |
+316 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
+317 |         with Shield(shield=True) as scope:
+318 |             class ShadowsOuterScope:
+    |

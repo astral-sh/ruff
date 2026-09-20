@@ -125,6 +125,7 @@ pub(crate) fn await_in_finally_or_cancelled<'a>(
         context: (function.name.as_str() == "__aexit__").then_some(CleanupContext::AsyncExit),
         scopes: Vec::new(),
         boundary: 0,
+        class_depth: 0,
     }
     .visit_body(&function.body);
 }
@@ -142,6 +143,8 @@ struct CleanupVisitor<'a, 'b> {
     scopes: Vec<CancelScope<'a>>,
     /// Scopes entered before the current cleanup cannot shield its checkpoints.
     boundary: usize,
+    /// Class-local bindings must not invalidate handles in the enclosing function.
+    class_depth: usize,
 }
 
 // Keep the cancellation families separate: catching Trio cancellation does
@@ -276,6 +279,9 @@ impl<'a> CleanupVisitor<'a, '_> {
         // Rebinding the handle does not change the original scope's shield,
         // but subsequent attribute writes must no longer modify that scope.
         if let Expr::Name(name) = target {
+            if self.class_depth > 0 {
+                return;
+            }
             for scope in &mut self.scopes {
                 if scope.name == Some(name.id.as_str()) {
                     scope.name = None;
@@ -295,12 +301,26 @@ impl<'a> CleanupVisitor<'a, '_> {
             }
             expr => (expr, false),
         };
-        if let Expr::Name(name) = receiver
-            && let Some(scope) = self.scopes.iter_mut().rev().find(|scope| {
+        if let Expr::Name(name) = receiver {
+            if self.class_depth > 0
+                && self
+                    .checker
+                    .semantic()
+                    .resolve_name(name)
+                    .is_some_and(|binding_id| {
+                        let binding = self.checker.semantic().binding(binding_id);
+                        self.checker.semantic().scopes[binding.scope]
+                            .kind
+                            .is_class()
+                    })
+            {
+                return;
+            }
+            if let Some(scope) = self.scopes.iter_mut().rev().find(|scope| {
                 scope.name == Some(name.id.as_str()) && scope.task_group == task_group
-            })
-        {
-            scope.shielded = value.is_some_and(enables_shield);
+            }) {
+                scope.shielded = value.is_some_and(enables_shield);
+            }
         }
     }
 
@@ -427,6 +447,9 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
                 if let Some(arguments) = &class.arguments {
                     self.visit_arguments(arguments);
                 }
+                self.class_depth += 1;
+                self.visit_body(&class.body);
+                self.class_depth -= 1;
             }
             Stmt::Try(stmt) => self.visit_try(stmt),
             Stmt::With(stmt) => {
