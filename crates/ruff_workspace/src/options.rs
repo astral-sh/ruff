@@ -711,7 +711,7 @@ pub struct LintCommonOptions {
     /// should be ignored when enforcing (e.g.) unused-variable rules. The
     /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
     #[option(
-        default = r#""^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$""#,
+        default = r#""^(_+|(_+\w*[^_]+?))$""#,
         value_type = "str",
         example = r#"
             # Only ignore variables named "_".

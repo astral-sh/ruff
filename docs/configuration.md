@@ -61,7 +61,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
     unfixable = []
 
     # Allow unused variables when underscore-prefixed.
-    dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+    dummy-variable-rgx = "^(_+|(_+\w*[^_]+?))$"
 
     [tool.ruff.format]
     # Like Black, use double quotes for strings.
@@ -140,7 +140,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
     unfixable = []
 
     # Allow unused variables when underscore-prefixed.
-    dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+    dummy-variable-rgx = "^(_+|(_+\w*[^_]+?))$"
 
     [format]
     # Like Black, use double quotes for strings.

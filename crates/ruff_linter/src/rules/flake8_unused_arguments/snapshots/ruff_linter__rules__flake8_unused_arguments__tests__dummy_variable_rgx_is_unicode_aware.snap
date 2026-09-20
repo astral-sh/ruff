@@ -1,0 +1,31 @@
+---
+source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
+assertion_line: 79
+---
+ARG001 Unused function argument: `_a_`
+  --> dummy_variable_rgx.py:41:17
+   |
+39 | ###
+40 |
+41 | def k(previous, _a_):
+   |                 ^^^
+42 |     return previous
+   |
+
+ARG001 Unused function argument: `__a__`
+  --> dummy_variable_rgx.py:45:17
+   |
+45 | def l(previous, __a__):
+   |                 ^^^^^
+46 |     return previous
+   |
+
+ARG001 Unused function argument: `a`
+  --> dummy_variable_rgx.py:56:17
+   |
+54 | ###
+55 |
+56 | def m(previous, a):
+   |                 ^
+57 |     return previous
+   |

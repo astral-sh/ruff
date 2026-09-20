@@ -69,4 +69,14 @@ mod tests {
         assert_diagnostics!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn dummy_variable_rgx_is_unicode_aware() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_unused_arguments/dummy_variable_rgx.py"),
+            &settings::LinterSettings::for_rule(Rule::UnusedFunctionArgument),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
 }
