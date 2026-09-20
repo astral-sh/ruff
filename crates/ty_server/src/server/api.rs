@@ -317,7 +317,7 @@ where
 
         let uri = R::document_uri(&params);
 
-        let Ok(document) = session.snapshot_document(&uri) else {
+        let Ok(snapshot) = session.snapshot_document(&uri) else {
             let reason = format!("Document {uri} is neither open nor a supported closed file");
             tracing::warn!(
                 "Ignoring request id={id} method={} because {reason}",
@@ -336,9 +336,9 @@ where
             });
         };
 
-        let path = document.document().notebook_or_file_path();
+        let path = snapshot.document().notebook_or_file_path();
         let db = session.project_db(path).clone();
-        let log_guidance = document.client_name().log_guidance();
+        let log_guidance = snapshot.client_name().log_guidance();
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = %R::METHOD).entered();
@@ -358,7 +358,7 @@ where
 
             if let Err(error) = ruff_db::panic::catch_unwind(|| {
                 salsa::attach(&db, || {
-                    R::handle_request(&id, &db, document, client, params);
+                    R::handle_request(&id, &db, snapshot, client, params);
                 });
             }) {
                 panic_response::<R>(&id, client, &error, retry, log_guidance);
