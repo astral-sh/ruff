@@ -2235,6 +2235,14 @@ impl<'db> Type<'db> {
         Self::Divergent(DivergentType::new(id))
     }
 
+    /// Returns a divergent marker for a cycle in type alias inference.
+    fn divergent_alias(id: salsa::Id) -> Self {
+        Self::Divergent(DivergentType {
+            flags: DivergentFlags::FROM_TYPE_ALIAS,
+            ..DivergentType::new(id)
+        })
+    }
+
     const fn is_divergent(&self) -> bool {
         matches!(self, Type::Divergent(_))
     }
@@ -10927,6 +10935,18 @@ impl<'db> TypeMapping<'_, 'db> {
     }
 }
 
+bitflags! {
+    /// Metadata retained when recursive inference recovers to a divergent marker.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    struct DivergentFlags: u8 {
+        /// The cycle comes from type alias inference. Value inference can also diverge,
+        /// for example when an assignment feeds into the next iteration of a loop.
+        const FROM_TYPE_ALIAS = 1 << 0;
+    }
+}
+
+impl get_size2::GetSize for DivergentFlags {}
+
 /// A type that is determined to be divergent during recursive type inference.
 /// This type must never be eliminated by dynamic type reduction
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reduced to `@Todo`).
@@ -10936,6 +10956,7 @@ impl<'db> TypeMapping<'_, 'db> {
 pub struct DivergentType {
     /// The query ID that caused the cycle.
     id: salsa::Id,
+    flags: DivergentFlags,
     /// If this divergent marker has been materialized, preserve whether it should behave like the
     /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
     materialization: Option<MaterializationKind>,
@@ -10948,6 +10969,7 @@ impl DivergentType {
     const fn new(id: salsa::Id) -> Self {
         Self {
             id,
+            flags: DivergentFlags::empty(),
             materialization: None,
         }
     }
@@ -10958,8 +10980,8 @@ impl DivergentType {
 
     const fn materialized(self, kind: MaterializationKind) -> Self {
         Self {
-            id: self.id,
             materialization: Some(kind),
+            ..self
         }
     }
 
