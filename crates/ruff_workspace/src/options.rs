@@ -1531,7 +1531,7 @@ pub struct Flake8CopyrightOptions {
     author: Option<String>,
 
     /// A minimum file size (in bytes) required for a copyright notice to
-    /// be enforced. By default, all files are validated.
+    /// be enforced. By default, all non-empty files are validated.
     #[option(
         default = r#"0"#,
         value_type = "int",

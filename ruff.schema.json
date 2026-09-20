@@ -1150,7 +1150,7 @@
           ]
         },
         "min-file-size": {
-          "description": "A minimum file size (in bytes) required for a copyright notice to\nbe enforced. By default, all files are validated.",
+          "description": "A minimum file size (in bytes) required for a copyright notice to\nbe enforced. By default, all non-empty files are validated.",
           "type": [
             "integer",
             "null"

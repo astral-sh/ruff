@@ -948,7 +948,7 @@ linter.flake8_builtins.strict_checking = false
 linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
 linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
 linter.flake8_copyright.author = none
-linter.flake8_copyright.min_file_size = 0
+linter.flake8_copyright.min_file_size = 1
 linter.flake8_errmsg.max_string_length = 0
 linter.flake8_gettext.function_names = [
 	_,

@@ -24,7 +24,7 @@ impl Default for Settings {
         Self {
             notice_rgx: COPYRIGHT.clone(),
             author: None,
-            min_file_size: 0,
+            min_file_size: 1,
         }
     }
 }

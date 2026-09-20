@@ -1330,14 +1330,13 @@ fn preview_enabled_all() {
     exit_code: 1
     ----- stdout -----
     -:1:1: undocumented-public-module: Missing docstring in public module
-    -:1:1: missing-copyright-notice: Missing copyright notice at top of file
     -:1:1: stable-test-rule: Hey this is a stable test rule.
     -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
     -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
     -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
     -:1:1: preview-test-rule: Hey this is a preview test rule.
     -:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
-    Found 8 errors.
+    Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
