@@ -106,6 +106,7 @@ pub enum KnownClass {
     SpecialForm,
     TypeVar,
     ParamSpec,
+    Coroutine,
     // typing_extensions.ParamSpec
     ExtensionsParamSpec, // must be distinct from typing.ParamSpec, backports new features
     ParamSpecArgs,
@@ -260,6 +261,7 @@ impl KnownClass {
             | Self::SupportsIndex
             | Self::Iterable
             | Self::Iterator
+            | Self::Coroutine
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
@@ -409,6 +411,7 @@ impl KnownClass {
             | Self::Super
             | Self::Awaitable
             | Self::Generator
+            | Self::Coroutine
             | Self::AsyncGenerator
             | Self::Deprecated
             | Self::Field
@@ -499,6 +502,7 @@ impl KnownClass {
             | KnownClass::GeneratorType
             | KnownClass::AsyncGeneratorType
             | KnownClass::CoroutineType
+            | KnownClass::Coroutine
             | KnownClass::NoneType
             | KnownClass::StdlibAlias
             | KnownClass::SpecialForm
@@ -637,6 +641,7 @@ impl KnownClass {
             | KnownClass::Hashable
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::Coroutine
             | KnownClass::TyExtensionsAsyncIterable
             | KnownClass::TyExtensionsAsyncIterator
             | KnownClass::TyExtensionsIterable
@@ -757,6 +762,7 @@ impl KnownClass {
             | KnownClass::Hashable
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::Coroutine
             | KnownClass::TyExtensionsAsyncIterable
             | KnownClass::TyExtensionsAsyncIterator
             | KnownClass::TyExtensionsIterable
@@ -827,6 +833,9 @@ impl KnownClass {
             | Self::NamedTupleLike
             | Self::AsyncGenerator
             | Self::Generator => true,
+
+            // TODO this is what typeshed says but it sort-of seems wrong...
+            Self::Coroutine => false,
 
             Self::Bool
             | Self::Object
@@ -1014,6 +1023,7 @@ impl KnownClass {
             | KnownClass::Hashable
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::Coroutine
             | KnownClass::TyExtensionsAsyncIterable
             | KnownClass::TyExtensionsAsyncIterator
             | KnownClass::TyExtensionsIterable
@@ -1083,6 +1093,7 @@ impl KnownClass {
             Self::Classmethod => "classmethod",
             Self::Awaitable => "Awaitable",
             Self::Generator => "Generator",
+            Self::Coroutine => "Coroutine",
             Self::AsyncGenerator => "AsyncGenerator",
             Self::Deprecated => "deprecated",
             Self::GenericAlias => "GenericAlias",
@@ -1549,6 +1560,7 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::ParamSpec
             | Self::Hashable
+            | Self::Coroutine
             | Self::SupportsIndex => KnownModule::Typing,
             Self::ExtensionsTypeAliasType
             | Self::ExtensionsTypeVar
@@ -1708,6 +1720,7 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::Iterable
+            | Self::Coroutine
             | Self::TyExtensionsAsyncIterable
             | Self::TyExtensionsAsyncIterator
             | Self::TyExtensionsIterable
@@ -1777,6 +1790,7 @@ impl KnownClass {
             "classmethod" => &[Self::Classmethod],
             "Awaitable" => &[Self::Awaitable],
             "Generator" => &[Self::Generator],
+            "Coroutine" => &[Self::Coroutine],
             "AsyncGenerator" => &[Self::AsyncGenerator],
             "deprecated" => &[Self::Deprecated],
             "GenericAlias" => &[Self::GenericAlias],
@@ -1955,6 +1969,7 @@ impl KnownClass {
             | Self::TyExtensionsIterable
             | Self::TyExtensionsIterator
             | Self::Awaitable
+            | Self::Coroutine
             | Self::Generator
             | Self::AsyncGenerator
             | Self::Template

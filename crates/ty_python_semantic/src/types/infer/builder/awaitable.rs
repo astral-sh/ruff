@@ -40,37 +40,52 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     pub(super) fn check_unused_awaitable(&self, expression: &ast::Expr) {
         let db = self.db();
-        let ty = self.expression_type(expression);
-        if ty.is_awaitable(db)
-            && !self.is_known_function_call(expression)
-            && let Some(builder) = self.context.report_lint(&UNUSED_AWAITABLE, expression)
-        {
-            let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Object of type `{}` is not awaited",
-                ty.display(db, self.program_environment()),
-            ));
-            if let Some(fix) = self.await_expression_fix(expression) {
-                diagnostic.help("Did you mean to `await` this expression?");
-                diagnostic.set_fix(fix);
-            }
-        }
-    }
+        let env = self.program_environment();
 
-    /// Returns `true` if `expr` is a call to a known diagnostic function
-    /// (e.g., `reveal_type` or `assert_type`) whose return value should not
-    /// trigger the `unused-awaitable` lint.
-    fn is_known_function_call(&self, expr: &ast::Expr) -> bool {
-        let ast::Expr::Call(call) = expr else {
-            return false;
+        let ty = self.expression_type(expression);
+
+        let coroutine_top_spec = &[Type::object(), Type::Never, Type::object()];
+        let coroutine_top =
+            KnownClass::Coroutine.to_specialized_instance(db, env, coroutine_top_spec);
+
+        // Can happen if the user is using a custom typeshed that doesn't include the symbol;
+        // this is unlikely to happen in practice but the guard here also avoids noise in our
+        // mdtests.
+        if coroutine_top.is_dynamic() {
+            return;
+        }
+
+        if !ty.is_pure_redundant_with(db, env, coroutine_top) {
+            return;
+        }
+
+        if ty.is_equivalent_to(db, env, Type::Never) {
+            return;
+        }
+
+        if let ast::Expr::Call(call) = expression
+            && let Type::FunctionLiteral(function) = self.expression_type(&call.func)
+            && matches!(
+                function.known(self.db()),
+                Some(KnownFunction::RevealType | KnownFunction::AssertType)
+            )
+        {
+            return;
+        }
+
+        let Some(builder) = self.context.report_lint(&UNUSED_AWAITABLE, expression) else {
+            return;
         };
-        matches!(
-            self.expression_type(&call.func),
-            Type::FunctionLiteral(f)
-                if matches!(
-                    f.known(self.db()),
-                    Some(KnownFunction::RevealType | KnownFunction::AssertType)
-                )
-        )
+
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Object of type `{}` is not awaited",
+            ty.display(db, self.program_environment()),
+        ));
+
+        if let Some(fix) = self.await_expression_fix(expression) {
+            diagnostic.help("Did you mean to `await` this expression?");
+            diagnostic.set_fix(fix);
+        }
     }
 
     /// Returns `true` if adding `await` at `expression` would produce valid Python.
