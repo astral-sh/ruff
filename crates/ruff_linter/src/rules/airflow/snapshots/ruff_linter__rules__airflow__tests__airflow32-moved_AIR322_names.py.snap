@@ -1,0 +1,211 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR322 [*] `airflow.exceptions.AirflowDagCycleException` is moved in Airflow 3.2
+  --> AIR322_names.py:15:1
+   |
+13 | )
+14 |
+15 | AirflowDagCycleException()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+16 | AirflowFailException()
+17 | AirflowInactiveAssetInInletOrOutletException()
+   |
+help: `AirflowDagCycleException` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+4  | from airflow.exceptions import (
+   -     AirflowDagCycleException,
+5  |     AirflowFailException,
+--------------------------------------------------------------------------------
+12 | )
+13 + from airflow.sdk.exceptions import AirflowDagCycleException
+14 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.AirflowFailException` is moved in Airflow 3.2
+  --> AIR322_names.py:16:1
+   |
+15 | AirflowDagCycleException()
+16 | AirflowFailException()
+   | ^^^^^^^^^^^^^^^^^^^^
+17 | AirflowInactiveAssetInInletOrOutletException()
+18 | AirflowSensorTimeout()
+   |
+help: `AirflowFailException` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+5  |     AirflowDagCycleException,
+   -     AirflowFailException,
+6  |     AirflowInactiveAssetInInletOrOutletException,
+--------------------------------------------------------------------------------
+12 | )
+13 + from airflow.sdk.exceptions import AirflowFailException
+14 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.AirflowInactiveAssetInInletOrOutletException` is moved in Airflow 3.2
+  --> AIR322_names.py:17:1
+   |
+15 | AirflowDagCycleException()
+16 | AirflowFailException()
+17 | AirflowInactiveAssetInInletOrOutletException()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+18 | AirflowSensorTimeout()
+19 | AirflowSkipException()
+   |
+help: `AirflowInactiveAssetInInletOrOutletException` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+6  |     AirflowFailException,
+   -     AirflowInactiveAssetInInletOrOutletException,
+7  |     AirflowSensorTimeout,
+--------------------------------------------------------------------------------
+12 | )
+13 + from airflow.sdk.exceptions import AirflowInactiveAssetInInletOrOutletException
+14 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.AirflowSensorTimeout` is moved in Airflow 3.2
+  --> AIR322_names.py:18:1
+   |
+16 | AirflowFailException()
+17 | AirflowInactiveAssetInInletOrOutletException()
+18 | AirflowSensorTimeout()
+   | ^^^^^^^^^^^^^^^^^^^^
+19 | AirflowSkipException()
+20 | AirflowTaskTerminated()
+   |
+help: `AirflowSensorTimeout` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+7  |     AirflowInactiveAssetInInletOrOutletException,
+   -     AirflowSensorTimeout,
+8  |     AirflowSkipException,
+--------------------------------------------------------------------------------
+12 | )
+13 + from airflow.sdk.exceptions import AirflowSensorTimeout
+14 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.AirflowSkipException` is moved in Airflow 3.2
+  --> AIR322_names.py:19:1
+   |
+17 | AirflowInactiveAssetInInletOrOutletException()
+18 | AirflowSensorTimeout()
+19 | AirflowSkipException()
+   | ^^^^^^^^^^^^^^^^^^^^
+20 | AirflowTaskTerminated()
+21 | AirflowTaskTimeout()
+   |
+help: `AirflowSkipException` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+8  |     AirflowSensorTimeout,
+   -     AirflowSkipException,
+9  |     AirflowTaskTerminated,
+10 |     AirflowTaskTimeout,
+11 |     DagRunTriggerException,
+12 | )
+13 + from airflow.sdk.exceptions import AirflowSkipException
+14 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.AirflowTaskTerminated` is moved in Airflow 3.2
+  --> AIR322_names.py:20:1
+   |
+18 | AirflowSensorTimeout()
+19 | AirflowSkipException()
+20 | AirflowTaskTerminated()
+   | ^^^^^^^^^^^^^^^^^^^^^
+21 | AirflowTaskTimeout()
+22 | DagRunTriggerException()
+   |
+help: `AirflowTaskTerminated` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+9  |     AirflowSkipException,
+   -     AirflowTaskTerminated,
+10 |     AirflowTaskTimeout,
+11 |     DagRunTriggerException,
+12 | )
+13 + from airflow.sdk.exceptions import AirflowTaskTerminated
+14 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.AirflowTaskTimeout` is moved in Airflow 3.2
+  --> AIR322_names.py:21:1
+   |
+19 | AirflowSkipException()
+20 | AirflowTaskTerminated()
+21 | AirflowTaskTimeout()
+   | ^^^^^^^^^^^^^^^^^^
+22 | DagRunTriggerException()
+   |
+help: `AirflowTaskTimeout` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+10 |     AirflowTaskTerminated,
+   -     AirflowTaskTimeout,
+11 |     DagRunTriggerException,
+12 | )
+13 + from airflow.sdk.exceptions import AirflowTaskTimeout
+14 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.DagRunTriggerException` is moved in Airflow 3.2
+  --> AIR322_names.py:22:1
+   |
+20 | AirflowTaskTerminated()
+21 | AirflowTaskTimeout()
+22 | DagRunTriggerException()
+   | ^^^^^^^^^^^^^^^^^^^^^^
+23 |
+24 | # Accessed through the module
+   |
+help: `DagRunTriggerException` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+11 |     AirflowTaskTimeout,
+   -     DagRunTriggerException,
+12 | )
+13 + from airflow.sdk.exceptions import DagRunTriggerException
+14 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.AirflowSkipException` is moved in Airflow 3.2
+  --> AIR322_names.py:27:1
+   |
+25 | from airflow import exceptions
+26 |
+27 | exceptions.AirflowSkipException()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+28 | exceptions.TaskDeferred()
+   |
+help: `AirflowSkipException` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+25 | from airflow import exceptions
+26 + from airflow.sdk.exceptions import AirflowSkipException
+27 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.TaskDeferred` is moved in Airflow 3.2
+  --> AIR322_names.py:28:1
+   |
+27 | exceptions.AirflowSkipException()
+28 | exceptions.TaskDeferred()
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+29 |
+30 | # Not moved: still importable from `airflow.exceptions` without a deprecation warning
+   |
+help: `TaskDeferred` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+25 | from airflow import exceptions
+26 + from airflow.sdk.exceptions import TaskDeferred
+27 |
+28 | exceptions.AirflowSkipException()
+   - exceptions.TaskDeferred()
+29 + TaskDeferred()
+30 |
+   |

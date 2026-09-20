@@ -1,0 +1,193 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR322 [*] `airflow.exceptions.DownstreamTasksSkipped` is moved in Airflow 3.2
+  --> AIR322_names_rest.py:16:1
+   |
+14 | )
+15 |
+16 | DownstreamTasksSkipped()
+   | ^^^^^^^^^^^^^^^^^^^^^^
+17 | DuplicateTaskIdFound()
+18 | FailFastDagInvalidTriggerRule()
+   |
+help: `DownstreamTasksSkipped` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+4  | from airflow.exceptions import (
+   -     DownstreamTasksSkipped,
+5  |     DuplicateTaskIdFound,
+--------------------------------------------------------------------------------
+13 | )
+14 + from airflow.sdk.exceptions import DownstreamTasksSkipped
+15 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.DuplicateTaskIdFound` is moved in Airflow 3.2
+  --> AIR322_names_rest.py:17:1
+   |
+16 | DownstreamTasksSkipped()
+17 | DuplicateTaskIdFound()
+   | ^^^^^^^^^^^^^^^^^^^^
+18 | FailFastDagInvalidTriggerRule()
+19 | ParamValidationError()
+   |
+help: `DuplicateTaskIdFound` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+5  |     DownstreamTasksSkipped,
+   -     DuplicateTaskIdFound,
+6  |     FailFastDagInvalidTriggerRule,
+--------------------------------------------------------------------------------
+13 | )
+14 + from airflow.sdk.exceptions import DuplicateTaskIdFound
+15 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.FailFastDagInvalidTriggerRule` is moved in Airflow 3.2
+  --> AIR322_names_rest.py:18:1
+   |
+16 | DownstreamTasksSkipped()
+17 | DuplicateTaskIdFound()
+18 | FailFastDagInvalidTriggerRule()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+19 | ParamValidationError()
+20 | TaskAlreadyInTaskGroup()
+   |
+help: `FailFastDagInvalidTriggerRule` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+6  |     DuplicateTaskIdFound,
+   -     FailFastDagInvalidTriggerRule,
+7  |     ParamValidationError,
+--------------------------------------------------------------------------------
+13 | )
+14 + from airflow.sdk.exceptions import FailFastDagInvalidTriggerRule
+15 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.ParamValidationError` is moved in Airflow 3.2
+  --> AIR322_names_rest.py:19:1
+   |
+17 | DuplicateTaskIdFound()
+18 | FailFastDagInvalidTriggerRule()
+19 | ParamValidationError()
+   | ^^^^^^^^^^^^^^^^^^^^
+20 | TaskAlreadyInTaskGroup()
+21 | TaskDeferralError()
+   |
+help: `ParamValidationError` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+7  |     FailFastDagInvalidTriggerRule,
+   -     ParamValidationError,
+8  |     TaskAlreadyInTaskGroup,
+--------------------------------------------------------------------------------
+13 | )
+14 + from airflow.sdk.exceptions import ParamValidationError
+15 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.TaskAlreadyInTaskGroup` is moved in Airflow 3.2
+  --> AIR322_names_rest.py:20:1
+   |
+18 | FailFastDagInvalidTriggerRule()
+19 | ParamValidationError()
+20 | TaskAlreadyInTaskGroup()
+   | ^^^^^^^^^^^^^^^^^^^^^^
+21 | TaskDeferralError()
+22 | TaskDeferralTimeout()
+   |
+help: `TaskAlreadyInTaskGroup` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+8  |     ParamValidationError,
+   -     TaskAlreadyInTaskGroup,
+9  |     TaskDeferralError,
+--------------------------------------------------------------------------------
+13 | )
+14 + from airflow.sdk.exceptions import TaskAlreadyInTaskGroup
+15 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.TaskDeferralError` is moved in Airflow 3.2
+  --> AIR322_names_rest.py:21:1
+   |
+19 | ParamValidationError()
+20 | TaskAlreadyInTaskGroup()
+21 | TaskDeferralError()
+   | ^^^^^^^^^^^^^^^^^
+22 | TaskDeferralTimeout()
+23 | TaskDeferred()
+   |
+help: `TaskDeferralError` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+9  |     TaskAlreadyInTaskGroup,
+   -     TaskDeferralError,
+10 |     TaskDeferralTimeout,
+11 |     TaskDeferred,
+12 |     XComNotFound,
+13 | )
+14 + from airflow.sdk.exceptions import TaskDeferralError
+15 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.TaskDeferralTimeout` is moved in Airflow 3.2
+  --> AIR322_names_rest.py:22:1
+   |
+20 | TaskAlreadyInTaskGroup()
+21 | TaskDeferralError()
+22 | TaskDeferralTimeout()
+   | ^^^^^^^^^^^^^^^^^^^
+23 | TaskDeferred()
+24 | XComNotFound()
+   |
+help: `TaskDeferralTimeout` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+10 |     TaskDeferralError,
+   -     TaskDeferralTimeout,
+11 |     TaskDeferred,
+12 |     XComNotFound,
+13 | )
+14 + from airflow.sdk.exceptions import TaskDeferralTimeout
+15 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.TaskDeferred` is moved in Airflow 3.2
+  --> AIR322_names_rest.py:23:1
+   |
+21 | TaskDeferralError()
+22 | TaskDeferralTimeout()
+23 | TaskDeferred()
+   | ^^^^^^^^^^^^
+24 | XComNotFound()
+   |
+help: `TaskDeferred` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+11 |     TaskDeferralTimeout,
+   -     TaskDeferred,
+12 |     XComNotFound,
+13 | )
+14 + from airflow.sdk.exceptions import TaskDeferred
+15 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR322 [*] `airflow.exceptions.XComNotFound` is moved in Airflow 3.2
+  --> AIR322_names_rest.py:24:1
+   |
+22 | TaskDeferralTimeout()
+23 | TaskDeferred()
+24 | XComNotFound()
+   | ^^^^^^^^^^^^
+help: `XComNotFound` has been moved to `airflow.sdk.exceptions` since Airflow 3.2 (with apache-airflow-task-sdk>=1.2.0).
+   |
+12 |     TaskDeferred,
+   -     XComNotFound,
+13 | )
+14 + from airflow.sdk.exceptions import XComNotFound
+15 |
+   |
+note: This is an unsafe fix and may change runtime behavior

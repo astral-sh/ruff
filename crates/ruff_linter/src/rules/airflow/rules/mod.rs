@@ -1,6 +1,7 @@
 pub(crate) use dag_schedule_argument::*;
 pub(crate) use function_signature_change_in_3::*;
 pub(crate) use moved_in_3_1::*;
+pub(crate) use moved_in_3_2::*;
 pub(crate) use moved_to_provider_in_3::*;
 pub(crate) use removal_in_3::*;
 pub(crate) use runtime_value_in_dag_or_task::*;
@@ -15,6 +16,7 @@ pub(crate) use xcom_pull_in_template_string::*;
 mod dag_schedule_argument;
 mod function_signature_change_in_3;
 mod moved_in_3_1;
+mod moved_in_3_2;
 mod moved_to_provider_in_3;
 mod removal_in_3;
 mod runtime_value_in_dag_or_task;
