@@ -32,6 +32,7 @@ For implementors, see `import-resolution-diagram.svg` for a flow diagram that
 specifies ty's implementation of Python's import resolution algorithm.
 */
 
+mod enumerate;
 mod search;
 
 use std::borrow::Cow;
@@ -272,7 +273,7 @@ fn resolve_module_query<'db>(
     resolved
         .into_iter()
         .next()
-        .map(|candidate| candidate.into_module(db, resolver_environment, name))
+        .map(|candidate| candidate.into_module(db, resolver_environment, Cow::Borrowed(name)))
 }
 
 /// Like `resolve_module_query` but for cases where it failed to resolve the module
@@ -315,7 +316,7 @@ fn desperately_resolve_module<'db>(
     resolved
         .into_iter()
         .next()
-        .map(|candidate| candidate.into_module(db, resolver_environment, name))
+        .map(|candidate| candidate.into_module(db, resolver_environment, Cow::Borrowed(name)))
 }
 
 /// Resolves the module for the given path.
@@ -1319,12 +1320,12 @@ impl<'db> ModuleResolutionCandidate<'db> {
         self,
         db: &'db dyn Db,
         resolver_environment: ResolverEnvironment<'db>,
-        name: &ModuleName,
+        name: Cow<'_, ModuleName>,
     ) -> Module<'db> {
         match self.module {
             ResolvedModule::NamespacePackage => {
                 tracing::trace!("Resolve namespace package `{name}`");
-                Module::namespace_package(db, resolver_environment, Cow::Borrowed(name))
+                Module::namespace_package(db, resolver_environment, name)
             }
             ResolvedModule::Package(file) => {
                 // Legacy namespace packages also use their defining file when resolved directly.
@@ -1336,7 +1337,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
                     db,
                     file,
                     resolver_environment,
-                    Cow::Borrowed(name),
+                    name,
                     ModuleKind::Package,
                     self.directory.into_search_path(),
                 )
@@ -1347,7 +1348,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
                     db,
                     file,
                     resolver_environment,
-                    Cow::Borrowed(name),
+                    name,
                     ModuleKind::Module,
                     self.directory.into_search_path(),
                 )

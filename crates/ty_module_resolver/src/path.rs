@@ -235,6 +235,15 @@ impl ModulePath {
         }
     }
 
+    /// Returns the path within the vendored filesystem, if this is a vendored module.
+    fn to_vendored_path(&self) -> Option<VendoredPathBuf> {
+        Some(
+            self.search_path
+                .as_vendored_path()?
+                .join(&self.relative_path),
+        )
+    }
+
     #[must_use]
     pub(crate) fn to_module_name(&self) -> Option<ModuleName> {
         fn strip_stubs(component: &str) -> &str {
@@ -358,6 +367,25 @@ impl<'db> ModuleDirectory<'db> {
         let mut path = self.path.clone();
         path.push(name);
         path.is_directory(context).then(|| Self::new(context, path))
+    }
+
+    /// Visits the names and file types of entries in a system or vendored directory.
+    pub(crate) fn for_each_entry(&self, db: &dyn Db, mut visit: impl FnMut(&str, FileType)) {
+        if let Some(listing) = self.system_listing() {
+            for (name, kind) in listing.iter() {
+                visit(name, kind);
+            }
+        } else if let Some(path) = self.path.to_vendored_path() {
+            for entry in db.vendored().read_directory(&path) {
+                if let Some(name) = entry.path().file_name() {
+                    let kind = match entry.file_type() {
+                        ruff_db::vendored::FileType::Directory => FileType::Directory,
+                        ruff_db::vendored::FileType::File => FileType::File,
+                    };
+                    visit(name, kind);
+                }
+            }
+        }
     }
 
     /// Returns the directory's path without permitting it to change.
