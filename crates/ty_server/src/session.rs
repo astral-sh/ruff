@@ -1220,7 +1220,7 @@ impl Session {
     /// Creates a document snapshot with the URI referencing the document to snapshot.
     pub(crate) fn snapshot_document(&self, uri: &Uri) -> Result<DocumentSnapshot, DocumentError> {
         let index = self.index();
-        let document_handle = index.document_handle(uri)?;
+        let document_handle = index.open_document_handle(uri)?;
 
         Ok(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
@@ -1271,16 +1271,16 @@ impl Session {
             .map(DocumentHandle::from_document)
     }
 
-    /// Returns a handle to the document specified by its URI.
+    /// Returns a handle to the open document specified by its URI.
     ///
     /// # Errors
     ///
-    /// If the document is not found.
-    pub(crate) fn document_handle(
+    /// Returns an error if the document is not open in the session.
+    pub(crate) fn open_document_handle(
         &self,
         uri: &lsp_types::Uri,
     ) -> Result<DocumentHandle, DocumentError> {
-        self.index().document_handle(uri)
+        self.index().open_document_handle(uri)
     }
 
     /// Registers a notebook document at the provided `path`.

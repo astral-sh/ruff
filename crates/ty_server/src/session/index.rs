@@ -43,7 +43,10 @@ impl Index {
         })
     }
 
-    pub(crate) fn document_handle(
+    /// Returns a handle to the open document specified by its URI.
+    ///
+    /// Returns an error if the document is not open in the index.
+    pub(crate) fn open_document_handle(
         &self,
         uri: &lsp_types::Uri,
     ) -> Result<DocumentHandle, DocumentError> {

@@ -266,7 +266,7 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
             )]
             for (cell_uri, diagnostics) in cell_diagnostics {
                 let version = session
-                    .document_handle(&cell_uri)
+                    .open_document_handle(&cell_uri)
                     .map(|document| document.version())
                     .ok();
                 publish_diagnostics_notification(cell_uri, version, diagnostics);
