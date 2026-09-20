@@ -233,6 +233,38 @@ class Foo4[**P]:
         self.kwargs: P.kwargs = kwargs
 ```
 
+## Class `ParamSpec` bindings remain visible in nested classes
+
+A PEP 695 `ParamSpec` remains bound to the class that declares it when referenced in a nested
+class's method. Both callable annotations and forwarded arguments use the outer class's binding.
+
+```py
+from typing import Callable
+
+class Outer[**P]:
+    class Inner:
+        def method(self, callback: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> int:
+            return callback(*args, **kwargs)
+
+# revealed: def method(self, callback: (**P@Outer) -> int, *args: P@Outer.args, **kwargs: P@Outer.kwargs) -> int
+reveal_type(Outer.Inner.method)
+```
+
+## Class `ParamSpec` bindings across intervening methods
+
+A PEP 695 `ParamSpec` binding remains visible through an intervening method that captures it through
+its components.
+
+```py
+class Outer[**P]:
+    def method(self, *args: P.args, **kwargs: P.kwargs) -> None:
+        class Inner:
+            def nested(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+        # revealed: def nested(self, *args: P@Outer.args, **kwargs: P@Outer.kwargs) -> None
+        reveal_type(Inner.nested)
+```
+
 ## Semantics of `P.args` and `P.kwargs`
 
 The type of `args` and `kwargs` inside the function is `P.args` and `P.kwargs` respectively instead

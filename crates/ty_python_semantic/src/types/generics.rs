@@ -134,8 +134,9 @@ pub(crate) fn resolve_typevar_reference<'db>(
 /// variables.
 ///
 /// Captured `ParamSpec` bindings are recovered from component annotations because those bindings
-/// are deliberately excluded from a nested function's own generic context. A binding owned by a
-/// class is hidden after the search crosses a nested class boundary.
+/// are deliberately excluded from a nested function's own generic context. A legacy binding owned
+/// by a class is hidden after the search crosses a nested class boundary. PEP 695 type parameters
+/// remain visible in inner scopes.
 fn find_typevar_binding<'db>(
     db: &'db dyn Db,
     index: &SemanticIndex<'db>,
@@ -190,7 +191,9 @@ fn find_typevar_binding<'db>(
         }
     }
     // Walk ancestor scopes, tracking whether we've crossed a class scope boundary.
-    // Class-scoped type variables are not visible from inner class scopes.
+    // Legacy class-scoped type variables are not visible from inner class scopes. PEP 695 type
+    // parameters have lexical scopes that include nested classes, so they do not use this barrier.
+    let is_pep695 = typevar.kind(db).is_pep695();
     let mut crossed_class_scope = false;
     for (ancestor_scope_id, ancestor_scope) in index.ancestor_scopes(containing_scope) {
         let is_class_scope = ancestor_scope.kind().is_class();
@@ -232,7 +235,7 @@ fn find_typevar_binding<'db>(
             }
         };
         // If we've already crossed a class boundary, skip class-scoped generic contexts.
-        // This prevents inner classes from accessing type parameters of outer classes.
+        // This prevents inner classes from accessing legacy type variables bound by outer classes.
         // An enclosing function's context can also retain a type variable originally bound by its
         // enclosing class, so check the binding context as well as the ancestor node.
         if (!is_class_scope || !crossed_class_scope)
@@ -242,7 +245,7 @@ fn find_typevar_binding<'db>(
         {
             return Some(bound);
         }
-        if is_class_scope {
+        if is_class_scope && !is_pep695 {
             crossed_class_scope = true;
         }
     }

@@ -3409,32 +3409,40 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .inference_flags()
                 .contains(InferenceFlags::IN_INIT_RECEIVER_ANNOTATION)
             && let Some(owner) = typevar.binding_context(db).definition()
-            && matches!(owner.kind(db), DefinitionKind::Class(_))
+            && Some(owner) != self.typevar_binding_context
             && let Some(builder) = self
                 .context
                 .report_lint(&INVALID_INIT_TYPE_VARIABLE, expression)
         {
             let mut diagnostic = builder.into_diagnostic(format_args!(
-                "First parameter of `__init__` cannot use the class's type variable `{}`",
+                "First parameter of `__init__` cannot use type variable `{}` from an outer scope",
                 typevar.name(db)
             ));
             diagnostic.set_concise_message(format_args!(
-                "First parameter of `__init__` cannot use the class's type variable `{}`",
+                "First parameter of `__init__` cannot use type variable `{}` from an outer scope",
                 typevar.name(db)
             ));
             diagnostic.set_primary_annotation_message(format_args!(
                 "`{}` used in the first parameter's annotation here",
                 typevar.name(db)
             ));
-            if let Type::ClassLiteral(class) = binding_type(db, owner) {
-                diagnostic.annotate(Annotation::secondary(class.header_span(db)).message(
-                    format_args!("`{}` is a type parameter of this class", typevar.name(db)),
-                ));
+            let owner_span = match binding_type(db, owner) {
+                Type::ClassLiteral(class) => Some(class.header_span(db)),
+                Type::FunctionLiteral(function) => Some(function.spans(db).signature),
+                _ => None,
+            };
+            if let Some(owner_span) = owner_span {
+                diagnostic.annotate(Annotation::secondary(owner_span).message(format_args!(
+                    "`{}` is bound to this enclosing scope",
+                    typevar.name(db)
+                )));
             }
             diagnostic.info(
-                "Using a class's type variables here can make the constructed type ambiguous",
+                "Using type variables from an outer scope can make the constructed type ambiguous",
             );
-            diagnostic.help("Use a new type variable, or omit the first parameter's annotation");
+            diagnostic.help(
+                "Use a type variable scoped to `__init__`, or omit the first parameter's annotation",
+            );
             diagnostic
                 .info("See https://typing.python.org/en/latest/spec/constructors.html#init-method");
         }
