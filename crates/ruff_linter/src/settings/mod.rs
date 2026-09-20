@@ -772,8 +772,11 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
 
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
+/// Matches "dummy" variables, i.e. variables prefixed with an underscore to mark
+/// them as intentionally unused (e.g. `_`, `__`, and `_var`, but not `_var_`).
+/// `\w` is Unicode-aware, so non-ASCII names like `_次` match as well.
 pub static DUMMY_VARIABLE_RGX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
+    LazyLock::new(|| Regex::new("^(_+|(_+\\w*[^\\W_]+?))$").unwrap());
 
 impl LinterSettings {
     pub fn for_rule(rule_code: Rule) -> Self {

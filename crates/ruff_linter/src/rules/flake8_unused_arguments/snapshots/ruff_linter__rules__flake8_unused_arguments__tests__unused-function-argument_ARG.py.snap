@@ -36,3 +36,11 @@ ARG001 Unused function argument: `x`
    |            ^
 14 |     print("Hello, world!")
    |
+
+ARG001 Unused function argument: `_次_`
+   --> ARG.py:294:7
+    |
+294 | def f(_次_):
+    |       ^^^^
+295 |     print("Hello, world!")
+    |

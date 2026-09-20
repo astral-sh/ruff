@@ -268,3 +268,31 @@ def f(
 ) -> None:
     TypeVar(**kwargs)
 
+
+###
+# Dummy variables with non-ASCII characters (see #28721).
+###
+
+
+def f(_次):
+    print("Hello, world!")
+
+
+def f(_μετάβλητη):
+    print("Hello, world!")
+
+
+lambda _次: print("Hello, world!")
+
+
+###
+# Names with trailing underscores are not dummy variables,
+# even with non-ASCII characters.
+###
+
+
+def f(_次_):
+    print("Hello, world!")
+
+
+lambda _次_: print("Hello, world!")

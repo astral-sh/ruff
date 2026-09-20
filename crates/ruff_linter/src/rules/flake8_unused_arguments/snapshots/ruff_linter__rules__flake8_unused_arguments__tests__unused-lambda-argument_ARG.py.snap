@@ -11,3 +11,9 @@ ARG005 Unused lambda argument: `x`
 29 |
 30 | lambda: print("Hello, world!")
    |
+
+ARG005 Unused lambda argument: `_次_`
+   --> ARG.py:298:8
+    |
+298 | lambda _次_: print("Hello, world!")
+    |        ^^^^
