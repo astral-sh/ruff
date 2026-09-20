@@ -689,3 +689,25 @@ ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel 
 317 |         with Shield(shield=True) as scope:
 318 |             class ShadowsOuterScope:
     |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:334:13
+    |
+332 |             else:
+333 |                 scope.shield = True
+334 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
+335 |         with Shield() as scope:
+336 |             while flag:
+    |
+
+ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:340:13
+    |
+338 |             else:
+339 |                 scope.shield = True
+340 |             await cleanup()  # ASYNC102
+    |             ^^^^^^^^^^^^^^^
+341 |         with Shield() as scope:
+342 |             for item in items:
+    |

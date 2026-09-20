@@ -320,3 +320,28 @@ async def class_body_effects():
                 scope.shield = False
 
             await cleanup()
+
+
+async def loop_else_shielding(items, flag):
+    try:
+        pass
+    finally:
+        with Shield() as scope:
+            for item in items:
+                break
+            else:
+                scope.shield = True
+            await cleanup()  # ASYNC102
+        with Shield() as scope:
+            while flag:
+                break
+            else:
+                scope.shield = True
+            await cleanup()  # ASYNC102
+        with Shield() as scope:
+            for item in items:
+                while flag:
+                    break
+            else:
+                scope.shield = True
+            await cleanup()

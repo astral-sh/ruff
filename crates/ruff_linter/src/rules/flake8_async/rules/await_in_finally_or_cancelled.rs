@@ -161,6 +161,47 @@ fn enables_shield(expr: &Expr) -> bool {
         )
 }
 
+/// Returns `true` if `body` contains a `break` for its enclosing loop.
+fn loop_exits_early(body: &[Stmt]) -> bool {
+    body.iter().any(|stmt| match stmt {
+        Stmt::If(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => {
+            loop_exits_early(body)
+                || elif_else_clauses
+                    .iter()
+                    .any(|clause| loop_exits_early(&clause.body))
+        }
+        Stmt::With(ast::StmtWith { body, .. }) => loop_exits_early(body),
+        Stmt::Match(ast::StmtMatch { cases, .. }) => cases
+            .iter()
+            .any(|ast::MatchCase { body, .. }| loop_exits_early(body)),
+        Stmt::Try(ast::StmtTry {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            ..
+        }) => {
+            loop_exits_early(body)
+                || loop_exits_early(orelse)
+                || loop_exits_early(finalbody)
+                || handlers.iter().any(|handler| match handler {
+                    ast::ExceptHandler::ExceptHandler(handler) => loop_exits_early(&handler.body),
+                })
+        }
+        // A nested loop's `break` targets that loop, but a `break` in its
+        // `else` clause targets the enclosing loop.
+        Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
+            loop_exits_early(orelse)
+        }
+        Stmt::Break(_) => true,
+        _ => false,
+    })
+}
+
 impl<'a> CleanupVisitor<'a, '_> {
     fn checkpoint(&self, range: TextRange) -> bool {
         if let Some(context) = self.context
@@ -529,7 +570,11 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
                 let before = self.scopes.clone();
                 self.visit_body(&stmt.body);
                 self.merge_scopes(&before);
+                let before_else = self.scopes.clone();
                 self.visit_body(&stmt.orelse);
+                if loop_exits_early(&stmt.body) {
+                    self.merge_scopes(&before_else);
+                }
             }
             Stmt::While(stmt) => {
                 self.invalidate_assignments(&stmt.body);
@@ -537,7 +582,11 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
                 let before = self.scopes.clone();
                 self.visit_body(&stmt.body);
                 self.merge_scopes(&before);
+                let before_else = self.scopes.clone();
                 self.visit_body(&stmt.orelse);
+                if loop_exits_early(&stmt.body) {
+                    self.merge_scopes(&before_else);
+                }
             }
             Stmt::Match(stmt) => {
                 self.visit_expr(&stmt.subject);
