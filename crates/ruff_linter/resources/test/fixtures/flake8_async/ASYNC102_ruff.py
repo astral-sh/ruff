@@ -412,3 +412,18 @@ async def class_body_nonlocal():
                 scope.shield = True
 
             await cleanup()  # ASYNC102
+
+
+async def nested_loop_else_break(items, flag):
+    try:
+        pass
+    finally:
+        with Shield() as scope:
+            for item in items:
+                while flag:
+                    pass
+                else:
+                    break
+            else:
+                scope.shield = True
+            await cleanup()  # ASYNC102
