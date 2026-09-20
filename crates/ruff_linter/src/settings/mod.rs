@@ -773,7 +773,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
 pub static DUMMY_VARIABLE_RGX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
+    LazyLock::new(|| Regex::new("^(_+|(_+\\w*[^\\W_]+?))$").unwrap());
 
 impl LinterSettings {
     pub fn for_rule(rule_code: Rule) -> Self {

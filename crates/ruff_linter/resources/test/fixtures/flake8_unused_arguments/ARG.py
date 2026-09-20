@@ -268,3 +268,21 @@ def f(
 ) -> None:
     TypeVar(**kwargs)
 
+
+###
+# Dummy variables with Unicode names (OK).
+###
+def f(_次):
+    print("Hello, world!")
+
+
+lambda _次: print("Hello, world!")
+
+
+def f(_é, _α, _中):
+    print("Hello, world!")
+
+
+class C:
+    def m(self, _次):
+        print("Hello, world!")
