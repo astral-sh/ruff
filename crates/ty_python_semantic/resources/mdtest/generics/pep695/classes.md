@@ -791,8 +791,8 @@ python-version = "3.13"
 from __future__ import annotations
 
 class Swapped[T, U]:
-    # error: [invalid-init-type-variable] "First parameter of `__init__` cannot use the class's type variable `U`"
-    # error: [invalid-init-type-variable] "First parameter of `__init__` cannot use the class's type variable `T`"
+    # error: [invalid-init-type-variable] "First parameter of `__init__` cannot use type variable `U` from an outer scope"
+    # error: [invalid-init-type-variable] "First parameter of `__init__` cannot use type variable `T` from an outer scope"
     def __init__(self: Swapped[U, T]) -> None: ...
 
 class Identity[T]:
@@ -805,16 +805,16 @@ class Nested[T]:
 ```
 
 ```snapshot
-error[invalid-init-type-variable]: First parameter of `__init__` cannot use the class's type variable `T`
+error[invalid-init-type-variable]: First parameter of `__init__` cannot use type variable `T` from an outer scope
   --> src/mdtest_snippet.py:14:36
    |
 12 | class Nested[T]:
-   |       ------ `T` is a type parameter of this class
+   |       ------ `T` is bound to this enclosing scope
 13 |     # snapshot: invalid-init-type-variable
 14 |     def __init__(self: Nested[list[T]]) -> None: ...
    |                                    ^ `T` used in the first parameter's annotation here
-info: Using a class's type variables here can make the constructed type ambiguous
-help: Use a new type variable, or omit the first parameter's annotation
+info: Using type variables from an outer scope can make the constructed type ambiguous
+help: Use a type variable scoped to `__init__`, or omit the first parameter's annotation
 info: See https://typing.python.org/en/latest/spec/constructors.html#init-method
 ```
 
@@ -843,14 +843,80 @@ class WithTuple[*Ts]:
     def __init__(self: WithTuple[*Ts]) -> None: ...  # error: [invalid-init-type-variable]
 ```
 
-Function-scoped type variables can determine the constructed type without referencing the class's
-own type variables.
+Type variables scoped to `__init__` can determine the constructed type without referencing the
+class's own type variables.
 
 ```py
 class Remapped[T]:
     def __init__[V](self: "Remapped[list[V]]", value: V) -> None: ...
 
 reveal_type(Remapped(1))  # revealed: Remapped[list[Literal[1]]]
+```
+
+### Type variables from enclosing scopes in `__init__` receiver annotations
+
+A nested class can reference an enclosing class's type parameters, but cannot use them in an
+explicit `__init__` receiver annotation. Type variables in that annotation must be scoped to
+`__init__`.
+
+```py
+class Outer[T]:
+    class Inner[S]:
+        # snapshot: invalid-init-type-variable
+        def __init__(self: "Outer.Inner[T]") -> None: ...
+```
+
+```snapshot
+error[invalid-init-type-variable]: First parameter of `__init__` cannot use type variable `T` from an outer scope
+ --> src/mdtest_snippet.py:4:41
+  |
+1 | class Outer[T]:
+  |       ----- `T` is bound to this enclosing scope
+2 |     class Inner[S]:
+3 |         # snapshot: invalid-init-type-variable
+4 |         def __init__(self: "Outer.Inner[T]") -> None: ...
+  |                                         ^ `T` used in the first parameter's annotation here
+info: Using type variables from an outer scope can make the constructed type ambiguous
+help: Use a type variable scoped to `__init__`, or omit the first parameter's annotation
+info: See https://typing.python.org/en/latest/spec/constructors.html#init-method
+```
+
+The same restriction applies to type variables bound to an enclosing function.
+
+```py
+def outer[T](value: T) -> T:
+    class Inner[S]:
+        # snapshot: invalid-init-type-variable
+        def __init__(self: "Inner[T]") -> None: ...
+
+    return value
+```
+
+```snapshot
+error[invalid-init-type-variable]: First parameter of `__init__` cannot use type variable `T` from an outer scope
+ --> src/mdtest_snippet.py:8:35
+  |
+5 | def outer[T](value: T) -> T:
+  |     ----------------------- `T` is bound to this enclosing scope
+6 |     class Inner[S]:
+7 |         # snapshot: invalid-init-type-variable
+8 |         def __init__(self: "Inner[T]") -> None: ...
+  |                                   ^ `T` used in the first parameter's annotation here
+info: Using type variables from an outer scope can make the constructed type ambiguous
+help: Use a type variable scoped to `__init__`, or omit the first parameter's annotation
+info: See https://typing.python.org/en/latest/spec/constructors.html#init-method
+```
+
+This includes `ParamSpec` and `TypeVarTuple` parameters from enclosing scopes.
+
+```py
+def with_paramspec[**P]():
+    class Inner[**Q]:
+        def __init__(self: "Inner[P]") -> None: ...  # error: [invalid-init-type-variable]
+
+def with_tuple[*Ts]():
+    class Inner[*Us]:
+        def __init__(self: "Inner[*Ts]") -> None: ...  # error: [invalid-init-type-variable]
 ```
 
 ### Some `__init__` overloads only apply to certain specializations

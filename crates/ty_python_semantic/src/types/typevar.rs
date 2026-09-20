@@ -1658,6 +1658,17 @@ pub enum TypeVarKind {
 }
 
 impl TypeVarKind {
+    pub(super) const fn is_pep695(self) -> bool {
+        match self {
+            Self::Pep695TypeVar | Self::Pep695ParamSpec | Self::Pep695TypeVarTuple => true,
+            Self::LegacyTypeVar
+            | Self::TypingSelf
+            | Self::LegacyParamSpec
+            | Self::LegacyTypeVarTuple
+            | Self::Pep613Alias => false,
+        }
+    }
+
     pub(super) const fn is_paramspec(self) -> bool {
         matches!(self, Self::LegacyParamSpec | Self::Pep695ParamSpec)
     }

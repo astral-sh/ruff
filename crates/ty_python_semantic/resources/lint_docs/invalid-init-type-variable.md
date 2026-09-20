@@ -1,15 +1,15 @@
 ## What it does
 
-Checks for class-scoped type variables in an explicit annotation of the `self` parameter of
+Checks for type variables from outer scopes in an explicit annotation of the `self` parameter of
 `__init__`.
 
 ## Why is this bad?
 
 An explicit `self` annotation on `__init__` can determine the type arguments of the constructed
-class. Referring to the class's own type variables in this annotation can make their meaning
-ambiguous. The
+class. Referring to type variables bound to the class or an enclosing scope in this annotation can
+make their meaning ambiguous. The
 [typing specification](https://typing.python.org/en/latest/spec/constructors.html#init-method)
-requires function-scoped type variables instead.
+allows type variables scoped to `__init__` instead.
 
 ## Example
 
@@ -24,7 +24,7 @@ class Container[T]:
     def __init__(self: "Container[list[T]]", value: T) -> None: ...
 ```
 
-Use a function-scoped type variable instead:
+Use a type variable scoped to `__init__` instead:
 
 ```python
 class ListContainer[T]:

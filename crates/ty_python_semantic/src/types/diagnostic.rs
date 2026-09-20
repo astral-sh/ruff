@@ -730,7 +730,7 @@ declare_lint! {
 declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-init-type-variable.md")]
     pub(crate) static INVALID_INIT_TYPE_VARIABLE = {
-        summary: "detects class-scoped type variables in `__init__` receiver annotations",
+        summary: "detects type variables from outer scopes in `__init__` receiver annotations",
         status: LintStatus::stable("0.0.83"),
         default_level: Level::Error,
     }

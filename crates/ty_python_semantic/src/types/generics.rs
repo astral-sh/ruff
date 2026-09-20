@@ -193,10 +193,7 @@ fn find_typevar_binding<'db>(
     // Walk ancestor scopes, tracking whether we've crossed a class scope boundary.
     // Legacy class-scoped type variables are not visible from inner class scopes. PEP 695 type
     // parameters have lexical scopes that include nested classes, so they do not use this barrier.
-    let is_pep695 = matches!(
-        typevar.kind(db),
-        TypeVarKind::Pep695TypeVar | TypeVarKind::Pep695ParamSpec | TypeVarKind::Pep695TypeVarTuple
-    );
+    let is_pep695 = typevar.kind(db).is_pep695();
     let mut crossed_class_scope = false;
     for (ancestor_scope_id, ancestor_scope) in index.ancestor_scopes(containing_scope) {
         let is_class_scope = ancestor_scope.kind().is_class();
