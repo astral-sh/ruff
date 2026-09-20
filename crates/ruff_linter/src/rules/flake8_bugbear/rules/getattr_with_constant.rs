@@ -37,6 +37,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// (e.g., `obj.attr`), but does not normalize string arguments passed to `getattr`. Rewriting
 /// `getattr(obj, "ſ")` to `obj.ſ` would be interpreted as `obj.s` at runtime, changing behavior.
 ///
+/// Additionally, the fix is marked as unsafe if the call has additional keyword arguments
+/// (e.g., `getattr(obj, "attr", **kwargs)`). `getattr` does not accept keyword arguments, so the
+/// original call either raises `TypeError` or evaluates the keyword expressions for their side
+/// effects when the unpacking produces an empty mapping. Replacing the call with attribute access
+/// would discard that evaluation entirely.
+///
 /// Additionally, the fix is marked as unsafe if the expression contains comments,
 /// as the replacement may remove comments attached to the original `getattr` call.
 ///
@@ -69,7 +75,13 @@ impl AlwaysFixableViolation for GetAttrWithConstant {
 }
 
 /// B009
-pub(crate) fn getattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn getattr_with_constant(
+    checker: &Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[ast::Keyword],
+) {
     let [obj, arg] = args else {
         return;
     };
@@ -91,10 +103,14 @@ pub(crate) fn getattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
 
     // Mark fixes as unsafe for non-NFKC attribute names. Python normalizes identifiers using NFKC, so using
     // attribute syntax (e.g., `obj.attr`) would normalize the name and potentially change
-    // program behavior.
+    // program behavior. Also mark fixes as unsafe if the call has additional keyword arguments
+    // (e.g., `getattr(obj, "attr", **kwargs)`), as the replacement would discard their
+    // evaluation and any side effects.
     let attr_name = value.to_str();
     let has_comments = checker.comment_ranges().intersects(expr.range());
-    let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name || has_comments;
+    let has_extra_keywords = !keywords.is_empty();
+    let is_unsafe =
+        attr_name.nfkc().collect::<String>() != attr_name || has_comments || has_extra_keywords;
 
     let mut diagnostic = checker.report_diagnostic(GetAttrWithConstant, expr.range());
     let edit = Edit::range_replacement(

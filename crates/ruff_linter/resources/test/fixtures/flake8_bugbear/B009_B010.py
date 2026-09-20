@@ -86,3 +86,10 @@ getattr(
     # text
     "foo",
 )
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/28732
+# The fix is unsafe when the call has additional keyword arguments: replacing
+# the call with attribute access would discard their evaluation (and any side
+# effects), and `getattr` raises `TypeError` for keyword arguments anyway.
+getattr(foo, "bar", **kwargs)
+getattr(foo, "bar", baz=1)
