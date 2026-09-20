@@ -296,3 +296,10 @@ async def control_flow_and_targets(flag, cm):
             finally:
                 scope.shield = False
             await cleanup()  # ASYNC102
+
+
+async def handler_type_checkpoints():
+    try:
+        pass
+    except (BaseException, await exception_type()):  # ASYNC102
+        await cleanup()  # ASYNC102

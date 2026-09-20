@@ -660,3 +660,21 @@ ASYNC102 Cancellation point in `finally` must be protected by a shielded cancel 
 297 |                 scope.shield = False
 298 |             await cleanup()  # ASYNC102
     |             ^^^^^^^^^^^^^^^
+
+ASYNC102 Cancellation point in a cancellation-catching exception handler must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:304:28
+    |
+302 |     try:
+303 |         pass
+304 |     except (BaseException, await exception_type()):  # ASYNC102
+    |                            ^^^^^^^^^^^^^^^^^^^^^^
+305 |         await cleanup()  # ASYNC102
+    |
+
+ASYNC102 Cancellation point in a cancellation-catching exception handler must be protected by a shielded cancel scope
+   --> ASYNC102_ruff.py:305:9
+    |
+303 |         pass
+304 |     except (BaseException, await exception_type()):  # ASYNC102
+305 |         await cleanup()  # ASYNC102
+    |         ^^^^^^^^^^^^^^^

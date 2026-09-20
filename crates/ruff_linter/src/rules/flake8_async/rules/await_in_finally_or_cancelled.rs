@@ -347,9 +347,6 @@ impl<'a> CleanupVisitor<'a, '_> {
             self.context = context;
             self.boundary = boundary;
             self.scopes.clone_from(&handler_entry);
-            if let Some(type_) = &handler.type_ {
-                self.visit_expr(type_);
-            }
             let types = if types & ALL_CANCELLED != 0 {
                 TRIO_CANCELLED | ASYNCIO_CANCELLED
             } else {
@@ -361,6 +358,9 @@ impl<'a> CleanupVisitor<'a, '_> {
                 if !stmt.is_star {
                     remaining &= !types;
                 }
+            }
+            if let Some(type_) = &handler.type_ {
+                self.visit_expr(type_);
             }
             self.visit_body(&handler.body);
             self.merge_scopes(&outcomes);
