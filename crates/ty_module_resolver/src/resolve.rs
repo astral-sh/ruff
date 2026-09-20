@@ -1233,7 +1233,7 @@ fn desperately_resolve_name<'db>(
     ModuleSearchCursor::with_supplied_search_paths(&context, search_paths).resolve_name(name)
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 enum ResolvedModule {
     NamespacePackage,
     Package(File),
@@ -1254,7 +1254,7 @@ enum ComponentFileFilter {
 /// Variants are declared from highest to lowest precedence so that derived ordering can be used
 /// when traversing candidates. This is a precedence tier rather than a total ordering: the stable
 /// sorts used by the resolver preserve search-path order between candidates in the same tier.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, get_size2::GetSize)]
 enum CandidatePrecedence {
     /// A PEP 561 stub-only package named `<package>-stubs`.
     ///
@@ -1663,7 +1663,7 @@ fn has_legacy_namespace_declaration(db: &dyn Db, init: PythonFile<'_>) -> bool {
 }
 
 /// Info about the `py.typed` file for this package
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, get_size2::GetSize)]
 pub(crate) enum PyTyped {
     /// No `py.typed` was found
     Untyped,

@@ -25,9 +25,10 @@ use crate::typeshed::TypeshedVersionsQueryResult;
 ///   in the vendored zip archive.
 /// - A relative path from the search path to the file
 ///   that contains the source code of the Python module in question.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) struct ModulePath {
     search_path: SearchPath,
+    #[get_size(size_fn = utf8_path_buf_size)]
     relative_path: Utf8PathBuf,
 }
 
@@ -284,6 +285,10 @@ impl ModulePath {
             }
         }
     }
+}
+
+fn utf8_path_buf_size(path: &Utf8PathBuf) -> usize {
+    path.capacity()
 }
 
 impl PartialEq<SystemPathBuf> for ModulePath {
