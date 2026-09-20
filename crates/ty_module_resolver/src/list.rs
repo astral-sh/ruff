@@ -160,6 +160,7 @@ impl<'db> Lister<'db> {
             directory: ModuleDirectory::new(
                 &ResolverContext::new(db, resolver_environment, ModuleResolveMode::Typing),
                 search_path.to_module_path(),
+                Some(true),
             ),
             resolver_environment,
             modules: BTreeMap::new(),

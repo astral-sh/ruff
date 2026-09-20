@@ -1298,7 +1298,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
         precedence: CandidatePrecedence,
     ) -> Self {
         Self {
-            directory: ModuleDirectory::new(context, search_path.to_module_path()),
+            directory: ModuleDirectory::new(context, search_path.to_module_path(), Some(true)),
             module: ResolvedModule::NamespacePackage,
             py_typed: PyTyped::Untyped,
             precedence,
@@ -1565,7 +1565,7 @@ pub(super) fn resolve_file_module(
     parent.pop();
 
     resolve_file_module_with_filter(
-        &ModuleDirectory::new(resolver_state, parent),
+        &ModuleDirectory::new(resolver_state, parent, None),
         resolver_state,
         module.file_stem()?,
         ComponentFileFilter::ByMode,
