@@ -2,19 +2,22 @@ use crate::Db;
 use std::borrow::Cow;
 use std::cell::OnceCell;
 use std::fmt::Display;
+use std::hash::BuildHasherDefault;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
+use crate::FxIndexMap;
 use crate::ProgramEnvironment;
 use crate::subscript::PyIndex;
 use crate::types::tuple::{TupleLength, TupleSpec};
+use crate::types::type_expansion::expand_elements;
 use crate::types::typed_dict::{
     TypedDictOpenness, UnpackedTypedDictKey, extract_unpacked_typed_dict_from_value_type,
 };
-use crate::types::{Type, TypeContext, UnionType, expand_type};
+use crate::types::{Parameters, Type, TypeContext, UnionType, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
 /// in [`CallArgumentExpansions::iter`].
@@ -61,7 +64,7 @@ pub(crate) struct CallArguments<'a, 'db> {
 /// This call has one [`CallArgument::Variadic`] with source type
 /// `tuple[Literal[1], Literal["two"]]`. Matching supplies `Literal[1]` to `x` and
 /// `Literal["two"]` to `y`. Both parameter matches refer to the same source argument index.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum CallArgument<'a, 'db> {
     /// A receiver passed as `self` or `cls` without an explicit argument at the call site.
     Synthetic(CallArgumentTypes<'db>),
@@ -85,8 +88,8 @@ impl<'a, 'db> CallArgument<'a, 'db> {
             Argument::Synthetic => Self::Synthetic(types),
             Argument::Positional => Self::Positional(types),
             Argument::Keyword(name) => Self::Keyword { name, types },
-            Argument::Variadic => Self::Variadic(VariadicArgument { types }),
-            Argument::Keywords => Self::Keywords(KeywordArgument { types }),
+            Argument::Variadic => Self::Variadic(VariadicArgument::Type(types)),
+            Argument::Keywords => Self::Keywords(KeywordArgument::Type(types)),
         }
     }
 
@@ -104,16 +107,20 @@ impl<'a, 'db> CallArgument<'a, 'db> {
     pub(crate) fn source_types(&self) -> &CallArgumentTypes<'db> {
         match self {
             Self::Synthetic(types) | Self::Positional(types) | Self::Keyword { types, .. } => types,
-            Self::Variadic(argument) => &argument.types,
-            Self::Keywords(argument) => &argument.types,
+            Self::Variadic(argument) => argument.source_types(),
+            Self::Keywords(argument) => argument.source_types(),
         }
     }
 
     fn source_types_mut(&mut self) -> &mut CallArgumentTypes<'db> {
         match self {
             Self::Synthetic(types) | Self::Positional(types) | Self::Keyword { types, .. } => types,
-            Self::Variadic(argument) => &mut argument.types,
-            Self::Keywords(argument) => &mut argument.types,
+            Self::Variadic(
+                VariadicArgument::Type(types) | VariadicArgument::Sequence { types, .. },
+            )
+            | Self::Keywords(KeywordArgument::Type(types) | KeywordArgument::Known { types, .. }) => {
+                types
+            }
         }
     }
 
@@ -163,9 +170,13 @@ impl<'a, 'db> CallArgument<'a, 'db> {
 }
 
 /// A starred argument, whose source type and unpacked positional values serve different purposes.
-#[derive(Clone, Debug)]
-pub(crate) struct VariadicArgument<'db> {
-    types: CallArgumentTypes<'db>,
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum VariadicArgument<'db> {
+    Type(CallArgumentTypes<'db>),
+    Sequence {
+        types: CallArgumentTypes<'db>,
+        sequence: TupleSpec<'db>,
+    },
 }
 
 /// Positional information used when matching a starred argument to a signature.
@@ -176,33 +187,53 @@ pub(crate) struct VariadicArgumentMatch<'db> {
 }
 
 impl<'db> VariadicArgument<'db> {
+    fn source_types(&self) -> &CallArgumentTypes<'db> {
+        match self {
+            Self::Type(types) | Self::Sequence { types, .. } => types,
+        }
+    }
+
     fn source_type(&self) -> Option<Type<'db>> {
-        self.types.get_default()
+        self.source_types().get_default()
     }
 
     pub(crate) fn sequence(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-    ) -> Option<Cow<'db, TupleSpec<'db>>> {
-        Some(self.source_type()?.iterate(db, env))
+    ) -> Option<Cow<'_, TupleSpec<'db>>> {
+        Some(match self {
+            Self::Type(_) => self.source_type()?.iterate(db, env),
+            Self::Sequence { sequence, .. } => Cow::Borrowed(sequence),
+        })
     }
 
-    fn is_fixed_tuple(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
-        self.source_type()
-            .and_then(|ty| ty.tuple_instance_spec(db, env))
-            .is_some_and(|spec| spec.as_fixed_length().is_some())
+    fn is_fixed_sequence(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        match self {
+            Self::Type(_) => self
+                .source_type()
+                .and_then(|ty| ty.tuple_instance_spec(db, env))
+                .is_some_and(|spec| spec.as_fixed_length().is_some()),
+            Self::Sequence { sequence, .. } => sequence.as_fixed_length().is_some(),
+        }
     }
 
     fn expand(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Vec<Self>> {
-        Some(
-            expand_type(db, env, self.source_type()?)?
+        Some(match self {
+            Self::Type(_) => expand_type(db, env, self.source_type()?)?
                 .into_iter()
-                .map(|ty| Self {
-                    types: CallArgumentTypes::new(Some(ty)),
-                })
+                .map(|ty| Self::Type(CallArgumentTypes::new(Some(ty))))
                 .collect(),
-        )
+            Self::Sequence { types, sequence } => {
+                expand_elements(db, env, sequence.as_fixed_length()?.iter_all_elements())?
+                    .into_iter()
+                    .map(|elements| Self::Sequence {
+                        types: types.clone(),
+                        sequence: TupleSpec::heterogeneous(elements),
+                    })
+                    .collect()
+            }
+        })
     }
 
     pub(crate) fn matching(
@@ -211,6 +242,13 @@ impl<'db> VariadicArgument<'db> {
         env: &ProgramEnvironment<'db>,
         preserve_union_alternatives: bool,
     ) -> VariadicArgumentMatch<'db> {
+        if let Self::Sequence { sequence, .. } = self {
+            return VariadicArgumentMatch {
+                types: sequence.iter_element_types(db).collect(),
+                length: sequence.len(),
+                variable_element: sequence.variable_element_type(db),
+            };
+        }
         let Some(ty) = self.source_type() else {
             return VariadicArgumentMatch {
                 types: Vec::new(),
@@ -291,31 +329,75 @@ impl<'db> VariadicArgument<'db> {
 }
 
 /// A double-starred argument, with operations shared by all consumers of its keyword values.
-#[derive(Clone, Debug)]
-pub(crate) struct KeywordArgument<'db> {
-    types: CallArgumentTypes<'db>,
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum KeywordArgument<'db> {
+    Type(CallArgumentTypes<'db>),
+    Known {
+        types: CallArgumentTypes<'db>,
+        keywords: UnpackedKeywords<'db>,
+    },
 }
 
 /// Known keyword values and possible undeclared keys.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct UnpackedKeywords<'db> {
     pub(crate) keys: Box<[(Name, UnpackedTypedDictKey<'db>)]>,
     pub(crate) openness: TypedDictOpenness<'db>,
 }
 
 impl<'db> KeywordArgument<'db> {
+    fn source_types(&self) -> &CallArgumentTypes<'db> {
+        match self {
+            Self::Type(types) | Self::Known { types, .. } => types,
+        }
+    }
+
     pub(crate) fn source_type(&self) -> Option<Type<'db>> {
-        self.types.get_default()
+        self.source_types().get_default()
+    }
+
+    /// Whether all keyword values were captured at the call site, rather than described by a type.
+    pub(crate) fn is_complete(&self) -> bool {
+        matches!(self, Self::Known { keywords, .. }
+            if matches!(keywords.openness, TypedDictOpenness::Closed)
+                && keywords.keys.iter().all(|(_, key)| key.is_required))
+    }
+
+    pub(crate) fn explicit_keyword_names(&self) -> impl Iterator<Item = &Name> {
+        let keys = match self {
+            Self::Type(_) => [].as_slice(),
+            Self::Known { keywords, .. } => keywords.keys.as_ref(),
+        };
+        keys.iter()
+            .filter_map(|(name, key)| key.is_required.then_some(name))
     }
 
     fn expand(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Vec<Self>> {
-        Some(
-            expand_type(db, env, self.source_type()?)?
+        Some(match self {
+            Self::Type(_) => expand_type(db, env, self.source_type()?)?
                 .into_iter()
-                .map(|ty| Self {
-                    types: CallArgumentTypes::new(Some(ty)),
-                })
+                .map(|ty| Self::Type(CallArgumentTypes::new(Some(ty))))
                 .collect(),
-        )
+            Self::Known { types, keywords } => {
+                expand_elements(db, env, keywords.keys.iter().map(|(_, key)| key.value_ty))?
+                    .into_iter()
+                    .map(|elements| Self::Known {
+                        types: types.clone(),
+                        keywords: UnpackedKeywords {
+                            keys: keywords
+                                .keys
+                                .iter()
+                                .zip(elements)
+                                .map(|((name, key), value_ty)| {
+                                    (name.clone(), UnpackedTypedDictKey { value_ty, ..*key })
+                                })
+                                .collect(),
+                            openness: keywords.openness,
+                        },
+                    })
+                    .collect()
+            }
+        })
     }
 
     pub(crate) fn unpack(
@@ -323,6 +405,9 @@ impl<'db> KeywordArgument<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<UnpackedKeywords<'db>> {
+        if let Self::Known { keywords, .. } = self {
+            return Some(keywords.clone());
+        }
         let unpacked = extract_unpacked_typed_dict_from_value_type(db, env, self.source_type()?)?;
         Some(UnpackedKeywords {
             keys: unpacked.keys.into_iter().collect(),
@@ -336,6 +421,13 @@ impl<'db> KeywordArgument<'db> {
         env: &ProgramEnvironment<'db>,
         name: Option<&str>,
     ) -> Type<'db> {
+        if let Self::Known { keywords, .. } = self {
+            return keywords
+                .keys
+                .iter()
+                .find_map(|(key, value)| (Some(key.as_str()) == name).then_some(value.value_ty))
+                .unwrap_or(Type::unknown());
+        }
         self.source_type()
             .and_then(|ty| {
                 ty.as_paramspec_typevar(db)
@@ -456,23 +548,23 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// typechecking.
     pub(crate) fn from_arguments_typed(
         arguments: &'a ast::Arguments,
-        mut infer_argument_type: impl FnMut(&ast::Expr) -> Type<'db>,
+        mut infer_argument_type: impl FnMut(&ast::Expr) -> Option<Type<'db>>,
     ) -> Self {
-        arguments
+        let call_arguments: Self = arguments
             .iter_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        let ty = infer_argument_type(value);
+                        let ty = infer_argument_type(value).unwrap_or(Type::unknown());
                         (Argument::Variadic, Some(ty))
                     }
                     _ => {
-                        let ty = infer_argument_type(arg);
+                        let ty = infer_argument_type(arg).unwrap_or(Type::unknown());
                         (Argument::Positional, Some(ty))
                     }
                 },
                 ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
-                    let ty = infer_argument_type(value);
+                    let ty = infer_argument_type(value).unwrap_or(Type::unknown());
                     if let Some(arg) = arg {
                         (Argument::Keyword(&arg.id), Some(ty))
                     } else {
@@ -480,7 +572,92 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     }
                 }
             })
-            .collect()
+            .collect();
+        call_arguments.with_known_unpacking(arguments, infer_argument_type)
+    }
+
+    /// Retain the elements of collections constructed directly at an unpacking site.
+    ///
+    /// Ordinary tuple types already describe their elements. List and dictionary types do not
+    /// retain the contents needed for call binding, even when those contents are known here.
+    /// The callback reads types inferred while checking the enclosing collection expression.
+    pub(crate) fn with_known_unpacking(
+        mut self,
+        arguments: &ast::Arguments,
+        mut expression_type: impl FnMut(&ast::Expr) -> Option<Type<'db>>,
+    ) -> Self {
+        for (argument, source) in self.items.iter_mut().zip(arguments.iter_source_order()) {
+            match (argument, source) {
+                (
+                    CallArgument::Variadic(argument),
+                    ast::ArgOrKeyword::Arg(ast::Expr::Starred(ast::ExprStarred { value, .. })),
+                ) => {
+                    let ast::Expr::List(ast::ExprList { elts, .. }) = value.as_ref() else {
+                        continue;
+                    };
+                    let Some(elements) = elts
+                        .iter()
+                        .map(|element| {
+                            if element.is_starred_expr() {
+                                None
+                            } else {
+                                expression_type(element)
+                            }
+                        })
+                        .collect::<Option<Vec<_>>>()
+                    else {
+                        continue;
+                    };
+                    *argument = VariadicArgument::Sequence {
+                        types: argument.source_types().clone(),
+                        sequence: TupleSpec::heterogeneous(elements),
+                    };
+                }
+                (
+                    CallArgument::Keywords(argument),
+                    ast::ArgOrKeyword::Keyword(ast::Keyword {
+                        arg: None, value, ..
+                    }),
+                ) => {
+                    let ast::Expr::Dict(ast::ExprDict { items, .. }) = value else {
+                        continue;
+                    };
+                    let mut keywords = FxIndexMap::with_capacity_and_hasher(
+                        items.len(),
+                        BuildHasherDefault::default(),
+                    );
+                    let complete = items.iter().all(|ast::DictItem { key, value }| {
+                        let Some(ast::Expr::StringLiteral(key)) = key else {
+                            return false;
+                        };
+                        let Some(value_ty) = expression_type(value) else {
+                            return false;
+                        };
+                        // Replacing a duplicate key preserves its first position in the dictionary.
+                        keywords.insert(
+                            Name::new(key.value.to_str()),
+                            UnpackedTypedDictKey {
+                                value_ty,
+                                is_required: true,
+                                definition: None,
+                            },
+                        );
+                        true
+                    });
+                    if complete {
+                        *argument = KeywordArgument::Known {
+                            types: argument.source_types().clone(),
+                            keywords: UnpackedKeywords {
+                                keys: keywords.into_iter().collect(),
+                                openness: TypedDictOpenness::Closed,
+                            },
+                        };
+                    }
+                }
+                _ => {}
+            }
+        }
+        self
     }
 
     /// Create a [`CallArguments`] with no arguments.
@@ -509,7 +686,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         })
     }
 
-    fn get(&self, index: usize) -> Option<&CallArgument<'a, 'db>> {
+    pub(crate) fn get(&self, index: usize) -> Option<&CallArgument<'a, 'db>> {
         self.items.get(index)
     }
 
@@ -541,10 +718,9 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
     /// Returns `true` if the inferred types are equal for the given set of argument indices.
     pub(crate) fn inferred_types_equal_at(&self, other: &Self, argument_indices: &[usize]) -> bool {
-        argument_indices.iter().all(|&index| {
-            self.items.get(index).map(CallArgument::source_types)
-                == other.items.get(index).map(CallArgument::source_types)
-        })
+        argument_indices
+            .iter()
+            .all(|&index| self.items.get(index) == other.items.get(index))
     }
 
     /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
@@ -572,21 +748,43 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         }
     }
 
-    /// Create a new [`CallArguments`] containing only the arguments at the specified indices.
+    /// Select the arguments forwarded to a `ParamSpec` sub-call.
     ///
     /// The resulting argument list preserves the order of `indices`. Unlike [`Self::start_from`],
-    /// this can project a non-contiguous subset of the original call arguments. This is used to
-    /// turn the forwarded outer arguments into the argument list for a synthetic sub-call:
+    /// this can project a non-contiguous subset of the original call arguments. Known keyword
+    /// arguments retain only keys that were not consumed by the wrapper's prefix:
     ///
     /// ```py
     /// def wrapper[**P, R](func: Callable[P, R], **kwargs: P.kwargs) -> R: ...
     /// wrapper(TagSet=[...], func=f)  # select `TagSet=[...]`, but not the later `func=f`
     /// ```
-    pub(crate) fn select(&self, indices: &[usize]) -> Self {
+    pub(crate) fn select_for_paramspec(
+        &self,
+        indices: &[usize],
+        parameters: &Parameters<'db>,
+        prefix_len: usize,
+    ) -> Self {
         Self {
             items: indices
                 .iter()
-                .map(|index| self.items[*index].clone())
+                .map(|index| {
+                    let mut argument = self.items[*index].clone();
+                    if let CallArgument::Keywords(KeywordArgument::Known { keywords, .. }) =
+                        &mut argument
+                    {
+                        keywords.keys = keywords
+                            .keys
+                            .iter()
+                            .filter(|(name, _)| {
+                                parameters
+                                    .keyword_by_name(name.as_str())
+                                    .is_none_or(|(index, _)| index >= prefix_len)
+                            })
+                            .cloned()
+                            .collect();
+                    }
+                    argument
+                })
                 .collect(),
         }
     }
@@ -604,7 +802,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         for argument in bound_call_arguments.iter() {
             match argument {
                 CallArgument::Variadic(argument) => {
-                    if !argument.is_fixed_tuple(db, env) {
+                    if !argument.is_fixed_sequence(db, env) {
                         return None;
                     }
                 }
@@ -613,7 +811,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     // parameters, even though possible hidden items prevent us from synthesizing
                     // a precise partial signature.
                     argument.unpack(db, env)?;
-                    can_synthesize_signature = false;
+                    can_synthesize_signature &= argument.is_complete();
                 }
                 CallArgument::Positional(_)
                 | CallArgument::Synthetic(_)
@@ -717,7 +915,6 @@ impl<'a, 'db> CallArgumentExpansions<'_, 'a, 'db> {
         // this only shows up in very convoluted instances of generic call inference across multiple
         // overloads, and is unlikely to happen in practice.
         let argument = self.arguments.get(index)?;
-        argument.source_type()?;
         // Most calls need no expansion; allocate the cache only when a check asks for it.
         let types = self.types.get_or_init(|| {
             std::iter::repeat_with(OnceCell::new)

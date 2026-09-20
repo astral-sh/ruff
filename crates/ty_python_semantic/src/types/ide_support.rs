@@ -1127,10 +1127,8 @@ pub fn call_signature_details<'db>(
         // Use from_arguments_typed so that check_types can infer TypeVar
         // specializations from the actual argument types at this call site.
         let call_arguments =
-            CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
-                splatted_value
-                    .inferred_type(model)
-                    .unwrap_or(Type::unknown())
+            CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
+                expression.inferred_type(model)
             });
         let mut bindings =
             callable_type
@@ -1152,11 +1150,41 @@ pub fn call_signature_details<'db>(
             CheckTypesMode::Finalize,
         );
 
-        // Extract signature details from all callable bindings
+        // Argument-order errors survive parser recovery as ordinary AST arguments. Keep their
+        // types for diagnostics, but do not highlight a parameter for an invalid source position.
+        let parsed = parsed_module(db, model.program_file().python_file(db)).load(db);
+        let invalid_arguments: Vec<_> = call_expr
+            .arguments
+            .iter_source_order()
+            .map(|argument| {
+                parsed.errors().iter().any(|error| {
+                    matches!(
+                        error.error,
+                        ruff_python_parser::ParseErrorType::PositionalAfterKeywordArgument
+                            | ruff_python_parser::ParseErrorType::PositionalAfterKeywordUnpacking
+                    ) && call_expr.arguments.range().contains_range(error.location)
+                        && error.location.contains_range(argument.range())
+                })
+            })
+            .collect();
+
+        // Extract signature details from all callable bindings.
         bindings
             .iter_flat()
             .flatten()
-            .map(|binding| CallSignatureDetails::from_binding(db, env, binding))
+            .map(|binding| {
+                let mut details = CallSignatureDetails::from_binding(db, env, binding);
+                for (mapped, invalid) in details
+                    .argument_to_displayed_parameter_mapping
+                    .iter_mut()
+                    .zip(&invalid_arguments)
+                {
+                    if *invalid {
+                        *mapped = None;
+                    }
+                }
+                details
+            })
             .collect()
     } else {
         // Type is not callable, return empty signatures
@@ -1175,10 +1203,8 @@ fn resolve_single_overload<'db>(
     let env = &model.program_environment();
     let bindings = callable_type.bindings(db, env);
 
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
-        splatted_value
-            .inferred_type(model)
-            .unwrap_or(Type::unknown())
+    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
+        expression.inferred_type(model)
     });
 
     let constraints = ConstraintSetBuilder::new();
@@ -1221,12 +1247,9 @@ fn full_type_bindings_for_call<'db>(
 ) -> crate::types::call::Bindings<'db> {
     let db = model.db();
     let env = &model.program_environment();
-    let call_arguments =
-        CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
-            splatted_value
-                .inferred_type(model)
-                .unwrap_or(Type::unknown())
-        });
+    let call_arguments = CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
+        expression.inferred_type(model)
+    });
     let constraints = ConstraintSetBuilder::new();
 
     func_type
@@ -1564,10 +1587,8 @@ pub fn resolved_call_signature<'db>(
     let env = &model.program_environment();
     let callable_type = func_type.try_upcast_to_callable(db, env)?.to_type(db, env);
 
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
-        splatted_value
-            .inferred_type(model)
-            .unwrap_or(Type::unknown())
+    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
+        expression.inferred_type(model)
     });
 
     // Extract the `Bindings` regardless of whether type checking succeeded or failed.

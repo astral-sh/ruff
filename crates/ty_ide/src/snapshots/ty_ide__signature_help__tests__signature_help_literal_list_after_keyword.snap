@@ -1,0 +1,12 @@
+---
+source: crates/ty_ide/src/signature_help.rs
+expression: test.signature_help_render()
+---
+
+============== active signature =============
+(x: int, *, y: int) -> Unknown
+---------------------------------------------
+
+-------------- active parameter -------------
+x: int
+---------------------------------------------
