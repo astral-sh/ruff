@@ -1,0 +1,44 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+assertion_line: 111
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 3
+
+--- Added ---
+S102 Use of `exec` detected
+  --> S102_reference.py:8:10
+   |
+ 7 | # Error (reference passed to map)
+ 8 | list(map(exec, ['x = 2']))
+   |          ^^^^
+ 9 |
+10 | # Error (bare reference)
+   |
+
+
+S102 Use of `exec` detected
+  --> S102_reference.py:11:5
+   |
+10 | # Error (bare reference)
+11 | x = exec
+   |     ^^^^
+12 |
+13 | # Error (bare load, no call)
+   |
+
+
+S102 Use of `exec` detected
+  --> S102_reference.py:14:1
+   |
+13 | # Error (bare load, no call)
+14 | exec
+   | ^^^^
+15 |
+16 | # No error: a same-named attribute on another object is not the builtin
+   |

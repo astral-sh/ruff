@@ -18,8 +18,7 @@ mod tests {
     #[test_case(Rule::Assert, Path::new("S101.py"))]
     #[test_case(Rule::BadFilePermissions, Path::new("S103.py"))]
     #[test_case(Rule::CallWithShellEqualsTrue, Path::new("S604.py"))]
-    #[test_case(Rule::ExecBuiltin, Path::new("S102.py"))]
-    #[test_case(Rule::FlaskDebugTrue, Path::new("S201.py"))]
+    #[test_case(Rule::ExecBuiltin, Path::new("S102.py"))]    #[test_case(Rule::FlaskDebugTrue, Path::new("S201.py"))]
     #[test_case(Rule::HardcodedBindAllInterfaces, Path::new("S104.py"))]
     #[test_case(Rule::HardcodedPasswordDefault, Path::new("S107.py"))]
     #[test_case(Rule::HardcodedPasswordFuncArg, Path::new("S106.py"))]
@@ -98,6 +97,7 @@ mod tests {
     }
 
     #[test_case(Rule::BadFilePermissions, Path::new("S103.py"))]
+    #[test_case(Rule::ExecBuiltin, Path::new("S102_reference.py"))]
     #[test_case(Rule::SuspiciousPickleUsage, Path::new("S301.py"))]
     #[test_case(Rule::SuspiciousEvalUsage, Path::new("S307.py"))]
     #[test_case(Rule::SuspiciousMarkSafeUsage, Path::new("S308.py"))]

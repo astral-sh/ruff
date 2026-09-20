@@ -305,6 +305,12 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         flake8_bandit::rules::suspicious_function_reference(checker, expr);
                     }
 
+                    if checker.is_rule_enabled(Rule::ExecBuiltin) {
+                        flake8_bandit::rules::exec_used_reference(
+                            checker, expr, &checker.semantic(),
+                        );
+                    }
+
                     // Ex) List[...]
                     if checker.any_rule_enabled(&[
                         Rule::FutureRewritableTypeAnnotation,
