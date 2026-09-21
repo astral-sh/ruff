@@ -11,7 +11,8 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
 use crate::types::equality::{
-    ComparisonSoundnessPolicy, TupleEqualityEvaluator, equality_truthiness, inequality_truthiness,
+    ComparisonSoundnessPolicy, ContainerElementEqualityEvaluator, equality_truthiness,
+    inequality_truthiness,
 };
 use crate::types::iteration::extract_literal_container_element_types;
 use crate::types::known_instance::{FunctoolsPartialInstance, InternedType, MethodWrapper};
@@ -726,7 +727,7 @@ fn fixed_membership_truthiness<'db>(
     let env = context.program_environment();
     let soundness_policy =
         ComparisonSoundnessPolicy::from_analysis_settings(db.analysis_settings(context.file()));
-    let mut equality = TupleEqualityEvaluator::new(db, env, soundness_policy);
+    let mut equality = ContainerElementEqualityEvaluator::new(db, env, soundness_policy);
     let mut truthiness = Truthiness::AlwaysFalse;
     for &element in elements {
         // It's okay to ignore errors here because Python doesn't call `__bool__`
@@ -1575,7 +1576,7 @@ fn infer_tuple_rich_comparison<'db>(
             let soundness_policy = ComparisonSoundnessPolicy::from_analysis_settings(
                 db.analysis_settings(context.file()),
             );
-            let mut equality = TupleEqualityEvaluator::new(db, env, soundness_policy);
+            let mut equality = ContainerElementEqualityEvaluator::new(db, env, soundness_policy);
 
             for (l_ty, r_ty) in left_iter.zip(right_iter) {
                 let eq_truthiness = equality
