@@ -61,7 +61,7 @@ impl PythonVersion {
     }
 
     pub const fn latest() -> Self {
-        Self::PY314
+        Self::PY315
     }
 
     /// The latest Python version supported in preview
@@ -98,7 +98,7 @@ impl PythonVersion {
 
 impl Default for PythonVersion {
     fn default() -> Self {
-        Self::PY310
+        Self::PY311
     }
 }
 

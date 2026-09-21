@@ -66,10 +66,10 @@ if sys.version_info < (3, 13, 37):
 if sys.version_info <= (3, 13, 37):
     print()
 
-if sys.version_info <= (3, 14, 0):
+if sys.version_info <= (3, 15, 0):
     print()
 
-if sys.version_info <= (3, 14, 15):
+if sys.version_info <= (3, 15, 15):
     print()
 
 # https://github.com/astral-sh/ruff/issues/18165

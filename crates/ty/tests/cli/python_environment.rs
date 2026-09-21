@@ -1254,7 +1254,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 
             os.grantpt(1) # only available on unix, Python 3.13 or newer
 
-            from typing import LiteralString  # added in Python 3.11
+            from typing import TypeAliasType  # added in Python 3.12
             "#,
         ),
     ])?;
@@ -1269,22 +1269,22 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
       | ^^^^^^^^^^
     info: The member may be available on other Python versions or platforms
-    info: Python 3.10 was assumed when resolving the `grantpt` attribute
+    info: Python 3.11 was assumed when resolving the `grantpt` attribute
      --> ty.toml:3:18
       |
-    3 | python-version = "3.10"
+    3 | python-version = "3.11"
       |                  ^^^^^^ Python version configuration
 
-    error[unresolved-import]: Module `typing` has no member `LiteralString`
+    error[unresolved-import]: Module `typing` has no member `TypeAliasType`
      --> main.py:6:20
       |
-    6 | from typing import LiteralString  # added in Python 3.11
+    6 | from typing import TypeAliasType  # added in Python 3.12
       |                    ^^^^^^^^^^^^^
     info: The member may be available on other Python versions or platforms
-    info: Python 3.10 was assumed when resolving imports
+    info: Python 3.11 was assumed when resolving imports
      --> ty.toml:3:18
       |
-    3 | python-version = "3.10"
+    3 | python-version = "3.11"
       |                  ^^^^^^ Python version configuration
 
     Found 2 diagnostics
