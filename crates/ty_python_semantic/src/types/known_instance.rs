@@ -964,14 +964,21 @@ impl<'db> FunctoolsPartialInstance<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        // Repeated `f = partial(f)` assignments add a new layer to the wrapped callable.
+        // Treat it as nested so that cycle recovery can collapse these layers while
+        // preserving the reduced signature of the outer partial.
+        let wrapped = self
+            .wrapped(db)
+            .inner(db)
+            .recursive_type_normalized_impl(db, env, div, true);
+        let wrapped = if nested {
+            wrapped?
+        } else {
+            wrapped.unwrap_or(div)
+        };
         Some(Self::new(
             db,
-            InternedType::new(
-                db,
-                self.wrapped(db)
-                    .inner(db)
-                    .recursive_type_normalized_impl(db, env, div, nested)?,
-            ),
+            InternedType::new(db, wrapped),
             self.partial(db)
                 .recursive_type_normalized_impl(db, env, div, nested)?,
         ))
