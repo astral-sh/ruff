@@ -23,7 +23,6 @@ mod hover;
 mod importer;
 mod inlay_hints;
 mod markup;
-#[cfg(test)]
 mod pytest_test_discovery;
 mod references;
 mod rename;
@@ -32,7 +31,6 @@ mod semantic_tokens;
 mod signature_help;
 mod stub_mapping;
 mod symbols;
-mod test_discovery;
 mod type_hierarchy;
 mod workspace_symbols;
 
@@ -57,6 +55,9 @@ pub use inlay_hints::{
     InlayHintKind, InlayHintLabel, InlayHintSettings, InlayHintTextEdit, inlay_hints,
 };
 pub use markup::MarkupKind;
+pub use pytest_test_discovery::{
+    DiscoveredPytestTest, DiscoveredPytestTestKind, discover_pytest_tests,
+};
 pub use references::ReferencesMode;
 pub use rename::{can_rename, rename};
 pub use selection_range::selection_range;
@@ -65,7 +66,6 @@ pub use semantic_tokens::{
 };
 pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
 pub use symbols::{FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, SymbolKind};
-pub use test_discovery::{DiscoveredTest, DiscoveredTestKind, discover_tests};
 pub use type_hierarchy::{
     TypeHierarchyItem, prepare_type_hierarchy, type_hierarchy_subtypes, type_hierarchy_supertypes,
 };

@@ -29,7 +29,6 @@ fn server_with_one_test_module() -> Result<TestServer> {
     let server = TestServerBuilder::new()?
         .with_workspace(SystemPath::new("src"), None)?
         .with_file(SystemPath::new(MODULE), MODULE_CONTENT)?
-        .enable_pull_diagnostics(false)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -167,7 +166,6 @@ def test_beta():
         .with_file(module_one, module_one_content)?
         .with_workspace(workspace_two, None)?
         .with_file(module_two, module_two_content)?
-        .enable_pull_diagnostics(false)
         .build()
         .wait_until_workspaces_are_initialized();
 
