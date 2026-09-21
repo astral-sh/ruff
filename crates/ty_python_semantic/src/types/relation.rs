@@ -2452,7 +2452,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     {
                         context.push(ErrorContext::InferredCallableType {
                             source,
-                            callable: callables.into_type(db, env),
+                            callable: callables.to_type(db, env),
                         });
                     }
 

@@ -7081,7 +7081,7 @@ impl<'db> Type<'db> {
                     || CallableBinding::not_callable(self).into(),
                     |callables| {
                         callables
-                            .into_type(db, env)
+                            .to_type(db, env)
                             .bindings_impl(db, env, recursion_guard)
                     },
                 )
@@ -7445,6 +7445,29 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Resolves a `__new__` descriptor before the constructor supplies its implicit `cls`.
+    fn resolve_dunder_new_callable(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        place: Place<'db>,
+    ) -> Place<'db> {
+        // If `__new__` itself resolved to `Any`, treat it as absent rather than as a real
+        // constructor override. This preserves the known nominal constructor result for
+        // subclasses of `Any` while still allowing explicitly typed `__new__` callables
+        // returning `Any` to keep their annotated behavior.
+        if matches!(
+            place,
+            Place::Defined(DefinedPlace {
+                ty: Type::Dynamic(DynamicType::Any),
+                ..
+            })
+        ) {
+            return Place::Undefined;
+        }
+        place.try_call_dunder_get(db, env, self)
+    }
+
     // Build bindings for constructor calls by combining `__new__`/`__init__` signatures.
     // Returns fallback bindings for cases that intentionally keep bespoke call behavior.
     fn constructor_bindings(
@@ -7454,34 +7477,6 @@ impl<'db> Type<'db> {
         class: ClassType<'db>,
         recursion_guard: &ActiveRecursionDetector<Type<'db>>,
     ) -> Bindings<'db> {
-        fn resolve_dunder_new_callable<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            owner: Type<'db>,
-            place: Place<'db>,
-        ) -> Option<(Type<'db>, Definedness)> {
-            // If `__new__` itself resolved to `Any`, treat it as absent rather than as a real
-            // constructor override. This preserves the known nominal constructor result for
-            // subclasses of `Any` while still allowing explicitly typed `__new__` callables
-            // returning `Any` to keep their annotated behavior.
-            if matches!(
-                place,
-                Place::Defined(DefinedPlace {
-                    ty: Type::Dynamic(DynamicType::Any),
-                    ..
-                })
-            ) {
-                return None;
-            }
-            match place.try_call_dunder_get(db, env, owner) {
-                Place::Defined(DefinedPlace {
-                    ty: callable,
-                    definedness,
-                    ..
-                }) => Some((callable, definedness)),
-                Place::Undefined => None,
-            }
-        }
         fn bind_constructor_new<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
@@ -7620,34 +7615,31 @@ impl<'db> Type<'db> {
                     | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
             );
 
-            let (new_bindings, has_any_new) = match new_method.as_ref().map(|method| method.place) {
-                Some(place) => match resolve_dunder_new_callable(db, env, self_type, place) {
-                    Some((new_callable, definedness)) => {
-                        let bindings = new_callable.bindings_impl(db, env, recursion_guard);
-                        let mut bindings = bind_constructor_new(
-                            db,
-                            env,
-                            bindings,
-                            self_type,
-                            constructor_instance_ty,
-                        )
+            let new_bindings = if let Some(method) = &new_method
+                && let Place::Defined(DefinedPlace {
+                    ty: new_callable,
+                    definedness,
+                    ..
+                }) = self_type.resolve_dunder_new_callable(db, env, method.place)
+            {
+                let bindings = new_callable.bindings_impl(db, env, recursion_guard);
+                let mut bindings =
+                    bind_constructor_new(db, env, bindings, self_type, constructor_instance_ty)
                         .into_constructor_bindings(
                             constructor_instance_ty,
                             ConstructorCallableKind::New,
                         )
                         .with_constructed_instance_type(db, constructor_instance_ty);
-                        if definedness == Definedness::PossiblyUndefined {
-                            bindings.set_implicit_dunder_new_is_possibly_unbound();
-                        }
-                        (Some(bindings), true)
-                    }
-                    None => (None, false),
-                },
-                None => (None, false),
+                if definedness == Definedness::PossiblyUndefined {
+                    bindings.set_implicit_dunder_new_is_possibly_unbound();
+                }
+                Some(bindings)
+            } else {
+                None
             };
 
             // Only fall back to `object.__init__` when `__new__` is absent.
-            let init_bindings = match (&init_method_no_object.place, has_any_new) {
+            let init_bindings = match (&init_method_no_object.place, new_bindings.is_some()) {
                 (
                     Place::Defined(DefinedPlace {
                         ty: init_method,
@@ -10534,7 +10526,13 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             }
 
             Type::BoundMethod(method_type) => {
-                if let Some(signatures) = method_type.bound_signatures(db) {
+                // Function-backed methods contribute their bound signatures. Callable instances
+                // also expose attributes through `__func__`, so preserve their full variance.
+                if matches!(
+                    method_type.func(db),
+                    Type::FunctionLiteral(_) | Type::Callable(_)
+                ) && let Some(signatures) = method_type.bound_signatures(db)
+                {
                     signatures.variance_of(db, env, typevar)
                 } else {
                     // A callable object's type does not include the additional receiver bound

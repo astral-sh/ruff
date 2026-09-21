@@ -11,7 +11,7 @@ use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTup
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
-    CallDunderError, CallableTypes, ClassBase, ClassLiteral, KnownClass, KnownFunction, KnownUnion,
+    CallDunderError, ClassBase, ClassLiteral, KnownClass, KnownFunction, KnownUnion,
     PropertyAccessorRole, Type, TypeContext, TypeVarBoundOrConstraints, binding_type,
 };
 use crate::{Db, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
@@ -861,14 +861,9 @@ pub fn definitions_for_keyword_argument<'db>(
     let mut resolved_definitions = Vec::new();
     let env = &model.program_environment();
 
-    if let Some(callable_type) = func_type
-        .try_upcast_to_callable(db, env)
-        .and_then(CallableTypes::exactly_one)
-    {
-        let signatures = callable_type.signatures(db);
-
+    if let Some(callables) = func_type.try_upcast_to_callable(db, env) {
         // For each signature, find the parameter with the matching name
-        for signature in signatures {
+        for signature in callables.signatures(db) {
             if let Some((_param_index, param)) =
                 signature.parameters().keyword_by_name(keyword_name_str)
                 && let Some(definition) = param.definition()
@@ -1127,7 +1122,7 @@ pub fn call_signature_details<'db>(
     let env = &model.program_environment();
     if let Some(callable_type) = func_type
         .try_upcast_to_callable(db, env)
-        .map(|callables| callables.into_type(db, env))
+        .map(|callables| callables.to_type(db, env))
     {
         // Use from_arguments_typed so that check_types can infer TypeVar
         // specializations from the actual argument types at this call site.
@@ -1385,9 +1380,7 @@ pub fn call_type_simplified_by_overloads(
     let func_type = call_expr.func.inferred_type(model)?;
 
     let env = &model.program_environment();
-    let callable_type = func_type
-        .try_upcast_to_callable(db, env)?
-        .into_type(db, env);
+    let callable_type = func_type.try_upcast_to_callable(db, env)?.to_type(db, env);
 
     // If the callable is trivial this analysis is useless, bail out
     if let Some(binding) = callable_type.bindings(db, env).single_element()
@@ -1569,9 +1562,7 @@ pub fn resolved_call_signature<'db>(
     let db = model.db();
     let func_type = call_expr.func.inferred_type(model)?;
     let env = &model.program_environment();
-    let callable_type = func_type
-        .try_upcast_to_callable(db, env)?
-        .into_type(db, env);
+    let callable_type = func_type.try_upcast_to_callable(db, env)?.to_type(db, env);
 
     let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
         splatted_value
@@ -2163,7 +2154,7 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
     };
     let callable_type = function_ty
         .try_upcast_to_callable(db, env)?
-        .into_type(db, env);
+        .to_type(db, env);
     let bindings = callable_type.bindings(db, env);
 
     if let Some(binding) = bindings.single_element()

@@ -2646,9 +2646,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         if special_form == SpecialFormType::RegularCallableTypeOf {
                             callables
                                 .map(|callable| callable.into_regular(db))
-                                .into_type(db, env)
+                                .to_type(db, env)
                         } else {
-                            callables.into_type(db, env)
+                            callables.to_type(db, env)
                         }
                     })
                 else {

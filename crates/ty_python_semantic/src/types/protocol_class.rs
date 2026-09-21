@@ -3379,6 +3379,10 @@ fn proto_interface_cycle_recover<'db>(
 /// This additional upcasting is required in order for protocols with `__call__` method
 /// members to be considered assignable to `Callable` types, since the `Callable` supertype
 /// of the `__call__` method will be function-like but a `Callable` type is not.
+///
+/// Protocol interfaces can be prepared before their receiver is known, so we do not use
+/// [`CallableType::bind_self`] here. Preserve all overloads and record receiver constraints for
+/// later compatibility checks instead of specializing or filtering signatures here.
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn protocol_bind_self<'db>(
     db: &'db dyn Db,
@@ -3386,8 +3390,19 @@ fn protocol_bind_self<'db>(
     callable: CallableType<'db>,
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
+    if callable.is_dunder_paramspec(db) {
+        return callable.into_regular(db);
+    }
+
     let env = ProgramEnvironment::from_program(program);
-    callable.bind_self(db, &env, self_type).into_regular(db)
+    callable
+        .with_signatures(
+            db,
+            callable
+                .signatures(db)
+                .bind_self_with_receiver(db, &env, self_type, self_type),
+        )
+        .into_regular(db)
 }
 
 /// Cache receiver and `Self` binding only for protocol-member compatibility checks.
@@ -3405,11 +3420,7 @@ fn protocol_apply_self_with_receiver<'db>(
 ) -> CallableType<'db> {
     let env = ProgramEnvironment::from_program(program);
 
-    if receiver_type == self_type {
-        callable.apply_self(db, &env, self_type)
-    } else {
-        callable.apply_self_with_receiver(db, &env, receiver_type, self_type)
-    }
+    callable.apply_self_with_receiver(db, &env, receiver_type, self_type)
 }
 
 /// Return `true` if a callable has at least one overload and none return `Never`.
