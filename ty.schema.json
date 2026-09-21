@@ -456,7 +456,7 @@
         },
         "cyclic-type-alias-definition": {
           "title": "detects cyclic type alias definitions",
-          "description": "## What it does\n\nChecks for circular type alias definitions.\n\n## Why is it bad?\n\nRecursive aliases are valid when recursive references occur inside another type, such as\n`list[Tree]`. An alias cannot expand directly to itself or include itself as a union member. This\napplies to both `type` statements and aliases created with `TypeAliasType`.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import TypeAliasType\n\ntype Itself = Itself  # error\n\ntype A = B  # error\ntype B = A  # error\n\ntype IntOr = int | IntOr  # error\n\nCycle = TypeAliasType(\"Cycle\", \"Cycle\")  # error\n\ntype Tree = int | list[Tree]  # valid recursive alias\n```",
+          "description": "## What it does\n\nChecks for circular type alias definitions.\n\n## Why is it bad?\n\nRecursive aliases are valid when recursive references occur inside another type, such as\n`list[Tree]`. An alias cannot expand directly to itself or include itself as a union member. This\napplies to implicit type aliases, aliases annotated with `TypeAlias`, `type` statements, and aliases\ncreated with `TypeAliasType`.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import TypeAlias, TypeAliasType, Union\n\ntype Itself = Itself  # error\n\ntype A = B  # error\ntype B = A  # error\n\ntype IntOr = int | IntOr  # error\n\nCycle = TypeAliasType(\"Cycle\", \"Cycle\")  # error\n\nLegacyCycle: TypeAlias = \"int | LegacyCycle\"  # error\n\nImplicitCycle = Union[int, \"ImplicitCycle\"]  # error\nvalue: ImplicitCycle\n\ntype Tree = int | list[Tree]  # valid recursive alias\n```",
           "default": "error",
           "oneOf": [
             {
@@ -808,6 +808,16 @@
           "title": "detects ignore comments that use invalid syntax",
           "description": "## What it does\n\nChecks for `type: ignore` and `ty: ignore` comments that are syntactically incorrect.\n\n## Why is this bad?\n\nA syntactically incorrect ignore comment is probably a mistake and is useless.\n\n## Examples\n\n```py\n# error\na = 20 / 1  # type: ignoree\n```\n\nUse instead:\n\n```py\na = 20 / 0  # type: ignore\n```",
           "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-init-type-variable": {
+          "title": "detects type variables from outer scopes in `__init__` receiver annotations",
+          "description": "## What it does\n\nChecks for type variables from outer scopes in an explicit annotation of the `self` parameter of\n`__init__`.\n\n## Why is this bad?\n\nAn explicit `self` annotation on `__init__` can determine the type arguments of the constructed\nclass. Referring to type variables bound to the class or an enclosing scope in this annotation can\nmake their meaning ambiguous. The\n[typing specification](https://typing.python.org/en/latest/spec/constructors.html#init-method)\nallows type variables scoped to `__init__` instead.\n\n## Example\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nclass Container[T]:\n    # error: [invalid-init-type-variable]\n    def __init__(self: \"Container[list[T]]\", value: T) -> None: ...\n```\n\nUse a type variable scoped to `__init__` instead:\n\n```python\nclass ListContainer[T]:\n    def __init__[U](self: \"ListContainer[list[U]]\", value: U) -> None: ...\n```\n\nIf the receiver annotation does not change the class's type arguments, it can be omitted:\n\n```python\nclass Box[T]:\n    def __init__(self, value: T) -> None: ...\n```\n\nThis restriction also applies to type variables declared with legacy syntax:\n\n```python\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\")\n\n\nclass LegacyContainer(Generic[T]):\n    # error: [invalid-init-type-variable]\n    def __init__(self: \"LegacyContainer[list[T]]\", value: T) -> None: ...\n```\n\n## References\n\n- [Typing specification: `__init__` method](https://typing.python.org/en/latest/spec/constructors.html#init-method)",
+          "default": "error",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

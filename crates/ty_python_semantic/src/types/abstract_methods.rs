@@ -126,7 +126,7 @@ impl<'db> AbstractMethods<'db> {
                         db,
                         Signature::new(Parameters::gradual_form(), Type::none(db, env)),
                     )
-                    .is_assignable_to(db, env, callables.into_type(db, env))
+                    .is_assignable_to(db, env, callables.to_type(db, env))
                 {
                     diagnostic.help(format_args!(
                         "Change the body of `{first_method_name}` to `return` \

@@ -201,8 +201,8 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableType, CallableTypes, ComparisonSoundnessPolicy, EnumClassLiteral,
-        KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
+        CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
+        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
         expand_type, infer_expression_types, infer_narrowing_constraints,
         infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
@@ -1780,12 +1780,7 @@ pub(crate) fn is_non_terminal_call<'db>(
         return Truthiness::AlwaysTrue;
     }
 
-    let overloads_iterator = if let Some(callable) = ty
-        .try_upcast_to_callable(db, env)
-        .and_then(CallableTypes::exactly_one)
-    {
-        callable.signatures(db).overloads.iter()
-    } else {
+    let Some(callables) = ty.try_upcast_to_callable(db, env) else {
         return Truthiness::AlwaysTrue;
     };
 
@@ -1793,7 +1788,7 @@ pub(crate) fn is_non_terminal_call<'db>(
     let mut all_overloads_return_never = true;
     let mut any_overload_is_generic = false;
 
-    for overload in overloads_iterator {
+    for overload in callables.signatures(db) {
         let returns_never = overload.return_ty.is_equivalent_to(db, env, Type::Never);
         no_overloads_return_never &= !returns_never;
         all_overloads_return_never &= returns_never;

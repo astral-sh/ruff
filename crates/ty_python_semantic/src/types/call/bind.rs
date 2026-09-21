@@ -2360,7 +2360,7 @@ impl<'db> Bindings<'db> {
                             else {
                                 continue;
                             };
-                            overload.set_return_type(callables.into_type(db, env));
+                            overload.set_return_type(callables.to_type(db, env));
                         }
 
                         Some(KnownFunction::DunderAllNames) => {

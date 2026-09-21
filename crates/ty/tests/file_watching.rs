@@ -2193,8 +2193,6 @@ mod unix {
     ///   |-- foo.py
     /// ```
     #[test]
-    // TODO: Re-enable once symlink file-watching is reliable in CI.
-    #[ignore = "Flaky symlink file-watching test"]
     fn symlink_inside_project() -> anyhow::Result<()> {
         let mut case = setup(|context: &mut SetupContext| {
             // Set up the symlink target.
@@ -2266,7 +2264,29 @@ mod unix {
             bar_baz_text = bar_baz_text.as_str()
         );
 
-        case.assert_indexed_project_files([patched_bar_baz_file]);
+        if cfg!(target_os = "linux") {
+            // Known bug: the index depends on which path notify reports. Discovery skips symlinked
+            // directories, so initially only `project/patched/bar/baz.py` is indexed. Resolving
+            // `bar.baz` creates a separate `File` for `project/bar/baz.py`, outside the index.
+            //
+            // notify uses different watcher backends across operating systems. On Linux, it follows
+            // the symlink and registers both directory paths. Inotify returns the same watch
+            // descriptor for both, and notify retains the last registered path. The recursive walk
+            // doesn't sort directory entries, so filesystem iteration order determines which path
+            // wins. That order can differ between filesystems and runs, even on the same OS.
+            //
+            // An event for the original path updates its `File` and leaves the index unchanged.
+            // An event for the symlinked path updates that `File` and adds it to the index, leaving
+            // both paths indexed but the original `File`'s revision stale. Accept either path (or
+            // both) until indexing agrees with discovery regardless of the reported path.
+            let files = case.db().project().files(case.db());
+            assert!(
+                files.contains(patched_bar_baz_file) || files.contains(baz_file),
+                "Expected the project to contain the original or symlinked file"
+            );
+        } else {
+            case.assert_indexed_project_files([patched_bar_baz_file]);
+        }
         Ok(())
     }
 

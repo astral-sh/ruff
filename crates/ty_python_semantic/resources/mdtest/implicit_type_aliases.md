@@ -2339,6 +2339,53 @@ def inspect(
     reveal_type(explicit)  # revealed: Explicit
 ```
 
+### Invalid cycles
+
+An implicit alias cannot include itself as a union member without a containing type. The error is
+reported once at the definition, even when the alias is used in multiple annotations.
+
+```py
+from typing import Union
+
+# snapshot: cyclic-type-alias-definition
+IntOr = Union[int, "IntOr"]
+
+def first(value: IntOr): ...
+def second(value: IntOr): ...
+```
+
+```snapshot
+error[cyclic-type-alias-definition]: Type alias `IntOr` has a circular definition
+ --> src/mdtest_snippet.py:4:9
+  |
+4 | IntOr = Union[int, "IntOr"]
+  |         ^^^^^^^^^^^^^^^^^^^
+```
+
+The same restriction applies to mutually recursive aliases.
+
+```py
+First = Union[int, "Second"]  # error: [cyclic-type-alias-definition] "Type alias `First` has a circular definition"
+Second = Union[str, "First"]  # error: [cyclic-type-alias-definition] "Type alias `Second` has a circular definition"
+
+def inspect(first: First, second: Second): ...
+```
+
+### Invalid generic cycles
+
+Specializing a recursive reference does not guard its cycle. A generic implicit alias cannot include
+a specialization of itself as a union member.
+
+```py
+from typing import TypeVar, Union
+
+T = TypeVar("T")
+Alias = Union[T, "Alias[T]"]  # error: [cyclic-type-alias-definition]
+Growing = Union[T, "Growing[list[T]]"]  # error: [cyclic-type-alias-definition]
+
+def inspect(bare: Alias, specialized: Alias[int], growing: Growing[int]): ...
+```
+
 ### Invalid recursive alias bodies
 
 `Self` cannot appear in a type alias. Repeated uses of a recursive alias report the error once, at
@@ -2754,14 +2801,14 @@ def inspect(direct: Direct, repeated: Repeated):
     repeated[0]
 ```
 
-A union retains its non-recursive alternative after recovery.
+A union member does not make an unguarded cycle valid.
 
 ```py
-WithLeaf = int | Identity["WithLeaf"]
+WithLeaf = int | Identity["WithLeaf"]  # error: [cyclic-type-alias-definition]
 
 def inspect_union(value: WithLeaf):
-    reveal_type(value)  # revealed: int
-    value[0]  # error: [not-subscriptable]
+    reveal_type(value)  # revealed: Divergent
+    value[0]
 ```
 
 ### Generic recursive aliases

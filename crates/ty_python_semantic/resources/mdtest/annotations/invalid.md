@@ -347,6 +347,9 @@ def func3(t: tuple[*Ts]):
 
 ## Ellipses in the wrong place in a `tuple` specialization
 
+An ellipsis is only valid after a single, non-unpacked element type. Each misplaced ellipsis is
+reported at its own location.
+
 ```toml
 [environment]
 python-version = "3.11"
@@ -377,6 +380,31 @@ def invalid_typevartuple_ellipsis(
     # error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
     unpacked: tuple[Unpack[Ts], ...],
 ) -> None: ...
+```
+
+Multiple misplaced ellipses in an alias produce separate diagnostics, each highlighting only the
+offending ellipsis:
+
+```py
+# snapshot: invalid-type-form
+# snapshot: invalid-type-form
+X = tuple[int, ..., ...]
+y: X
+```
+
+```snapshot
+error[invalid-type-form]: Invalid `tuple` specialization
+  --> src/mdtest_snippet.py:27:16
+   |
+27 | X = tuple[int, ..., ...]
+   |                ^^^ `...` can only be used as the second element in a two-element `tuple` specialization
+
+
+error[invalid-type-form]: Invalid `tuple` specialization
+  --> src/mdtest_snippet.py:27:21
+   |
+27 | X = tuple[int, ..., ...]
+   |                     ^^^ `...` can only be used as the second element in a two-element `tuple` specialization
 ```
 
 ## Invalid AST nodes in string annotations
