@@ -455,6 +455,262 @@ info: Type variable defined here
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
+## Inferring a constrained typevar from a callback parameter
+
+A callback must accept every value of at least one declared constraint. A callback accepting only
+`bool` is too narrow for both `int` and `str`, even though `bool` is a subtype of `int`.
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T", int, str)
+
+def constrained(consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def accepts_int(value: int) -> None: ...
+def accepts_str(value: str) -> None: ...
+def accepts_bool(value: bool) -> None: ...
+
+reveal_type(constrained(accepts_int))  # revealed: int
+reveal_type(constrained(accepts_str))  # revealed: str
+# snapshot: invalid-argument-type
+reveal_type(constrained(accepts_bool))  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `constrained` is incorrect
+  --> src/mdtest_snippet.py:15:25
+   |
+15 | reveal_type(constrained(accepts_bool))  # revealed: Unknown
+   |                         ^^^^^^^^^^^^ Expected `(T@constrained, /) -> None`, found `def accepts_bool(value: bool) -> None`
+info: No allowed specialization of `T` satisfies the inferred upper bound `bool`
+info: Parameter declared here
+ --> src/mdtest_snippet.py:5:17
+  |
+5 | def constrained(consumer: Callable[[T], None]) -> T:
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | T = TypeVar("T", int, str)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+## Constraint diagnostics across modules
+
+The diagnostic points to the parameter and type variable in the module where they are declared. It
+also distinguishes the method's defining class from the argument's type when they share a name.
+
+```py
+from definitions import Handler as ImportedHandler
+
+class Handler: ...
+
+def accepts(value: Handler) -> None: ...
+
+# snapshot: invalid-argument-type
+ImportedHandler().constrained(accepts)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to bound method `definitions.Handler.constrained` is incorrect
+ --> src/mdtest_snippet.py:8:31
+  |
+8 | ImportedHandler().constrained(accepts)
+  |                               ^^^^^^^ Expected `(T@constrained, /) -> None`, found `def accepts(value: mdtest_snippet.Handler) -> None`
+info: No allowed specialization of `T` satisfies the inferred upper bound `mdtest_snippet.Handler`
+info: Parameter declared here
+ --> src/definitions.py:6:27
+  |
+6 |     def constrained(self, consumer: Callable[[T], None]) -> None: ...
+  |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+info: Type variable defined here
+ --> src/definitions.py:3:1
+  |
+3 | T = TypeVar("T", int, str)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+`definitions.py`:
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T", int, str)
+
+class Handler:
+    def constrained(self, consumer: Callable[[T], None]) -> None: ...
+```
+
+## Inferring a constrained typevar from a union of protocols
+
+A union of text and binary writers requires one specialization that both writers accept. The
+inferred upper bounds are `str` and `bytes`; neither allowed specialization satisfies both. Each
+writer alone accepts one of the declared constraints.
+
+```py
+from typing import Protocol, TypeVar
+
+T_contra = TypeVar("T_contra", contravariant=True)
+T = TypeVar("T", str, bytes)
+
+class Writer(Protocol[T_contra]):
+    def write(self, value: T_contra) -> None: ...
+
+def constrained(writer: Writer[T]) -> None: ...
+def f(text: Writer[str], binary: Writer[bytes], either: Writer[str] | Writer[bytes]):
+    constrained(text)
+    constrained(binary)
+    # snapshot: invalid-argument-type
+    constrained(either)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `constrained` is incorrect
+  --> src/mdtest_snippet.py:14:17
+   |
+14 |     constrained(either)
+   |                 ^^^^^^ Expected `Writer[T@constrained]`, found `Writer[str] | Writer[bytes]`
+info: No allowed specialization of `T` satisfies all inferred upper bounds: `str`, `bytes`
+info: Parameter declared here
+ --> src/mdtest_snippet.py:9:17
+  |
+9 | def constrained(writer: Writer[T]) -> None: ...
+  |                 ^^^^^^^^^^^^^^^^^
+info: Type variable defined here
+ --> src/mdtest_snippet.py:4:1
+  |
+4 | T = TypeVar("T", str, bytes)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+## Constraint diagnostics for unpacked parameters
+
+When an unpacked tuple parameter accepts several arguments, a constraint error points to the
+original parameter annotation even if a later tuple element causes the failure.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T_contra = TypeVar("T_contra", contravariant=True)
+T = TypeVar("T", str, bytes)
+
+class Writer(Protocol[T_contra]):
+    def write(self, value: T_contra) -> None: ...
+
+def constrained(prefix: int, *writers: *tuple[Writer[T], Writer[T]]) -> None: ...
+def f(text: Writer[str], either: Writer[str] | Writer[bytes]):
+    # snapshot: invalid-argument-type
+    constrained(0, text, either)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `constrained` is incorrect
+  --> src/mdtest_snippet.py:12:26
+   |
+12 |     constrained(0, text, either)
+   |                          ^^^^^^ Expected `Writer[T@constrained]`, found `Writer[str] | Writer[bytes]`
+info: No allowed specialization of `T` satisfies all inferred upper bounds: `str`, `bytes`
+info: Parameter declared here
+ --> src/mdtest_snippet.py:9:30
+  |
+9 | def constrained(prefix: int, *writers: *tuple[Writer[T], Writer[T]]) -> None: ...
+  |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+info: Type variable defined here
+ --> src/mdtest_snippet.py:4:1
+  |
+4 | T = TypeVar("T", str, bytes)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+## Constrained typevar inferred from both callback input and output
+
+Both the callback's input and its output constrain `T`. For a callback from `bool` to `bool`, the
+output fits the `int` constraint, but the input is too narrow. For a callback from `bytes` to
+`bytes`, the output does not fit either constraint.
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T", int, str)
+
+def constrained(callback: Callable[[T], T]) -> T:
+    raise NotImplementedError
+
+def bool_identity(value: bool) -> bool:
+    return value
+
+# snapshot: invalid-argument-type
+reveal_type(constrained(bool_identity))  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `constrained` is incorrect
+  --> src/mdtest_snippet.py:12:25
+   |
+12 | reveal_type(constrained(bool_identity))  # revealed: Unknown
+   |                         ^^^^^^^^^^^^^ Expected `(T@constrained, /) -> T@constrained`, found `def bool_identity(value: bool) -> bool`
+info: No allowed specialization of `T` satisfies the inferred upper bound `bool`
+info: Parameter declared here
+ --> src/mdtest_snippet.py:5:17
+  |
+5 | def constrained(callback: Callable[[T], T]) -> T:
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | T = TypeVar("T", int, str)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+```py
+def bytes_identity(value: bytes) -> bytes:
+    return value
+
+# snapshot: invalid-argument-type
+reveal_type(constrained(bytes_identity))  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `constrained` is incorrect
+  --> src/mdtest_snippet.py:17:25
+   |
+17 | reveal_type(constrained(bytes_identity))  # revealed: Unknown
+   |                         ^^^^^^^^^^^^^^ Argument type `bytes` does not satisfy constraints (`int`, `str`) of type variable `T`
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | T = TypeVar("T", int, str)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+## No common specialization for lower and upper bounds
+
+A callback from `int` to `int` requires `int <= T <= int`. Of the declared constraints
+`(object, bool)`, `object` satisfies the lower bound and `bool` satisfies the upper bound, but
+neither satisfies both. The failure cannot be attributed to either bound alone.
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T", object, bool)
+
+def constrained(callback: Callable[[T], T]) -> T:
+    raise NotImplementedError
+
+def identity(value: int) -> int:
+    return value
+
+# TODO: Report that no allowed specialization satisfies both bounds.
+reveal_type(constrained(identity))  # revealed: Unknown
+```
+
 ## Conflicting arguments against a constrained typevar
 
 All arguments of a generic call must be assignable to the chosen bound of a constrained type
@@ -2137,8 +2393,9 @@ def nested(values: tuple[U]) -> None:
     reveal_type(first(values))  # revealed: int
 ```
 
-A bounded type variable is not assignable to a constrained type variable in non-covariant position,
-even if they share the same bound:
+A bounded type variable may represent any subtype of its bound. In an invariant or contravariant
+position, matching it to a constrained type variable could require accepting a value outside that
+subtype, even if the bound matches one of the declared constraints:
 
 ```py
 from collections.abc import Callable
@@ -2150,10 +2407,10 @@ def contravariant(consume: Callable[[T], None]) -> T:
     raise NotImplementedError
 
 def caller(values: list[V], consume: Callable[[V], None]) -> None:
-    # error: [invalid-argument-type] "Argument type `V@caller` does not satisfy constraints"
+    # error: [invalid-argument-type] "No allowed specialization of `T` satisfies the inferred upper bound `V@caller`"
     # error: [invalid-argument-type] "Expected `list[int]`, found `list[V@caller]`"
     invariant(values)
-    # TODO: This should error.
+    # error: [invalid-argument-type] "No allowed specialization of `T` satisfies the inferred upper bound `V@caller`"
     reveal_type(contravariant(consume))  # revealed: Unknown
 ```
 
