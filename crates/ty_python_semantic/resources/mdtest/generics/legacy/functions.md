@@ -2850,6 +2850,7 @@ def first(x: Sequence[T]) -> T:
 
 # An intersection where both positive elements satisfy the bound.
 def _(x: Intersection[Sequence[Sub1], Sequence[Sub2]]) -> None:
+    # TODO: Refine the return type per specialization to reveal Sub1 & Sub2.
     reveal_type(first(x))  # revealed: Sub1 | Sub2
 
 # An intersection with one positive element that satisfies the bound and one that doesn't.
@@ -2858,6 +2859,7 @@ def _(x: Intersection[Sequence[Sub1], Sequence[Unrelated1]]) -> None:
 
 # An intersection with two positive elements that satisfy the bound and one that doesn't.
 def _(x: Intersection[Sequence[Sub1], Sequence[Sub2], Sequence[Unrelated1]]) -> None:
+    # TODO: Refine the return type per specialization to reveal Sub1 & Sub2.
     reveal_type(first(x))  # revealed: Sub1 | Sub2
 
 # Both rejected alternatives contribute to the bound violation.
@@ -2915,7 +2917,7 @@ def element(sink: Sink[T]) -> T:
     raise NotImplementedError
 
 def _(sink: Intersection[Sink[A], Sink[B]]) -> None:
-    # TODO: Validate the complete specializations separately.
+    # TODO: Validate and refine each specialization separately to accept this call and reveal A & B.
     # error: [invalid-argument-type] "Expected `Sink[A | B]`"
     reveal_type(element(sink))  # revealed: A | B
 ```
@@ -2975,7 +2977,8 @@ def _(both: C, only_a: A, sink: Sink[Intersection[Source[A], Source[B]]]) -> Non
 ## Bounds and constraints on intersection alternatives
 
 Only alternatives satisfying a declared bound or constraint contribute to inference. The return type
-uses the union of all accepted assignments:
+currently uses the union of all accepted assignments; refining it per specialization would preserve
+the intersection of the accepted result types:
 
 ```py
 from typing import Generic, TypeVar
@@ -3005,7 +3008,9 @@ def constrained(source: Source[ConstrainedT]) -> ConstrainedT:
     return source.get()
 
 def _(both: Intersection[Source[A], Source[B]], mixed: Intersection[Source[A], Source[C]]) -> None:
+    # TODO: Refine the return type per specialization to reveal A & B.
     reveal_type(bounded(both))  # revealed: A | B
+    # TODO: Refine the return type per specialization to reveal A & B.
     reveal_type(constrained(both))  # revealed: A | B
     reveal_type(bounded(mixed))  # revealed: A
     reveal_type(constrained(mixed))  # revealed: A
