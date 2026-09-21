@@ -2,9 +2,11 @@ use anyhow::Result;
 use insta::assert_snapshot;
 use lsp_types::{
     DiagnosticSeverity, DocumentDiagnosticReport, FullDocumentDiagnosticReport, Message, Position,
-    WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport,
+    RegistrationRequest, UnregistrationRequest, WorkspaceDiagnosticReport,
+    WorkspaceDocumentDiagnosticReport,
 };
 use ruff_db::system::SystemPath;
+use ruff_python_trivia::textwrap::dedent;
 use ty_server::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
 
 use crate::{
@@ -103,6 +105,41 @@ fn add_workspace_folder_after_init() -> Result<()> {
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     "
     );
+
+    Ok(())
+}
+
+/// Adding a workspace refreshes diagnostics even when diagnostic support is re-registered.
+#[test]
+fn add_workspace_refreshes_diagnostics_with_dynamic_registration() -> Result<()> {
+    let root1 = SystemPath::new("root1");
+    let root2 = SystemPath::new("root2");
+    let main = root1.join("main.py");
+    let mut server = TestServerBuilder::new()?
+        .enable_workspace_diagnostic_refresh(true)
+        .enable_diagnostic_dynamic_registration(true)
+        .with_file(&main, "missing")?
+        .with_file(root2.join("main.py"), "")?
+        .with_workspace(root1, None)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let (id, _) = server.await_request::<RegistrationRequest>();
+    server.acknowledge_request(id);
+
+    server.open_text_document(&main, "missing", 1);
+    server.document_diagnostic_request(&main, None);
+    server.assert_no_pending_messages();
+
+    server.add_workspace_folder(root2, None)?;
+    server.change_workspace_folders([root2], []);
+    server = server.wait_until_workspaces_are_initialized();
+
+    let (id, _) = server.await_request::<UnregistrationRequest>();
+    server.acknowledge_request(id);
+    let (id, _) = server.await_request::<RegistrationRequest>();
+    server.acknowledge_request(id);
+    server.await_diagnostic_refresh();
 
     Ok(())
 }
@@ -349,6 +386,52 @@ fn add_and_remove_workspace_folders() -> Result<()> {
     file://<temp_dir>/root3/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     "
+    );
+
+    Ok(())
+}
+
+/// Replacing the only workspace still refreshes diagnostics for documents that remain open.
+#[test]
+fn replace_only_workspace_refreshes_diagnostics() -> Result<()> {
+    let root = SystemPath::new("project");
+    let nested = root.join("app");
+    let main = nested.join("main.py");
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .enable_workspace_diagnostic_refresh(true)
+        .with_file(&main, "missing")?
+        .with_file(
+            nested.join("ty.toml"),
+            dedent(
+                r#"
+                [rules]
+                unresolved-reference = "warn"
+                "#,
+            ),
+        )?
+        .with_workspace(root, None)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(&main, "missing", 1);
+    assert_eq!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(&main, None)),
+        "0:0..0:7[ERROR]: Name `missing` used when not defined",
+    );
+    server.assert_no_pending_messages();
+
+    // Removing the parent temporarily leaves no projects, but this is not initial configuration.
+    server.add_workspace_folder(&nested, None)?;
+    server.change_workspace_folders([nested.as_path()], [root]);
+    server = server.wait_until_workspaces_are_initialized();
+    server.await_diagnostic_refresh();
+
+    assert_eq!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(&main, None)),
+        "0:0..0:7[WARNING]: Name `missing` used when not defined",
     );
 
     Ok(())
