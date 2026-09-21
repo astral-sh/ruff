@@ -6,6 +6,7 @@ use lsp_types::{
     WorkspaceDocumentDiagnosticReport,
 };
 use ruff_db::system::SystemPath;
+use ruff_python_trivia::textwrap::dedent;
 use ty_server::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
 
 use crate::{
@@ -104,6 +105,41 @@ fn add_workspace_folder_after_init() -> Result<()> {
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     "
     );
+
+    Ok(())
+}
+
+/// Adding a workspace refreshes diagnostics even when diagnostic support is re-registered.
+#[test]
+fn add_workspace_refreshes_diagnostics_with_dynamic_registration() -> Result<()> {
+    let root1 = SystemPath::new("root1");
+    let root2 = SystemPath::new("root2");
+    let main = root1.join("main.py");
+    let mut server = TestServerBuilder::new()?
+        .enable_workspace_diagnostic_refresh(true)
+        .enable_diagnostic_dynamic_registration(true)
+        .with_file(&main, "missing")?
+        .with_file(root2.join("main.py"), "")?
+        .with_workspace(root1, None)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let (id, _) = server.await_request::<RegistrationRequest>();
+    server.acknowledge_request(id);
+
+    server.open_text_document(&main, "missing", 1);
+    server.document_diagnostic_request(&main, None);
+    server.assert_no_pending_messages();
+
+    server.add_workspace_folder(root2, None)?;
+    server.change_workspace_folders([root2], []);
+    server = server.wait_until_workspaces_are_initialized();
+
+    let (id, _) = server.await_request::<UnregistrationRequest>();
+    server.acknowledge_request(id);
+    let (id, _) = server.await_request::<RegistrationRequest>();
+    server.acknowledge_request(id);
+    server.await_diagnostic_refresh();
 
     Ok(())
 }
@@ -369,7 +405,12 @@ fn replace_only_workspace_refreshes_diagnostics() -> Result<()> {
         .with_file(&main, "missing")?
         .with_file(
             nested.join("ty.toml"),
-            "[rules]\nunresolved-reference = 'warn'",
+            dedent(
+                r#"
+                [rules]
+                unresolved-reference = "warn"
+                "#,
+            ),
         )?
         .with_workspace(root, None)?
         .build()
@@ -713,16 +754,11 @@ fn global_settings_change() -> Result<()> {
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(&ClientOptions::default())
-        .enable_workspace_diagnostic_refresh(true)
-        .enable_diagnostic_dynamic_registration(true)
         .with_file(&main1, main_content)?
         .with_file(&main2, main_content)?
         .with_workspace(root1, None)?
         .build()
         .wait_until_workspaces_are_initialized();
-
-    let (id, _) = server.await_request::<RegistrationRequest>();
-    server.acknowledge_request(id);
 
     server.open_text_document(&main1, main_content, 1);
     let document_diagnostics = server.document_diagnostic_request(&main1, None);
@@ -730,7 +766,6 @@ fn global_settings_change() -> Result<()> {
         condensed_document_diagnostic_snapshot(document_diagnostics),
         @"0:1..0:1[ERROR]: unexpected EOF while parsing",
     );
-    server.assert_no_pending_messages();
 
     // Now we'll add a new workspace folder with syntax error
     // diagnostics disabled. This will apply not just to the
@@ -747,14 +782,6 @@ fn global_settings_change() -> Result<()> {
     )?;
     server.change_workspace_folders([root2], []);
     server = server.wait_until_workspaces_are_initialized();
-
-    let (id, _) = server.await_request::<UnregistrationRequest>();
-    server.acknowledge_request(id);
-    let (id, _) = server.await_request::<RegistrationRequest>();
-    server.acknowledge_request(id);
-
-    // Re-registering diagnostic support does not invalidate the client's cached diagnostics.
-    server.await_diagnostic_refresh();
 
     let document_diagnostics = server.document_diagnostic_request(&main1, None);
     assert_snapshot!(
