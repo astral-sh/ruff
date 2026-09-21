@@ -13,8 +13,8 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 use super::{
-    DisplayTypeVars, TypeVar, TypeVarReferenceVisitor, expr_name_to_type_var,
-    non_default_follows_default, type_var_has_unpacked_kwargs,
+    DisplayTypeVars, TypeVar, TypeVarLookup, TypeVarReferenceVisitor, expr_name_to_type_var,
+    non_default_follows_default,
 };
 
 /// ## What it does
@@ -102,7 +102,7 @@ enum TypeAliasKind {
 }
 
 impl Violation for NonPEP695TypeAlias {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -168,20 +168,37 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
         return;
     }
 
-    // Bail out if any type parameter has unpacked keyword arguments that
-    // cannot be represented in PEP 695 syntax.
-    if type_params.iter().any(|expr| {
-        expr.as_name_expr()
-            .is_some_and(|name| type_var_has_unpacked_kwargs(checker.semantic(), name))
-    }) {
+    // Check if any type parameter has unpacked keyword arguments.
+    // If so, emit a diagnostic without a fix.
+    let has_unpacked_kwargs = type_params.iter().any(|expr| {
+        expr.as_name_expr().is_some_and(|name| {
+            matches!(
+                expr_name_to_type_var(checker.semantic(), name),
+                TypeVarLookup::UnpackedKwargs
+            )
+        })
+    });
+
+    if has_unpacked_kwargs {
+        checker.report_diagnostic(
+            NonPEP695TypeAlias {
+                name: target_name.id.to_string(),
+                type_alias_kind: TypeAliasKind::TypeAliasType,
+            },
+            stmt.range(),
+        );
         return;
     }
 
     let Some(vars) = type_params
         .iter()
         .map(|expr| {
-            expr.as_name_expr()
-                .and_then(|name| expr_name_to_type_var(checker.semantic(), name))
+            expr.as_name_expr().and_then(|name| {
+                match expr_name_to_type_var(checker.semantic(), name) {
+                    TypeVarLookup::Resolved(var) => Some(var),
+                    TypeVarLookup::UnpackedKwargs | TypeVarLookup::Unresolved => None,
+                }
+            })
         })
         .collect::<Option<Vec<_>>>()
     else {
@@ -226,17 +243,26 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
         return;
     };
 
-    let mut visitor = TypeVarReferenceVisitor {
-        vars: vec![],
-        semantic: checker.semantic(),
-        any_skipped: false,
-        has_unpacked_kwargs: false,
+    let vars = {
+        let mut visitor = TypeVarReferenceVisitor {
+            vars: vec![],
+            semantic: checker.semantic(),
+            any_skipped: false,
+            has_unpacked_kwargs: false,
+        };
+        visitor.visit_expr(value);
+        if visitor.has_unpacked_kwargs {
+            checker.report_diagnostic(
+                NonPEP695TypeAlias {
+                    name: name.to_string(),
+                    type_alias_kind: TypeAliasKind::TypeAlias,
+                },
+                stmt.range(),
+            );
+            return;
+        }
+        visitor.vars
     };
-    visitor.visit_expr(value);
-    if visitor.has_unpacked_kwargs {
-        return;
-    }
-    let vars = visitor.vars;
 
     // Type variables must be unique; filter while preserving order.
     let vars = vars

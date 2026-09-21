@@ -146,22 +146,23 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
     }
 
     let mut type_vars = Vec::new();
-    let mut has_unpacked_kwargs = false;
     for parameter in parameters {
         if let Some(annotation) = parameter.annotation() {
-            let mut visitor = TypeVarReferenceVisitor {
-                vars: vec![],
-                semantic: checker.semantic(),
-                any_skipped: false,
-                has_unpacked_kwargs: false,
+            let vars = {
+                let mut visitor = TypeVarReferenceVisitor {
+                    vars: vec![],
+                    semantic: checker.semantic(),
+                    any_skipped: false,
+                    has_unpacked_kwargs: false,
+                };
+                visitor.visit_expr(annotation);
+                if visitor.has_unpacked_kwargs {
+                    return;
+                }
+                visitor.vars
             };
-            visitor.visit_expr(annotation);
-            has_unpacked_kwargs |= visitor.has_unpacked_kwargs;
-            type_vars.extend(visitor.vars);
+            type_vars.extend(vars);
         }
-    }
-    if has_unpacked_kwargs {
-        return;
     }
 
     // Deduplicate type vars that appear in multiple parameter annotations
