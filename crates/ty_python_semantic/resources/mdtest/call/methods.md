@@ -748,8 +748,9 @@ class GenericFinal[T]:
 
 ### Accessing the classmethod as a static member
 
-Accessing a `@classmethod`-decorated function at runtime returns a `classmethod` object. We
-currently don't model this explicitly:
+`inspect.getattr_static` bypasses descriptor binding and returns the `classmethod` descriptor.
+Ordinary attribute access (`C.f` or `C().f`) instead returns a bound method. We model the descriptor
+explicitly, but display it using the wrapped function's name and signature:
 
 ```py
 from inspect import getattr_static
@@ -763,7 +764,7 @@ reveal_type(getattr_static(C, "f"))  # revealed: def f(cls) -> Unknown
 reveal_type(getattr_static(C, "f").__get__)
 ```
 
-But we correctly model how the `classmethod` descriptor works:
+Calling the `classmethod` descriptor's `__get__` binds the wrapped function to the class:
 
 ```py
 reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: bound method <class 'C'>.f() -> Unknown
@@ -1304,8 +1305,9 @@ class C:
     def f(): ...
 ```
 
-Accessing the staticmethod as a static member. This will reveal the raw function, as `staticmethod`
-is transparent when accessed via `getattr_static`.
+`getattr_static` bypasses descriptor binding and returns the `staticmethod` descriptor. Ordinary
+attribute access (`C.f` or `C().f`) instead returns the underlying function. We model the descriptor
+explicitly, but display it using the wrapped function's name and signature:
 
 ```py
 reveal_type(getattr_static(C, "f"))  # revealed: def f() -> Unknown
