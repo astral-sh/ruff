@@ -213,11 +213,10 @@ mod tests {
     }
 
     #[test]
-    fn preview_lazy_import_immediately_resolved() -> Result<()> {
+    fn lazy_import_immediately_resolved() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID255.py"),
             &LinterSettings::for_rule(Rule::LazyImportImmediatelyResolved)
-                .with_preview_mode()
                 .with_target_version(PythonVersion::PY315),
         )?;
         assert_diagnostics!(diagnostics);
@@ -265,7 +264,7 @@ mod tests {
     }
 
     #[test]
-    fn preview_lazy_import_immediately_resolved_fix() {
+    fn lazy_import_immediately_resolved_fix() {
         let source = dedent(
             r#"
             lazy  import foo
@@ -294,7 +293,6 @@ mod tests {
             &source_kind,
             Path::new("flake8_tidy_imports/TID255_fix.py"),
             &LinterSettings::for_rule(Rule::LazyImportImmediatelyResolved)
-                .with_preview_mode()
                 .with_target_version(PythonVersion::PY315),
         );
 

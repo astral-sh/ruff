@@ -62,7 +62,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// - [`lint.flake8-tidy-imports.require-lazy`]
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.13", category = Category::Correctness)]
+#[violation_metadata(stable_since = "NEXT_RUFF_VERSION", category = Category::Correctness)]
 pub(crate) struct LazyImportImmediatelyResolved {
     name: String,
     fixable: bool,

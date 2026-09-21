@@ -65,7 +65,6 @@ OtherBase()  # error: [lazy-import-immediately-resolved]
 target-version = "py315"
 
 [lint]
-preview = true
 select = ["TID255"]
 ```
 
@@ -134,7 +133,6 @@ keyword.
 target-version = "py314"
 
 [lint]
-preview = true
 select = ["TID255"]
 ```
 
