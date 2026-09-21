@@ -100,7 +100,7 @@ help: Did you mean to use `any()`?
 14 +     if any(filtered):  # snapshot: redundant-condition
 15 |         pass
    |
-warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 And testing an awaitable without awaiting it:
@@ -1433,7 +1433,7 @@ help: Replace with `wut(...)`
 3 + if wut(...):  # snapshot: redundant-condition
 4 |     pass
   |
-warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 
 warning[redundant-condition]: Function `wuttt` is always truthy
@@ -1448,7 +1448,7 @@ help: Replace with `await wuttt(...)`
 8 +     if await wuttt(...):  # snapshot: redundant-condition
 9 |         pass
   |
-warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ### Call fixes for overloaded functions
@@ -1484,7 +1484,7 @@ help: Replace with `await asynchronous(...)`
 11 +     if await asynchronous(...):  # snapshot: redundant-condition
 12 |         pass
    |
-warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 If an overload returns a non-awaitable value, calling and awaiting the function might be invalid. We
@@ -1516,7 +1516,7 @@ help: Replace with `mixed(...)`
 21 +     if mixed(...):  # snapshot: redundant-condition
 22 |         pass
    |
-warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ### Call fixes for synchronous functions with gradual or `Never` return types
