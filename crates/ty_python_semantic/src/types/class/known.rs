@@ -564,7 +564,9 @@ impl KnownClass {
             | KnownClass::PydanticConfigDict
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
-            | KnownClass::PytestParametrizeMarkDecorator => false,
+            | KnownClass::PytestParametrizeMarkDecorator
+            | KnownClass::Date
+            | KnownClass::DateTime => false,
         }
     }
 
@@ -682,7 +684,9 @@ impl KnownClass {
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
-            | KnownClass::PytestParametrizeMarkDecorator => false,
+            | KnownClass::PytestParametrizeMarkDecorator
+            | KnownClass::Date
+            | KnownClass::DateTime => false,
 
             KnownClass::PydanticConfigDict => true,
         }
@@ -802,7 +806,9 @@ impl KnownClass {
             | KnownClass::PydanticConfigDict
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
-            | KnownClass::PytestParametrizeMarkDecorator => false,
+            | KnownClass::PytestParametrizeMarkDecorator
+            | KnownClass::Date
+            | KnownClass::DateTime => false,
         }
     }
 
@@ -1055,7 +1061,9 @@ impl KnownClass {
             | KnownClass::PydanticConfigDict
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
-            | KnownClass::PytestParametrizeMarkDecorator => false,
+            | KnownClass::PytestParametrizeMarkDecorator
+            | KnownClass::Date
+            | KnownClass::DateTime => false,
             KnownClass::NamedTupleFallback
             | KnownClass::TypedDictFallback
             | KnownClass::ExtensionTypedDictFallback => true,

@@ -7,18 +7,18 @@ runtime rather than silently comparing/subtracting across the two types.
 The exact runtime behavior is more subtle than "always raises", and it changed in Python 3.13:
 
 - The literal `date` and `datetime` classes always raise `TypeError` when mixed, on every Python
-  version, for both the ordering comparisons and `__sub__`.
-- A genuine **subclass** of `date` (not the literal `date` class itself) compared with a
-  `datetime` via `<`, `<=`, `>`, or `>=`, with the `date` subclass instance on the left, does
-  **not** raise before Python 3.13 -- it silently returns a `bool` by comparing only the date
-  fields, ignoring the `datetime`'s time component. From Python 3.13 onwards, this case raises
-  `TypeError` too, closing the gap.
+    version, for both the ordering comparisons and `__sub__`.
+- A genuine **subclass** of `date` (not the literal `date` class itself) compared with a `datetime`
+    via `<`, `<=`, `>`, or `>=`, with the `date` subclass instance on the left, does **not** raise
+    before Python 3.13 -- it silently returns a `bool` by comparing only the date fields, ignoring
+    the `datetime`'s time component. From Python 3.13 onwards, this case raises `TypeError` too,
+    closing the gap.
 - `__sub__` between a `date` subclass and a `datetime` always raises, on every version -- the
-  pre-3.13 exemption above is specific to the four ordering comparisons.
-- A subclass that overrides the relevant dunder itself is exempt from all of the above, since ty
-  can no longer assume the operation carries `date`/`datetime`'s own unsafe runtime behavior.
+    pre-3.13 exemption above is specific to the four ordering comparisons.
+- A subclass that overrides the relevant dunder itself is exempt from all of the above, since ty can
+    no longer assume the operation carries `date`/`datetime`'s own unsafe runtime behavior.
 - A `NewType` wrapping `date` has no runtime class of its own -- an instance of it *is* a plain
-  `date` at runtime, so it behaves like the literal `date` case, not like a genuine subclass.
+    `date` at runtime, so it behaves like the literal `date` case, not like a genuine subclass.
 
 ## Literal `date` and `datetime` are always unsupported
 
@@ -108,23 +108,34 @@ reveal_type(md > dt)  # revealed: Unknown
 reveal_type(md >= dt)  # revealed: Unknown
 ```
 
-## A subclass that overrides the operator itself is exempt regardless of Python version
+## A subclass that overrides `__sub__` itself is exempt regardless of Python version
 
-Subtraction has no pre-3.13 exemption at all (see above), so overriding `__sub__` is the
-cleanest way to demonstrate the override escape hatch independently of the target Python
-version:
+Subtraction has no pre-3.13 exemption at all (see above), so overriding `__sub__` is the cleanest
+way to demonstrate the override escape hatch independently of the target Python version:
 
 ```toml
 [environment]
 python-version = "3.12"
 ```
 
+`date.__sub__` is itself overloaded, so a well-typed override needs to reproduce all three of its
+overloads to remain a valid override; only the first (`datetime` on the right) is relevant here:
+
 ```py
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from typing import Never, Self, overload
 
 class SafeDate(date):
-    def __sub__(self, other: object) -> int:
-        return 0
+    @overload
+    def __sub__(self, other: datetime) -> Never: ...
+    @overload
+    def __sub__(self, other: Self) -> timedelta: ...
+    @overload
+    def __sub__(self, other: timedelta) -> Self: ...
+    def __sub__(self, other):
+        if isinstance(other, datetime):
+            raise TypeError("cannot subtract a datetime from a SafeDate")
+        return NotImplemented
 
 sd = SafeDate(2020, 1, 1)
 dt = datetime(2020, 1, 1, 12, 30)
@@ -132,11 +143,13 @@ dt = datetime(2020, 1, 1, 12, 30)
 # `SafeDate` overrides `__sub__` itself, so ty can no longer assume the operation carries
 # `date`'s unsafe inherited runtime behavior -- unlike the plain-subclass subtraction case
 # above, this must not be flagged.
-reveal_type(sd - dt)  # revealed: int
+reveal_type(sd - dt)  # revealed: Never
 ```
 
-The same holds for the ordering comparisons on Python 3.13, where the plain subclass case
-above *is* flagged:
+## A subclass that overrides a comparison method itself is exempt even on Python 3.13
+
+The same override escape hatch holds for the ordering comparisons on Python 3.13, where the plain
+subclass case above *is* flagged:
 
 ```toml
 [environment]
@@ -176,7 +189,9 @@ dt = datetime(2020, 1, 1, 12, 30)
 
 # `NewType` has no runtime class of its own -- `ud` is a plain `date` instance at runtime, so
 # it must be flagged the same way the literal `date` case at the top of this file is, even on
-# Python < 3.13 where a genuine subclass would be exempt (see above).
-# error: [unsupported-operator] "Operator `<` is not supported between objects of type `date` and `datetime`"
+# Python < 3.13 where a genuine subclass would be exempt (see above). The diagnostic names the
+# `NewType` alias, since that is the type as written, even though the safety check itself
+# reasons about the underlying `date` class.
+# error: [unsupported-operator] "Operator `<` is not supported between objects of type `UserDate` and `datetime`"
 reveal_type(ud < dt)  # revealed: Unknown
 ```
