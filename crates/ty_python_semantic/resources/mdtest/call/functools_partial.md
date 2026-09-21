@@ -713,8 +713,8 @@ reveal_type(bound({}))  # revealed: Any
 
 ### Truthiness-narrowed gradual ParamSpec callable bound with `partial`
 
-Truthiness narrowing preserves a callable's gradual parameter list when inferring a `ParamSpec`. The
-resulting callable remains compatible with any fixed parameter list:
+Narrowing an optional callable by truthiness preserves its gradual parameter list when inferring a
+`ParamSpec`. The resulting callable remains compatible with any fixed parameter list:
 
 ```toml
 [environment]
@@ -743,8 +743,9 @@ def pep695_wrapper[**P](
 ) -> dict[str, Any]:
     return original(*args, **kwargs)
 
-def patch(original: Callable[..., Any]) -> None:
-    if original:  # error: [truthiness-test-of-callable]
+def patch(original: Callable[..., Any] | None) -> None:
+    if original:
+        reveal_type(original)  # revealed: ((...) -> Any) & ~AlwaysFalsy
         legacy = partial(legacy_wrapper, original, "state")
         reveal_type(legacy)  # revealed: partial[(...) -> dict[str, Any]]
         callback: Callable[[str], dict[str, Any]] = legacy
