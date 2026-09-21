@@ -4812,7 +4812,7 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     1 + # fix from stable-test-rule-display-only-fix
     2 | import os
       |
-    warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+    note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
     preview-test-rule: Hey this is a preview test rule.
     --> normal.py:1:1

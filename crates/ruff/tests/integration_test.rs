@@ -2090,7 +2090,7 @@ fn fix_does_not_apply_display_only_fixes() {
     1 + # fix from stable-test-rule-display-only-fix
     2 | def add_to_list(item, some_list=[]): ...
       |
-    warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+    note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
     Found 1 error.
     ");
@@ -2115,7 +2115,7 @@ fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
     1 + # fix from stable-test-rule-display-only-fix
     2 | def add_to_list(item, some_list=[]): ...
       |
-    warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+    note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
     Found 1 error.
     ");
@@ -2434,7 +2434,7 @@ extend-safe-fixes = ["RUF9"]
     1 + # fix from stable-test-rule-display-only-fix
     2 | x = {'a': 1, 'a': 1}
       |
-    warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+    note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
     RUF950 Hey this is a test rule that was redirected from another.
     --> -:1:1

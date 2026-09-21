@@ -19,7 +19,7 @@ help: Replace with `Path(...).iterdir()`
 4 + pathlib.Path('.').iterdir()
 5 | os.listdir(b'.')
   |
-warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PTH208 [*] Use `pathlib.Path.iterdir()` instead.
  --> PTH208.py:4:1
@@ -40,7 +40,7 @@ help: Replace with `Path(...).iterdir()`
 5 + pathlib.Path(b'.').iterdir()
 6 |
   |
-warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PTH208 [*] Use `pathlib.Path.iterdir()` instead.
  --> PTH208.py:7:1
@@ -62,7 +62,7 @@ help: Replace with `Path(...).iterdir()`
 8 + pathlib.Path(string_path).iterdir()
 9 |
   |
-warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PTH208 [*] Use `pathlib.Path.iterdir()` instead.
   --> PTH208.py:10:1
@@ -81,7 +81,7 @@ help: Replace with `Path(...).iterdir()`
 11 + pathlib.Path(bytes_path).iterdir()
 12 |
    |
-warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PTH208 [*] Use `pathlib.Path.iterdir()` instead.
   --> PTH208.py:16:1
@@ -96,7 +96,7 @@ help: Replace with `Path(...).iterdir()`
 16 + Path(path_path).iterdir()
 17 |
    |
-warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PTH208 [*] Use `pathlib.Path.iterdir()` instead.
   --> PTH208.py:19:4
@@ -112,7 +112,7 @@ help: Replace with `Path(...).iterdir()`
 19 + if Path("dir").iterdir():
 20 |     ...
    |
-warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PTH208 [*] Use `pathlib.Path.iterdir()` instead.
   --> PTH208.py:22:14
@@ -130,4 +130,4 @@ help: Replace with `Path(...).iterdir()`
 22 + if "file" in Path("dir").iterdir():
 23 |     ...
    |
-warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
