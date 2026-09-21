@@ -2726,14 +2726,11 @@ struct ConstraintFailure<'db> {
 
 impl<'db> ConstraintFailure<'db> {
     fn from_bounds(path_bound: &PathBound<'db>, error: SpecializationError<'db>) -> Option<Self> {
-        let variance = match (
-            path_bound.evidence_lower().is_some(),
-            path_bound.has_upper_evidence(),
-        ) {
-            (true, true) => ConstraintFailureVariance::Invariant,
-            (true, false) => ConstraintFailureVariance::Contravariant,
-            (false, true) => ConstraintFailureVariance::Covariant,
-            (false, false) => return None,
+        let variance = match path_bound.variance() {
+            TypeVarVariance::Invariant => ConstraintFailureVariance::Invariant,
+            TypeVarVariance::Contravariant => ConstraintFailureVariance::Contravariant,
+            TypeVarVariance::Covariant => ConstraintFailureVariance::Covariant,
+            TypeVarVariance::Bivariant => return None,
         };
         Some(Self { error, variance })
     }
