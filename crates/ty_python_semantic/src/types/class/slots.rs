@@ -72,6 +72,8 @@ impl InstanceDictionary {
             | KnownClass::Bytes
             | KnownClass::Bytearray
             | KnownClass::Memoryview
+            | KnownClass::Date
+            | KnownClass::DateTime
             | KnownClass::Int
             | KnownClass::Float
             | KnownClass::Complex

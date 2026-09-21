@@ -153,8 +153,10 @@ fn is_unsafe_datetime_operation<'db>(
 
     let inherits_operator = |class: ClassType<'db>, method: &str| {
         for base in class.iter_mro(db) {
+            // Non-class MRO entries such as `Generic` or `Protocol` never define dunder
+            // methods themselves; skip past them to find the class that does.
             let Some(base) = base.into_class() else {
-                return false;
+                continue;
             };
             if !base.own_class_member(db, env, None, method).is_undefined() {
                 return matches!(base.known(db), Some(KnownClass::Date | KnownClass::DateTime));
