@@ -3393,7 +3393,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
         )
     }
 
-    fn variance(&self) -> TypeVarVariance {
+    pub(crate) fn variance(&self) -> TypeVarVariance {
         match (self.has_lower_inference(), self.has_upper_inference()) {
             (false, true) => TypeVarVariance::Covariant,
             (true, false) => TypeVarVariance::Contravariant,
