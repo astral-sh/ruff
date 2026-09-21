@@ -58,8 +58,7 @@ impl Diagnostics {
         diagnostics.hash(&mut hasher);
         unnecessary_hints.hash(&mut hasher);
 
-        // Syntax errors are filtered during LSP conversion, after computing the raw diagnostics.
-        global_settings.show_syntax_errors().hash(&mut hasher);
+        global_settings.hash_diagnostic_settings(&mut hasher);
 
         if client_capabilities.supports_full_diagnostic_output() {
             // The rendered output includes source snippets that aren't part of the raw diagnostic.
