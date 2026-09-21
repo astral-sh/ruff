@@ -2095,8 +2095,8 @@ impl<'db> TypeVarConstraints<'db> {
 
     /// Whether every constraint in `self` has an equivalent constraint in `other`.
     ///
-    /// Subtyping is not sufficient: replacing a caller's constraint with a wider one could
-    /// allow the callee to return a value outside the caller's original type.
+    /// For example, `(int, str)` is a subset of `(int, str, bytes)`, but `(bool, str)` is not
+    /// a subset of `(int, str)`: `bool` is a subtype of `int`, but is not equivalent to it.
     pub(super) fn is_subset_of(
         self,
         db: &'db dyn Db,
