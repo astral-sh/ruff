@@ -133,8 +133,6 @@ fn resolve_run_params_for_a_class() -> Result<()> {
     Ok(())
 }
 
-/// A client can hold on to an id for a module that has since been deleted or renamed. The
-/// server answers `null` so the client knows to discover the tests again.
 #[test]
 fn resolve_run_params_for_a_path_that_is_not_in_the_project() -> Result<()> {
     let mut server = server_with_one_test_module()?;
@@ -152,8 +150,6 @@ fn resolve_run_params_for_a_module_with_same_relative_path_in_another_workspace(
     let workspace_one = SystemPath::new("workspace_one");
     let workspace_two = SystemPath::new("workspace_two");
 
-    // Both workspaces have a `tests/test_module.py` at the same relative path, so each id
-    // has to resolve against the workspace it actually belongs to.
     let module_one = SystemPath::new("workspace_one/tests/test_module.py");
     let module_one_content = "\
 def test_alpha():
