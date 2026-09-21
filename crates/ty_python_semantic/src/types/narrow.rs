@@ -9,6 +9,7 @@ use crate::reachability::{
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
+use crate::types::iteration::extract_literal_container_element_types;
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::{TupleElement, TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema, TypedDictType};
@@ -3782,30 +3783,21 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
     /// Preserve the precise element types of an immediately consumed list or set literal.
     ///
-    /// These expressions cannot be mutated before membership is evaluated. Representing them as
-    /// fixed-length tuples also lets negative narrowing exclude values that are guaranteed present.
+    /// A tuple carries the element types into equality-based narrowing, including negative
+    /// constraints for singleton elements. This view does not describe a set's length or order.
     fn inline_membership_rhs_type(
         &self,
         rhs: &ast::Expr,
         inference: &ExpressionInference<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db;
-        let elements = match rhs.expression_value() {
-            ast::Expr::List(list) => &list.elts,
-            ast::Expr::Set(set) => &set.elts,
-            _ => return None,
-        };
-
-        if elements.iter().any(ast::Expr::is_starred_expr) {
-            return None;
-        }
-
+        let elements = extract_literal_container_element_types(db, &self.env, rhs, |element| {
+            inference.expression_type(element)
+        })?;
         Some(Type::heterogeneous_tuple(
             db,
             &self.env,
-            elements
-                .iter()
-                .map(|element| inference.expression_type(element)),
+            elements.iter().copied(),
         ))
     }
 

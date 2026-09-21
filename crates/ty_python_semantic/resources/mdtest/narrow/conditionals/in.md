@@ -1409,6 +1409,21 @@ def after_excluding_red_mixed(x: Color | int):
         reveal_type(x)  # revealed: Literal[Color.BLUE] | int
 ```
 
+Inline set literals also preserve the individual enum members for narrowing in either branch.
+
+```py
+def inline_enum_set(x: Color):
+    if x in {Color.RED, Color.GREEN}:
+        reveal_type(x)  # revealed: Literal[Color.RED, Color.GREEN]
+    else:
+        reveal_type(x)  # revealed: Literal[Color.BLUE]
+
+    if x not in {Color.RED}:
+        reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
+    else:
+        reveal_type(x)  # revealed: Literal[Color.RED]
+```
+
 When the container's element type is a union of enum literals, membership narrows to that union.
 Without the annotation, the tuple's elements are widened to `Color`, so the comprehension remains
 `list[Color]`:

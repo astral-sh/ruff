@@ -108,6 +108,27 @@ fn iterable_factory_definition<'db>(
     overload.signature.definition()
 }
 
+/// Extract precise element types for membership in an immediately consumed list or set display.
+///
+/// The ordinary inferred container type remains unchanged. Set construction can remove duplicates,
+/// so these elements do not describe an iteration order or an exact length.
+pub(super) fn extract_literal_container_element_types<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    expression: &ast::Expr,
+    expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+) -> Option<Box<[Type<'db>]>> {
+    match expression {
+        ast::Expr::List(_) => {
+            extract_fixed_length_iterable_element_types(db, env, expression, expression_type)
+        }
+        ast::Expr::Set(set) if !set.elts.iter().any(ast::Expr::is_starred_expr) => {
+            Some(set.elts.iter().map(expression_type).collect())
+        }
+        _ => None,
+    }
+}
+
 /// Extract the element types from an expression with a statically known fixed-length iteration.
 ///
 /// List and tuple literals are expanded directly so we preserve precise element types, including
