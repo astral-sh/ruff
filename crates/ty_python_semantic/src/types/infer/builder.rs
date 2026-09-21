@@ -11652,18 +11652,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     |element| builder.expression_type(element),
                 );
 
-                let comparison = literal_membership.map_or_else(
-                    || {
-                        comparisons::infer_binary_type_comparison(
-                            &builder.context,
-                            left_ty,
-                            *op,
-                            right_ty,
-                            range,
-                        )
-                    },
-                    Ok,
-                );
+                let comparison = match literal_membership {
+                    Some(ty) => Ok(ty),
+                    None => comparisons::infer_binary_type_comparison(
+                        &builder.context,
+                        left_ty,
+                        *op,
+                        right_ty,
+                        range,
+                    ),
+                };
                 let ty = comparison.unwrap_or_else(|error| {
                     report_unsupported_comparison(
                         &builder.context,
