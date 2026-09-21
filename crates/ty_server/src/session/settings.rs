@@ -20,8 +20,6 @@ impl GlobalSettings {
 
     /// Whether a diagnostic should be included in result IDs and LSP output.
     pub(crate) fn should_show_diagnostic(&self, diagnostic: &Diagnostic) -> bool {
-        // Keep these patterns exhaustive so new settings require a filtering decision.
-        // Diagnostic mode is handled before filtering diagnostics.
         let Self {
             diagnostic_mode: _,
             experimental: ExperimentalSettings {},
