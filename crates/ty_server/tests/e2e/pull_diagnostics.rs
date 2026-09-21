@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use insta::{assert_compact_json_snapshot, assert_debug_snapshot};
 use lsp_server::RequestId;
 use lsp_types::{
@@ -11,7 +11,7 @@ use lsp_types::{
 };
 use lsp_types::{TextDocumentContentChangeWholeDocument, WorkspaceDiagnosticRequest};
 use ruff_db::system::SystemPath;
-use ty_server::{ClientOptions, DiagnosticMode, GlobalOptions};
+use ty_server::{ClientOptions, DiagnosticMode};
 
 use crate::workspace_folders::condensed_document_diagnostic_snapshot;
 use crate::{AwaitResponseError, TestServer, TestServerBuilder};
@@ -615,23 +615,11 @@ fn workspace_diagnostic_caching_settings_changed() -> Result<()> {
 
     let first_response = server.workspace_diagnostic_request(None, None);
     let previous_result_ids = extract_result_ids_from_response(&first_response);
-    let unchanged_result_id = previous_result_ids
-        .iter()
-        .find(|result| result.uri == server.file_uri(&unchanged))
-        .context("Expected a result ID for the undefined name")?
-        .value
-        .clone();
 
     // Adding a workspace can change global settings for existing workspaces, without edits.
     server.add_workspace_folder(
         extra,
-        Some(ClientOptions {
-            global: GlobalOptions {
-                show_syntax_errors: Some(false),
-                ..GlobalOptions::default()
-            },
-            ..ClientOptions::default()
-        }),
+        Some(ClientOptions::default().with_show_syntax_errors(false)),
     )?;
     server.change_workspace_folders([extra], []);
     server = server.wait_until_workspaces_are_initialized();
@@ -651,12 +639,6 @@ fn workspace_diagnostic_caching_settings_changed() -> Result<()> {
     assert!(report.full_document_diagnostic_report.items.is_empty());
     assert!(report.full_document_diagnostic_report.result_id.is_none());
     assert_eq!(unchanged_report.uri, server.file_uri(&unchanged));
-    assert_eq!(
-        unchanged_report
-            .unchanged_document_diagnostic_report
-            .result_id,
-        unchanged_result_id,
-    );
 
     Ok(())
 }

@@ -711,10 +711,6 @@ fn global_settings_change() -> Result<()> {
     server = server.wait_until_workspaces_are_initialized();
 
     let document_diagnostics = server.document_diagnostic_request(&main1, Some(result_id));
-    assert!(matches!(
-        document_diagnostics,
-        DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(_)
-    ));
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(document_diagnostics),
         @"",

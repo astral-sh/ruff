@@ -396,16 +396,6 @@ impl<'a> ResponseWriter<'a> {
         diagnostics: &[Diagnostic],
         unnecessary_hints: &[Hint],
     ) {
-        let mut diagnostics = diagnostics
-            .iter()
-            .filter(|diagnostic| self.global_settings.should_show_diagnostic(diagnostic))
-            .peekable();
-        if diagnostics.peek().is_none() && unnecessary_hints.is_empty() {
-            // Leave any previous result ID for `into_final_report` to clear. Without a previous
-            // result, there is nothing to report and the request can continue long polling.
-            return;
-        }
-
         let Some(uri) = file_to_uri(db, file) else {
             tracing::debug!("Failed to convert file path to URI at {}", file.path(db));
             return;
@@ -426,28 +416,35 @@ impl<'a> ResponseWriter<'a> {
             .map(|doc| doc.version())
             .ok();
 
-        let result_id = Diagnostics::result_id_from_hash(
+        let diagnostics = diagnostics
+            .iter()
+            .filter(|diagnostic| self.global_settings.should_show_diagnostic(diagnostic));
+        let Some(result_id) = Diagnostics::result_id_from_hash(
             db,
             diagnostics.clone(),
             unnecessary_hints,
             self.client_capabilities,
-        );
+        ) else {
+            // Leave any previous result ID for `into_final_report` to clear. Without a previous
+            // result, there is nothing to report and the request can continue long polling.
+            return;
+        };
 
         let previous_result_id = self.previous_result_ids.remove(&key).map(|(_uri, id)| id);
 
-        let report = match result_id {
-            Some(new_id) if Some(&new_id) == previous_result_id.as_ref() => {
+        let report = match previous_result_id {
+            Some(previous_id) if result_id == previous_id => {
                 WorkspaceDocumentDiagnosticReport::WorkspaceUnchangedDocumentDiagnosticReport(
                     WorkspaceUnchangedDocumentDiagnosticReport {
                         uri,
                         version,
                         unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
-                            result_id: new_id,
+                            result_id,
                         },
                     },
                 )
             }
-            new_id => {
+            _ => {
                 let mut lsp_diagnostics = diagnostics
                     .map(|diagnostic| {
                         to_lsp_diagnostic(
@@ -471,7 +468,7 @@ impl<'a> ResponseWriter<'a> {
                         uri,
                         version,
                         full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                            result_id: new_id,
+                            result_id: Some(result_id),
                             items: lsp_diagnostics,
                         },
                     },
