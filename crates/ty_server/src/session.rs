@@ -74,6 +74,9 @@ pub(crate) struct Session {
     /// Maps workspace folders to their respective workspace.
     workspaces: Workspaces,
 
+    /// Whether the initial workspace configuration has been applied.
+    workspace_configuration_initialized: bool,
+
     /// The projects across all workspaces.
     projects: BTreeMap<SystemPathBuf, ProjectState>,
 
@@ -178,6 +181,7 @@ impl Session {
             native_system,
             position_encoding,
             workspaces,
+            workspace_configuration_initialized: false,
             deferred_messages: VecDeque::new(),
             index: Some(index),
             initialization_options,
@@ -624,8 +628,6 @@ impl Session {
         client: &Client,
         workspace_folders: Vec<(Uri, ClientOptions)>,
     ) {
-        let is_initial_configuration = self.projects.is_empty();
-
         // Every workspace folder can come with its own
         // global options. In theory, these can have different
         // values. At time of writing (2026-01-28), AG has been
@@ -701,13 +703,14 @@ impl Session {
         // New workspace settings can affect diagnostics in existing workspaces. Re-registering
         // diagnostic support does not invalidate the client's cached results. There are no
         // cached results to refresh during the initial workspace configuration.
-        if !is_initial_configuration
+        if self.workspace_configuration_initialized
             && self
                 .client_capabilities()
                 .supports_workspace_diagnostic_refresh()
         {
             client.send_request::<lsp_types::DiagnosticRefreshRequest>(self, (), |_, ()| {});
         }
+        self.workspace_configuration_initialized = true;
     }
 
     /// Initializes a single workspace folder with the given URI

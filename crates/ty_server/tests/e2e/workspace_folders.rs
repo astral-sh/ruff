@@ -355,6 +355,47 @@ fn add_and_remove_workspace_folders() -> Result<()> {
     Ok(())
 }
 
+/// Replacing the only workspace still refreshes diagnostics for documents that remain open.
+#[test]
+fn replace_only_workspace_refreshes_diagnostics() -> Result<()> {
+    let root = SystemPath::new("project");
+    let nested = root.join("app");
+    let main = nested.join("main.py");
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .enable_workspace_diagnostic_refresh(true)
+        .with_file(&main, "missing")?
+        .with_file(
+            nested.join("ty.toml"),
+            "[rules]\nunresolved-reference = 'warn'",
+        )?
+        .with_workspace(root, None)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(&main, "missing", 1);
+    assert_eq!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(&main, None)),
+        "0:0..0:7[ERROR]: Name `missing` used when not defined",
+    );
+    server.assert_no_pending_messages();
+
+    // Removing the parent temporarily leaves no projects, but this is not initial configuration.
+    server.add_workspace_folder(&nested, None)?;
+    server.change_workspace_folders([nested.as_path()], [root]);
+    server = server.wait_until_workspaces_are_initialized();
+    server.await_diagnostic_refresh();
+
+    assert_eq!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(&main, None)),
+        "0:0..0:7[WARNING]: Name `missing` used when not defined",
+    );
+
+    Ok(())
+}
+
 /// Tests that if we add a workspace folder that has already been
 /// added, then it's a no-op and things still work.
 #[test]
