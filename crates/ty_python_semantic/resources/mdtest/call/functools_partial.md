@@ -1114,6 +1114,24 @@ for _ in range(10):
 reveal_type(cur())  # revealed: int | Divergent
 ```
 
+### Repeated partial application through `func`
+
+Rewrapping a partial's `func` attribute preserves the original callable. Calls through `func` still
+check argument types and retain the known return type.
+
+```py
+from functools import partial
+
+def f(value: int) -> int:
+    return value
+
+cur = partial(f)
+for _ in range(10):
+    cur = partial(cur.func)
+    cur.func("bad")  # error: [invalid-argument-type]
+    result: str = cur.func(1)  # error: [invalid-assignment]
+```
+
 ### Repeated partial application through a class attribute
 
 The wrapped callable can also flow through a class attribute before being rebound in the loop.
