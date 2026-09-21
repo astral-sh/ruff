@@ -988,6 +988,7 @@ mod tests {
         	blocking-http-call-httpx-in-async-function (ASYNC212),
         	blocking-path-method-in-async-function (ASYNC240),
         	blocking-input-in-async-function (ASYNC250),
+        	pytest-raises-exception-group (ASYNC401),
         	abstract-base-class-without-abstract-method (B024),
         	empty-method-without-abstract-decorator (B027),
         	del-attr-with-constant (B043),
