@@ -1079,6 +1079,97 @@ p2 = partial(p1, "hello")
 reveal_type(p2)  # revealed: partial[(c: float) -> bool]
 ```
 
+### Repeated partial application in a function
+
+A loop can repeatedly wrap a callable in `partial`. Inference converges without retaining an
+unbounded chain of wrapped callables.
+
+```py
+import functools
+
+def chain(depth):
+    def count(*args):
+        return len(args)
+
+    cur = count
+    for _ in range(depth):
+        cur = functools.partial(cur)
+    reveal_type(cur())  # revealed: Unknown | Divergent
+    return cur
+```
+
+### Repeated partial application at module scope
+
+The same cycle at module scope retains the known return type alongside the recursive alternative.
+
+```py
+from functools import partial
+
+def count(*args: int) -> int:
+    return len(args)
+
+cur = count
+for _ in range(10):
+    cur = partial(cur, 1)
+reveal_type(cur())  # revealed: int | Divergent
+```
+
+### Repeated partial application through `func`
+
+Rewrapping a partial's `func` attribute preserves the original callable. Calls through `func` still
+check argument types and retain the known return type.
+
+```py
+from functools import partial
+
+def f(value: int) -> int:
+    return value
+
+cur = partial(f)
+for _ in range(10):
+    cur = partial(cur.func)
+    cur.func("bad")  # error: [invalid-argument-type]
+    result: str = cur.func(1)  # error: [invalid-assignment]
+```
+
+### Repeated partial application through a class attribute
+
+The wrapped callable can also flow through a class attribute before being rebound in the loop.
+
+```py
+from functools import partial
+
+def chain(depth: int):
+    def count(*args: int) -> int:
+        return len(args)
+
+    cur = count
+    for _ in range(depth):
+        class Holder:
+            bound = partial(cur)
+
+        cur = Holder().bound
+    reveal_type(cur())  # revealed: int | Divergent
+```
+
+### Repeated partial application through `__call__`
+
+A partial's bound `__call__` method retains the same wrapped callable, so inference also converges
+when the loop rebinds that method.
+
+```py
+from functools import partial
+
+def chain(depth: int):
+    def count(*args: int) -> int:
+        return len(args)
+
+    cur = count
+    for _ in range(depth):
+        cur = partial(cur).__call__
+    reveal_type(cur())  # revealed: int | Divergent
+```
+
 ## Constructors and advanced signatures
 
 ### Class constructor
