@@ -2093,28 +2093,22 @@ impl<'db> TypeVarConstraints<'db> {
         UnionType::from_elements(db, env, self.elements(db))
     }
 
-    /// Whether a constrained type variable can retain its identity under these constraints.
-    /// Each of its constraints must match an element here by equivalence, not just subtyping:
-    /// selecting a wider constraint could return a value outside the caller's original type.
-    pub(crate) fn accepts_typevar(
+    /// Whether every constraint in `self` has an equivalent constraint in `other`.
+    ///
+    /// Subtyping is not sufficient: replacing a caller's constraint with a wider one could
+    /// allow the callee to return a value outside the caller's original type.
+    pub(super) fn is_subset_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        actual: Type<'db>,
+        other: Self,
     ) -> bool {
-        let Type::TypeVar(actual_typevar) = actual.resolve_type_alias(db) else {
-            return false;
-        };
-        actual_typevar
-            .typevar(db)
-            .constraints(db, env)
-            .is_some_and(|actual_constraints| {
-                actual_constraints.iter().all(|actual_constraint| {
-                    self.elements(db)
-                        .iter()
-                        .any(|constraint| actual_constraint.is_equivalent_to(db, env, *constraint))
-                })
-            })
+        self.elements(db).iter().all(|constraint| {
+            other
+                .elements(db)
+                .iter()
+                .any(|other_constraint| constraint.is_equivalent_to(db, env, *other_constraint))
+        })
     }
 
     fn to_instance(
