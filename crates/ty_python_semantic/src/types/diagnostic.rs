@@ -195,6 +195,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER);
     registry.register_lint(&REDUNDANT_CONDITION);
     registry.register_lint(&REDUNDANT_CONDITION_STRICT);
+    registry.register_lint(&TRUTHINESS_TEST_OF_CALLABLE);
+    registry.register_lint(&TRUTHINESS_TEST_OF_ITERABLE);
 
     // String annotations
     registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
@@ -1402,6 +1404,24 @@ declare_lint! {
         summary: "detects conditions that are always truthy or always falsey (strict)",
         status: LintStatus::stable("0.0.79"),
         default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/truthiness-test-of-callable.md")]
+    pub(crate) static TRUTHINESS_TEST_OF_CALLABLE = {
+        summary: "detects truthiness tests of `Callable`-typed objects",
+        status: LintStatus::stable("0.0.83"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/truthiness-test-of-iterable.md")]
+    pub(crate) static TRUTHINESS_TEST_OF_ITERABLE = {
+        summary: "detects truthiness tests of `Iterable`-typed objects",
+        status: LintStatus::stable("0.0.83"),
+        default_level: Level::Warn,
     }
 }
 

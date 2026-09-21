@@ -4,8 +4,9 @@ use std::borrow::Cow;
 
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
-    parsed::parsed_module,
-    source::source_text,
+    files::{FilePath, FileRange},
+    parsed::{ParsedModuleRef, parsed_module, parsed_string_annotation},
+    source::{line_index, source_text},
 };
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast::{
@@ -20,9 +21,11 @@ use ty_module_resolver::{SearchPath, file_to_module};
 use ty_python_core::{
     Truthiness,
     ast_ids::HasScopedUseId,
-    definition::DefinitionKind,
+    definition::{Definition, DefinitionKind},
     place::PlaceExpr,
     predicate::{Predicate, PredicateNode},
+    scope::FileScopeId,
+    semantic_index,
 };
 
 use crate::{
@@ -35,6 +38,7 @@ use crate::{
         KnownClass, LintDiagnosticGuard, LintDiagnosticGuardBuilder, MemberLookupPolicy, Type,
         TypeContext,
         call::bind::CallableDescription,
+        context::InferContext,
         diagnostic::typing_module_for_fix,
         enum_metadata,
         function::KnownFunction,
@@ -96,7 +100,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let RedundantCondition {
             expression: test,
             value_type: test_type,
-            is_truthy,
+            truthiness,
             kind,
         } = condition;
 
@@ -117,7 +121,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     test_type.display(db, env)
                 ));
             } else {
-                let is_truthy = if *is_truthy { "truthy" } else { "falsy" };
+                let is_truthy = if truthiness.is_always_true() {
+                    "truthy"
+                } else {
+                    "falsy"
+                };
                 diagnostic.set_primary_annotation_message(format_args!(
                     "Inferred type `{}` is always {is_truthy}",
                     test_type.display(db, env)
@@ -127,6 +135,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let describe_condition = |diagnostic: &mut LintDiagnosticGuard| {
             let source = source_text(db, self.file());
+            let is_truthy = if truthiness.is_always_true() {
+                "true"
+            } else {
+                "false"
+            };
             if source.contains_line_break(test.range()) {
                 diagnostic.set_concise_message(format_args!("Condition is always {is_truthy}"));
             } else {
@@ -186,12 +199,233 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Short-circuit evaluation can determine a condition's truthiness even when its
         // value type does not. In that case, describe the condition rather than the type.
-        let describe_as_condition =
-            test_type.is_subtype_of(db, env, KnownClass::Bool.to_instance(db, env))
-                || test_type.bool(db, env) != Truthiness::from(*is_truthy);
+        let describe_as_condition = !truthiness.is_ambiguous()
+            && (test_type.is_subtype_of(db, env, KnownClass::Bool.to_instance(db, env))
+                || test_type.bool(db, env) != *truthiness);
 
         let builder = self.context.report_lint(rule, test)?;
-        let diagnostic = if *is_truthy {
+
+        let diagnostic = if let ConditionKind::Callable(callables) = kind {
+            let mut diagnostic = builder.into_diagnostic("Suspicious boolean test of a `Callable`");
+            let source = source_text(db, self.file());
+
+            if source.contains_line_break(test.range()) {
+                diagnostic.set_concise_message(format_args!(
+                    "Object of type `{}` might always be truthy (did you mean to call it?)",
+                    test_type.display(db, env)
+                ));
+            } else if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+                diagnostic.set_concise_message(format_args!(
+                    "Callable `{}` might always be truthy \
+                        (has type `{}` -- did you mean to call it?)",
+                    &source[test.range()],
+                    test_type.display(db, env)
+                ));
+            } else {
+                diagnostic.set_concise_message(format_args!(
+                    "Expression `{}` of type `{}` might always be truthy \
+                        (did you mean to call it?)",
+                    &source[test.range()],
+                    test_type.display(db, env)
+                ));
+            }
+            diagnostic.set_primary_annotation_message(format_args!(
+                "`{}` object tested for truthiness",
+                test_type.display(db, env)
+            ));
+            diagnostic
+                .info("Callable objects are usually functions, and functions are always truthy");
+
+            let should_await = self.should_await_call(
+                test,
+                callables.iter().flat_map(|callable| {
+                    callable
+                        .signatures(db)
+                        .iter()
+                        .map(|signature| signature.return_ty)
+                }),
+            );
+
+            if should_await {
+                diagnostic.help("Did you mean to call and await this callable?");
+            } else {
+                diagnostic.help("Did you mean to call this callable?");
+            }
+
+            let uncalled_function = UncalledFunction {
+                has_parameters: callables
+                    .iter()
+                    .any(|callable| callable.signatures(db).has_parameters()),
+                should_await,
+            };
+
+            uncalled_function.suggest_call(&self.context, &mut diagnostic, test);
+
+            diagnostic
+        } else if kind == &ConditionKind::Iterable {
+            let mut diagnostic =
+                builder.into_diagnostic("Suspicious boolean test of an `Iterable`");
+            let source = source_text(db, self.file());
+
+            if source.contains_line_break(test.range()) {
+                diagnostic.set_concise_message(format_args!(
+                    "Object might be truthy even if its length is 0 (has type `{}`)",
+                    test_type.display(db, env)
+                ));
+            } else {
+                let kind = if test.is_name_expr() {
+                    "Variable"
+                } else {
+                    "Expression"
+                };
+                diagnostic.set_concise_message(format_args!(
+                    "{kind} `{}` might be truthy even if its length is 0 (has type `{}`)",
+                    &source[test.range()],
+                    test_type.display(db, env)
+                ));
+            }
+            diagnostic.set_primary_annotation_message(format_args!(
+                "`{}` object tested for truthiness",
+                test_type.display(db, env)
+            ));
+
+            let definition_info =
+                condition_definition_info(db, self.program_file(), test, |expr| {
+                    self.expression_type(expr)
+                });
+
+            let mut first_party_annotation = None;
+
+            if let Some(single_definition) = definition_info.single_definition {
+                let file = single_definition.python_file(db);
+                let module = parsed_module(db, file).load(db);
+
+                if let Some(annotation) =
+                    self.matching_type_annotation(single_definition, &module, *test_type)
+                {
+                    let file = single_definition.file(db);
+
+                    diagnostic.annotate(
+                        Annotation::secondary(Span::from(file).with_range(annotation.range()))
+                            .message(format_args!(
+                                "Inferred as `{}` due to this annotation",
+                                test_type.display(db, env)
+                            )),
+                    );
+
+                    if test_type
+                        .known_specialization(db, env, KnownClass::Iterable)
+                        .is_some()
+                        && self.is_first_party_definition(single_definition)
+                    {
+                        first_party_annotation = Some(IterableAnnotation {
+                            range: FileRange::new(file, annotation.range()),
+                            scope: semantic_index(db, single_definition.program_file(db))
+                                .expression_scope_id(annotation),
+                            iterable_ranges: self
+                                .iterable_annotation_ranges(single_definition, annotation),
+                        });
+                    }
+                }
+            }
+
+            diagnostic.info(format_args!(
+                "`{}` objects can be generators, \
+                and generators are truthy even when empty",
+                test_type.display(db, env)
+            ));
+
+            if let Some(IterableAnnotation {
+                range,
+                scope,
+                iterable_ranges,
+            }) = first_party_annotation
+            {
+                let line = line_index(db, range.file()).line_index(range.start());
+                let collection_module = if env.python_version(db) >= PythonVersion::PY39 {
+                    "collections.abc"
+                } else {
+                    "typing"
+                };
+
+                let annotation_source = source_text(db, range.file());
+                let suggestion = iterable_ranges.map(|ranges| &annotation_source[ranges.element]);
+
+                if range.file() == self.file() {
+                    if let Some(suggestion) = suggestion {
+                        diagnostic.help(format_args!(
+                            "Use `{collection_module}.Collection[{suggestion}]` as the annotation \
+                            on line {line}"
+                        ));
+                        if let Some(ranges) = iterable_ranges
+                            && let Some(action) = self.context.importer().import_for_diagnostic(
+                                ImportRequest::import_from(collection_module, "Collection"),
+                                scope,
+                                range.start(),
+                            )
+                        {
+                            diagnostic.set_fix(Fix::unsafe_edits(
+                                Edit::range_replacement(
+                                    action.symbol_text().to_string(),
+                                    ranges.origin,
+                                ),
+                                action.import().cloned(),
+                            ));
+                        }
+                    } else {
+                        diagnostic.help(format_args!(
+                            "Consider reworking the annotation on line {line} \
+                            to use `{collection_module}.Collection`",
+                        ));
+                    }
+                } else {
+                    let path = range.file().path(db);
+                    let rendered_path = match path {
+                        FilePath::System(path) => path
+                            .strip_prefix(db.system().current_directory())
+                            .unwrap_or(path)
+                            .as_str(),
+                        FilePath::Vendored(_) | FilePath::SystemVirtual(_) => path.as_str(),
+                    };
+                    if let Some(suggestion) = suggestion {
+                        diagnostic.help(format_args!(
+                            "Consider using `{collection_module}.Collection[{suggestion}]` \
+                            in the annotation on line {line} of {rendered_path}"
+                        ));
+                    } else {
+                        diagnostic.help(format_args!(
+                            "Consider reworking the annotation on line {line} of {rendered_path} \
+                            to use `{collection_module}.Collection`",
+                        ));
+                    }
+                }
+                diagnostic.info(
+                    "A `Collection` must define `__len__`, \
+                    so `Collection` excludes generators",
+                );
+                diagnostic.help(
+                    "Alternatively, test the length of the iterable \
+                    instead of its truthiness",
+                );
+            } else {
+                diagnostic.help("Test the length of the iterable instead of its truthiness");
+            }
+
+            if diagnostic.fix().is_none() {
+                let semantic_model = SemanticModel::new(db, self.program_file());
+                let test_ref = ast::AnyNodeRef::from(*test);
+                if semantic_model.definitely_has_builtin_binding("len", test_ref)
+                    && semantic_model.definitely_has_builtin_binding("tuple", test_ref)
+                {
+                    diagnostic.set_fix(Fix::display_only_edits(
+                        Edit::insertion("len(tuple(".to_string(), test.start()),
+                        [Edit::insertion("))".to_string(), test.end())],
+                    ));
+                }
+            }
+
+            diagnostic
+        } else if truthiness.is_always_true() {
             let add_always_truthy_concise_message = |diagnostic: &mut LintDiagnosticGuard| {
                 if should_quote_test_expression()
                     && let source = source_text(db, self.file())
@@ -242,31 +476,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut diagnostic =
                     builder.into_diagnostic(format_args!("{function} is always truthy"));
 
-                // Add a suggestion and fix that they might have meant to call (and possibly
-                // also await) this function.
-                //
-                // It's true that calling the function might not actually fix this diagnostic
-                // if the function returns something that is always truthy. They still probably
-                // meant to call the function, though, so it's still a useful suggestion/fix!
-
-                // A coroutine return type establishes that calling and awaiting the function
-                // is appropriate. `Any`, `Unknown`, and `Never` do not establish this, even
-                // though they are assignable to `CoroutineType`.
-                // Use the top materialization so the unspecified generic arguments do not
-                // prevent concrete coroutine types from being subtypes.
-                let coroutine = KnownClass::CoroutineType
-                    .to_instance(db, env)
-                    .top_materialization(db, env);
-
-                let is_awaitable_coro_function = self.can_await_here(test)
-                    && function.signature().iter().all(|signature| {
-                        !signature.return_ty.is_equivalent_to(db, env, Type::Never)
-                            && signature.return_ty.is_subtype_of(db, env, coroutine)
-                    });
+                let should_await = self.should_await_call(
+                    test,
+                    function
+                        .signature()
+                        .iter()
+                        .map(|signature| signature.return_ty),
+                );
 
                 let kind = function.kind();
 
-                if is_awaitable_coro_function {
+                if should_await {
                     diagnostic.set_primary_annotation_message(format_args!(
                         "Did you mean to `await` and call this {kind}?",
                     ));
@@ -276,35 +496,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ));
                 }
 
-                if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
-                    let (call, applicability) = if function.signature().has_parameters() {
-                        ("(...)", Applicability::DisplayOnly)
-                    } else {
-                        ("()", Applicability::Unsafe)
-                    };
-                    let call_edit = Edit::insertion(call.to_string(), test.end());
+                let uncalled_function = UncalledFunction {
+                    has_parameters: function.signature().has_parameters(),
+                    should_await,
+                };
 
-                    let fix = if is_awaitable_coro_function {
-                        Fix::applicable_edits(
-                            Edit::insertion("await ".to_string(), test.start()),
-                            [call_edit],
-                            applicability,
-                        )
-                    } else {
-                        Fix::applicable_edit(call_edit, applicability)
-                    };
-                    let source = source_text(db, self.file());
-                    let expression_text = &source[test.range()];
-                    let prefix = if is_awaitable_coro_function {
-                        "await "
-                    } else {
-                        ""
-                    };
-                    diagnostic.help(format_args!(
-                        "Replace with `{prefix}{expression_text}{call}`"
-                    ));
-                    diagnostic.set_fix(fix);
-                }
+                uncalled_function.suggest_call(&self.context, &mut diagnostic, test);
 
                 diagnostic
             } else if let Some(tuple_spec) = test_type.tuple_instance_spec(db, env)
@@ -687,6 +884,82 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         diagnostic
     }
 
+    /// Find a definition's annotation if it matches the type inferred at the use site.
+    fn matching_type_annotation<'ast>(
+        &self,
+        definition: Definition<'db>,
+        module: &'ast ParsedModuleRef,
+        inferred_type: Type<'db>,
+    ) -> Option<&'ast ast::Expr> {
+        let db = self.db();
+        let annotation = match definition.kind(db) {
+            DefinitionKind::AnnotatedAssignment(assignment) => assignment.annotation(module),
+            DefinitionKind::Parameter(parameter) => parameter.annotation(module)?,
+            _ => return None,
+        };
+        (self.annotation_expression_type(definition, annotation)? == inferred_type)
+            .then_some(annotation)
+    }
+
+    fn annotation_expression_type(
+        &self,
+        definition: Definition<'db>,
+        expression: &ast::Expr,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        match definition.kind(db) {
+            DefinitionKind::AnnotatedAssignment(_) => {
+                infer_definition_types(db, definition).try_expression_type(expression)
+            }
+            DefinitionKind::Parameter(_) => {
+                let scope = definition.scope(db).scope(db).parent()?;
+                let scope_id = scope.to_scope_id(db, definition.program_file(db));
+                infer_scope_types(db, scope_id, TypeContext::default())
+                    .try_expression_type(expression)
+            }
+            _ => None,
+        }
+    }
+
+    /// Locate the iterable name and its element annotation so a fix can change only the name.
+    /// Keeping the rest of the source preserves aliases, forward references, and version-specific
+    /// syntax. Parsed string annotations retain source offsets, including nested quotes.
+    fn iterable_annotation_ranges(
+        &self,
+        definition: Definition<'db>,
+        annotation: &ast::Expr,
+    ) -> Option<IterableAnnotationRanges> {
+        let db = self.db();
+        match annotation {
+            ast::Expr::StringLiteral(string) => {
+                let source = source_text(db, definition.file(db));
+                let parsed =
+                    parsed_string_annotation(&source, string.as_single_part_string()?).ok()?;
+                self.iterable_annotation_ranges(definition, parsed.expr())
+            }
+            ast::Expr::Subscript(subscript) => {
+                let known_class = self
+                    .annotation_expression_type(definition, &subscript.value)?
+                    .as_class_literal()?
+                    .known(db)?;
+
+                (known_class == KnownClass::Iterable).then_some(IterableAnnotationRanges {
+                    origin: subscript.value.range(),
+                    element: subscript.slice.range(),
+                })
+            }
+            _ => None,
+        }
+    }
+
+    fn is_first_party_definition(&self, definition: Definition<'db>) -> bool {
+        let db = self.db();
+        definition.file(db) == self.file()
+            || file_to_module(db, definition.program_file(db).resolver_file(db))
+                .and_then(|module| module.search_path(db))
+                .is_some_and(SearchPath::is_first_party)
+    }
+
     fn diagnose_single_length_tuple(
         &self,
         length: TupleLength,
@@ -727,31 +1000,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             if let Some(single_definition) = definition_info.single_definition {
                 let file = single_definition.python_file(db);
-                let program_file = single_definition.program_file(db);
                 let module = parsed_module(db, file).load(db);
-                let annotation_info = match single_definition.kind(db) {
-                    DefinitionKind::AnnotatedAssignment(assignment) => {
-                        let annotation = assignment.annotation(&module);
-                        infer_definition_types(db, single_definition)
-                            .try_expression_type(annotation)
-                            .map(|annotation_type| (annotation, annotation_type))
-                    }
-                    DefinitionKind::Parameter(parameter) => {
-                        parameter.annotation(&module).and_then(|annotation| {
-                            let scope = single_definition.scope(db).scope(db).parent()?;
-                            let annotation_type = infer_scope_types(
-                                db,
-                                scope.to_scope_id(db, program_file),
-                                TypeContext::default(),
-                            )
-                            .try_expression_type(annotation)?;
-                            Some((annotation, annotation_type))
-                        })
-                    }
-                    _ => None,
-                };
-                if let Some((annotation, annotation_type)) = annotation_info
-                    && annotation_type == node_type
+                if let Some(annotation) =
+                    self.matching_type_annotation(single_definition, &module, node_type)
                 {
                     let file = single_definition.file(db);
                     let diagnostic_annotation =
@@ -767,19 +1018,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .to_string_parts();
 
                     if suggested_type.is_valid_syntax {
-                        let resolver_file = single_definition.program_file(db).resolver_file(db);
-                        let annotated_in_first_party_code = file == self.file()
-                            || file_to_module(db, resolver_file)
-                                .and_then(|module| module.search_path(db))
-                                .is_some_and(SearchPath::is_first_party);
-
                         let maybe_star = if annotation.is_starred_expr() {
                             "*"
                         } else {
                             ""
                         };
 
-                        let annotation = if annotated_in_first_party_code {
+                        let annotation = if self.is_first_party_definition(single_definition) {
                             diagnostic_annotation().message(format_args!(
                                 "Did you mean `{maybe_star}{}`?",
                                 suggested_type.label
@@ -796,6 +1041,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
         }
+    }
+
+    /// Whether every callable return type is known to be awaitable in this context.
+    fn should_await_call(
+        &self,
+        expression: &ast::Expr,
+        return_types: impl IntoIterator<Item = Type<'db>>,
+    ) -> bool {
+        if !self.can_await_here(expression) {
+            return false;
+        }
+
+        let db = self.db();
+        let env = self.program_environment();
+
+        // Use the top materialization so concrete return types can be subtypes regardless of
+        // the awaitable's generic arguments. `Any`, `Unknown`, and `Never` do not establish
+        // that a call returns an awaitable.
+        let awaitable = KnownClass::Awaitable
+            .to_instance(db, env)
+            .top_materialization(db, env);
+
+        return_types.into_iter().all(|return_ty| {
+            !return_ty.is_equivalent_to(db, env, Type::Never)
+                && return_ty.is_subtype_of(db, env, awaitable)
+        })
     }
 
     /// Return a [`TextRange`] spanning from `branch_start` up to and including
@@ -1007,7 +1278,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let RedundantCondition {
             expression: test,
             value_type: _,
-            is_truthy: _,
+            truthiness: _,
             kind,
         } = condition;
 
@@ -1070,7 +1341,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             if !implicit_else_is_unreachable
-                && *kind == ConditionKind::Boolean
+                && kind.is_boolean()
                 && let Some(clause) = if_stmt.elif_else_clauses.last()
                 && clause.test.as_ref() == Some(test)
                 && !diagnostic.has_applicable_fix(Applicability::DisplayOnly)
@@ -1336,4 +1607,77 @@ fn logical_line_end(source: &str, tokens: &Tokens, offset: TextSize) -> TextSize
 /// See [`is_trivial_statement`] for the definition of a trivial statement.
 fn first_nontrivial_statement(suite: &[ast::Stmt]) -> Option<&ast::Stmt> {
     suite.iter().find(|stmt| !is_trivial_statement(stmt))
+}
+
+#[derive(Debug, Clone, Copy)]
+struct UncalledFunction {
+    has_parameters: bool,
+    should_await: bool,
+}
+
+impl UncalledFunction {
+    /// Add a suggestion and fix that they might have meant to call (and possibly
+    /// also await) this function.
+    ///
+    /// It's true that calling the function might not actually fix this diagnostic
+    /// if the function returns something that is always truthy. They still probably
+    /// meant to call the function, though, so it's still a useful suggestion/fix!
+    fn suggest_call(self, context: &InferContext, diagnostic: &mut Diagnostic, test: &ast::Expr) {
+        if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+            let (call, applicability) = if self.has_parameters {
+                ("(...)", Applicability::DisplayOnly)
+            } else {
+                ("()", Applicability::Unsafe)
+            };
+            let call_edit = Edit::insertion(call.to_string(), test.end());
+            let prefix = if self.should_await { "await " } else { "" };
+            let fix = if self.should_await {
+                Fix::applicable_edits(
+                    Edit::insertion(prefix.to_string(), test.start()),
+                    [call_edit],
+                    applicability,
+                )
+            } else {
+                Fix::applicable_edit(call_edit, applicability)
+            };
+            let source = source_text(context.db(), context.file());
+            diagnostic.help(format_args!(
+                "Replace with `{prefix}{}{call}`",
+                &source[test.range()]
+            ));
+            diagnostic.set_fix(fix);
+        }
+    }
+}
+
+/// A first-party `Iterable` annotation that can be replaced with `Collection`.
+#[derive(Debug)]
+struct IterableAnnotation {
+    range: FileRange,
+    /// The scope where the annotation's names are resolved. Import validation uses this scope
+    /// because names can be shadowed differently at the truthiness test.
+    scope: FileScopeId,
+    iterable_ranges: Option<IterableAnnotationRanges>,
+}
+
+/// Source ranges for replacing `Iterable` while preserving the element annotation.
+///
+/// In this function's stringized parameter annotation, `origin` covers `Iterable` inside the
+/// string, and `element` covers `P` inside the string:
+///
+/// ```python
+/// from collections.abc import Iterable
+/// from pathlib import Path as P
+///
+/// def check(items: "Iterable[P]"):
+///     if items:
+///         print("Received paths")
+/// ```
+///
+/// The fix adds a `Collection` import and replaces `origin`, producing `"Collection[P]"` while
+/// preserving the original quotes and the alias `P`.
+#[derive(Debug, Clone, Copy)]
+struct IterableAnnotationRanges {
+    origin: TextRange,
+    element: TextRange,
 }
