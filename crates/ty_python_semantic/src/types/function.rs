@@ -2408,6 +2408,8 @@ pub enum KnownFunction {
     IsEquivalentTo,
     /// `ty_extensions._internal.is_subtype_of`
     IsSubtypeOf,
+    /// `ty_extensions._internal.is_constraint_set_subtype_of`
+    IsConstraintSetSubtypeOf,
     /// `ty_extensions._internal.is_assignable_to`
     IsAssignableTo,
     /// `ty_extensions._internal.is_constraint_set_assignable_to`
@@ -2526,6 +2528,7 @@ impl KnownFunction {
             Self::StaticAssert => module.is_ty_extensions(),
             Self::IsAssignableTo
             | Self::IsConstraintSetAssignableTo
+            | Self::IsConstraintSetSubtypeOf
             | Self::IsDisjointFrom
             | Self::IsEquivalentTo
             | Self::IsSingleton
@@ -3210,6 +3213,7 @@ pub(crate) mod tests {
 
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf
+                | KnownFunction::IsConstraintSetSubtypeOf
                 | KnownFunction::GenericContext
                 | KnownFunction::IntoCallable
                 | KnownFunction::IntoRegularCallable

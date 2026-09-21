@@ -120,11 +120,12 @@ upper-bound evidence.
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to, is_constraint_set_subtype_of
 
 def _[T]() -> None:
     expected = is_constraint_set_assignable_to(int, T)
     static_assert(ConstraintSet.lower_bound(int, T) == expected)
+    static_assert(is_constraint_set_subtype_of(int, T) == expected)
 ```
 
 Ordinary TypeVar bounds retain callable returns.
@@ -144,11 +145,12 @@ lower-bound evidence.
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to, is_constraint_set_subtype_of
 
 def _[T]() -> None:
     expected = is_constraint_set_assignable_to(T, int)
     static_assert(ConstraintSet.upper_bound(T, int) == expected)
+    static_assert(is_constraint_set_subtype_of(T, int) == expected)
 ```
 
 Upper bounds likewise retain ordinary callable returns.
@@ -437,6 +439,23 @@ class RecursiveValue[T](Protocol):
 
 def inspect[T]() -> None:
     constraints = is_constraint_set_assignable_to(Top[RecursiveValue[str]], Bottom[RecursiveValue[T]])
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
+```
+
+Subtyping also rejects a top-materialized source against an unmaterialized target, and an
+unmaterialized source against a bottom-materialized target.
+
+```py
+from ty_extensions._internal import is_constraint_set_subtype_of
+
+def subtype[T]() -> None:
+    constraints = is_constraint_set_subtype_of(Top[RecursiveValue[str]], Bottom[RecursiveValue[T]])
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
+
+    constraints = is_constraint_set_subtype_of(Top[RecursiveValue[str]], RecursiveValue[T])
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
+
+    constraints = is_constraint_set_subtype_of(RecursiveValue[str], Bottom[RecursiveValue[T]])
     reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
 ```
 
