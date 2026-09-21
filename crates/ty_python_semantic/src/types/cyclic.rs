@@ -262,6 +262,14 @@ struct DefinitionUse<'db> {
     specialization: Option<Specialization<'db>>,
 }
 
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct SpecializationFlow<'db> {
+    may_grow: bool,
+    /// Parameter-free references can select distinct descriptor overloads. There are only
+    /// finitely many, so visiting them cannot by itself produce unbounded specialization.
+    fixed_specializations: Box<[Specialization<'db>]>,
+}
+
 /// Parameter flow between all recursive definitions reachable from one root.
 ///
 /// Whether a recursive definition can keep producing new specializations is modeled as a graph
@@ -292,6 +300,7 @@ struct DefinitionUse<'db> {
 #[derive(Default)]
 struct SpecializationFlowGraph<'db> {
     edges: FxHashSet<FlowEdge<'db>>,
+    fixed_specializations: Vec<Specialization<'db>>,
     /// Definition references used to decide whether an unresolved flow can return to the root.
     definition_edges: Vec<(Definition<'db>, Definition<'db>)>,
     /// Definitions whose captured outer parameters cannot be mapped to their parent specialization.
@@ -309,6 +318,7 @@ struct SpecializationFlowVisitor<'db> {
     visited_types: TypeCollector<'db>,
     edges: RefCell<Vec<FlowEdge<'db>>>,
     referenced_definitions: RefCell<Vec<RecursiveDefinition<'db>>>,
+    fixed_specializations: RefCell<Vec<Specialization<'db>>>,
     inconclusive: Cell<bool>,
 }
 
@@ -425,21 +435,28 @@ impl<'db> RecursiveDefinition<'db> {
     }
 
     fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
+        self.specialization_flow(db).may_grow
+    }
+
+    fn specialization_flow(self, db: &'db dyn Db) -> &'db SpecializationFlow<'db> {
         #[salsa::tracked(
-            returns(copy),
-            cycle_initial=|_, _, _, ()| true,
+            returns(ref),
+            cycle_initial=|_, _, _, ()| SpecializationFlow { may_grow: true, fixed_specializations: Box::default() },
             heap_size=ruff_memory_usage::heap_size,
         )]
-        fn may_have_unbounded_specialization_inner<'db>(
+        fn specialization_flow_inner<'db>(
             db: &'db dyn Db,
             root: RecursiveDefinition<'db>,
             _: (),
-        ) -> bool {
+        ) -> SpecializationFlow<'db> {
             let graph = SpecializationFlowGraph::build(db, root);
-            graph.root_may_have_unbounded_specialization(db, root)
+            SpecializationFlow {
+                may_grow: graph.root_may_have_unbounded_specialization(db, root),
+                fixed_specializations: graph.fixed_specializations.into_boxed_slice(),
+            }
         }
 
-        may_have_unbounded_specialization_inner(db, self, ())
+        specialization_flow_inner(db, self, ())
     }
 }
 
@@ -482,6 +499,7 @@ impl<'db> DefinitionUse<'db> {
 impl<'db> SpecializationFlowGraph<'db> {
     fn build(db: &'db dyn Db, root: RecursiveDefinition<'db>) -> Self {
         let mut graph = Self::default();
+        let root_context = root.generic_context(db);
         let mut pending = vec![root];
         let mut visited = FxHashSet::default();
 
@@ -497,11 +515,18 @@ impl<'db> SpecializationFlowGraph<'db> {
             if !visitor.visit_definition_body(db, source) {
                 graph.inconclusive = true;
             }
-            let (edges, referenced_definitions, inconclusive) = visitor.finish();
-            graph.edges.extend(edges);
-            if inconclusive {
+            graph.edges.extend(visitor.edges.into_inner());
+            for specialization in visitor.fixed_specializations.into_inner() {
+                if Some(specialization.generic_context(db)) == root_context
+                    && !graph.fixed_specializations.contains(&specialization)
+                {
+                    graph.fixed_specializations.push(specialization);
+                }
+            }
+            if visitor.inconclusive.get() {
                 graph.inconclusive_definitions.insert(source_definition);
             }
+            let referenced_definitions = visitor.referenced_definitions.into_inner();
             graph.definition_edges.extend(
                 referenced_definitions
                     .iter()
@@ -676,16 +701,9 @@ impl<'db> SpecializationFlowVisitor<'db> {
             visited_types: TypeCollector::default(),
             edges: RefCell::default(),
             referenced_definitions: RefCell::default(),
+            fixed_specializations: RefCell::default(),
             inconclusive: Cell::default(),
         })
-    }
-
-    fn finish(self) -> (Vec<FlowEdge<'db>>, Vec<RecursiveDefinition<'db>>, bool) {
-        (
-            self.edges.into_inner(),
-            self.referenced_definitions.into_inner(),
-            self.inconclusive.get(),
-        )
     }
 
     /// Visits the definition with each formal parameter mapped to itself.
@@ -741,6 +759,18 @@ impl<'db> SpecializationFlowVisitor<'db> {
                     // helper independently loses those arguments, so it cannot establish that
                     // expansion will not return to the root.
                     complete &= reference.target == source;
+                    if let Some(specialization) = reference.specialization
+                        && specialization.types(db).iter().all(|&argument| {
+                            !any_over_type_including_alias_arguments(
+                                db,
+                                &self.env,
+                                argument,
+                                |ty| matches!(ty, Type::TypeVar(_)),
+                            )
+                        })
+                    {
+                        self.fixed_specializations.borrow_mut().push(specialization);
+                    }
                     self.record_reference(db, reference);
                 }
                 return complete;
@@ -1515,7 +1545,26 @@ impl<'db> CallableRecursionGuard<'db> {
                 analysis.references.borrow_mut().push(reference);
                 return on_growth();
             }
-            if reference.target.may_have_unbounded_specialization(db) {
+            // References with fixed arguments reset the specialization rather than growing it.
+            // Descriptor overloads can select a finite chain through such references, including
+            // `C[int] -> C[list[int]] -> End`. Expand these finitely many receivers normally;
+            // revisiting the exact receiver is still caught above.
+            let flow = reference.target.specialization_flow(db);
+            if flow.may_grow
+                && !reference.specialization.is_some_and(|specialization| {
+                    flow.fixed_specializations.contains(&specialization)
+                })
+                && self
+                    .active
+                    .seen
+                    .borrow()
+                    .iter()
+                    .filter_map(|&active| CallableDefinition::from_type(db, env, active, self.mode))
+                    .filter(|active| active.target == reference.target)
+                    .any(|previous| {
+                        previous.has_shrinking_argument(db, env, &std::iter::once(reference))
+                    })
+            {
                 return on_growth();
             }
             return self.active.visit(ty, on_cycle, func);

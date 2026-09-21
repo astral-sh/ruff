@@ -227,6 +227,47 @@ missing: Callable[[], C[C[C[End]]]] = C[C[C[End]]]  # error: [invalid-assignment
 wrong: Callable[[str], C[C[C[End]]]] = C[C[C[End]]]  # error: [invalid-assignment]
 ```
 
+## Finite constructor chains selected by descriptors
+
+In the example below, the initializer descriptor selects the finite chain
+`C[int] -> C[list[int]] -> C[list[list[int]]] -> End`. Its type argument grows temporarily, but each
+step selects a different overload with a fixed return type. Other specializations can grow
+recursively through the generic overload. Direct calls and callback assignments retain the final
+initializer's required integer parameter.
+
+```py
+from typing import Any, Callable, overload
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Initializer:
+    @overload
+    def __get__(self, instance: "C[int]", owner: type) -> "type[C[list[int]]]": ...
+    @overload
+    def __get__(self, instance: "C[list[int]]", owner: type) -> "type[C[list[list[int]]]]": ...
+    @overload
+    def __get__(self, instance: "C[list[list[int]]]", owner: type) -> type[End]: ...
+    @overload
+    def __get__[T](
+        self, instance: "C[T]", owner: type
+    ) -> "type[C[list[int]]] | type[C[list[list[int]]]] | type[End] | type[C[list[T]]]": ...
+    def __get__(self, instance: Any, owner: type) -> Any: ...
+
+class C[T]:
+    value: T
+    __init__ = Initializer()
+
+def check(cls: type[C[int]]) -> None:
+    cls(1)
+    cls()  # error: [missing-argument]
+    cls("x")  # error: [invalid-argument-type]
+
+    valid: Callable[[int], C[int]] = cls
+    missing: Callable[[], C[int]] = cls  # error: [invalid-assignment]
+    wrong: Callable[[str], C[int]] = cls  # error: [invalid-assignment]
+```
+
 ## Generic `__iter__` methods with explicit receivers
 
 Binding `__iter__` to an `Unpacker[Iterable[int]]` infers `S` as `int` from the explicit
