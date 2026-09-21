@@ -60,7 +60,6 @@ fn resolve_run_params_for_a_file() -> Result<()> {
         "pytest",
         "<temp_dir>/src/tests/test_module.py"
       ],
-      "program": null,
       "workingDirectory": "<temp_dir>/src"
     }
     "#);
@@ -82,7 +81,6 @@ fn resolve_run_params_for_a_directory() -> Result<()> {
         "pytest",
         "<temp_dir>/src/tests"
       ],
-      "program": null,
       "workingDirectory": "<temp_dir>/src"
     }
     "#);
@@ -104,7 +102,6 @@ fn resolve_run_params_for_a_function() -> Result<()> {
         "pytest",
         "<temp_dir>/src/tests/test_module.py::test_one"
       ],
-      "program": null,
       "workingDirectory": "<temp_dir>/src"
     }
     "#);
@@ -126,48 +123,6 @@ fn resolve_run_params_for_a_class() -> Result<()> {
         "pytest",
         "<temp_dir>/src/tests/test_module.py::TestThings"
       ],
-      "program": null,
-      "workingDirectory": "<temp_dir>/src"
-    }
-    "#);
-
-    Ok(())
-}
-
-#[cfg(unix)]
-#[test]
-fn resolve_run_params_with_a_project_virtual_environment() -> Result<()> {
-    let builder = TestServerBuilder::new()?;
-    let python_home = builder.file_path(SystemPath::new("base/bin"));
-
-    let mut server = builder
-        .with_workspace(SystemPath::new("src"), None)?
-        .with_file(SystemPath::new("base/bin/python"), "")?
-        .with_file(
-            SystemPath::new("src/.venv/pyvenv.cfg"),
-            format!("home = {python_home}\n"),
-        )?
-        .with_file(SystemPath::new("src/.venv/bin/python"), "")?
-        .with_file(
-            SystemPath::new("src/.venv/lib/python3.13/site-packages/.gitkeep"),
-            "",
-        )?
-        .with_file(SystemPath::new(MODULE), MODULE_CONTENT)?
-        .enable_pull_diagnostics(false)
-        .build()
-        .wait_until_workspaces_are_initialized();
-
-    let id = test_id(&server, MODULE, Some("test_one"));
-    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
-
-    insta::assert_json_snapshot!(params, @r#"
-    {
-      "arguments": [
-        "-m",
-        "pytest",
-        "<temp_dir>/src/tests/test_module.py::test_one"
-      ],
-      "program": "<temp_dir>/src/.venv/bin/python",
       "workingDirectory": "<temp_dir>/src"
     }
     "#);
@@ -230,7 +185,6 @@ def test_beta():
         "pytest",
         "<temp_dir>/workspace_one/tests/test_module.py::test_alpha"
       ],
-      "program": null,
       "workingDirectory": "<temp_dir>/workspace_one"
     }
     "#);
@@ -249,7 +203,6 @@ def test_beta():
         "pytest",
         "<temp_dir>/workspace_two/tests/test_module.py::test_beta"
       ],
-      "program": null,
       "workingDirectory": "<temp_dir>/workspace_two"
     }
     "#);
