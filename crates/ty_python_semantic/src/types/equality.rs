@@ -1929,6 +1929,10 @@ fn has_reflexive_equality_semantics<'db>(
     evaluator: &ComparisonEvaluator<'db>,
     ty: Type<'db>,
 ) -> bool {
+    // `comparison_semantics` identifies a single builtin comparison implementation. The evaluator
+    // normally distributes unions before that lookup, but this check receives the original operands.
+    // A union such as `Literal[1, "a"]` has reflexive equality in every alternative without sharing
+    // one comparison implementation, so check each alternative here.
     if let Type::Union(union) = ty.resolve_type_alias(evaluator.db) {
         return union
             .elements(evaluator.db)
