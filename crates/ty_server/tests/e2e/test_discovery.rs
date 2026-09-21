@@ -3,7 +3,7 @@ use lsp_types::{LspRequestMethod, MessageDirection, Request};
 use ruff_db::system::SystemPath;
 use serde_json::{Value, json};
 
-use crate::TestServerBuilder;
+use crate::{TestServer, TestServerBuilder};
 
 enum DiscoverTests {}
 
@@ -13,6 +13,16 @@ impl Request for DiscoverTests {
     const METHOD: LspRequestMethod<'static> = LspRequestMethod::Custom("ty/discoverTests");
     const MESSAGE_DIRECTION: MessageDirection = MessageDirection::ClientToServer;
 }
+
+const DUMMY_TEST: &str = "\
+def test_dummy():
+    pass
+";
+
+const NON_TEST: &str = "\
+def test_should_not_be_found():
+    pass
+";
 
 fn sort_by_id(mut response: Value) -> Value {
     if let Some(Value::Array(items)) = response.get_mut("tests") {
@@ -25,32 +35,19 @@ fn sort_by_id(mut response: Value) -> Value {
 fn discover_all_tests() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let test_example = SystemPath::new("src/tests/test_example.py");
-    let test_example_content = "\
-def test_dummy():
-    pass
-";
     let test_other = SystemPath::new("src/tests/test_other.py");
     let test_other_content = "\
 class Test:
-    def method_test():
+    def test_method(self):
         pass
 ";
     let main = SystemPath::new("src/main.py");
-    let main_content = "\
-def test_should_not_be_found():
-    pass
-
-
-def main():
-    pass
-";
 
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
-        .with_file(test_example, test_example_content)?
+        .with_file(test_example, DUMMY_TEST)?
         .with_file(test_other, test_other_content)?
-        .with_file(main, main_content)?
-        .enable_pull_diagnostics(false)
+        .with_file(main, NON_TEST)?
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -119,6 +116,23 @@ def main():
             }
           },
           "uri": "file://<temp_dir>/src/tests/test_other.py"
+        },
+        {
+          "id": "<temp_dir>/src/tests/test_other.py::Test::test_method",
+          "kind": "function",
+          "label": "test_method",
+          "parent": "<temp_dir>/src/tests/test_other.py::Test",
+          "range": {
+            "end": {
+              "character": 19,
+              "line": 1
+            },
+            "start": {
+              "character": 8,
+              "line": 1
+            }
+          },
+          "uri": "file://<temp_dir>/src/tests/test_other.py"
         }
       ]
     }
@@ -128,127 +142,18 @@ def main():
 }
 
 #[test]
-fn discover_tests_across_multiple_workspaces() -> Result<()> {
-    let workspace_one = SystemPath::new("workspace_one");
-    let workspace_two = SystemPath::new("workspace_two");
-    // Both workspaces have a file with the same name, showing that ids don't
-    // collide, since they embed each workspace's own absolute path.
-    let test_one = SystemPath::new("workspace_one/test_example.py");
-    let test_one_content = "\
-def test_first():
-    pass
-";
-    let test_two = SystemPath::new("workspace_two/test_example.py");
-    let test_two_content = "\
-def test_second():
-    pass
-";
-
-    let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_one, None)?
-        .with_file(test_one, test_one_content)?
-        .with_workspace(workspace_two, None)?
-        .with_file(test_two, test_two_content)?
-        .enable_pull_diagnostics(false)
-        .build()
-        .wait_until_workspaces_are_initialized();
-
-    let tests = sort_by_id(server.send_request_await::<DiscoverTests>(json!({})));
-
-    insta::assert_json_snapshot!(tests, @r#"
-    {
-      "tests": [
-        {
-          "id": "<temp_dir>/workspace_one",
-          "kind": "directory",
-          "label": "workspace_one",
-          "uri": "file://<temp_dir>/workspace_one/"
-        },
-        {
-          "id": "<temp_dir>/workspace_one/test_example.py",
-          "kind": "file",
-          "label": "test_example.py",
-          "parent": "<temp_dir>/workspace_one",
-          "uri": "file://<temp_dir>/workspace_one/test_example.py"
-        },
-        {
-          "id": "<temp_dir>/workspace_one/test_example.py::test_first",
-          "kind": "function",
-          "label": "test_first",
-          "parent": "<temp_dir>/workspace_one/test_example.py",
-          "range": {
-            "end": {
-              "character": 14,
-              "line": 0
-            },
-            "start": {
-              "character": 4,
-              "line": 0
-            }
-          },
-          "uri": "file://<temp_dir>/workspace_one/test_example.py"
-        },
-        {
-          "id": "<temp_dir>/workspace_two",
-          "kind": "directory",
-          "label": "workspace_two",
-          "uri": "file://<temp_dir>/workspace_two/"
-        },
-        {
-          "id": "<temp_dir>/workspace_two/test_example.py",
-          "kind": "file",
-          "label": "test_example.py",
-          "parent": "<temp_dir>/workspace_two",
-          "uri": "file://<temp_dir>/workspace_two/test_example.py"
-        },
-        {
-          "id": "<temp_dir>/workspace_two/test_example.py::test_second",
-          "kind": "function",
-          "label": "test_second",
-          "parent": "<temp_dir>/workspace_two/test_example.py",
-          "range": {
-            "end": {
-              "character": 15,
-              "line": 0
-            },
-            "start": {
-              "character": 4,
-              "line": 0
-            }
-          },
-          "uri": "file://<temp_dir>/workspace_two/test_example.py"
-        }
-      ]
-    }
-    "#);
-
-    Ok(())
-}
-
-#[test]
-fn discover_tests_single_file() -> Result<()> {
+fn discover_tests_file() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let module_1 = SystemPath::new("src/tests/test_module_1.py");
-    let module_1_content = "\
-def test_one():
-    pass
-";
     let module_2 = SystemPath::new("src/tests/test_module_2.py");
-    let module_2_content = "\
-def test_two():
-    pass
-";
 
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
-        .with_file(module_1, module_1_content)?
-        .with_file(module_2, module_2_content)?
-        .enable_pull_diagnostics(false)
+        .with_file(module_1, DUMMY_TEST)?
+        .with_file(module_2, DUMMY_TEST)?
         .build()
         .wait_until_workspaces_are_initialized();
 
-    // The client sends a full `file://` uri to the module it wants tests for, e.g.
-    // `file:///Users/.../hue-control/tests/test_enable_alarm.py`.
     let uri = server.file_uri(module_1);
     let tests = sort_by_id(server.send_request_await::<DiscoverTests>(json!({ "uri": uri })));
 
@@ -276,13 +181,13 @@ def test_two():
           "uri": "file://<temp_dir>/src/tests/test_module_1.py"
         },
         {
-          "id": "<temp_dir>/src/tests/test_module_1.py::test_one",
+          "id": "<temp_dir>/src/tests/test_module_1.py::test_dummy",
           "kind": "function",
-          "label": "test_one",
+          "label": "test_dummy",
           "parent": "<temp_dir>/src/tests/test_module_1.py",
           "range": {
             "end": {
-              "character": 12,
+              "character": 14,
               "line": 0
             },
             "start": {
@@ -300,115 +205,16 @@ def test_two():
 }
 
 #[test]
-fn discover_tests_scoped_to_a_module_with_same_relative_path_in_another_workspace() -> Result<()> {
-    let workspace_one = SystemPath::new("workspace_one");
-    let workspace_two = SystemPath::new("workspace_two");
-
-    // Both workspaces have a `tests/test_module_1.py` and a `tests/test_module_2.py` at
-    // the same relative path, so a request scoped to workspace_one's module_1 must not
-    // pick up workspace_two's identically-pathed module_1, or either workspace's module_2.
-    let module_1_one = SystemPath::new("workspace_one/tests/test_module_1.py");
-    let module_1_one_content = "\
-def test_one_alpha():
-    pass
-";
-    let module_2_one = SystemPath::new("workspace_one/tests/test_module_2.py");
-    let module_2_one_content = "\
-def test_two_alpha():
-    pass
-";
-    let module_1_two = SystemPath::new("workspace_two/tests/test_module_1.py");
-    let module_1_two_content = "\
-def test_one_beta():
-    pass
-";
-    let module_2_two = SystemPath::new("workspace_two/tests/test_module_2.py");
-    let module_2_two_content = "\
-def test_two_beta():
-    pass
-";
-
-    let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_one, None)?
-        .with_file(module_1_one, module_1_one_content)?
-        .with_file(module_2_one, module_2_one_content)?
-        .with_workspace(workspace_two, None)?
-        .with_file(module_1_two, module_1_two_content)?
-        .with_file(module_2_two, module_2_two_content)?
-        .enable_pull_diagnostics(false)
-        .build()
-        .wait_until_workspaces_are_initialized();
-
-    let uri = server.file_uri(module_1_one);
-    let tests = sort_by_id(server.send_request_await::<DiscoverTests>(json!({ "uri": uri })));
-
-    insta::assert_json_snapshot!(tests, @r#"
-    {
-      "tests": [
-        {
-          "id": "<temp_dir>/workspace_one",
-          "kind": "directory",
-          "label": "workspace_one",
-          "uri": "file://<temp_dir>/workspace_one/"
-        },
-        {
-          "id": "<temp_dir>/workspace_one/tests",
-          "kind": "directory",
-          "label": "tests",
-          "parent": "<temp_dir>/workspace_one",
-          "uri": "file://<temp_dir>/workspace_one/tests/"
-        },
-        {
-          "id": "<temp_dir>/workspace_one/tests/test_module_1.py",
-          "kind": "file",
-          "label": "test_module_1.py",
-          "parent": "<temp_dir>/workspace_one/tests",
-          "uri": "file://<temp_dir>/workspace_one/tests/test_module_1.py"
-        },
-        {
-          "id": "<temp_dir>/workspace_one/tests/test_module_1.py::test_one_alpha",
-          "kind": "function",
-          "label": "test_one_alpha",
-          "parent": "<temp_dir>/workspace_one/tests/test_module_1.py",
-          "range": {
-            "end": {
-              "character": 18,
-              "line": 0
-            },
-            "start": {
-              "character": 4,
-              "line": 0
-            }
-          },
-          "uri": "file://<temp_dir>/workspace_one/tests/test_module_1.py"
-        }
-      ]
-    }
-    "#);
-
-    Ok(())
-}
-
-#[test]
-fn discover_tests_single_directory() -> Result<()> {
+fn discover_tests_directory() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let unit_directory = SystemPath::new("src/tests/unit");
     let unit_module = SystemPath::new("src/tests/unit/test_module.py");
-    let unit_module_content = "\
-def test_unit():
-    pass
-";
     let integration_module = SystemPath::new("src/tests/integration/test_module.py");
-    let integration_module_content = "\
-def test_integration():
-    pass
-";
 
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
-        .with_file(unit_module, unit_module_content)?
-        .with_file(integration_module, integration_module_content)?
-        .enable_pull_diagnostics(false)
+        .with_file(unit_module, DUMMY_TEST)?
+        .with_file(integration_module, DUMMY_TEST)?
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -448,13 +254,13 @@ def test_integration():
           "uri": "file://<temp_dir>/src/tests/unit/test_module.py"
         },
         {
-          "id": "<temp_dir>/src/tests/unit/test_module.py::test_unit",
+          "id": "<temp_dir>/src/tests/unit/test_module.py::test_dummy",
           "kind": "function",
-          "label": "test_unit",
+          "label": "test_dummy",
           "parent": "<temp_dir>/src/tests/unit/test_module.py",
           "range": {
             "end": {
-              "character": 13,
+              "character": 14,
               "line": 0
             },
             "start": {
@@ -471,49 +277,207 @@ def test_integration():
     Ok(())
 }
 
-#[test]
-fn discover_tests_scoped_to_a_directory_with_same_relative_path_in_another_workspace() -> Result<()>
-{
-    let workspace_one = SystemPath::new("workspace_one");
-    let workspace_two = SystemPath::new("workspace_two");
+const UNIT_DIRECTORY: &str = "workspace_one/tests/unit";
+const UNIT_MODULE: &str = "workspace_one/tests/unit/test_module.py";
+const INTEGRATION_MODULE: &str = "workspace_one/tests/integration/test_module.py";
 
-    // Both workspaces have a `tests/unit` and a `tests/integration` directory at the same
-    // relative path, so a request scoped to workspace_one's `tests/unit` must not pick up
-    // workspace_two's identically-pathed directory, or either workspace's `tests/integration`.
-    let unit_directory_one = SystemPath::new("workspace_one/tests/unit");
-    let unit_module_one = SystemPath::new("workspace_one/tests/unit/test_module.py");
-    let unit_module_one_content = "\
-def test_unit_alpha():
-    pass
-";
-    let integration_module_one = SystemPath::new("workspace_one/tests/integration/test_module.py");
-    let integration_module_one_content = "\
-def test_integration_alpha():
-    pass
-";
-    let unit_module_two = SystemPath::new("workspace_two/tests/unit/test_module.py");
-    let unit_module_two_content = "\
-def test_unit_beta():
-    pass
-";
-    let integration_module_two = SystemPath::new("workspace_two/tests/integration/test_module.py");
-    let integration_module_two_content = "\
-def test_integration_beta():
-    pass
-";
-
-    let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_one, None)?
-        .with_file(unit_module_one, unit_module_one_content)?
-        .with_file(integration_module_one, integration_module_one_content)?
-        .with_workspace(workspace_two, None)?
-        .with_file(unit_module_two, unit_module_two_content)?
-        .with_file(integration_module_two, integration_module_two_content)?
-        .enable_pull_diagnostics(false)
+/// Builds two workspaces with the same internal layout, so that an item resolved against the
+/// wrong workspace shows up in a snapshot as an extra entry.
+fn server_with_two_workspaces() -> Result<TestServer> {
+    let server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("workspace_one"), None)?
+        .with_file(SystemPath::new(UNIT_MODULE), DUMMY_TEST)?
+        .with_file(SystemPath::new(INTEGRATION_MODULE), DUMMY_TEST)?
+        .with_workspace(SystemPath::new("workspace_two"), None)?
+        .with_file(
+            SystemPath::new("workspace_two/tests/unit/test_module.py"),
+            DUMMY_TEST,
+        )?
+        .with_file(
+            SystemPath::new("workspace_two/tests/integration/test_module.py"),
+            DUMMY_TEST,
+        )?
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let uri = server.file_uri(unit_directory_one);
+    Ok(server)
+}
+
+/// A request without a uri covers every workspace. Ids embed each workspace's own absolute
+/// path, so the identically named modules stay distinct.
+#[test]
+fn discover_tests_two_workspaces_all() -> Result<()> {
+    let mut server = server_with_two_workspaces()?;
+
+    let tests = sort_by_id(server.send_request_await::<DiscoverTests>(json!({})));
+
+    insta::assert_json_snapshot!(tests, @r#"
+    {
+      "tests": [
+        {
+          "id": "<temp_dir>/workspace_one",
+          "kind": "directory",
+          "label": "workspace_one",
+          "uri": "file://<temp_dir>/workspace_one/"
+        },
+        {
+          "id": "<temp_dir>/workspace_one/tests",
+          "kind": "directory",
+          "label": "tests",
+          "parent": "<temp_dir>/workspace_one",
+          "uri": "file://<temp_dir>/workspace_one/tests/"
+        },
+        {
+          "id": "<temp_dir>/workspace_one/tests/integration",
+          "kind": "directory",
+          "label": "integration",
+          "parent": "<temp_dir>/workspace_one/tests",
+          "uri": "file://<temp_dir>/workspace_one/tests/integration/"
+        },
+        {
+          "id": "<temp_dir>/workspace_one/tests/integration/test_module.py",
+          "kind": "file",
+          "label": "test_module.py",
+          "parent": "<temp_dir>/workspace_one/tests/integration",
+          "uri": "file://<temp_dir>/workspace_one/tests/integration/test_module.py"
+        },
+        {
+          "id": "<temp_dir>/workspace_one/tests/integration/test_module.py::test_dummy",
+          "kind": "function",
+          "label": "test_dummy",
+          "parent": "<temp_dir>/workspace_one/tests/integration/test_module.py",
+          "range": {
+            "end": {
+              "character": 14,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file://<temp_dir>/workspace_one/tests/integration/test_module.py"
+        },
+        {
+          "id": "<temp_dir>/workspace_one/tests/unit",
+          "kind": "directory",
+          "label": "unit",
+          "parent": "<temp_dir>/workspace_one/tests",
+          "uri": "file://<temp_dir>/workspace_one/tests/unit/"
+        },
+        {
+          "id": "<temp_dir>/workspace_one/tests/unit/test_module.py",
+          "kind": "file",
+          "label": "test_module.py",
+          "parent": "<temp_dir>/workspace_one/tests/unit",
+          "uri": "file://<temp_dir>/workspace_one/tests/unit/test_module.py"
+        },
+        {
+          "id": "<temp_dir>/workspace_one/tests/unit/test_module.py::test_dummy",
+          "kind": "function",
+          "label": "test_dummy",
+          "parent": "<temp_dir>/workspace_one/tests/unit/test_module.py",
+          "range": {
+            "end": {
+              "character": 14,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file://<temp_dir>/workspace_one/tests/unit/test_module.py"
+        },
+        {
+          "id": "<temp_dir>/workspace_two",
+          "kind": "directory",
+          "label": "workspace_two",
+          "uri": "file://<temp_dir>/workspace_two/"
+        },
+        {
+          "id": "<temp_dir>/workspace_two/tests",
+          "kind": "directory",
+          "label": "tests",
+          "parent": "<temp_dir>/workspace_two",
+          "uri": "file://<temp_dir>/workspace_two/tests/"
+        },
+        {
+          "id": "<temp_dir>/workspace_two/tests/integration",
+          "kind": "directory",
+          "label": "integration",
+          "parent": "<temp_dir>/workspace_two/tests",
+          "uri": "file://<temp_dir>/workspace_two/tests/integration/"
+        },
+        {
+          "id": "<temp_dir>/workspace_two/tests/integration/test_module.py",
+          "kind": "file",
+          "label": "test_module.py",
+          "parent": "<temp_dir>/workspace_two/tests/integration",
+          "uri": "file://<temp_dir>/workspace_two/tests/integration/test_module.py"
+        },
+        {
+          "id": "<temp_dir>/workspace_two/tests/integration/test_module.py::test_dummy",
+          "kind": "function",
+          "label": "test_dummy",
+          "parent": "<temp_dir>/workspace_two/tests/integration/test_module.py",
+          "range": {
+            "end": {
+              "character": 14,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file://<temp_dir>/workspace_two/tests/integration/test_module.py"
+        },
+        {
+          "id": "<temp_dir>/workspace_two/tests/unit",
+          "kind": "directory",
+          "label": "unit",
+          "parent": "<temp_dir>/workspace_two/tests",
+          "uri": "file://<temp_dir>/workspace_two/tests/unit/"
+        },
+        {
+          "id": "<temp_dir>/workspace_two/tests/unit/test_module.py",
+          "kind": "file",
+          "label": "test_module.py",
+          "parent": "<temp_dir>/workspace_two/tests/unit",
+          "uri": "file://<temp_dir>/workspace_two/tests/unit/test_module.py"
+        },
+        {
+          "id": "<temp_dir>/workspace_two/tests/unit/test_module.py::test_dummy",
+          "kind": "function",
+          "label": "test_dummy",
+          "parent": "<temp_dir>/workspace_two/tests/unit/test_module.py",
+          "range": {
+            "end": {
+              "character": 14,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file://<temp_dir>/workspace_two/tests/unit/test_module.py"
+        }
+      ]
+    }
+    "#);
+
+    Ok(())
+}
+
+/// Scoping to a module excludes the module of the same name in the other workspace, and the
+/// sibling module in this one.
+#[test]
+fn discover_tests_two_workspaces_one_file() -> Result<()> {
+    let mut server = server_with_two_workspaces()?;
+
+    let uri = server.file_uri(SystemPath::new(UNIT_MODULE));
     let tests = sort_by_id(server.send_request_await::<DiscoverTests>(json!({ "uri": uri })));
 
     insta::assert_json_snapshot!(tests, @r#"
@@ -547,13 +511,76 @@ def test_integration_beta():
           "uri": "file://<temp_dir>/workspace_one/tests/unit/test_module.py"
         },
         {
-          "id": "<temp_dir>/workspace_one/tests/unit/test_module.py::test_unit_alpha",
+          "id": "<temp_dir>/workspace_one/tests/unit/test_module.py::test_dummy",
           "kind": "function",
-          "label": "test_unit_alpha",
+          "label": "test_dummy",
           "parent": "<temp_dir>/workspace_one/tests/unit/test_module.py",
           "range": {
             "end": {
-              "character": 19,
+              "character": 14,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file://<temp_dir>/workspace_one/tests/unit/test_module.py"
+        }
+      ]
+    }
+    "#);
+
+    Ok(())
+}
+
+/// Scoping to a directory excludes the directory of the same name in the other workspace, and
+/// the sibling directory in this one.
+#[test]
+fn discover_tests_two_workspaces_one_dir() -> Result<()> {
+    let mut server = server_with_two_workspaces()?;
+
+    let uri = server.file_uri(SystemPath::new(UNIT_DIRECTORY));
+    let tests = sort_by_id(server.send_request_await::<DiscoverTests>(json!({ "uri": uri })));
+
+    insta::assert_json_snapshot!(tests, @r#"
+    {
+      "tests": [
+        {
+          "id": "<temp_dir>/workspace_one",
+          "kind": "directory",
+          "label": "workspace_one",
+          "uri": "file://<temp_dir>/workspace_one/"
+        },
+        {
+          "id": "<temp_dir>/workspace_one/tests",
+          "kind": "directory",
+          "label": "tests",
+          "parent": "<temp_dir>/workspace_one",
+          "uri": "file://<temp_dir>/workspace_one/tests/"
+        },
+        {
+          "id": "<temp_dir>/workspace_one/tests/unit",
+          "kind": "directory",
+          "label": "unit",
+          "parent": "<temp_dir>/workspace_one/tests",
+          "uri": "file://<temp_dir>/workspace_one/tests/unit/"
+        },
+        {
+          "id": "<temp_dir>/workspace_one/tests/unit/test_module.py",
+          "kind": "file",
+          "label": "test_module.py",
+          "parent": "<temp_dir>/workspace_one/tests/unit",
+          "uri": "file://<temp_dir>/workspace_one/tests/unit/test_module.py"
+        },
+        {
+          "id": "<temp_dir>/workspace_one/tests/unit/test_module.py::test_dummy",
+          "kind": "function",
+          "label": "test_dummy",
+          "parent": "<temp_dir>/workspace_one/tests/unit/test_module.py",
+          "range": {
+            "end": {
+              "character": 14,
               "line": 0
             },
             "start": {
@@ -574,22 +601,12 @@ def test_integration_beta():
 fn discover_tests_for_a_uri_outside_any_workspace() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let inside = SystemPath::new("src/tests/test_module.py");
-    let inside_content = "\
-def test_inside():
-    pass
-";
-    // This file exists on disk but no open workspace contains it.
     let outside = SystemPath::new("elsewhere/test_module.py");
-    let outside_content = "\
-def test_outside():
-    pass
-";
 
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
-        .with_file(inside, inside_content)?
-        .with_file(outside, outside_content)?
-        .enable_pull_diagnostics(false)
+        .with_file(inside, DUMMY_TEST)?
+        .with_file(outside, DUMMY_TEST)?
         .build()
         .wait_until_workspaces_are_initialized();
 

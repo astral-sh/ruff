@@ -4,7 +4,7 @@ use ruff_db::files::{File, system_path_to_directory, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
-use ty_ide::{DiscoveredTestKind, discover_tests};
+use ty_ide::{DiscoveredPytestTestKind, discover_pytest_tests};
 use ty_project::{Db as _, ProjectDatabase, SemanticDb as _};
 
 use crate::PositionEncoding;
@@ -16,8 +16,6 @@ use crate::session::SessionSnapshot;
 use crate::session::client::Client;
 use crate::system::file_to_uri;
 
-/// Custom `ty/discoverTests` request that lists the tests defined in a project, a
-/// directory, or a single file.
 pub(in crate::server::api) enum DiscoverTestsRequest {}
 
 impl Request for DiscoverTestsRequest {
@@ -53,8 +51,6 @@ impl DiscoverTestsResult {
     }
 }
 
-/// A node in the discovered test tree: a directory, a file, a test class, or a test
-/// function/method.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub(in crate::server::api) struct TestItem {
@@ -75,7 +71,6 @@ pub(in crate::server::api) struct TestItem {
     uri: Option<Uri>,
 }
 
-/// The kind of a [`TestItem`] in the discovered test tree.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub(in crate::server::api) enum TestItemKind {
@@ -106,37 +101,32 @@ impl BackgroundRequestHandler for DiscoverTestsRequestHandler {
 
         let Some(uri) = params.uri else {
             for db in snapshot.projects() {
-                for file in db.project().files(db).iter().copied() {
+                for file in db.project().files(db).iter() {
                     append_file_tests(db, file, encoding, &mut test_items);
                 }
             }
-            tracing::debug!(
-                "Discovered {} test items across all projects",
-                test_items.len()
-            );
             return Ok(DiscoverTestsResult::new(test_items));
         };
 
         let Ok(path) = uri.to_file_path() else {
-            tracing::debug!("`{uri}` is not a file path; discovering nothing");
+            tracing::warn!("`{uri}` is not a file path.");
             return Ok(DiscoverTestsResult::new(vec![]));
         };
         let Ok(path) = SystemPathBuf::from_path_buf(path) else {
-            tracing::debug!("`{uri}` is not valid UTF-8; discovering nothing");
+            tracing::warn!("`{uri}` is not valid UTF-8.");
             return Ok(DiscoverTestsResult::new(vec![]));
         };
 
         for db in snapshot.projects() {
             let project_root = db.project().root(db);
             if !project_includes_path(db, &path) {
-                tracing::debug!("Project `{project_root}` has no `{path}`; skipping it");
+                tracing::debug!("`{path}` does not belong to the `{project_root}`.");
                 continue;
             }
 
-            // NOTE: I cannot rely on file.status() here because FileStatus enum is private. Why is status() method available?
             if db.system().is_directory(&path) {
                 tracing::debug!(
-                    "Discovering every test under directory `{path}` of project `{project_root}`"
+                    "Discovering the tests under directory `{path}` of project `{project_root}`"
                 );
                 collect_directory_tests(db, &path, encoding, &mut test_items);
             } else {
@@ -168,15 +158,6 @@ fn test_id(file_path: &str, qualified_name: &str) -> String {
     format!("{file_path}::{qualified_name}")
 }
 
-/// Returns whether `path` points at a file or directory that this project checks.
-///
-/// A relative `path` is resolved against the project root, so the same relative path can
-/// belong to more than one open project. An absolute `path` keeps its own root and only
-/// gets its `.` and `..` components normalized, which is what stops a `..` from walking
-/// out of the project while still matching as if it were underneath it.
-///
-/// The path has to exist. Include patterns alone say nothing about whether a path is
-/// really there, and both callers need a path they can hand to pytest or index as a file.
 pub(super) fn project_includes_path(db: &ProjectDatabase, path: &SystemPath) -> bool {
     let project = db.project();
     let path = SystemPath::absolute(path, project.root(db));
@@ -192,19 +173,29 @@ pub(super) fn project_includes_path(db: &ProjectDatabase, path: &SystemPath) -> 
     project.is_file_included(db, &path).is_included()
 }
 
-/// Appends tests for the given file to `items`, along with an item for each ancestor
-/// directory between `file` and project root
-/// Caller must make sure the file is within the project, otherwise the parent never finds root directory.
+fn collect_directory_tests(
+    db: &ProjectDatabase,
+    directory: &SystemPath,
+    encoding: PositionEncoding,
+    items: &mut FxHashSet<TestItem>,
+) {
+    for file in db.project().files(db).iter() {
+        let Some(path) = file.path(db).as_system_path() else {
+            continue;
+        };
+        if path.starts_with(directory) {
+            append_file_tests(db, file, encoding, items);
+        }
+    }
+}
+
 fn append_file_tests(
     db: &ProjectDatabase,
     file: File,
     encoding: PositionEncoding,
     items: &mut FxHashSet<TestItem>,
 ) {
-    if !matches_pytest_naming_convention(db, file) {
-        return;
-    }
-    let tests = discover_tests(db, db.program_file(file));
+    let tests = discover_pytest_tests(db, db.program_file(file));
     let stop_at: &SystemPath = db.project().root(db);
     if tests.is_empty() {
         return;
@@ -267,8 +258,8 @@ fn append_file_tests(
         items.insert(TestItem {
             id,
             kind: match test.kind {
-                DiscoveredTestKind::Class => TestItemKind::Class,
-                DiscoveredTestKind::Function => TestItemKind::Function,
+                DiscoveredPytestTestKind::Class => TestItemKind::Class,
+                DiscoveredPytestTestKind::Function => TestItemKind::Function,
             },
             label: test.label,
             parent: Some(parent),
@@ -276,28 +267,4 @@ fn append_file_tests(
             uri: text_document.clone(),
         });
     }
-}
-
-fn collect_directory_tests(
-    db: &ProjectDatabase,
-    directory: &SystemPath,
-    encoding: PositionEncoding,
-    items: &mut FxHashSet<TestItem>,
-) {
-    for file in db.project().files(db).iter().copied() {
-        let Some(path) = file.path(db).as_system_path() else {
-            continue;
-        };
-        if path.starts_with(directory) {
-            append_file_tests(db, file, encoding, items);
-        }
-    }
-}
-
-fn matches_pytest_naming_convention(db: &ProjectDatabase, file: File) -> bool {
-    file.path(db)
-        .as_system_path()
-        .and_then(SystemPath::file_name)
-        .and_then(|name| name.strip_suffix(".py"))
-        .is_some_and(|stem| stem.starts_with("test_") || stem.ends_with("_test"))
 }

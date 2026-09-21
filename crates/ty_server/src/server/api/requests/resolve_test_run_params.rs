@@ -10,11 +10,7 @@ use crate::server::api::traits::{
 use crate::session::SessionSnapshot;
 use crate::session::client::Client;
 
-/// Custom `ty/resolveTestRunParams` request that resolves how to run a test that was
-/// previously discovered through `ty/discoverTests`.
-///
-/// The server never runs tests itself; it only describes the command so the client can
-/// execute it with its own process management, cancellation, and output handling.
+/// `ty/resolveTestRunParams` resolves how to run a test that was previously discovered through `ty/discoverTests`.
 pub(crate) enum ResolveTestRunParamsRequest {}
 
 impl Request for ResolveTestRunParamsRequest {
@@ -31,7 +27,6 @@ pub(crate) struct ResolveTestRunParamsParams {
     pub(crate) test_id: String,
 }
 
-/// Describes how to run a test with pytest.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TestRunParams {
@@ -70,11 +65,6 @@ impl BackgroundRequestHandler for ResolveTestRunParamsRequestHandler {
         };
 
         let working_directory = db.project().root(db).to_string();
-
-        tracing::debug!(
-            "Resolved `{}` to run from `{working_directory}`",
-            params.test_id
-        );
 
         Ok(Some(TestRunParams {
             working_directory,
