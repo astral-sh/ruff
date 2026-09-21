@@ -5,8 +5,8 @@ use crate::{
     Db, FxOrderSet,
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-        DivergentFlags, GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type,
-        TypeContext, TypeMapping, TypeRecursionContext, TypingModule, UnionType, VarianceTerm,
+        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type, TypeContext,
+        TypeMapping, TypeRecursionContext, TypingModule, UnionType, VarianceTerm,
         cyclic::CycleDetector,
         definition_expression_type,
         display::qualified_name_components_from_scope,
@@ -92,12 +92,7 @@ impl<'db> AliasCycleSummary<'db> {
                 .elements(db)
                 .iter()
                 .find_map(|&element| Self::collect(db, element, typevars)),
-            Type::Divergent(divergent)
-                if divergent.flags.contains(DivergentFlags::FROM_TYPE_ALIAS) =>
-            {
-                Some(ty)
-            }
-            _ => None,
+            _ => ty.is_divergent().then_some(ty),
         }
     }
 
@@ -207,7 +202,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent_alias(id),
+        cycle_initial=|_, id, _| Type::divergent(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_scope(alias.rhs_scope(db));
             value.cycle_normalized(db, &env, *previous, cycle)
@@ -319,7 +314,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent_alias(id),
+        cycle_initial=|_, id, _| Type::divergent(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_definition(alias.definition(db));
             value.cycle_normalized(db, &env, *previous, cycle)
@@ -466,7 +461,7 @@ impl<'db> TypeAliasType<'db> {
     fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, id, _, ()| AliasCycleSummary { cycle: Some(Type::divergent_alias(id)), ..AliasCycleSummary::default() },
+            cycle_initial=|_, id, _, ()| AliasCycleSummary { cycle: Some(Type::divergent(id)), ..AliasCycleSummary::default() },
             heap_size=ruff_memory_usage::heap_size
         )]
         fn cycle_summary<'db>(

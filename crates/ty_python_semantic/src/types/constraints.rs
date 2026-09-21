@@ -3011,16 +3011,38 @@ struct PathBoundBuilder<'db> {
     evidence_lower: FxIndexSet<Type<'db>>,
     validity_lower: FxIndexSet<Type<'db>>,
     upper: UpperBound<'db>,
+    // Classify each evidence bound before aggregation: a union can otherwise make gradual and
+    // static argument evidence indistinguishable from a single gradual union.
+    has_gradual_evidence: bool,
+    has_static_evidence: bool,
 }
 
 impl<'db> PathBoundBuilder<'db> {
-    fn add_lower(&mut self, provenance: ConstraintProvenance, ty: Type<'db>) {
+    fn classify_evidence(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
+        if ty.has_unspecialized_type_var(db, env) {
+            return;
+        }
+        if ty.bottom_materialization(db, env) == ty.top_materialization(db, env) {
+            self.has_static_evidence = true;
+        } else {
+            self.has_gradual_evidence = true;
+        }
+    }
+
+    fn add_lower(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        provenance: ConstraintProvenance,
+        ty: Type<'db>,
+    ) {
         // Lower bounds are unioned. Our type representation is in DNF, so unioning a new
         // element is typically cheap (in that it does not involve a combinatorial
         // explosion from distributing the clause through an existing disjunction). So we
         // don't need to be as clever here as in `add_upper`.
         match provenance {
             ConstraintProvenance::Evidence => {
+                self.classify_evidence(db, env, ty);
                 self.evidence_lower.insert(ty);
             }
             ConstraintProvenance::Validity => {
@@ -3031,7 +3053,16 @@ impl<'db> PathBoundBuilder<'db> {
         }
     }
 
-    fn add_upper(&mut self, provenance: ConstraintProvenance, ty: Type<'db>) {
+    fn add_upper(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        provenance: ConstraintProvenance,
+        ty: Type<'db>,
+    ) {
+        if provenance == ConstraintProvenance::Evidence {
+            self.classify_evidence(db, env, ty);
+        }
         self.upper.add_clause(provenance, ty);
     }
 
@@ -3045,25 +3076,9 @@ impl<'db> PathBoundBuilder<'db> {
             evidence_lower,
             validity_lower,
             mut upper,
+            has_gradual_evidence,
+            has_static_evidence,
         } = self;
-
-        // Classify the original evidence bounds before aggregation, as gradual and static argument
-        // evidence may collapse into a single gradual union.
-        //
-        // Note that we only compute this flag for constrained typevars.
-        let has_only_gradual_evidence = bound_typevar.typevar(db).is_constrained(db).then(|| {
-            let mut evidence = evidence_lower
-                .iter()
-                .copied()
-                .chain(upper.iter_evidence())
-                .filter(|ty| !ty.has_unspecialized_type_var(db, env))
-                .peekable();
-
-            evidence.peek().is_some()
-                && evidence
-                    .all(|ty| ty.bottom_materialization(db, env) != ty.top_materialization(db, env))
-        });
-
         let evidence_lower =
             (!evidence_lower.is_empty()).then(|| UnionType::from_elements(db, env, evidence_lower));
         let validity_lower = if validity_lower.is_empty() {
@@ -3077,7 +3092,7 @@ impl<'db> PathBoundBuilder<'db> {
             evidence_lower,
             validity_lower,
             upper,
-            has_only_gradual_evidence,
+            has_only_gradual_evidence: has_gradual_evidence && !has_static_evidence,
         }
     }
 }
@@ -3138,9 +3153,7 @@ pub(crate) struct PathBound<'db> {
     validity_lower: Type<'db>,
     upper: UpperBound<'db>,
     /// Whether the path contains gradual evidence and no static evidence.
-    ///
-    /// Note that this is only computed for constrained typevars.
-    has_only_gradual_evidence: Option<bool>,
+    has_only_gradual_evidence: bool,
 }
 
 impl<'db> PathBound<'db> {
@@ -3150,7 +3163,7 @@ impl<'db> PathBound<'db> {
             evidence_lower: Some(ty),
             validity_lower: Type::Never,
             upper: UpperBound::from_clause(ty),
-            has_only_gradual_evidence: None,
+            has_only_gradual_evidence: false,
         }
     }
 
@@ -3594,16 +3607,16 @@ impl<'db> CandidateSolutions<'db> {
             match constraint {
                 Constraint::ConcreteLower(lower) => {
                     let bounds = mappings.entry(lower.typevar).or_default();
-                    bounds.add_lower(lower.provenance, lower.bound);
+                    bounds.add_lower(db, env, lower.provenance, lower.bound);
                 }
                 Constraint::ConcreteUpper(upper) => {
                     let bounds = mappings.entry(upper.typevar).or_default();
-                    bounds.add_upper(upper.provenance, upper.bound);
+                    bounds.add_upper(db, env, upper.provenance, upper.bound);
                 }
                 Constraint::ConcreteEquivalence(equivalence) => {
                     let bounds = mappings.entry(equivalence.typevar).or_default();
-                    bounds.add_lower(equivalence.provenance, equivalence.bound);
-                    bounds.add_upper(equivalence.provenance, equivalence.bound);
+                    bounds.add_lower(db, env, equivalence.provenance, equivalence.bound);
+                    bounds.add_upper(db, env, equivalence.provenance, equivalence.bound);
                 }
                 Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => {
                     panic!("typevar constraint should have been filtered out");
@@ -3984,9 +3997,7 @@ impl<'db> CandidateSolutions<'db> {
                 // as the result if it's gradual. (Checking `Any` against `T: (int, str)` selects
                 // `T = Any`) If the path solution is fully static, we choose the "tightest"
                 // constraint. (Checking `int` against `T: (int, int | str)` selects `T = int`.)
-                if multiple_compatible_constraints
-                    && path_bound.has_only_gradual_evidence == Some(true)
-                {
+                if multiple_compatible_constraints && path_bound.has_only_gradual_evidence {
                     if path_bound.evidence_lower.is_some() {
                         PathBoundSolution::Solved(path_bound.effective_lower(db, env))
                     } else if path_bound.has_upper_evidence() {
@@ -5539,7 +5550,7 @@ mod tests {
             evidence_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::unconstrained(),
-            has_only_gradual_evidence: None,
+            has_only_gradual_evidence: false,
         };
         let inferable = TypeVarSet::from_typevars(db, [t]);
 
@@ -5566,10 +5577,14 @@ mod tests {
         let builder = ConstraintSetBuilder::new();
         let mut bounds = PathBoundBuilder::default();
         bounds.add_lower(
+            db,
+            &env,
             ConstraintProvenance::Evidence,
             known_instance(db, KnownClass::Int),
         );
         bounds.add_upper(
+            db,
+            &env,
             ConstraintProvenance::Evidence,
             known_instance(db, KnownClass::Str),
         );
@@ -5622,9 +5637,9 @@ mod tests {
             for lower_evidence in [false, true] {
                 let mut bounds = PathBoundBuilder::default();
                 if lower_evidence {
-                    bounds.add_lower(ConstraintProvenance::Evidence, lower);
+                    bounds.add_lower(db, &env, ConstraintProvenance::Evidence, lower);
                 } else {
-                    bounds.add_upper(ConstraintProvenance::Evidence, upper);
+                    bounds.add_upper(db, &env, ConstraintProvenance::Evidence, upper);
                 }
                 let path_bound = bounds.finish(db, &env, t);
 
@@ -5682,7 +5697,7 @@ mod tests {
         // Each tuple position could be satisfied separately, but invariance requires one E
         // to equal both int and str. Neither declared constraint satisfies the whole path.
         let mut bounds = PathBoundBuilder::default();
-        bounds.add_lower(ConstraintProvenance::Evidence, lower);
+        bounds.add_lower(db, &env, ConstraintProvenance::Evidence, lower);
         assert_eq!(
             CandidateSolutions::default_solve(
                 db,
@@ -5774,10 +5789,10 @@ class E: ...
         for lower in [None, Some(Type::any())] {
             let mut bounds = PathBoundBuilder::default();
             if let Some(lower) = lower {
-                bounds.add_lower(ConstraintProvenance::Evidence, lower);
+                bounds.add_lower(db, &env, ConstraintProvenance::Evidence, lower);
             }
-            bounds.add_upper(ConstraintProvenance::Evidence, left);
-            bounds.add_upper(ConstraintProvenance::Evidence, right);
+            bounds.add_upper(db, &env, ConstraintProvenance::Evidence, left);
+            bounds.add_upper(db, &env, ConstraintProvenance::Evidence, right);
             let exhausted = bounds.finish(db, &env, t);
             let expected = PathBoundSolution::BudgetExceeded { fallback: lower };
             assert_eq!(
@@ -5819,8 +5834,8 @@ class E: ...
 
             // A later contradiction rejects the entire path, including its exhausted binding.
             let mut invalid = PathBoundBuilder::default();
-            invalid.add_lower(ConstraintProvenance::Evidence, int);
-            invalid.add_upper(ConstraintProvenance::Evidence, str);
+            invalid.add_lower(db, &env, ConstraintProvenance::Evidence, int);
+            invalid.add_upper(db, &env, ConstraintProvenance::Evidence, str);
             let invalid = invalid.finish(db, &env, u);
             for invalid_first in [false, true] {
                 let mut rejected = vec![exhausted.clone(), invalid.clone()];
@@ -5856,11 +5871,11 @@ class E: ...
         assert!(IntersectionType::bounded_from_elements(db, &env, gradual_upper).is_none());
         let mut bounds = PathBoundBuilder::default();
         for upper in gradual_upper {
-            bounds.add_upper(ConstraintProvenance::Evidence, upper);
+            bounds.add_upper(db, &env, ConstraintProvenance::Evidence, upper);
         }
         let exhausted = bounds.finish(db, &env, constrained);
         let inferable = TypeVarSet::from_typevars(db, [constrained]);
-        assert_eq!(exhausted.has_only_gradual_evidence, Some(true));
+        assert!(exhausted.has_only_gradual_evidence);
         assert_eq!(
             CandidateSolutions::preliminary_solve(db, &env, &builder, inferable, &exhausted),
             PathBoundSolution::BudgetExceeded { fallback: None }

@@ -424,12 +424,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeGenericAlias(ty) => ty
                 .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::TypeGenericAlias),
-            // A stringified alias is still a string value when its aliased type diverges.
-            // Preserve the wrapper so type-expression checks can validate uses of the alias.
-            Self::LiteralStringAlias(ty) => Some(Self::LiteralStringAlias(
-                ty.recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or_else(|| InternedType::new(db, div)),
-            )),
+            Self::LiteralStringAlias(ty) => ty
+                .recursive_type_normalized_impl(db, env, div, true)
+                .map(Self::LiteralStringAlias),
             Self::Callable(callable) => callable
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Self::Callable),

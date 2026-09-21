@@ -219,10 +219,7 @@ pub enum TypedDictType<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum SynthesizedTypedDictKind {
     Schema,
-    /// Constraints on operands of a non-mutating merge.
     Patch,
-    /// Constraints on sources of an in-place update, including their hidden items.
-    UpdatePatch,
 }
 
 impl<'db> TypedDictType<'db> {
@@ -661,12 +658,7 @@ impl<'db> TypedDictType<'db> {
             TypedDictOpenness::Closed | TypedDictOpenness::Extra(_) => TypedDictOpenness::Closed,
         };
 
-        Self::Synthesized(SynthesizedTypedDictType::new(
-            db,
-            items,
-            SynthesizedTypedDictKind::UpdatePatch,
-            openness,
-        ))
+        Self::from_patch_items_with_openness(db, items, openness)
     }
 
     pub fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
@@ -699,8 +691,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let source_items = source.items(db);
             let target_items = synthesized_target.items(db);
             let target_openness = synthesized_target.openness(db);
-            let is_update_patch =
-                synthesized_target.kind(db) == SynthesizedTypedDictKind::UpdatePatch;
             let mut result = self.always();
 
             for (source_item_name, source_item_field) in source_items {
@@ -709,16 +699,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         target_item_field.declared_ty
                     } else {
                         match target_openness {
-                            TypedDictOpenness::ImplicitlyOpen
-                                if !is_update_patch || !source_item_field.may_be_present(db) =>
-                            {
-                                continue;
-                            }
-                            // A mutation cannot write an undeclared key: a subtype of the
-                            // destination may give that key an incompatible type.
-                            TypedDictOpenness::ImplicitlyOpen | TypedDictOpenness::Closed => {
-                                return self.never();
-                            }
+                            TypedDictOpenness::ImplicitlyOpen => continue,
+                            TypedDictOpenness::Closed => return self.never(),
                             TypedDictOpenness::Extra(extra_items) => extra_items.declared_ty,
                         }
                     };
@@ -734,10 +716,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
             }
 
-            // An open source can hide items that overlap the destination's declared fields.
-            // For example, a source declaring only `name: str` may also contain `count: str`,
-            // so it cannot update a destination declaring `count: int`.
-            let source_extra_items = if !is_update_patch && target_openness.is_implicitly_open() {
+            let source_extra_items = if target_openness.is_implicitly_open() {
                 source.explicit_extra_items(db)
             } else {
                 source.openness(db).effective_extra_items()
@@ -3108,10 +3087,7 @@ impl<'db> SynthesizedTypedDictType<'db> {
     }
 
     fn is_patch(self, db: &'db dyn Db) -> bool {
-        matches!(
-            self.kind(db),
-            SynthesizedTypedDictKind::Patch | SynthesizedTypedDictKind::UpdatePatch
-        )
+        self.kind(db) == SynthesizedTypedDictKind::Patch
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -3137,7 +3113,10 @@ impl<'db> SynthesizedTypedDictType<'db> {
             .openness(db)
             .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
 
-        Self::new(db, items, self.kind(db), openness)
+        match self.kind(db) {
+            SynthesizedTypedDictKind::Schema => Self::schema(db, items, openness),
+            SynthesizedTypedDictKind::Patch => Self::patch(db, items, openness),
+        }
     }
 }
 

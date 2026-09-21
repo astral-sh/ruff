@@ -912,10 +912,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .context
             .inference_flags
             .replace(InferenceFlags::IN_PARAMETER_ANNOTATION, true);
-        let previously_in_init_receiver = self.context.inference_flags.replace(
-            InferenceFlags::IN_INIT_RECEIVER_ANNOTATION,
-            function.name.id == "__init__" && receiver_kind == MethodReceiverKind::Instance,
-        );
         let annotation_type = self.infer_type_expression_with_state(
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),
@@ -923,11 +919,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.context.inference_flags.set(
             InferenceFlags::IN_PARAMETER_ANNOTATION,
             previously_in_parameter_annotation,
-        );
-
-        self.context.inference_flags.set(
-            InferenceFlags::IN_INIT_RECEIVER_ANNOTATION,
-            previously_in_init_receiver,
         );
 
         Some(!receiver_kind.accepts_annotation(self.db(), annotation_type))
