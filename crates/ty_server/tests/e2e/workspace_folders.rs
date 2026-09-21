@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use insta::assert_snapshot;
 use lsp_types::{
     DiagnosticSeverity, DocumentDiagnosticReport, FullDocumentDiagnosticReport, Message, Position,
@@ -679,6 +679,16 @@ fn global_settings_change() -> Result<()> {
 
     server.open_text_document(&main1, main_content, 1);
     let document_diagnostics = server.document_diagnostic_request(&main1, None);
+    let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) =
+        &document_diagnostics
+    else {
+        anyhow::bail!("Expected a full report for the initial diagnostics");
+    };
+    let result_id = report
+        .full_document_diagnostic_report
+        .result_id
+        .clone()
+        .context("Expected a result ID for the syntax error")?;
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(document_diagnostics),
         @"0:1..0:1[ERROR]: unexpected EOF while parsing",
@@ -700,7 +710,11 @@ fn global_settings_change() -> Result<()> {
     server.change_workspace_folders([root2], []);
     server = server.wait_until_workspaces_are_initialized();
 
-    let document_diagnostics = server.document_diagnostic_request(&main1, None);
+    let document_diagnostics = server.document_diagnostic_request(&main1, Some(result_id));
+    assert!(matches!(
+        document_diagnostics,
+        DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(_)
+    ));
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(document_diagnostics),
         @"",

@@ -421,6 +421,7 @@ impl<'a> ResponseWriter<'a> {
             diagnostics,
             unnecessary_hints,
             self.client_capabilities,
+            self.global_settings,
         );
 
         let previous_result_id = self.previous_result_ids.remove(&key).map(|(_uri, id)| id);

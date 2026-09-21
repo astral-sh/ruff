@@ -11,7 +11,7 @@ use lsp_types::{
 };
 use lsp_types::{TextDocumentContentChangeWholeDocument, WorkspaceDiagnosticRequest};
 use ruff_db::system::SystemPath;
-use ty_server::{ClientOptions, DiagnosticMode};
+use ty_server::{ClientOptions, DiagnosticMode, GlobalOptions};
 
 use crate::workspace_folders::condensed_document_diagnostic_snapshot;
 use crate::{AwaitResponseError, TestServer, TestServerBuilder};
@@ -600,6 +600,56 @@ def foo() -> str:
     assert_debug_snapshot!(
         "document_diagnostic_caching_rendered_source_after",
         second_response
+    );
+
+    Ok(())
+}
+
+/// Settings that change the reported diagnostics invalidate cached workspace results.
+#[test]
+fn workspace_diagnostic_caching_settings_changed() -> Result<()> {
+    let root = SystemPath::new("src");
+    let extra = SystemPath::new("extra");
+    let main = root.join("main.py");
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .with_workspace(root, None)?
+        .with_file(&main, "(")?
+        .with_file(extra.join("empty.py"), "")?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let first_response = server.workspace_diagnostic_request(None, None);
+    let previous_result_ids = extract_result_ids_from_response(&first_response);
+    assert_eq!(previous_result_ids.len(), 1);
+
+    // Adding a workspace can change global settings for existing workspaces, without edits.
+    server.add_workspace_folder(
+        extra,
+        Some(ClientOptions {
+            global: GlobalOptions {
+                show_syntax_errors: Some(false),
+                ..GlobalOptions::default()
+            },
+            ..ClientOptions::default()
+        }),
+    )?;
+    server.change_workspace_folders([extra], []);
+    server = server.wait_until_workspaces_are_initialized();
+
+    let response = server.workspace_diagnostic_request(None, Some(previous_result_ids.clone()));
+    let [WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(report)] =
+        response.items.as_slice()
+    else {
+        anyhow::bail!("Expected a full report after disabling syntax errors");
+    };
+    assert_eq!(report.uri, server.file_uri(&main));
+    assert!(report.full_document_diagnostic_report.items.is_empty());
+    assert_ne!(
+        report.full_document_diagnostic_report.result_id.as_deref(),
+        Some(previous_result_ids[0].value.as_str()),
     );
 
     Ok(())
