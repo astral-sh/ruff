@@ -37,8 +37,6 @@ pub(crate) struct ResolveTestRunParamsParams {
 pub(crate) struct TestRunParams {
     /// The directory the test should be run from (the project root).
     pub(crate) working_directory: String,
-    /// The Python interpreter that ty discovered for the project, if any.
-    pub(crate) program: Option<String>,
     /// The arguments to pass to a Python interpreter to run the test with pytest.
     pub(crate) arguments: Vec<String>,
 }
@@ -71,23 +69,15 @@ impl BackgroundRequestHandler for ResolveTestRunParamsRequestHandler {
             return Ok(None);
         };
 
-        let program = db
-            .project()
-            .program(db)
-            .python_executable(db)
-            .as_deref()
-            .map(ToString::to_string);
-
         let working_directory = db.project().root(db).to_string();
 
         tracing::debug!(
-            "Resolved `{}` to run from `{working_directory}` with interpreter {program:?}",
+            "Resolved `{}` to run from `{working_directory}`",
             params.test_id
         );
 
         Ok(Some(TestRunParams {
             working_directory,
-            program,
             arguments: vec!["-m".to_string(), "pytest".to_string(), params.test_id],
         }))
     }
