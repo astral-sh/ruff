@@ -683,8 +683,14 @@ fn shadowed_descriptor_write_type<'db>(
     attr_ty: Type<'db>,
 ) -> Type<'db> {
     match attr_ty {
-        Type::Union(union) => union.map(db, env, |ty| shadowed_descriptor_write_type(db, env, *ty)),
-        Type::TypeAlias(alias) => shadowed_descriptor_write_type(db, env, alias.value_type(db)),
+        Type::Union(union) => {
+            union.map_leave_aliases(db, env, |ty| shadowed_descriptor_write_type(db, env, *ty))
+        }
+        Type::TypeAlias(alias) => {
+            let value = alias.value_type(db);
+            let write_ty = shadowed_descriptor_write_type(db, env, value);
+            if write_ty == value { attr_ty } else { write_ty }
+        }
         _ if attr_ty.function_like_kind(db) == Some(CallableTypeKind::StaticMethodLike) => {
             attr_ty.underlying_function(db)
         }

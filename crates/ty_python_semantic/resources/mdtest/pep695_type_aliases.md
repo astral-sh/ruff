@@ -111,6 +111,20 @@ type OptionalInt = int | None
 x: OptionalInt = "1"
 ```
 
+Attribute-assignment diagnostics retain the declared alias name, including aliases within a union:
+
+```py
+class C:
+    value: OptionalInt = None
+    combined: OptionalInt | bytes = None
+
+def assign(c: C) -> None:
+    # error: [invalid-assignment] "attribute `value` of type `OptionalInt`"
+    c.value = "incorrect"
+    # error: [invalid-assignment] "attribute `combined` of type `OptionalInt | bytes`"
+    c.combined = "incorrect"
+```
+
 ## No type qualifiers
 
 The right-hand side of a type alias definition is a type expression, not an annotation expression.
