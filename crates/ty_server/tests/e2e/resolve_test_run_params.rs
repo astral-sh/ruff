@@ -57,6 +57,7 @@ fn resolve_run_params_for_a_file() -> Result<()> {
       "arguments": [
         "-m",
         "pytest",
+        "-vv",
         "<temp_dir>/src/tests/test_module.py"
       ],
       "workingDirectory": "<temp_dir>/src"
@@ -78,6 +79,7 @@ fn resolve_run_params_for_a_directory() -> Result<()> {
       "arguments": [
         "-m",
         "pytest",
+        "-vv",
         "<temp_dir>/src/tests"
       ],
       "workingDirectory": "<temp_dir>/src"
@@ -99,6 +101,7 @@ fn resolve_run_params_for_a_function() -> Result<()> {
       "arguments": [
         "-m",
         "pytest",
+        "-vv",
         "<temp_dir>/src/tests/test_module.py::test_one"
       ],
       "workingDirectory": "<temp_dir>/src"
@@ -120,6 +123,7 @@ fn resolve_run_params_for_a_class() -> Result<()> {
       "arguments": [
         "-m",
         "pytest",
+        "-vv",
         "<temp_dir>/src/tests/test_module.py::TestThings"
       ],
       "workingDirectory": "<temp_dir>/src"
@@ -181,6 +185,7 @@ def test_beta():
       "arguments": [
         "-m",
         "pytest",
+        "-vv",
         "<temp_dir>/workspace_one/tests/test_module.py::test_alpha"
       ],
       "workingDirectory": "<temp_dir>/workspace_one"
@@ -199,6 +204,7 @@ def test_beta():
       "arguments": [
         "-m",
         "pytest",
+        "-vv",
         "<temp_dir>/workspace_two/tests/test_module.py::test_beta"
       ],
       "workingDirectory": "<temp_dir>/workspace_two"
