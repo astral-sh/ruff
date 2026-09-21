@@ -2648,10 +2648,10 @@ enum ConstraintSetAnalysis<'db> {
 impl<'db> ConstraintSetAnalysis<'db> {
     /// Reports why a type variable's declared bound or constraints cannot be satisfied.
     ///
-    /// Multiple rejected paths describe one failure when their lower bounds violate the same type
-    /// variable's declaration in a contravariant position. Their argument types are combined into
-    /// an intersection. For example, paths rejecting `int` and `bool` for `T: bytes` report
-    /// `bool`, the intersection of `int` and `bool`.
+    /// Multiple rejected paths describe one failure when their bounds violate the same type
+    /// variable's declaration with the same variance. Lower-bound evidence is combined into an
+    /// intersection, while upper-bound evidence is combined into a union. For example, paths
+    /// rejecting lower bounds `int` and `bool` for `T: bytes` report `bool`, their intersection.
     ///
     /// The inference API returns at most one declaration error per relation. Failures involving
     /// different declarations, variances, or type variables cannot be combined meaningfully, so
@@ -2692,8 +2692,10 @@ impl<'db> ConstraintSetAnalysis<'db> {
         let arguments = failures.iter().map(|failure| failure.error.argument_type());
         let argument = match first.variance {
             ConstraintFailureVariance::Contravariant => {
-                IntersectionType::from_elements(db, env, arguments)
+                IntersectionType::bounded_from_elements(db, env, arguments)
+                    .unwrap_or_else(|| first.error.argument_type())
             }
+            ConstraintFailureVariance::Covariant => UnionType::from_elements(db, env, arguments),
             ConstraintFailureVariance::Invariant => {
                 // TODO: Combine invariant failures without losing their lower- or upper-bound
                 // evidence.
@@ -2715,19 +2717,20 @@ impl<'db> ConstraintSetAnalysis<'db> {
 
 /// A declared type-variable bound or constraint rejected while solving one alternative.
 ///
-/// The variance identifies whether the rejected lower bound also has an upper bound, so multiple
-/// failures from the same relation can be combined into one diagnostic.
+/// The variance identifies whether the rejected path has lower, upper, or invariant evidence, so
+/// multiple failures from the same relation can be combined into one diagnostic.
 struct ConstraintFailure<'db> {
     error: SpecializationError<'db>,
     variance: ConstraintFailureVariance,
 }
 
-/// The possible variances for a path with a lower bound that violates a declaration.
+/// The possible variances for a path whose evidence violates a declaration.
 ///
-/// Covariant and bivariant paths have no lower bound, so they cannot produce declaration failures.
+/// A bivariant path has no evidence, so it cannot produce a declaration failure.
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum ConstraintFailureVariance {
     Contravariant,
+    Covariant,
     Invariant,
 }
 
@@ -3587,8 +3590,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let argument = violation.argument?;
         let variance = match violation.variance {
             TypeVarVariance::Contravariant => ConstraintFailureVariance::Contravariant,
+            TypeVarVariance::Covariant => ConstraintFailureVariance::Covariant,
             TypeVarVariance::Invariant => ConstraintFailureVariance::Invariant,
-            TypeVarVariance::Covariant | TypeVarVariance::Bivariant => return None,
+            TypeVarVariance::Bivariant => return None,
         };
         let error = match violation.kind {
             SolutionViolationKind::UpperBound => SpecializationError::MismatchedBound {
@@ -4806,6 +4810,7 @@ mod tests {
     use super::*;
 
     use crate::types::constraints::resolution::SolutionType::{Resolved, Unresolved};
+    use crate::types::typevar::TypeVarConstraints;
 
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem;
@@ -5610,6 +5615,68 @@ mod tests {
     }
 
     #[test]
+    fn constrained_invariant_declaration_failure() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(db, &env);
+        let str = KnownClass::Str.to_instance(db, &env);
+        let bytes = KnownClass::Bytes.to_instance(db, &env);
+        let [typevar] = create_typevars(db, ["T"]);
+        let typevar = typevar.map_bound_or_constraints(db, |_| {
+            Some(TypeVarBoundOrConstraints::Constraints(
+                TypeVarConstraints::new(db, [int, str].as_slice()),
+            ))
+        });
+        let context = GenericContext::from_typevar_instances(db, &env, [typevar]);
+        let constraints = ConstraintSetBuilder::new();
+        let builder = SpecializationBuilder::new(db, &env, &constraints, context);
+        let relation =
+            ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, bytes, bytes);
+
+        assert_eq!(
+            builder
+                .analyze_constraint_set(relation)
+                .specialization_error(db, &env),
+            Some(SpecializationError::MismatchedConstraint {
+                bound_typevar: typevar,
+                argument: bytes,
+            })
+        );
+    }
+
+    #[test]
+    fn constrained_upper_declaration_failure() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(db, &env);
+        let str = KnownClass::Str.to_instance(db, &env);
+        let bool = KnownClass::Bool.to_instance(db, &env);
+        let [typevar] = create_typevars(db, ["T"]);
+        let typevar = typevar.map_bound_or_constraints(db, |_| {
+            Some(TypeVarBoundOrConstraints::Constraints(
+                TypeVarConstraints::new(db, [int, str].as_slice()),
+            ))
+        });
+        let context = GenericContext::from_typevar_instances(db, &env, [typevar]);
+        let constraints = ConstraintSetBuilder::new();
+        let builder = SpecializationBuilder::new(db, &env, &constraints, context);
+        let relation =
+            ConstraintSet::constrain_typevar_upper_bound(db, &env, &constraints, typevar, bool);
+
+        assert_eq!(
+            builder
+                .analyze_constraint_set(relation)
+                .specialization_error(db, &env),
+            Some(SpecializationError::MismatchedConstraint {
+                bound_typevar: typevar,
+                argument: bool,
+            })
+        );
+    }
+
+    #[test]
     fn constraint_failure_diagnostics_preserve_variance() {
         let db = setup_db();
         let db = &db;
@@ -5627,7 +5694,7 @@ mod tests {
                 [first, second]
                     .into_iter()
                     .map(|argument| ConstraintFailure {
-                        error: SpecializationError::MismatchedBound {
+                        error: SpecializationError::MismatchedConstraint {
                             bound_typevar: typevar,
                             argument,
                         },
@@ -5641,6 +5708,11 @@ mod tests {
             .specialization_error(db, &env)
             .map(|error| error.argument_type());
         assert_eq!(contravariant, Some(bool));
+
+        let covariant = analysis(ConstraintFailureVariance::Covariant, int, bool)
+            .specialization_error(db, &env)
+            .map(|error| error.argument_type());
+        assert_eq!(covariant, Some(int));
 
         let invariant = analysis(ConstraintFailureVariance::Invariant, int, bool)
             .specialization_error(db, &env)

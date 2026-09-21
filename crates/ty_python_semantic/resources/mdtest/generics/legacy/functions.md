@@ -455,6 +455,42 @@ info: Type variable defined here
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
+## Inferring a constrained typevar from a callback parameter
+
+A callback must accept every value of at least one declared constraint. A callback accepting only
+`bool` is too narrow for both `int` and `str`, even though `bool` is a subtype of `int`.
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T", int, str)
+
+def constrained(consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def accepts_int(value: int) -> None: ...
+def accepts_str(value: str) -> None: ...
+def accepts_bool(value: bool) -> None: ...
+
+reveal_type(constrained(accepts_int))  # revealed: int
+reveal_type(constrained(accepts_str))  # revealed: str
+# snapshot: invalid-argument-type
+reveal_type(constrained(accepts_bool))  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `constrained` is incorrect
+  --> src/mdtest_snippet.py:15:25
+   |
+15 | reveal_type(constrained(accepts_bool))  # revealed: Unknown
+   |                         ^^^^^^^^^^^^ Argument type `bool` does not satisfy constraints (`int`, `str`) of type variable `T`
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | T = TypeVar("T", int, str)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
 ## Typevar constraints
 
 If a type parameter has an upper bound, that upper bound constrains which types can be used for that
