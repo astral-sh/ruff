@@ -772,7 +772,7 @@ def element[T](sink: Sink[T]) -> T:
     raise NotImplementedError
 
 def _(sink: Intersection[Sink[A], Sink[B]]) -> None:
-    # TODO: Validate the complete specializations separately.
+    # TODO: Validate and refine each specialization separately to accept this call and reveal A & B.
     # error: [invalid-argument-type] "Expected `Sink[A | B]`"
     reveal_type(element(sink))  # revealed: A | B
 ```
@@ -823,7 +823,8 @@ def _(both: C, only_a: A, sink: Sink[Intersection[Source[A], Source[B]]]) -> Non
 ## Bounds and constraints on intersection alternatives
 
 Only alternatives satisfying a declared bound or constraint contribute to inference. The return type
-uses the union of all accepted assignments:
+currently uses the union of all accepted assignments; refining it per specialization would preserve
+the intersection of the accepted result types:
 
 ```py
 from ty_extensions import Intersection
@@ -845,7 +846,9 @@ def constrained[T: (A, B)](source: Source[T]) -> T:
     return source.get()
 
 def _(both: Intersection[Source[A], Source[B]], mixed: Intersection[Source[A], Source[C]]) -> None:
+    # TODO: Refine the return type per specialization to reveal A & B.
     reveal_type(bounded(both))  # revealed: A | B
+    # TODO: Refine the return type per specialization to reveal A & B.
     reveal_type(constrained(both))  # revealed: A | B
     reveal_type(bounded(mixed))  # revealed: A
     reveal_type(constrained(mixed))  # revealed: A
