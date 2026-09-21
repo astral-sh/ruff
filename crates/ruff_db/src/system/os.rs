@@ -234,10 +234,22 @@ impl CommandExecutor for OsSystem {
             .get_current_dir()
             .unwrap_or_else(|| self.current_directory());
 
-        std::process::Command::new(command.get_executable())
+        let mut process = std::process::Command::new(command.get_executable());
+        process
             .args(command.get_args())
-            .current_dir(directory.as_std_path())
-            .output()
+            .current_dir(directory.as_std_path());
+        if command.get_env_clear() {
+            process.env_clear();
+        }
+
+        for (name, value) in command.get_envs() {
+            if let Some(value) = value {
+                process.env(name, value);
+            } else {
+                process.env_remove(name);
+            }
+        }
+        process.output()
     }
 
     fn dyn_clone(&self) -> Box<dyn CommandExecutor> {

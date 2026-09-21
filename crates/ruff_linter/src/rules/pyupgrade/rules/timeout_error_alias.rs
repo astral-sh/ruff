@@ -8,6 +8,7 @@ use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -45,7 +46,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `TimeoutError`](https://docs.python.org/3/library/exceptions.html#TimeoutError)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Suspicious)]
 pub(crate) struct TimeoutErrorAlias {
     name: Option<String>,
 }

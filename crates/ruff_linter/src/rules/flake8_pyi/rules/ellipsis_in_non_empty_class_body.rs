@@ -4,6 +4,7 @@ use ruff_python_ast::{Stmt, StmtExpr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -28,7 +29,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     value: int
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.270")]
+#[violation_metadata(stable_since = "v0.0.270", category = Category::Correctness)]
 pub(crate) struct EllipsisInNonEmptyClassBody;
 
 impl Violation for EllipsisInNonEmptyClassBody {

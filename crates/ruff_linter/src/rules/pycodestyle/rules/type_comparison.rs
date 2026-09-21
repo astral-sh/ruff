@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast::{self as ast, CmpOp, Expr};
@@ -7,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for object type comparisons using `==` and other comparison
@@ -49,7 +49,7 @@ use crate::checkers::ast::Checker;
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.39")]
+#[violation_metadata(stable_since = "v0.0.39", category = Category::Pedantic)]
 pub(crate) struct TypeComparison;
 
 impl Violation for TypeComparison {
@@ -62,12 +62,9 @@ impl Violation for TypeComparison {
 
 /// E721
 pub(crate) fn type_comparison(checker: &Checker, compare: &ast::ExprCompare) {
-    for (left, right) in std::iter::once(&*compare.left)
-        .chain(&compare.comparators)
-        .tuple_windows()
-        .zip(&compare.ops)
-        .filter(|(_, op)| matches!(op, CmpOp::Eq | CmpOp::NotEq))
-        .map(|((left, right), _)| (left, right))
+    for (left, _, right) in compare
+        .iter()
+        .filter(|(_, op, _)| matches!(op, CmpOp::Eq | CmpOp::NotEq))
     {
         // If either expression is a type...
         if is_type(left, checker.semantic()) || is_type(right, checker.semantic()) {

@@ -1,5 +1,7 @@
+use std::debug_assert_matches;
+
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
-use crate::use_def::{ControlFlowRevision, FlowSnapshot, ScopedDefinitionId, UseDefMapBuilder};
+use crate::use_def::{ExceptionCheckpointKey, FlowSnapshot, UseDefMapBuilder};
 
 use super::SemanticIndexBuilder;
 
@@ -89,14 +91,14 @@ impl ExceptionContextStackManager {
     pub(super) fn finish_context_manager_context(&mut self) -> Vec<FlowSnapshot> {
         let snapshots = self.take_exception_snapshots();
         let context = self.current_exception_context_stack().pop_context();
-        debug_assert!(matches!(context.kind, ExceptionContextKind::With));
+        debug_assert_matches!(context.kind, ExceptionContextKind::With);
         snapshots
     }
 
     /// Removes the current `try` context after its handlers have been deactivated.
     pub(super) fn pop_try_context(&mut self) -> ExceptionContext {
         let context = self.current_exception_context_stack().pop_context();
-        debug_assert!(matches!(context.kind, ExceptionContextKind::Try { .. }));
+        debug_assert_matches!(context.kind, ExceptionContextKind::Try { .. });
         debug_assert!(!context.exception_handlers.is_active());
         context
     }
@@ -347,7 +349,7 @@ enum ExceptionContextKind {
 pub(super) struct ExceptionContext {
     exception_handlers: ExceptionHandlers,
     kind: ExceptionContextKind,
-    last_checkpoint_key: Option<(ScopedDefinitionId, ControlFlowRevision)>,
+    last_checkpoint_key: Option<ExceptionCheckpointKey>,
     /// Whether an exception escaped this suite and must also propagate after its cleanup.
     has_escaping_exception: bool,
     /// Whether apparently terminal control flow in a nested context-manager body, such as a

@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -41,7 +42,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// - `lint.isort.required-imports`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.156")]
+#[violation_metadata(stable_since = "v0.0.156", category = Category::Complexity)]
 pub(crate) struct UselessImportAlias {
     required_import_conflict: bool,
 }

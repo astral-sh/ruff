@@ -1,6 +1,7 @@
 name: Run typing conformance
 
-permissions: {}
+permissions:
+  contents: read
 
 on:
   pull_request:
@@ -13,6 +14,7 @@ on:
       - "!crates/ty_wasm/**"
       - "crates/ruff_db"
       - "crates/ruff_python_ast"
+      - "crates/ruff_python_edits/**"
       - "crates/ruff_python_parser"
       - "scripts/conformance.py"
       - ".github/workflows/typing_conformance.yaml"
@@ -29,6 +31,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
+  UV_LOCKED: 1
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
@@ -38,7 +41,7 @@ env:
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
   CARGO_PROFILE_DEV_LTO: "false"
   CARGO_PROFILE_DEV_OPT_LEVEL: 0
-  CONFORMANCE_SUITE_COMMIT: bee91c2646261629c9835dc0adad16e0d554b4a5
+  CONFORMANCE_SUITE_COMMIT: 3a4ada0a0e6b380c6d7561b8392c6b159f5f374e
   PYTHON_VERSION: 3.12
 
 jobs:

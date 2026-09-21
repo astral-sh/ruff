@@ -1156,8 +1156,9 @@ def _(answer: CoupledInequality):
 
 ## Recursive aliases containing enum domains
 
-Comparisons involving recursive enum aliases remain valid. Comparing against a specific enum member
-narrows both branches to their remaining members while preserving any `NewType` tag.
+Comparisons involving invalid recursive enum aliases still use their non-recursive members.
+Comparing against a specific enum member narrows both branches to their remaining members while
+preserving any `NewType` tag.
 
 ```toml
 [environment]
@@ -1172,13 +1173,13 @@ class EnumValue(Enum):
     VALUE = 1
     OTHER = 2
 
-type Recursive = EnumValue | Recursive
+type Recursive = EnumValue | Recursive  # error: [cyclic-type-alias-definition]
 
 def _(left: Recursive, right: EnumValue):
     reveal_type(left == right)  # revealed: bool
 
 BrandedEnumValue = NewType("BrandedEnumValue", EnumValue)
-type RecursiveBrand = BrandedEnumValue | RecursiveBrand
+type RecursiveBrand = BrandedEnumValue | RecursiveBrand  # error: [cyclic-type-alias-definition]
 
 def compare_recursive_brand_to_member(left: RecursiveBrand) -> None:
     if left == EnumValue.VALUE:
@@ -1193,8 +1194,8 @@ def compare_recursive_brand_to_member(left: RecursiveBrand) -> None:
 ```
 
 A recursive alias with changing type arguments may introduce values outside its original enum
-domain. Here, `True` compares equal to the integer-valued enum member, so the `bool` alternative
-must remain reachable.
+domain. Here, `True` compares equal to the integer-valued enum member. The `bool` alternative
+remains reachable and narrows to `True` or `False` according to the comparison.
 
 ```py
 from enum import IntEnum
@@ -1204,13 +1205,13 @@ class Number(IntEnum):
     TWO = 2
 
 BrandedNumber = NewType("BrandedNumber", Number)
-type Changing[T] = T | Changing[bool]
+type Changing[T] = T | Changing[bool]  # error: [cyclic-type-alias-definition]
 
 def compare_changing_specialization(value: Changing[BrandedNumber]) -> None:
     if value == Number.ONE:
-        reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.ONE]) | bool
+        reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.ONE]) | Literal[True]
     else:
-        reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.TWO]) | bool
+        reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.TWO]) | Literal[False]
 ```
 
 Mutually recursive aliases can likewise admit values outside their enum domain. Intersecting the
@@ -1219,16 +1220,16 @@ aliases does not remove their shared `bool` alternative.
 ```py
 from ty_extensions import Intersection
 
-type RecursiveWithBool = RecursiveWithBrand | bool
-type RecursiveWithBrand = RecursiveWithBool | BrandedNumber
+type RecursiveWithBool = RecursiveWithBrand | bool  # error: [cyclic-type-alias-definition]
+type RecursiveWithBrand = RecursiveWithBool | BrandedNumber  # error: [cyclic-type-alias-definition]
 
 def compare_mutually_recursive_intersection(
     value: Intersection[RecursiveWithBool, RecursiveWithBrand],
 ) -> None:
     if value == Number.ONE:
-        reveal_type(value)  # revealed: bool | BrandedNumber
+        reveal_type(value)  # revealed: Literal[True] | (BrandedNumber & Literal[Number.ONE])
     else:
-        reveal_type(value)  # revealed: bool | BrandedNumber
+        reveal_type(value)  # revealed: Literal[False] | (BrandedNumber & Literal[Number.TWO])
 ```
 
 ## Recursive aliases containing gradual generic branches
@@ -1314,7 +1315,7 @@ def narrow_final_object_equality(value: A | B, other: A):
         reveal_type(value)  # revealed: A
 ```
 
-Different inherited built-in implementations cannot compare equal:
+Final classes with different inherited built-in equality implementations cannot compare equal:
 
 ```py
 from typing import final
@@ -2184,6 +2185,88 @@ def gradual_enum_union_inequality(value: Color | Any, other: Color):
         reveal_type(value)  # revealed: Color | Any
 ```
 
+## Chained comparisons against distinct enum alternatives
+
+The enum class can be one of two unrelated classes, so each comparison can fail even if `item` is
+one of the two members being compared. Successive failed comparisons add no exclusions to the
+unknown type; the earlier `str` exclusion still applies. In particular, the number of alternatives
+does not grow with each branch:
+
+```py
+from enum import Enum
+
+class First(Enum):
+    A = 1
+    B = 2
+    C = 3
+    D = 4
+    E = 5
+    F = 6
+    G = 7
+    H = 8
+    I = 9
+    J = 10
+
+class Second(Enum):
+    A = 1
+    B = 2
+    C = 3
+    D = 4
+    E = 5
+    F = 6
+    G = 7
+    H = 8
+    I = 9
+    J = 10
+
+def describe(item, choice: bool):
+    enum = First if choice else Second
+    if isinstance(item, str):
+        return item
+
+    if item == enum.A:
+        name = "a"
+    elif item == enum.B:
+        name = "b"
+    elif item == enum.C:
+        name = "c"
+    elif item == enum.D:
+        name = "d"
+    elif item == enum.E:
+        name = "e"
+    elif item == enum.F:
+        name = "f"
+    elif item == enum.G:
+        name = "g"
+    elif item == enum.H:
+        name = "h"
+    elif item == enum.I:
+        name = "i"
+    elif item == enum.J:
+        name = "j"
+    else:
+        reveal_type(item)  # revealed: Unknown & ~str
+        raise ValueError(item)
+
+    return name
+```
+
+The true branch of `!=` keeps the same type. Comparing with one known member, however, still
+excludes that specific member:
+
+```py
+def exclusions(item, choice: bool):
+    enum = First if choice else Second
+    if isinstance(item, str):
+        return
+
+    if item != enum.A:
+        reveal_type(item)  # revealed: Unknown & ~str
+
+    if item != First.A:
+        reveal_type(item)  # revealed: Unknown & ~str & ~Literal[First.A]
+```
+
 ## Unions of gradual string literals
 
 Comparing a union of string literals intersected with `Any` keeps the matching alternative for
@@ -2464,6 +2547,40 @@ def tuple_with_erased_element_identity(value: NeverEqualTupleElement) -> None:
     reveal_type((LeftElement(value),) != (RightElement(value),))  # revealed: bool
 ```
 
+## Comparing sequences with tuples
+
+A `Sequence[object]` can be an empty tuple, so the equality branch remains reachable and we report
+errors inside it:
+
+```py
+from collections.abc import Sequence
+
+def _(value: Sequence[object]):
+    if value == ():
+        reveal_type(value)  # revealed: Sequence[object]
+        1 + "a"  # error: [unsupported-operator]
+```
+
+## Comparing truthy sequences with literals
+
+A truthy sequence can still be a string or bytes object. Comparing a literal on the left with such a
+sequence does not make the equality branch unreachable:
+
+```py
+from collections.abc import Sequence
+
+def _(text: Sequence[str], data: Sequence[int]):
+    if text:
+        reveal_type("x" == text)  # revealed: bool
+        reveal_type("x" != text)  # revealed: bool
+        if "x" == text:
+            1 + "a"  # error: [unsupported-operator]
+
+    if data:
+        reveal_type(b"x" == data)  # revealed: bool
+        reveal_type(b"x" != data)  # revealed: bool
+```
+
 ## Narrowing with NewTypes
 
 A `NewType` constructor returns its argument unchanged at runtime. A `WrappedIdentityEnum` value can
@@ -2605,6 +2722,10 @@ class B:
     tag: Literal["b"]
     field_b: str
 
+class C1:
+    tag: Literal["c", 1]
+    field_c1: str
+
 class Marker(Protocol):
     marked: bool
 
@@ -2619,6 +2740,12 @@ class TaggedB(Protocol):
 
     @property
     def tag(self) -> Literal["b"]: ...
+
+class TaggedC1(Protocol):
+    field_c1: str
+
+    @property
+    def tag(self) -> Literal["c", 1]: ...
 
 class Container:
     value: A | B | None
@@ -2640,6 +2767,34 @@ def _(x: A | B):
         reveal_type(x)  # revealed: B
     else:
         reveal_type(x)  # revealed: A
+
+def multiple_tags(x: A | C1):
+    if x.tag == "a":
+        reveal_type(x)  # revealed: A
+        reveal_type(x.field_a)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: C1
+        reveal_type(x.field_c1)  # revealed: str
+
+    if "a" == x.tag:
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: C1
+
+    if x.tag != "a":
+        reveal_type(x)  # revealed: C1
+    else:
+        reveal_type(x)  # revealed: A
+
+    if x.tag == "c":
+        reveal_type(x)  # revealed: C1
+    else:
+        reveal_type(x)  # revealed: A | C1
+
+    if x.tag != "c":
+        reveal_type(x)  # revealed: A | C1
+    else:
+        reveal_type(x)  # revealed: C1
 
 def truthiness_guard(value: A | B | None):
     if not value:
@@ -2678,6 +2833,14 @@ def protocol_union(value: TaggedA | TaggedB):
     else:
         reveal_type(value)  # revealed: TaggedB
         reveal_type(value.field_b)  # revealed: str
+
+def protocol_union_multiple_tags(value: TaggedA | TaggedC1):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: TaggedA
+        reveal_type(value.field_a)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: TaggedC1
+        reveal_type(value.field_c1)  # revealed: str
 ```
 
 Enum literals are also supported as attribute tags:
@@ -2703,7 +2866,8 @@ def _(x: A | B):
         reveal_type(x)  # revealed: B
 ```
 
-Non-literal tag arms are preserved during positive narrowing:
+A broad `str` tag can match the comparison value or a different string, so its containing object
+remains possible in both branches:
 
 ```py
 from typing import Literal
@@ -2747,6 +2911,199 @@ def _(x: A | B):
         reveal_type(x)  # revealed: A
     else:
         reveal_type(x)  # revealed: B
+```
+
+## Attribute tags with non-literal comparators
+
+A boolean comparison value can match a boolean tag, but cannot match either of these other tags:
+
+```py
+from typing import Literal
+
+class BooleanTag:
+    tag: bool
+
+class StringTag:
+    tag: Literal["text"]
+
+class NumberTag:
+    tag: Literal[2]
+
+def boolean_comparator(value: BooleanTag | StringTag | NumberTag, other: bool):
+    if value.tag == other:
+        reveal_type(value)  # revealed: BooleanTag
+    else:
+        reveal_type(value)  # revealed: BooleanTag | StringTag | NumberTag
+```
+
+A union comparison value can match tags of different types. Neither `True` nor `"text"` equals `2`,
+so `NumberTag` is excluded from the equality branch:
+
+```py
+def union_comparator(value: BooleanTag | StringTag | NumberTag, other: Literal[True, "text"]):
+    if value.tag == other:
+        reveal_type(value)  # revealed: BooleanTag | StringTag
+    else:
+        reveal_type(value)  # revealed: BooleanTag | StringTag | NumberTag
+```
+
+## Attribute tags with ambiguous comparisons
+
+An `int` tag can contain a subclass with custom equality. This remains true when the tag is a
+non-final subclass that inherits `int.__eq__`. Both tag types stay possible when compared with a
+string, while the unrelated literal tag is excluded:
+
+```py
+from typing import Literal
+
+class OpenInt(int): ...
+
+class IntegerTag:
+    tag: int
+
+class SubclassTag:
+    tag: OpenInt
+
+class A:
+    tag: Literal["a"]
+
+class B:
+    tag: Literal["b"]
+
+def integer_tags(value: IntegerTag | SubclassTag | A | B):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: IntegerTag | SubclassTag | A
+    else:
+        reveal_type(value)  # revealed: IntegerTag | SubclassTag | B
+```
+
+The comparison value can also have a subclass with custom equality. A `str` value might therefore
+match an integer tag, so neither containing object can be excluded:
+
+```py
+class One:
+    tag: Literal[1]
+
+def broad_comparator(value: A | One, other: str):
+    if value.tag == other:
+        reveal_type(value)  # revealed: A | One
+    else:
+        reveal_type(value)  # revealed: A | One
+```
+
+## Attribute tags with enum equality
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+An `IntEnum` member compares equal to its integer value, so both `EnumTag` and `IntegerTag` match
+`1`. `EnumTag` also permits a different tag, leaving it possible in both branches:
+
+```py
+from enum import Enum, IntEnum, StrEnum
+from typing import Literal
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+class EnumTag:
+    tag: Literal[Number.ONE, "other"]
+
+class IntegerTag:
+    tag: Literal[1]
+
+class OtherTag:
+    tag: Literal[2]
+
+def equal_integer_tags(value: EnumTag | IntegerTag | OtherTag):
+    if value.tag == 1:
+        reveal_type(value)  # revealed: EnumTag | IntegerTag
+    else:
+        reveal_type(value)  # revealed: EnumTag | OtherTag
+
+    if value.tag != 1:
+        reveal_type(value)  # revealed: EnumTag | OtherTag
+    else:
+        reveal_type(value)  # revealed: EnumTag | IntegerTag
+```
+
+The enum can also be the comparison value. An integer literal can match the enum member without
+having the same literal type:
+
+```py
+def enum_comparator(value: EnumTag | IntegerTag | OtherTag):
+    if Number.ONE == value.tag:
+        reveal_type(value)  # revealed: EnumTag | IntegerTag
+    else:
+        reveal_type(value)  # revealed: EnumTag | OtherTag
+```
+
+`StrEnum` members likewise compare equal to strings with the same value:
+
+```py
+class Word(StrEnum):
+    A = "a"
+    B = "b"
+
+class EnumStringTag:
+    tag: Literal[Word.A]
+
+class StringTag:
+    tag: Literal["a"]
+
+class OtherStringTag:
+    tag: Literal["b"]
+
+def equal_string_tags(value: EnumStringTag | StringTag | OtherStringTag):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: EnumStringTag | StringTag
+    else:
+        reveal_type(value)  # revealed: OtherStringTag
+```
+
+Custom equality methods can make an enum member compare equal to unrelated values. An ambiguous
+comparison keeps the alternative containing that member in both branches:
+
+```py
+class Custom(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class CustomTag:
+    tag: Literal[Custom.A]
+
+def custom_equality(value: CustomTag | StringTag):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: CustomTag | StringTag
+    else:
+        reveal_type(value)  # revealed: CustomTag
+```
+
+An enum can customize `__ne__` independently of `__eq__`. An ambiguous inequality keeps the
+alternative with that enum tag in both branches, including the branch where the inequality is false:
+
+```py
+class NeverUnequal(Enum):
+    A = 1
+    B = 2
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+class UnequalTag:
+    tag: Literal[NeverUnequal.A]
+
+def custom_inequality(value: UnequalTag | StringTag | OtherStringTag):
+    if value.tag != "a":
+        reveal_type(value)  # revealed: UnequalTag | OtherStringTag
+    else:
+        reveal_type(value)  # revealed: UnequalTag | StringTag
 ```
 
 ## Enabling strict equality narrowing

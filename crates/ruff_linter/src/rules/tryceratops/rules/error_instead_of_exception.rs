@@ -6,6 +6,7 @@ use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
@@ -56,7 +57,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `logging.exception`](https://docs.python.org/3/library/logging.html#logging.exception)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.236")]
+#[violation_metadata(stable_since = "v0.0.236", category = Category::Pedantic)]
 pub(crate) struct ErrorInsteadOfException;
 
 impl Violation for ErrorInsteadOfException {

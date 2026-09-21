@@ -12,11 +12,11 @@ set -euo pipefail
 snapshot_dir="$(mktemp -d "${TMPDIR:-/tmp}/ty-ecosystem-report.XXXXXX")"
 ecosystem_comment_id="<matching-comment-id-or-empty>"
 if [[ -n "$ecosystem_comment_id" ]]; then
-  gh api "repos/astral-sh/ruff/issues/comments/$ecosystem_comment_id" > "$snapshot_dir/comment.json"
+  GH_TELEMETRY=false gh api "repos/astral-sh/ruff/issues/comments/$ecosystem_comment_id" > "$snapshot_dir/comment.json"
 fi
-gh run view <actions-run> --repo astral-sh/ruff --attempt <actions-attempt> \
+GH_TELEMETRY=false gh run view <actions-run> --repo astral-sh/ruff --attempt <actions-attempt> \
   --json attempt,headSha,jobs,startedAt,updatedAt,url > "$snapshot_dir/run.json"
-gh api --paginate --slurp \
+GH_TELEMETRY=false gh api --paginate --slurp \
   "repos/astral-sh/ruff/actions/runs/<actions-run>/artifacts?per_page=100" |
   jq '{artifacts: [.[].artifacts[]]}' > "$snapshot_dir/artifacts.json"
 printf 'TY_ECOSYSTEM_SNAPSHOT_DIR=%s\n' "$snapshot_dir"
@@ -32,7 +32,7 @@ download_validated_artifact() {
   local destination="$2"
 
   mkdir -p "$destination"
-  gh api "repos/astral-sh/ruff/actions/artifacts/$artifact_id/zip" \
+  GH_TELEMETRY=false gh api "repos/astral-sh/ruff/actions/artifacts/$artifact_id/zip" \
     > "$snapshot_dir/artifact-$artifact_id.zip"
   unzip -q "$snapshot_dir/artifact-$artifact_id.zip" -d "$destination"
 }

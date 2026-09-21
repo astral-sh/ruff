@@ -151,6 +151,33 @@ match obj:
         pass
 ```
 
+## Duplicate keyword arguments
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def f(x: int) -> None: ...
+
+# error: [invalid-syntax] "Duplicate keyword argument `x`"
+f(x=1, x=2)
+
+# error: [parameter-already-assigned] "Multiple values provided for parameter `x` of function `f`"
+f(1, x=2)
+```
+
+Duplicate keywords are also invalid in class definitions:
+
+```py
+# error: [invalid-syntax] "Duplicate keyword argument `metaclass`"
+class C(metaclass=type, metaclass=type): ...
+
+# error: [invalid-syntax] "Duplicate keyword argument `metaclass`"
+class Generic[T](metaclass=type, metaclass=type): ...
+```
+
 ## `return`, `yield`, `yield from`, and `await` outside function
 
 ```py

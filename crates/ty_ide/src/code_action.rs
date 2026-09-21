@@ -9,7 +9,7 @@ use ty_project::Db;
 use ty_python_core::ProgramFile;
 use ty_python_semantic::lint::LintId;
 use ty_python_semantic::suppress_single;
-use ty_python_semantic::types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
+use ty_python_semantic::types::UNRESOLVED_REFERENCE;
 
 /// A `QuickFix` Code Action
 #[derive(Debug, Clone)]
@@ -33,9 +33,7 @@ pub fn code_actions(
     let mut actions = Vec::new();
 
     // Suggest imports/qualifications for unresolved references (often ideal)
-    let is_unresolved_reference =
-        lint_id == LintId::of(&UNRESOLVED_REFERENCE) || lint_id == LintId::of(&UNDEFINED_REVEAL);
-    if is_unresolved_reference
+    if lint_id == LintId::of(&UNRESOLVED_REFERENCE)
         && let Some(import_quick_fix) = unresolved_fixes(db, file, diagnostic_range)
     {
         actions.extend(import_quick_fix);
@@ -645,7 +643,7 @@ mod tests {
     }
 
     #[test]
-    fn undefined_reveal_type() {
+    fn add_ignore_undefined_reveal_type() {
         let test = CodeActionTest::with_source(
             r#"
             <START>reveal_type<END>(1)
@@ -653,28 +651,6 @@ mod tests {
         );
 
         assert_snapshot!(test.code_actions(&UNDEFINED_REVEAL), @"
-        info[code-action]: import typing.reveal_type
-         --> main.py:2:1
-          |
-        2 | reveal_type(1)
-          | ^^^^^^^^^^^
-        help: This is a preferred code action
-          |
-        1 + from typing import reveal_type
-        2 |
-          |
-
-        info[code-action]: import typing_extensions.reveal_type
-         --> main.py:2:1
-          |
-        2 | reveal_type(1)
-          | ^^^^^^^^^^^
-        help: This is a preferred code action
-          |
-        1 + from typing_extensions import reveal_type
-        2 |
-          |
-
         info[code-action]: Ignore 'undefined-reveal' for this line
          --> main.py:2:1
           |

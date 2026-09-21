@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `@contextlib.contextmanager` decorated functions that contain
@@ -49,7 +50,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `contextlib.contextmanager`](https://docs.python.org/3/library/contextlib.html#contextlib.contextmanager)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.14")]
+#[violation_metadata(preview_since = "0.15.14", category = Category::Suspicious)]
 pub(crate) struct FallibleContextManager;
 
 impl Violation for FallibleContextManager {

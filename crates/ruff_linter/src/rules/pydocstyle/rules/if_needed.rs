@@ -4,6 +4,7 @@ use ruff_python_semantic::analyze::visibility::is_overload;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 
 /// ## What it does
@@ -73,7 +74,7 @@ use crate::docstrings::Docstring;
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [Python documentation: `typing.overload`](https://docs.python.org/3/library/typing.html#typing.overload)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.71")]
+#[violation_metadata(stable_since = "v0.0.71", category = Category::Pedantic)]
 pub(crate) struct OverloadWithDocstring;
 
 impl Violation for OverloadWithDocstring {

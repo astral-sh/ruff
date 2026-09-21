@@ -2,7 +2,17 @@
 
 This repository contains both Ruff (a Python linter and formatter) and ty (a Python type checker). The crates follow a naming convention: `ruff_*` for Ruff-specific code and `ty_*` for ty-specific code. ty reuses several Ruff crates, including the Python parser (`ruff_python_parser`) and AST definitions (`ruff_python_ast`).
 
+## Before contributing
+
+Before starting work on an issue and again before opening a pull request, follow the
+[guidance on avoiding duplicate work](CONTRIBUTING.md#avoiding-duplicate-work). If an open pull
+request already addresses the issue, do not submit a competing one without maintainer agreement.
+
 ## Code Review Rules
+
+For security reviews of Ruff and ty runtime changes, use the
+[threat models](agents/references/threat-models.md) to assess trust boundaries and
+calibrate severity.
 
 When reviewing a branch or pull request, be deliberately nitpicky. Report not
 only bugs and regressions, but also architectural and maintenance risks, weak
@@ -15,6 +25,20 @@ During code review, check the proposed changes against all applicable code, test
 documentation, and architectural conventions in this `AGENTS.md`. Report
 meaningful violations introduced by the changes; do not apply agent-only workflow
 instructions to PR authors or flag unrelated pre-existing issues.
+
+For security reviews of repository, CI, and release changes, use the
+[repository threat model](agents/references/repository-threat-model.md) to assess
+trust boundaries and calibrate severity.
+
+## Writing for human readers
+
+Write every mdtest paragraph, code comment, piece of documentation, PR description, and GitHub issue for its eventual reader, not for the current Codex conversation. Determine the reader's knowledge, purpose, and likely questions privately; do not add an audience-analysis section to the artifact.
+
+Base public-facing text on the final code, complete final diff, relevant issue, and verified evidence. Explain the observable behavior or problem before implementation details. Use established technical terminology and the actual names of types, functions, files, and invariants.
+
+Do not mention discarded alternatives, intermediate edits, private instructions, tool usage, branch or draft status, local test commands, or session history unless the reader needs that information to understand the final result. Do not describe reverted changes as part of the final change.
+
+Preserve useful human-written comments unless the code change makes them inaccurate. Before finishing, reread each changed artifact as someone with no access to the Codex session and remove or explain anything that would surprise or confuse that reader.
 
 ## Running Tests
 
@@ -72,12 +96,17 @@ Never edit snapshot files or inline snapshot bodies manually. Regenerate them by
 
 ## Writing mdtests
 
-- Write mdtests as readable, literate specifications, and minimize the context a reader must hold in mind. Prefer short, focused code blocks, and define types, fixtures, and helpers close to the assertions that use them. Give independent scenarios separate sibling Markdown test headings at the same level; only introduce child headings if any existing code beneath their parent is first moved into child sections. When scenarios need shared setup, interleave short prose-and-code blocks under the same heading. Code blocks for the same file within a section are concatenated, so do not repeat imports or definitions.
+- Write mdtests as readable, literate specifications, and minimize the context a reader must hold in mind. Prefer short, focused code blocks, and define types, fixtures, and helpers close to the assertions that use them. Sections and subsections can be long when they develop a coherent topic through many short examples interspersed with prose. Do not split a subsection, or flag it in review, solely because of its length. Give independent scenarios separate sibling Markdown test headings at the same level; only introduce child headings if any existing code beneath their parent is first moved into child sections. When scenarios need shared setup, interleave short prose-and-code blocks under the same heading.
+- Code blocks for the same file within a section are concatenated into one file. For inline snapshots, keep each example's code block close to its `# snapshot` block. Ideally, any given code block only has one snapshot in it, but one codeblock containing several snapshots is also acceptable. Repeating a short, independent function definition, including one with the same name, is fine if it keeps the code triggering a snapshot close to the snapshot demonstrating the expected diagnostic on that code. Reuse shared setup when clearer, and check that repeated names do not affect other examples.
 - Prioritize document structure and readability over avoiding duplicated setup. Add a test to an existing section when its heading accurately describes the new scenario, adding or improving introductory prose as needed; otherwise, create a separate sibling section, even if that requires repeating a small fixture.
-- Introduce each scenario with a short prose paragraph explaining the code immediately below. Use clear, precise terminology. Avoid using jargon where it's unnecessary, and avoid inventing new jargon if there's an existing term of art used in that file. Avoid long paragraphs covering multiple scenarios followed by a single long code block.
-- Minimize regression examples to the behavior under test. When adapting real-world code or an issue reproducer, remove incidental types, methods, type parameters, imports, and domain-specific details. Preserve complexity only when necessary to reproduce the regression or distinguish the intended behavior, and reuse nearby fixtures or simple built-in types when doing so keeps the test easy to understand.
+- Order mdtests from basic, common behavior to more specialized cases. Place narrow regression tests alongside closely related examples when they fit naturally; otherwise, put them near the end of the relevant section or file. Do not put an obscure special case at the beginning simply because it is the newest regression.
+- Aim for readable documents that serve as both documentation and tests. Use prose to explain the key type checker behavior and its rationale where helpful. A sentence or fragment may suffice; avoid repeating what the heading, surrounding explanation, or assertions already make clear. Use clear, precise terminology. Avoid using jargon where it's unnecessary, and avoid inventing new jargon if there's an existing term of art used in that file. Avoid long paragraphs covering multiple scenarios followed by a single long code block.
+- Prefer examples whose purpose is understandable without following issue links. For narrow regressions, a brief issue reference can be enough when additional explanation would merely restate the code or obscure the relevant behavior.
+- Prefer direct, present-tense descriptions of behavior over abstract requirements: write "We reject this assignment" rather than "We must reject this assignment."
+- Keep each code example as simple as possible while still demonstrating the key behavior. When adapting real-world code or an issue reproducer, remove incidental types, methods, type parameters, imports, and domain-specific details. Preserve complexity only when necessary to reproduce the regression or distinguish the intended behavior, and reuse nearby fixtures or simple built-in types when doing so keeps the test easy to understand.
 - Prefer a minimal, purpose-built custom type over a standard-library type when a regression depends on particular attributes, methods, bounds, or constraints. Define the relevant behavior in the test so readers do not need to look up the standard-library type to understand the scenario. For commonly used standard-library types, consider adding a separate regression using the real type to protect against changes in typeshed.
 - Place each mdtest in a file for the behavior it actually tests, and assert that behavior directly. Prefer an existing file when one already covers that behavior; create a new file when no existing file is a good fit. Do not choose a file solely because its directive or helper can express the assertion.
+- When testing generic behavior supported by both legacy and PEP 695 syntax, add equivalent cases under `generics/legacy/` and `generics/pep695/`.
 
 ## Running Clippy
 
@@ -170,7 +199,7 @@ Parts of `.github/workflows/release.yml` are generated by cargo-dist from `dist-
 - Follow existing code style. Check neighboring files for patterns.
 - Prefer narrow visibility by default because this workspace is generally its own consumer. However, do not add workarounds solely to avoid `pub`: make an item public when another workspace crate needs it and that produces the cleaner implementation.
 - Rust imports should always go at the top of the file, never locally in functions.
-- Run `uv run --only-group dev --locked prek` at the end of a task if you changed files in the repo. This includes changes such as rebases or addressing review comments. Use `uv run --only-group dev --locked prek run --files <path1> <path2>` and pass every file you changed. This keeps the hook run independent of staged state and avoids sweeping unrelated changes. Use `uv run --only-group dev --locked prek run --all-files` when a full-repository hook sweep is specifically needed.
+- Run `uv run --only-dev --locked prek` at the end of a task if you changed files in the repo. This includes changes such as rebases or addressing review comments. Use `uv run --only-dev --locked prek run --files <path1> <path2>` and pass every file you changed. This keeps the hook run independent of staged state and avoids sweeping unrelated changes. Use `uv run --only-dev --locked prek run --all-files` when a full-repository hook sweep is specifically needed.
 - Before writing significant amounts of new code, look for existing utilities or mechanisms that could solve the problem. Avoid expanding the task to unrelated issues, but do not confuse keeping the task focused with minimizing the size of the implementation. Prefer addressing the underlying architectural problem over adding a localized workaround, even when doing so requires a substantial refactor or rearchitecture. Ask the user for guidance if in doubt about whether to attempt a larger refactor or not.
 - Try hard to avoid patterns that require `panic!`, `unreachable!`, `.unwrap()` or `.expect()`. Instead, try to encode those constraints in the type system. Don't be afraid to write code that's more verbose or requires largeish refactors if it enables you to avoid these unsafe calls.
 - Prefer let chains (`if let` combined with `&&`) and let guards (`PAT if let ... =>`) over nested `if let` statements to reduce indentation and improve readability. At the end of a task, always check your work to see if you missed opportunities to use `let` chains or `let` guards.
@@ -179,4 +208,5 @@ Parts of `.github/workflows/release.yml` are generated by cargo-dist from `dist-
 - Run `cargo dev generate-all` after changing configuration options, CLI arguments, lint rules, or environment variable definitions, as these changes require regeneration of schemas, docs, and CLI references.
 - Don't prefix tests with `test_`.
 - Don't separate struct definitions from their `impl` blocks unless the `impl` is deliberately placed in a separate file, as for large structs.
-- Avoid running `uv run` for any scripts from the repository root unless you use `--no-project`, `--script` or similar. Using `uv run` from the Ruff repo root without these flags will build Ruff from source, which is very slow and usually unnecessary.
+- Write all self-contained Python scripts as PEP 723 scripts, with inline metadata.
+- When running a PEP 723 script, run it with `uv run <script>`. If a script doesn't have PEP 723 metadata, run it with `--no-project`, `--script`, or similar to avoid building Ruff from source, which is very slow and usually unnecessary.

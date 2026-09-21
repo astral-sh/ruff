@@ -64,7 +64,7 @@ publish-jobs = ["./publish-pypi", "./publish-wasm", "./publish-crates"]
 # Post-announce jobs to run in CI
 post-announce-jobs = ["./notify-dependents", "./publish-docs", "./publish-playground", "./publish-versions", "./publish-mirror"]
 # Custom permissions for GitHub Jobs
-github-custom-job-permissions = { "build-docker" = { packages = "write", contents = "read", id-token = "write", attestations = "write" }, "publish-wasm" = { contents = "read", id-token = "write", packages = "write" }, "publish-crates" = { contents = "read" }, "publish-mirror" = { contents = "read" } }
+github-custom-job-permissions = { "build-binaries" = { contents = "read" }, "build-docker" = { packages = "write", contents = "read", id-token = "write", attestations = "write" }, "build-wasm" = { contents = "read" }, "publish-wasm" = { contents = "read", id-token = "write", packages = "write" }, "publish-crates" = { contents = "read" }, "publish-playground" = { contents = "read" }, "publish-versions" = { contents = "read" }, "publish-mirror" = { contents = "read" } }
 # Whether to install an updater program
 install-updater = false
 # Path that installers should place binaries in

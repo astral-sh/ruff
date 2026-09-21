@@ -1,7 +1,6 @@
 use std::ops::Deref;
 
 use bitflags::bitflags;
-use rustc_hash::{FxBuildHasher, FxHashSet};
 use thin_vec::ThinVec;
 
 use ruff_python_ast::name::Name;
@@ -47,7 +46,7 @@ const LITERAL_SET: TokenSet = TokenSet::new([
 
 /// Tokens that represents either an expression or the start of one.
 pub(super) const EXPR_SET: TokenSet = TokenSet::new([
-    TokenKind::Name,
+    TokenKind::Identifier,
     TokenKind::Minus,
     TokenKind::Plus,
     TokenKind::Tilde,
@@ -118,14 +117,14 @@ const END_EXPR_SET: TokenSet = TokenSet::new([
 const END_SEQUENCE_SET: TokenSet = END_EXPR_SET.remove(TokenKind::Comma);
 
 impl<'src> Parser<'src> {
-    /// Returns `true` if the parser is at a name or keyword (including soft keyword) token.
-    pub(super) fn at_name_or_keyword(&self) -> bool {
-        self.at(TokenKind::Name) || self.current_token_kind().is_keyword()
+    /// Returns `true` if the parser is at an identifier or keyword (including soft keyword) token.
+    pub(super) fn at_identifier_or_keyword(&self) -> bool {
+        self.at(TokenKind::Identifier) || self.current_token_kind().is_keyword()
     }
 
-    /// Returns `true` if the parser is at a name or soft keyword token.
-    pub(super) fn at_name_or_soft_keyword(&self) -> bool {
-        self.at(TokenKind::Name) || self.at_soft_keyword()
+    /// Returns `true` if the parser is at an identifier or soft keyword token.
+    pub(super) fn at_identifier_or_soft_keyword(&self) -> bool {
+        self.at(TokenKind::Identifier) || self.at_soft_keyword()
     }
 
     /// Returns `true` if the parser is at a soft keyword token.
@@ -507,8 +506,8 @@ impl<'src> Parser<'src> {
     fn parse_identifier_with_context(&mut self, context: ExpressionContext) -> ast::Identifier {
         let range = self.current_token_range();
 
-        if self.at(TokenKind::Name) {
-            let name = self.bump_name();
+        if self.at(TokenKind::Identifier) {
+            let name = self.bump_identifier();
             return ast::Identifier {
                 id: name,
                 range,
@@ -519,7 +518,7 @@ impl<'src> Parser<'src> {
         if self.current_token_kind().is_soft_keyword() {
             let text = self.src_text(range);
             let id = self.intern_name(text);
-            self.bump_soft_keyword_as_name();
+            self.bump_soft_keyword_as_identifier();
             return ast::Identifier {
                 id,
                 range,
@@ -640,7 +639,7 @@ impl<'src> Parser<'src> {
                     node_index: AtomicNodeIndex::NONE,
                 })
             }
-            TokenKind::Name => Expr::Name(self.parse_name(context)),
+            TokenKind::Identifier => Expr::Name(self.parse_name(context)),
             TokenKind::IpyEscapeCommand => {
                 Expr::IpyEscapeCommand(self.parse_ipython_escape_command_expression())
             }
@@ -735,7 +734,7 @@ impl<'src> Parser<'src> {
             return ast::Arguments {
                 range: self.node_range(start),
                 node_index: AtomicNodeIndex::NONE,
-                args: Box::default(),
+                args: ThinVec::new(),
                 keywords: ThinVec::default(),
             };
         }
@@ -872,7 +871,7 @@ impl<'src> Parser<'src> {
         let arguments = ast::Arguments {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            args: self.expr_scratch.take(args_snapshot),
+            args: self.expr_scratch.take_thin_vec(args_snapshot),
             keywords,
         };
 
@@ -1241,7 +1240,8 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprCompare {
         self.bump_cmp_op(op);
 
-        let comparators_snapshot = self.expr_scratch.snapshot();
+        let operands_snapshot = self.expr_scratch.snapshot();
+        self.expr_scratch.push(lhs);
         let mut operators = vec![op];
 
         let mut progress = ParserProgress::default();
@@ -1273,9 +1273,8 @@ impl<'src> Parser<'src> {
         }
 
         ast::ExprCompare {
-            left: Box::new(lhs),
             ops: operators.into_boxed_slice(),
-            comparators: self.expr_scratch.take(comparators_snapshot),
+            operands: self.expr_scratch.take(operands_snapshot),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -1388,16 +1387,20 @@ impl<'src> Parser<'src> {
                 // We could convert the node into a string and mark it as invalid
                 // and would be clever to mark the type which is fewer in quantity.
 
+                // test_err mixed_tstring_and_bytes_literals
+                // t'first' b'second'
+                // b'first' t'second'
+                // t'first' br'second'
+                // 'first' b'second' t'third'
+                // b'first' 'second' t'third'
+                // 'first' t'second' 'third' b'fourth'
+                // b'first' t'second' f'third'
+
                 // test_err mixed_bytes_and_non_bytes_literals
                 // 'first' b'second'
                 // f'first' b'second'
                 // 'first' f'second' b'third'
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "Bytes literal cannot be mixed with non-bytes literals".to_string(),
-                    ),
-                    range,
-                );
+                self.report_mixed_string_literal_error(&strings, range);
             }
             // Only construct a byte expression if all the literals are bytes
             // otherwise, we'll try either string, t-string, or f-string. This is to retain
@@ -1416,16 +1419,9 @@ impl<'src> Parser<'src> {
                     node_index: AtomicNodeIndex::NONE,
                 });
             }
-        }
-
-        if has_tstring {
+        } else if has_tstring {
             if tstring_count < strings.len() {
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "Cannot mix t-string literals with string or bytes literals".to_string(),
-                    ),
-                    range,
-                );
+                self.report_mixed_string_literal_error(&strings, range);
             }
             // Only construct a t-string expression if all the literals are t-strings
             // otherwise, we'll try either string or f-string. This is to retain
@@ -1505,6 +1501,26 @@ impl<'src> Parser<'src> {
             range,
             node_index: AtomicNodeIndex::NONE,
         })
+    }
+
+    fn report_mixed_string_literal_error(&mut self, strings: &[StringType], range: TextRange) {
+        // CPython reports the first incompatible pair. A t-string mismatch takes
+        // precedence over a bytes mismatch within that pair.
+        for pair in strings.windows(2) {
+            let message = match pair {
+                [StringType::TString(_), StringType::TString(_)]
+                | [StringType::Bytes(_), StringType::Bytes(_)] => continue,
+                [StringType::TString(_), _] | [_, StringType::TString(_)] => {
+                    "Cannot mix t-string literals with string or bytes literals"
+                }
+                [StringType::Bytes(_), _] | [_, StringType::Bytes(_)] => {
+                    "Bytes literal cannot be mixed with non-bytes literals"
+                }
+                _ => continue,
+            };
+            self.add_error(ParseErrorType::OtherError(message.to_string()), range);
+            break;
+        }
     }
 
     /// Parses a single string or byte literal.
@@ -1754,12 +1770,12 @@ impl<'src> Parser<'src> {
         };
 
         let conversion = if self.eat(TokenKind::Exclamation) {
-            // Ensure that the `r` is lexed as a `r` name token instead of a raw string
+            // Ensure that the `r` is lexed as an identifier token instead of a raw string
             // in `f{abc!r"` (note the missing `}`).
             self.tokens.re_lex_raw_string_in_format_spec();
 
             let conversion_flag_range = self.current_token_range();
-            if self.at(TokenKind::Name) {
+            if self.at(TokenKind::Identifier) {
                 // test_err f_string_conversion_follows_exclamation
                 // f"{x! s}"
                 // t"{x! s}"
@@ -1773,7 +1789,7 @@ impl<'src> Parser<'src> {
                         TextRange::new(self.prev_token_end, conversion_flag_range.start()),
                     );
                 }
-                let name = self.bump_name();
+                let name = self.bump_identifier();
                 match &*name {
                     "s" => ConversionFlag::Str,
                     "r" => ConversionFlag::Repr,
@@ -2650,7 +2666,7 @@ impl<'src> Parser<'src> {
         ast::ExprDictComp {
             key: key.map(Box::new),
             value: Box::new(value),
-            generators,
+            generators: generators.into_boxed_slice(),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -2974,31 +2990,13 @@ impl<'src> Parser<'src> {
     }
 
     /// Performs the following validations on the arguments:
-    /// 1. There aren't any duplicate keyword argument
-    /// 2. Generator expressions are parenthesized when required by the argument context.
+    /// - Generator expressions are parenthesized when required by the argument context.
     fn validate_arguments(
         &mut self,
         arguments: &ast::Arguments,
         has_trailing_comma: bool,
         context: ArgumentsContext,
     ) {
-        let mut all_arg_names =
-            FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
-
-        for (name, range) in arguments
-            .keywords
-            .iter()
-            .filter_map(|argument| argument.arg.as_ref().map(|arg| (arg, argument.range)))
-        {
-            let arg_name = name.as_str();
-            if !all_arg_names.insert(arg_name) {
-                self.add_error(
-                    ParseErrorType::DuplicateKeywordArgumentError(arg_name.to_string()),
-                    range,
-                );
-            }
-        }
-
         let generator_must_be_parenthesized = match context {
             ArgumentsContext::Call => has_trailing_comma || arguments.len() > 1,
             // CPython rejects an unparenthesized generator expression as a class base even though

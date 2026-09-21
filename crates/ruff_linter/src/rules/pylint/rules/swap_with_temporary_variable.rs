@@ -8,6 +8,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for code that swaps two variables using a temporary variable.
@@ -39,7 +40,7 @@ use crate::checkers::ast::Checker;
 /// The rule's fix is marked as safe, unless the replacement range contains comments
 /// that would be removed.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.3")]
+#[violation_metadata(preview_since = "0.15.3", category = Category::Complexity)]
 pub(crate) struct SwapWithTemporaryVariable<'a> {
     first: &'a Name,
     second: &'a Name,

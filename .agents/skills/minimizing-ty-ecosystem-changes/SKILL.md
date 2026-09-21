@@ -15,6 +15,8 @@ description: Use when a user says "minimize this ty ecosystem change", "reproduc
 
 Start each investigation from fresh artifacts. Do not trust retained memories, previous minimizations, current upstream project state, or the helper script's default lockfile.
 
+Prefix every direct or indirect `gh` invocation with `GH_TELEMETRY=false`; each Codex tool call may start a new shell.
+
 ## Collect Exact-Run Metadata
 
 If the primary agent supplied an immutable `TY_ECOSYSTEM_RUN_METADATA` manifest, verify that its run ID and attempt match the frozen report and that it contains each assigned project. All subagents reuse the same read-only manifest; never modify it or generate another shared manifest.
@@ -22,7 +24,7 @@ If the primary agent supplied an immutable `TY_ECOSYSTEM_RUN_METADATA` manifest,
 Otherwise, run the bundled helper once with the Actions run ID or URL, matching attempt, and every affected mypy-primer project name:
 
 ```bash
-scripts/collect_ty_ecosystem_run_metadata.py \
+GH_TELEMETRY=false uv run --script scripts/collect_ty_ecosystem_run_metadata.py \
   <actions-run> <project-name>... \
   --attempt <actions-attempt> \
   --output target/ty-ecosystem-run.json
@@ -45,7 +47,7 @@ set -euo pipefail
 
 test -z "$(git status --short)" || { git status --short; exit 1; }
 original_ref="$(git symbolic-ref --quiet --short HEAD || git rev-parse HEAD)"
-git fetch https://github.com/astral-sh/ruff.git <pr-revision>
+GH_TELEMETRY=false git fetch https://github.com/astral-sh/ruff.git <pr-revision>
 mkdir -p target/ty-ecosystem-bins
 trap 'git checkout "$original_ref"' EXIT
 
@@ -70,7 +72,7 @@ After restoring the original ref, inspect vendored definitions and Rust implemen
 Create a unique temporary directory for each project and use its absolute path. Read its Python version and the pinned mypy-primer revision from the shared manifest. Obtain the project revision from the `/blob/<commit>/` component of the original diagnostic's source permalink, and check that links for the same project agree. If no diagnostic permalink exists, inspect the matching diagnostics shard or Actions logs; if the exact revision cannot be recovered, explicitly report that limitation. Then bypass the adjacent script lockfile:
 
 ```bash
-uv run \
+GH_TELEMETRY=false uv run \
   --python <project-python> \
   --with "mypy-primer @ git+https://github.com/hauntsaninja/mypy_primer@<mypy-primer-revision>" \
   --no-project \

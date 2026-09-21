@@ -10,6 +10,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -32,7 +33,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [PEP 3120]: https://peps.python.org/pep-3120/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Complexity)]
 pub(crate) struct UTF8EncodingDeclaration;
 
 impl AlwaysFixableViolation for UTF8EncodingDeclaration {

@@ -252,6 +252,57 @@ static_assert(not is_equivalent_to(tuple[str, int], tuple[str, int, bytes]))
 static_assert(not is_equivalent_to(tuple[str, int], tuple[int, str]))
 ```
 
+## Recursive tuples with fixed ends
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Mutually recursive tuple aliases can describe the same nonempty trees. Moving a required element
+between the prefix and suffix does not change the type when every element has that same tree type.
+The type of the leaves still distinguishes integer trees from string trees.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type A = int | tuple[*tuple[A, ...], B]
+type B = int | tuple[*tuple[B, ...], A]
+type Prefix = int | tuple[Prefix, *tuple[Prefix, ...]]
+type Strings = str | tuple[*tuple[Strings, ...], Strings]
+
+static_assert(is_equivalent_to(A, B))
+static_assert(is_equivalent_to(B, A))
+static_assert(is_equivalent_to(A, Prefix))
+static_assert(not is_equivalent_to(A, Strings))
+```
+
+## Implicit recursive tuples with fixed ends
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Implicit aliases describe the same nonempty trees regardless of whether the required element appears
+at the start or end of the tuple. Integer and string leaves still distinguish different tree types.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+A = int | tuple[*tuple["A", ...], "B"]
+B = int | tuple[*tuple["B", ...], "A"]
+Prefix = int | tuple["Prefix", *tuple["Prefix", ...]]
+Strings = str | tuple[*tuple["Strings", ...], "Strings"]
+
+static_assert(is_equivalent_to(A, B))
+static_assert(is_equivalent_to(B, A))
+static_assert(is_equivalent_to(A, Prefix))
+static_assert(not is_equivalent_to(A, Strings))
+```
+
 ## Tuples containing equivalent but differently ordered unions/intersections are equivalent
 
 ```pyi

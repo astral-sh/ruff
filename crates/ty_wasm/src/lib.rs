@@ -24,7 +24,7 @@ use ty_ide::{
 };
 use ty_ide::{NavigationTarget, NavigationTargets, hints, signature_help};
 use ty_project::metadata::options::Options;
-use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
+use ty_project::watch::{ChangeEvent, ChangedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase, SemanticDb as _};
 use ty_python_core::program::FallibleStrategy;
@@ -115,6 +115,7 @@ pub struct Workspace {
 
 #[wasm_bindgen]
 impl Workspace {
+    /// Creates a workspace with options that take precedence over configuration files.
     #[wasm_bindgen(constructor)]
     pub fn new(
         root: &str,
@@ -127,15 +128,11 @@ impl Workspace {
         )
         .map_err(into_error)?;
 
-        let system = WasmSystem::new(SystemPath::new(root));
-
-        let project = ProjectMetadata::from_options(
-            options,
-            SystemPathBuf::from(root),
-            None,
-            &FallibleStrategy,
-        )
-        .map_err(into_error)?;
+        let root = SystemPath::new(root);
+        let system = WasmSystem::new(root);
+        let mut project =
+            ProjectMetadata::new(root.file_name().unwrap_or("root"), root.to_path_buf());
+        project.set_override_options(options);
 
         let mut db = ProjectDatabase::fallible(project, system.clone()).map_err(into_error)?;
 
@@ -150,6 +147,7 @@ impl Workspace {
         })
     }
 
+    /// Replaces the options set at construction, taking precedence over configuration files.
     #[wasm_bindgen(js_name = "updateOptions")]
     pub fn update_options(&mut self, options: JsValue) -> Result<(), Error> {
         let options = Options::deserialize_with(
@@ -158,13 +156,8 @@ impl Workspace {
         )
         .map_err(into_error)?;
 
-        let project = ProjectMetadata::from_options(
-            options,
-            self.db.project().root(&self.db).to_path_buf(),
-            None,
-            &FallibleStrategy,
-        )
-        .map_err(into_error)?;
+        let mut project = self.db.project().metadata(&self.db).clone();
+        project.set_override_options(options);
 
         let merged_options = project.to_merged_options();
         let (program_settings, program_settings_diagnostics) = merged_options
@@ -199,10 +192,7 @@ impl Workspace {
             .write_file_all(&path, contents)
             .map_err(into_error)?;
 
-        self.db.apply_changes(&[ChangeEvent::Created {
-            path: path.clone(),
-            kind: CreatedKind::File,
-        }]);
+        self.db.apply_changes(&[ChangeEvent::Opened(path.clone())]);
 
         let file = system_path_to_file(&self.db, &path).expect("File to exist");
 
@@ -279,7 +269,7 @@ impl Workspace {
 
     #[wasm_bindgen(js_name = "hints")]
     pub fn hints(&self, file_id: &FileHandle) -> Result<Vec<Hint>, Error> {
-        Ok(hints(&self.db, self.db.program_file(file_id.file))
+        Ok(hints(&self.db, file_id.file)
             .into_iter()
             .map(|hint| Hint::from_ide_hint(&self.db, file_id.file, self.position_encoding, &hint))
             .collect())
@@ -1585,6 +1575,8 @@ pub enum SemanticTokenKind {
     Decorator,
     BuiltinConstant,
     TypeParameter,
+    Operator,
+    Regexp,
 }
 
 impl From<ty_ide::SemanticTokenType> for SemanticTokenKind {
@@ -1605,6 +1597,8 @@ impl From<ty_ide::SemanticTokenType> for SemanticTokenKind {
             ty_ide::SemanticTokenType::Decorator => Self::Decorator,
             ty_ide::SemanticTokenType::BuiltinConstant => Self::BuiltinConstant,
             ty_ide::SemanticTokenType::TypeParameter => Self::TypeParameter,
+            ty_ide::SemanticTokenType::Operator => Self::Operator,
+            ty_ide::SemanticTokenType::Regexp => Self::Regexp,
         }
     }
 }

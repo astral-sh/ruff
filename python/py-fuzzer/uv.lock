@@ -6,6 +6,9 @@ requires-python = ">=3.12"
 exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P7D"
 
+[manifest]
+build-constraints = [{ name = "flit-core", specifier = "==3.12.0" }]
+
 [[package]]
 name = "markdown-it-py"
 version = "4.0.0"

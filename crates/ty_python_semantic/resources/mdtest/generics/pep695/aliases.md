@@ -128,8 +128,9 @@ def _(doubly_specialized: Tuple[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
-class LegacyProto(Protocol[T]):
+class LegacyProto(Protocol[T_co]):
     pass
 
 type LegacyProtoInt = LegacyProto[int]
@@ -152,7 +153,7 @@ class LegacyDict(TypedDict[T]):
     # error: [unbound-type-variable]
     x: T
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'LegacyDict'>`"
+# error: [invalid-type-form] "Non-generic class `LegacyDict` cannot be specialized in a type expression"
 type LegacyDictInt = LegacyDict[int]
 
 # error: [not-subscriptable] "Cannot specialize non-generic type alias `LegacyDictInt`"
@@ -278,7 +279,7 @@ def _(x: Outer[str]):
 Self-referential defaults should not crash type inference:
 
 ```py
-# error: [cyclic-type-alias-definition] "Cyclic definition of `A`"
+# error: [cyclic-type-alias-definition] "Type alias `A` has a circular definition"
 type A[T = A] = A[int]
 ```
 

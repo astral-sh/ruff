@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for function calls that use star-argument unpacking after providing a
@@ -46,7 +47,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [Disallow iterable argument unpacking after a keyword argument?](https://github.com/python/cpython/issues/82741)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.109")]
+#[violation_metadata(stable_since = "v0.0.109", category = Category::Suspicious)]
 pub(crate) struct StarArgUnpackingAfterKeywordArg;
 
 impl Violation for StarArgUnpackingAfterKeywordArg {
