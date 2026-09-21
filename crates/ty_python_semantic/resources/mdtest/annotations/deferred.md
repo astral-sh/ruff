@@ -130,6 +130,16 @@ class C:
     str: "str" = ""  # error: [invalid-type-form]
 ```
 
+The built-in `type` is an instance of itself, so assigning it to an attribute with this cyclic
+annotation is valid:
+
+```py
+class C:
+    type: "type" = type
+
+reveal_type(C.type)  # revealed: type
+```
+
 ## Class bindings shadow types with future annotations
 
 With `from __future__ import annotations`, unquoted annotations follow the same name-resolution
