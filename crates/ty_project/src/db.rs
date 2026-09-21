@@ -786,7 +786,6 @@ pub(crate) mod testing {
                 python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths,
-                python_executable: None,
             };
             let project = Project::from_metadata(
                 &db,
@@ -809,7 +808,6 @@ pub(crate) mod testing {
                 },
                 python_platform: program.python_platform(self).clone(),
                 search_paths: program.search_paths(self).clone(),
-                python_executable: program.python_executable(self).clone(),
             };
             self.project().update_program(self, settings);
         }
