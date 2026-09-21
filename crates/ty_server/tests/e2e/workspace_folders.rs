@@ -2,7 +2,8 @@ use anyhow::Result;
 use insta::assert_snapshot;
 use lsp_types::{
     DiagnosticSeverity, DocumentDiagnosticReport, FullDocumentDiagnosticReport, Message, Position,
-    WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport,
+    RegistrationRequest, UnregistrationRequest, WorkspaceDiagnosticReport,
+    WorkspaceDocumentDiagnosticReport,
 };
 use ruff_db::system::SystemPath;
 use ty_server::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
@@ -671,11 +672,16 @@ fn global_settings_change() -> Result<()> {
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(&ClientOptions::default())
+        .enable_workspace_diagnostic_refresh(true)
+        .enable_diagnostic_dynamic_registration(true)
         .with_file(&main1, main_content)?
         .with_file(&main2, main_content)?
         .with_workspace(root1, None)?
         .build()
         .wait_until_workspaces_are_initialized();
+
+    let (id, _) = server.await_request::<RegistrationRequest>();
+    server.acknowledge_request(id);
 
     server.open_text_document(&main1, main_content, 1);
     let document_diagnostics = server.document_diagnostic_request(&main1, None);
@@ -683,6 +689,7 @@ fn global_settings_change() -> Result<()> {
         condensed_document_diagnostic_snapshot(document_diagnostics),
         @"0:1..0:1[ERROR]: unexpected EOF while parsing",
     );
+    server.assert_no_pending_messages();
 
     // Now we'll add a new workspace folder with syntax error
     // diagnostics disabled. This will apply not just to the
@@ -699,6 +706,14 @@ fn global_settings_change() -> Result<()> {
     )?;
     server.change_workspace_folders([root2], []);
     server = server.wait_until_workspaces_are_initialized();
+
+    let (id, _) = server.await_request::<UnregistrationRequest>();
+    server.acknowledge_request(id);
+    let (id, _) = server.await_request::<RegistrationRequest>();
+    server.acknowledge_request(id);
+
+    // Re-registering diagnostic support does not invalidate the client's cached diagnostics.
+    server.await_diagnostic_refresh();
 
     let document_diagnostics = server.document_diagnostic_request(&main1, None);
     assert_snapshot!(

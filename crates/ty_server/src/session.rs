@@ -624,6 +624,8 @@ impl Session {
         client: &Client,
         workspace_folders: Vec<(Uri, ClientOptions)>,
     ) {
+        let is_initial_configuration = self.projects.is_empty();
+
         // Every workspace folder can come with its own
         // global options. In theory, these can have different
         // values. At time of writing (2026-01-28), AG has been
@@ -695,6 +697,17 @@ impl Session {
         }
 
         self.register_capabilities(client);
+
+        // New workspace settings can affect diagnostics in existing workspaces. Re-registering
+        // diagnostic support does not invalidate the client's cached results. There are no
+        // cached results to refresh during the initial workspace configuration.
+        if !is_initial_configuration
+            && self
+                .client_capabilities()
+                .supports_workspace_diagnostic_refresh()
+        {
+            client.send_request::<lsp_types::DiagnosticRefreshRequest>(self, (), |_, ()| {});
+        }
     }
 
     /// Initializes a single workspace folder with the given URI
