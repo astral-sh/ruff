@@ -444,24 +444,30 @@ impl<'db> RecursiveDefinition<'db> {
 }
 
 impl<'db> DefinitionUse<'db> {
-    fn has_smaller_arguments_than(
+    fn has_shrinking_argument(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        previous: Self,
+        previous: &(impl Iterator<Item = Self> + Clone),
     ) -> bool {
-        let (Some(current), Some(previous)) = (self.specialization, previous.specialization) else {
+        let Some(current) = self.specialization else {
             return false;
         };
         let current = current.types(db);
-        let previous = previous.types(db);
-        current.len() == previous.len()
-            && current != previous
-            && current.iter().zip(previous).all(|(&current, &previous)| {
-                any_over_type_including_alias_arguments(db, env, previous, |nested| {
-                    nested == current
-                })
+        current.iter().enumerate().any(|(index, &argument)| {
+            previous.clone().all(|previous| {
+                let Some(previous) = previous
+                    .specialization
+                    .and_then(|specialization| specialization.types(db).get(index).copied())
+                else {
+                    return false;
+                };
+                previous != argument
+                    && any_over_type_including_alias_arguments(db, env, previous, |nested| {
+                        nested == argument
+                    })
             })
+        })
     }
 
     fn walk_arguments(self, db: &'db dyn Db, visitor: &impl TypeVisitor<'db>) {
@@ -1489,16 +1495,20 @@ impl<'db> CallableRecursionGuard<'db> {
 
         if self.definitions.seen.borrow().contains(&reference.target) {
             if let Some(analysis) = &self.analysis {
-                // Unwrap `Forward[Forward[T]]` before recording a dependency. At least one
-                // argument shrinks on every step and none grows, keeping the analysis finite.
-                let unwraps_arguments = self
-                    .active
-                    .seen
-                    .borrow()
-                    .iter()
-                    .filter_map(|&active| CallableDefinition::from_type(db, env, active, self.mode))
-                    .filter(|active| active.target == reference.target)
-                    .all(|active| reference.has_smaller_arguments_than(db, env, active));
+                // Unwrap nested forwarding helpers before recording a dependency. One parameter
+                // must shrink below all its active arguments; other parameters may change freely.
+                // Each step therefore establishes a new minimum for one of finitely many parameters,
+                // keeping the analysis finite even when the shrinking parameter changes.
+                let unwraps_arguments = {
+                    let active = self.active.seen.borrow();
+                    let previous = active
+                        .iter()
+                        .filter_map(|&active| {
+                            CallableDefinition::from_type(db, env, active, self.mode)
+                        })
+                        .filter(|active| active.target == reference.target);
+                    reference.has_shrinking_argument(db, env, &previous)
+                };
                 if unwraps_arguments {
                     return self.active.visit(ty, on_cycle, func);
                 }

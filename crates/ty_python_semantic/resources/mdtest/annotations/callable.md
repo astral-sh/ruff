@@ -707,6 +707,8 @@ def create(factory: Callable[[int], Product]) -> Product:
     return factory(1)
 
 reveal_type(create(Product))  # revealed: Product
+missing_argument: Callable[[], Product] = Product  # error: [invalid-assignment]
+wrong_argument: Callable[[str], Product] = Product  # error: [invalid-assignment]
 ```
 
 ### Callable initializers on classes with dynamic bases

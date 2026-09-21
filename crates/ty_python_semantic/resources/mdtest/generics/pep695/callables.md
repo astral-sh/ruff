@@ -204,6 +204,29 @@ callback: Callable[..., object] = Grow[int]
 reveal_type(Grow[int]())  # revealed: Grow[int]
 ```
 
+## Finite initializer chains with unused type parameters
+
+In the example below, each initializer forwards to its first type argument. The second parameter on
+`Forward` is unused, so changing it does not alter the finite chain. The class's callback signature
+retains the final initializer's required integer parameter.
+
+```py
+from typing import Callable
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Forward[A, B]:
+    __init__: type[A]
+
+class C[T]:
+    __init__: type[Forward[Forward[T, int], str]]
+
+valid: Callable[[int], C[C[C[End]]]] = C[C[C[End]]]
+missing: Callable[[], C[C[C[End]]]] = C[C[C[End]]]  # error: [invalid-assignment]
+wrong: Callable[[str], C[C[C[End]]]] = C[C[C[End]]]  # error: [invalid-assignment]
+```
+
 ## Generic `__iter__` methods with explicit receivers
 
 Binding `__iter__` to an `Unpacker[Iterable[int]]` infers `S` as `int` from the explicit
