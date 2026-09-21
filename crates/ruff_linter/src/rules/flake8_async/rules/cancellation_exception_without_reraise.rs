@@ -93,8 +93,8 @@ impl Violation for CancellationExceptionWithoutReraise {
     fn message(&self) -> String {
         let Self { handler } = self;
         format!(
-            "{} handler has a code path that does not raise an exception",
-            handler.name()
+            "{exception} handler has a code path that does not raise an exception",
+            exception = handler.name(),
         )
     }
 }
