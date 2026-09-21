@@ -147,7 +147,6 @@ impl BackgroundRequestHandler for DiscoverTestsRequestHandler {
 
 impl RetriableRequestHandler for DiscoverTestsRequestHandler {}
 
-/// Returns the last path component of `path`, or `path` itself if it has none.
 fn path_label(path: &SystemPath) -> String {
     path.file_name()
         .map(ToString::to_string)
