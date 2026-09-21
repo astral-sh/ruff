@@ -28,9 +28,7 @@ use crate::types::signatures::{Parameters, ReturnCallableTypeVarScope, Signature
 use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
-use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
-};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, TypeVarSet};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
@@ -2807,9 +2805,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                     path_bound,
                                 )
                             });
-                        let outcome = builder
-                            .validate_noninferable_solution(path_bound.bound_typevar, outcome)
-                            .unwrap_or(PathBoundSolution::Unsatisfiable);
+                        let outcome = outcome.validate_noninferable(
+                            db,
+                            builder.env,
+                            builder.constraints,
+                            builder.inferable,
+                            path_bound.bound_typevar,
+                        );
                         // Only this explicitly merged projection accepts fallback bindings as
                         // ordinary types. Correlated inference retains their incomplete outcome.
                         match outcome {
@@ -2963,9 +2965,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             path_bound,
                         )
                     });
-                    builder
-                        .validate_noninferable_solution(path_bound.bound_typevar, outcome)
-                        .unwrap_or(PathBoundSolution::Unsatisfiable)
+                    outcome.validate_noninferable(
+                        db,
+                        builder.env,
+                        builder.constraints,
+                        builder.inferable,
+                        path_bound.bound_typevar,
+                    )
                 },
             )?;
             Ok(match solutions {
@@ -3534,7 +3540,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Solves one relation without recording it or changing the legacy type mappings.
     fn analyze_constraint_set(&self, set: ConstraintSet<'db, 'c>) -> ConstraintSetAnalysis<'db> {
         self.analyze_constraint_set_with(set, |typevar, outcome| {
-            self.validate_noninferable_solution(typevar, outcome)
+            outcome.validate_noninferable(
+                self.db,
+                self.env,
+                self.constraints,
+                self.inferable,
+                typevar,
+            )
         })
     }
 
@@ -3544,17 +3556,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         mut validate: impl FnMut(
             BoundTypeVarInstance<'db>,
             PathBoundSolution<'db>,
-        ) -> Result<PathBoundSolution<'db>, SpecializationError<'db>>,
+        ) -> PathBoundSolution<'db>,
     ) -> ConstraintSetAnalysis<'db> {
         let db = self.db;
-        let mut failures = SmallVec::new();
         let solutions = set.solutions_with(
             db,
             self.env,
             self.inferable,
             SolutionBudget::default(),
             |_variance, path_bound| {
-                CandidateSolutions::preliminary_solve(db, self.env, self.constraints, path_bound)
+                validate(
+                    path_bound.bound_typevar,
+                    CandidateSolutions::preliminary_solve(db, self.env, self.constraints, path_bound),
+                )
             },
         );
 
@@ -3572,86 +3586,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Ok(Solutions::Constrained(solutions)) => ConstraintSetAnalysis::Constrained(solutions),
             Err(_) => ConstraintSetAnalysis::BudgetExceeded,
         }
-    }
-
-    /// Checks declarations for solutions containing type variables fixed by an outer caller.
-    ///
-    /// TODO: Remove this check when solving preserves universal validity for non-inferable
-    /// variables. A raw constraint can accept `S <= T` with `T: str` for some `S`, but inferring
-    /// `T = S` is valid only if every type allowed by the caller's `S` satisfies the bound.
-    /// Relations involving other variables being inferred remain the solver's responsibility.
-    fn validate_noninferable_solution(
-        &self,
-        bound_typevar: BoundTypeVarInstance<'db>,
-        outcome: PathBoundSolution<'db>,
-    ) -> Result<PathBoundSolution<'db>, SpecializationError<'db>> {
-        let db = self.db;
-        let PathBoundSolution::Solved(solution) = outcome else {
-            return Ok(outcome);
-        };
-        let Some(declaration) = bound_typevar.typevar(db).bound_or_constraints(db, self.env) else {
-            return Ok(outcome);
-        };
-        if !any_over_type_expanding_aliases(db, self.env, solution, Type::is_type_var)
-            || any_over_type_expanding_aliases(db, self.env, solution, |nested| {
-                nested
-                    .as_typevar()
-                    .is_some_and(|typevar| typevar.is_inferable(db, self.inferable))
-            })
-        {
-            return Ok(outcome);
-        }
-
-        let satisfies = |target| {
-            solution
-                .when_assignable_to(db, self.env, target, self.constraints, self.inferable)
-                .is_always_satisfied(db, self.env)
-        };
-        match declaration {
-            TypeVarBoundOrConstraints::UpperBound(bound) if !satisfies(bound) => {
-                Err(SpecializationError::MismatchedBound {
-                    bound_typevar,
-                    argument: solution,
-                })
-            }
-            TypeVarBoundOrConstraints::Constraints(constraints)
-                if !self.typevar_matches_constraints(solution, constraints)
-                    && !constraints.elements(db).iter().copied().any(satisfies) =>
-            {
-                Err(SpecializationError::MismatchedConstraint {
-                    bound_typevar,
-                    argument: solution,
-                })
-            }
-            _ => Ok(outcome),
-        }
-    }
-
-    /// A constrained caller variable can retain its identity when each allowed type is one of
-    /// the callee's declared constraints. Mere subtyping is insufficient: narrowing the callee's
-    /// variable can return the wider declared constraint instead of the caller's narrower type.
-    fn typevar_matches_constraints(
-        &self,
-        actual: Type<'db>,
-        formal_constraints: TypeVarConstraints<'db>,
-    ) -> bool {
-        let db = self.db;
-        let Type::TypeVar(actual_typevar) = actual.resolve_type_alias(db) else {
-            return false;
-        };
-        actual_typevar
-            .typevar(db)
-            .constraints(db, self.env)
-            .is_some_and(|actual_constraints| {
-                actual_constraints.iter().all(|actual_constraint| {
-                    formal_constraints
-                        .elements(db)
-                        .iter()
-                        .any(|formal_constraint| {
-                            actual_constraint.is_equivalent_to(db, self.env, *formal_constraint)
-                        })
-                })
-            })
     }
 
     /// Adds available solutions, including fallback bindings, to the legacy inference mapping.
@@ -3997,7 +3931,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // Checking `R` alone treats `T` as fixed and can incorrectly reject a bound
                 // such as `Factory[object]`. Keep compatibility inference for this relation;
                 // other arguments must still validate genuinely fixed outer variables.
-                let analysis = self.analyze_constraint_set_with(when, |_, outcome| Ok(outcome));
+                let analysis = self.analyze_constraint_set_with(when, |_, outcome| outcome);
                 self.record_constraint_set(when);
                 if let Some(error) = analysis.specialization_error(db, self.env) {
                     return Err(error);
@@ -4426,7 +4360,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // that is a strict subtype (e.g. `bool` vs `int`) would allow
                         // the callee to return a widened type that violates the caller's
                         // constraint.
-                        if self.typevar_matches_constraints(ty, typevar_constraints) {
+                        if let Type::TypeVar(actual_typevar) = ty.resolve_type_alias(db)
+                            && let Some(TypeVarBoundOrConstraints::Constraints(actual_constraints)) =
+                                actual_typevar
+                                    .typevar(db)
+                                    .bound_or_constraints(db, self.env)
+                            && actual_constraints.is_subset_of(db, self.env, typevar_constraints)
+                        {
                             self.add_type_mapping(bound_typevar, ty, polarity);
                             return Ok(());
                         }
@@ -4522,16 +4462,26 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             .iter()
                             .flat_map(|solution| &solution.solved_typevars)
                             .any(|binding| is_gradual(binding.solution)),
-                        ConstraintSetAnalysis::Unsatisfiable(failures) => failures
-                            .iter()
-                            .any(|failure| is_gradual(failure.error.argument_type())),
+                        ConstraintSetAnalysis::Unsatisfiable(failures) => {
+                            failures.iter().any(|failure| match &failure.error {
+                                SpecializationError::MismatchedBound { argument, .. }
+                                | SpecializationError::MismatchedConstraint {
+                                    evidence: ConstraintFailureEvidence::Lower(argument),
+                                    ..
+                                } => is_gradual(*argument),
+                                SpecializationError::MismatchedConstraint {
+                                    evidence: ConstraintFailureEvidence::Upper(bounds),
+                                    ..
+                                } => bounds.iter().copied().any(is_gradual),
+                            })
+                        }
                         // Do not bypass exhausted budgets by retrying recursive inference.
                         ConstraintSetAnalysis::Constrained(SolutionPaths::BudgetExceeded(_))
                         | ConstraintSetAnalysis::BudgetExceeded => false,
                     };
                 if use_legacy_inference {
                     // TODO: Remove this compatibility path once gradual materialization evidence
-                    // is preserved (https://github.com/astral-sh/ruff/pull/26873). For example,
+                    // is preserved (https://github.com/astral-sh/ruff/pull/28307). For example,
                     // `Any & Source[str] <= Source[T]` becomes unconditionally true, losing the
                     // `str` contribution. Inferring each positive separately retains that evidence.
                     // Inspecting inferred types also catches gradual specializations inherited
