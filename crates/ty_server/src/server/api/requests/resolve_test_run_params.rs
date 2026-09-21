@@ -24,16 +24,16 @@ impl Request for ResolveTestRunParamsRequest {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ResolveTestRunParamsParams {
     /// The id of the test, file, or directory to resolve, as returned by `ty/discoverTests`.
-    pub(crate) test_id: String,
+    test_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TestRunParams {
     /// The directory the test should be run from (the project root).
-    pub(crate) working_directory: String,
+    working_directory: String,
     /// The arguments to pass to a Python interpreter to run the test with pytest.
-    pub(crate) arguments: Vec<String>,
+    arguments: Vec<String>,
 }
 
 pub(crate) struct ResolveTestRunParamsRequestHandler;
@@ -68,7 +68,12 @@ impl BackgroundRequestHandler for ResolveTestRunParamsRequestHandler {
 
         Ok(Some(TestRunParams {
             working_directory,
-            arguments: vec!["-m".to_string(), "pytest".to_string(), params.test_id],
+            arguments: vec![
+                "-m".to_string(),
+                "pytest".to_string(),
+                "-vv".to_string(),
+                params.test_id,
+            ],
         }))
     }
 }
