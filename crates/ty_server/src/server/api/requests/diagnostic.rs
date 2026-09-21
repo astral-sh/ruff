@@ -37,17 +37,18 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
             return Ok(RelatedFullDocumentDiagnosticReport::default().into());
         }
 
-        let diagnostics = compute_diagnostics(db, snapshot.document(), snapshot.encoding());
+        let diagnostics = compute_diagnostics(
+            db,
+            snapshot.document(),
+            snapshot.encoding(),
+            snapshot.global_settings(),
+        );
 
         let Some(diagnostics) = diagnostics else {
             return Ok(RelatedFullDocumentDiagnosticReport::default().into());
         };
 
-        let result_id = diagnostics.result_id(
-            db,
-            snapshot.resolved_client_capabilities(),
-            snapshot.global_settings(),
-        );
+        let result_id = diagnostics.result_id(db, snapshot.resolved_client_capabilities());
 
         let report = match result_id {
             Some(new_id) if Some(&new_id) == params.previous_result_id.as_ref() => {
@@ -66,11 +67,7 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
                     // A notebook is checked as a whole, but a pull response only includes
                     // diagnostics for the requested cell.
                     items: diagnostics
-                        .to_lsp_diagnostics(
-                            db,
-                            snapshot.resolved_client_capabilities(),
-                            snapshot.global_settings(),
-                        )
+                        .to_lsp_diagnostics(db, snapshot.resolved_client_capabilities())
                         .into_document_diagnostics(snapshot.uri()),
                 },
             }

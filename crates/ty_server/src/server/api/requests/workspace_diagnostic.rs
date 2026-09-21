@@ -396,6 +396,16 @@ impl<'a> ResponseWriter<'a> {
         diagnostics: &[Diagnostic],
         unnecessary_hints: &[Hint],
     ) {
+        let mut diagnostics = diagnostics
+            .iter()
+            .filter(|diagnostic| self.global_settings.should_show_diagnostic(diagnostic))
+            .peekable();
+        if diagnostics.peek().is_none() && unnecessary_hints.is_empty() {
+            // Leave any previous result ID for `into_final_report` to clear. Without a previous
+            // result, there is nothing to report and the request can continue long polling.
+            return;
+        }
+
         let Some(uri) = file_to_uri(db, file) else {
             tracing::debug!("Failed to convert file path to URI at {}", file.path(db));
             return;
@@ -418,10 +428,9 @@ impl<'a> ResponseWriter<'a> {
 
         let result_id = Diagnostics::result_id_from_hash(
             db,
-            diagnostics,
+            diagnostics.clone(),
             unnecessary_hints,
             self.client_capabilities,
-            self.global_settings,
         );
 
         let previous_result_id = self.previous_result_ids.remove(&key).map(|(_uri, id)| id);
@@ -440,18 +449,14 @@ impl<'a> ResponseWriter<'a> {
             }
             new_id => {
                 let mut lsp_diagnostics = diagnostics
-                    .iter()
-                    .filter_map(|diagnostic| {
-                        Some(
-                            to_lsp_diagnostic(
-                                db,
-                                diagnostic,
-                                self.position_encoding,
-                                self.client_capabilities,
-                                self.global_settings,
-                            )?
-                            .1,
+                    .map(|diagnostic| {
+                        to_lsp_diagnostic(
+                            db,
+                            diagnostic,
+                            self.position_encoding,
+                            self.client_capabilities,
                         )
+                        .1
                     })
                     .collect::<Vec<_>>();
                 lsp_diagnostics.extend(unnecessary_hints_to_lsp_diagnostics(

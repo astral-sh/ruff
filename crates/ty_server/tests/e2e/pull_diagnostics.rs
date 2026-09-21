@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use insta::{assert_compact_json_snapshot, assert_debug_snapshot};
 use lsp_server::RequestId;
 use lsp_types::{
@@ -332,25 +332,15 @@ def foo(
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
-    assert_compact_json_snapshot!(workspace_diagnostics, @r#"
-    {
-      "items": [
-        {
-          "uri": "file://<temp_dir>/src/foo.py",
-          "version": null,
-          "resultId": "[RESULT_ID]",
-          "items": [],
-          "kind": "full"
-        }
-      ]
-    }
-    "#);
-
     server.open_text_document(foo, foo_content, 1);
     let diagnostics = server.document_diagnostic_request(foo, None);
 
-    assert_compact_json_snapshot!(diagnostics, @r#"{"resultId": "[RESULT_ID]", "items": [], "kind": "full"}"#);
+    assert_compact_json_snapshot!(diagnostics, @r#"{"items": [], "kind": "full"}"#);
+
+    let request_id = send_workspace_diagnostic_request(&mut server);
+    assert_workspace_diagnostics_suspends_for_long_polling(&mut server, &request_id);
+    let workspace_diagnostics = shutdown_and_await_workspace_diagnostic(server, &request_id);
+    assert_compact_json_snapshot!(workspace_diagnostics, @r#"{"items": []}"#);
 
     Ok(())
 }
@@ -605,25 +595,32 @@ def foo() -> str:
     Ok(())
 }
 
-/// Settings that change the reported diagnostics invalidate cached workspace results.
+/// Settings invalidate cached workspace results only when the reported diagnostics change.
 #[test]
 fn workspace_diagnostic_caching_settings_changed() -> Result<()> {
     let root = SystemPath::new("src");
     let extra = SystemPath::new("extra");
     let main = root.join("main.py");
+    let unchanged = root.join("unchanged.py");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
             &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_workspace(root, None)?
         .with_file(&main, "(")?
+        .with_file(&unchanged, "missing")?
         .with_file(extra.join("empty.py"), "")?
         .build()
         .wait_until_workspaces_are_initialized();
 
     let first_response = server.workspace_diagnostic_request(None, None);
     let previous_result_ids = extract_result_ids_from_response(&first_response);
-    assert_eq!(previous_result_ids.len(), 1);
+    let unchanged_result_id = previous_result_ids
+        .iter()
+        .find(|result| result.uri == server.file_uri(&unchanged))
+        .context("Expected a result ID for the undefined name")?
+        .value
+        .clone();
 
     // Adding a workspace can change global settings for existing workspaces, without edits.
     server.add_workspace_folder(
@@ -639,17 +636,26 @@ fn workspace_diagnostic_caching_settings_changed() -> Result<()> {
     server.change_workspace_folders([extra], []);
     server = server.wait_until_workspaces_are_initialized();
 
-    let response = server.workspace_diagnostic_request(None, Some(previous_result_ids.clone()));
-    let [WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(report)] =
-        response.items.as_slice()
+    let mut response = server.workspace_diagnostic_request(None, Some(previous_result_ids));
+    sort_workspace_diagnostic_response(&mut response);
+    let [
+        WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(report),
+        WorkspaceDocumentDiagnosticReport::WorkspaceUnchangedDocumentDiagnosticReport(
+            unchanged_report,
+        ),
+    ] = response.items.as_slice()
     else {
-        anyhow::bail!("Expected a full report after disabling syntax errors");
+        anyhow::bail!("Expected syntax errors to be cleared and other diagnostics to be unchanged");
     };
     assert_eq!(report.uri, server.file_uri(&main));
     assert!(report.full_document_diagnostic_report.items.is_empty());
-    assert_ne!(
-        report.full_document_diagnostic_report.result_id.as_deref(),
-        Some(previous_result_ids[0].value.as_str()),
+    assert!(report.full_document_diagnostic_report.result_id.is_none());
+    assert_eq!(unchanged_report.uri, server.file_uri(&unchanged));
+    assert_eq!(
+        unchanged_report
+            .unchanged_document_diagnostic_report
+            .result_id,
+        unchanged_result_id,
     );
 
     Ok(())

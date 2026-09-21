@@ -1,5 +1,4 @@
-use std::hash::{Hash as _, Hasher};
-
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::system::SystemPathBuf;
 use ty_ide::{CompletionSettings, InlayHintSettings};
 use ty_project::metadata::Options;
@@ -19,21 +18,17 @@ impl GlobalSettings {
         self.diagnostic_mode
     }
 
-    pub(crate) fn show_syntax_errors(&self) -> bool {
-        self.show_syntax_errors
-    }
-
-    /// Hashes settings that affect diagnostic output without changing the raw diagnostics.
-    pub(crate) fn hash_diagnostic_settings(&self, hasher: &mut impl Hasher) {
-        // Keep these patterns exhaustive so new settings require a caching decision.
-        // Diagnostic mode is handled before computing diagnostic result IDs.
+    /// Whether a diagnostic should be included in result IDs and LSP output.
+    pub(crate) fn should_show_diagnostic(&self, diagnostic: &Diagnostic) -> bool {
+        // Keep these patterns exhaustive so new settings require a filtering decision.
+        // Diagnostic mode is handled before filtering diagnostics.
         let Self {
             diagnostic_mode: _,
             experimental: ExperimentalSettings {},
             show_syntax_errors,
         } = self;
 
-        show_syntax_errors.hash(hasher);
+        *show_syntax_errors || !diagnostic.is_invalid_syntax()
     }
 }
 
