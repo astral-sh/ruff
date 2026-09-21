@@ -1117,14 +1117,9 @@ Strategy for loading the `ruff` executable.
 
 ### `interpreter`
 
-A list of paths to Python interpreters. Even though this is a list, only the first interpreter is
-used.
+A list of paths to Python interpreters. Even though this is a list, only the first interpreter is used.
 
-This setting depends on the [`ruff.nativeServer`](#nativeserver) setting:
-
-- If using the native server, the interpreter is used to find the `ruff` executable when
-    [`ruff.importStrategy`](#importstrategy) is set to `fromEnvironment`.
-- Otherwise, the interpreter is used to run the `ruff-lsp` server.
+The interpreter is used to find the `ruff` executable when [`ruff.importStrategy`](#importstrategy) is set to `fromEnvironment`.
 
 **Default value**: `[]`
 
@@ -1187,6 +1182,10 @@ Run Ruff on every keystroke (`onType`) or on save (`onSave`).
 ```
 
 ### `nativeServer`
+
+!!! warning "Deprecated"
+
+    This setting is deprecated. The Ruff extension will always use the native language server.
 
 Whether to use the native language server, [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) or
 automatically decide between the two based on the Ruff version and extension settings.
