@@ -994,9 +994,9 @@ reveal_type(infer(callback))  # revealed: A | Any
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set
 as a whole is compatible with the target callable.
 
-The type variable should be inferred from the first matching overload, rather than unioning
-parameter types across all overloads (which would create an unsatisfiable expected type for
-contravariant type variables).
+Both `T = str` and `T = bytes` give valid specializations for the same call. We currently merge them
+into `str | bytes`. Refining the return type per specialization should instead infer their
+intersection, `Never`.
 
 ```py
 from typing import Callable, overload
@@ -1011,6 +1011,7 @@ def f(val: bytes) -> None: ...
 def f(val: str | bytes) -> None:
     pass
 
+# TODO: Refine the return type per specialization to reveal Never.
 reveal_type(accepts_callable(f))  # revealed: str | bytes
 ```
 
