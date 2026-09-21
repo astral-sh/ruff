@@ -1,0 +1,43 @@
+# Publish a saved Depot image without rebuilding it.
+name: "Publish Docker image"
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: "Saved image record from the Docker build manifest"
+        required: true
+        type: string
+
+env:
+  ACTIONS_CACHE_MODE: none
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: ${{ github.repository == 'astral-sh/ruff' && github.event_name == 'workflow_dispatch' && github.workflow_ref == 'astral-sh/ruff/.github/workflows/release.yml@refs/heads/main' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    environment:
+      name: release
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+      attestations: write
+    steps:
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish saved image
+        uses: astral-sh/github-actions/docker-publish@29736b0ef051c49097a9b4adca75e0f3e0c973dd
+        with:
+          project: ${{ vars.DEPOT_PROJECT_PROD }}
+          image: ${{ inputs.image }}
+          images: ghcr.io/astral-sh/ruff
+          attestation-image: ghcr.io/astral-sh/ruff
