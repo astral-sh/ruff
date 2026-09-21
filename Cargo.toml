@@ -167,7 +167,7 @@ pep440_rs = { version = "0.7.1", default-features = false }
 pretty_assertions = { version = "1.3.0", default-features = false, features = ["std"] }
 proc-macro2 = { version = "1.0.79", default-features = false, features = ["proc-macro"] }
 pyproject-toml = { version = "0.13.4", default-features = false }
-quick-junit = { version = "0.7.0", default-features = false }
+quick-junit = { version = "0.8.0", default-features = false }
 quickcheck = { version = "1.0.3", default-features = false }
 quickcheck_macros = { version = "1.0.0", default-features = false }
 quote = { version = "1.0.23", default-features = false, features = ["proc-macro"] }
