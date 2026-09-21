@@ -177,6 +177,27 @@ fn is_immediate_resolution_context(semantic: &SemanticModel, source_type: PySour
         return false;
     }
 
+    // Imports can only be lazy on Python 3.15+, where ordinary annotations are deferred, even if an
+    // older target version makes the model treat them as runtime-evaluated. For example, this
+    // import is runtime-evaluated on 3.9 in our semantic model but would be deferred on 3.15, where
+    // `__lazy_modules__` actually has an effect:
+    //
+    // ```toml
+    // target-version = "py39"
+    // ```
+    //
+    // ```
+    // __lazy_modules__ = ["pathlib"]
+    //
+    // from pathlib import Path
+    //
+    // class C:
+    //     path: Path
+    // ```
+    if semantic.in_runtime_evaluated_annotation() && !semantic.in_runtime_required_annotation() {
+        return false;
+    }
+
     let mut parent_statements = semantic.current_statements().skip(1);
     if semantic.in_exception_handler() || helpers::on_conditional_branch(&mut parent_statements) {
         return false;
