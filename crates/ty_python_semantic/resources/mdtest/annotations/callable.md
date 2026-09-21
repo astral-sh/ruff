@@ -643,6 +643,94 @@ def check(use_text: bool):
     reveal_type(converter("abc"))  # revealed: str | int
 ```
 
+### Callable objects used as `__init__`
+
+In the example below, a callable object initializes each `Product`. Passing the class as a callback
+requires the same integer argument as constructing it directly. The initializer is not a descriptor,
+so it does not receive the new instance as an additional argument.
+
+```py
+from typing import Callable
+
+class Initialize:
+    def __call__(self, value: int) -> None: ...
+
+class Product:
+    __init__ = Initialize()
+
+def create(factory: Callable[[int], Product]) -> Product:
+    return factory(1)
+
+reveal_type(create(Product))  # revealed: Product
+invalid: Callable[[], Product] = Product  # error: [invalid-assignment]
+```
+
+### Unions used as `__init__`
+
+In the example below, the initializer is either a function that binds the new instance or a callable
+object that does not. Both accept one integer, but only the object accepts a second argument.
+Converting the class to a callback preserves both alternatives.
+
+```py
+from typing import Callable
+
+def initialize(self, value: int) -> None: ...
+
+class InitializeWithFlag:
+    def __call__(self, value: int, flag: bool = False) -> None: ...
+
+def check(use_flag: bool):
+    class Product:
+        __init__ = InitializeWithFlag() if use_flag else initialize
+
+    valid: Callable[[int], Product] = Product
+    invalid: Callable[[int, bool], Product] = Product  # error: [invalid-assignment]
+```
+
+### Descriptors used as `__init__`
+
+In the example below, accessing the initializer invokes its descriptor and produces a callable that
+accepts an integer. Constructor callbacks use that callable's parameters without binding another
+receiver.
+
+```py
+from typing import Callable
+
+class Initializer:
+    def __get__(self, instance: object, owner: type) -> Callable[[int], None]:
+        raise NotImplementedError
+
+class Product:
+    __init__ = Initializer()
+
+def create(factory: Callable[[int], Product]) -> Product:
+    return factory(1)
+
+reveal_type(create(Product))  # revealed: Product
+```
+
+### Callable initializers on classes with dynamic bases
+
+In the example below, the class defines a callable initializer that requires an integer. An `Any`
+base and a metaclass declaration of `__init__` do not change the arguments required when the class
+is used as a callback.
+
+```py
+from typing import Any, Callable
+
+class Meta(type):
+    __init__: Callable[..., None]
+
+class Initialize:
+    def __call__(self, value: int) -> None: ...
+
+class Product(Any, metaclass=Meta):
+    __init__ = Initialize()
+
+valid: Callable[[int], Product] = Product
+invalid: Callable[[], Product] = Product  # error: [invalid-assignment]
+```
+
 ### Callable objects used as metaclass `__call__`
 
 In the example below, the metaclass delegates construction to a callable object that returns a

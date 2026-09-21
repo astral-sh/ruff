@@ -11,6 +11,7 @@ use crate::{
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
+        cyclic::CallableRecursionGuard,
         function::OverloadLiteral,
         known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
         relation::{TypeRelation, TypeRelationChecker},
@@ -141,6 +142,24 @@ impl<'db> Type<'db> {
             UpcastPolicy::default(),
             CallableUpcastContext {
                 recursive_definition,
+                ..CallableUpcastContext::default()
+            },
+        )
+    }
+
+    pub(super) fn try_upcast_to_callable_with_recursion_guard(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursion_guard: &CallableRecursionGuard<'db>,
+    ) -> Option<CallableTypes<'db>> {
+        self.try_upcast_to_callable_with_policy_and_context(
+            db,
+            env,
+            UpcastPolicy::default(),
+            CallableUpcastContext {
+                recursion_guard: Some(recursion_guard),
+                ..CallableUpcastContext::default()
             },
         )
     }
@@ -164,7 +183,32 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         policy: UpcastPolicy,
-        context: CallableUpcastContext<'db>,
+        context: CallableUpcastContext<'_, 'db>,
+    ) -> Option<CallableTypes<'db>> {
+        if let Some(recursion_guard) = context.recursion_guard {
+            return recursion_guard.visit(
+                db,
+                env,
+                &self,
+                || Some(CallableTypes::one(CallableType::bottom(db))),
+                || {
+                    Some(CallableTypes::one(CallableType::single(
+                        db,
+                        Signature::unknown(),
+                    )))
+                },
+                || self.try_upcast_to_callable_impl(db, env, policy, context),
+            );
+        }
+        self.try_upcast_to_callable_impl(db, env, policy, context)
+    }
+
+    fn try_upcast_to_callable_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        policy: UpcastPolicy,
+        context: CallableUpcastContext<'_, 'db>,
     ) -> Option<CallableTypes<'db>> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
             return fallback
@@ -206,7 +250,23 @@ impl<'db> Type<'db> {
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
-            Type::BoundMethod(bound_method) => bound_method.callables(db).cloned(),
+            Type::BoundMethod(bound_method) => {
+                if context.recursion_guard.is_some() {
+                    let callables = bound_method
+                        .func(db)
+                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)?;
+                    Some(callables.map(|callable| {
+                        callable.bind_self(
+                            db,
+                            env,
+                            bound_method.signature_receiver(db),
+                            bound_method.typing_self_type(db),
+                        )
+                    }))
+                } else {
+                    bound_method.callables(db).cloned()
+                }
+            }
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
@@ -232,10 +292,13 @@ impl<'db> Type<'db> {
                 }
             }
             Type::ClassLiteral(class_literal) => {
-                Some(class_literal.identity_specialization(db).into_callable(db))
+                let class = class_literal.identity_specialization(db);
+                Some(context.class_into_callable(db, class, Type::from(class)))
             }
 
-            Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
+            Type::GenericAlias(alias) => {
+                Some(context.class_into_callable(db, ClassType::Generic(alias), self))
+            }
 
             Type::NewTypeInstance(newtype) => newtype
                 .concrete_base_type(db)
@@ -250,15 +313,17 @@ impl<'db> Type<'db> {
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(class) => Some(class.into_callable(db)),
+                SubclassOfInner::Class(class) => {
+                    Some(context.class_into_callable(db, class, Type::from(class)))
+                }
                 SubclassOfInner::Protocol(protocol) => protocol.class_origin(db).map(|origin| {
                     if protocol.materialization_kind(db).is_some() {
                         // The origin supplies the constructor, but the actual receiver retains
                         // `Top[P]` or `Bottom[P]`. Infer with both so instance-returning overloads
                         // are materialized without replacing explicit non-instance returns.
-                        (*origin).into_callable_with_receiver(db, self)
+                        context.class_into_callable(db, *origin, self)
                     } else {
-                        (*origin).into_callable(db)
+                        context.class_into_callable(db, *origin, Type::from(*origin))
                     }
                 }),
                 SubclassOfInner::TypeVar(tvar) => {
@@ -371,13 +436,19 @@ impl<'db> Type<'db> {
             ) => Some(CallableTypes::one(partial.partial(db))),
 
             Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
-                wrapper.callables(db, env)
+                match wrapper.kind(db) {
+                    MethodWrapperKind::Staticmethod => wrapper
+                        .wrapped(db)
+                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context),
+                    MethodWrapperKind::Classmethod => None,
+                }
             }
 
             Type::Intersection(intersection) => intersection
                 .finite_alternative_union(db, env)
                 .and_then(|alternatives| {
-                    alternatives.try_upcast_to_callable_with_policy(db, env, policy)
+                    alternatives
+                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)
                 }),
 
             Type::EnumComplement(complement) => complement
@@ -398,11 +469,25 @@ impl<'db> Type<'db> {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-struct CallableUpcastContext<'db> {
+struct CallableUpcastContext<'a, 'db> {
     recursive_definition: Option<Definition<'db>>,
+    recursion_guard: Option<&'a CallableRecursionGuard<'db>>,
 }
 
-impl<'db> CallableUpcastContext<'db> {
+impl<'db> CallableUpcastContext<'_, 'db> {
+    fn class_into_callable(
+        self,
+        db: &'db dyn Db,
+        class: ClassType<'db>,
+        receiver: Type<'db>,
+    ) -> CallableTypes<'db> {
+        if let Some(recursion_guard) = self.recursion_guard {
+            recursion_guard.constructor_callables(db, class, receiver)
+        } else {
+            class.into_callable_with_receiver(db, receiver)
+        }
+    }
+
     fn is_recursive_reference(self, db: &'db dyn Db, function: FunctionType<'db>) -> bool {
         self.recursive_definition
             .is_some_and(|definition| function.contains_definition(db, definition))
@@ -971,7 +1056,7 @@ impl<'db> CallableType<'db> {
 pub(crate) struct CallableTypes<'db>(SmallVec<[CallableType<'db>; 1]>);
 
 impl<'db> CallableTypes<'db> {
-    fn new(mut callables: SmallVec<[CallableType<'db>; 1]>) -> Self {
+    pub(super) fn new(mut callables: SmallVec<[CallableType<'db>; 1]>) -> Self {
         assert!(!callables.is_empty(), "CallableTypes should not be empty");
         // Repeated alternatives do not change a union. Removing them also lets recursive
         // constructor queries converge when each iteration adds the same `__init__` callable.

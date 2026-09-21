@@ -34,10 +34,14 @@ use ty_python_core::definition::Definition;
 
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization};
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type_including_alias_arguments,
+    walk_type_with_recursion_guard,
+};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ProtocolInstanceType, RecursiveType,
-    StaticClassLiteral, Type, TypeAliasType, TypedDictType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, CallableTypes, ClassType, ProtocolInstanceType,
+    RecursiveType, StaticClassLiteral, SubclassOfInner, SubclassOfType, Type, TypeAliasType,
+    TypedDictType,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -116,6 +120,7 @@ impl<'db> Type<'db> {
                     RecursiveDefinition::Structural(_) => {
                         TypeIdentity::GrowingRecursive(definition)
                     }
+                    RecursiveDefinition::Callable(_, _) => return None,
                 })
             }
             _ => None,
@@ -140,6 +145,78 @@ enum RecursiveDefinition<'db> {
     Protocol(StaticClassLiteral<'db>),
     TypedDict(StaticClassLiteral<'db>),
     Structural(RecursiveType<'db>),
+    Callable(CallableDefinition<'db>, CallableExpansion),
+}
+
+/// Analyze the same expansion used by the guarded operation. Direct calls preserve class-object
+/// receivers that callable upcasting can normalize, which can select different descriptor overloads.
+#[derive(
+    Clone, Copy, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue,
+)]
+pub(super) enum CallableExpansion {
+    Bindings,
+    #[default]
+    Upcast,
+}
+
+/// Constructor expansion and `__call__` expansion have different dependencies, even on the same class.
+/// Exact class objects and subclass types can also select different descriptor overloads.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum CallableDefinition<'db> {
+    Constructor(StaticClassLiteral<'db>),
+    SubclassConstructor(StaticClassLiteral<'db>),
+    Instance(StaticClassLiteral<'db>),
+}
+
+impl<'db> CallableDefinition<'db> {
+    fn from_type(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        mode: CallableExpansion,
+    ) -> Option<DefinitionUse<'db>> {
+        let (class, is_constructor) = match ty {
+            Type::ClassLiteral(class) => (class.identity_specialization(db), true),
+            Type::GenericAlias(alias) => (super::ClassType::Generic(alias), true),
+            Type::SubclassOf(subclass) => match subclass.subclass_of() {
+                SubclassOfInner::Class(class) => (class, true),
+                SubclassOfInner::Protocol(protocol) => (*protocol.class_origin(db)?, true),
+                _ => return None,
+            },
+            Type::NominalInstance(instance) => (instance.class(db, env), false),
+            Type::ProtocolInstance(protocol) => (*protocol.class_origin(db)?, false),
+            _ => return None,
+        };
+        let (origin, specialization) = class.static_class_literal(db)?;
+        let definition = if matches!(ty, Type::SubclassOf(_)) {
+            Self::SubclassConstructor(origin)
+        } else if is_constructor {
+            Self::Constructor(origin)
+        } else {
+            Self::Instance(origin)
+        };
+        Some(DefinitionUse {
+            target: RecursiveDefinition::Callable(definition, mode),
+            specialization,
+        })
+    }
+
+    fn origin(self) -> StaticClassLiteral<'db> {
+        match self {
+            Self::Constructor(origin)
+            | Self::SubclassConstructor(origin)
+            | Self::Instance(origin) => origin,
+        }
+    }
+
+    fn identity_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        let class = self.origin().identity_specialization(db);
+        match self {
+            Self::Constructor(_) => Type::from(class),
+            Self::SubclassConstructor(_) => SubclassOfType::from(db, env, class),
+            Self::Instance(_) => Type::instance(db, env, class),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -179,7 +256,7 @@ struct FlowEdge<'db> {
     kind: FlowKind,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct DefinitionUse<'db> {
     target: RecursiveDefinition<'db>,
     specialization: Option<Specialization<'db>>,
@@ -289,6 +366,7 @@ impl<'db> RecursiveDefinition<'db> {
             Self::TypeAlias(alias) => alias.definition(db),
             Self::Structural(recursive) => recursive.definition(db),
             Self::Protocol(origin) | Self::TypedDict(origin) => origin.definition(db),
+            Self::Callable(callable, _) => callable.origin().definition(db),
         }
     }
 
@@ -297,6 +375,7 @@ impl<'db> RecursiveDefinition<'db> {
             Self::TypeAlias(alias) => alias.generic_context(db),
             Self::Structural(recursive) => recursive.parameters(db),
             Self::Protocol(origin) | Self::TypedDict(origin) => origin.generic_context(db),
+            Self::Callable(callable, _) => callable.origin().generic_context(db),
         }
     }
 
@@ -308,6 +387,7 @@ impl<'db> RecursiveDefinition<'db> {
         let known_class = match self {
             Self::TypeAlias(_) | Self::Structural(_) => None,
             Self::Protocol(origin) | Self::TypedDict(origin) => origin.known(db),
+            Self::Callable(callable, _) => callable.origin().known(db),
         };
         generic_context.default_specialization(db, known_class)
     }
@@ -364,6 +444,26 @@ impl<'db> RecursiveDefinition<'db> {
 }
 
 impl<'db> DefinitionUse<'db> {
+    fn has_smaller_arguments_than(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: Self,
+    ) -> bool {
+        let (Some(current), Some(previous)) = (self.specialization, previous.specialization) else {
+            return false;
+        };
+        let current = current.types(db);
+        let previous = previous.types(db);
+        current.len() == previous.len()
+            && current != previous
+            && current.iter().zip(previous).all(|(&current, &previous)| {
+                any_over_type_including_alias_arguments(db, env, previous, |nested| {
+                    nested == current
+                })
+            })
+    }
+
     fn walk_arguments(self, db: &'db dyn Db, visitor: &impl TypeVisitor<'db>) {
         if let Some(specialization) = self.specialization {
             for argument in specialization.types(db) {
@@ -381,7 +481,7 @@ impl<'db> SpecializationFlowGraph<'db> {
 
         while let Some(source) = pending.pop() {
             let source_definition = source.definition(db);
-            if !visited.insert(source_definition) {
+            if !visited.insert(source) {
                 continue;
             }
             let Some(visitor) = SpecializationFlowVisitor::new(db, source) else {
@@ -606,6 +706,38 @@ impl<'db> SpecializationFlowVisitor<'db> {
                 if let Some(extra_items) = typed_dict.explicit_extra_items(db) {
                     self.visit_type(db, extra_items.declared_ty);
                 }
+            }
+            RecursiveDefinition::Callable(callable, mode) => {
+                // Expand helpers with the root's symbolic arguments still in place. For example,
+                // `Forward[T].__new__: type[T]` can expose another constructor supplied by its
+                // caller, while `End[T]` can ignore that same argument entirely.
+                let guard = CallableRecursionGuard {
+                    analysis: Some(CallableFlowAnalysis::default()),
+                    ..CallableRecursionGuard::new(mode)
+                };
+                let ty = callable.identity_type(db, &self.env);
+                match mode {
+                    CallableExpansion::Bindings => {
+                        let _ = ty.bindings_impl(db, &self.env, &guard);
+                    }
+                    CallableExpansion::Upcast => {
+                        let _ =
+                            ty.try_upcast_to_callable_with_recursion_guard(db, &self.env, &guard);
+                    }
+                }
+                let mut complete = true;
+                for reference in guard
+                    .analysis
+                    .into_iter()
+                    .flat_map(|analysis| analysis.references.into_inner())
+                {
+                    // A helper may dispatch through its remaining arguments. Analyzing that
+                    // helper independently loses those arguments, so it cannot establish that
+                    // expansion will not return to the root.
+                    complete &= reference.target == source;
+                    self.record_reference(db, reference);
+                }
+                return complete;
             }
         }
         true
@@ -1234,6 +1366,154 @@ struct ActiveRecursionGuard<'a, T: Hash + Eq> {
 impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
     fn drop(&mut self) {
         self.seen.borrow_mut().remove(self.item);
+    }
+}
+
+/// Dependency discovery retains references across paths, so each exact receiver only needs expanding once.
+#[derive(Debug, Default)]
+struct CallableFlowAnalysis<'db> {
+    visited: RefCell<FxHashSet<Type<'db>>>,
+    references: RefCell<Vec<DefinitionUse<'db>>>,
+}
+
+/// Detects callable recursion even when recursive constructors keep changing their type arguments.
+///
+/// Exact receiver types remain distinct: a finite constructor chain can revisit a generic class
+/// with different arguments. When a declaration recurs, specialization-flow analysis determines
+/// whether its parameters can accumulate structure around a cycle, as in `C[T] -> C[list[T]]`.
+#[derive(Debug, Default)]
+pub(super) struct CallableRecursionGuard<'db> {
+    mode: CallableExpansion,
+    use_shared_cache: bool,
+    active: ActiveRecursionDetector<Type<'db>>,
+    definitions: ActiveRecursionDetector<RecursiveDefinition<'db>>,
+    identities: ActiveRecursionDetector<TypeIdentity<'db>>,
+    cycles: Cell<usize>,
+    constructors: RefCell<CycleDetectorCache<(ClassType<'db>, Type<'db>), CallableTypes<'db>>>,
+    /// During flow analysis, record repeated declarations once their arguments stop shrinking.
+    /// This makes the analysis finite without relying on the analysis's own result.
+    analysis: Option<CallableFlowAnalysis<'db>>,
+}
+
+impl<'db> CallableRecursionGuard<'db> {
+    /// Bounded specialization can use Salsa's cache and exact cycle recovery. Potentially growing
+    /// constructors must keep the same guard across nested conversions to recognize new specializations.
+    pub(super) fn for_constructor(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
+    ) -> Self {
+        let use_shared_cache =
+            CallableDefinition::from_type(db, env, receiver, CallableExpansion::Upcast).is_none_or(
+                |reference| {
+                    reference.specialization.is_none()
+                        || !reference.target.may_have_unbounded_specialization(db)
+                },
+            );
+        Self {
+            use_shared_cache,
+            ..Self::default()
+        }
+    }
+
+    pub(super) fn new(mode: CallableExpansion) -> Self {
+        Self {
+            mode,
+            ..Self::default()
+        }
+    }
+
+    /// Reuses shared constructor queries when specialization is bounded. Otherwise, only memoize
+    /// completed expansions locally: recursion fallbacks depend on the active ancestors.
+    pub(super) fn constructor_callables(
+        &self,
+        db: &'db dyn Db,
+        class: ClassType<'db>,
+        receiver: Type<'db>,
+    ) -> CallableTypes<'db> {
+        if self.use_shared_cache {
+            return class.into_callable_with_receiver(db, receiver);
+        }
+        let key = (class, receiver);
+        if let Some(callables) = self.constructors.borrow().get(&key) {
+            return callables.clone();
+        }
+
+        let cycles = self.cycles.get();
+        let callables = class.into_callable_with_recursion_guard(db, receiver, self);
+        if self.cycles.get() == cycles {
+            self.constructors
+                .borrow_mut()
+                .insert_completed(key, callables.clone());
+        }
+        callables
+    }
+
+    pub(super) fn visit<R>(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: &Type<'db>,
+        on_cycle: impl FnOnce() -> R,
+        on_growth: impl FnOnce() -> R,
+        func: impl FnOnce() -> R,
+    ) -> R {
+        let on_cycle = || {
+            self.cycles.set(self.cycles.get() + 1);
+            on_cycle()
+        };
+        let on_growth = || {
+            self.cycles.set(self.cycles.get() + 1);
+            on_growth()
+        };
+        if self.active.seen.borrow().contains(ty) {
+            return on_cycle();
+        }
+
+        let Some(reference) = CallableDefinition::from_type(db, env, *ty, self.mode) else {
+            let Some(identity) = ty.recursive_identity(db) else {
+                return self.active.visit(ty, on_cycle, func);
+            };
+            return self.identities.visit(&identity, on_growth, || {
+                self.active.visit(ty, on_cycle, func)
+            });
+        };
+
+        if let Some(analysis) = &self.analysis
+            && !analysis.visited.borrow_mut().insert(*ty)
+        {
+            // Its references were already collected, even if the earlier expansion hit a cycle.
+            // The callable result can depend on that path's ancestors, so use a conservative result.
+            return on_growth();
+        }
+
+        if self.definitions.seen.borrow().contains(&reference.target) {
+            if let Some(analysis) = &self.analysis {
+                // Unwrap `Forward[Forward[T]]` before recording a dependency. At least one
+                // argument shrinks on every step and none grows, keeping the analysis finite.
+                let unwraps_arguments = self
+                    .active
+                    .seen
+                    .borrow()
+                    .iter()
+                    .filter_map(|&active| CallableDefinition::from_type(db, env, active, self.mode))
+                    .filter(|active| active.target == reference.target)
+                    .all(|active| reference.has_smaller_arguments_than(db, env, active));
+                if unwraps_arguments {
+                    return self.active.visit(ty, on_cycle, func);
+                }
+                analysis.references.borrow_mut().push(reference);
+                return on_growth();
+            }
+            if reference.target.may_have_unbounded_specialization(db) {
+                return on_growth();
+            }
+            return self.active.visit(ty, on_cycle, func);
+        }
+
+        self.definitions.visit(&reference.target, on_growth, || {
+            self.active.visit(ty, on_cycle, func)
+        })
     }
 }
 

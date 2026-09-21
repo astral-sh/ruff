@@ -29,7 +29,9 @@ pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
-use self::cyclic::{ActiveRecursionDetector, HasIdentity, TypeIdentity};
+use self::cyclic::{
+    ActiveRecursionDetector, CallableExpansion, CallableRecursionGuard, HasIdentity, TypeIdentity,
+};
 pub use self::dedicated::pytest::{
     FixtureBinding, FixtureExposure, FixtureNameSource, PytestTest, fixture_bindings_for_parameter,
     fixture_exposures_for_definition, pytest_global_plugin_files, pytest_tests_in_file,
@@ -6565,14 +6567,18 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Bindings<'db> {
-        self.bindings_impl(db, env, &ActiveRecursionDetector::default())
+        self.bindings_impl(
+            db,
+            env,
+            &CallableRecursionGuard::new(CallableExpansion::Bindings),
+        )
     }
 
     fn bindings_impl(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        recursion_guard: &ActiveRecursionDetector<Type<'db>>,
+        recursion_guard: &CallableRecursionGuard<'db>,
     ) -> Bindings<'db> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
             return fallback.bindings_impl(db, env, recursion_guard);
@@ -7475,7 +7481,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         class: ClassType<'db>,
-        recursion_guard: &ActiveRecursionDetector<Type<'db>>,
+        recursion_guard: &CallableRecursionGuard<'db>,
     ) -> Bindings<'db> {
         fn bind_constructor_new<'db>(
             db: &'db dyn Db,
@@ -7582,7 +7588,7 @@ impl<'db> Type<'db> {
         // Key recursion by the full receiver type. Descriptor overloads can distinguish `C` from
         // `type[C]`, and different specializations need separate expansion even if one contains
         // the other, because a constructor may ignore its nested type arguments.
-        recursion_guard.visit(&self_type, on_cycle, || {
+        recursion_guard.visit(db, env, &self_type, on_cycle, on_cycle, || {
             // Check for a custom `__call__` on the metaclass (excluding `type.__call__`).
             // We preserve its full overload set here and defer constructor branching decisions
             // until call-time overload resolution.

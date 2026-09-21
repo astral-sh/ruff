@@ -30,6 +30,7 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
+use crate::types::cyclic::CallableRecursionGuard;
 use crate::types::enums::enum_metadata;
 use crate::types::function::DataclassTransformerParams;
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
@@ -64,6 +65,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
@@ -2374,12 +2376,6 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Return a callable type (or union of callable types) that represents the callable
-    /// constructor signature of this class.
-    pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
-        self.into_callable_with_receiver(db, Type::from(self))
-    }
-
     /// Infer this class's constructor using the actual class-object receiver.
     ///
     /// A materialized protocol uses its class origin for constructor lookup, but `Self` must be
@@ -2394,6 +2390,28 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         receiver: Type<'db>,
+    ) -> CallableTypes<'db> {
+        let env = ProgramEnvironment::from_file(self.class_literal(db).program_file(db));
+        let recursion_guard = CallableRecursionGuard::for_constructor(db, &env, receiver);
+        recursion_guard.visit(
+            db,
+            &env,
+            &receiver,
+            || CallableTypes::one(CallableType::bottom(db)),
+            || CallableTypes::one(CallableType::single(db, Signature::unknown())),
+            || self.into_callable_with_recursion_guard(db, receiver, &recursion_guard),
+        )
+    }
+
+    /// Expands a constructor within an already guarded callable conversion.
+    ///
+    /// [`CallableRecursionGuard::constructor_callables`] shares cached conversions when specialization
+    /// is bounded. Potentially growing expansions keep their recursion context and use a local cache.
+    pub(super) fn into_callable_with_recursion_guard(
+        self,
+        db: &'db dyn Db,
+        receiver: Type<'db>,
+        recursion_guard: &CallableRecursionGuard<'db>,
     ) -> CallableTypes<'db> {
         let env = &ProgramEnvironment::from_file(self.class_literal(db).program_file(db));
         // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
@@ -2439,7 +2457,10 @@ impl<'db> ClassType<'db> {
             // `Color("red")`, instead of the overloaded signature of `EnumMeta.__call__` which also accounts
             // for dynamic Enum creation.
             let is_actual_enum = enum_metadata(db, self.class_literal(db)).is_some();
-            if !is_actual_enum && let Some(callables) = ty.try_upcast_to_callable(db, env) {
+            if !is_actual_enum
+                && let Some(callables) =
+                    ty.try_upcast_to_callable_with_recursion_guard(db, env, recursion_guard)
+            {
                 return callables;
             }
         }
@@ -2451,7 +2472,9 @@ impl<'db> ClassType<'db> {
                     .resolve_dunder_new_callable(db, env, place_and_quals.place)
                     .ignore_possibly_undefined()
             })
-            .and_then(|ty| ty.try_upcast_to_callable(db, env));
+            .and_then(|ty| {
+                ty.try_upcast_to_callable_with_recursion_guard(db, env, recursion_guard)
+            });
 
         let dunder_new_callables = if let Some(callables) = dunder_new_callables {
             let bound_callables =
@@ -2471,89 +2494,37 @@ impl<'db> ClassType<'db> {
             None
         };
 
-        let dunder_init_function_symbol = lookup_type
-            .member_lookup_with_policy(
+        let synthesized_dunder_init_callables = Type::from(self)
+            .class_namespace_member(
                 db,
                 env,
+                self,
                 "__init__",
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                    | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
             )
-            .place;
-
-        // If the class defines an `__init__` method, then we synthesize a callable type with the
-        // same parameters as the `__init__` method after it is bound, and with the return type of
-        // the concrete type of `Self`.
-        let synthesized_dunder_init_callable = if let Place::Defined(DefinedPlace { ty, .. }) =
-            dunder_init_function_symbol
-        {
-            let signature = match ty {
-                Type::FunctionLiteral(dunder_init_function) => {
-                    Some(dunder_init_function.signature(db))
-                }
-                Type::Callable(callable) => Some(callable.signatures(db)),
-                _ => None,
-            };
-
-            if let Some(signature) = signature {
-                let synthesized_signature = |signature: &Signature<'db>| {
-                    let self_annotation = signature
-                        .parameters()
-                        .get_positional(0)
-                        .filter(|parameter| !parameter.inferred_annotation)
-                        .map(Parameter::annotated_type)
-                        .filter(|ty| {
-                            ty.as_typevar()
-                                .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))
-                        });
-                    let return_type = self_annotation.unwrap_or(instance_type);
-                    let generic_context = GenericContext::merge_optional(
-                        db,
-                        class_generic_context,
-                        signature.generic_context,
-                    );
-                    Signature::new_generic(
-                        generic_context,
-                        signature.parameters().clone(),
-                        return_type,
-                    )
-                    .with_definition(signature.definition())
-                    .with_source_overload_index(signature.source_overload_index())
-                    .bind_self_with_receiver(
-                        db,
-                        env,
-                        Some(instance_type),
-                        Some(instance_type),
-                    )
-                };
-
-                let synthesized_dunder_init_signature = CallableSignature::from_overloads(
-                    signature.overloads.iter().map(synthesized_signature),
-                );
-
-                Some(CallableType::new(
+            .ignore_possibly_undefined()
+            .and_then(|init_type| {
+                self.synthesize_init_callables(
                     db,
-                    synthesized_dunder_init_signature,
-                    CallableTypeKind::Regular,
-                ))
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+                    env,
+                    init_type,
+                    receiver,
+                    instance_type,
+                    recursion_guard,
+                )
+            });
 
-        match (dunder_new_callables, synthesized_dunder_init_callable) {
-            (Some(dunder_new_callables), Some(synthesized_dunder_init_callable)) => {
+        match (dunder_new_callables, synthesized_dunder_init_callables) {
+            (Some(dunder_new_callables), Some(synthesized_dunder_init_callables)) => {
                 CallableTypes::from_elements(
                     dunder_new_callables
                         .iter()
                         .copied()
-                        .chain([synthesized_dunder_init_callable]),
+                        .chain(synthesized_dunder_init_callables.iter().copied()),
                 )
             }
-            (Some(constructors), None) => constructors,
-            (None, Some(constructor)) => CallableTypes::one(constructor),
+            (Some(constructors), None) | (None, Some(constructors)) => constructors,
             (None, None) => {
                 // If no `__new__` or `__init__` method is found, then we fall back to looking for
                 // an `object.__new__` method.
@@ -2594,6 +2565,104 @@ impl<'db> ClassType<'db> {
                 ))
             }
         }
+    }
+
+    /// Synthesizes constructor callables with the parameters of the bound `__init__` attribute
+    /// and the constructed instance as their return type.
+    fn synthesize_init_callables(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        init_type: Type<'db>,
+        receiver: Type<'db>,
+        instance_type: Type<'db>,
+        recursion_guard: &CallableRecursionGuard<'db>,
+    ) -> Option<CallableTypes<'db>> {
+        if let Some(union) = init_type.as_union_like(db) {
+            let mut callables = SmallVec::new();
+            for alternative in union.elements(db) {
+                let alternatives = self.synthesize_init_callables(
+                    db,
+                    env,
+                    *alternative,
+                    receiver,
+                    instance_type,
+                    recursion_guard,
+                )?;
+                callables.extend(alternatives.iter().copied());
+            }
+            return Some(CallableTypes::new(callables));
+        }
+
+        let (init_type, bound_method) = match init_type.function_like_dunder_get(
+            db,
+            env,
+            Some(instance_type),
+            Some(receiver),
+        ) {
+            Some(Type::BoundMethod(method)) => (method.func(db), Some(method)),
+            Some(ty) => (ty, None),
+            None => {
+                let descriptor = init_type
+                    .try_call_dunder_get(db, env, Some(instance_type), receiver)
+                    .unwrap_or_else(|error| Some(error.fallback()));
+                (
+                    descriptor
+                        .map(|descriptor| descriptor.return_type)
+                        .unwrap_or(init_type),
+                    None,
+                )
+            }
+        };
+
+        let callables =
+            init_type.try_upcast_to_callable_with_recursion_guard(db, env, recursion_guard)?;
+
+        let class_generic_context = self
+            .static_class_literal(db)
+            .and_then(|(class_literal, _)| class_literal.generic_context(db));
+
+        let synthesized_signature = |signature: &Signature<'db>| {
+            let self_annotation = bound_method
+                .filter(|method| !method.class_method(db))
+                .and_then(|_| signature.parameters().get_positional(0))
+                .filter(|parameter| !parameter.inferred_annotation)
+                .map(Parameter::annotated_type)
+                .filter(|ty| {
+                    ty.as_typevar()
+                        .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))
+                });
+
+            let mut signature = signature.clone();
+
+            signature.generic_context = GenericContext::merge_optional(
+                db,
+                class_generic_context,
+                signature.generic_context,
+            );
+
+            signature.return_ty = self_annotation.unwrap_or(instance_type);
+
+            let Some(method) = bound_method else {
+                return signature;
+            };
+
+            // Constructor arguments determine the class's specialization, so
+            // preserve generic parameters and overloads until they are checked.
+            signature.bind_self_with_receiver(
+                db,
+                env,
+                Some(method.signature_receiver(db)),
+                Some(method.typing_self_type(db)),
+            )
+        };
+
+        Some(callables.map(|callable| {
+            let signatures = CallableSignature::from_overloads(
+                callable.signatures(db).iter().map(synthesized_signature),
+            );
+            callable.with_signatures(db, signatures).into_regular(db)
+        }))
     }
 
     pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {

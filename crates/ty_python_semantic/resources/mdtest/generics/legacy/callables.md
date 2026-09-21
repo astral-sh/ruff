@@ -105,6 +105,51 @@ missing_argument: Callable[[], Factory[int]] = Factory[int]  # error: [invalid-a
 wrong_argument: Callable[[str], Factory[int]] = Factory[int]  # error: [invalid-assignment]
 ```
 
+## Recursive constructors with growing type arguments
+
+In the example below, resolving either constructor repeatedly nests its type argument inside another
+`list`. Both direct calls and callback assignments stop expanding these recursive constructors
+rather than overflowing the stack.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class New(Generic[T]):
+    __new__: "type[New[list[T]]]"
+
+class Init(Generic[T]):
+    __init__: "type[Init[list[T]]]"
+
+new: Callable[..., object] = New[int]
+init: Callable[..., Init[int]] = Init[int]
+
+reveal_type(New[int]())  # revealed: New[int]
+reveal_type(Init[int]())  # revealed: Init[int]
+```
+
+## Recursive constructors passed through type parameters
+
+In the example below, the forwarding class calls whichever constructor it receives as its type
+argument. Expanding both nested uses of this helper exposes the growing constructor. Direct calls
+and callback assignments stop expanding the resulting cycle.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Forward(Generic[T]):
+    __new__: type[T]
+
+class Grow(Generic[T]):
+    __new__: "type[Forward[Forward[Grow[list[T]]]]]"
+
+callback: Callable[..., object] = Grow[int]
+reveal_type(Grow[int]())  # revealed: Grow[int]
+```
+
 ## Naming a generic `Callable`: type aliases
 
 The easiest way to refer to a generic `Callable` type directly is via a type alias:
