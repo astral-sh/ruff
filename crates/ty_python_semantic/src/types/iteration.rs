@@ -15,44 +15,24 @@ use ruff_python_ast as ast;
 use std::borrow::Cow;
 use ty_python_core::EvaluationMode;
 
-/// Precise contents of a container display consumed before it can be aliased or mutated.
+/// Extract precise element types for membership in an immediately consumed list or set display.
 ///
-/// The ordinary inferred container type remains unchanged. These elements describe the values
-/// supplied by the display, rather than just the container's homogeneous element type.
-pub(super) enum LiteralContainerElements<'db> {
-    Sequence(Box<[Type<'db>]>),
-    /// Set construction can remove duplicates, so these elements do not describe an iteration
-    /// order or an exact length. Membership evaluation must account for hashing and equality:
-    /// custom equality could discard an element that would compare differently with the needle.
-    Set(Box<[Type<'db>]>),
-}
-
-impl<'db> LiteralContainerElements<'db> {
-    pub(super) fn from_expression(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        expression: &ast::Expr,
-        expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
-    ) -> Option<Self> {
-        match expression {
-            ast::Expr::List(_) => {
-                extract_fixed_length_iterable_element_types(db, env, expression, expression_type)
-                    .map(Self::Sequence)
-            }
-            ast::Expr::Set(set) => {
-                if set.elts.iter().any(ast::Expr::is_starred_expr) {
-                    return None;
-                }
-                Some(Self::Set(set.elts.iter().map(expression_type).collect()))
-            }
-            _ => None,
+/// The ordinary inferred container type remains unchanged. Set construction can remove duplicates,
+/// so these elements do not describe an iteration order or an exact length.
+pub(super) fn extract_literal_container_element_types<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    expression: &ast::Expr,
+    expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+) -> Option<Box<[Type<'db>]>> {
+    match expression {
+        ast::Expr::List(_) => {
+            extract_fixed_length_iterable_element_types(db, env, expression, expression_type)
         }
-    }
-
-    pub(super) fn elements(&self) -> &[Type<'db>] {
-        match self {
-            Self::Sequence(elements) | Self::Set(elements) => elements,
+        ast::Expr::Set(set) if !set.elts.iter().any(ast::Expr::is_starred_expr) => {
+            Some(set.elts.iter().map(expression_type).collect())
         }
+        _ => None,
     }
 }
 

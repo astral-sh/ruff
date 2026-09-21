@@ -77,6 +77,23 @@ An unknown element does not prevent a later known element from establishing memb
 def known_element(value: str):
     reveal_type("a" in [value, "a"])  # revealed: Literal[True]
     reveal_type("a" not in [value, "a"])  # revealed: Literal[False]
+    reveal_type("a" in {value, "a"})  # revealed: Literal[True]
+    reveal_type("a" not in {value, "a"})  # revealed: Literal[False]
+```
+
+## Inline enum members
+
+An inline set of enum members also has known membership.
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+reveal_type(Color.RED in {Color.RED})  # revealed: Literal[True]
+reveal_type(Color.BLUE in {Color.RED})  # revealed: Literal[False]
 ```
 
 ## Unpacked inline list elements
@@ -109,25 +126,27 @@ def stored(values: list[Literal["a", "b"]], keys: set[Literal["a", "b"]]):
 
 ## Inline containers with custom equality
 
-A list tests its elements using identity or equality. A custom equality method that always returns
-true can therefore establish membership. Sets also depend on hashes, so equality alone does not
-establish membership when custom objects are involved.
+Lists and sets test their elements using identity or equality. A custom equality method with a known
+result can therefore establish membership. We assume that equal objects have equal hashes.
 
 ```py
-from typing import Literal
+from typing import Literal, overload
 
-class MatchesEverything:
-    def __eq__(self, other: object) -> Literal[True]:
-        return True
+class EqualValue:
+    @overload
+    def __eq__(self, other: "EqualValue") -> Literal[True]: ...
+    @overload
+    def __eq__(self, other: object) -> bool: ...
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, EqualValue)
 
     def __hash__(self) -> int:
         return 0
 
-reveal_type(1 in [MatchesEverything()])  # revealed: Literal[True]
-reveal_type(1 not in [MatchesEverything()])  # revealed: Literal[False]
-reveal_type(1 in {MatchesEverything()})  # revealed: bool
-reveal_type(1 not in {MatchesEverything()})  # revealed: bool
-reveal_type(MatchesEverything() in {1})  # revealed: bool
+reveal_type(EqualValue() in [EqualValue()])  # revealed: Literal[True]
+reveal_type(EqualValue() not in [EqualValue()])  # revealed: Literal[False]
+reveal_type(EqualValue() in {EqualValue()})  # revealed: Literal[True]
+reveal_type(EqualValue() not in {EqualValue()})  # revealed: Literal[False]
 ```
 
 Identity also counts as a match, even when equality always returns false. The equality result alone

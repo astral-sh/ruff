@@ -13,7 +13,7 @@ use crate::types::cyclic::CycleDetector;
 use crate::types::equality::{
     ComparisonSoundnessPolicy, TupleEqualityEvaluator, equality_truthiness, inequality_truthiness,
 };
-use crate::types::iteration::LiteralContainerElements;
+use crate::types::iteration::extract_literal_container_element_types;
 use crate::types::known_instance::{FunctoolsPartialInstance, InternedType, MethodWrapper};
 use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::{
@@ -695,6 +695,7 @@ pub(crate) struct UnsupportedComparisonError<'db> {
 }
 
 /// Refine membership using the contents of an immediately consumed container display.
+/// For sets, assume equality is an equivalence relation and equal objects have equal hashes.
 pub(super) fn infer_literal_membership_comparison<'db>(
     context: &InferContext<'db, '_>,
     left: Type<'db>,
@@ -709,42 +710,13 @@ pub(super) fn infer_literal_membership_comparison<'db>(
     };
     let db = context.db();
     let env = context.program_environment();
-    let right = LiteralContainerElements::from_expression(db, env, right, expression_type)?;
-    if let LiteralContainerElements::Set(elements) = &right
-        && (!has_builtin_literal_hashing(db, left)
-            || !elements
-                .iter()
-                .all(|element| has_builtin_literal_hashing(db, *element)))
-    {
-        return None;
-    }
-    let truthiness = fixed_membership_truthiness(context, left, right.elements()).negate_if(negate);
+    let elements = extract_literal_container_element_types(db, env, right, expression_type)?;
+    let truthiness = fixed_membership_truthiness(context, left, &elements).negate_if(negate);
     Some(Type::from_truthiness(db, env, truthiness))
 }
 
-/// Whether every represented value has builtin literal equality and hashing semantics.
-///
-/// Equality alone cannot establish set membership for custom objects: their hashes can differ
-/// even when `__eq__` always returns true. Enum literals can also customize these methods.
-fn has_builtin_literal_hashing<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty.resolve_type_alias(db) {
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| has_builtin_literal_hashing(db, *element)),
-        Type::LiteralValue(literal) => matches!(
-            literal.kind(),
-            LiteralValueTypeKind::Int(_)
-                | LiteralValueTypeKind::Bool(_)
-                | LiteralValueTypeKind::String(_)
-                | LiteralValueTypeKind::Bytes(_)
-        ),
-        ty => ty.is_none(db),
-    }
-}
-
-/// Evaluate membership against elements that are all present, preserving identity-or-equality
-/// semantics. An ambiguous comparison does not prevent a later element from proving membership.
+/// Evaluate membership using the supplied element types and identity-or-equality semantics.
+/// An ambiguous comparison does not prevent a later element from proving membership.
 fn fixed_membership_truthiness<'db>(
     context: &InferContext<'db, '_>,
     needle: Type<'db>,

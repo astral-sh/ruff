@@ -9,7 +9,7 @@ use crate::reachability::{
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
-use crate::types::iteration::LiteralContainerElements;
+use crate::types::iteration::extract_literal_container_element_types;
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::{TupleElement, TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema, TypedDictType};
@@ -3795,13 +3795,13 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         inference: &ExpressionInference<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db;
-        let elements = LiteralContainerElements::from_expression(db, &self.env, rhs, |element| {
+        let elements = extract_literal_container_element_types(db, &self.env, rhs, |element| {
             inference.expression_type(element)
         })?;
         Some(Type::heterogeneous_tuple(
             db,
             &self.env,
-            elements.elements().iter().copied(),
+            elements.iter().copied(),
         ))
     }
 
