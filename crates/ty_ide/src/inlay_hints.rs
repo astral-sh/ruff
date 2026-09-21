@@ -1,9 +1,7 @@
 use std::{fmt, vec};
 use ty_python_semantic::ProgramEnvironment;
 
-use rustc_hash::FxHashMap;
-
-use crate::{Db, HasNavigationTargets, NavigationTarget};
+use crate::{Db, FxIndexMap, HasNavigationTargets, NavigationTarget};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
@@ -31,12 +29,7 @@ impl InlayHint {
         ty: Type<'db>,
         mut allow_edits: bool,
     ) -> Option<Self> {
-        let InlayHintImportContext {
-            db,
-            file,
-            importer,
-            dynamic_imports,
-        } = context;
+        let InlayHintImportContext { db, file, importer } = context;
 
         let position = expr.range().end();
         let env = ProgramEnvironment::from_file(file);
@@ -48,7 +41,7 @@ impl InlayHint {
             return None;
         }
 
-        let mut dynamic_importer = DynamicImporter::new(importer, expr, dynamic_imports);
+        let mut dynamic_importer = DynamicImporter::new(importer, expr);
 
         // Ok so the idea here is that we potentially have a random soup of spans here,
         // and each byte of the string can have at most one target associate with it.
@@ -341,19 +334,16 @@ impl Default for InlayHintSettings {
     }
 }
 
+#[derive(Clone, Copy)]
 struct InlayHintImportContext<'a, 'db> {
     db: &'db dyn Db,
     file: ProgramFile<'db>,
     importer: &'a Importer<'db>,
-    dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
 }
 
 struct InlayHintVisitor<'a, 'db> {
     db: &'db dyn Db,
     model: SemanticModel<'db>,
-    /// Imports that we have already created.
-    /// We store these imports so that we don't create multiple imports for the same symbol.
-    dynamic_imports: FxHashMap<DynamicallyImportedMember, ImportAction>,
     importer: Importer<'db>,
     hints: Vec<InlayHint>,
     assignment_rhs: Option<&'a Expr>,
@@ -373,7 +363,6 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         Self {
             db,
             model: SemanticModel::new(db, file),
-            dynamic_imports: FxHashMap::default(),
             importer,
             hints: Vec::new(),
             assignment_rhs: None,
@@ -396,7 +385,6 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             db: self.db,
             file: self.model.program_file(),
             importer: &self.importer,
-            dynamic_imports: &mut self.dynamic_imports,
         };
 
         if let Some(inlay_hint) = InlayHint::variable_type(context, expr, rhs, ty, allow_edits) {
@@ -670,7 +658,7 @@ fn is_ignored_variable_assignment_target(expr: &Expr) -> bool {
     name.starts_with('_') && !is_dunder
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct DynamicallyImportedMember {
     module: String,
     name: String,
@@ -682,23 +670,19 @@ struct DynamicImporter<'a, 'db> {
     scope_node: AnyNodeRef<'a>,
     scope_offset: TextSize,
     members: Option<MembersInScope<'db>>,
-    dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
-    imported_members: Vec<DynamicallyImportedMember>,
+    /// Deduplicate imports within this hint, preserving their order. Each hint must
+    /// include its own imports because hints can be applied independently.
+    dynamic_imports: FxIndexMap<DynamicallyImportedMember, ImportAction>,
 }
 
 impl<'a, 'db> DynamicImporter<'a, 'db> {
-    fn new(
-        importer: &'a Importer<'db>,
-        expr: &'a Expr,
-        dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
-    ) -> Self {
+    fn new(importer: &'a Importer<'db>, expr: &'a Expr) -> Self {
         Self {
             importer,
             scope_node: expr.into(),
             scope_offset: expr.range().start(),
             members: None,
-            dynamic_imports,
-            imported_members: Vec::new(),
+            dynamic_imports: FxIndexMap::default(),
         }
     }
 
@@ -713,8 +697,6 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
         symbol_name: &str,
         label_text: &str,
     ) -> Option<String> {
-        use std::collections::hash_map::Entry;
-
         // Ensure members are computed before borrowing other fields.
         let members = self.members.get_or_insert_with(|| {
             self.importer
@@ -740,30 +722,23 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
             name: symbol_name.to_string(),
         };
 
-        match self.dynamic_imports.entry(key.clone()) {
-            Entry::Vacant(entry) => {
-                let request = if is_possibly_qualified_name {
-                    ImportRequest::import(module_name, symbol_name).force()
-                } else {
-                    ImportRequest::import_from(module_name, symbol_name)
-                };
+        let action = self.dynamic_imports.entry(key).or_insert_with(|| {
+            let request = if is_possibly_qualified_name {
+                ImportRequest::import(module_name, symbol_name).force()
+            } else {
+                ImportRequest::import_from(module_name, symbol_name)
+            };
 
-                let import_action = self.importer.import(request, members);
-                let action = entry.insert(import_action);
+            self.importer.import(request, members)
+        });
 
-                self.imported_members.push(key);
-
-                qualified_symbol_text(action).map(str::to_string)
-            }
-            Entry::Occupied(entry) => qualified_symbol_text(entry.get()).map(str::to_string),
-        }
+        qualified_symbol_text(action).map(str::to_string)
     }
 
     /// Builds the text edits from all collected imports.
     fn text_edits(&self) -> Vec<InlayHintTextEdit> {
-        self.imported_members
-            .iter()
-            .filter_map(|member| self.dynamic_imports.get(member))
+        self.dynamic_imports
+            .values()
             .filter_map(|import_action| {
                 import_action.import().and_then(|edit| {
                     edit.content().map(|content| InlayHintTextEdit {
@@ -921,6 +896,13 @@ mod tests {
 
                 inlay_hint_buf.insert_str(end_position, &hint_str);
             }
+
+            // Hints can be applied independently, but these snapshots combine all edits.
+            // Deduplicate imports shared by multiple hints before applying them together.
+            let all_edits: Vec<_> = all_edits
+                .into_iter()
+                .unique_by(|edit| (edit.range, edit.new_text.clone()))
+                .collect();
             let mut edit_offset = TextSize::default();
 
             for edit in all_edits.iter().sorted_by_key(|edit| edit.range.start()) {
@@ -7053,6 +7035,53 @@ Source with applied edits:
           - a = D(Baz)
         6 + a: D[Baz] = D(x=Baz)
           |
+        ");
+    }
+
+    #[test]
+    fn auto_import_each_hint_independently() {
+        // Each hint needs its own imports, even when another hint uses the same types.
+        // Repeated types within a hint should only produce one import per symbol.
+        let test = inlay_hint_test("x = (y, 1, y, 1)\nx = (y, 1, y, 1)\n");
+        let hints = inlay_hints(
+            &test.db,
+            ProgramFile::new(
+                &test.db,
+                test.file,
+                test.db.program_environment().program(&test.db),
+            ),
+            test.range,
+            &InlayHintSettings::default(),
+        );
+
+        assert_eq!(hints.len(), 2);
+        let source = source_text(&test.db, test.file);
+        let edited_sources = hints
+            .into_iter()
+            .map(|hint| {
+                let mut edited = source.as_str().to_string();
+                for edit in hint
+                    .text_edits
+                    .iter()
+                    .sorted_by_key(|edit| edit.range.start())
+                    .rev()
+                {
+                    edited.replace_range(edit.range.to_std_range(), &edit.new_text);
+                }
+                edited
+            })
+            .join("\n");
+
+        assert_snapshot!(edited_sources, @"
+        from ty_extensions._internal import Unknown
+        from typing import Literal
+        x: tuple[Unknown, Literal[1], Unknown, Literal[1]] = (y, 1, y, 1)
+        x = (y, 1, y, 1)
+
+        from ty_extensions._internal import Unknown
+        from typing import Literal
+        x = (y, 1, y, 1)
+        x: tuple[Unknown, Literal[1], Unknown, Literal[1]] = (y, 1, y, 1)
         ");
     }
 
