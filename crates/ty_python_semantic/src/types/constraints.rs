@@ -3822,6 +3822,13 @@ impl<'db> CandidateSolutions<'db> {
         path_bound: &PathBound<'db>,
     ) -> PathBoundSolution<'db> {
         let lower = path_bound.effective_lower(db, env);
+        // A missing lower bound imposes no restriction. Use the parameter-signature domain's
+        // bottom for this comparison, since `Never` cannot be a ParamSpec value.
+        let lower = if path_bound.evidence_lower().is_none() && lower.is_never() {
+            path_bound.bound_typevar.domain(db).bottom(db)
+        } else {
+            lower
+        };
         if !path_bound
             .upper
             .is_possibly_satisfied_by(db, env, builder, lower)
@@ -5061,8 +5068,8 @@ mod tests {
         TypeVarIdentity, TypeVarKind,
     };
     use crate::types::{
-        BindingContext, BoundTypeVarInstance, KnownClass, ParamSpecAttrKind, Parameter, Signature,
-        SubclassOfType, TypeVarNonce, TypeVarVariance,
+        BindingContext, BoundTypeVarInstance, KnownClass, ParamSpecAttrKind, Parameter, Parameters,
+        Signature, SubclassOfType, TypeVarNonce, TypeVarVariance,
     };
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem;
