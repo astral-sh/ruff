@@ -6279,6 +6279,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // which would incorrectly imply that the function cannot return.
         // Apply this check only to valid specializations: a rejected sibling cannot prevent a
         // single remaining specialization from providing its own return type.
+        // Combine the return variances of all variables whose bindings differ: `Callable[[T], U]`
+        // can capture state linking its input and output even though neither variable is invariant
+        // on its own. Output-only callables can still refine their covariant return types.
+        let mut variance = TypeVarVariance::Bivariant;
         let invariant_visitor = PairVisitor::new(true);
         let mut remaining_comparisons = SolutionBudget::default().visits;
         let has_invariant_difference = inference
@@ -6295,22 +6299,25 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     .iter()
                     .map(|specialization| specialization.types(db)[index])
                     .unique();
-                !types.clone().all_equal()
-                    && (self
-                        .return_ty
+                if types.clone().all_equal() {
+                    return false;
+                }
+                variance = variance.join(
+                    self.return_ty
                         .variance_of(db, env, variable.identity(db))
-                        .evaluate(db)
-                        == TypeVarVariance::Invariant
-                        // Whole-union comparisons are more conservative than tuple decomposition,
-                        // so compatibility with one alternative is not transitive. Check every
-                        // pair, falling back conservatively if the quadratic work exceeds budget.
-                        || types.array_combinations().any(|[left, right]| {
-                            let Some(remaining) = remaining_comparisons.checked_sub(1) else {
-                                return true;
-                            };
-                            remaining_comparisons = remaining;
-                            self.has_invariant_return_difference(left, right, &invariant_visitor)
-                        }))
+                        .evaluate(db),
+                );
+                variance == TypeVarVariance::Invariant
+                    // Whole-union comparisons are more conservative than tuple decomposition,
+                    // so compatibility with one alternative is not transitive. Check every
+                    // pair, falling back conservatively if the quadratic work exceeds budget.
+                    || types.array_combinations().any(|[left, right]| {
+                        let Some(remaining) = remaining_comparisons.checked_sub(1) else {
+                            return true;
+                        };
+                        remaining_comparisons = remaining;
+                        self.has_invariant_return_difference(left, right, &invariant_visitor)
+                    })
             });
 
         let mut returns = Vec::with_capacity(specializations.len());

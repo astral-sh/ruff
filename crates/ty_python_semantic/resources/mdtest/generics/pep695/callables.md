@@ -1595,6 +1595,96 @@ def _() -> None:
     reveal_type(invoke(with_fixed, Both()))  # revealed: tuple[A, (int, /) -> int] & tuple[B, (int, /) -> int]
 ```
 
+Separate input and output type variables do not make a stateful callable safe to specialize
+independently for each call. The closure below can return a value produced by an earlier call, so
+its return type includes both `A` and `B` even when its latest argument is a `B`:
+
+```py
+@overload
+def identity(value: A) -> A: ...
+@overload
+def identity(value: B) -> B: ...
+def identity(value: A | B) -> A | B:
+    return value
+
+def remember_first[T, U](convert: Callable[[T], U]) -> Callable[[T], U]:
+    values: list[U] = []
+
+    def first(value: T) -> U:
+        values.append(convert(value))
+        return values[0]
+
+    return first
+
+def _() -> None:
+    result = remember_first(identity)
+    reveal_type(result)  # revealed: (A | B, /) -> A | B
+    result(A())
+    reveal_type(result(B()))  # revealed: A | B
+```
+
+In contrast, a deferred call exposes only its output type. Capturing an argument accepted by both
+overloads lets the returned callable produce a value satisfying both return types:
+
+```py
+def defer[T, U](convert: Callable[[T], U], value: T) -> Callable[[], U]:
+    return lambda: convert(value)
+
+def _() -> None:
+    result = defer(identity, Both())
+    reveal_type(result())  # revealed: A & B
+```
+
+The same state can be shared between two returned callables. Reading after writing an `A` must not
+claim that the stored value is also a `B`:
+
+```py
+def writer_and_reader[T, U](convert: Callable[[T], U]) -> tuple[Callable[[T], None], Callable[[], U]]:
+    values: list[U] = []
+
+    def write(value: T) -> None:
+        values.append(convert(value))
+
+    def read() -> U:
+        return values[0]
+
+    return write, read
+
+def _() -> None:
+    write, read = writer_and_reader(identity)
+    write(A())
+    reveal_type(read())  # revealed: A | B
+```
+
+Exposing the same state through nominal producer and consumer types also requires a merged return.
+The producer's output type and the consumer's input type can vary together even though they use
+different type variables:
+
+```py
+class Producer[T]:
+    def __init__(self, get: Callable[[], T]) -> None:
+        self._get = get
+
+    def get(self) -> T:
+        return self._get()
+
+class Consumer[T]:
+    def __init__(self, put: Callable[[T], None]) -> None:
+        self._put = put
+
+    def put(self, value: T) -> None:
+        self._put(value)
+
+def nominal_views[T, U](convert: Callable[[T], U]) -> tuple[Producer[U], Consumer[T]]:
+    write, read = writer_and_reader(convert)
+    return Producer(read), Consumer(write)
+
+def _() -> None:
+    producer, consumer = nominal_views(identity)
+    consumer.put(A())
+    reveal_type(producer.get())  # revealed: A | B
+```
+
 ## Multiple occurrences of a higher-order generic callable
 
 If a generic callable is used more than once in a higher-order call, each occurrence should get its
