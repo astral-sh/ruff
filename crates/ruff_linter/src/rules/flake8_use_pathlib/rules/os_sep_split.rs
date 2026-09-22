@@ -1,11 +1,14 @@
+use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprAttribute};
+use ruff_python_ast::{self as ast, Expr, ExprAttribute, Number, UnaryOp};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
-use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::importer::ImportRequest;
+use crate::preview::is_fix_os_sep_split_enabled;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `.split(os.sep)`
@@ -49,6 +52,11 @@ use crate::codes::Category;
 /// it can be less performant than working directly with strings,
 /// especially on older versions of Python.
 ///
+/// ## Fix Safety
+/// This rule's fix is only offered for the unambiguous `.split(os.sep)[-1]`
+/// case, which is rewritten to `Path(...).name`. The fix is marked as unsafe
+/// because comments within the replaced range would be removed.
+///
 /// ## References
 /// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
@@ -58,9 +66,15 @@ use crate::codes::Category;
 pub(crate) struct OsSepSplit;
 
 impl Violation for OsSepSplit {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Replace `.split(os.sep)` with `Path.parts`".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace `.split(os.sep)[-1]` with `Path(...).name`".to_string())
     }
 }
 
@@ -70,7 +84,7 @@ pub(crate) fn os_sep_split(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let Expr::Attribute(ExprAttribute { attr, .. }) = call.func.as_ref() else {
+    let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
         return;
     };
 
@@ -96,5 +110,54 @@ pub(crate) fn os_sep_split(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    checker.report_diagnostic(OsSepSplit, attr.range());
+    let mut diagnostic = checker.report_diagnostic(OsSepSplit, attr.range());
+
+    if is_fix_os_sep_split_enabled(checker.settings())
+        && is_last_element_subscript(checker, call)
+    {
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import("pathlib", "Path"),
+                call.start(),
+                checker.semantic(),
+            )?;
+            let subscript = checker
+                .semantic()
+                .current_expression_parent()
+                .and_then(Expr::as_subscript_expr)
+                .expect("checked by is_last_element_subscript");
+            let value_source = checker.locator().slice(value.as_ref().range());
+            let replacement = format!("{binding}({value_source}).name");
+            Ok(Fix::unsafe_edits(
+                Edit::range_replacement(replacement, subscript.range()),
+                [import_edit],
+            ))
+        });
+    }
+}
+
+/// Returns `true` when `call` is the value of an enclosing `[-1]` subscript,
+/// i.e. `<call>[-1]`, the only case that maps cleanly to `Path(...).name`.
+fn is_last_element_subscript(checker: &Checker, call: &ast::ExprCall) -> bool {
+    let Some(Expr::Subscript(subscript)) = checker.semantic().current_expression_parent() else {
+        return false;
+    };
+    if subscript.value.range() != call.range() {
+        return false;
+    }
+    let Expr::UnaryOp(ast::ExprUnaryOp {
+        op: UnaryOp::USub,
+        operand,
+        ..
+    }) = subscript.slice.as_ref()
+    else {
+        return false;
+    };
+    matches!(
+        operand.as_ref(),
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: Number::Int(int),
+            ..
+        }) if int.as_u64() == Some(1)
+    )
 }

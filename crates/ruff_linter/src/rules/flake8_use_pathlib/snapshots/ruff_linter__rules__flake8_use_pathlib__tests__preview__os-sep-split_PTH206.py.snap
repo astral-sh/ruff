@@ -24,7 +24,7 @@ PTH206 Replace `.split(os.sep)` with `Path.parts`
    |
 help: Replace `.split(os.sep)[-1]` with `Path(...).name`
 
-PTH206 Replace `.split(os.sep)` with `Path.parts`
+PTH206 [*] Replace `.split(os.sep)` with `Path.parts`
   --> PTH206.py:10:12
    |
  8 | "foo/bar/".split(os.sep)
@@ -35,6 +35,17 @@ PTH206 Replace `.split(os.sep)` with `Path.parts`
 12 | "foo/bar/".split(os.sep)[-2:]
    |
 help: Replace `.split(os.sep)[-1]` with `Path(...).name`
+   |
+2  | from os import sep
+3  + import pathlib
+4  |
+--------------------------------------------------------------------------------
+10 | "foo/bar/".split(sep=os.sep)
+   - "foo/bar/".split(os.sep)[-1]
+11 + pathlib.Path("foo/bar/").name
+12 | "foo/bar/".split(os.sep)[-2]
+   |
+note: This is an unsafe fix and may change runtime behavior
 
 PTH206 Replace `.split(os.sep)` with `Path.parts`
   --> PTH206.py:11:12
@@ -72,7 +83,7 @@ PTH206 Replace `.split(os.sep)` with `Path.parts`
    |
 help: Replace `.split(os.sep)[-1]` with `Path(...).name`
 
-PTH206 Replace `.split(os.sep)` with `Path.parts`
+PTH206 [*] Replace `.split(os.sep)` with `Path.parts`
   --> PTH206.py:14:13
    |
 12 | "foo/bar/".split(os.sep)[-2:]
@@ -83,8 +94,19 @@ PTH206 Replace `.split(os.sep)` with `Path.parts`
 16 | file_name.split(os.sep)
    |
 help: Replace `.split(os.sep)[-1]` with `Path(...).name`
+   |
+2  | from os import sep
+3  + import pathlib
+4  |
+--------------------------------------------------------------------------------
+14 | "fizz/buzz".split(sep)
+   - "fizz/buzz".split(sep)[-1]
+15 + pathlib.Path("fizz/buzz").name
+16 | os.path.splitext("path/to/hello_world.py")[0].split(os.sep)[-1]
+   |
+note: This is an unsafe fix and may change runtime behavior
 
-PTH206 Replace `.split(os.sep)` with `Path.parts`
+PTH206 [*] Replace `.split(os.sep)` with `Path.parts`
   --> PTH206.py:15:47
    |
 13 | "fizz/buzz".split(sep)
@@ -95,6 +117,17 @@ PTH206 Replace `.split(os.sep)` with `Path.parts`
 17 | (os.path.abspath(file_name)).split(os.sep)
    |
 help: Replace `.split(os.sep)[-1]` with `Path(...).name`
+   |
+2  | from os import sep
+3  + import pathlib
+4  |
+--------------------------------------------------------------------------------
+15 | "fizz/buzz".split(sep)[-1]
+   - os.path.splitext("path/to/hello_world.py")[0].split(os.sep)[-1]
+16 + pathlib.Path(os.path.splitext("path/to/hello_world.py")[0]).name
+17 | file_name.split(os.sep)
+   |
+note: This is an unsafe fix and may change runtime behavior
 
 PTH206 Replace `.split(os.sep)` with `Path.parts`
   --> PTH206.py:16:11
