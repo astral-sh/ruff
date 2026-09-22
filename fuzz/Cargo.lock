@@ -439,7 +439,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10d60334b3b2e7c9d91ef8150abfb6fa4c1c39ebbcf4a81c2e346aad939fee3e"
 dependencies = [
- "thiserror 2.0.18",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -938,7 +938,7 @@ dependencies = [
  "paste",
  "peg",
  "regex",
- "thiserror 2.0.18",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -1339,22 +1339,22 @@ dependencies = [
  "pep440_rs",
  "pep508_rs",
  "serde",
- "thiserror 2.0.18",
+ "thiserror 2.0.20",
  "toml 0.9.12+spec-1.1.0",
 ]
 
 [[package]]
 name = "quick-junit"
-version = "0.6.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8216516c957e00535b3c91770524c219dd7df90dec439a182547f750dfe41591"
+checksum = "bae23b8e1a59a90f7bf98caa2f4c8c2eedf6df011c6c88ed633e85a87c84526e"
 dependencies = [
  "chrono",
  "indexmap",
  "newtype-uuid",
  "quick-xml",
  "strip-ansi-escapes",
- "thiserror 2.0.18",
+ "thiserror 2.0.20",
  "uuid",
 ]
 
@@ -1537,7 +1537,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_annotate_snippets"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "anstyle",
  "memchr",
@@ -1546,7 +1546,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cache"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "char_str",
  "filetime",
@@ -1559,7 +1559,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_db"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "anstyle",
  "arc-swap",
@@ -1588,7 +1588,7 @@ dependencies = [
  "serde_json",
  "similar",
  "supports-hyperlinks",
- "thiserror 2.0.18",
+ "thiserror 2.0.20",
  "tracing",
  "ty_static",
  "web-time",
@@ -1597,7 +1597,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_diagnostics"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "get-size2",
  "is-macro",
@@ -1607,7 +1607,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_formatter"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "drop_bomb",
  "ruff_cache",
@@ -1622,7 +1622,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_index"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "get-size2",
  "ruff_macros",
@@ -1631,7 +1631,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.16.8"
+version = "0.16.9"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -1678,7 +1678,7 @@ dependencies = [
  "smallvec",
  "strum",
  "strum_macros",
- "thiserror 2.0.18",
+ "thiserror 2.0.20",
  "toml 1.1.3+spec-1.1.0",
  "typed-arena",
  "unicode-normalization",
@@ -1689,7 +1689,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_macros"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "heck",
  "itertools 0.15.0",
@@ -1702,14 +1702,14 @@ dependencies = [
 
 [[package]]
 name = "ruff_memory_usage"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "get-size2",
 ]
 
 [[package]]
 name = "ruff_notebook"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "anyhow",
  "rand 0.10.2",
@@ -1718,13 +1718,13 @@ dependencies = [
  "ruff_text_size",
  "serde",
  "serde_json",
- "thiserror 2.0.18",
+ "thiserror 2.0.20",
  "uuid",
 ]
 
 [[package]]
 name = "ruff_python_ast"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "aho-corasick",
  "arrayvec",
@@ -1743,12 +1743,12 @@ dependencies = [
  "salsa",
  "serde",
  "thin-vec",
- "thiserror 2.0.18",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
 name = "ruff_python_codegen"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "ruff_python_ast",
  "ruff_python_literal",
@@ -1759,7 +1759,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_edits"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "ruff_python_ast",
  "ruff_source_file",
@@ -1768,7 +1768,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_formatter"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "anyhow",
  "clap",
@@ -1790,13 +1790,13 @@ dependencies = [
  "serde",
  "smallvec",
  "static_assertions",
- "thiserror 2.0.18",
+ "thiserror 2.0.20",
  "tracing",
 ]
 
 [[package]]
 name = "ruff_python_importer"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "anyhow",
  "ruff_diagnostics",
@@ -1809,7 +1809,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_index"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "ruff_python_ast",
  "ruff_python_trivia",
@@ -1819,7 +1819,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_literal"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "bitflags 2.13.0",
  "icu_properties",
@@ -1829,7 +1829,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_parser"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "bitflags 2.13.0",
  "bstr",
@@ -1851,7 +1851,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_semantic"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "bitflags 2.13.0",
  "is-macro",
@@ -1868,7 +1868,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_stdlib"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "bitflags 2.13.0",
  "unicode-ident",
@@ -1876,7 +1876,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_trivia"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "itertools 0.15.0",
  "memchr",
@@ -1889,7 +1889,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_ranged_value"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "ruff_db",
  "ruff_python_ast",
@@ -1900,7 +1900,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_source_file"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "get-size2",
  "memchr",
@@ -1910,7 +1910,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_text_size"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "get-size2",
  "serde",
@@ -2220,11 +2220,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.18"
+version = "2.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
+checksum = "ec86235f5fcc2a73650310756d2ac5b138a5780bbbdfae3eeccec992c435ba4f"
 dependencies = [
- "thiserror-impl 2.0.18",
+ "thiserror-impl 2.0.20",
 ]
 
 [[package]]
@@ -2240,13 +2240,13 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.18"
+version = "2.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
+checksum = "bc04cd3e1236dd4a98afca4569f2deb3f120e5422a4023be2cb683f8486292af"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -2370,7 +2370,7 @@ dependencies = [
 
 [[package]]
 name = "ty_combine"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "ordermap",
  "ruff_db",
@@ -2380,7 +2380,7 @@ dependencies = [
 
 [[package]]
 name = "ty_module_resolver"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "anyhow",
  "camino",
@@ -2399,13 +2399,13 @@ dependencies = [
  "salsa",
  "strum",
  "strum_macros",
- "thiserror 2.0.18",
+ "thiserror 2.0.20",
  "tracing",
 ]
 
 [[package]]
 name = "ty_python_core"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "bitflags 2.13.0",
  "bitvec",
@@ -2433,7 +2433,7 @@ dependencies = [
 
 [[package]]
 name = "ty_python_semantic"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "bitflags 2.13.0",
  "char_str",
@@ -2466,7 +2466,7 @@ dependencies = [
  "static_assertions",
  "strum",
  "strum_macros",
- "thiserror 2.0.18",
+ "thiserror 2.0.20",
  "tracing",
  "ty_module_resolver",
  "ty_python_core",
@@ -2476,7 +2476,7 @@ dependencies = [
 
 [[package]]
 name = "ty_site_packages"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "camino",
  "colored",
@@ -2496,14 +2496,14 @@ dependencies = [
 
 [[package]]
 name = "ty_static"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "ruff_macros",
 ]
 
 [[package]]
 name = "ty_vendored"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "path-slash",
  "ruff_db",
