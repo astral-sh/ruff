@@ -45,6 +45,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// class Bar(foo.Foo): ...
 /// ```
 ///
+/// ## Known problems
+/// Ruff does not detect all cases where decorators evaluate annotations. For
+/// example, `@dataclasses.dataclass` can immediately resolve lazy imports used in
+/// field annotations without triggering this rule.
+///
 /// ## Fix availability
 /// The fix is only available when the lazy import statement imports a single
 /// member, since removing `lazy` from a multi-member import would make every

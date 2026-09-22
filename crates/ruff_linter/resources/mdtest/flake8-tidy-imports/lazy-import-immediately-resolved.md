@@ -186,3 +186,19 @@ def process(value): ...
 @process.register
 def process_path(value: Path): ...  # error: [lazy-import-immediately-resolved]
 ```
+
+#### Dataclass annotations
+
+The `dataclass` decorator evaluates field annotations, immediately resolving the lazy import.
+This is a known false negative.
+
+```py
+__lazy_modules__ = ["pathlib"]
+
+from pathlib import Path
+from dataclasses import dataclass
+
+@dataclass
+class C:
+    path: Path  # false negative
+```
