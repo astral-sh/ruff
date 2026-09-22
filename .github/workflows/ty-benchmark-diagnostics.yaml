@@ -30,6 +30,12 @@ jobs:
         with:
           persist-credentials: false
 
+      # The harness prepares project fixtures even when the filter selects only microbenchmarks.
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
+
       - name: Download baseline binary
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -154,30 +160,6 @@ jobs:
         with:
           name: ty-benchmark-diagnostics-${{ matrix.host }}-head-1
           path: diagnostic-results/head-1
-          compression-level: 6
-          retention-days: 3
-
-      - name: Measure base, second repetition
-        run: bash "$RUNNER_TEMP/run-ty-benchmark-diagnostic.sh" base 2
-
-      - name: Upload base, second repetition
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ty-benchmark-diagnostics-${{ matrix.host }}-base-2
-          path: diagnostic-results/base-2
-          compression-level: 6
-          retention-days: 3
-
-      - name: Measure head, second repetition
-        run: bash "$RUNNER_TEMP/run-ty-benchmark-diagnostic.sh" head 2
-
-      - name: Upload head, second repetition
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ty-benchmark-diagnostics-${{ matrix.host }}-head-2
-          path: diagnostic-results/head-2
           compression-level: 6
           retention-days: 3
 
