@@ -296,7 +296,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let mut first_party_annotation = None;
 
-            if let Some(single_definition) = definition_info.single_definition {
+            if let Some(single_definition) = definition_info.single_definition() {
                 let file = single_definition.python_file(db);
                 let module = parsed_module(db, file).load(db);
 
@@ -998,7 +998,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.expression_type(expr)
                 });
 
-            if let Some(single_definition) = definition_info.single_definition {
+            if let Some(single_definition) = definition_info.single_definition() {
                 let file = single_definition.python_file(db);
                 let module = parsed_module(db, file).load(db);
                 if let Some(annotation) =
