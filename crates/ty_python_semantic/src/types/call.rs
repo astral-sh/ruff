@@ -159,7 +159,10 @@ fn is_unsafe_datetime_operation<'db>(
                 continue;
             };
             if !base.own_class_member(db, env, None, method).is_undefined() {
-                return matches!(base.known(db), Some(KnownClass::Date | KnownClass::DateTime));
+                return matches!(
+                    base.known(db),
+                    Some(KnownClass::Date | KnownClass::DateTime)
+                );
             }
         }
         // A missing reflected method cannot make an otherwise unsafe operation valid.
