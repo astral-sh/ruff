@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Keyword};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -69,16 +69,7 @@ impl AlwaysFixableViolation for GetAttrWithConstant {
 }
 
 /// B009
-pub(crate) fn getattr_with_constant(
-    checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
-    if !keywords.is_empty() {
-        return;
-    }
+pub(crate) fn getattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     let [obj, arg] = args else {
         return;
     };
