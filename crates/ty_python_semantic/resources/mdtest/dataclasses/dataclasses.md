@@ -2821,7 +2821,7 @@ from dataclasses import dataclass
 
 dataclass_with_order = dataclass(order=True)
 
-reveal_type(dataclass_with_order)  # revealed: [T](cls: type[T], /) -> type[T]
+reveal_type(dataclass_with_order)  # revealed: [T](cls: type[T], /) -> type[T] & Any
 reveal_type(dataclass_with_order.__name__)  # revealed: str
 
 @dataclass_with_order
@@ -2973,8 +2973,9 @@ def test_c():
 ## Imperatively calling `dataclasses.dataclass`
 
 Calls to `dataclasses.dataclass` preserve the input class type, both when passing the class directly
-and when first creating a decorator with options. A nonliteral class argument retains its annotated
-type; a class literal also exposes the generated dataclass methods.
+and when first creating a decorator with options. For a nonliteral class argument, the return type
+includes an intersection with `Any` to allow for generated methods. A class literal exposes the
+generated dataclass methods precisely.
 
 ```py
 from dataclasses import dataclass
@@ -2990,7 +2991,7 @@ def sequence(cls: type[U]) -> type[U]:
         match_args=False,
         kw_only=True,
     )(cls)
-    reveal_type(d)  # revealed: type[U@sequence]
+    reveal_type(d)  # revealed: type[U@sequence] & Any
     return d
 
 @dataclass_transform(kw_only_default=True)
@@ -3001,16 +3002,16 @@ def sequence2(cls: type) -> type:
         match_args=False,
         kw_only=True,
     )(cls)
-    reveal_type(d)  # revealed: type
+    reveal_type(d)  # revealed: type & Any
     return d
 
 @dataclass_transform(kw_only_default=True)
 def sequence3(cls: type[U]) -> type[U]:
-    return reveal_type(dataclass(cls))  # revealed: type[U@sequence3]
+    return reveal_type(dataclass(cls))  # revealed: type[U@sequence3] & Any
 
 @dataclass_transform(kw_only_default=True)
 def sequence4(cls: type) -> type:
-    return reveal_type(dataclass(cls))  # revealed: type
+    return reveal_type(dataclass(cls))  # revealed: type & Any
 
 class Foo: ...
 

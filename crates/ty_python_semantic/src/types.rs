@@ -1955,11 +1955,14 @@ impl<'db> DataclassDecorator<'db> {
             TypeVarVariance::Invariant,
         );
         let class_type = SubclassOfType::from(db, env, typevar);
+        // Intersect with `Any` for the return type to reflect the fact that the `dataclass()`
+        // decorator adds methods to the class.
+        let return_type = IntersectionType::from_two_elements(db, env, class_type, Type::any());
         Signature::new_generic(
             Some(GenericContext::from_typevar_instances(db, env, [typevar])),
             Parameters::standard([Parameter::positional_only(Some(Name::new_static("cls")))
                 .with_annotated_type(class_type)]),
-            class_type,
+            return_type,
         )
     }
 }
@@ -6840,9 +6843,6 @@ impl<'db> Type<'db> {
                 Some(KnownFunction::Dataclass) => {
                     let python_version = env.python_version(db);
                     let decorator_signature = DataclassDecorator::default_signature(db, env);
-                    let class_type = decorator_signature.return_ty;
-                    let generic_context = decorator_signature.generic_context;
-                    let decorator_type = Type::function_like_callable(db, decorator_signature);
                     let bool_parameter = |name: &'static str, default: bool| {
                         Parameter::keyword_only(Name::new_static(name))
                             .with_annotated_type(KnownClass::Bool.to_instance(db, env))
@@ -6870,31 +6870,34 @@ impl<'db> Type<'db> {
                         decorator_factory_parameters.push(bool_parameter("weakref_slot", false));
                     }
 
-                    let parameters_with_cls = |cls_ty| {
-                        let mut parameters =
-                            Vec::with_capacity(decorator_factory_parameters.len() + 1);
-                        parameters.push(
-                            Parameter::positional_only(Some(Name::new_static("cls")))
-                                .with_annotated_type(cls_ty),
-                        );
-                        parameters.extend_from_slice(&decorator_factory_parameters);
-                        parameters
-                    };
+                    let direct_signature = Signature::new_generic(
+                        decorator_signature.generic_context,
+                        Parameters::standard(
+                            decorator_signature
+                                .parameters()
+                                .iter()
+                                .chain(&decorator_factory_parameters)
+                                .cloned(),
+                        ),
+                        decorator_signature.return_ty,
+                    );
+                    let decorator_type = Type::function_like_callable(db, decorator_signature);
 
                     CallableBinding::from_overloads(
                         self,
                         [
-                            // def dataclass(cls: None, /, *, ...) -> Callable[[type[_T]], type[_T]]: ...
+                            // def dataclass(cls: None, /, *, ...) -> Callable[[type[_T]], type[_T] & Any]: ...
                             Signature::new(
-                                Parameters::standard(parameters_with_cls(Type::none(db, env))),
+                                Parameters::standard(
+                                    [Parameter::positional_only(Some(Name::new_static("cls")))
+                                        .with_annotated_type(Type::none(db, env))]
+                                    .into_iter()
+                                    .chain(decorator_factory_parameters.iter().cloned()),
+                                ),
                                 decorator_type,
                             ),
-                            // def dataclass(cls: type[_T], /, *, ...) -> type[_T]: ...
-                            Signature::new_generic(
-                                generic_context,
-                                Parameters::standard(parameters_with_cls(class_type)),
-                                class_type,
-                            ),
+                            // def dataclass(cls: type[_T], /, *, ...) -> type[_T] & Any: ...
+                            direct_signature,
                             // def dataclass(
                             //     *,
                             //     init: bool = True,
@@ -6907,7 +6910,7 @@ impl<'db> Type<'db> {
                             //     kw_only: bool = False,
                             //     slots: bool = False,
                             //     weakref_slot: bool = False,
-                            // ) -> Callable[[type[_T]], type[_T]]: ...
+                            // ) -> Callable[[type[_T]], type[_T] & Any]: ...
                             Signature::new(
                                 Parameters::standard(decorator_factory_parameters),
                                 decorator_type,

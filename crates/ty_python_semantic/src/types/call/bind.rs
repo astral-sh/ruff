@@ -7444,8 +7444,8 @@ pub(crate) struct Binding<'db> {
 
 impl<'db> Binding<'db> {
     /// Enrich a class-preserving return with the methods and flags supplied by the decorator.
-    /// Nonliteral class arguments do not identify a class definition to enrich, so ordinary
-    /// inference is sufficient.
+    /// Nonliteral class arguments do not identify a class definition to enrich, so they retain
+    /// the inferred return type, including any gradual component of a synthesized signature.
     fn apply_dataclass_params(
         &mut self,
         db: &'db dyn Db,
@@ -7480,6 +7480,11 @@ impl<'db> Binding<'db> {
                 && self.return_type() != *argument
                 && !SubclassOfType::try_from_type(db, env, *argument).is_some_and(|class_type| {
                     self.return_type().is_equivalent_to(db, env, class_type)
+                        || self.return_type().is_equivalent_to(
+                            db,
+                            env,
+                            IntersectionType::from_two_elements(db, env, class_type, Type::any()),
+                        )
                 })
             {
                 continue;

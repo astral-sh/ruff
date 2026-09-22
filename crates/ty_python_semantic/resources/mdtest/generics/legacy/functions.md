@@ -1088,6 +1088,28 @@ def wrapper(cls: type[T]) -> type[T]:
     return result
 ```
 
+## Calling `dataclass()` in a generic wrapper
+
+The return type of `dataclass()` permits access to generated members even when a class-valued type
+variable prevents us from determining them precisely. A wrapper can inspect fields, replace the
+initializer, and return the class using its original type variable.
+
+```py
+from dataclasses import dataclass, fields
+from typing import TypeVar
+
+T = TypeVar("T", bound=type)
+
+def wrap(cls: T) -> T:
+    cls = dataclass()(cls)
+    fields(cls)
+
+    def new_init(self, *args, **kwargs) -> None: ...
+
+    cls.__init__ = new_init
+    return cls
+```
+
 ## Opaque decorators don't affect typevar binding
 
 Inside the body of a generic function, we should be able to see that the typevars bound by that
