@@ -413,16 +413,9 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnnecessaryLiteralWithinDictCall), // C418
     RuleSelector::rule(Rule::UnnecessaryComprehensionInCall), // C419
     RuleSelector::rule(Rule::EmptyDocstring), // D419
-    RuleSelector::rule(Rule::CallDatetimeWithoutTzinfo), // DTZ001
     RuleSelector::rule(Rule::CallDatetimeToday), // DTZ002
     RuleSelector::rule(Rule::CallDatetimeUtcnow), // DTZ003
     RuleSelector::rule(Rule::CallDatetimeUtcfromtimestamp), // DTZ004
-    RuleSelector::rule(Rule::CallDatetimeNowWithoutTzinfo), // DTZ005
-    RuleSelector::rule(Rule::CallDatetimeFromtimestamp), // DTZ006
-    RuleSelector::rule(Rule::CallDatetimeStrptimeWithoutZone), // DTZ007
-    RuleSelector::rule(Rule::CallDateToday), // DTZ011
-    RuleSelector::rule(Rule::CallDateFromtimestamp), // DTZ012
-    RuleSelector::rule(Rule::DatetimeMinMax), // DTZ901
     RuleSelector::rule(Rule::BareExcept), // E722
     RuleSelector::rule(Rule::IOError), // E902
     RuleSelector::rule(Rule::ShebangNotExecutable), // EXE001
@@ -432,6 +425,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnusedImport), // F401
     RuleSelector::rule(Rule::ImportShadowedByLoopVar), // F402
     RuleSelector::rule(Rule::LateFutureImport), // F404
+    RuleSelector::rule(Rule::UndefinedLocalWithNestedImportStarUsage), // F406
     RuleSelector::rule(Rule::FutureFeatureNotDefined), // F407
     RuleSelector::rule(Rule::PercentFormatInvalidFormat), // F501
     RuleSelector::rule(Rule::PercentFormatExpectedMapping), // F502
@@ -1013,7 +1007,6 @@ mod tests {
         	pandas-use-of-dot-read-table (PD012),
         	pandas-use-of-pd-merge (PD015),
         	escape-sequence-in-docstring (D301),
-        	undefined-local-with-nested-import-star-usage (F406),
         	missing-maxsplit-arg (PLC0207),
         	unnecessary-dunder-call (PLC2801),
         	duplicate-bases (PLE0241),
@@ -1070,13 +1063,6 @@ mod tests {
         Removed in preview:
         [
         	exec-builtin (S102),
-        	call-datetime-without-tzinfo (DTZ001),
-        	call-datetime-now-without-tzinfo (DTZ005),
-        	call-datetime-fromtimestamp (DTZ006),
-        	call-datetime-strptime-without-zone (DTZ007),
-        	call-date-today (DTZ011),
-        	call-date-fromtimestamp (DTZ012),
-        	datetime-min-max (DTZ901),
         ]
         ");
     }
