@@ -711,6 +711,62 @@ missing_argument: Callable[[], Product] = Product  # error: [invalid-assignment]
 wrong_argument: Callable[[str], Product] = Product  # error: [invalid-assignment]
 ```
 
+### Initializer descriptors returning `Self`
+
+In the example below, the inherited property returns an initializer that accepts another instance of
+the class being constructed. Accessing it on `Child` binds `Self` to `Child`, so both direct
+construction and callback assignments require a `Child` argument.
+
+```py
+from typing import Callable
+from typing_extensions import Self
+
+class Base:
+    @property
+    def __init__(self) -> Callable[[Self], None]:
+        def initialize(other: Self) -> None: ...
+        return initialize
+
+class Child(Base): ...
+
+def check(base: Base, child: Child):
+    Child(child)
+    Child(base)  # error: [invalid-argument-type] "Expected `Child`"
+
+    valid: Callable[[Child], Child] = Child
+    invalid: Callable[[Base], Child] = Child  # error: [invalid-assignment]
+```
+
+### Intersections of initializer descriptors
+
+In the example below, narrowing establishes that the initializer has both descriptor types. Both
+descriptors return a callable requiring one integer. Constructing the class and using it as a
+callback preserve that requirement.
+
+```py
+from typing import Callable
+
+class D:
+    def __get__(self, instance: object, owner: type) -> Callable[[int], None]:
+        raise NotImplementedError
+
+class E:
+    def __get__(self, instance: object, owner: type) -> Callable[[int], None]:
+        raise NotImplementedError
+
+def check(initializer: D) -> None:
+    if isinstance(initializer, E):
+        class F:
+            __init__ = initializer
+
+        F(1)
+        F()  # error: [missing-argument]
+        F("s")  # error: [invalid-argument-type]
+
+        valid: Callable[[int], F] = F
+        missing: Callable[[], F] = F  # error: [invalid-assignment]
+```
+
 ### Callable initializers on classes with dynamic bases
 
 In the example below, the class defines a callable initializer that requires an integer. An `Any`

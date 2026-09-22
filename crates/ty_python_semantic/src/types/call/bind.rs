@@ -71,11 +71,12 @@ use crate::types::visitor::{
 };
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
-    DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
-    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, TypeContext, TypeIdentity,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
-    UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
+    DATACLASS_FLAGS, DataclassFlags, DataclassParams, DescriptorDispatch, DescriptorDispatches,
+    DescriptorGetCallContext, DescriptorOrigin, DynamicType, GenericAlias, InternedConstraintSet,
+    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
+    NominalInstanceType, PropertyInstanceType, TypeContext, TypeIdentity, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -4491,8 +4492,8 @@ impl<'db> CallableBinding<'db> {
             .filter(|(_, overload)| !overload.has_errors_affecting_overload_resolution())
     }
 
-    /// Returns the overloads selected for deprecation reporting without changing the matches
-    /// retained for argument inference. Equivalent return types select the first match;
+    /// Returns the overloads selected by call resolution without changing the matches retained
+    /// for argument inference. Equivalent return types select the first match;
     /// ambiguous calls retain every match, and argument expansion combines its selected matches.
     fn selected_overloads(&self) -> impl Iterator<Item = (usize, &Binding<'db>)> + Clone {
         let matching = self.matching_overloads();
@@ -4506,6 +4507,39 @@ impl<'db> CallableBinding<'db> {
             OverloadCallResult::Ambiguous => true,
             OverloadCallResult::ArgumentTypeExpansionLimitReached(_) => false,
         }))
+    }
+
+    /// Retains the invocation and selected declarations for recursive callable expansion.
+    pub(in crate::types) fn descriptor_origin(
+        &self,
+        db: &'db dyn Db,
+        call: DescriptorGetCallContext<'db>,
+    ) -> DescriptorOrigin<'db> {
+        let selected = self.selected_overloads();
+        let definitions = selected
+            .clone()
+            .map(|(_, overload)| overload.signature.definition())
+            .collect::<Option<FxOrderSet<_>>>()
+            .filter(|definitions| !definitions.is_empty());
+        let (function, bound_receiver) = match self.signature_type {
+            Type::FunctionLiteral(function) => (Some(function), None),
+            Type::BoundMethod(method) => (method.function(db), Some(method.signature_receiver(db))),
+            _ => (None, None),
+        };
+        let dispatches = Some(DescriptorDispatches::new(
+            db,
+            Box::from([DescriptorDispatch::new(
+                db,
+                definitions
+                    .unwrap_or_default()
+                    .into_iter()
+                    .collect::<Box<[_]>>(),
+                function,
+                bound_receiver,
+                call,
+            )]),
+        ));
+        DescriptorOrigin { dispatches }
     }
 
     /// Returns the deprecated implementation, taking precedence over any deprecated overloads.

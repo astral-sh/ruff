@@ -1048,6 +1048,7 @@ fn bind_new_for_override<'db>(
     let instance_of_class = Type::instance(db, env, class);
     let Some(callables) = receiver
         .resolve_dunder_new_callable(db, env, Place::bound(ty))
+        .place
         .ignore_possibly_undefined()
         .and_then(|ty| ty.try_upcast_to_callable(db, env))
     else {

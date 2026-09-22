@@ -441,62 +441,6 @@ impl<'db> UnionType<'db> {
         }
     }
 
-    pub(crate) fn map_with_boundness(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
-    ) -> Place<'db> {
-        let mut builder = UnionBuilder::new(db, env);
-
-        let mut all_unbound = true;
-        let mut possibly_unbound = false;
-        let mut origin = TypeOrigin::Declared;
-        let mut provenance = Provenance::Unknown;
-        for ty in self.elements(db) {
-            let ty_member = transform_fn(ty);
-            match ty_member {
-                Place::Undefined => {
-                    possibly_unbound = true;
-                }
-                Place::Defined(DefinedPlace {
-                    ty: ty_member,
-                    origin: member_origin,
-                    definedness: member_boundness,
-                    provenance: member_provenance,
-                    ..
-                }) => {
-                    origin = origin.merge(member_origin);
-                    if member_boundness == Definedness::PossiblyUndefined {
-                        possibly_unbound = true;
-                    }
-                    provenance = provenance.or(member_provenance);
-
-                    all_unbound = false;
-                    builder.add_in_place(ty_member);
-                }
-            }
-        }
-
-        if all_unbound {
-            Place::Undefined
-        } else {
-            Place::Defined(DefinedPlace {
-                ty: builder
-                    .or_recursively_defined(self.recursively_defined(db))
-                    .build(),
-                origin,
-                definedness: if possibly_unbound {
-                    Definedness::PossiblyUndefined
-                } else {
-                    Definedness::AlwaysDefined
-                },
-                public_type_policy: PublicTypePolicy::Raw,
-                provenance,
-            })
-        }
-    }
-
     pub(crate) fn map_with_boundness_and_qualifiers(
         self,
         db: &'db dyn Db,
@@ -1180,58 +1124,6 @@ impl<'db> IntersectionType<'db> {
             builder.add_positive_in_place(positive.dunder_class(db, env));
         }
         Some(builder.build())
-    }
-
-    pub(crate) fn map_with_boundness(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
-    ) -> Place<'db> {
-        let mut builder = IntersectionBuilder::new(db, env);
-
-        let mut all_unbound = true;
-        let mut any_definitely_bound = false;
-        let mut origin = TypeOrigin::Declared;
-        let mut provenance = Provenance::Unknown;
-        for ty in self.positive_elements_or_object(db) {
-            let ty_member = transform_fn(&ty);
-            match ty_member {
-                Place::Undefined => {}
-                Place::Defined(DefinedPlace {
-                    ty: ty_member,
-                    origin: member_origin,
-                    definedness: member_boundness,
-                    provenance: member_provenance,
-                    ..
-                }) => {
-                    origin = origin.merge(member_origin);
-                    all_unbound = false;
-                    if member_boundness == Definedness::AlwaysDefined {
-                        any_definitely_bound = true;
-                    }
-                    provenance = provenance.or(member_provenance);
-
-                    builder.add_positive_in_place(ty_member);
-                }
-            }
-        }
-
-        if all_unbound {
-            Place::Undefined
-        } else {
-            Place::Defined(DefinedPlace {
-                ty: builder.build(),
-                origin,
-                definedness: if any_definitely_bound {
-                    Definedness::AlwaysDefined
-                } else {
-                    Definedness::PossiblyUndefined
-                },
-                public_type_policy: PublicTypePolicy::Raw,
-                provenance,
-            })
-        }
     }
 
     pub(crate) fn map_with_boundness_and_qualifiers(

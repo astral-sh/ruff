@@ -30,6 +30,7 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
+use crate::types::constructor::ConstructorMembers;
 use crate::types::cyclic::CallableRecursionGuard;
 use crate::types::enums::enum_metadata;
 use crate::types::function::DataclassTransformerParams;
@@ -2414,9 +2415,6 @@ impl<'db> ClassType<'db> {
         recursion_guard: &CallableRecursionGuard<'db>,
     ) -> CallableTypes<'db> {
         let env = &ProgramEnvironment::from_file(self.class_literal(db).program_file(db));
-        // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
-        // consolidate the two? Can we invoke a class by upcasting the class into a Callable, and
-        // then relying on the call binding machinery to Just Work™?
 
         // Dynamic classes don't have a generic context.
         let class_generic_context = self
@@ -2424,28 +2422,11 @@ impl<'db> ClassType<'db> {
             .and_then(|(class_literal, _)| class_literal.generic_context(db));
 
         let lookup_type = Type::from(self);
-        let instance_type = receiver
-            .to_instance_approximation(db, env)
-            .unwrap_or_else(Type::unknown);
+        let members = ConstructorMembers::new(db, env, self, receiver);
+        let instance_type = members.instance;
+        let metaclass_dunder_call = members.metaclass_call(db, env);
 
-        let metaclass_dunder_call = lookup_type
-            .member_lookup_with_policy_and_receiver(
-                db,
-                env,
-                "__call__",
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-                if receiver == lookup_type {
-                    None
-                } else {
-                    Some(receiver)
-                },
-            )
-            .unwrap_or_else(|error| error.fallback_member(db))
-            .member(db)
-            .place;
-
-        if let Place::Defined(DefinedPlace { ty, .. }) = metaclass_dunder_call {
+        if let Place::Defined(DefinedPlace { ty, .. }) = metaclass_dunder_call.place {
             // TODO: this intentionally diverges from step 1 in
             // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
             // by always respecting the signature of the metaclass `__call__`, rather than
@@ -2459,22 +2440,20 @@ impl<'db> ClassType<'db> {
             let is_actual_enum = enum_metadata(db, self.class_literal(db)).is_some();
             if !is_actual_enum
                 && let Some(callables) =
-                    ty.try_upcast_to_callable_with_recursion_guard(db, env, recursion_guard)
+                    recursion_guard.with_dependency(db, metaclass_dunder_call.origin, || {
+                        ty.try_upcast_to_callable_with_recursion_guard(db, env, recursion_guard)
+                    })
             {
                 return callables;
             }
         }
 
-        let dunder_new_callables = lookup_type
-            .lookup_dunder_new(db, env)
-            .and_then(|place_and_quals| {
-                receiver
-                    .resolve_dunder_new_callable(db, env, place_and_quals.place)
-                    .ignore_possibly_undefined()
-            })
-            .and_then(|ty| {
+        let new_method = members.new_method(db, env);
+        let dunder_new_callables = new_method.place.ignore_possibly_undefined().and_then(|ty| {
+            recursion_guard.with_dependency(db, new_method.origin, || {
                 ty.try_upcast_to_callable_with_recursion_guard(db, env, recursion_guard)
-            });
+            })
+        });
 
         let dunder_new_callables = if let Some(callables) = dunder_new_callables {
             let bound_callables =
@@ -2494,15 +2473,8 @@ impl<'db> ClassType<'db> {
             None
         };
 
-        let synthesized_dunder_init_callables = Type::from(self)
-            .class_namespace_member(
-                db,
-                env,
-                self,
-                "__init__",
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                    | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-            )
+        let synthesized_dunder_init_callables = members
+            .raw_initializer(db, env, false)
             .ignore_possibly_undefined()
             .and_then(|init_type| {
                 self.synthesize_init_callables(
@@ -2594,29 +2566,14 @@ impl<'db> ClassType<'db> {
             return Some(CallableTypes::new(callables));
         }
 
-        let (init_type, bound_method) = match init_type.function_like_dunder_get(
-            db,
-            env,
-            Some(instance_type),
-            Some(receiver),
-        ) {
-            Some(Type::BoundMethod(method)) => (method.func(db), Some(method)),
-            Some(ty) => (ty, None),
-            None => {
-                let descriptor = init_type
-                    .try_call_dunder_get(db, env, Some(instance_type), receiver)
-                    .unwrap_or_else(|error| Some(error.fallback()));
-                (
-                    descriptor
-                        .map(|descriptor| descriptor.return_type)
-                        .unwrap_or(init_type),
-                    None,
-                )
-            }
-        };
-
-        let callables =
-            init_type.try_upcast_to_callable_with_recursion_guard(db, env, recursion_guard)?;
+        let initializer =
+            ConstructorMembers::new(db, env, self, receiver).bind_initializer(db, env, init_type);
+        let bound_method = initializer.bound_method;
+        let callables = recursion_guard.with_dependency(db, initializer.origin, || {
+            initializer
+                .callable
+                .try_upcast_to_callable_with_recursion_guard(db, env, recursion_guard)
+        })?;
 
         let class_generic_context = self
             .static_class_literal(db)

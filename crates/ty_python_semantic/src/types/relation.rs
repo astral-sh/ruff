@@ -1,5 +1,6 @@
-use crate::ProgramEnvironment;
+use crate::{FxOrderMap, FxOrderSet, ProgramEnvironment};
 use std::borrow::Cow;
+use std::cell::{Cell, RefCell};
 
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
@@ -10,7 +11,7 @@ use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
     OwnedConstraintSet,
 };
-use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
+use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity, TypeStructureSize};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::relation_error::ErrorRelation;
@@ -18,11 +19,13 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::typevar::TypeVarDomain;
+use crate::types::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, CallableType, ClassBase, ClassLiteral,
+    ClassType, CycleDetector, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
+    ProtocolInstanceType, SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType,
+    UpcastPolicy,
 };
 use crate::{
     Db,
@@ -383,6 +386,7 @@ impl<'db> Type<'db> {
             relation: TypeRelation::SubtypingAssuming,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
+            observations: None,
             given: assuming,
             perform_expensive_checks: true,
             relation_visitor: &relation_visitor,
@@ -405,6 +409,63 @@ impl<'db> Type<'db> {
         let constraints = ConstraintSetBuilder::new();
         self.when_assignable_to(db, env, target, &constraints, TypeVarSet::None)
             .is_always_satisfied(db, env)
+    }
+
+    /// Records comparisons for one signature, including relationships between types constraining
+    /// the same inferable variable. Constructor expansion uses these observations to retain
+    /// progress towards descriptor overloads without implementing its own type relations.
+    pub(super) fn assignability_observations(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        comparisons: impl IntoIterator<Item = (usize, Type<'db>, Type<'db>)>,
+        patterns: &FxHashSet<Type<'db>>,
+        inferable: TypeVarSet<'db>,
+    ) -> FxHashSet<RelationObservation<'db>> {
+        let constraints = ConstraintSetBuilder::new();
+        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+        let signature_visitor = SignatureRelationVisitor::default();
+        let mapping_visitor = ApplyTypeMappingVisitor::new(env);
+        let observations = RelationObservations {
+            patterns,
+            results: RefCell::default(),
+            site: Cell::new(RelationObservationSite::Argument(0)),
+            inferred: RefCell::default(),
+        };
+        let checker = TypeRelationChecker {
+            observations: Some(&observations),
+            ..TypeRelationChecker::new(
+                env,
+                TypeRelation::Assignability,
+                &constraints,
+                inferable,
+                &relation_visitor,
+                &disjointness_visitor,
+                &signature_visitor,
+                &mapping_visitor,
+            )
+        };
+        for (index, source, target) in comparisons {
+            observations
+                .site
+                .set(RelationObservationSite::Argument(index));
+            checker.check_type_pair(db, source, target);
+        }
+        // A repeated type variable relates its occurrences even when comparing each occurrence
+        // to the variable itself reveals no structure. Observe those relationships using the same
+        // checker; this does not choose an inferred type or decide whether the overload matches.
+        for (typevar, candidates) in observations.inferred.take() {
+            observations
+                .site
+                .set(RelationObservationSite::TypeVar(typevar));
+            for (index, &left) in candidates.iter().enumerate() {
+                for &right in candidates.iter().skip(index + 1) {
+                    checker.check_type_pair(db, left, right);
+                    checker.check_type_pair(db, right, left);
+                }
+            }
+        }
+        observations.results.into_inner()
     }
 
     /// Re-run the assignability check with error context collection enabled.
@@ -459,6 +520,7 @@ impl<'db> Type<'db> {
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new(relation)),
+            observations: None,
             given: ConstraintSet::from_bool(&builder, false),
             perform_expensive_checks: true,
             relation_visitor: &HasRelationToVisitor::default(&builder),
@@ -699,6 +761,7 @@ impl<'db> Type<'db> {
             relation,
             typevar_evaluation,
             context_tree: None,
+            observations: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             relation_visitor: &relation_visitor,
@@ -831,6 +894,7 @@ impl<'db> Type<'db> {
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let checker = EquivalenceChecker {
+            observations: None,
             env: materialization_visitor.env,
             constraints,
             given: ConstraintSet::from_bool(constraints, false),
@@ -887,6 +951,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             context_tree: None,
+            observations: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             disjointness_visitor: &disjointness_visitor,
@@ -911,6 +976,7 @@ impl<'db> Type<'db> {
             constraints: &constraints,
             inferable: TypeVarSet::None,
             context_tree: Some(context.clone()),
+            observations: None,
             given: ConstraintSet::from_bool(&constraints, false),
             perform_expensive_checks: true,
             relation_visitor: &HasRelationToVisitor::default(&constraints),
@@ -942,6 +1008,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             context_tree: None,
+            observations: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: false,
             disjointness_visitor: &disjointness_visitor,
@@ -1005,6 +1072,75 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
     }
 }
 
+/// A finite observation of a comparison against part of a declared annotation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct RelationObservation<'db> {
+    site: RelationObservationSite<'db>,
+    pattern: Type<'db>,
+    is_target: bool,
+    outcome: RelationOutcome,
+    /// Retain nesting progress when short-circuiting reaches the same failing obligations.
+    /// Structure beyond the declaration's own size does not introduce additional states.
+    size: usize,
+    /// Arity checks can reject tuples or callables before comparing their elements. Count
+    /// immediate children separately from their nested structure, up to the annotation's arity.
+    arity: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+enum RelationObservationSite<'db> {
+    Argument(usize),
+    TypeVar(BoundTypeVarIdentity<'db>),
+}
+
+/// Counts stored children without following their types or expanding declaration bodies.
+/// In particular, a deeply nested tuple element still occupies only one tuple position.
+struct TypeArity<'a, 'db> {
+    env: &'a ProgramEnvironment<'db>,
+    count: Cell<usize>,
+}
+
+impl TypeArity<'_, '_> {
+    fn of<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> usize {
+        let visitor = TypeArity {
+            env,
+            count: Cell::new(0),
+        };
+        if let TypeKind::NonAtomic(ty) = TypeKind::from(ty) {
+            walk_non_atomic_type(db, ty, &visitor);
+        }
+        visitor.count.get()
+    }
+}
+
+impl<'db> TypeVisitor<'db> for TypeArity<'_, 'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        self.env
+    }
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+    fn visit_type(&self, _db: &'db dyn Db, _ty: Type<'db>) {
+        self.count.set(self.count.get() + 1);
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+enum RelationOutcome {
+    Never,
+    Always,
+    Conditional,
+}
+
+/// Results of relation obligations involving a fixed set of declared types.
+/// Restricting the keys to declarations keeps this state finite even when the source grows.
+struct RelationObservations<'a, 'db> {
+    patterns: &'a FxHashSet<Type<'db>>,
+    results: RefCell<FxHashSet<RelationObservation<'db>>>,
+    site: Cell<RelationObservationSite<'db>>,
+    inferred: RefCell<FxOrderMap<BoundTypeVarIdentity<'db>, FxOrderSet<Type<'db>>>>,
+}
+
 #[derive(Clone)]
 pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) env: &'a ProgramEnvironment<'db>,
@@ -1013,6 +1149,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) relation: TypeRelation,
     pub(super) typevar_evaluation: TypeVarEvaluation,
     context_tree: Option<ErrorContextTree<'db>>,
+    observations: Option<&'a RelationObservations<'a, 'db>>,
     given: ConstraintSet<'db, 'c>,
     perform_expensive_checks: bool,
 
@@ -1048,6 +1185,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
+            observations: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             relation_visitor,
@@ -1116,6 +1254,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
+            observations: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             relation_visitor,
@@ -1140,6 +1279,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
+            observations: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             relation_visitor,
@@ -1164,15 +1304,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: ClassType<'db>,
     ) -> bool {
         let env = self.env;
-        Self::subtyping(
-            env,
-            self.constraints,
-            TypeVarSet::None,
-            self.relation_visitor,
-            self.disjointness_visitor,
-            self.signature_relation_visitor,
-            self.materialization_visitor,
-        )
+        Self {
+            observations: self.observations,
+            ..Self::subtyping(
+                env,
+                self.constraints,
+                TypeVarSet::None,
+                self.relation_visitor,
+                self.disjointness_visitor,
+                self.signature_relation_visitor,
+                self.materialization_visitor,
+            )
+        }
         .check_class_pair(db, source, target)
         .is_always_satisfied(db, env)
     }
@@ -1669,6 +1812,56 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     /// Return a constraint set indicating the conditions under which `self.relation` holds between `source` and `target`.
     pub(super) fn check_type_pair(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let result = self.check_type_pair_inner(db, source, target);
+        if let Some(observations) = self.observations {
+            let outcome = if result.is_trivially_never_satisfied() {
+                RelationOutcome::Never
+            } else if result.is_trivially_always_satisfied() {
+                RelationOutcome::Always
+            } else {
+                RelationOutcome::Conditional
+            };
+            let mut results = observations.results.borrow_mut();
+            for (pattern, actual, is_target) in [(source, target, false), (target, source, true)] {
+                if matches!(
+                    observations.site.get(),
+                    RelationObservationSite::Argument(_)
+                ) && observations.patterns.contains(&pattern)
+                    && let Type::TypeVar(typevar) = pattern
+                    && typevar.is_inferable(db, self.inferable)
+                {
+                    observations
+                        .inferred
+                        .borrow_mut()
+                        .entry(typevar.identity(db))
+                        .or_default()
+                        .insert(actual);
+                }
+                if observations.patterns.contains(&pattern) {
+                    let arity = TypeArity::of(db, self.env, actual)
+                        .min(TypeArity::of(db, self.env, pattern));
+                    let size = TypeStructureSize::of(db, self.env, actual)
+                        .min(TypeStructureSize::of(db, self.env, pattern));
+                    results.insert(RelationObservation {
+                        site: observations.site.get(),
+                        pattern,
+                        is_target,
+                        outcome,
+                        size,
+                        arity,
+                    });
+                }
+            }
+        }
+        result
+    }
+
+    fn check_type_pair_inner(
         &self,
         db: &'db dyn Db,
         source: Type<'db>,
@@ -2949,6 +3142,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
+            observations: self.observations,
             env: self.env,
             constraints: self.constraints,
             given: self.given,
@@ -2967,6 +3161,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints: self.constraints,
             inferable: self.inferable,
             context_tree: None,
+            observations: self.observations,
             given: self.given,
             perform_expensive_checks: self.perform_expensive_checks,
             relation_visitor: self.relation_visitor,
@@ -2996,6 +3191,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 }
 
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
+    observations: Option<&'a RelationObservations<'a, 'db>>,
     env: &'a ProgramEnvironment<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     given: ConstraintSet<'db, 'c>,
@@ -3025,6 +3221,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             typevar_evaluation: self.typevar_evaluation,
             constraints: self.constraints,
             context_tree: None,
+            observations: self.observations,
             given: self.given,
             perform_expensive_checks: self.perform_expensive_checks,
             inferable: TypeVarSet::None,
@@ -3070,6 +3267,7 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     inferable: TypeVarSet<'db>,
     context_tree: Option<ErrorContextTree<'db>>,
+    observations: Option<&'a RelationObservations<'a, 'db>>,
     given: ConstraintSet<'db, 'c>,
     perform_expensive_checks: bool,
 
@@ -3100,6 +3298,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             constraints,
             inferable,
             context_tree: None,
+            observations: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             disjointness_visitor,
@@ -3120,6 +3319,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             constraints: self.constraints,
             inferable: self.inferable,
             context_tree: None,
+            observations: self.observations,
             given: self.given,
             perform_expensive_checks: self.perform_expensive_checks,
             relation_visitor: self.relation_visitor,
@@ -3157,6 +3357,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
     fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
+            observations: self.observations,
             env: self.env,
             constraints: self.constraints,
             given: self.given,

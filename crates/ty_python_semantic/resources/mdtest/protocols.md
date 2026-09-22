@@ -6359,7 +6359,7 @@ def _(r: Recursive):
     reveal_type(r.direct)  # revealed: Recursive
     reveal_type(r.union)  # revealed: None | Recursive
     reveal_type(r.intersection1)  # revealed: C & Recursive
-    reveal_type(r.intersection2)  # revealed: C
+    reveal_type(r.intersection2)  # revealed: C & ~Recursive
     reveal_type(r.t)  # revealed: tuple[int, tuple[str, Recursive]]
     reveal_type(r.callable1)  # revealed: (int, /) -> Recursive
     reveal_type(r.callable2)  # revealed: (Recursive, /) -> int

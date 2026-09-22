@@ -269,21 +269,31 @@ impl<'db> Type<'db> {
             }
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
-                let call_symbol = self
-                    .member_lookup_with_policy(
+                let member = self
+                    .member_lookup_with_policy_and_receiver(
                         db,
                         env,
                         "__call__",
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        None,
                     )
-                    .place;
+                    .unwrap_or_else(|error| error.fallback_member(db));
 
-                if let Place::Defined(place) = call_symbol
+                if let Place::Defined(place) = member.member(db).place
                     && place.is_definitely_defined()
                 {
-                    place
-                        .ty
-                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)
+                    let upcast = || {
+                        place.ty.try_upcast_to_callable_with_policy_and_context(
+                            db, env, policy, context,
+                        )
+                    };
+                    let callables = match context.recursion_guard {
+                        Some(guard) => {
+                            guard.with_dependency(db, member.descriptor_origin(db), upcast)
+                        }
+                        None => upcast(),
+                    };
+                    callables
                         // The callable instance itself doesn't inherit the descriptor behavior of
                         // its `__call__` method.
                         .map(|callables| callables.map(|callable| callable.into_regular(db)))

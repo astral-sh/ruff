@@ -1016,6 +1016,88 @@ def check(value: Chain[tuple[int, str]]) -> None:
     });
 }
 
+/// Each pair of classes forwards to the same pair in the next layer. Reusing completed
+/// constructors keeps expansion proportional to the number of classes rather than paths.
+fn benchmark_constructor_shared_subgraphs(criterion: &mut Criterion) {
+    let mut code = String::from(
+        "from typing import Callable
+class End:
+    def __new__(cls, *args: object) -> int: return 1
+",
+    );
+    for index in (0..24).rev() {
+        let target = if index == 23 {
+            "type[End]".to_string()
+        } else {
+            format!("type[A{0}] | type[B{0}]", index + 1)
+        };
+        writeln!(
+            code,
+            "class A{index}:\n    __new__: {target}\nclass B{index}:\n    __new__: {target}"
+        )
+        .ok();
+    }
+    code.push_str("callback: Callable[..., int] = A0\n");
+    benchmark_constructor_callables(criterion, "ty_micro[constructor_shared_subgraphs]", &code);
+}
+
+/// The final layer points back to the root. Dependency discovery must visit shared classes
+/// once even when the cycle prevents reusing ancestor-dependent constructor results.
+fn benchmark_constructor_cyclic_dependencies(criterion: &mut Criterion) {
+    let mut code =
+        String::from("from __future__ import annotations\nfrom typing import Callable\n");
+    for index in 0..=18 {
+        let target = if index == 18 {
+            "type[A0[T]]".to_string()
+        } else {
+            format!("type[A{0}[T]] | type[B{0}[T]]", index + 1)
+        };
+        writeln!(
+            code,
+            "class A{index}[T]:\n    __new__: {target}\nclass B{index}[T]:\n    __new__: {target}"
+        )
+        .ok();
+    }
+    code.push_str("callback: Callable[..., object] = A0[int]\n");
+    benchmark_constructor_callables(
+        criterion,
+        "ty_micro[constructor_cyclic_dependencies]",
+        &code,
+    );
+}
+
+/// Each callback adds one link to a previously checked constructor chain. Reusing results
+/// across callback assignments avoids expanding every prefix again, which would be quadratic.
+fn benchmark_constructor_repeated_callbacks(criterion: &mut Criterion) {
+    let mut code = String::from(
+        "from typing import Callable
+class C0:
+    def __new__(cls, *args: object) -> int: return 1
+",
+    );
+    for index in 1..1600 {
+        writeln!(code, "class C{index}:\n    __new__ = C{}", index - 1).ok();
+    }
+    for index in 0..1600 {
+        writeln!(code, "callback{index}: Callable[..., int] = C{index}").ok();
+    }
+    benchmark_constructor_callables(criterion, "ty_micro[constructor_repeated_callbacks]", &code);
+}
+
+fn benchmark_constructor_callables(criterion: &mut Criterion, name: &str, code: &str) {
+    setup_rayon();
+
+    criterion.bench_function(name, |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| {
+                assert!(case.db.check().is_empty());
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for large calls to a gradual variadic tail.
 ///
 /// Without the gradual-call shortcut, every positional argument type is folded into the same
@@ -2063,6 +2145,9 @@ criterion_group!(
     benchmark_inherited_recursive_protocol,
     benchmark_nested_recursive_protocol_receiver,
     benchmark_materialized_recursive_protocol_overload,
+    benchmark_constructor_shared_subgraphs,
+    benchmark_constructor_cyclic_dependencies,
+    benchmark_constructor_repeated_callbacks,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,

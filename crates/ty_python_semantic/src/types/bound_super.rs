@@ -16,7 +16,7 @@ use crate::{
         constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
-        member_lookup_result,
+        member_lookup_result_with_origin,
         relation::EquivalenceChecker,
         signatures::{Parameter, Parameters, Signature},
         typevar::{TypeVarConstraints, TypeVarInstance},
@@ -941,9 +941,9 @@ impl<'db> BoundSuperType<'db> {
         attribute: PlaceAndQualifiers<'db>,
     ) -> Option<MemberLookupResult<'db>> {
         let (instance, owner) = self.owner(db).descriptor_binding(db, env)?;
-        let (member, _, descriptor_error) =
+        let (member, _, descriptor_error, descriptor) =
             Type::try_call_dunder_get_on_attribute(db, env, attribute, instance, owner);
-        Some(member_lookup_result(
+        Some(member_lookup_result_with_origin(
             db,
             member,
             descriptor_error.map(MemberLookupErrorKind::DescriptorGet),
@@ -952,6 +952,7 @@ impl<'db> BoundSuperType<'db> {
                 .and_then(|ty| ty.property_deprecations(db))
                 // `super` delegates reads to the owner's descriptors, but not writes or deletions.
                 .map(|properties| properties.getters_only(db)),
+            descriptor,
         ))
     }
 
