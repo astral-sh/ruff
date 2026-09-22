@@ -1,0 +1,36 @@
+[package]
+name = "ruff_unicode_names2"
+version = "0.0.14"
+description = "This is an internal component crate of Ruff"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = "(MIT OR Apache-2.0) AND Unicode-DFS-2016"
+
+[dependencies]
+phf = { workspace = true }
+
+[build-dependencies]
+ruff_unicode_names2_generator = { workspace = true }
+
+[dev-dependencies]
+rand = { version = "0.8.5", default-features = false, features = ["std", "std_rng"] }
+
+[lints.rust]
+# Ruff uses std; retain upstream's optional no_std code without enabling it.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("no_std"))'] }
+
+[lints.clippy]
+# Preserve the vendored source.
+unnecessary_map_or = "allow"
+question_mark = "allow"
+
+[lib]
+name = "unicode_names2"
+# Upstream unit tests, benchmarks, and macro doctests require nightly Rust.
+test = false
+doctest = false
+bench = false

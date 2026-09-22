@@ -44,6 +44,8 @@ ruff_source_file = { version = "0.0.14", path = "crates/ruff_source_file" }
 ruff_mdtest = { path = "crates/ruff_mdtest" }
 ruff_ranged_value = { version = "0.0.14", path = "crates/ruff_ranged_value" }
 ruff_text_size = { version = "0.0.14", path = "crates/ruff_text_size" }
+ruff_unicode_names2 = { version = "0.0.14", path = "crates/ruff_unicode_names2" }
+ruff_unicode_names2_generator = { version = "0.0.14", path = "crates/ruff_unicode_names2_generator" }
 ruff_workspace = { version = "0.0.14", path = "crates/ruff_workspace" }
 
 ty = { path = "crates/ty" }
@@ -163,6 +165,8 @@ parking_lot = { version = "0.12.4", default-features = false }
 path-absolutize = { version = "4.0.0", default-features = false }
 path-slash = { version = "0.2.1", default-features = false }
 pathdiff = { version = "0.2.1", default-features = false }
+phf = { version = "0.11.3", default-features = false }
+phf_codegen = { version = "0.11.3", default-features = false }
 pep440_rs = { version = "0.7.1", default-features = false }
 pretty_assertions = { version = "1.3.0", default-features = false, features = ["std"] }
 proc-macro2 = { version = "1.0.79", default-features = false, features = ["proc-macro"] }
