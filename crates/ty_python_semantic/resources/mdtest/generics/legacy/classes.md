@@ -885,6 +885,26 @@ def construct_from_str(value: str) -> None:
     reveal_type(Box(value, Box(1)))
 ```
 
+### Constructing through `type(self)`
+
+Calling a constructor through `type(self)` preserves the current `Self` specialization. The class's
+type variable is fixed by that specialization and cannot be inferred from a different constructor
+argument.
+
+```py
+from typing_extensions import Generic, Self, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, value: T) -> None:
+        self.value = value
+
+    def reset(self) -> Self:
+        # error: [invalid-argument-type]
+        return type(self)("hello")
+```
+
 ### Constructing with an enclosing Self type
 
 The recursive call in `__init__` shares a source-level `Self` binding with the constructor it calls,
