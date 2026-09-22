@@ -1537,6 +1537,130 @@ DescriptorMethods.static = static_replacement  # error: [invalid-assignment]
 DescriptorMethods.class_ = class_replacement  # error: [invalid-assignment]
 ```
 
+## Shadowing static methods on instances
+
+### Nominal instances
+
+Assigning a static method's underlying function to an instance shadows the descriptor without
+changing how the function is called.
+
+```py
+class Decoder:
+    @staticmethod
+    def decode(data: bytes) -> str:
+        return data.decode("utf-8")
+
+def reset(decoder: Decoder) -> None:
+    decoder.decode = decoder.decode
+    reveal_type(decoder.decode(b"hello"))  # revealed: str
+    decoder.decode = None  # error: [invalid-assignment]
+```
+
+Assigning the unwrapped function to the class would change binding on subsequent instance access, so
+class writes still require the `staticmethod` wrapper.
+
+```py
+Decoder.decode = Decoder.decode  # error: [invalid-assignment]
+Decoder.decode = staticmethod(Decoder.decode)
+```
+
+### Implicit `self`
+
+An unannotated `self` parameter can also shadow a static method with its underlying function.
+
+```py
+class Decoder:
+    @staticmethod
+    def decode(data: bytes) -> str:
+        return data.decode("utf-8")
+
+    def reset(self) -> None:
+        self.decode = Decoder.decode
+        reveal_type(self.decode(b"hello"))  # revealed: str
+        self.decode = None  # error: [invalid-assignment]
+```
+
+### Conditional static methods
+
+When a class conditionally defines a static method, the instance can shadow either descriptor with
+the function returned by attribute access.
+
+```py
+def example(flag: bool) -> None:
+    class C:
+        if flag:
+            @staticmethod
+            def f(x: int) -> int:
+                return x
+
+        else:
+            @staticmethod
+            def f(x: int) -> int:
+                return x + 1
+
+    c = C()
+    c.f = c.f
+    reveal_type(c.f(1))  # revealed: int
+    c.f = None  # error: [invalid-assignment]
+    C.f = C.f  # error: [invalid-assignment]
+```
+
+### Static methods mixed with other attributes
+
+Only staticmethod alternatives are unwrapped when an attribute can also hold another type.
+
+```py
+def example(flag: bool) -> None:
+    class C:
+        if flag:
+            @staticmethod
+            def f(x: int) -> int:
+                return x
+
+        else:
+            f = 1
+
+    c = C()
+    c.f = c.f
+    c.f = 1
+    c.f = None  # error: [invalid-assignment]
+```
+
+### Static methods on metaclasses
+
+A class object can shadow a static method inherited from its metaclass. Replacing the descriptor on
+the metaclass itself still requires the wrapper.
+
+```py
+class Meta(type):
+    @staticmethod
+    def f(x: int) -> int:
+        return x
+
+class C(metaclass=Meta): ...
+
+C.f = C.f
+Meta.f = Meta.f  # error: [invalid-assignment]
+```
+
+### Static methods stored on instances
+
+A staticmethod stored directly on an instance does not invoke the descriptor protocol. Its write
+type therefore retains the wrapper.
+
+```py
+def f(x: int) -> int:
+    return x
+
+class C:
+    def __init__(self) -> None:
+        self.f = staticmethod(f)
+
+def replace(c: C) -> None:
+    c.f = staticmethod(f)
+    c.f = f  # error: [invalid-assignment]
+```
+
 ## Accessing attributes on class objects
 
 When accessing attributes on class objects, they are always looked up on the type of the class

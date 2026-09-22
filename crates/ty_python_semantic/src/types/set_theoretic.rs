@@ -314,7 +314,7 @@ impl<'db> UnionType<'db> {
     }
 
     /// A version of [`UnionType::map`] that does not unpack type aliases.
-    fn map_leave_aliases(
+    pub(super) fn map_leave_aliases(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
