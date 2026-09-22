@@ -1,0 +1,190 @@
+name: Temporary ty benchmark diagnostics
+
+# Compare existing binaries across hosts without publishing experimental CodSpeed results.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/ty-benchmark-diagnostics.yaml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  compare:
+    name: "Compare benchmark binaries (host ${{ matrix.host }})"
+    if: github.repository == 'astral-sh/ruff'
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download baseline binary
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: benchmarks-instrumented-ty-binary
+          path: base-artifact
+          run-id: 35718148708
+          github-token: ${{ github.token }}
+
+      - name: Download PR binary
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: benchmarks-instrumented-ty-binary
+          path: head-artifact
+          run-id: 35746936084
+          github-token: ${{ github.token }}
+
+      - name: Capture host and original library versions
+        run: |
+          mkdir -p diagnostic-results
+          {
+            uname -a
+            cat /etc/os-release
+            lscpu --json
+            cat /proc/cpuinfo
+            ldd --version
+            getconf GNU_LIBC_VERSION
+            dpkg-query -W libc6 libc6-dbg || true
+            printf 'GLIBC_TUNABLES=%s\nMALLOC_ARENA_MAX=%s\nMALLOC_PERTURB_=%s\n' \
+              "${GLIBC_TUNABLES-}" "${MALLOC_ARENA_MAX-}" "${MALLOC_PERTURB_-}"
+          } | tee diagnostic-results/host-before-setup.txt
+
+      - name: Install the matching CodSpeed runner
+        env:
+          CODSPEED_RUNNER_INSTALL_DIR: ${{ runner.temp }}/codspeed-bin
+        run: |
+          curl --fail --silent --show-error --location \
+            https://codspeed.io/v5.0.2/install.sh -o "$RUNNER_TEMP/codspeed-install.sh"
+          printf '%s  %s\n' \
+            4ea0e3b0425e01498ff1b70fba78228eedb4dd58efb6093360776fc6e4eae1a9 \
+            "$RUNNER_TEMP/codspeed-install.sh" | sha256sum --check
+          bash "$RUNNER_TEMP/codspeed-install.sh" --quiet
+
+      - name: Install simulation dependencies
+        run: |
+          printf '%s\n' \
+            'Acquire::Retries "0";' \
+            'Acquire::http::Timeout "10";' \
+            'Acquire::https::Timeout "10";' \
+            | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
+          codspeed setup --mode simulation
+          {
+            codspeed --version
+            valgrind --version
+            ldd --version
+            getconf GNU_LIBC_VERSION
+            dpkg-query -W libc6 libc6-dbg
+            dpkg-query -W 'valgrind*' || true
+            sha256sum /lib/x86_64-linux-gnu/libc.so.6 /lib64/ld-linux-x86-64.so.2
+          } | tee diagnostic-results/libraries-after-setup.txt
+
+      - name: Prepare identical benchmark invocation
+        run: |
+          printf '%s  %s\n' \
+            2c843a85b29783c5404368c3e0e1dffe304222a02d715586d7869a458cb21484 \
+            base-artifact/analysis/ruff_benchmark/ty \
+            4c6adfbdcc2062a16d56f56a3bf8fd905054dfe6859ee76411e3b8e5d95869e0 \
+            head-artifact/analysis/ruff_benchmark/ty | sha256sum --check
+          for variant in base head; do
+            cp "$variant-artifact/analysis/ruff_benchmark/ty" "diagnostic-$variant"
+            chmod +x "diagnostic-$variant"
+            sha256sum "diagnostic-$variant"
+            ldd "diagnostic-$variant"
+          done | tee diagnostic-results/binaries.txt
+
+          cat > "$RUNNER_TEMP/run-ty-benchmark-diagnostic.sh" <<'SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          variant="$1"
+          repetition="$2"
+          output="$PWD/diagnostic-results/$variant-$repetition"
+          mkdir -p "$output/profiles"
+          cp diagnostic-results/*.txt "$output/"
+          # Keep the executable's path and argv identical between base and head.
+          cp "diagnostic-$variant" diagnostic-ty
+          sha256sum diagnostic-ty | tee "$output/executed-binary.txt"
+          CODSPEED_CARGO_WORKSPACE_ROOT="$PWD" CODSPEED_LOG=debug \
+            codspeed run --mode simulation --skip-setup --skip-upload \
+            --cycle-estimation=true --exclude-allocations=false \
+            --profile-folder "$output/profiles" \
+            -- "./diagnostic-ty 'ty_micro\[[^a-l]'" \
+            2>&1 | tee "$output/runner.log"
+          # Callgrind can append multiple benchmark parts to the same .out file.
+          find "$output/profiles" -type f -name '*.out*' -exec awk '
+            FNR == 1 { selected = 0; part = "" }
+            /^part:/ { selected = 0; part = $0 }
+            /^desc: Trigger:/ {
+              selected = index($0, "::ty_micro[repeated_suppressing_context_managers") > 0
+              if (selected) print FILENAME "\n" part "\n" $0
+            }
+            selected && /^(events|summary|totals):/ { print }
+          ' {} + | tee "$output/context-manager-totals.txt"
+          SCRIPT
+
+      - name: Measure base, first repetition
+        run: bash "$RUNNER_TEMP/run-ty-benchmark-diagnostic.sh" base 1
+
+      - name: Upload base, first repetition
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-benchmark-diagnostics-${{ matrix.host }}-base-1
+          path: diagnostic-results/base-1
+          compression-level: 6
+          retention-days: 3
+
+      - name: Measure head, first repetition
+        run: bash "$RUNNER_TEMP/run-ty-benchmark-diagnostic.sh" head 1
+
+      - name: Upload head, first repetition
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-benchmark-diagnostics-${{ matrix.host }}-head-1
+          path: diagnostic-results/head-1
+          compression-level: 6
+          retention-days: 3
+
+      - name: Measure base, second repetition
+        run: bash "$RUNNER_TEMP/run-ty-benchmark-diagnostic.sh" base 2
+
+      - name: Upload base, second repetition
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-benchmark-diagnostics-${{ matrix.host }}-base-2
+          path: diagnostic-results/base-2
+          compression-level: 6
+          retention-days: 3
+
+      - name: Measure head, second repetition
+        run: bash "$RUNNER_TEMP/run-ty-benchmark-diagnostic.sh" head 2
+
+      - name: Upload head, second repetition
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-benchmark-diagnostics-${{ matrix.host }}-head-2
+          path: diagnostic-results/head-2
+          compression-level: 6
+          retention-days: 3
+
+      - name: Upload host metadata
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-benchmark-diagnostics-${{ matrix.host }}-metadata
+          path: diagnostic-results/*.txt
+          retention-days: 3
