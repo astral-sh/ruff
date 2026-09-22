@@ -606,7 +606,7 @@ For more, see the [`etcetera`](https://crates.io/crates/etcetera) crate.
 ## Ruff tried to fix something — but it broke my code. What's going on?
 
 Ruff labels fixes as "safe" and "unsafe". By default, Ruff will fix all violations for which safe
-fixes are available, while unsafe fixes can be enabled via the [`unsafe-fixes`](settings.md#unsafe-fixes)
+fixes are available, while unsafe fixes can be applied via the [`unsafe-fixes`](settings.md#unsafe-fixes)
 setting, or passing the [`--unsafe-fixes`](settings.md#unsafe-fixes) flag to `ruff check`. For
 more, see [the fix documentation](linter.md#fixes).
 
