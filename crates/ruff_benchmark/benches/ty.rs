@@ -1016,6 +1016,42 @@ def check(value: Chain[tuple[int, str]]) -> None:
     });
 }
 
+/// Regression benchmark for subtyping between materialized recursive protocols.
+///
+/// Subtyping checks between materialized specializations of a recursive protocol should terminate even
+/// though the recursive methods repeatedly introduce type variables and nested specializations.
+fn benchmark_materialized_recursive_protocol_subtyping(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from __future__ import annotations
+
+from typing import Any, Protocol
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_subtype_of
+
+class Chain[T](Protocol):
+    marker: Any
+    def value(self) -> T: ...
+    def child[U](self, other: U) -> Chain[tuple[T, U]]: ...
+    def pair(self) -> Chain[tuple[T, T]]: ...
+    def window(self) -> Chain[Chain[T]]: ...
+    def concat[U](self, other: Chain[U]) -> Chain[T | U]: ...
+
+def _[T]():
+    constraints = is_constraint_set_subtype_of(Top[Chain[T]], Top[Chain[object]])
+    static_assert(constraints == ConstraintSet.upper_bound(T, object))
+"#;
+
+    criterion.bench_function("ty_micro[materialized_recursive_protocol_subtyping]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for large calls to a gradual variadic tail.
 ///
 /// Without the gradual-call shortcut, every positional argument type is folded into the same
@@ -2063,6 +2099,7 @@ criterion_group!(
     benchmark_inherited_recursive_protocol,
     benchmark_nested_recursive_protocol_receiver,
     benchmark_materialized_recursive_protocol_overload,
+    benchmark_materialized_recursive_protocol_subtyping,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,

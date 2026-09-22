@@ -2671,6 +2671,21 @@ static_assert(is_assignable_to(Bottom[RecursiveValue[str]], Top[RecursiveValue[o
 static_assert(is_assignable_to(Top[RecursiveValue[str]], RecursiveValue[object]))
 ```
 
+Subtyping also rejects a top-materialized source against an unmaterialized target, and an
+unmaterialized source against a bottom-materialized target.
+
+```py
+from ty_extensions._internal import is_subtype_of
+
+static_assert(not is_subtype_of(Top[RecursiveValue[str]], Bottom[RecursiveValue[object]]))
+static_assert(not is_subtype_of(Top[RecursiveValue[str]], RecursiveValue[object]))
+static_assert(not is_subtype_of(RecursiveValue[str], Bottom[RecursiveValue[object]]))
+
+static_assert(is_subtype_of(Bottom[RecursiveValue[str]], Top[RecursiveValue[object]]))
+static_assert(is_subtype_of(Bottom[RecursiveValue[str]], RecursiveValue[object]))
+static_assert(is_subtype_of(RecursiveValue[str], Top[RecursiveValue[object]]))
+```
+
 ### Generator delegation
 
 `yield from` uses the same materialized yield and return types as direct generator methods. Applying

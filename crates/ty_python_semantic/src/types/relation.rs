@@ -359,6 +359,24 @@ impl<'db> Type<'db> {
         )
     }
 
+    pub(super) fn when_constraint_set_subtype_of<'c>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.has_relation_to_with_typevar_evaluation(
+            db,
+            env,
+            target,
+            constraints,
+            TypeVarSet::None,
+            TypeRelation::Subtyping,
+            TypeVarEvaluation::Lazy,
+        )
+    }
+
     /// Return the constraints under which this type is a subtype of type `target`, assuming that
     /// all of the restrictions in `constraints` hold.
     ///

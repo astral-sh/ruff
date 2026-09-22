@@ -235,6 +235,20 @@ def is_subtype_of(ty: TypeForm[object], of: TypeForm[object]) -> ConstraintSet:
     .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     """
 
+def is_constraint_set_subtype_of(
+    ty: TypeForm[object], of: TypeForm[object]
+) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`.
+
+    This differs from `is_subtype_of` in how it treats typevars.
+    `is_subtype_of` will assume that all typevars are non-inferable, and will
+    require all possible specializations of a typevar to satisfy the relation.
+    This method will instead return a constraint set describing which
+    specializations (possibly not all of them) satisfy the relation.
+
+    .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+    """
+
 def is_assignable_to(ty: TypeForm[object], to: TypeForm[object]) -> ConstraintSet:
     """Returns a constraint set that is satisfied when `ty` is `assignable`_ to `to`.
 
