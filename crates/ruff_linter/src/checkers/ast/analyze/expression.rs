@@ -770,7 +770,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_bugbear::rules::strip_with_multi_characters(checker, expr, func, args);
             }
             if checker.is_rule_enabled(Rule::GetAttrWithConstant) {
-                flake8_bugbear::rules::getattr_with_constant(checker, expr, func, args);
+                flake8_bugbear::rules::getattr_with_constant(checker, expr, func, args, keywords);
             }
             if checker.is_rule_enabled(Rule::DelAttrWithConstant) {
                 flake8_bugbear::rules::delattr_with_constant(checker, expr, func, args);
