@@ -852,6 +852,22 @@
       },
       "additionalProperties": false
     },
+    "AnnotationSemanticsSelection": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/RuntimeSemantics"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
     "ApiBan": {
       "type": "object",
       "properties": {
@@ -1533,24 +1549,26 @@
           ]
         },
         "runtime-evaluated-base-classes": {
-          "description": "Exempt classes that list any of the enumerated classes as a base class\nfrom needing to be moved into type-checking blocks.\n\nCommon examples include Pydantic's `pydantic.BaseModel` and SQLAlchemy's\n`sqlalchemy.orm.DeclarativeBase`, but can also support user-defined\nclasses that inherit from those base classes. For example, if you define\na common `DeclarativeBase` subclass that's used throughout your project\n(e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to\nthis list (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt\nmodels from being moved into type-checking blocks.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
+          "description": "Exempt classes that list any of the enumerated classes as a base class\nfrom needing to be moved into type-checking blocks.\n\nThis can either be configured as a list, if all entries share the same\nruntime semantics of being runtime required. Or a table where each entry\nis assigned to its desired runtime semantics.\n\nA common example for `\"runtime\"` required semantics is Pydantic's `pydantic.BaseModel`\nbut can also support user-defined classes that inherit from those base classes.\nFor example, if you define a common `BaseModel` subclass that's used throughout\nyour project (e.g., `class Base(BaseModel) ...` in `base.py`), you can add it to\nthis list/table (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt\nmodels from being moved into type-checking blocks.\n\n```toml\n[tool.ruff.lint.flake8-type-checking]\nruntime-evaluated-base-classes = [\"pydantic.BaseModel\"]\n```\n\nOr\n\n```toml\n[tool.ruff.lint.flake8-type-checking.runtime-evaluated-base-classes]\n\"pydantic.BaseModel\" = \"required\"\n```\n\nFor some use-cases like SQLAlchemy's `sqlalchemy.orm.DeclarativeBase` it makes more\nsense to mark the class as runtime `\"ambiguous\"`, since references to other models do\nnot need to resolve at runtime. With these semantics ruff will assume the annotations\nalready contain all of the correct forward references, and will not attempt to move\nrelated imports and/or quote annotations.\n\n```toml\n[tool.ruff.lint.flake8-type-checking.runtime-evaluated-base-classes]\n\"sqlalchemy.orm.DeclarativeBase\" = \"ambiguous\"\n```\n\nIn some rare cases you may wish to revert back to `\"default\"` semantics in a\nconfiguration that extends another. This could be useful if you implement\nsomething like Pydantic's `BaseModel` yourself and need `\"default\"` semantics for\nthis base class, but `\"required\"` semantics for all derived classes.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnnotationSemanticsSelection"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "runtime-evaluated-decorators": {
-          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
+          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.\n\nJust like with `runtime-evaluated-base-classes` it's possible to mark\ndecorators as runtime `\"ambiguous\"` or revert a parent configuration's\nsetting back to the `\"default\"` semantics.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnnotationSemanticsSelection"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "strict": {
           "description": "Enforce `TC001`, `TC002`, and `TC003` rules even when valid runtime imports\nare present for the same module.\n\nSee flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.",
@@ -5548,6 +5566,26 @@
         "zip-dict-keys-and-values",
         "zip-instead-of-pairwise",
         "zip-without-explicit-strict"
+      ]
+    },
+    "RuntimeSemantics": {
+      "description": "Represents the desired runtime semantics for a set of type definitions\n\nNote that the order of variants is important here. `Required` has the\nhighest precedence when calling `RuntimeSemantics::combine` on two\nseparate targeting sources. (E.g. classes can be targeted both via\ntheir decorators, but also via their base classes, so this determines\nwhat happens when two sources disagree)",
+      "oneOf": [
+        {
+          "description": "Assume that all targeted annotations are going to be evaluated at runtime\nat some point. So all referenced bindings need to be available at runtime.",
+          "type": "string",
+          "const": "required"
+        },
+        {
+          "description": "Do not make any assumptions about how the targeted annotations are going\nto be interacted with, assume the current execution context of any referenced\nbindings is already correct.",
+          "type": "string",
+          "const": "ambiguous"
+        },
+        {
+          "description": "Use the default runtime semantics of the targeted annotations, this\nexists so that child configurations can revert entries the parent\nconfiguration configured back to the default semantics.",
+          "type": "string",
+          "const": "default"
+        }
       ]
     },
     "Strictness": {

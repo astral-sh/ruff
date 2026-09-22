@@ -22,6 +22,7 @@ use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::rules::flake8_tidy_imports::settings::{
     AllImports, ApiBan, ImportSelection, ImportSelector, Strictness,
 };
+use ruff_linter::rules::flake8_type_checking::settings::RuntimeSemantics;
 use ruff_linter::rules::isort::settings::RelativeImportsOrder;
 use ruff_linter::rules::isort::{ImportSection, ImportType};
 use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
@@ -37,7 +38,7 @@ use ruff_linter::settings::types::{
     IdentifierPattern, Language, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
 };
 use ruff_linter::{UnresolvedRuleSelector, warn_user_once};
-use ruff_macros::{CombineOptions, OptionsMetadata};
+use ruff_macros::{CacheKey, CombineOptions, OptionsMetadata};
 use ruff_options_metadata::{OptionsMetadata, Visit};
 use ruff_python_ast::name::Name;
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
@@ -2318,6 +2319,20 @@ fn matches_module_prefix(module: &str, prefix: &str) -> bool {
             .is_some_and(|suffix| suffix.starts_with('.'))
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
+#[serde(untagged)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+enum AnnotationSemanticsSelection {
+    Table(FxHashMap<String, RuntimeSemantics>),
+    List(Vec<String>),
+}
+
+impl Default for AnnotationSemanticsSelection {
+    fn default() -> Self {
+        Self::Table(FxHashMap::default())
+    }
+}
+
 /// Options for the `flake8-type-checking` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
@@ -2352,21 +2367,56 @@ pub struct Flake8TypeCheckingOptions {
     /// Exempt classes that list any of the enumerated classes as a base class
     /// from needing to be moved into type-checking blocks.
     ///
-    /// Common examples include Pydantic's `pydantic.BaseModel` and SQLAlchemy's
-    /// `sqlalchemy.orm.DeclarativeBase`, but can also support user-defined
-    /// classes that inherit from those base classes. For example, if you define
-    /// a common `DeclarativeBase` subclass that's used throughout your project
-    /// (e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to
-    /// this list (`runtime-evaluated-base-classes = ["base.Base"]`) to exempt
+    /// This can either be configured as a list, if all entries share the same
+    /// runtime semantics of being runtime required. Or a table where each entry
+    /// is assigned to its desired runtime semantics.
+    ///
+    /// A common example for `"runtime"` required semantics is Pydantic's `pydantic.BaseModel`
+    /// but can also support user-defined classes that inherit from those base classes.
+    /// For example, if you define a common `BaseModel` subclass that's used throughout
+    /// your project (e.g., `class Base(BaseModel) ...` in `base.py`), you can add it to
+    /// this list/table (`runtime-evaluated-base-classes = ["base.Base"]`) to exempt
     /// models from being moved into type-checking blocks.
+    ///
+    /// ```toml
+    /// [tool.ruff.lint.flake8-type-checking]
+    /// runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+    /// ```
+    ///
+    /// Or
+    ///
+    /// ```toml
+    /// [tool.ruff.lint.flake8-type-checking.runtime-evaluated-base-classes]
+    /// "pydantic.BaseModel" = "required"
+    /// ```
+    ///
+    /// For some use-cases like SQLAlchemy's `sqlalchemy.orm.DeclarativeBase` it makes more
+    /// sense to mark the class as runtime `"ambiguous"`, since references to other models do
+    /// not need to resolve at runtime. With these semantics ruff will assume the annotations
+    /// already contain all of the correct forward references, and will not attempt to move
+    /// related imports and/or quote annotations.
+    ///
+    /// ```toml
+    /// [tool.ruff.lint.flake8-type-checking.runtime-evaluated-base-classes]
+    /// "sqlalchemy.orm.DeclarativeBase" = "ambiguous"
+    /// ```
+    ///
+    /// In some rare cases you may wish to revert back to `"default"` semantics in a
+    /// configuration that extends another. This could be useful if you implement
+    /// something like Pydantic's `BaseModel` yourself and need `"default"` semantics for
+    /// this base class, but `"required"` semantics for all derived classes.
     #[option(
-        default = "[]",
-        value_type = "list[str]",
+        default = "{}",
+        value_type = "list[str] | dict[str, \"required\" | \"ambiguous\" | \"default\"]",
+        scope = "runtime-evaluated-base-classes",
         example = r#"
-            runtime-evaluated-base-classes = ["pydantic.BaseModel", "sqlalchemy.orm.DeclarativeBase"]
+            "pydantic.BaseModel" = "required"
+            "sqlalchemy.orm.DeclarativeBase" = "ambiguous"
+            # revert parent configuration's decision
+            "my_package.MyBase" = "default"
         "#
     )]
-    runtime_evaluated_base_classes: Option<Vec<String>>,
+    runtime_evaluated_base_classes: Option<AnnotationSemanticsSelection>,
 
     /// Exempt classes and functions decorated with any of the enumerated
     /// decorators from being moved into type-checking blocks.
@@ -2388,14 +2438,22 @@ pub struct Flake8TypeCheckingOptions {
     /// ```
     ///
     /// Here `app.get` will correctly be identified as `fastapi.FastAPI.get`.
+    ///
+    /// Just like with `runtime-evaluated-base-classes` it's possible to mark
+    /// decorators as runtime `"ambiguous"` or revert a parent configuration's
+    /// setting back to the `"default"` semantics.
     #[option(
-        default = "[]",
-        value_type = "list[str]",
+        default = "{}",
+        value_type = "list[str] | dict[str, \"required\" | \"ambiguous\" | \"default\"]",
+        scope = "runtime-evaluated-decorators",
         example = r#"
-            runtime-evaluated-decorators = ["pydantic.validate_call", "attrs.define"]
+            "pydantic.validate_call" = "required"
+            "sqlalchemy.orm.declared_attr = "ambiguous"
+            # revert parent configuration's decision
+            "my_package.my_decorator" = "default"
         "#
     )]
-    runtime_evaluated_decorators: Option<Vec<String>>,
+    runtime_evaluated_decorators: Option<AnnotationSemanticsSelection>,
 
     /// Whether to add quotes around type annotations, if doing so would allow
     /// the corresponding import to be moved into a type-checking block.
@@ -2457,8 +2515,26 @@ impl Flake8TypeCheckingOptions {
             exempt_modules: self
                 .exempt_modules
                 .unwrap_or_else(|| vec!["typing".to_string()]),
-            runtime_required_base_classes: self.runtime_evaluated_base_classes.unwrap_or_default(),
-            runtime_required_decorators: self.runtime_evaluated_decorators.unwrap_or_default(),
+            runtime_evaluated_base_classes: match self
+                .runtime_evaluated_base_classes
+                .unwrap_or_default()
+            {
+                AnnotationSemanticsSelection::Table(map) => map,
+                AnnotationSemanticsSelection::List(vector) => vector
+                    .iter()
+                    .map(|name| (name.clone(), RuntimeSemantics::Required))
+                    .collect(),
+            },
+            runtime_evaluated_decorators: match self
+                .runtime_evaluated_decorators
+                .unwrap_or_default()
+            {
+                AnnotationSemanticsSelection::Table(map) => map,
+                AnnotationSemanticsSelection::List(vector) => vector
+                    .iter()
+                    .map(|name| (name.clone(), RuntimeSemantics::Required))
+                    .collect(),
+            },
             quote_annotations: self.quote_annotations.unwrap_or_default(),
         }
     }
