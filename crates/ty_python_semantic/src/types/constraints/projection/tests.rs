@@ -9,9 +9,10 @@ use super::{ProjectionError, ProjectionTypeBudget, SolutionBudget, SolutionProje
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::global_symbol;
 use crate::types::constraints::{
-    CandidateSolution, CandidateSolutions, ConstraintSet, ConstraintSetBuilder,
-    IteratorConstraintsExtension, PathBound, PathBoundSolution, Solution, SolutionPaths,
-    SolutionValidity, Solutions, TypeVarSolution,
+    CandidateSolution, CandidateSolutions, ConstraintFailureEvidence, ConstraintSet,
+    ConstraintSetBuilder, IteratorConstraintsExtension, PathBound, PathBoundSolution, Solution,
+    SolutionPaths, SolutionValidity, SolutionViolation, SolutionViolationKind, Solutions,
+    TypeVarSolution,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{
@@ -390,7 +391,7 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                     if bound.bound_typevar == u {
                         PathBoundSolution::Unsatisfiable
                     } else if bound.evidence_lower == Some(str) {
-                        rejected_binding
+                        rejected_binding.clone()
                     } else {
                         PathBoundSolution::Solved(int)
                     }
@@ -458,7 +459,7 @@ fn valid_unsolved_path_is_not_unconstrained() {
         ),
     ] {
         assert_eq!(
-            set.solutions_with(db, &env, inferable, budget, |_, _| selected),
+            set.solutions_with(db, &env, inferable, budget, |_, _| selected.clone()),
             Ok(collected)
         );
         assert_eq!(
@@ -467,7 +468,7 @@ fn valid_unsolved_path_is_not_unconstrained() {
                 &env,
                 inferable,
                 budget,
-                |_, _| selected,
+                |_, _| selected.clone(),
                 0,
                 |count, path, _| {
                     assert!(path.is_empty());
@@ -544,6 +545,56 @@ fn type_budget_is_charged_before_constructing_a_union() {
                     &env,
                     [int, str, bytes],
                 )))
+            );
+        }
+    }
+}
+
+#[test]
+fn type_budget_charges_all_rejected_upper_bounds() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let t = create_typevar(db, "T");
+    let int = known_instance(db, KnownClass::Int);
+    let str = known_instance(db, KnownClass::Str);
+    let bytes = known_instance(db, KnownClass::Bytes);
+    let builder = ConstraintSetBuilder::new();
+    let set = exact(db, &builder, t, int);
+    let inferable = TypeVarSet::from_typevars(db, [t]);
+    let evidence = ConstraintFailureEvidence::Upper(Box::new([
+        UnionType::from_two_elements(db, &env, int, str),
+        bytes,
+    ]));
+
+    // The union costs three terms and the second upper bound costs one. Charge the retained
+    // clauses separately, even though intersecting these disjoint bounds would give `Never`.
+    for type_terms in [3, 4] {
+        let result = set.solutions_with(
+            db,
+            &env,
+            inferable,
+            SolutionBudget {
+                type_terms,
+                ..SolutionBudget::default()
+            },
+            |_, _| PathBoundSolution::ViolatesDeclaredConstraints(evidence.clone()),
+        );
+        if type_terms == 3 {
+            assert_eq!(result, Err(ProjectionError::TypeBudgetExceeded));
+        } else {
+            assert_eq!(
+                result,
+                Ok(Solutions::Unsatisfiable(SolutionPaths::Complete(vec![
+                    Solution {
+                        solved_typevars: vec![],
+                        validity: SolutionValidity::Invalid(Box::new([SolutionViolation {
+                            bound_typevar: t,
+                            variance: TypeVarVariance::Invariant,
+                            kind: SolutionViolationKind::Constraints(evidence.clone()),
+                        }])),
+                    }
+                ])))
             );
         }
     }

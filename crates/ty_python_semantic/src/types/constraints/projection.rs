@@ -170,8 +170,8 @@ impl<'db> ConstraintSet<'db, '_> {
         let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
         path_bounds.try_solve_with(choose, |solution| {
             for violation in solution.violations() {
-                if let Some(argument) = violation.argument {
-                    type_budget.charge_type(db, argument)?;
+                for evidence in violation.evidence_types() {
+                    type_budget.charge_type(db, *evidence)?;
                 }
             }
             for binding in &solution.solved_typevars {

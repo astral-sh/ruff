@@ -896,8 +896,9 @@ info: Type variable defined here
 ## Inferring a constrained typevar from a union of protocols
 
 A union of text and binary writers requires one specialization that both writers accept. The
-inferred upper bound is `str & bytes`, or `Never`, which neither declared constraint satisfies. Each
-writer alone accepts one of the declared constraints.
+inferred upper bounds are `str` and `bytes`; neither allowed specialization satisfies both. Each
+writer alone accepts one of the declared constraints. The diagnostic lists both upper bounds
+individually.
 
 ```py
 from typing import Protocol
@@ -909,8 +910,21 @@ def constrained[T: (str, bytes)](writer: Writer[T]) -> None: ...
 def f(text: Writer[str], binary: Writer[bytes], either: Writer[str] | Writer[bytes]):
     constrained(text)
     constrained(binary)
-    # error: [invalid-argument-type] "No allowed specialization of `T` satisfies the inferred upper bound `Never`"
+    # snapshot: invalid-argument-type
     constrained(either)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `constrained` is incorrect
+  --> src/mdtest_snippet.py:11:17
+   |
+11 |     constrained(either)
+   |                 ^^^^^^ No allowed specialization of `T` satisfies all inferred upper bounds: `str`, `bytes`
+info: Type variable defined here
+ --> src/mdtest_snippet.py:6:17
+  |
+6 | def constrained[T: (str, bytes)](writer: Writer[T]) -> None: ...
+  |                 ^^^^^^^^^^^^^^^
 ```
 
 ## Typevar constraints

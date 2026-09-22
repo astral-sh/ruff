@@ -34,7 +34,7 @@ use crate::types::ProgramEnvironment;
 use crate::types::call::arguments::{CallArgumentExpansions, CallArgumentTypes, Expansion};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    CandidateSolutions, ConstraintFailureDirection, ConstraintSet, ConstraintSetBuilder, PathBound,
+    CandidateSolutions, ConstraintFailureEvidence, ConstraintSet, ConstraintSetBuilder, PathBound,
     PathBoundSolution, SolutionPaths, Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
@@ -9599,9 +9599,6 @@ impl<'db> BindingError<'db> {
                 let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
                     return;
                 };
-                let argument_type = error.argument_type();
-                let argument_ty_display = argument_type.display(db, env);
-
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
                     callable_description
@@ -9610,7 +9607,11 @@ impl<'db> BindingError<'db> {
                 ));
 
                 match error {
-                    SpecializationError::MismatchedBound { bound_typevar, .. } => {
+                    SpecializationError::MismatchedBound {
+                        bound_typevar,
+                        argument,
+                    } => {
+                        let argument_ty_display = argument.display(db, env);
                         let typevar = bound_typevar.typevar(context.db());
                         let typevar_name = typevar.name(context.db());
                         diag.set_primary_annotation_message(format_args!(
@@ -9626,9 +9627,9 @@ impl<'db> BindingError<'db> {
                     }
                     SpecializationError::MismatchedConstraint {
                         bound_typevar,
-                        direction: ConstraintFailureDirection::Lower,
-                        ..
+                        evidence: ConstraintFailureEvidence::Lower(argument),
                     } => {
+                        let argument_ty_display = argument.display(db, env);
                         let typevar = bound_typevar.typevar(context.db());
                         let typevar_name = typevar.name(context.db());
                         diag.set_primary_annotation_message(format_args!(
@@ -9648,14 +9649,25 @@ impl<'db> BindingError<'db> {
                     }
                     SpecializationError::MismatchedConstraint {
                         bound_typevar,
-                        direction: ConstraintFailureDirection::Upper,
-                        ..
+                        evidence: ConstraintFailureEvidence::Upper(bounds),
                     } => {
                         let typevar_name = bound_typevar.typevar(db).name(db);
-                        diag.set_primary_annotation_message(format_args!(
-                            "No allowed specialization of `{typevar_name}` satisfies \
-                                the inferred upper bound `{argument_ty_display}`"
-                        ));
+                        if let [bound] = bounds.as_ref() {
+                            diag.set_primary_annotation_message(format_args!(
+                                "No allowed specialization of `{typevar_name}` satisfies \
+                                    the inferred upper bound `{}`",
+                                bound.display(db, env)
+                            ));
+                        } else {
+                            diag.set_primary_annotation_message(format_args!(
+                                "No allowed specialization of `{typevar_name}` satisfies \
+                                    all inferred upper bounds: {}",
+                                bounds.iter().format_with(", ", |ty, f| f(&format_args!(
+                                    "`{}`",
+                                    ty.display(db, env)
+                                )))
+                            ));
+                        }
                     }
                 }
 

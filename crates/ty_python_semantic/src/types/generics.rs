@@ -14,7 +14,7 @@ use crate::types::class_base::ClassBase;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget, SolutionProjection};
 use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::{
-    CandidateSolutions, ConstraintFailureDirection, ConstraintSet, ConstraintSetBuilder,
+    CandidateSolutions, ConstraintFailureEvidence, ConstraintSet, ConstraintSetBuilder,
     IteratorConstraintsExtension, PathBound, PathBoundSolution, Solution, SolutionPaths,
     SolutionViolation, SolutionViolationKind, Solutions, TypeVarSolution,
 };
@@ -2648,15 +2648,14 @@ enum ConstraintSetAnalysis<'db> {
 impl<'db> ConstraintSetAnalysis<'db> {
     /// Reports why a type variable's declared bound or constraints cannot be satisfied.
     ///
-    /// Multiple rejected paths describe one failure when their bounds violate the same type
-    /// variable's declaration with the same variance and evidence direction. Lower-bound evidence
-    /// is combined into an intersection, while upper-bound evidence is combined into a union. For
-    /// example, paths rejecting lower bounds `int` and `bool` for `T: bytes` report `bool`, their
-    /// intersection.
+    /// Paths with only lower bounds that violate the same type variable's declaration are combined
+    /// into an intersection. For example, paths rejecting lower bounds `int` and `bool` for
+    /// `T: bytes` report `bool`, their intersection.
     ///
     /// The inference API returns at most one declaration error per relation. Failures involving
-    /// different declarations, variances, evidence directions, or type variables cannot be combined
-    /// meaningfully, so only the first is reported.
+    /// upper bounds report the first failed path's bounds: these must hold together, while bounds
+    /// from different paths describe alternatives. Invariant paths and failures involving different
+    /// declarations or type variables also report only the first failure.
     fn specialization_error(
         &self,
         db: &'db dyn Db,
@@ -2667,55 +2666,49 @@ impl<'db> ConstraintSetAnalysis<'db> {
         };
 
         let first = failures.first()?;
-        // A single failure needs no aggregation; failures for different declarations, type
-        // variables, variances, or evidence directions cannot be combined, so they also return
-        // the first failure.
+        let mut error = first.error.clone();
         // TODO: Rank incompatible failures by their diagnostic usefulness, or report them
         // separately.
-        if failures.len() < 2
-            || failures.iter().any(|failure| {
-                failure.error.bound_typevar() != first.error.bound_typevar()
-                    || failure.variance != first.variance
-                    || match (&first.error, &failure.error) {
-                        (
-                            SpecializationError::MismatchedBound { .. },
-                            SpecializationError::MismatchedBound { .. },
-                        ) => false,
-                        (
-                            SpecializationError::MismatchedConstraint {
-                                direction: first, ..
-                            },
-                            SpecializationError::MismatchedConstraint { direction, .. },
-                        ) => first != direction,
-                        _ => true,
-                    }
-            })
-        {
-            return Some(first.error.clone());
+        if failures.len() < 2 || first.variance != ConstraintFailureVariance::Contravariant {
+            return Some(error);
         }
 
-        let arguments = failures.iter().map(|failure| failure.error.argument_type());
-        let argument = match first.variance {
-            ConstraintFailureVariance::Contravariant => {
-                IntersectionType::bounded_from_elements(db, env, arguments)
-                    .unwrap_or_else(|| first.error.argument_type())
-            }
-            ConstraintFailureVariance::Covariant => UnionType::from_elements(db, env, arguments),
-            ConstraintFailureVariance::Invariant => {
-                // TODO: Combine invariant failures without losing their lower- or upper-bound
-                // evidence.
-                return Some(first.error.clone());
-            }
-        };
-
-        let mut error = first.error.clone();
-        let (SpecializationError::MismatchedBound {
-            argument: existing, ..
-        }
+        let (SpecializationError::MismatchedBound { argument, .. }
         | SpecializationError::MismatchedConstraint {
-            argument: existing, ..
-        }) = &mut error;
-        *existing = argument;
+            evidence: ConstraintFailureEvidence::Lower(argument),
+            ..
+        }) = &mut error
+        else {
+            return Some(error);
+        };
+        let lower_bounds = failures.iter().map(|failure| {
+            if failure.variance != first.variance
+                || failure.error.bound_typevar() != first.error.bound_typevar()
+            {
+                return None;
+            }
+            match (&first.error, &failure.error) {
+                (
+                    SpecializationError::MismatchedBound { .. },
+                    SpecializationError::MismatchedBound { argument, .. },
+                )
+                | (
+                    SpecializationError::MismatchedConstraint {
+                        evidence: ConstraintFailureEvidence::Lower(_),
+                        ..
+                    },
+                    SpecializationError::MismatchedConstraint {
+                        evidence: ConstraintFailureEvidence::Lower(argument),
+                        ..
+                    },
+                ) => Some(*argument),
+                _ => None,
+            }
+        });
+        if lower_bounds.clone().all(|bound| bound.is_some()) {
+            *argument = IntersectionType::bounded_from_elements(db, env, lower_bounds.flatten())
+                .unwrap_or(*argument);
+        }
         Some(error)
     }
 }
@@ -2914,7 +2907,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> PendingInference<'db, T> {
         let merged_types = self
             .solve_hash_map_with(self.generic_context, &mut |typevar, bounds| {
-                choose(typevar, bounds).and_then(PathBoundSolution::as_type)
+                choose(typevar, bounds).and_then(|solution| solution.as_type())
             });
         PendingInference {
             merged_types,
@@ -3113,9 +3106,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .iter()
             .any(|(identity, ty)| self.has_expanding_cycle(generic_context, types, *identity, *ty))
         {
-            inference.merged_types = self
-                .solve_hash_map_with(generic_context, &mut |typevar, bounds| {
-                    choose(typevar, bounds).and_then(PathBoundSolution::as_type)
+            inference.merged_types =
+                self.solve_hash_map_with(generic_context, &mut |typevar, bounds| {
+                    choose(typevar, bounds).and_then(|solution| solution.as_type())
                 });
         }
 
@@ -3592,23 +3585,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         violation: &SolutionViolation<'db>,
     ) -> Option<ConstraintFailure<'db>> {
         let bound_typevar = violation.bound_typevar;
-        let argument = violation.argument?;
         let variance = match violation.variance {
             TypeVarVariance::Contravariant => ConstraintFailureVariance::Contravariant,
             TypeVarVariance::Covariant => ConstraintFailureVariance::Covariant,
             TypeVarVariance::Invariant => ConstraintFailureVariance::Invariant,
             TypeVarVariance::Bivariant => return None,
         };
-        let error = match violation.kind {
-            SolutionViolationKind::UpperBound => SpecializationError::MismatchedBound {
+        let error = match &violation.kind {
+            SolutionViolationKind::UpperBound(argument) => SpecializationError::MismatchedBound {
                 bound_typevar,
-                argument,
+                argument: (*argument)?,
             },
-            SolutionViolationKind::Constraints(direction) => {
+            SolutionViolationKind::Constraints(evidence) => {
                 SpecializationError::MismatchedConstraint {
                     bound_typevar,
-                    argument,
-                    direction,
+                    evidence: evidence.clone(),
                 }
             }
         };
@@ -4374,11 +4365,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         }
                         return Err(SpecializationError::MismatchedConstraint {
                             bound_typevar,
-                            argument: ty,
-                            direction: if polarity.is_contravariant() {
-                                ConstraintFailureDirection::Upper
+                            evidence: if polarity.is_contravariant() {
+                                ConstraintFailureEvidence::Upper(Box::new([ty]))
                             } else {
-                                ConstraintFailureDirection::Lower
+                                ConstraintFailureEvidence::Lower(ty)
                             },
                         });
                     }
@@ -4798,8 +4788,7 @@ pub(crate) enum SpecializationError<'db> {
     },
     MismatchedConstraint {
         bound_typevar: BoundTypeVarInstance<'db>,
-        argument: Type<'db>,
-        direction: ConstraintFailureDirection,
+        evidence: ConstraintFailureEvidence<'db>,
     },
 }
 
@@ -4808,13 +4797,6 @@ impl<'db> SpecializationError<'db> {
         match self {
             Self::MismatchedBound { bound_typevar, .. } => *bound_typevar,
             Self::MismatchedConstraint { bound_typevar, .. } => *bound_typevar,
-        }
-    }
-
-    pub(crate) fn argument_type(&self) -> Type<'db> {
-        match self {
-            Self::MismatchedBound { argument, .. } => *argument,
-            Self::MismatchedConstraint { argument, .. } => *argument,
         }
     }
 }
@@ -5648,9 +5630,9 @@ mod tests {
         let builder = SpecializationBuilder::new(db, &env, &constraints, context);
         // The lower bound `bytes` excludes every declared constraint. For `bool`, the lower
         // bound fits `int`, but the upper bound excludes both constraints. Both paths are invariant.
-        for (argument, direction) in [
-            (bytes, ConstraintFailureDirection::Lower),
-            (bool, ConstraintFailureDirection::Upper),
+        for (argument, evidence) in [
+            (bytes, ConstraintFailureEvidence::Lower(bytes)),
+            (bool, ConstraintFailureEvidence::Upper(Box::new([bool]))),
         ] {
             let relation = ConstraintSet::constrain_typevar(
                 db,
@@ -5667,47 +5649,14 @@ mod tests {
                     .specialization_error(db, &env),
                 Some(SpecializationError::MismatchedConstraint {
                     bound_typevar: typevar,
-                    argument,
-                    direction,
+                    evidence,
                 })
             );
         }
     }
 
     #[test]
-    fn constrained_upper_declaration_failure() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let int = KnownClass::Int.to_instance(db, &env);
-        let str = KnownClass::Str.to_instance(db, &env);
-        let bool = KnownClass::Bool.to_instance(db, &env);
-        let [typevar] = create_typevars(db, ["T"]);
-        let typevar = typevar.map_bound_or_constraints(db, |_| {
-            Some(TypeVarBoundOrConstraints::Constraints(
-                TypeVarConstraints::new(db, [int, str].as_slice()),
-            ))
-        });
-        let context = GenericContext::from_typevar_instances(db, &env, [typevar]);
-        let constraints = ConstraintSetBuilder::new();
-        let builder = SpecializationBuilder::new(db, &env, &constraints, context);
-        let relation =
-            ConstraintSet::constrain_typevar_upper_bound(db, &env, &constraints, typevar, bool);
-
-        assert_eq!(
-            builder
-                .analyze_constraint_set(relation)
-                .specialization_error(db, &env),
-            Some(SpecializationError::MismatchedConstraint {
-                bound_typevar: typevar,
-                argument: bool,
-                direction: ConstraintFailureDirection::Upper,
-            })
-        );
-    }
-
-    #[test]
-    fn constraint_failure_diagnostics_preserve_variance_and_direction() {
+    fn constraint_failure_diagnostics_preserve_variance_and_evidence() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -5719,15 +5668,16 @@ mod tests {
         );
         let int = KnownClass::Int.to_instance(db, &env);
         let bool = KnownClass::Bool.to_instance(db, &env);
+        let str = KnownClass::Str.to_instance(db, &env);
+        let bytes = KnownClass::Bytes.to_instance(db, &env);
         let analysis = |variance, first, second| {
             ConstraintSetAnalysis::Unsatisfiable(
                 [first, second]
                     .into_iter()
-                    .map(|(argument, direction)| ConstraintFailure {
+                    .map(|evidence| ConstraintFailure {
                         error: SpecializationError::MismatchedConstraint {
                             bound_typevar: typevar,
-                            argument,
-                            direction,
+                            evidence,
                         },
                         variance,
                     })
@@ -5735,56 +5685,45 @@ mod tests {
             )
         };
 
-        let contravariant = analysis(
-            ConstraintFailureVariance::Contravariant,
-            (int, ConstraintFailureDirection::Lower),
-            (bool, ConstraintFailureDirection::Lower),
-        )
-        .specialization_error(db, &env)
-        .map(|error| error.argument_type());
-        assert_eq!(contravariant, Some(bool));
-
-        let covariant = analysis(
-            ConstraintFailureVariance::Covariant,
-            (int, ConstraintFailureDirection::Upper),
-            (bool, ConstraintFailureDirection::Upper),
-        )
-        .specialization_error(db, &env)
-        .map(|error| error.argument_type());
-        assert_eq!(covariant, Some(int));
-
-        let invariant = analysis(
-            ConstraintFailureVariance::Invariant,
-            (int, ConstraintFailureDirection::Lower),
-            (bool, ConstraintFailureDirection::Lower),
-        )
-        .specialization_error(db, &env)
-        .map(|error| error.argument_type());
-        assert_eq!(invariant, Some(int));
-
-        for (variance, first, second, direction, other_direction) in [
+        for (variance, first, second, expected) in [
             (
                 ConstraintFailureVariance::Contravariant,
-                int,
-                bool,
-                ConstraintFailureDirection::Lower,
-                ConstraintFailureDirection::Upper,
+                ConstraintFailureEvidence::Lower(int),
+                ConstraintFailureEvidence::Lower(bool),
+                ConstraintFailureEvidence::Lower(bool),
+            ),
+            (
+                ConstraintFailureVariance::Invariant,
+                ConstraintFailureEvidence::Lower(int),
+                ConstraintFailureEvidence::Lower(bool),
+                ConstraintFailureEvidence::Lower(int),
+            ),
+            // Each upper-bound group describes one alternative. Preserve the first group
+            // without intersecting its elements or including bounds from the second group.
+            (
+                ConstraintFailureVariance::Covariant,
+                ConstraintFailureEvidence::Upper(Box::new([bool, str])),
+                ConstraintFailureEvidence::Upper(Box::new([int, bytes])),
+                ConstraintFailureEvidence::Upper(Box::new([bool, str])),
+            ),
+            (
+                ConstraintFailureVariance::Contravariant,
+                ConstraintFailureEvidence::Lower(int),
+                ConstraintFailureEvidence::Upper(Box::new([bool])),
+                ConstraintFailureEvidence::Lower(int),
             ),
             (
                 ConstraintFailureVariance::Covariant,
-                bool,
-                int,
-                ConstraintFailureDirection::Upper,
-                ConstraintFailureDirection::Lower,
+                ConstraintFailureEvidence::Upper(Box::new([bool])),
+                ConstraintFailureEvidence::Lower(int),
+                ConstraintFailureEvidence::Upper(Box::new([bool])),
             ),
         ] {
             assert_eq!(
-                analysis(variance, (first, direction), (second, other_direction))
-                    .specialization_error(db, &env),
+                analysis(variance, first, second).specialization_error(db, &env),
                 Some(SpecializationError::MismatchedConstraint {
                     bound_typevar: typevar,
-                    argument: first,
-                    direction,
+                    evidence: expected,
                 })
             );
         }
