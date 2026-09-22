@@ -7,9 +7,10 @@ use crate::{
     place::Place,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
-        FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
-        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
+        FunctionType, InternedType, IntersectionType, KnownBoundMethodType, KnownClass,
+        KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
+        Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+        UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         cyclic::ActiveRecursionDetector,
         function::OverloadLiteral,
@@ -22,6 +23,61 @@ use crate::{
 use ty_python_core::definition::Definition;
 
 impl<'db> Type<'db> {
+    /// Maps callable leaves without losing the union or intersection of their signatures.
+    pub(super) fn try_map_callable(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        map: &mut impl FnMut(CallableType<'db>) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        self.try_map_union_intersection(db, env, &mut |ty| ty.as_callable().and_then(&mut *map))
+    }
+
+    /// Maps the positive leaves of a union or intersection. Negated types cannot generally be
+    /// transformed in the same way, so an intersection containing one is rejected.
+    pub(super) fn try_map_union_intersection(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        map: &mut impl FnMut(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        match self {
+            Type::Union(union) => union.try_map(db, env, |element| {
+                element.try_map_union_intersection(db, env, map)
+            }),
+            Type::Intersection(intersection) if intersection.negative(db).is_empty() => {
+                let elements = intersection
+                    .positive(db)
+                    .iter()
+                    .map(|element| element.try_map_union_intersection(db, env, map))
+                    .collect::<Option<Vec<_>>>()?;
+                Some(IntersectionType::from_elements(db, env, elements))
+            }
+            Type::Intersection(_) => None,
+            _ => map(self),
+        }
+    }
+
+    /// Reifies a captured parameter list as a callable for argument matching and checking.
+    pub(super) fn paramspec_value_callable_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        self.try_map_union_intersection(db, env, &mut |value| match value {
+            Type::Callable(callable) if callable.kind(db) == CallableTypeKind::ParamSpecValue => {
+                Some(Type::Callable(callable.into_regular(db)))
+            }
+            Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
+                Some(Type::Callable(CallableType::single(
+                    db,
+                    Signature::new(Parameters::paramspec(db, typevar), Type::unknown()),
+                )))
+            }
+            _ => None,
+        })
+    }
+
     pub(super) fn function_like_kind(self, db: &'db dyn Db) -> Option<CallableTypeKind> {
         match self {
             Type::FunctionLiteral(function) => Some(function.callable_type_kind(db)),

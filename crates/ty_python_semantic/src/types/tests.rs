@@ -2,6 +2,7 @@ use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::call::bind::CallableDescription;
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::type_alias::PEP695TypeAliasType;
 use crate::types::typevar::TypeVarSet;
 use crate::{Db, ProgramEnvironment};
