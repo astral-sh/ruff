@@ -887,6 +887,51 @@ reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[Literal["a"], Literal
 reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 ```
 
+## A single generic member of a union
+
+An optional container supplies its element type even when the argument can also be `None`. The fixed
+union member contributes no type variable evidence.
+
+```py
+from collections.abc import Mapping, Sequence
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+def sequence_element(value: Sequence[T] | None) -> T:
+    raise NotImplementedError
+
+def mapping_value(value: Mapping[str, T] | None) -> T:
+    raise NotImplementedError
+
+def _(sequence: list[str] | None, mapping: dict[str, int] | None):
+    reveal_type(sequence_element(sequence))  # revealed: str
+    reveal_type(mapping_value(mapping))  # revealed: int
+
+reveal_type(sequence_element(None))  # revealed: Unknown
+
+def _(invalid: list[str] | int):
+    sequence_element(invalid)  # error: [invalid-argument-type]
+```
+
+The same inference applies to an optional container nested in a covariant receiver.
+
+```py
+T_co = TypeVar("T_co", covariant=True)
+U = TypeVar("U")
+
+class Container(Generic[T_co]):
+    def element(self: "Container[Sequence[T] | None]") -> T:
+        raise NotImplementedError
+
+    def pair(self: "Container[Sequence[T] | None]", other: U) -> tuple[T, U]:
+        raise NotImplementedError
+
+def _(container: Container[list[str] | None]):
+    reveal_type(container.element())  # revealed: str
+    reveal_type(container.pair(42))  # revealed: tuple[str, Literal[42]]
+```
+
 ## Inference from unions containing generic classes
 
 When a union parameter contains generic classes like `P[T] | Q[T]`, we can infer the typevar from
