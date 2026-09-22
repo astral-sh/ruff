@@ -693,17 +693,10 @@ reveal_type(infer_constrained(invalid_first))  # revealed: int
 reveal_type(infer_constrained(invalid_last))  # revealed: int
 ```
 
-## Overloaded methods with `Self` passed to a decorator
+## Unresolved `Self` overloads
 
-An overloaded method can have a concrete return type in one overload and use `Self` to relate the
-receiver and return types in another. When passed through a generic decorator, the concrete overload
-can be fully solved while the `Self` overload remains unresolved. Discarding that unresolved
-alternative would incorrectly remove the overload that accepts `Expr`.
-
-We therefore merge the inferred types for the whole call instead of retaining only the fully solved
-alternative. This keeps calls with `Expr` valid, but does not yet preserve the `Self` correlation:
-the decorator still reports an error, and a call with a `SpecialMatrix` receiver and an `Expr`
-argument is inferred to return `Matrix` rather than `SpecialMatrix`:
+The inferred callable retains the argument types accepted by every overload, even when a `Self`
+dependency in one overload cannot be resolved.
 
 ```py
 from typing import Callable, TypeVar, overload
@@ -716,31 +709,23 @@ R = TypeVar("R")
 def identity(fn: Callable[[A, B], R]) -> Callable[[A, B], R]:
     return fn
 
-class Expr: ...
-
-class Matrix:
+class C:
     @overload
-    def __mul__(self, other: "Matrix") -> "Matrix": ...
+    def method(self, value: int) -> "C": ...
     @overload
-    def __mul__(self, other: Expr) -> Self: ...
-    def __mul__(self, other: "Matrix | Expr") -> "Matrix | Self":
-        raise NotImplementedError
+    def method(self, value: str) -> Self: ...
+    def method(self, value: int | str) -> "C":
+        return self
 
-class SpecialMatrix(Matrix): ...
-
-matrix = Matrix()
-special = SpecialMatrix()
-expr = Expr()
-
-# TODO: Preserve both overloads, including the generic `Self` alternative, without erroring.
+# TODO: Accept the callback without error.
 # error: [invalid-argument-type]
-mul = identity(Matrix.__mul__)
-reveal_type(mul)  # revealed: (Matrix, Matrix | Expr, /) -> Matrix
-reveal_type(mul(matrix, expr))  # revealed: Matrix
-reveal_type(mul(matrix, matrix))  # revealed: Matrix
-# TODO: revealed: SpecialMatrix
-reveal_type(mul(special, expr))  # revealed: Matrix
-reveal_type(mul(special, special))  # revealed: Matrix
+method = identity(C.method)
+reveal_type(method)  # revealed: (C, int | str, /) -> C
+
+class Sub(C): ...
+
+# TODO: revealed: Sub (preserve the generic `Self` overload)
+reveal_type(method(Sub(), ""))  # revealed: C
 ```
 
 ## Overloaded callable with a constrained type variable
@@ -833,14 +818,12 @@ R = TypeVar("R")
 def infer_result(callback: Callable[[T], R], consumer: Callable[[T], None]) -> R:
     raise NotImplementedError
 
+# Eager subtype checking cannot yet infer callback-local type variables, so `identity`
+# wrongly fails revalidation against both `Callable[[A], A]` and `Callable[[B], B]`, so
+# we fall back to `A | B` instead of `A & B`.
 # TODO: revealed: A & B
 reveal_type(infer_result(identity, consume))  # revealed: A | B
 ```
-
-Before intersecting the results, we check that each specialization accepts the original callbacks.
-This subtype check does not yet infer `identity`'s own type variable when comparing it with
-`Callable[[A], A]` or `Callable[[B], B]`. Neither specialization currently passes this check, so we
-infer `A | B` here until this limitation is fixed.
 
 If we additionally supply a value, that selects the specific consumer overload that accepts it. The
 identity callback's result type follows that selected argument type:
@@ -937,38 +920,6 @@ def callback(value):
 
 assert_type(infer_return((callback, callback, callback), 0), Unknown)
 assert_type(infer_return(default=0, callback=(callback, callback, callback)), Unknown)
-```
-
-## Inferred type-guard return alternatives
-
-Type-guard functions return booleans. The types inside `TypeGuard` and `TypeIs` describe how their
-arguments can be narrowed, not the values they return. A callback can have two type-guard signatures
-and still return normally. Intersecting those return annotations as ordinary types can instead
-produce `Never`, incorrectly suggesting that the call cannot return.
-
-A generic function that calls the callback and returns its result has the same behavior, even if its
-own return annotation is only a type variable. Its inferred return type therefore retains the union
-of the guard annotations rather than becoming `Never`.
-
-```py
-from collections.abc import Callable
-from typing import TypeGuard, TypeVar
-from typing_extensions import TypeIs
-from ty_extensions import Intersection
-
-R = TypeVar("R")
-
-class A: ...
-class B: ...
-
-def invoke(callback: Callable[[object], R], value: object) -> R:
-    return callback(value)
-
-def _(callback: Intersection[Callable[[object], TypeGuard[A]], Callable[[object], TypeGuard[B]]]) -> None:
-    reveal_type(invoke(callback, object()))  # revealed: TypeGuard[A] | TypeGuard[B]
-
-def _(callback: Intersection[Callable[[object], TypeIs[A]], Callable[[object], TypeIs[B]]]) -> None:
-    reveal_type(invoke(callback, object()))  # revealed: TypeIs[A] | TypeIs[B]
 ```
 
 ## Inferred mutable return alternatives

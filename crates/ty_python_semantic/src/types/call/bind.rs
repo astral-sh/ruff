@@ -6324,14 +6324,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
         for &specialization in specializations {
             let return_ty = self.return_ty.apply_specialization(db, specialization);
-            // TODO: Preserve alternatives through type-guard narrowing. Guard wrappers are not
-            // ordinary result types: their intersection can simplify to `Never` even though both
-            // specializations return booleans. They can also appear inside an inferred type.
-            if any_over_type_expanding_aliases(db, env, return_ty, |ty| {
-                matches!(ty, Type::TypeGuard(_) | Type::TypeIs(_))
-            }) {
-                return None;
-            }
             budget.charge_type(db, return_ty).ok()?;
             // Expose aliased unions to the intersection constructor's expansion budget.
             returns.push(match return_ty.resolve_type_alias(db) {

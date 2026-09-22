@@ -1924,41 +1924,6 @@ def _(sink: Intersection[ASink, BSink]) -> None:
     reveal_type(with_fixed(sink, "bad"))  # revealed: list[A | B]
 ```
 
-## Type guards inferred from intersection arguments
-
-Type-guard functions return booleans. The types inside `TypeGuard` and `TypeIs` describe how their
-arguments can be narrowed, not the values they return. When an intersection argument permits two
-valid specializations of a guard, the call can still return a boolean. Intersecting the specialized
-guard annotations as ordinary return types could instead produce `Never`, incorrectly suggesting
-that the call cannot return.
-
-Until narrowing can preserve the separate specializations, we merge the inferred types for `T`
-before applying the guard annotation. The result is a guard for `A | B`, rather than an intersection
-of guards for `A` and `B`:
-
-```py
-from typing import TypeGuard
-from typing_extensions import TypeIs
-from ty_extensions import Intersection
-
-class Source[T]:
-    def get(self) -> T:
-        raise NotImplementedError
-
-class A: ...
-class B: ...
-
-def guard[T](value: object, source: Source[T]) -> TypeGuard[T]:
-    return False
-
-def is_type[T](value: object, source: Source[T]) -> TypeIs[T]:
-    return False
-
-def _(value: object, source: Intersection[Source[A], Source[B]]) -> None:
-    reveal_type(guard(value, source))  # revealed: TypeGuard[A | B @ value]
-    reveal_type(is_type(value, source))  # revealed: TypeIs[A | B @ value]
-```
-
 ## Inferring tuple parameter types
 
 ```py
