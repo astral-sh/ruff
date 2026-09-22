@@ -63,3 +63,9 @@ t'\'normal\' {t'nested'} normal'  # Q003
 t'\'normal\' {t'nested'} "double quotes"'
 t'\'normal\' {t'\'nested\' {'other'} normal'} "double quotes"'  # Q003
 t'\'normal\' {t'\'nested\' {'other'} "double quotes"'} normal'  # Q00l
+
+# Implicit concatenation: the escaped literal is directly preceded by two opposite
+# quotes, so changing its outer quotes would form a triple quote and produce a syntax
+# error. No Q003 fix should be offered here.
+# https://github.com/astral-sh/ruff/issues/12641
+print(""'\'')

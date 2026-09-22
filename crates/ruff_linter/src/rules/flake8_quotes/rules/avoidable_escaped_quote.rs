@@ -274,6 +274,20 @@ fn check_string_or_bytes(
         return;
     }
 
+    // If this literal is directly preceded (with no intervening whitespace) by two of the
+    // opposite quote characters, changing its outer quotes would merge them into a triple quote
+    // and produce a syntax error via implicit string concatenation. For example, with single
+    // inline quotes, `""'\''` would be rewritten to `"""'"`, an unterminated triple-quoted string.
+    // Skip the fix in that case (the rewritten value never ends in an opposite quote, so only the
+    // start boundary needs guarding). See https://github.com/astral-sh/ruff/issues/12641.
+    let opposite = quotes_settings.inline_quotes.opposite().as_char();
+    if flags.prefix().as_str().is_empty() {
+        let mut prev = locator.up_to(range.start()).chars().rev();
+        if prev.next() == Some(opposite) && prev.next() == Some(opposite) {
+            return;
+        }
+    }
+
     let mut diagnostic = checker.report_diagnostic(AvoidableEscapedQuote, range);
     let fixed_contents = format!(
         "{prefix}{quote}{value}{quote}",
