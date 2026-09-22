@@ -36,8 +36,11 @@ use crate::{FixAvailability, Violation};
 /// it can be less performant than the lower-level alternatives that work directly with strings,
 /// especially on older versions of Python.
 ///
-/// ## Fix Safety
+/// ## Fix safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+///
+/// The fix may also change behavior if the argument is an empty string, since `os.path.isdir("")` returns `False`
+/// whereas `Path("").is_dir()` returns `True` (because `Path("")` is normalized to `Path(".")`).
 ///
 /// ## References
 /// - [Python documentation: `Path.is_dir`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.is_dir)

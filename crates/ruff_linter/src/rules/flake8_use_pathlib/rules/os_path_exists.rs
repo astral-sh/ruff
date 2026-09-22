@@ -36,8 +36,11 @@ use crate::{FixAvailability, Violation};
 /// it can be less performant than the lower-level alternatives that work directly with strings,
 /// especially on older versions of Python.
 ///
-/// ## Fix Safety
+/// ## Fix safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+///
+/// The fix may also change behavior if the argument is an empty string, since `os.path.exists("")` returns `False`
+/// whereas `Path("").exists()` returns `True` (because `Path("")` is normalized to `Path(".")`).
 ///
 /// ## References
 /// - [Python documentation: `Path.exists`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.exists)
