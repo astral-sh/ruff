@@ -1829,19 +1829,6 @@ impl<'db> Signature<'db> {
             .flat_map(OwnedConstraintSet::types)
     }
 
-    /// Returns this signature with the given specialization applied to parameters and return type.
-    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        let env = &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
-        let type_mapping =
-            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
-        self.apply_type_mapping_impl(
-            db,
-            &type_mapping,
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::new(env),
-        )
-    }
-
     /// Specializes a partial's full signature before matching its bound arguments again.
     pub(crate) fn specialize_for_partial_application(
         &self,
@@ -1850,20 +1837,14 @@ impl<'db> Signature<'db> {
         partial_application: &PartialApplication<'db>,
         inference: Option<TypeVarInference<'db>>,
         unspecialized_return_ty: Type<'db>,
-    ) -> Self {
+    ) -> Type<'db> {
         let signature_specialization =
             self.partial_application_specialization(db, env, partial_application, inference);
-        let signature = signature_specialization.map_or_else(
-            || self.clone(),
-            |specialization| self.apply_specialization(db, specialization),
-        );
-
-        let return_ty = signature_specialization.map_or_else(
-            || unspecialized_return_ty,
-            |specialization| unspecialized_return_ty.apply_specialization(db, specialization),
-        );
-
-        signature.with_return_type(return_ty)
+        let callable = Type::Callable(CallableType::single(
+            db,
+            self.clone().with_return_type(unspecialized_return_ty),
+        ));
+        callable.apply_optional_specialization(db, signature_specialization)
     }
 
     /// Reduces a specialized signature using bindings matched against that same signature.

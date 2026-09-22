@@ -4742,7 +4742,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             formal_specialization,
                             base_specialization
                         ) {
-                            let variance = typevar.variance_with_polarity(db, polarity);
+                            let variance =
+                                polarity.compose_thunk(|| specialization_variance(db, typevar));
                             self.infer_map_impl(*formal_ty, *base_ty, variance, visitor)?;
                         }
                         return Ok(());
