@@ -885,7 +885,13 @@ error[invalid-argument-type]: Argument to function `constrained` is incorrect
   --> src/mdtest_snippet.py:13:25
    |
 13 | reveal_type(constrained(accepts_bool))  # revealed: Unknown
-   |                         ^^^^^^^^^^^^ No allowed specialization of `T` satisfies the inferred upper bound `bool`
+   |                         ^^^^^^^^^^^^ Expected `(T@constrained, /) -> None`, found `def accepts_bool(value: bool) -> None`
+info: No allowed specialization of `T` satisfies the inferred upper bound `bool`
+info: Parameter declared here
+ --> src/mdtest_snippet.py:3:32
+  |
+3 | def constrained[T: (int, str)](consumer: Callable[[T], None]) -> T:
+  |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 info: Type variable defined here
  --> src/mdtest_snippet.py:3:17
   |
@@ -897,8 +903,8 @@ info: Type variable defined here
 
 A union of text and binary writers requires one specialization that both writers accept. The
 inferred upper bounds are `str` and `bytes`; neither allowed specialization satisfies both. Each
-writer alone accepts one of the declared constraints. The diagnostic lists both upper bounds
-individually.
+writer alone accepts one of the declared constraints. The diagnostic shows the argument type, lists
+both upper bounds individually, and points to the parameter annotation that contains `T`.
 
 ```py
 from typing import Protocol
@@ -919,11 +925,53 @@ error[invalid-argument-type]: Argument to function `constrained` is incorrect
   --> src/mdtest_snippet.py:11:17
    |
 11 |     constrained(either)
-   |                 ^^^^^^ No allowed specialization of `T` satisfies all inferred upper bounds: `str`, `bytes`
+   |                 ^^^^^^ Expected `Writer[T@constrained]`, found `Writer[str] | Writer[bytes]`
+info: No allowed specialization of `T` satisfies all inferred upper bounds: `str`, `bytes`
+info: Parameter declared here
+ --> src/mdtest_snippet.py:6:34
+  |
+6 | def constrained[T: (str, bytes)](writer: Writer[T]) -> None: ...
+  |                                  ^^^^^^^^^^^^^^^^^
 info: Type variable defined here
  --> src/mdtest_snippet.py:6:17
   |
 6 | def constrained[T: (str, bytes)](writer: Writer[T]) -> None: ...
+  |                 ^^^^^^^^^^^^^^^
+```
+
+## Constraint diagnostics for unpacked parameters
+
+When an unpacked tuple parameter accepts several arguments, a constraint error points to the
+original parameter annotation even if a later tuple element causes the failure.
+
+```py
+from typing import Protocol
+
+class Writer[T](Protocol):
+    def write(self, value: T) -> None: ...
+
+def constrained[T: (str, bytes)](prefix: int, *writers: *tuple[Writer[T], Writer[T]]) -> None: ...
+def f(text: Writer[str], either: Writer[str] | Writer[bytes]):
+    # snapshot: invalid-argument-type
+    constrained(0, text, either)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `constrained` is incorrect
+ --> src/mdtest_snippet.py:9:26
+  |
+9 |     constrained(0, text, either)
+  |                          ^^^^^^ Expected `Writer[T@constrained]`, found `Writer[str] | Writer[bytes]`
+info: No allowed specialization of `T` satisfies all inferred upper bounds: `str`, `bytes`
+info: Parameter declared here
+ --> src/mdtest_snippet.py:6:47
+  |
+6 | def constrained[T: (str, bytes)](prefix: int, *writers: *tuple[Writer[T], Writer[T]]) -> None: ...
+  |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+info: Type variable defined here
+ --> src/mdtest_snippet.py:6:17
+  |
+6 | def constrained[T: (str, bytes)](prefix: int, *writers: *tuple[Writer[T], Writer[T]]) -> None: ...
   |                 ^^^^^^^^^^^^^^^
 ```
 
