@@ -416,41 +416,44 @@ impl<'a> ResponseWriter<'a> {
             .map(|doc| doc.version())
             .ok();
 
-        let result_id = Diagnostics::result_id_from_hash(
+        let diagnostics = diagnostics
+            .iter()
+            .filter(|diagnostic| self.global_settings.should_show_diagnostic(diagnostic));
+        let Some(result_id) = Diagnostics::result_id_from_hash(
             db,
-            diagnostics,
+            diagnostics.clone(),
             unnecessary_hints,
             self.client_capabilities,
-        );
+        ) else {
+            // Leave any previous result ID for `into_final_report` to clear. Without a previous
+            // result, there is nothing to report and the request can continue long polling.
+            return;
+        };
 
         let previous_result_id = self.previous_result_ids.remove(&key).map(|(_uri, id)| id);
 
-        let report = match result_id {
-            Some(new_id) if Some(&new_id) == previous_result_id.as_ref() => {
+        let report = match previous_result_id {
+            Some(previous_id) if result_id == previous_id => {
                 WorkspaceDocumentDiagnosticReport::WorkspaceUnchangedDocumentDiagnosticReport(
                     WorkspaceUnchangedDocumentDiagnosticReport {
                         uri,
                         version,
                         unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
-                            result_id: new_id,
+                            result_id,
                         },
                     },
                 )
             }
-            new_id => {
+            _ => {
                 let mut lsp_diagnostics = diagnostics
-                    .iter()
-                    .filter_map(|diagnostic| {
-                        Some(
-                            to_lsp_diagnostic(
-                                db,
-                                diagnostic,
-                                self.position_encoding,
-                                self.client_capabilities,
-                                self.global_settings,
-                            )?
-                            .1,
+                    .map(|diagnostic| {
+                        to_lsp_diagnostic(
+                            db,
+                            diagnostic,
+                            self.position_encoding,
+                            self.client_capabilities,
                         )
+                        .1
                     })
                     .collect::<Vec<_>>();
                 lsp_diagnostics.extend(unnecessary_hints_to_lsp_diagnostics(
@@ -465,7 +468,7 @@ impl<'a> ResponseWriter<'a> {
                         uri,
                         version,
                         full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                            result_id: new_id,
+                            result_id: Some(result_id),
                             items: lsp_diagnostics,
                         },
                     },
