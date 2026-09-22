@@ -1944,6 +1944,64 @@ reveal_type(replacement)  # revealed: type[Output]
 replacement(1)  # error: [too-many-positional-arguments]
 ```
 
+### Protocol class return annotations
+
+Some transforms, including Pydantic's dataclass decorator, use `type[Protocol]` to describe the
+interface added to the input class. For these returns, ty assumes the first parameter receives the
+class being transformed and preserves that class and its dataclass constructor. Additional members
+described by the protocol are not currently added to the class.
+
+```py
+from typing import Protocol, dataclass_transform
+
+class DataclassInterface(Protocol):
+    def serialize(self) -> str: ...
+
+@dataclass_transform()
+def model(cls: type, *, config: type | None = None) -> type[DataclassInterface]:
+    raise NotImplementedError
+
+@model
+class Direct:
+    x: int
+
+reveal_type(Direct(1).x)  # revealed: int
+Direct("wrong")  # error: [invalid-argument-type]
+reveal_type(model(cls=Direct))  # revealed: <class 'Direct'>
+```
+
+The same heuristic applies to a saved decorator returned by a factory. For a callable instance, the
+class argument follows the implicit `self` parameter.
+
+```py
+class Decorator:
+    def __call__(self, cls: type) -> type[DataclassInterface]:
+        raise NotImplementedError
+
+@dataclass_transform()
+def configured() -> Decorator:
+    raise NotImplementedError
+
+decorator = configured()
+
+@decorator
+class Configured:
+    x: int
+
+reveal_type(Configured(1).x)  # revealed: int
+Configured("wrong")  # error: [invalid-argument-type]
+```
+
+A nonliteral class argument keeps the declared return type. A class passed as configuration does not
+become the transformed class instead.
+
+```py
+class Config: ...
+
+def decorate(cls: type[Direct]):
+    reveal_type(model(cls, config=Config))  # revealed: type[DataclassInterface]
+```
+
 ### Overloaded decorator function
 
 When the decorator function has overloads (one for direct class application, one for returning a

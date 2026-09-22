@@ -74,9 +74,9 @@ use crate::types::{
     DATACLASS_FLAGS, DataclassDecorator, DataclassFlags, DataclassParams, DynamicType,
     GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
-    SubclassOfType, TypeContext, TypeIdentity, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
-    is_property_method, list_members,
+    SubclassOfInner, SubclassOfType, TypeContext, TypeIdentity, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -1680,6 +1680,7 @@ impl<'db> Bindings<'db> {
         // Each special case listed here should have a corresponding clause in `Type::bindings`.
         for binding in self.iter_flat_mut() {
             let binding_type = binding.callable_type;
+            let first_parameter_index = usize::from(binding.bound_type.is_some());
             for (overload_index, overload) in binding.matching_overloads_mut() {
                 match binding_type {
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
@@ -2637,7 +2638,12 @@ impl<'db> Bindings<'db> {
 
                                 // `dataclass` being used as a non-decorator (i.e., `dataclass(SomeClass)`).
                                 if cls_argument.is_some_and(|cls_ty| !cls_ty.is_none(db)) {
-                                    overload.apply_dataclass_params(db, env, params);
+                                    overload.apply_dataclass_params(
+                                        db,
+                                        env,
+                                        params,
+                                        first_parameter_index,
+                                    );
                                 }
                             }
                         }
@@ -2772,7 +2778,12 @@ impl<'db> Bindings<'db> {
                                     dataclass_params.field_specifiers(db),
                                 );
 
-                                overload.apply_dataclass_params(db, env, dataclass_params);
+                                overload.apply_dataclass_params(
+                                    db,
+                                    env,
+                                    dataclass_params,
+                                    first_parameter_index,
+                                );
                                 overload.set_return_type(dataclass_factory_result(
                                     db,
                                     env,
@@ -3205,7 +3216,7 @@ impl<'db> Bindings<'db> {
 
             for (_, overload) in binding.matching_overloads_mut() {
                 if let Some(params) = overload.dataclass_params {
-                    overload.apply_dataclass_params(db, env, params);
+                    overload.apply_dataclass_params(db, env, params, first_parameter_index);
                 }
             }
 
@@ -7433,21 +7444,40 @@ pub(crate) struct Binding<'db> {
 
 impl<'db> Binding<'db> {
     /// Enrich a class-preserving return with the methods and flags supplied by the decorator.
-    /// An explicit replacement type, including `Never`, remains authoritative. Nonliteral class
-    /// arguments do not identify a class definition to enrich, so ordinary inference is sufficient.
+    /// Nonliteral class arguments do not identify a class definition to enrich, so ordinary
+    /// inference is sufficient.
     fn apply_dataclass_params(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         params: DataclassParams<'db>,
+        first_parameter_index: usize,
     ) {
-        for argument in self.parameter_types().iter().flatten() {
+        // Libraries such as Pydantic use `type[Protocol]` to describe an interface added to the
+        // input class. Assume these transforms preserve the class passed to the first positional
+        // parameter. Unlike a matching return type, a protocol cannot identify the target among
+        // other class-valued arguments, such as configuration classes.
+        let returns_protocol_class = matches!(
+            self.return_type().resolve_type_alias(db),
+            Type::SubclassOf(subclass_of)
+                if matches!(subclass_of.subclass_of(), SubclassOfInner::Protocol(_))
+        ) && self
+            .signature
+            .parameters()
+            .get_positional(first_parameter_index)
+            .is_some();
+
+        for (index, argument) in self.parameter_types().iter().enumerate() {
+            let Some(argument) = argument else {
+                continue;
+            };
             let class_literal = match argument {
                 Type::ClassLiteral(class_literal) => *class_literal,
                 Type::GenericAlias(alias) => ClassLiteral::Static(alias.origin(db)),
                 _ => continue,
             };
-            if self.return_type() != *argument
+            if !(returns_protocol_class && index == first_parameter_index)
+                && self.return_type() != *argument
                 && !SubclassOfType::try_from_type(db, env, *argument).is_some_and(|class_type| {
                     self.return_type().is_equivalent_to(db, env, class_type)
                 })
