@@ -854,7 +854,8 @@ def _(both: Intersection[Source[A], Source[B]], mixed: Intersection[Source[A], S
     reveal_type(constrained(mixed))  # revealed: A
 ```
 
-If no alternative satisfies the declaration, the diagnostic combines the rejected evidence:
+If no covariant source alternative satisfies the declaration, the diagnostic intersects their
+rejected lower bounds:
 
 ```py
 def _(source: Intersection[Source[C], Source[D]]) -> None:
@@ -866,7 +867,8 @@ def _(source: Intersection[Source[C], Source[D]]) -> None:
 
 For a contravariant sink, the declared constraint must be a subtype of the sink's element type. A
 sink accepting only a strict subclass of `A` cannot select `A`; neither unrelated sink can select
-any declared constraint:
+any declared constraint. When both alternatives fail, the diagnostic reports the upper bound from
+the first rejected alternative:
 
 ```py
 class Sink[T]:
@@ -879,9 +881,9 @@ def constrained_sink[T: (A, B)](sink: Sink[T]) -> T:
     raise NotImplementedError
 
 def _(narrow: Intersection[Sink[SubA], Marker], unrelated: Intersection[Sink[C], Sink[D]]) -> None:
-    # error: [invalid-argument-type] "Argument type `SubA` does not satisfy constraints (`A`, `B`)"
+    # error: [invalid-argument-type] "No allowed specialization of `T` satisfies the inferred upper bound `SubA`"
     reveal_type(constrained_sink(narrow))  # revealed: Unknown
-    # error: [invalid-argument-type] "Argument type `C | D` does not satisfy constraints (`A`, `B`)"
+    # error: [invalid-argument-type] "No allowed specialization of `T` satisfies the inferred upper bound `C`"
     reveal_type(constrained_sink(unrelated))  # revealed: Unknown
 ```
 
