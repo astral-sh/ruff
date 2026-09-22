@@ -195,7 +195,7 @@ RUF055 [*] Plain string pattern passed to `re` function
 95 | re.sub(r"a", r"\?", "a")
    | ^^^^^^^^^^^^^^^^^^^^^^^^
 96 |
-97 | # these double as tests for preserving raw string quoting style
+97 | # `\\` is also "processed" by `re.sub`: it collapses the escaped backslash to a
    |
 help: Replace with `"a".replace(r"a", r"\?")`
    |
@@ -205,54 +205,75 @@ help: Replace with `"a".replace(r"a", r"\?")`
 96 |
    |
 
-RUF055 [*] Plain string pattern passed to `re` function
-   --> RUF055_0.py:98:1
+RUF055 Plain string pattern passed to `re` function
+   --> RUF055_0.py:101:1
     |
- 97 | # these double as tests for preserving raw string quoting style
- 98 | re.sub(r'abc', "", s)
-    | ^^^^^^^^^^^^^^^^^^^^^
- 99 | re.sub(r"""abc""", "", s)
-100 | re.sub(r'''abc''', "", s)
+ 99 | # backslashes literally. A diagnostic should be emitted without a fix.
+100 | # https://github.com/astral-sh/ruff/issues/14757
+101 | re.sub(r"a", r"\\", "a")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
+102 | re.sub(r"a", "\\\\", "a")
     |
-help: Replace with `s.replace(r'abc', "")`
-   |
-97 | # these double as tests for preserving raw string quoting style
-   - re.sub(r'abc', "", s)
-98 + s.replace(r'abc', "")
-99 | re.sub(r"""abc""", "", s)
-   |
+
+RUF055 Plain string pattern passed to `re` function
+   --> RUF055_0.py:102:1
+    |
+100 | # https://github.com/astral-sh/ruff/issues/14757
+101 | re.sub(r"a", r"\\", "a")
+102 | re.sub(r"a", "\\\\", "a")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^
+103 |
+104 | # these double as tests for preserving raw string quoting style
+    |
 
 RUF055 [*] Plain string pattern passed to `re` function
-   --> RUF055_0.py:99:1
+   --> RUF055_0.py:105:1
     |
- 97 | # these double as tests for preserving raw string quoting style
- 98 | re.sub(r'abc', "", s)
- 99 | re.sub(r"""abc""", "", s)
+104 | # these double as tests for preserving raw string quoting style
+105 | re.sub(r'abc', "", s)
+    | ^^^^^^^^^^^^^^^^^^^^^
+106 | re.sub(r"""abc""", "", s)
+107 | re.sub(r'''abc''', "", s)
+    |
+help: Replace with `s.replace(r'abc', "")`
+    |
+104 | # these double as tests for preserving raw string quoting style
+    - re.sub(r'abc', "", s)
+105 + s.replace(r'abc', "")
+106 | re.sub(r"""abc""", "", s)
+    |
+
+RUF055 [*] Plain string pattern passed to `re` function
+   --> RUF055_0.py:106:1
+    |
+104 | # these double as tests for preserving raw string quoting style
+105 | re.sub(r'abc', "", s)
+106 | re.sub(r"""abc""", "", s)
     | ^^^^^^^^^^^^^^^^^^^^^^^^^
-100 | re.sub(r'''abc''', "", s)
+107 | re.sub(r'''abc''', "", s)
     |
 help: Replace with `s.replace(r"""abc""", "")`
     |
-98  | re.sub(r'abc', "", s)
+105 | re.sub(r'abc', "", s)
     - re.sub(r"""abc""", "", s)
-99  + s.replace(r"""abc""", "")
-100 | re.sub(r'''abc''', "", s)
+106 + s.replace(r"""abc""", "")
+107 | re.sub(r'''abc''', "", s)
     |
 
 RUF055 [*] Plain string pattern passed to `re` function
-   --> RUF055_0.py:100:1
+   --> RUF055_0.py:107:1
     |
- 98 | re.sub(r'abc', "", s)
- 99 | re.sub(r"""abc""", "", s)
-100 | re.sub(r'''abc''', "", s)
+105 | re.sub(r'abc', "", s)
+106 | re.sub(r"""abc""", "", s)
+107 | re.sub(r'''abc''', "", s)
     | ^^^^^^^^^^^^^^^^^^^^^^^^^
-101 |
-102 | # Empty pattern: re.split("", s) should not be flagged because
+108 |
+109 | # Empty pattern: re.split("", s) should not be flagged because
     |
 help: Replace with `s.replace(r'''abc''', "")`
     |
-99  | re.sub(r"""abc""", "", s)
+106 | re.sub(r"""abc""", "", s)
     - re.sub(r'''abc''', "", s)
-100 + s.replace(r'''abc''', "")
-101 |
+107 + s.replace(r'''abc''', "")
+108 |
     |

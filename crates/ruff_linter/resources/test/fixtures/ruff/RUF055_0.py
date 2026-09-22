@@ -94,6 +94,13 @@ re.sub(r"a", r"\a", "a")
 re.sub(r"a", "\?", "a")
 re.sub(r"a", r"\?", "a")
 
+# `\\` is also "processed" by `re.sub`: it collapses the escaped backslash to a
+# single backslash in the replacement, while `str.replace` would insert both
+# backslashes literally. A diagnostic should be emitted without a fix.
+# https://github.com/astral-sh/ruff/issues/14757
+re.sub(r"a", r"\\", "a")
+re.sub(r"a", "\\\\", "a")
+
 # these double as tests for preserving raw string quoting style
 re.sub(r'abc', "", s)
 re.sub(r"""abc""", "", s)

@@ -225,6 +225,12 @@ impl<'a> ReFunc<'a> {
                                 } else {
                                     return None;
                                 }
+                            } else if c == '\\' && next == '\\' {
+                                // `re.sub` processes the escaped backslash `\\` in the
+                                // replacement (it collapses to a single backslash), whereas
+                                // `str.replace` inserts it literally. Offering the fix would
+                                // silently change the output, so emit a diagnostic without a fix.
+                                fixable = false;
                             }
                         }
                     }
@@ -237,6 +243,10 @@ impl<'a> ReFunc<'a> {
                                     } else {
                                         return None;
                                     }
+                                } else if byte == b'\\' && next == b'\\' {
+                                    // See the comment in the `Str` branch above: `re.sub`
+                                    // collapses `\\` while `str.replace` keeps both bytes.
+                                    fixable = false;
                                 }
                             }
                         }
