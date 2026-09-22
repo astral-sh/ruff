@@ -136,6 +136,27 @@ def _(flag: bool):
     reveal_type(cls(1))  # revealed: A | B
 ```
 
+## Generic constructors in class-literal unions
+
+Each constructor arm infers its own generic specialization. A type variable used only by one arm
+must not leak into another arm's result.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class FancyDict[T](dict[str, T]): ...
+
+def construct(use_fancy: bool):
+    factory = FancyDict if use_fancy else dict
+    result = factory({"answer": 42})
+
+    # revealed: dict[str, int]
+    reveal_type(result)
+```
+
 ## Constructor checking through `type[]` in a union
 
 A call on a union of `type[]` types must satisfy every constructor.
