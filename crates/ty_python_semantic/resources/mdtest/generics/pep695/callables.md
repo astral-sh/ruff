@@ -1528,6 +1528,73 @@ def _() -> None:
     reveal_type(invoke(view, Both()))  # revealed: View[A] & View[B]
 ```
 
+## Inferred stateful callable return alternatives
+
+A returned callable can capture mutable state. `cell` creates a closure that uses a list to remember
+its first argument. It can be specialized for either `A` or `B`, but giving the same closure both
+signatures would allow an `A` to be stored and later returned as a `B`:
+
+```py
+from typing import Callable, overload
+
+class A: ...
+class B: ...
+class Both(A, B): ...
+
+def cell[T](values: list[T]) -> Callable[[T], T]:
+    def first(value: T) -> T:
+        values.append(value)
+        return values[0]
+
+    return first
+
+@overload
+def factory(value: A) -> Callable[[A], A]: ...
+@overload
+def factory(value: B) -> Callable[[B], B]: ...
+def factory(value: A | B) -> Callable[[A], A] | Callable[[B], B]:
+    return cell([])
+
+def invoke[T, R](callback: Callable[[T], R], value: T) -> R:
+    return callback(value)
+
+def _() -> None:
+    result = invoke(factory, Both())
+    reveal_type(result)  # revealed: ((A, /) -> A) | ((B, /) -> B)
+    # error: [invalid-argument-type]
+    result(A())
+    reveal_type(result(Both()))  # revealed: A | B
+```
+
+An immutable tuple wrapper does not make the captured state safe to share between specializations:
+
+```py
+@overload
+def wrapped(value: A) -> tuple[Callable[[A], A]]: ...
+@overload
+def wrapped(value: B) -> tuple[Callable[[B], B]]: ...
+def wrapped(value: A | B) -> tuple[Callable[[A], A]] | tuple[Callable[[B], B]]:
+    return (cell([]),)
+
+def _() -> None:
+    reveal_type(invoke(wrapped, Both()))  # revealed: tuple[(A, /) -> A] | tuple[(B, /) -> B]
+```
+
+When the callable component has the same type in every alternative, the other tuple component can
+still be refined:
+
+```py
+@overload
+def with_fixed(value: A) -> tuple[A, Callable[[int], int]]: ...
+@overload
+def with_fixed(value: B) -> tuple[B, Callable[[int], int]]: ...
+def with_fixed(value: A | B) -> tuple[A | B, Callable[[int], int]]:
+    return value, cell([])
+
+def _() -> None:
+    reveal_type(invoke(with_fixed, Both()))  # revealed: tuple[A, (int, /) -> int] & tuple[B, (int, /) -> int]
+```
+
 ## Multiple occurrences of a higher-order generic callable
 
 If a generic callable is used more than once in a higher-order call, each occurrence should get its

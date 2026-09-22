@@ -6046,13 +6046,28 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     // TypedDict fields and protocol members can be invariant without generic
                     // parameters. Treat distinct structural types conservatively without forcing
                     // their lazy definitions: even a read-only member can contain a mutable value.
-                    matches!(nested, Type::TypedDict(_) | Type::ProtocolInstance(_))
-                        || class_specialization(nested).is_some_and(|(_, specialization)| {
-                            specialization
-                                .generic_context(db)
-                                .variables(db)
-                                .any(|variable| variable.variance(db) == TypeVarVariance::Invariant)
-                        })
+                    // Callables can also capture state linking their inputs and outputs: a closure
+                    // that remembers its first argument can have type `(A) -> A` or `(B) -> B`,
+                    // but giving it both signatures would let it store an A and return it as a B.
+                    matches!(
+                        nested,
+                        Type::TypedDict(_)
+                            | Type::ProtocolInstance(_)
+                            | Type::Callable(_)
+                            | Type::FunctionLiteral(_)
+                            | Type::BoundMethod(_)
+                            | Type::KnownBoundMethod(_)
+                            | Type::KnownInstance(
+                                KnownInstanceType::FunctoolsPartial(_)
+                                    | KnownInstanceType::FunctoolsPartialCall(_)
+                                    | KnownInstanceType::MethodWrapper(_)
+                            )
+                    ) || class_specialization(nested).is_some_and(|(_, specialization)| {
+                        specialization
+                            .generic_context(db)
+                            .variables(db)
+                            .any(|variable| variable.variance(db) == TypeVarVariance::Invariant)
+                    })
                 })
             };
             if !has_invariant_component(left) && !has_invariant_component(right) {
