@@ -720,6 +720,9 @@ class Bad:
 def f[T: A](x: P[T, T], value: T) -> None:
     raise NotImplementedError
 
+# TODO: This isn't a great error message, since `P[B, B]` doesn't appear anywhere in the source.
+# Rework this to show how we got to that point, and what assumptions were made, that led to the
+# error.
 # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `P[B, B]`, found `Bad`"
 f(Bad(), B())
 ```
