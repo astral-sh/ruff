@@ -3792,6 +3792,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_unicode_names2"
+version = "0.0.15"
+dependencies = [
+ "phf 0.11.3",
+ "rand 0.8.5",
+ "ruff_unicode_names2_generator",
+]
+
+[[package]]
+name = "ruff_unicode_names2_generator"
+version = "0.0.15"
+dependencies = [
+ "phf_codegen",
+ "rand 0.8.5",
+]
+
+[[package]]
 name = "ruff_wasm"
 version = "0.16.9"
 dependencies = [

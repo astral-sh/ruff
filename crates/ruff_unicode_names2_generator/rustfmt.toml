@@ -1,0 +1,2 @@
+# Preserve the vendored source formatting.
+disable_all_formatting = true
