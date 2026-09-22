@@ -322,18 +322,20 @@ StopIteration
 
 Since the change in exception type could break error handling upstream, this fix is categorized as unsafe.
 
-Ruff only enables safe fixes by default. Unsafe fixes can be enabled by settings [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file or passing the `--unsafe-fixes` flag to `ruff check`:
+Ruff only applies safe fixes by default. To apply unsafe fixes as well, enable [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file or pass the `--unsafe-fixes` flag alongside `--fix`:
 
 ```console
-# Show unsafe fixes
-ruff check --unsafe-fixes
-
 # Apply unsafe fixes
 ruff check --fix --unsafe-fixes
 ```
 
-By default, Ruff will display a hint when unsafe fixes are available but not enabled. The suggestion can be silenced
-by setting the [`unsafe-fixes`](settings.md#unsafe-fixes) setting to `false` or using the `--no-unsafe-fixes` flag.
+The default `full` output format shows all suggested fixes, regardless of the `unsafe-fixes` setting.
+This includes fixes that require manual review and cannot be applied automatically, even with
+`--unsafe-fixes`.
+
+By default, Ruff will display a hint to use `--unsafe-fixes` when unsafe fixes are available but not
+applied. The suggestion can be silenced by setting the [`unsafe-fixes`](settings.md#unsafe-fixes)
+setting to `false` or using the `--no-unsafe-fixes` flag.
 
 The safety of fixes can be adjusted per rule using the [`lint.extend-safe-fixes`](settings.md#lint_extend-safe-fixes) and [`lint.extend-unsafe-fixes`](settings.md#lint_extend-unsafe-fixes) settings.
 
