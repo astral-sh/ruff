@@ -1,9 +1,9 @@
-use memchr::memchr;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_index::Indexer;
 use ruff_source_file::Line;
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::Locator;
 use crate::codes::Category;
 use crate::{Violation, checkers::ast::LintContext};
 
@@ -51,28 +51,43 @@ const SPACE: u8 = b' ';
 const TAB: u8 = b'\t';
 
 /// RUF054
-pub(crate) fn indented_form_feed(line: &Line, context: &LintContext) {
-    let Some(index_relative_to_line) = memchr(FORM_FEED, line.as_bytes()) else {
-        return;
-    };
-
-    if index_relative_to_line == 0 {
-        return;
-    }
-
-    if line[..index_relative_to_line]
-        .as_bytes()
-        .iter()
-        .any(|byte| *byte != SPACE && *byte != TAB)
+pub(crate) fn indented_form_feed(
+    line: &Line,
+    locator: &Locator,
+    indexer: &Indexer,
+    context: &LintContext,
+) {
+    // Leading whitespace on a physical line that continues a previous logical line
+    // (backslash continuation) is not indentation, so form feeds there are fine.
+    if indexer
+        .preceded_by_continuations(line.start(), locator.contents())
+        .is_some()
     {
         return;
     }
 
-    let Ok(relative_index) = u32::try_from(index_relative_to_line) else {
-        return;
-    };
-    let absolute_index = line.start() + TextSize::new(relative_index);
-    let range = TextRange::at(absolute_index, 1.into());
+    let bytes = line.as_bytes();
 
-    context.report_diagnostic(IndentedFormFeed, range);
+    // A run of form feeds at the very start of the line is ignored for indentation
+    // purposes, per the language reference. Any later form feed in the leading
+    // whitespace has an undefined effect and must be flagged.
+    let mut index = bytes.iter().take_while(|byte| **byte == FORM_FEED).count();
+
+    while index < bytes.len() {
+        match bytes[index] {
+            SPACE | TAB => index += 1,
+            FORM_FEED => {
+                let Ok(relative_index) = u32::try_from(index) else {
+                    return;
+                };
+                let absolute_index = line.start() + TextSize::new(relative_index);
+                context.report_diagnostic(
+                    IndentedFormFeed,
+                    TextRange::at(absolute_index, 1.into()),
+                );
+                index += 1;
+            }
+            _ => break,
+        }
+    }
 }

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+assertion_line: 805
 ---
 RUF054 Indented form feed
  --> RUF054.py:8:2
@@ -38,4 +39,37 @@ RUF054 Indented form feed
 16 |     print('F')
 17 |     ␌print('T')
    |     ^
+help: Remove form feed
+
+RUF054 Indented form feed
+  --> RUF054.py:38:3
+   |
+37 | if True:
+38 | ␌ ␌ print("!")
+   |   ^
+39 |
+40 | if True:
+   |
+help: Remove form feed
+
+RUF054 Indented form feed
+  --> RUF054.py:41:2
+   |
+40 | if True:
+41 |  ␌ ␌ print("!")
+   |  ^
+42 |
+43 | # Form feed after line continuation is not indentation (no error)
+   |
+help: Remove form feed
+
+RUF054 Indented form feed
+  --> RUF054.py:41:4
+   |
+40 | if True:
+41 |  ␌ ␌ print("!")
+   |    ^
+42 |
+43 | # Form feed after line continuation is not indentation (no error)
+   |
 help: Remove form feed
