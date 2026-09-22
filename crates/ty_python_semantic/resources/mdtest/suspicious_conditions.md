@@ -65,7 +65,7 @@ help: Replace with `predicate(...)`
 9  +     if predicate(...):  # snapshot: truthiness-test-of-callable
 10 |         pass
    |
-note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ## Unions of callable values
@@ -110,7 +110,7 @@ help: Replace with `predicate(...)`
 12 +     if predicate(...):  # snapshot: truthiness-test-of-callable
 13 |         pass
    |
-note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 and the same is currently true for callables with the gradual parameter list (`...`), though
@@ -141,7 +141,7 @@ help: Replace with `predicate1(...)`
 16 +     if predicate1(...):  # snapshot: truthiness-test-of-callable
 17 |         pass
    |
-note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 
 warning[truthiness-test-of-callable]: Suspicious boolean test of a `Callable`
@@ -158,7 +158,7 @@ help: Replace with `predicate2(...)`
 19 +     if predicate2(...):  # snapshot: truthiness-test-of-callable
 20 |         pass
    |
-note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ## Unions with functions and bound methods
@@ -245,7 +245,7 @@ help: Replace with `callback(...)`
 8 +     if callback(...):  # snapshot: truthiness-test-of-callable
 9 |         pass
   |
-note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ## Callable type aliases
@@ -410,7 +410,7 @@ help: Test the length of the iterable instead of its truthiness
 19 +     if len(tuple(iterator)):  # snapshot: truthiness-test-of-iterable
 20 |         next(iterator)
    |
-note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 
 warning[truthiness-test-of-iterable]: Suspicious boolean test of an `Iterable`
@@ -430,7 +430,7 @@ help: Test the length of the iterable instead of its truthiness
 21 +     if len(tuple(iterator2)):  # snapshot: truthiness-test-of-iterable
 22 |         pass
    |
-note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 as can `Generator`:
@@ -462,7 +462,7 @@ help: Test the length of the iterable instead of its truthiness
 27 +     if len(tuple(generator)):  # snapshot: truthiness-test-of-iterable
 28 |         pass
    |
-note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 
 warning[truthiness-test-of-iterable]: Suspicious boolean test of an `Iterable`
@@ -482,7 +482,7 @@ help: Test the length of the iterable instead of its truthiness
 29 +     if len(tuple(generator2)):  # snapshot: truthiness-test-of-iterable
 30 |         pass
    |
-note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 So can custom protocols that are subtypes of `Iterable[object]` but supertypes of all
@@ -518,7 +518,7 @@ help: Test the length of the iterable instead of its truthiness
 39 +     if len(tuple(x)):  # snapshot: truthiness-test-of-iterable
 40 |         print(x.gi_running)
    |
-note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 and some intersection types:
@@ -856,7 +856,7 @@ help: Alternatively, test the length of the iterable instead of its truthiness
 5 +     if len(tuple(items)):  # snapshot: truthiness-test-of-iterable
 6 |         pass
   |
-note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ## Collection fixes before Python 3.9
@@ -1007,7 +1007,7 @@ help: Alternatively, test the length of the iterable instead of its truthiness
 3 + if len(tuple(values)):  # snapshot: truthiness-test-of-iterable
 4 |     pass
   |
-note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ## Iterable annotations in dependencies
@@ -1056,7 +1056,7 @@ help: Test the length of the iterable instead of its truthiness
 3 + if len(tuple(items.values)):  # snapshot: truthiness-test-of-iterable
 4 |     pass
   |
-note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ## Iterable values without variable annotations
@@ -1088,7 +1088,7 @@ help: Test the length of the iterable instead of its truthiness
 6 + if len(tuple(get_items())):  # snapshot: truthiness-test-of-iterable
 7 |     pass
   |
-note: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ## Nested boolean tests

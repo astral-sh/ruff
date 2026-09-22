@@ -372,7 +372,7 @@ fn to_applicability_annotate(fix: &Fix) -> Option<AnnotateGroup<'static>> {
         ),
         Applicability::DisplayOnly => (
             AnnotateLevel::WARNING.with_name("note"),
-            "This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically",
+            "This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically",
         ),
     };
 
