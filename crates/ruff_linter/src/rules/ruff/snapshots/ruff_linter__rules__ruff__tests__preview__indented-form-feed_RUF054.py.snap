@@ -38,4 +38,28 @@ RUF054 Indented form feed
 16 |     print('F')
 17 |     ␌print('T')
    |     ^
+18 |
+19 | # Multiple form feeds in leading whitespace (https://github.com/astral-sh/ruff/issues/16139)
+   |
+help: Remove form feed
+
+RUF054 Indented form feed
+  --> RUF054.py:21:2
+   |
+19 | # Multiple form feeds in leading whitespace (https://github.com/astral-sh/ruff/issues/16139)
+20 | if True:
+21 | ␌␌ print("!")
+   |  ^
+22 | if True:
+23 | ␌ ␌ print("!")
+   |
+help: Remove form feed
+
+RUF054 Indented form feed
+  --> RUF054.py:23:3
+   |
+21 | ␌␌ print("!")
+22 | if True:
+23 | ␌ ␌ print("!")
+   |   ^
 help: Remove form feed

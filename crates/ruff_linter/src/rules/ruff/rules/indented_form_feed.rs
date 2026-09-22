@@ -1,5 +1,3 @@
-use memchr::memchr;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::Line;
 use ruff_text_size::{TextRange, TextSize};
@@ -51,28 +49,28 @@ const SPACE: u8 = b' ';
 const TAB: u8 = b'\t';
 
 /// RUF054
+///
+/// Scan every form feed that falls within leading whitespace of the physical
+/// line. A form feed at column 0 is allowed; any later form feed that is still
+/// only preceded by space/tab/form-feed is flagged (including `\f\f` and
+/// `\f \f`).
 pub(crate) fn indented_form_feed(line: &Line, context: &LintContext) {
-    let Some(index_relative_to_line) = memchr(FORM_FEED, line.as_bytes()) else {
-        return;
-    };
-
-    if index_relative_to_line == 0 {
-        return;
+    let bytes = line.as_bytes();
+    for (index_relative_to_line, byte) in bytes.iter().enumerate() {
+        match *byte {
+            SPACE | TAB => continue,
+            FORM_FEED => {
+                if index_relative_to_line == 0 {
+                    continue;
+                }
+                let Ok(relative_index) = u32::try_from(index_relative_to_line) else {
+                    return;
+                };
+                let absolute_index = line.start() + TextSize::new(relative_index);
+                let range = TextRange::at(absolute_index, 1.into());
+                context.report_diagnostic(IndentedFormFeed, range);
+            }
+            _ => break,
+        }
     }
-
-    if line[..index_relative_to_line]
-        .as_bytes()
-        .iter()
-        .any(|byte| *byte != SPACE && *byte != TAB)
-    {
-        return;
-    }
-
-    let Ok(relative_index) = u32::try_from(index_relative_to_line) else {
-        return;
-    };
-    let absolute_index = line.start() + TextSize::new(relative_index);
-    let range = TextRange::at(absolute_index, 1.into());
-
-    context.report_diagnostic(IndentedFormFeed, range);
 }
