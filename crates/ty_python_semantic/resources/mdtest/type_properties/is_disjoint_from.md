@@ -738,6 +738,209 @@ class UsesMeta2(metaclass=Meta2): ...
 static_assert(is_disjoint_from(type[UsesMeta1], type[UsesMeta2]))
 ```
 
+### Generic class types versus `object`
+
+`type[T]` overlaps `object`, whether the type variable is unbounded, bounded, or constrained.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Never, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+T = TypeVar("T")
+
+def unbounded_legacy(cls: type[T]):
+    static_assert(not is_disjoint_from(object, type[T]))
+    static_assert(not is_disjoint_from(type[T], object))
+
+def unbounded_pep695[T](cls: type[T]):
+    static_assert(not is_disjoint_from(object, type[T]))
+    static_assert(not is_disjoint_from(type[T], object))
+
+Bound = TypeVar("Bound", bound=int)
+
+def bounded_legacy(cls: type[Bound]):
+    static_assert(not is_disjoint_from(object, type[Bound]))
+    static_assert(not is_disjoint_from(type[Bound], object))
+
+def bounded_pep695[T: int](cls: type[T]):
+    static_assert(not is_disjoint_from(object, type[T]))
+    static_assert(not is_disjoint_from(type[T], object))
+
+Constrained = TypeVar("Constrained", int, str)
+
+def constrained_legacy(cls: type[Constrained]):
+    static_assert(not is_disjoint_from(object, type[Constrained]))
+    static_assert(not is_disjoint_from(type[Constrained], object))
+
+def constrained_pep695[T: (int, str)](cls: type[T]):
+    static_assert(not is_disjoint_from(object, type[T]))
+    static_assert(not is_disjoint_from(type[T], object))
+```
+
+If `T` is bounded by `Never`, `type[T]` is uninhabited and disjoint from `object`.
+
+```py
+Bottom = TypeVar("Bottom", bound=Never)
+
+def bottom_legacy(cls: type[Bottom]):
+    static_assert(is_disjoint_from(object, type[Bottom]))
+    static_assert(is_disjoint_from(type[Bottom], object))
+
+def bottom_pep695[T: Never](cls: type[T]):
+    static_assert(is_disjoint_from(object, type[T]))
+    static_assert(is_disjoint_from(type[T], object))
+```
+
+### Generic class types versus metaclass base classes
+
+A class described by `type[T]` is an instance of its metaclass's base classes.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+class Base: ...
+class Meta(type, Base): ...
+class C(metaclass=Meta): ...
+
+T = TypeVar("T", bound=C)
+
+def check_legacy(cls: type[T]):
+    static_assert(not is_disjoint_from(type[T], Base))
+    static_assert(not is_disjoint_from(Base, type[T]))
+    static_assert(is_disjoint_from(type[T], int))
+    static_assert(is_disjoint_from(int, type[T]))
+
+def check_pep695[T: C](cls: type[T]):
+    static_assert(not is_disjoint_from(type[T], Base))
+    static_assert(not is_disjoint_from(Base, type[T]))
+    static_assert(is_disjoint_from(type[T], int))
+    static_assert(is_disjoint_from(int, type[T]))
+```
+
+### Protocol-bounded class types
+
+Classes that implement a protocol can have metaclasses unrelated to the protocol's own metaclass.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import NewType, Protocol, TypeVar, final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+@final
+class Meta(type): ...
+
+class P(Protocol):
+    def f(self) -> int: ...
+
+T = TypeVar("T", bound=P)
+
+def check_legacy(cls: type[T]):
+    static_assert(not is_disjoint_from(type[T], Meta))
+    static_assert(not is_disjoint_from(Meta, type[T]))
+
+def check_pep695[T: P](cls: type[T]):
+    static_assert(not is_disjoint_from(type[T], Meta))
+    static_assert(not is_disjoint_from(Meta, type[T]))
+```
+
+The same applies to a `NewType` based on such a metaclass.
+
+```py
+TaggedMeta = NewType("TaggedMeta", Meta)
+
+def check_newtype_legacy(cls: type[T]):
+    static_assert(not is_disjoint_from(type[T], TaggedMeta))
+    static_assert(not is_disjoint_from(TaggedMeta, type[T]))
+
+def check_newtype_pep695[T: P](cls: type[T]):
+    static_assert(not is_disjoint_from(type[T], TaggedMeta))
+    static_assert(not is_disjoint_from(TaggedMeta, type[T]))
+```
+
+### Final-bounded class types versus protocols
+
+A class bounded by a final class cannot gain a missing protocol member through subclassing.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar, final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+@final
+class C: ...
+
+class HasValue(Protocol):
+    value: int
+
+T = TypeVar("T", bound=C)
+
+def check_legacy(cls: type[T]):
+    static_assert(is_disjoint_from(type[T], HasValue))
+    static_assert(is_disjoint_from(HasValue, type[T]))
+
+def check_pep695[T: C](cls: type[T]):
+    static_assert(is_disjoint_from(type[T], HasValue))
+    static_assert(is_disjoint_from(HasValue, type[T]))
+```
+
+### Generic class types versus their negations
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar
+from ty_extensions import Not, static_assert
+from ty_extensions._internal import is_disjoint_from
+
+T = TypeVar("T")
+
+def check_legacy(cls: type[T]):
+    static_assert(is_disjoint_from(type[T], Not[type[T]]))
+    static_assert(is_disjoint_from(Not[type[T]], type[T]))
+
+def check_pep695[T](cls: type[T]):
+    static_assert(is_disjoint_from(type[T], Not[type[T]]))
+    static_assert(is_disjoint_from(Not[type[T]], type[T]))
+```
+
+The types remain disjoint when the negation is combined with another disjoint type in a union.
+
+```py
+def check_union_legacy(cls: type[T]):
+    static_assert(is_disjoint_from(type[T], Not[type[T]] | int))
+    static_assert(is_disjoint_from(Not[type[T]] | int, type[T]))
+
+def check_union_pep695[T](cls: type[T]):
+    static_assert(is_disjoint_from(type[T], Not[type[T]] | int))
+    static_assert(is_disjoint_from(Not[type[T]] | int, type[T]))
+```
+
 ### `property`
 
 Property descriptors and property-bearing classes are disjoint from incompatible final classes or
@@ -1413,8 +1616,8 @@ static_assert(is_disjoint_from(Right, Left[bytes]))
 
 ### NewTypes and overlapping types
 
-A `NewType` overlaps with any nominal or structural type that overlaps its concrete base. This
-includes the base itself, its supertypes and subclasses, and protocols satisfied by the base.
+A `NewType` overlaps with its concrete base, its supertypes and subclasses, and protocols whose
+members remain compatible with the `NewType`.
 
 ```py
 from typing import NewType, Protocol, final
@@ -1441,6 +1644,35 @@ static_assert(not is_disjoint_from(UserId, SupportsInt))
 static_assert(is_disjoint_from(UserId, str))
 static_assert(not is_disjoint_from(FinalIntId, FinalInt))
 static_assert(not is_disjoint_from(FinalIntId, int))
+```
+
+### NewType receivers and inherited `Self`
+
+An inherited member returning `Self` resolves to the existing `NewType` of its receiver. A protocol
+requiring an unrelated `NewType` can therefore be disjoint even when it overlaps the concrete base.
+
+```py
+from typing import NewType, Protocol
+from typing_extensions import Self
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+class Base:
+    @property
+    def me(self) -> Self:
+        return self
+
+First = NewType("First", Base)
+Second = NewType("Second", Base)
+
+class ReturnsSecond(Protocol):
+    @property
+    def me(self) -> Second: ...
+
+static_assert(is_disjoint_from(First, ReturnsSecond))
+static_assert(is_disjoint_from(ReturnsSecond, First))
+static_assert(not is_disjoint_from(Base, ReturnsSecond))
+static_assert(not is_disjoint_from(ReturnsSecond, Base))
 ```
 
 ### NewTypes and literal types

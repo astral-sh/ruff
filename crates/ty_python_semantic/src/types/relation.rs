@@ -3410,24 +3410,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
-            // `type[T]` is disjoint from a callable or protocol instance if its upper bound or constraints are.
-            (
-                Type::SubclassOf(subclass_of),
-                other @ (Type::Callable(_) | Type::ProtocolInstance(_)),
-            )
-            | (
-                other @ (Type::Callable(_) | Type::ProtocolInstance(_)),
-                Type::SubclassOf(subclass_of),
-            ) if let Some(type_var) = subclass_of
-                .subclass_of()
-                .with_transposed_type_var(db, env)
-                .into_type_var() =>
-            {
-                nontrivial_check(self, || {
-                    self.check_type_pair(db, Type::TypeVar(type_var), other)
-                })
-            }
-
             // `type[T]` is disjoint from a class object `A` if every instance of `T` is disjoint from an instance of `A`.
             (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
                 if let Some(type_var) = subclass_of.into_type_var()
@@ -3565,6 +3547,45 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     self.check_intersection_pair_via_elements(db, left, right, intersection, other)
                 }
             }),
+
+            // A NewType's concrete base can be a metaclass: `N = NewType("N", Meta)`, where `Meta`
+            // subclasses `type`. Unwrapping it here lets the earlier `to_instance_approximation`
+            // arm reduce `type[T]` versus `Meta` to `T` versus `object`.
+            // If we transposed first (the next arm), a protocol bound on T could instead make us
+            // compare the protocol's own metaclass with Meta, incorrectly concluding that the
+            // types are disjoint. Other NewType comparisons need their specialized checks before
+            // unwrapping; in particular, protocol member lookup must preserve the NewType receiver
+            // for `Self`.
+            (class @ Type::SubclassOf(_), Type::NewTypeInstance(newtype))
+            | (Type::NewTypeInstance(newtype), class @ Type::SubclassOf(_)) => {
+                nontrivial_check(self, || {
+                    self.check_type_pair(db, class, newtype.concrete_base_type(db))
+                })
+            }
+
+            // `type[T]` is disjoint from another type if its transposed upper bound or constraints are.
+            // Transposition preserves T's identity but replaces its bounds. The match arms that
+            // perform the following operations must remain above this branch:
+            // - Unfold aliases and recursive types, which can expose other cases in this list.
+            // - Project class objects and TypeForms to their instance types, including metaclasses
+            //   exposed by unwrapping a NewType.
+            // - Handle bare typevars: T and its transpose share an identity but have different bounds.
+            // - Decompose unions and intersections: their members can refer to T or exclude type[T],
+            //   as in `type[T]` versus `Not[type[T]] | int`.
+            // The cases after this do not rely on the original typevar identity at the outer
+            // level.
+            // Keep transposition before protocol checks: a final bound can expose an exact class
+            // type whose missing members prove disjointness.
+            (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
+                if let Some(type_var) = subclass_of
+                    .subclass_of()
+                    .with_transposed_type_var(db, env)
+                    .into_type_var() =>
+            {
+                nontrivial_check(self, || {
+                    self.check_type_pair(db, Type::TypeVar(type_var), other)
+                })
+            }
 
             (Type::LiteralValue(left), Type::LiteralValue(right))
                 if left.is_literal_string() && right.is_literal_string()
@@ -3839,12 +3860,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         })
                 })
             }),
-
-            (Type::SubclassOf(subclass_of_ty), _) | (_, Type::SubclassOf(subclass_of_ty))
-                if subclass_of_ty.is_type_var() =>
-            {
-                self.always()
-            }
 
             (Type::GenericAlias(left_alias), Type::GenericAlias(right_alias)) => {
                 ConstraintSet::from_bool(
