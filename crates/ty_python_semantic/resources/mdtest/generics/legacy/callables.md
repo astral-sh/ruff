@@ -1072,6 +1072,49 @@ def _(
     reveal_type(invoke(callback, object()))
 ```
 
+A broader union return does not make incompatible mutable returns safe to intersect:
+
+```py
+class C: ...
+class All(A, B, C): ...
+
+InputT = TypeVar("InputT")
+
+def invoke_all(callback: Callable[[InputT], R], value: InputT) -> R:
+    return callback(value)
+
+def _(
+    callback: Intersection[
+        Callable[[A], list[A] | list[B]],
+        Callable[[B], list[A]],
+        Callable[[C], list[B]],
+    ],
+) -> None:
+    reveal_type(invoke_all(callback, All()))  # revealed: list[A] | list[B]
+```
+
+For now, wrapping a mutable component in a union can prevent refinement even when other alternatives
+agree on that component. This conservative fallback does not depend on the callback signature order:
+
+```py
+def _(
+    first: Intersection[
+        Callable[[A], tuple[A, list[int]]],
+        Callable[[B], tuple[B, list[int]]],
+        Callable[[C], tuple[A, list[int]] | int],
+    ],
+    reordered: Intersection[
+        Callable[[B], tuple[B, list[int]]],
+        Callable[[A], tuple[A, list[int]]],
+        Callable[[C], tuple[A, list[int]] | int],
+    ],
+) -> None:
+    # TODO: revealed: tuple[A, list[int]] & tuple[B, list[int]]
+    reveal_type(invoke_all(first, All()))  # revealed: tuple[A, list[int]] | int | tuple[B, list[int]]
+    # TODO: revealed: tuple[B, list[int]] & tuple[A, list[int]]
+    reveal_type(invoke_all(reordered, All()))  # revealed: tuple[B, list[int]] | tuple[A, list[int]] | int
+```
+
 The same distinction applies to generic classes with both covariant and invariant parameters.
 `Wrapper` only produces `T`, while its writable `value` attribute makes `U` invariant:
 
@@ -1186,6 +1229,106 @@ class BView(TypedDict):
 def _(callback: Intersection[Callable[[], AView], Callable[[], BView]]) -> None:
     # TODO: revealed: AView & BView
     reveal_type(invoke(callback))  # revealed: AView | BView
+```
+
+## Inferred protocol return alternatives
+
+A fresh empty list can have either element type, but cannot safely expose both mutable views at
+once. Even without type parameters, protocol returns can contain incompatible invariant members:
+
+```py
+from typing import Callable, Generic, Protocol, TypeVar, overload
+
+class A: ...
+class B: ...
+class Both(A, B): ...
+
+class IntList(Protocol):
+    value: list[int]
+
+class StrList(Protocol):
+    value: list[str]
+
+T = TypeVar("T")
+R = TypeVar("R")
+
+class Box(Generic[T]):
+    value: list[T]
+
+    def __init__(self) -> None:
+        self.value = []
+
+@overload
+def empty(value: A) -> IntList: ...
+@overload
+def empty(value: B) -> StrList: ...
+def empty(value: A | B) -> IntList | StrList:
+    return Box()
+
+def invoke(callback: Callable[[T], R], value: T) -> R:
+    return callback(value)
+
+def _() -> None:
+    reveal_type(invoke(empty, Both()))  # revealed: IntList | StrList
+```
+
+Making the property read-only does not make its list immutable. These returns also remain a union:
+
+```py
+class IntListView(Protocol):
+    @property
+    def value(self) -> list[int]: ...
+
+class StrListView(Protocol):
+    @property
+    def value(self) -> list[str]: ...
+
+@overload
+def readonly_empty(value: A) -> IntListView: ...
+@overload
+def readonly_empty(value: B) -> StrListView: ...
+def readonly_empty(value: A | B) -> IntListView | StrListView:
+    return Box()
+
+def _() -> None:
+    reveal_type(invoke(readonly_empty, Both()))  # revealed: IntListView | StrListView
+```
+
+An unchanged protocol component still allows the other tuple component to be refined:
+
+```py
+@overload
+def with_fixed(value: A) -> tuple[A, IntList]: ...
+@overload
+def with_fixed(value: B) -> tuple[B, IntList]: ...
+def with_fixed(value: A | B) -> tuple[A | B, IntList]:
+    return value, Box[int]()
+
+def _() -> None:
+    reveal_type(invoke(with_fixed, Both()))  # revealed: tuple[A, IntList] & tuple[B, IntList]
+```
+
+Specializations of the same generic protocol can also be compared without inspecting its members.
+Here, only the covariant parameter varies; the writable `state` has the same type in both returns:
+
+```py
+CovariantT = TypeVar("CovariantT", covariant=True)
+
+class View(Protocol[CovariantT]):
+    state: list[int]
+
+    @property
+    def value(self) -> CovariantT: ...
+
+@overload
+def view(value: A) -> View[A]: ...
+@overload
+def view(value: B) -> View[B]: ...
+def view(value: A | B) -> View[A] | View[B]:
+    raise NotImplementedError
+
+def _() -> None:
+    reveal_type(invoke(view, Both()))  # revealed: View[A] & View[B]
 ```
 
 ## Multiple occurrences of a higher-order generic callable

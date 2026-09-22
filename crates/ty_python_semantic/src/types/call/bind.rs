@@ -6034,17 +6034,19 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         visitor.visit(db, (left, right), || {
             let class_specialization = |ty| match ty {
                 Type::GenericAlias(alias) => Some((alias.origin(db), alias.specialization(db))),
-                Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
+                Type::NominalInstance(_) => ty.class_specialization(db, env),
+                // A pending protocol materialization affects its members, not just its arguments.
+                Type::ProtocolInstance(protocol) if protocol.materialization_kind(db).is_none() => {
                     ty.class_specialization(db, env)
                 }
                 _ => None,
             };
             let has_invariant_component = |ty| {
                 any_over_type_expanding_aliases(db, env, ty, |nested| {
-                    // TypedDict fields can be invariant without any generic parameters. Treat
-                    // distinct dictionaries conservatively without forcing their lazy schemas:
-                    // even a ReadOnly field can contain a mutable value.
-                    matches!(nested, Type::TypedDict(_))
+                    // TypedDict fields and protocol members can be invariant without generic
+                    // parameters. Treat distinct structural types conservatively without forcing
+                    // their lazy definitions: even a read-only member can contain a mutable value.
+                    matches!(nested, Type::TypedDict(_) | Type::ProtocolInstance(_))
                         || class_specialization(nested).is_some_and(|(_, specialization)| {
                             specialization
                                 .generic_context(db)
@@ -6055,6 +6057,25 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             };
             if !has_invariant_component(left) && !has_invariant_component(right) {
                 return false;
+            }
+
+            if left.is_union() || right.is_union() {
+                // Immutable union members can vary when all invariant-bearing members agree
+                // as whole types. For example, `P` and `P | int` share the same protocol `P`.
+                // Do not just check that one union contains the other: comparing `list[A] | list[B]`
+                // with each of `list[A]` and `list[B]` must still detect the incompatible lists.
+                let invariant_elements = |ty| {
+                    let elements = match ty {
+                        Type::Union(union) => union.elements(db),
+                        _ => std::slice::from_ref(&ty),
+                    };
+                    elements
+                        .iter()
+                        .copied()
+                        .filter(|&element| has_invariant_component(element))
+                        .collect::<FxHashSet<_>>()
+                };
+                return invariant_elements(left) != invariant_elements(right);
             }
 
             if let (Some(left), Some(right)) = (
@@ -6072,6 +6093,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 (left, right),
                 (Type::NominalInstance(_), Type::NominalInstance(_))
                     | (Type::GenericAlias(_), Type::GenericAlias(_))
+                    | (Type::ProtocolInstance(_), Type::ProtocolInstance(_))
             ) && let (Some((left_class, left)), Some((right_class, right))) =
                 (class_specialization(left), class_specialization(right))
                 && left_class == right_class
@@ -6133,11 +6155,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let return_variables = generic_context
             .variables(db)
             .enumerate()
-            .filter_map(|(index, variable)| {
+            .filter(|(_, variable)| {
                 any_over_type_expanding_aliases(db, env, self.return_ty, |ty| {
                     matches!(ty, Type::TypeVar(return_variable) if return_variable.identity(db) == variable.identity(db))
                 })
-                .then_some((index, variable))
             });
         // An unresolved dependency does not make an alternative invalid. Keep the merged fallback
         // for the whole call rather than silently dropping that sibling.
@@ -6244,6 +6265,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Apply this check only to valid specializations: a rejected sibling cannot prevent a
         // single remaining specialization from providing its own return type.
         let invariant_visitor = PairVisitor::new(true);
+        let mut remaining_comparisons = SolutionBudget::default().visits;
         let has_invariant_difference = inference
             .generic_context(db)
             .variables(db)
@@ -6254,20 +6276,25 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 })
             })
             .any(|(index, variable)| {
-                let mut types = specializations
+                let types = specializations
                     .iter()
-                    .map(|specialization| specialization.types(db)[index]);
-                let Some(first) = types.next() else {
-                    return false;
-                };
-                !types.clone().all(|ty| ty == first)
+                    .map(|specialization| specialization.types(db)[index])
+                    .unique();
+                !types.clone().all_equal()
                     && (self
                         .return_ty
                         .variance_of(db, env, variable.identity(db))
                         .evaluate(db)
                         == TypeVarVariance::Invariant
-                        || types.any(|ty| {
-                            self.has_invariant_return_difference(first, ty, &invariant_visitor)
+                        // Whole-union comparisons are more conservative than tuple decomposition,
+                        // so compatibility with one alternative is not transitive. Check every
+                        // pair, falling back conservatively if the quadratic work exceeds budget.
+                        || types.array_combinations().any(|[left, right]| {
+                            let Some(remaining) = remaining_comparisons.checked_sub(1) else {
+                                return true;
+                            };
+                            remaining_comparisons = remaining;
+                            self.has_invariant_return_difference(left, right, &invariant_visitor)
                         }))
             });
 
