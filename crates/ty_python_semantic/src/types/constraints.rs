@@ -3135,9 +3135,12 @@ pub(crate) enum PathBoundSolution<'db> {
     Unsatisfiable,
     /// The path does not satisfy the typevar's declared constraints.
     ///
-    /// The payload is the evidence to report. It is `None` if intersecting upper-bound evidence
+    /// The argument is the evidence to report. It is `None` if intersecting upper-bound evidence
     /// exceeds the type-construction budget; the declaration violation is still known.
-    ViolatesDeclaredConstraints(Option<Type<'db>>),
+    ViolatesDeclaredConstraints {
+        argument: Option<Type<'db>>,
+        direction: ConstraintFailureDirection,
+    },
     /// Computing the solution exceeded the type-construction budget. A previously known type
     /// can still be used as a conservative fallback, but is not a complete solution.
     BudgetExceeded {
@@ -3153,7 +3156,7 @@ impl<'db> PathBoundSolution<'db> {
             Self::BudgetExceeded { fallback } => Self::BudgetExceeded {
                 fallback: fallback.map(f),
             },
-            Self::Unsolved | Self::Unsatisfiable | Self::ViolatesDeclaredConstraints(_) => self,
+            Self::Unsolved | Self::Unsatisfiable | Self::ViolatesDeclaredConstraints { .. } => self,
         }
     }
 
@@ -3162,7 +3165,7 @@ impl<'db> PathBoundSolution<'db> {
     pub(crate) fn as_type(self) -> Option<Type<'db>> {
         match self {
             Self::Solved(ty) => Some(ty),
-            Self::Unsolved | Self::Unsatisfiable | Self::ViolatesDeclaredConstraints(_) => None,
+            Self::Unsolved | Self::Unsatisfiable | Self::ViolatesDeclaredConstraints { .. } => None,
             Self::BudgetExceeded { fallback } => fallback,
         }
     }
@@ -3815,12 +3818,15 @@ impl<'db> CandidateSolutions<'db> {
                 PathBoundSolution::Solved(ty) => Some(ty),
                 PathBoundSolution::Unsolved => None,
                 PathBoundSolution::Unsatisfiable => return None,
-                PathBoundSolution::ViolatesDeclaredConstraints(argument) => {
+                PathBoundSolution::ViolatesDeclaredConstraints {
+                    argument,
+                    direction,
+                } => {
                     violations.push(SolutionViolation {
                         bound_typevar: path_bound.bound_typevar,
                         argument,
                         variance: path_bound.variance(),
-                        kind: SolutionViolationKind::Constraints,
+                        kind: SolutionViolationKind::Constraints(direction),
                     });
                     None
                 }
@@ -4078,7 +4084,10 @@ impl<'db> CandidateSolutions<'db> {
                                 .is_never_satisfied(db, env)
                         })
                     {
-                        return PathBoundSolution::ViolatesDeclaredConstraints(Some(lower));
+                        return PathBoundSolution::ViolatesDeclaredConstraints {
+                            argument: Some(lower),
+                            direction: ConstraintFailureDirection::Lower,
+                        };
                     }
 
                     if path_bound.upper.has_evidence()
@@ -4094,13 +4103,14 @@ impl<'db> CandidateSolutions<'db> {
                                 .is_never_satisfied(db, env)
                         })
                     {
-                        return PathBoundSolution::ViolatesDeclaredConstraints(
-                            IntersectionType::bounded_from_elements(
+                        return PathBoundSolution::ViolatesDeclaredConstraints {
+                            argument: IntersectionType::bounded_from_elements(
                                 db,
                                 env,
                                 path_bound.upper.iter_evidence(),
                             ),
-                        );
+                            direction: ConstraintFailureDirection::Upper,
+                        };
                     }
 
                     return PathBoundSolution::Unsatisfiable;
@@ -4636,10 +4646,19 @@ impl<'db> SolutionPaths<'db> {
     }
 }
 
+/// The inferred bound that independently rejects every declared constraint.
+///
+/// This is separate from path variance: an invariant path can fail because of either bound.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum ConstraintFailureDirection {
+    Lower,
+    Upper,
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum SolutionViolationKind {
     UpperBound,
-    Constraints,
+    Constraints(ConstraintFailureDirection),
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
@@ -5800,7 +5819,7 @@ mod tests {
                 Some((
                     bytes,
                     TypeVarVariance::Invariant,
-                    SolutionViolationKind::Constraints,
+                    SolutionViolationKind::Constraints(ConstraintFailureDirection::Lower),
                 )),
             ),
             (
@@ -5810,7 +5829,17 @@ mod tests {
                 Some((
                     bool,
                     TypeVarVariance::Covariant,
-                    SolutionViolationKind::Constraints,
+                    SolutionViolationKind::Constraints(ConstraintFailureDirection::Upper),
+                )),
+            ),
+            (
+                constrained,
+                Some(bool),
+                bool,
+                Some((
+                    bool,
+                    TypeVarVariance::Invariant,
+                    SolutionViolationKind::Constraints(ConstraintFailureDirection::Upper),
                 )),
             ),
         ] {
@@ -5890,7 +5919,9 @@ mod tests {
                             bound_typevar: t,
                             argument: Some(bytes),
                             variance: TypeVarVariance::Invariant,
-                            kind: SolutionViolationKind::Constraints,
+                            kind: SolutionViolationKind::Constraints(
+                                ConstraintFailureDirection::Lower,
+                            ),
                         }])),
                     });
                 }
@@ -5994,7 +6025,10 @@ mod tests {
                 inferable,
                 &bounds.finish(db, &env, t)
             ),
-            PathBoundSolution::ViolatesDeclaredConstraints(Some(lower))
+            PathBoundSolution::ViolatesDeclaredConstraints {
+                argument: Some(lower),
+                direction: ConstraintFailureDirection::Lower,
+            }
         );
     }
 
@@ -6187,7 +6221,10 @@ class E: ...
         let rejected = bounds.finish(db, &env, constrained);
         assert_eq!(
             CandidateSolutions::preliminary_solve(db, &env, &builder, inferable, &rejected),
-            PathBoundSolution::ViolatesDeclaredConstraints(None)
+            PathBoundSolution::ViolatesDeclaredConstraints {
+                argument: None,
+                direction: ConstraintFailureDirection::Upper,
+            }
         );
         let candidates = CandidateSolutions::Constrained(Box::new([CandidateSolution {
             typevars: Box::new([rejected]),
@@ -6201,7 +6238,7 @@ class E: ...
                     bound_typevar: constrained,
                     argument: None,
                     variance: TypeVarVariance::Covariant,
-                    kind: SolutionViolationKind::Constraints,
+                    kind: SolutionViolationKind::Constraints(ConstraintFailureDirection::Upper),
                 }])),
             }]))
         );

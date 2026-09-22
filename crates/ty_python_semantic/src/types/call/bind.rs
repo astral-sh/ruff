@@ -34,8 +34,8 @@ use crate::types::ProgramEnvironment;
 use crate::types::call::arguments::{CallArgumentExpansions, CallArgumentTypes, Expansion};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    CandidateSolutions, ConstraintSet, ConstraintSetBuilder, PathBound, PathBoundSolution,
-    SolutionPaths, Solutions,
+    CandidateSolutions, ConstraintFailureDirection, ConstraintSet, ConstraintSetBuilder, PathBound,
+    PathBoundSolution, SolutionPaths, Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
@@ -9624,7 +9624,11 @@ impl<'db> BindingError<'db> {
                                 .display(db, env)
                         ));
                     }
-                    SpecializationError::MismatchedConstraint { bound_typevar, .. } => {
+                    SpecializationError::MismatchedConstraint {
+                        bound_typevar,
+                        direction: ConstraintFailureDirection::Lower,
+                        ..
+                    } => {
                         let typevar = bound_typevar.typevar(context.db());
                         let typevar_name = typevar.name(context.db());
                         diag.set_primary_annotation_message(format_args!(
@@ -9640,6 +9644,17 @@ impl<'db> BindingError<'db> {
                                     "`{}`",
                                     ty.display(db, env)
                                 )))
+                        ));
+                    }
+                    SpecializationError::MismatchedConstraint {
+                        bound_typevar,
+                        direction: ConstraintFailureDirection::Upper,
+                        ..
+                    } => {
+                        let typevar_name = bound_typevar.typevar(db).name(db);
+                        diag.set_primary_annotation_message(format_args!(
+                            "No allowed specialization of `{typevar_name}` satisfies \
+                                the inferred upper bound `{argument_ty_display}`"
                         ));
                     }
                 }

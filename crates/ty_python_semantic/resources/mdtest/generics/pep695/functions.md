@@ -885,12 +885,32 @@ error[invalid-argument-type]: Argument to function `constrained` is incorrect
   --> src/mdtest_snippet.py:13:25
    |
 13 | reveal_type(constrained(accepts_bool))  # revealed: Unknown
-   |                         ^^^^^^^^^^^^ Argument type `bool` does not satisfy constraints (`int`, `str`) of type variable `T`
+   |                         ^^^^^^^^^^^^ No allowed specialization of `T` satisfies the inferred upper bound `bool`
 info: Type variable defined here
  --> src/mdtest_snippet.py:3:17
   |
 3 | def constrained[T: (int, str)](consumer: Callable[[T], None]) -> T:
   |                 ^^^^^^^^^^^^^
+```
+
+## Inferring a constrained typevar from a union of protocols
+
+A union of text and binary writers requires one specialization that both writers accept. The
+inferred upper bound is `str & bytes`, or `Never`, which neither declared constraint satisfies. Each
+writer alone accepts one of the declared constraints.
+
+```py
+from typing import Protocol
+
+class Writer[T](Protocol):
+    def write(self, value: T) -> None: ...
+
+def constrained[T: (str, bytes)](writer: Writer[T]) -> None: ...
+def f(text: Writer[str], binary: Writer[bytes], either: Writer[str] | Writer[bytes]):
+    constrained(text)
+    constrained(binary)
+    # error: [invalid-argument-type] "No allowed specialization of `T` satisfies the inferred upper bound `Never`"
+    constrained(either)
 ```
 
 ## Typevar constraints
