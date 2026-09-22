@@ -11,9 +11,11 @@ use ruff_python_ast::{self as ast, helpers::any_over_expr, name::Name};
 use rustc_hash::FxHashMap;
 use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::{
-    ProgramFile,
+    BindingWithConstraintsIterator, ProgramFile,
     definition::{Definition, DefinitionKind},
-    place::ScopedPlaceId,
+    global_scope,
+    place::{PlaceExpr, ScopedPlaceId},
+    place_table,
     predicate::{PredicateNode, ScopedPredicateId},
     reachability_constraints::ScopedReachabilityConstraintId,
     scope::ScopeId,
@@ -22,11 +24,19 @@ use ty_python_core::{
 
 use crate::{
     Db, Program, ProgramEnvironment,
+    place::{
+        ConsideredDefinitions, Provenance, RequiresExplicitReExport, place_by_id,
+        place_from_bindings,
+    },
+    place_load::{
+        ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceLoadMode, PlaceLoadResolutionStep,
+        PlaceLoadSourceKind, resolve_place_load,
+    },
     types::{
         Type, TypeContext,
         definition_resolution::{
             ImportAliasResolution, ResolvedDefinition, definitions_for_attribute,
-            definitions_for_name,
+            definitions_for_name, resolve_definition,
         },
         diagnostic::REDUNDANT_CONDITION_STRICT,
         infer::{
@@ -352,38 +362,110 @@ fn is_special_cased_condition_expression<'db>(
         _ => {}
     }
 
-    // We don't recurse through definitions in a flow-sensitive way, but there isn't really any need to.
-    // The main objective here is to avoid false positives. Flow-sensitive definitions of variables/attributes
-    // where some paths define the place in terms of `sys.version_info` but other paths don't are pretty rare.
-    // It's okay to have a small number of false negatives for these very rare edge cases. Attempting to
-    // recurse through definitions in a flow-sensitive way would be significantly more complicated.
     condition_definition_info(db, file, expression, expression_type)
         .contains_special_cased_condition
 }
 
-/// Resolves the condition's source definitions using a scope or an already-inferred receiver type.
+/// Resolves definitions that reach this read, falling back to member lookup for attributes without
+/// a definite assignment. The receiver type comes from the caller to avoid re-entering inference
+/// of the enclosing scope.
 pub(super) fn condition_definition_info<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+    expression: &ast::Expr,
+    expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+) -> ConditionDefinitionInfo<'db> {
+    // Walking assignment expressions also visits their targets, which have no use-site bindings.
+    match expression {
+        ast::Expr::Name(name) if name.ctx.is_load() => {}
+        ast::Expr::Attribute(attribute) if attribute.ctx.is_load() => {}
+        _ => return ConditionDefinitionInfo::default(),
+    }
+    place_condition_definition_info(db, file, expression, expression_type)
+}
+
+/// Also accepts augmented-assignment targets, which have a recorded load despite their store context.
+fn place_condition_definition_info<'db>(
     db: &'db dyn Db,
     file: ProgramFile<'db>,
     expression: &ast::Expr,
     mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
 ) -> ConditionDefinitionInfo<'db> {
-    match expression {
-        ast::Expr::Name(name) => {
-            let index = semantic_index(db, file);
-            let Some(scope) = index.try_expression_scope_id(&ast::ExprRef::Name(name)) else {
-                return ConditionDefinitionInfo::default();
+    let mut info = ConditionDefinitionInfo::default();
+    let index = semantic_index(db, file);
+    if let Some(scope) = index.try_expression_scope_id(expression)
+        && let Some(place) = PlaceExpr::try_from_expr(expression)
+    {
+        let scope = scope.to_scope_id(db, file);
+        let env = ProgramEnvironment::from_scope(scope);
+        let resolution = resolve_place_load(
+            db,
+            index,
+            scope,
+            place,
+            PlaceLoadMode::AtExpression(expression.into()),
+        );
+        for step in resolution {
+            let source = match step {
+                PlaceLoadResolutionStep::Source(source) => source,
+                PlaceLoadResolutionStep::MemberResolutionCondition(prefixes) => {
+                    let use_def = use_def_map(db, prefixes.scope());
+                    if prefixes.iter().any(|prefix| {
+                        let bindings = match prefix {
+                            PlaceExprPrefixLoad::AtUse(id) => use_def.bindings_at_use(id),
+                            PlaceExprPrefixLoad::AllReachable(id) => use_def.reachable_bindings(id),
+                            PlaceExprPrefixLoad::DefinitelyBound => return true,
+                        };
+                        !place_from_bindings(db, &env, bindings).place.is_undefined()
+                    }) {
+                        break;
+                    }
+                    continue;
+                }
+                PlaceLoadResolutionStep::Exhausted(_) => break,
             };
-            name_condition_definition_info(db, scope.to_scope_id(db, file), name.id.clone())
+            let (source_info, definitely_bound) = match source.kind {
+                PlaceLoadSourceKind::Bindings(bindings) => {
+                    let definitely_bound = place_from_bindings(db, &env, bindings.clone())
+                        .place
+                        .is_definitely_bound();
+                    (
+                        ConditionDefinitionInfo::from_bindings(db, bindings),
+                        definitely_bound,
+                    )
+                }
+                PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => {
+                    owning_scope_condition_definition_info(db, scope, id)
+                }
+                PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ExplicitGlobalSymbol {
+                    file,
+                    name,
+                }) => {
+                    info.merge(name_condition_definition_info(
+                        db,
+                        global_scope(db, file),
+                        name,
+                    ));
+                    break;
+                }
+                PlaceLoadSourceKind::Implicit(_) => continue,
+            };
+            info.merge(source_info);
+            if definitely_bound {
+                return info;
+            }
         }
-        ast::Expr::Attribute(attribute) => attribute_condition_definition_info(
+    }
+
+    if let ast::Expr::Attribute(attribute) = expression {
+        info.merge(attribute_condition_definition_info(
             db,
             file.program(db),
             expression_type(&attribute.value),
             attribute.attr.id.clone(),
-        ),
-        _ => ConditionDefinitionInfo::default(),
+        ));
     }
+    info
 }
 
 /// The information needed for condition exemptions and annotation hints.
@@ -392,92 +474,155 @@ pub(super) fn condition_definition_info<'db>(
 /// without caching a potentially large list of bindings.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ConditionDefinitionInfo<'db> {
-    pub(super) single_definition: Option<Definition<'db>>,
+    provenance: Provenance<'db>,
     contains_special_cased_condition: bool,
 }
 
 impl<'db> ConditionDefinitionInfo<'db> {
+    pub(super) fn single_definition(self) -> Option<Definition<'db>> {
+        self.provenance.definition()
+    }
+
+    fn merge(&mut self, other: Self) {
+        self.provenance = self.provenance.or(other.provenance);
+        self.contains_special_cased_condition |= other.contains_special_cased_condition;
+    }
+
+    /// Follow only bindings retained at the read. Keep environment-dependent alternatives even
+    /// when their predicates are false for the configured platform or Python version.
+    fn from_bindings(db: &'db dyn Db, bindings: BindingWithConstraintsIterator<'_, 'db>) -> Self {
+        let mut info = Self::default();
+        for binding in bindings {
+            if binding.reachability_constraint == ScopedReachabilityConstraintId::ALWAYS_FALSE {
+                continue;
+            }
+            let Some(definition) = binding.binding.definition() else {
+                continue;
+            };
+            info.merge(resolved_condition_definition_info(db, definition));
+        }
+        info
+    }
+
     /// Summarizes resolved definitions, following assignments to establish environment provenance.
     fn from_definitions(db: &'db dyn Db, definitions: &[ResolvedDefinition<'db>]) -> Self {
-        // A place is a variable or attribute, and several definitions can bind the same place.
-        // The outer map identifies the place by its scope and place ID: place IDs are only unique
-        // within a scope. Each inner map associates a definition with the reachability constraint
-        // describing the paths from the start of that scope to its binding.
-        //
-        // For example:
-        //
-        // ```python
-        // import sys
-        //
-        // if sys.platform == "win32":
-        //     prefix = "\n"
-        // else:
-        //     prefix = ""
-        // ```
-        //
-        // There is one outer entry for `prefix` in the module scope. Its inner map has two
-        // entries, one for each assignment: the `"\n"` binding is guarded by the platform
-        // comparison, and the `""` binding by its negation. The constraint IDs refer to those
-        // formulas in the scope's use-def map; they do not store the assigned strings or the
-        // conditions' evaluated truthiness.
-        //
-        // Populate each inner map lazily and reuse it for the rest of this call: scanning all bindings
-        // for each definition would be quadratic for a variable assigned many times. Although building
-        // these indexes may look expensive, `name_condition_definition_info` and
-        // `attribute_condition_definition_info` cache this function's result with Salsa, so repeated
-        // conditions with the same lookup key reuse the summary without rebuilding the maps.
-        type ReachabilityByDefinition<'db> =
-            FxHashMap<Definition<'db>, ScopedReachabilityConstraintId>;
-        type ReachabilityByPlace<'db> =
-            FxHashMap<(ScopeId<'db>, ScopedPlaceId), ReachabilityByDefinition<'db>>;
-        let mut reachability_by_place = ReachabilityByPlace::default();
-
         let contains_special_cased_condition = definitions
             .iter()
             .filter_map(ResolvedDefinition::definition)
-            .any(|definition| {
-                let scope = definition.scope(db);
-                let place = definition.place(db);
+            .any(|definition| definition_contains_special_cased_condition(db, definition));
 
-                let reachability_by_definition = reachability_by_place
-                    .entry((scope, place))
-                    .or_insert_with(|| {
-                        use_def_map(db, scope)
-                            .reachable_bindings(place)
-                            .filter_map(|binding| {
-                                Some((
-                                    binding.binding.definition()?,
-                                    binding.reachability_constraint,
-                                ))
-                            })
-                            .collect()
-                    });
-
-                let reachability = reachability_by_definition
-                    .get(&definition)
-                    .copied()
-                    .unwrap_or(ScopedReachabilityConstraintId::ALWAYS_TRUE);
-
-                definition_contains_special_cased_condition(db, definition, reachability)
-            });
-
-        let single_definition = match definitions {
-            [ResolvedDefinition::Definition(definition)] => Some(*definition),
-            _ => None,
+        let provenance = match definitions {
+            [] => Provenance::Unknown,
+            [ResolvedDefinition::Definition(definition)] => {
+                Provenance::SingleDefinition(*definition)
+            }
+            _ => Provenance::MultipleDefinitions,
         };
 
         Self {
-            single_definition,
+            provenance,
             contains_special_cased_condition,
         }
     }
 }
 
-/// Caches definition information across uses of the same name in a scope.
+/// Cache the original guards separately from the bindings selected at each read. A read inside
+/// an environment guard does not make an earlier, unconditional assignment environment-dependent.
+/// Index once per place to avoid scanning all its assignments for each condition.
+#[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
+fn definition_reachability<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    place: ScopedPlaceId,
+) -> FxHashMap<Definition<'db>, ScopedReachabilityConstraintId> {
+    // A place is a variable or attribute, and several definitions can bind the same place.
+    // Each map entry records the paths from the start of the scope to that binding. For example:
+    //
+    // ```python
+    // if sys.platform == "win32":
+    //     prefix = "\n"
+    // else:
+    //     prefix = ""
+    // ```
+    //
+    // The map for `prefix` has two entries: the `"\n"` binding is guarded by the platform
+    // comparison, and the `""` binding by its negation. The constraint IDs refer to those
+    // formulas in the scope's use-def map, not the conditions' evaluated truthiness.
+    let mut reachability: FxHashMap<_, _> = use_def_map(db, scope)
+        .reachable_bindings(place)
+        .filter_map(|binding| {
+            Some((
+                binding.binding.definition()?,
+                binding.reachability_constraint,
+            ))
+        })
+        .collect();
+    reachability.shrink_to_fit();
+    reachability
+}
+
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| ConditionDefinitionInfo::default(),
+    heap_size = ruff_memory_usage::heap_size
+)]
+fn resolved_condition_definition_info<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> ConditionDefinitionInfo<'db> {
+    let scope = definition.scope(db);
+    let places = place_table(db, scope);
+    let symbol_name = places
+        .place(definition.place(db))
+        .as_symbol()
+        .map(|symbol| symbol.name().as_str());
+    ConditionDefinitionInfo::from_definitions(
+        db,
+        &resolve_definition(
+            db,
+            &ProgramEnvironment::from_scope(scope),
+            definition,
+            symbol_name,
+            ImportAliasResolution::ResolveAliases,
+        ),
+    )
+}
+
+/// Lazy closure reads share all reachable definitions in the owning scope. Cache both the provenance
+/// traversal and boundness analysis so repeated conditions do not rescan all those bindings.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _, _| (ConditionDefinitionInfo::default(), false),
+    heap_size = ruff_memory_usage::heap_size
+)]
+fn owning_scope_condition_definition_info<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    place: ScopedPlaceId,
+) -> (ConditionDefinitionInfo<'db>, bool) {
+    let use_def = use_def_map(db, scope);
+    let mut info = ConditionDefinitionInfo::from_bindings(db, use_def.reachable_bindings(place));
+    for declaration in use_def.reachable_declarations(place) {
+        if let Some(definition) = declaration.declaration.definition() {
+            info.merge(resolved_condition_definition_info(db, definition));
+        }
+    }
+    let definitely_bound = place_by_id(
+        db,
+        scope,
+        place,
+        RequiresExplicitReExport::No,
+        ConsideredDefinitions::AllReachable,
+    )
+    .place
+    .is_definitely_bound();
+    (info, definitely_bound)
+}
+
+/// Caches definition information for global reads in lazy scopes.
 ///
-/// Name lookup considers every reachable binding, so repeating it for every condition can be
-/// quadratic in the number of assignments. Caching only the per-definition traversal does not
-/// avoid collecting and resolving those bindings again.
+/// Any reachable module binding can supply such a read. Repeating this lookup for every condition
+/// can be quadratic in the number of assignments, even when the per-definition traversal is cached.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _, _| ConditionDefinitionInfo::default(),
@@ -538,16 +683,14 @@ fn attribute_condition_definition_info<'db>(
 ///
 /// This Salsa-tracked query reads the definition's AST behind its own incremental boundary, so
 /// callers do not depend directly on another file's syntax tree. Cyclic aliases recover as `false`.
-/// `reachability` belongs to the use-def map of the definition's scope.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| false,
+    cycle_initial = |_, _, _| false,
     heap_size = ruff_memory_usage::heap_size
 )]
 fn definition_contains_special_cased_condition<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    reachability: ScopedReachabilityConstraintId,
 ) -> bool {
     let module = parsed_module(db, definition.python_file(db)).load(db);
     let definition_kind = definition.kind(db);
@@ -581,12 +724,47 @@ fn definition_contains_special_cased_condition<'db>(
         DefinitionKind::Assignment(assignment) => Some(assignment.value(&module)),
         DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(&module),
         DefinitionKind::NamedExpression(named) => Some(&*named.node(&module).value),
-        DefinitionKind::AugmentedAssignment(assignment) => Some(&*assignment.node(&module).value),
         DefinitionKind::For(for_statement) => Some(for_statement.iterable(&module)),
         DefinitionKind::Comprehension(comprehension) => Some(comprehension.iterable(&module)),
         DefinitionKind::WithItem(with_item) => Some(with_item.context_expr(&module)),
         DefinitionKind::MatchPattern(pattern) => {
             Some(pattern.predicate().subject(db).node_ref(db).node(&module))
+        }
+        DefinitionKind::LoopHeader(header) => {
+            let use_def = use_def_map(db, definition.scope(db));
+            return use_def
+                .loop_header(header.loop_header_id())
+                .bindings_for_place(header.place())
+                .filter(|binding| {
+                    binding.reachability_constraint()
+                        != ScopedReachabilityConstraintId::ALWAYS_FALSE
+                })
+                .filter_map(|binding| use_def.definition(binding.binding()).definition())
+                .any(|source| {
+                    resolved_condition_definition_info(db, source).contains_special_cased_condition
+                });
+        }
+        DefinitionKind::NestedBindings(nested) => {
+            return nested
+                .visible_binding_sources(
+                    semantic_index(db, program_file),
+                    definition.file_scope(db),
+                )
+                .any(|bindings| {
+                    ConditionDefinitionInfo::from_bindings(db, bindings)
+                        .contains_special_cased_condition
+                });
+        }
+        DefinitionKind::AugmentedAssignment(assignment) => {
+            let assignment = assignment.node(&module);
+            if place_condition_definition_info(db, program_file, &assignment.target, |expr| {
+                infer_definition_types(db, definition).expression_type(expr)
+            })
+            .contains_special_cased_condition
+            {
+                return true;
+            }
+            Some(&*assignment.value)
         }
         DefinitionKind::Import(_)
         | DefinitionKind::ImportFrom(_)
@@ -601,9 +779,7 @@ fn definition_contains_special_cased_condition<'db>(
         | DefinitionKind::ExceptHandler(_)
         | DefinitionKind::TypeVar(_)
         | DefinitionKind::ParamSpec(_)
-        | DefinitionKind::TypeVarTuple(_)
-        | DefinitionKind::LoopHeader(_)
-        | DefinitionKind::NestedBindings(_) => None,
+        | DefinitionKind::TypeVarTuple(_) => None,
     };
     let Some(source_expression) = source_expression else {
         return false;
@@ -612,6 +788,10 @@ fn definition_contains_special_cased_condition<'db>(
     // A version guard can select a different function signature without changing the fact that
     // the function object is always truthy. Only definitions with a source expression above
     // inherit the provenance of their guards.
+    let reachability = definition_reachability(db, definition.scope(db), definition.place(db))
+        .get(&definition)
+        .copied()
+        .unwrap_or(ScopedReachabilityConstraintId::ALWAYS_TRUE);
     if reachability_contains_special_cased_condition(db, definition.scope(db), reachability) {
         return true;
     }

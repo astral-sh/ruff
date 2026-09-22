@@ -672,6 +672,33 @@ warning[redundant-condition]: A 1-element tuple is always truthy
    |        ^^^^^ Inferred type `tuple[list[T@check_nested_generic]]` is always truthy
 ```
 
+Captured variables retain the annotation hint when their type comes from a declaration in the
+enclosing scope:
+
+```py
+def outer():
+    value: tuple[int]
+
+    def inner():
+        if value:  # snapshot: redundant-condition
+            pass
+```
+
+```snapshot
+warning[redundant-condition]: A 1-element tuple is always truthy
+  --> src/mdtest_snippet.py:30:12
+   |
+27 |     value: tuple[int]
+   |            ----------
+   |            |
+   |            Inferred as a 1-element tuple due to this annotation
+   |            Did you mean `tuple[int, ...]`?
+28 |
+29 |     def inner():
+30 |         if value:  # snapshot: redundant-condition
+   |            ^^^^^ Inferred type `tuple[int]` is always truthy
+```
+
 ## Tuple annotations in dependencies
 
 A one-element tuple annotation in a dependency also explains why the condition is redundant. The
@@ -5304,6 +5331,253 @@ class PlatformAttributeCycle:
         reveal_type(bool(self.first))  # revealed: Literal[True]
         if self.first:
             pass
+```
+
+## Environment-dependent assignments that reach the use
+
+Only assignments that reach a condition can make it environment-dependent. A later assignment or an
+overwritten value does not exempt an otherwise redundant condition:
+
+```py
+import sys
+
+def later_assignment():
+    value = 1
+    if value:  # error: [redundant-condition-strict]
+        pass
+    value = sys.platform
+
+def overwritten_assignment():
+    value = sys.platform
+    value = 1
+    if value:  # error: [redundant-condition-strict]
+        pass
+```
+
+Following an alias uses the assignments that reach its source expression. Reassigning the source
+afterward does not change the alias's origin:
+
+```py
+def fixed_alias():
+    source = 1
+    alias = source
+    source = sys.platform
+    if alias:  # error: [redundant-condition-strict]
+        pass
+
+def environment_alias():
+    source = sys.platform
+    alias = source
+    source = 1
+    if alias == "linux":  # no diagnostic
+        pass
+```
+
+An augmented assignment also depends on the previous value of its target:
+
+```py
+def augmented_assignment():
+    value = sys.platform
+    value += ""
+    if value == "linux":  # no diagnostic
+        pass
+```
+
+## Environment-dependent assignments in separate branches
+
+An assignment in one branch does not affect a use in the other branch:
+
+```py
+import sys
+
+def separate_branches(flag: bool):
+    if flag:
+        value = sys.platform
+    else:
+        value = 1
+        if value:  # error: [redundant-condition-strict]
+            pass
+```
+
+After branches merge, a reaching environment-dependent assignment still exempts the condition.
+Assignments selected by an environment guard retain that exemption too:
+
+```py
+def reaching_assignment(flag: bool):
+    if flag:
+        value = sys.platform
+    else:
+        value = "ready"
+    if value:  # no diagnostic
+        pass
+
+def reaching_guard():
+    if sys.platform == "linux":
+        value = 1
+    else:
+        value = 2
+    if value:  # no diagnostic
+        pass
+```
+
+An environment guard around a use does not change the origin of an earlier assignment:
+
+```py
+def fixed_value_under_environment_guard():
+    value = 1
+    if sys.platform == "linux":
+        if value:  # error: [redundant-condition-strict]
+            pass
+```
+
+## Environment-dependent values across scope boundaries
+
+A class body sees the enclosing bindings present when it executes. A function can instead read a
+module variable assigned after the function is defined:
+
+```py
+import sys
+
+value = 1
+
+class Snapshot:
+    if value:  # error: [redundant-condition-strict]
+        pass
+
+value = sys.platform
+
+def lazy_read():
+    if later_platform == "linux":  # no diagnostic
+        pass
+
+later_platform = sys.platform
+```
+
+An assignment before the use also replaces an environment-dependent value reached through a `global`
+or `nonlocal` declaration:
+
+```py
+global_value = sys.platform
+
+def overwrite_global():
+    global global_value
+    global_value = 1
+    if global_value:  # error: [redundant-condition-strict]
+        pass
+
+def outer():
+    nonlocal_value = sys.platform
+
+    def overwrite_nonlocal():
+        nonlocal nonlocal_value
+        nonlocal_value = 1
+        if nonlocal_value:  # error: [redundant-condition-strict]
+            pass
+```
+
+A walrus assignment in an eagerly evaluated comprehension can supply the environment-dependent value
+to its enclosing scope:
+
+```py
+def comprehension_assignment():
+    value = ""
+    [(value := sys.platform) for _ in range(1)]
+    if value is None:  # no diagnostic
+        pass
+```
+
+Star imports preserve the imported value's environment-dependent origin:
+
+```py
+from sys import *
+
+if platform == "linux":  # no diagnostic
+    pass
+```
+
+## Environment-dependent attribute assignments that reach the use
+
+An attribute with a definite assignment at the use follows the same rules as a local variable:
+
+```py
+import sys
+
+class Config:
+    def later_assignment(self):
+        self.value = 1
+        if self.value:  # error: [redundant-condition-strict]
+            pass
+        self.value = sys.platform
+
+    def overwritten_assignment(self):
+        self.value = sys.platform
+        self.value = 1
+        if self.value:  # error: [redundant-condition-strict]
+            pass
+
+    def reaching_assignment(self):
+        self.value = sys.platform
+        if self.value == "linux":  # no diagnostic
+            pass
+```
+
+Aliases of attributes also retain the origin of the value at the source expression:
+
+```py
+class AttributeAlias:
+    def check(self):
+        self.value = 1
+        alias = self.value
+        self.value = sys.platform
+        if alias:  # error: [redundant-condition-strict]
+            pass
+```
+
+## Environment-dependent implicit instance attributes
+
+Without a definite assignment at the use, an instance attribute can obtain its value from another
+method. Its environment-dependent origin still exempts the condition, including when an ordinary
+assignment in the current method only occurs on some paths:
+
+```py
+import sys
+
+class Config:
+    def __init__(self):
+        self.value = sys.platform
+
+    def check(self):
+        reveal_type(self.value)  # revealed: str
+        if self.value is None:  # no diagnostic
+            pass
+
+    def possibly_assigned(self, flag: bool):
+        if flag:
+            self.value = "ready"
+        if self.value is None:  # no diagnostic
+            pass
+```
+
+An augmented assignment reads its previous value, including an implicit instance attribute or a
+variable in an enclosing scope:
+
+```py
+class AugmentedConfig:
+    def __init__(self):
+        self.value = sys.platform
+
+    def check(self):
+        self.value += ""
+        if self.value is None:  # no diagnostic
+            pass
+
+value = sys.platform
+
+def augmented_global():
+    global value
+    value += ""
+    if value is None:  # no diagnostic
+        pass
 ```
 
 ## Environment-dependent assignment guards

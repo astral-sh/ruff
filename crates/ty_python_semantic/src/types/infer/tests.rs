@@ -699,16 +699,22 @@ fn redundant_condition_lookup_does_not_reenter_scope_inference() -> anyhow::Resu
     Ok(())
 }
 
-/// Repeated conditions on the same name or attribute share one cached definition summary.
-/// The first two fixtures combine many assignments to one place with many conditions that test it.
-/// Each lookup can inspect every assignment, so repeating it for every condition would make
-/// these examples quadratic even if their diagnostics were unchanged.
+/// Repeated conditions share cached definition and reachability summaries. Reassigned names need
+/// different definitions at each read, but share the index of their original assignment guards.
+/// Rebuilding that index for every condition would make these examples quadratic even if their
+/// diagnostics were unchanged. Attribute fallback lookup also shares its definition summary.
+/// Lazy closure reads share both the summary and boundness analysis of their outer bindings.
 /// Conditions on distinct names also share the reachability summaries for preceding calls,
 /// rather than traversing an increasingly long call prefix for each name.
 #[test]
 fn repeated_tuple_conditions_share_provenance() -> anyhow::Result<()> {
     let repetitions = 100;
     let names = "value = (1,)\nif value:\n    pass\n".repeat(repetitions);
+    let lazy_closure = format!(
+        "def outer():\n    def inner():\n{}{}",
+        "        if value:\n            pass\n".repeat(repetitions),
+        "    value = (1,)\n".repeat(repetitions),
+    );
     let attributes = format!(
         "class C:\n{}\n{}",
         "    value = (1,)\n".repeat(repetitions),
@@ -729,7 +735,8 @@ if value_{index}:
     }
 
     for (source, query_name, max_queries) in [
-        (names, "name_condition_definition_info", 1),
+        (names, "definition_reachability", 1),
+        (lazy_closure, "owning_scope_condition_definition_info", 1),
         (attributes, "attribute_condition_definition_info", 1),
         (
             calls,
