@@ -6034,22 +6034,26 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         visitor.visit(db, (left, right), || {
             let class_specialization = |ty| match ty {
                 Type::GenericAlias(alias) => Some((alias.origin(db), alias.specialization(db))),
-                Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::TypedDict(_) => {
+                Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                     ty.class_specialization(db, env)
                 }
                 _ => None,
             };
-            let has_invariant_specialization = |ty| {
+            let has_invariant_component = |ty| {
                 any_over_type_expanding_aliases(db, env, ty, |nested| {
-                    class_specialization(nested).is_some_and(|(_, specialization)| {
-                        specialization
-                            .generic_context(db)
-                            .variables(db)
-                            .any(|variable| variable.variance(db) == TypeVarVariance::Invariant)
-                    })
+                    // TypedDict fields can be invariant without any generic parameters. Treat
+                    // distinct dictionaries conservatively without forcing their lazy schemas:
+                    // even a ReadOnly field can contain a mutable value.
+                    matches!(nested, Type::TypedDict(_))
+                        || class_specialization(nested).is_some_and(|(_, specialization)| {
+                            specialization
+                                .generic_context(db)
+                                .variables(db)
+                                .any(|variable| variable.variance(db) == TypeVarVariance::Invariant)
+                        })
                 })
             };
-            if !has_invariant_specialization(left) && !has_invariant_specialization(right) {
+            if !has_invariant_component(left) && !has_invariant_component(right) {
                 return false;
             }
 

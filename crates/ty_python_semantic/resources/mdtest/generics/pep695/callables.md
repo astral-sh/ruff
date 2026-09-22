@@ -1040,8 +1040,9 @@ def _(value: str | int) -> None:
     reveal_type(accepts_callable_and_value(overloaded_consumer, value))  # revealed: str | bytes | int
 ```
 
-When overloads exchange their input and output types, each specialization selects one overload and
-preserves its input-output pair:
+Type variables inferred from the same overload remain correlated. Here, the valid assignments are
+`T = int, U = str` and `T = str, U = int`; inference does not mix the input type from one overload
+with the return type from the other:
 
 ```py
 class Result[T]:
@@ -1316,6 +1317,79 @@ def _(
     callback: Intersection[Callable[[object], TupleWrapper[A]], Callable[[object], TupleWrapper[B]]],
 ) -> None:
     reveal_type(invoke(callback, object()))  # revealed: TupleWrapper[A] | TupleWrapper[B]
+```
+
+## Inferred TypedDict return alternatives
+
+Writable `TypedDict` fields are invariant even when the dictionaries have no type parameters. A
+fresh `{}` can be typed as either dictionary below because their fields are optional. Inference
+retains the union of these return types rather than their disjoint intersection, `Never`:
+
+```py
+from typing import Callable, TypedDict
+from ty_extensions import Intersection
+
+class IntDict(TypedDict, total=False):
+    value: int
+
+class StrDict(TypedDict, total=False):
+    value: str
+
+def invoke[R](callback: Callable[[], R]) -> R:
+    return callback()
+
+def _(callback: Intersection[Callable[[], IntDict], Callable[[], StrDict]]) -> None:
+    reveal_type(invoke(callback))  # revealed: IntDict | StrDict
+```
+
+The same field differences matter when the dictionaries are nested in a tuple:
+
+```py
+def _(callback: Intersection[Callable[[], tuple[IntDict]], Callable[[], tuple[StrDict]]]) -> None:
+    reveal_type(invoke(callback))  # revealed: tuple[IntDict] | tuple[StrDict]
+```
+
+A `ReadOnly` field can still contain a mutable value. A fresh empty list can have either element
+type, so these dictionary returns also remain a union:
+
+```py
+from typing_extensions import ReadOnly
+
+class IntListDict(TypedDict):
+    value: ReadOnly[list[int]]
+
+class StrListDict(TypedDict):
+    value: ReadOnly[list[str]]
+
+def _(callback: Intersection[Callable[[], IntListDict], Callable[[], StrListDict]]) -> None:
+    reveal_type(invoke(callback))  # revealed: IntListDict | StrListDict
+```
+
+An unchanged dictionary component still allows the other tuple component to be refined:
+
+```py
+class A: ...
+class B: ...
+
+def _(
+    callback: Intersection[Callable[[], tuple[A, IntDict]], Callable[[], tuple[B, IntDict]]],
+) -> None:
+    reveal_type(invoke(callback))  # revealed: tuple[A, IntDict] & tuple[B, IntDict]
+```
+
+For now, the conservative fallback also applies to distinct fully read-only dictionaries. These
+fields have no invariant components, so their return types could instead be intersected:
+
+```py
+class AView(TypedDict):
+    value: ReadOnly[A]
+
+class BView(TypedDict):
+    value: ReadOnly[B]
+
+def _(callback: Intersection[Callable[[], AView], Callable[[], BView]]) -> None:
+    # TODO: revealed: AView & BView
+    reveal_type(invoke(callback))  # revealed: AView | BView
 ```
 
 ## Multiple occurrences of a higher-order generic callable
