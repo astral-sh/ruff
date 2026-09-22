@@ -709,9 +709,10 @@ pub struct LintCommonOptions {
 
     /// A regular expression used to identify "dummy" variables, or those which
     /// should be ignored when enforcing (e.g.) unused-variable rules. The
-    /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
+    /// default expression matches `_`, `__`, `_var`, and `_次`, but not `_var_`
+    /// or `_次_`.
     #[option(
-        default = r#""^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$""#,
+        default = r#""^(_+|(_+[\\p{XID_Continue}]*[\\p{XID_Continue}--_]+?))$""#,
         value_type = "str",
         example = r#"
             # Only ignore variables named "_".
