@@ -4917,7 +4917,8 @@ mod tests {
                 let inference = builder
                     .build_inference_with(|typevar, bounds| {
                         (typevar == t
-                            && bounds.is_some_and(|bound| bound.evidence_lower() == Some(str)))
+                            && bounds
+                                .is_some_and(|bound| bound.inference_lower(db, &env) == Some(str)))
                         .then_some(PathBoundSolution::BudgetExceeded { fallback })
                     })
                     .map_err(|()| anyhow::anyhow!("incomplete alternatives remain satisfiable"))?;
@@ -5183,8 +5184,9 @@ mod tests {
 
         let inference = builder
             .build_inference_with(|typevar, bounds| {
-                (typevar == t && bounds.is_some_and(|bound| bound.evidence_lower() == Some(str)))
-                    .then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
+                (typevar == t
+                    && bounds.is_some_and(|bound| bound.inference_lower(db, &env) == Some(str)))
+                .then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
             .map_err(|()| anyhow::anyhow!("expected satisfiable alternatives"))?;
         let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
@@ -5229,7 +5231,7 @@ mod tests {
         // individual path still contains the cycle after merging with object.
         let inference = builder
             .build_inference_with(|typevar, bounds| {
-                let ty = match (typevar, bounds?.evidence_lower()) {
+                let ty = match (typevar, bounds?.inference_lower(db, &env)) {
                     (typevar, Some(lower)) if typevar == t && lower == int => list_of_u,
                     (typevar, Some(lower)) if typevar == u && lower == str => Type::TypeVar(t),
                     _ => Type::object(),

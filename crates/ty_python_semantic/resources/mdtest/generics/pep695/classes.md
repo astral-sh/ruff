@@ -451,6 +451,23 @@ def accepts_dog(value: Dog) -> None: ...
 consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [invalid-argument-type]
 ```
 
+### Constrained constructor inference uses argument evidence
+
+Constructor arguments should select the narrowest compatible declared constraint. A string argument
+therefore specializes `NameAttribute` to `str`, not the broader `object` constraint.
+
+```py
+class NameAttribute[T: (object, str)]:
+    def __init__(self, value: T) -> None:
+        self._value = value
+
+    @property
+    def value(self) -> T:
+        return self._value
+
+attribute: NameAttribute[str] = NameAttribute("Alice")
+```
+
 ### Constructing the class from its own type variable
 
 A constructor call inside a generic class can use a value whose type is one of the class's type
@@ -533,6 +550,28 @@ class Box[T: NamedTuple]:
     def __init__(self, value: T, other: Self | None = None) -> None:
         if other is None:
             reveal_type(Box(value, self))  # revealed: Box[T@Box]
+```
+
+### Inferring through a `Self`-annotated constructor parameter
+
+When ty accepts arguments that require different specializations of an invariant class, it should
+infer a specialization covering both. The `Self`-annotated template contributes `int` alongside the
+direct argument, whether that argument is gradual or static.
+
+```py
+from typing import Any, Self
+
+class Box[T]:
+    def __init__(self, value: T, template: Self | None = None) -> None:
+        self.value = value
+
+def construct_from_any(value: Any) -> None:
+    # revealed: Box[Any | int]
+    reveal_type(Box(value, Box(1)))
+
+def construct_from_str(value: str) -> None:
+    # revealed: Box[str | int]
+    reveal_type(Box(value, Box(1)))
 ```
 
 ### Constructing with an enclosing Self type

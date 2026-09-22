@@ -395,7 +395,7 @@ impl<'db> SolutionWalker<'db> {
                 {
                     violations.push(SolutionViolation {
                         bound_typevar,
-                        argument: path_bound.evidence_lower(),
+                        argument: path_bound.inference_lower(db, env),
                         variance: path_bound.variance(),
                         kind: SolutionViolationKind::UpperBound,
                     });

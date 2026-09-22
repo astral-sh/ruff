@@ -26,11 +26,13 @@ use crate::{Db, ProgramEnvironment};
 /// don't want to choose a validity bound as a solution unless we have no other choice. There is
 /// often an evidence bound that is a better choice.
 ///
-/// A bound derived only from validity remains validity. Any derivation that also depends on
-/// evidence is itself evidence.
+/// When we derive a new constraint from both an evidence constraint and a validity constraint, we
+/// produce a _mixed_ constraint. Sometimes we will need to treat that derived constraint the same
+/// as a validity constraint; other times we will need to treat it like an evidence constraint.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum ConstraintProvenance {
     Validity,
+    Mixed,
     Evidence,
 }
 
@@ -39,7 +41,8 @@ impl ConstraintProvenance {
     pub(super) const fn derived(left: Self, right: Self) -> Self {
         match (left, right) {
             (Self::Evidence, Self::Evidence) => Self::Evidence,
-            _ => Self::Validity,
+            (Self::Validity, Self::Validity) => Self::Validity,
+            _ => Self::Mixed,
         }
     }
 
