@@ -244,6 +244,63 @@ fn fix_unfixable() -> anyhow::Result<()> {
 }
 
 #[test]
+fn unsafe_fix() -> anyhow::Result<()> {
+    let case = CliTest::with_file("unsafe_fix.py", "raise NotImplemented")?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-raise]: Cannot raise `NotImplemented`
+     --> unsafe_fix.py:1:7
+      |
+    1 | raise NotImplemented
+      |       ^^^^^^^^^^^^^^ Did you mean `NotImplementedError`?
+    info: Can only raise an instance or subclass of `BaseException`
+    help: Use `NotImplementedError` instead
+      |
+      - raise NotImplemented
+    1 + raise NotImplementedError
+      |
+    note: This is an unsafe fix and may change runtime behavior
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn display_only_fix() -> anyhow::Result<()> {
+    let case = CliTest::with_file("display_only_fix.py", "if (x for x in range(3)): pass")?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[redundant-condition]: A generator is always truthy
+     --> display_only_fix.py:1:4
+      |
+    1 | if (x for x in range(3)): pass
+      |    ^^^^^^^^^^^^^^^^^^^^^ Inferred type `GeneratorType[int, None, None]` is always truthy
+    help: Did you mean to use `any()`?
+      |
+      - if (x for x in range(3)): pass
+    1 + if any((x for x in range(3))): pass
+      |
+    note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn fix_clean_file() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "clean.py",
