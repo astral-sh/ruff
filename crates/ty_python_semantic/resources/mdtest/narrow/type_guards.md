@@ -324,6 +324,66 @@ def _(d: Any, guarded: object, narrowed: object, other: object, mode: bool):
         reveal_type(narrowed)  # revealed: int
 ```
 
+## Intersections
+
+Intersections of guard return types retain distinct wrappers, even when their narrowed types are
+disjoint. An always-false `TypeGuard[Never]` function can satisfy both callable types below, so its
+result is not `Never`.
+
+```py
+from typing import Callable
+from typing_extensions import Never, TypeGuard, TypeIs
+from ty_extensions import Intersection, Not
+
+def never_true(value: object) -> TypeGuard[Never]:
+    return False
+
+def check_guard(
+    guard: Intersection[Callable[[object], TypeGuard[int]], Callable[[object], TypeGuard[str]]],
+    value: object,
+):
+    reveal_type(guard(value))  # revealed: TypeGuard[int] & TypeGuard[str]
+
+check_guard(never_true, object())
+
+def _(
+    guard: Intersection[TypeGuard[int], TypeGuard[str]],
+    type_is: Intersection[TypeIs[int], TypeIs[str]],
+    mixed: Intersection[TypeGuard[int], TypeIs[str]],
+):
+    reveal_type(guard)  # revealed: TypeGuard[int] & TypeGuard[str]
+    reveal_type(type_is)  # revealed: TypeIs[int] & TypeIs[str]
+    reveal_type(mixed)  # revealed: TypeGuard[int] & TypeIs[str]
+```
+
+Redundant components still simplify away. `TypeGuard` is covariant, whereas `TypeIs` is invariant.
+
+```py
+def _(
+    covariant: Intersection[TypeGuard[int], TypeGuard[bool]],
+    reversed: Intersection[TypeGuard[bool], TypeGuard[int]],
+    invariant: Intersection[TypeIs[int], TypeIs[bool]],
+    repeated: Intersection[TypeIs[int], TypeIs[int]],
+    boolean: Intersection[TypeGuard[int], bool],
+):
+    reveal_type(covariant)  # revealed: TypeGuard[bool]
+    reveal_type(reversed)  # revealed: TypeGuard[bool]
+    reveal_type(invariant)  # revealed: TypeIs[int] & TypeIs[bool]
+    reveal_type(repeated)  # revealed: TypeIs[int]
+    reveal_type(boolean)  # revealed: TypeGuard[int]
+```
+
+Excluding a different guard retains the exclusion. Excluding a supertype still yields `Never`.
+
+```py
+def _(
+    different: Intersection[TypeGuard[int], Not[TypeGuard[str]]],
+    supertype: Intersection[TypeGuard[bool], Not[TypeGuard[int]]],
+):
+    reveal_type(different)  # revealed: TypeGuard[int] & ~TypeGuard[str]
+    reveal_type(supertype)  # revealed: Never
+```
+
 ## Narrowing
 
 ```toml
