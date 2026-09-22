@@ -1,4 +1,12 @@
-<!-- Replace every placeholder and remove all HTML comments before presenting the report. Keep each prose paragraph and list item on one source line. Number retained change subsections consecutively within each section, restarting at 1 for each section. Do not mention the absence of new panics, overflows, or timeouts. Do not add change-count tables, bot-update timestamps, reproduction-completeness bookkeeping, import-audit details, exhaustive traceability appendices, raw URLs, or artifact hashes. -->
+<!--
+Replace every placeholder and remove all HTML comments before presenting the report. Keep each prose paragraph and list item on one source line. Number retained change subsections consecutively within each section, restarting at 1 for each section, with at most 100 change subsections in total. Combine related causes under a shared theme with separate explanations and examples wherever their behavior differs; do not conflate distinct causes to meet the limit.
+
+Order diagnostic sections and subsections by descending total ecosystem hit count. Include per-rule counts in every title and example label, for example, "Callback argument checking (18 invalid-argument-type; 6 no-matching-overload)". Count represented diagnostic occurrences, including duplicates, rather than projects or examples; do not net additions against removals. For failure titles, count represented outcomes such as crashes or timeouts, and include per-rule counts if the subsection also covers diagnostic changes.
+
+Keep each subsection's exhaustive bulleted entry inventory inside a details block; keep its explanation and examples outside. Identify each diagnostic's source permalink, rule, and whether it was added, removed, or changed. Preserve duplicate occurrences with explicit multiplicities. For failures without source diagnostics, list the affected project outcomes. Reconcile each subsection's inventory and examples with its title counts, and all subsection inventories with the retained report inventory so that every retained entry is represented exactly once.
+
+Do not mention the absence of new panics, overflows, or timeouts. Do not add change-count tables, bot-update timestamps, reproduction-completeness bookkeeping, import-audit details, exhaustive traceability appendices, raw URLs, or artifact hashes.
+-->
 
 # [PR #<number>](https://github.com/astral-sh/ruff/pull/<number>) ecosystem summary
 
@@ -6,41 +14,50 @@
 
 <!-- Omit this entire section if no stable project failures changed. Repeat its numbered subsection for each distinct failure. -->
 
-## Project failures
+## Project failures (<per-outcome and per-rule hit counts, as applicable>)
 
-### 1. <New, fixed, or changed project failure>
+### 1. <New, fixed, or changed project failure> (<per-outcome and per-rule hit counts, as applicable>)
 
-**Affected projects:**
+<details>
+<summary>Affected projects</summary>
 
 - [<project>](<project-url>): merge base: `<base outcome>`; PR: `<PR outcome>`.
+
+</details>
 
 <Explain the crash, panic, overflow, timeout, or abnormal exit, including relevant stderr where applicable.>
 
 <!-- Omit this entire section if no severe failure involving intermittent outcomes changed. Repeat its numbered subsection for each distinct change. -->
 
-## Intermittent severe failures
+## Intermittent severe failures (<per-outcome and per-rule hit counts, as applicable>)
 
-### 1. <New or changed intermittent panic, crash, overflow, or timeout>
+### 1. <New or changed intermittent panic, crash, overflow, or timeout> (<per-outcome and per-rule hit counts, as applicable>)
 
-**Affected projects:**
+<details>
+<summary>Affected projects</summary>
 
 - [<project>](<project-url>): merge base: `<base outcome and count/runs, or not present>`; PR: `<PR outcome and count/runs, or not present>`.
 
+</details>
+
 <Explain the change in failure behavior and relevant stderr. Do not include unchanged failures or frequency-only fluctuations.>
 
-<!-- Omit this entire section if no stable diagnostic behavior changed. Repeat its numbered subsection for each distinct behavior change. -->
+<!-- Omit this entire section if no stable diagnostic behavior changed. Organize related causes into thematic subsections. -->
 
-## Affected projects
+## Diagnostic changes (<count> <rule>; <count> <other-rule>)
 
-### 1. <Distinct behavior change>
+### 1. <Common theme or behavior change> (<count> <rule>; <count> <other-rule>)
 
-**Report entries:**
+<details>
+<summary>Report entries (<total> diagnostic hits)</summary>
 
-- [<project1 file1.py:line>](<permalink>)
-- [<project1 file2.py:line>](<permalink>)
-- [<project2 file1.py:line>](<permalink>)
+- [<project1 file1.py:line>](<permalink>): <added, removed, or changed> `<rule>`.
+- [<project1 file2.py:line>](<permalink>): <added, removed, or changed> `<other-rule>` (<count> duplicate occurrences).
+- [<project2 file1.py:line>](<permalink>): <added, removed, or changed> `<rule>`.
 
-<Explain the exact behavior on the merge base and PR. Group additional entries here only when the same explanation and minimized reproducer account for all of them.>
+</details>
+
+<Explain the common theme and exact behavior on the merge base and PR. Distinguish related causes with separate explanations and examples, and identify which entries each example explains. Give each changed rule its own example.>
 
 <!-- If this diagnostic change exposes an existing ty shortcoming, search astral-sh/ty for issues covering that exact shortcoming. Include the following paragraph only when a matching issue exists. -->
 
@@ -65,9 +82,13 @@ if x:
 ```
 -->
 
+**<Example description> (<count> <rule>)**
+
 ```python
 <minimal reproducer>
 ```
+
+<!-- Repeat the example with its explanation for every other changed rule in this subsection, and for distinct causes that need separate examples. Use prose labels rather than extra subsection headings. -->
 
 ## Reproduction
 

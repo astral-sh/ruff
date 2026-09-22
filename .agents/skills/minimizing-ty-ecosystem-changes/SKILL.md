@@ -130,13 +130,17 @@ Confirm the detailed report's difference exactly, including duplicate diagnostic
 
 ## Minimize
 
-The target is a fully minimized, provenance-preserving reproducer: preferably one self-contained file, with no avoidable third-party or standard-library imports and no unnecessary definitions, annotations, branches, or advanced language features. Retain a third-party import only if identified ty behavior depends on that library's identity or third-party search-path classification.
+The target is the smallest self-contained, provenance-preserving reproducer that still makes the relevant real-world pattern recognizable: preferably one file, with no avoidable third-party or standard-library imports and no unnecessary definitions, annotations, branches, or advanced language features. Retain a third-party import only if identified ty behavior depends on that library's identity or third-party search-path classification.
+
+Some strangeness or artificiality is expected after minimization. Keep enough meaningful structure and context that a reader can see how the pattern could arise in real code. Avoid examples that are extremely contrived or so generic that they leave no clue about that context, but continue reducing when this connection remains clear.
 
 Before minimizing any ecosystem change, read and follow [references/advanced-minimization.md](references/advanced-minimization.md). Exhaust its complete reduction loop, including third-party dependency and standard-library inlining, and retain an import only after verifying that neither removing it nor inlining its definitions preserves the underlying behavior.
 
+Inline the relevant stub definitions for complex builtins such as `zip` and `map`, reducing those definitions to what the example needs, so readers do not need to consult typeshed to understand the trigger. Verify the inlined example against both exact-revision binaries and preserve the original cause.
+
 Matching diagnostics or displayed types do not establish a shared cause. When the output is ambiguous, identify and compare the original and minimized triggers using exact-revision debug output, a targeted `reveal_type`, or the producing Rust call site from the matching analyzed revision.
 
-A minimization is complete only when a verified reduction chain connects the reproducer to the original ecosystem entry and an exhaustive pass finds no further reduction. If a genuine external blocker prevents completion, report the blocker and identify the minimization as incomplete; an original source excerpt is not a successfully minimized result.
+A minimization is complete only when a verified reduction chain connects the reproducer to the original ecosystem entry and an exhaustive pass finds no further reduction that preserves the underlying trigger and enough context to recognize how the pattern could arise in real code. If a genuine external blocker prevents completion, report the blocker and identify the minimization as incomplete; an original source excerpt is not a successfully minimized result.
 
 ## Return
 
