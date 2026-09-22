@@ -4,7 +4,7 @@
 # Enable off-by-default rules.
 [rules]
 blanket-ignore-comment = "warn"
-disjoint-cast = "warn"
+disjoint-cast-strict = "warn"
 division-by-zero = "warn"
 dynamic-function-decorator-return = "warn"
 invalid-legacy-positional-parameter = "warn"
