@@ -1170,7 +1170,14 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 }
                 write!(f.with_type(self.ty), "{dynamic}")
             }
-            Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
+            Type::Divergent(_) => {
+                f.with_type(self.ty)
+                    .write_str(if self.ty.is_pending_narrowing() {
+                        "PendingNarrowing"
+                    } else {
+                        "Divergent"
+                    })
+            }
             Type::RecursiveVar(_) => unreachable!("display of an unbound recursive variable"),
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {

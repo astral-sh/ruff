@@ -89,10 +89,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
         | PredicateNode::Condition(expression)
         | PredicateNode::ChainedComparisonCondition(expression) => {
             let constraints = all_narrowing_constraints_for_expression(db, expression);
-            (
-                constraints.get(place, true).cloned(),
-                constraints.get(place, false).cloned(),
-            )
+            (constraints.get(place, true), constraints.get(place, false))
         }
         PredicateNode::Pattern(pattern) => {
             let positive = all_narrowing_constraints_for_pattern(db, pattern)
@@ -161,10 +158,8 @@ fn all_narrowing_constraints_for_expression<'db>(
     let mut negative = NarrowingConstraintsBuilder::new(db, &env, &module, predicate, false);
     let negative_constraints = negative.finish();
 
-    if let Some(cycle_recovery) = positive.cycle_recovery.or(negative.cycle_recovery) {
-        ExpressionNarrowingConstraints::Provisional(NarrowingConstraint::intersection(
-            cycle_recovery,
-        ))
+    if positive.is_provisional || negative.is_provisional {
+        ExpressionNarrowingConstraints::Provisional
     } else {
         ExpressionNarrowingConstraints::Inferred {
             positive: positive_constraints,
@@ -1380,16 +1375,17 @@ enum ExpressionNarrowingConstraints<'db> {
     /// A predicate's type is not yet available during cycle recovery. The semantic index already
     /// restricts narrowing to places this predicate could affect, so the fallback applies to any
     /// requested place until inference resolves the predicate.
-    Provisional(NarrowingConstraint<'db>),
+    Provisional,
 }
 
 impl<'db> ExpressionNarrowingConstraints<'db> {
-    fn get(&self, place: ScopedPlaceId, is_positive: bool) -> Option<&NarrowingConstraint<'db>> {
+    fn get(&self, place: ScopedPlaceId, is_positive: bool) -> Option<NarrowingConstraint<'db>> {
         match self {
-            Self::Provisional(constraint) => Some(constraint),
+            Self::Provisional => Some(NarrowingConstraint::intersection(Type::pending_narrowing())),
             Self::Inferred { positive, negative } => if is_positive { positive } else { negative }
                 .as_ref()?
-                .get(&place),
+                .get(&place)
+                .cloned(),
         }
     }
 }
@@ -1676,7 +1672,7 @@ struct NarrowingConstraintsBuilder<'db, 'ast> {
     module: &'ast ParsedModuleRef,
     predicate: PredicateNode<'db>,
     is_positive: bool,
-    cycle_recovery: Option<Type<'db>>,
+    is_provisional: bool,
 }
 
 impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
@@ -1693,7 +1689,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             module,
             predicate,
             is_positive,
-            cycle_recovery: None,
+            is_provisional: false,
         }
     }
 
@@ -4481,8 +4477,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         // as a call with no narrowing would expose unguarded alternatives to the loop body. For
         // example, `while isinstance(x, list): x = x[0]` could subscript an `int` alternative and
         // feed the resulting recovery `Unknown` back into every subsequent cycle iteration.
-        if let Some(cycle_recovery) = inference.fallback_type() {
-            self.cycle_recovery.get_or_insert(cycle_recovery);
+        if inference.is_provisional() {
+            self.is_provisional = true;
             return None;
         }
 

@@ -33,6 +33,38 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Reassigning an inherited attribute
+
+Assigning a narrowed value back to an inherited attribute does not widen the attribute's type. The
+inferred type does not depend on whether we first check the code that reads the attribute or the
+code that initializes it.
+
+`redundant-condition-strict` follows the tested value's definitions to check for exemptions, such as
+conditions derived from `sys.platform`. Resolving those definitions creates an inference cycle here,
+which must not add `Divergent` to the attribute's type.
+
+```toml
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+def check(child: "Child"):
+    reveal_type(child.value)  # revealed: str | int
+
+class Base:
+    def __init__(self, value: str | int):
+        self.value = value
+
+class Child(Base):
+    def __init__(self):
+        # error: [redundant-condition-strict]
+        value = self.value if self.value is not None else None
+        if isinstance(value, str):
+            value = value.strip()
+            self.value = value
+```
+
 ## Concatenating recursively growing tuples
 
 Repeatedly appending or prepending elements to an inferred attribute can produce tuples of arbitrary

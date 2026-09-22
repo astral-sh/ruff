@@ -646,6 +646,125 @@ fn divergent_type() {
 }
 
 #[test]
+fn pending_narrowing_preserves_recursive_marker_identity() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let pending = Type::pending_narrowing();
+    let first = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let second = Type::divergent(salsa::plumbing::Id::from_bits(2));
+
+    assert_ne!(pending, first);
+    assert_ne!(first, second);
+    assert_eq!(
+        first.pending_narrowing_normalized(&db, &env, |ty| ty.same_divergent_marker(first)),
+        first
+    );
+    assert_eq!(
+        second.recursive_type_normalized_impl(&db, &env, first, true),
+        Some(second)
+    );
+    assert_eq!(
+        pending.recursive_type_normalized_impl(&db, &env, first, true),
+        Some(pending)
+    );
+
+    let visitor = ApplyTypeMappingVisitor::new(&env);
+    for kind in [MaterializationKind::Top, MaterializationKind::Bottom] {
+        let materialized = pending.materialize(&db, kind, &visitor);
+        assert!(materialized.is_pending_narrowing());
+        assert!(!materialized.is_recursive_divergent());
+        assert_ne!(materialized, first.materialize(&db, kind, &visitor));
+    }
+}
+
+#[test]
+fn pending_narrowing_intersections_are_order_independent() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let pending = Type::pending_narrowing();
+    let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let int = KnownClass::Int.to_instance(&db, &env);
+
+    for other in [int, recursive] {
+        for elements in [[pending, other], [other, pending]] {
+            assert_eq!(
+                IntersectionType::from_elements(&db, &env, elements),
+                pending
+            );
+        }
+    }
+    for elements in [[pending, Type::Never], [Type::Never, pending]] {
+        assert_eq!(
+            IntersectionType::from_elements(&db, &env, elements),
+            Type::Never
+        );
+    }
+    assert_eq!(
+        IntersectionBuilder::new(&db, &env)
+            .add_positive(recursive)
+            .add_negative(pending)
+            .build(),
+        pending
+    );
+    assert_eq!(
+        IntersectionBuilder::new(&db, &env)
+            .add_negative(pending)
+            .add_positive(recursive)
+            .build(),
+        pending
+    );
+}
+
+#[test]
+fn pending_narrowing_cycle_recovery_preserves_resolved_contributions() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let pending = Type::pending_narrowing();
+    let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let int = KnownClass::Int.to_instance(&db, &env);
+    let recursive_list = KnownClass::List.to_specialized_instance(&db, &env, &[recursive]);
+    let is_cycle_marker = |ty: Type<'_>| ty.same_divergent_marker(recursive);
+    let pending_list = KnownClass::List.to_specialized_instance(&db, &env, &[pending]);
+    let nested_pending_list = KnownClass::List.to_specialized_instance(&db, &env, &[pending_list]);
+
+    assert_eq!(
+        nested_pending_list.recursive_type_normalized_impl(&db, &env, recursive, false),
+        Some(nested_pending_list)
+    );
+    assert_eq!(
+        nested_pending_list.pending_narrowing_normalized(&db, &env, is_cycle_marker),
+        pending
+    );
+
+    let resolved = UnionType::from_elements(&db, &env, [int, recursive_list]);
+    let approximation = UnionType::from_elements(
+        &db,
+        &env,
+        [pending, int, nested_pending_list, recursive_list],
+    );
+    let normalized = approximation.pending_narrowing_normalized(&db, &env, is_cycle_marker);
+    assert_eq!(normalized, resolved);
+    assert!(
+        normalized
+            .as_union()
+            .is_some_and(|union| union.recursively_defined(&db) == RecursivelyDefined::No)
+    );
+
+    let unresolved = UnionType::from_elements(&db, &env, [pending, recursive]);
+    assert_eq!(
+        unresolved.pending_narrowing_normalized(&db, &env, is_cycle_marker),
+        pending
+    );
+
+    let foreign = Type::divergent(salsa::plumbing::Id::from_bits(2));
+    let unresolved = UnionType::from_elements(&db, &env, [pending, int, recursive, foreign]);
+    assert_eq!(
+        unresolved.pending_narrowing_normalized(&db, &env, is_cycle_marker),
+        UnionType::from_elements(&db, &env, [int, foreign])
+    );
+}
+
+#[test]
 fn unrestricted_tuple_materialization_absorbs_divergent_approximations() {
     let db = setup_db();
     let db = &db;

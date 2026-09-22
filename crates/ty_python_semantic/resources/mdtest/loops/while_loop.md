@@ -886,6 +886,63 @@ def stringify(initial: int) -> int | str:
     return value
 ```
 
+### Recursive assignments guarded by predicates
+
+Conditional loop inference preserves recursive type structure introduced by assignments, including
+through intermediate values. Resolving the condition does not leave pending narrowing in the type.
+
+```py
+def keep(value: object) -> bool:
+    return bool(value)
+
+def wrap(initial: int):
+    value = initial
+    while keep(value):
+        value = (value,)
+    reveal_type(value)  # revealed: int | tuple[Divergent] | tuple[int | tuple[Divergent]]
+
+def wrap_indirectly(initial: int):
+    value = initial
+    while keep(value):
+        box = [(value,)]
+        value = box[0]
+    reveal_type(value)  # revealed: int | tuple[Divergent] | tuple[int | tuple[Divergent]]
+```
+
+Bound methods also preserve recursive structure in their receivers during cyclic inference.
+
+```py
+def wrap_method(initial: int):
+    value = initial
+    while keep(value):
+        value = [value].copy
+    reveal_type(value)  # revealed: int | Divergent | (bound method list[int | Divergent].copy() -> list[int | Divergent])
+```
+
+### Compound conditions in nested loops
+
+Integer arithmetic preserves the counter's type across nested loops, including when a compound
+condition combines a predicate call with the counter's truthiness.
+
+```py
+def predicate(value: int) -> bool:
+    return True
+
+def decrement(tokens: list[int], branch: int, value: int):
+    while True:
+        if predicate(0) or value:
+            continue
+        if branch == 1:
+            while tokens:
+                value = reveal_type(value - 2)  # revealed: int
+        elif branch == 2:
+            while tokens[0]:
+                value = reveal_type(value - 2)  # revealed: int
+        else:
+            while 1 < value and tokens[1] == 0:
+                value = reveal_type(value - 2)  # revealed: int
+```
+
 ### `global` and `nonlocal` keywords in a loop
 
 We need to make sure that the loop header definition doesn't count as a "use" prior to the

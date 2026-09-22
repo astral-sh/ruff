@@ -1850,6 +1850,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
         // dominates intersections. However, `Divergent` is actually a dynamic/gradual type, so
         // `~Divergent` acts like `Divergent` rather than dropping out like `~Never` does.
         // `Divergent` also gets a lot of special handling in cycle recovery.
+        // Pending narrowing takes precedence over recursive markers: the predicate must be
+        // resolved before its intersection can contribute to the inferred type.
+        if self.positive.iter().any(Type::is_pending_narrowing) {
+            return;
+        }
         if new_positive.is_divergent() {
             *self = Self::default();
             self.positive.insert(new_positive);
@@ -2087,7 +2092,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
 
         // `Divergent & ~T` -> `Divergent`.
-        if self.positive.iter().any(Type::is_divergent) {
+        if self.positive.iter().any(Type::is_divergent) && !new_negative.is_pending_narrowing() {
             debug_assert_eq!(self.positive.len(), 1, "`Divergent` should be alone");
             return;
         }
