@@ -24,9 +24,9 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// Note that "isort-style" sorting here refers to how `isort` categorizes
 /// and orders imported symbols by casing (similar to `isort`'s
-/// [`order-by-type`](https://pycqa.github.io/isort/docs/configuration/options.html#order-by-type)
+/// [`order-by-type`](https://isort.readthedocs.io/en/latest/configuration/options.html#order-by-type)
 /// setting), rather than `isort`'s
-/// [`sort-reexports`](https://pycqa.github.io/isort/docs/configuration/options.html#sort-re-exports)
+/// [`sort-reexports`](https://isort.readthedocs.io/en/latest/configuration/options.html#sort-re-exports)
 /// option, which sorts `__all__` strictly lexicographically.
 ///
 /// ## Why is this bad?
