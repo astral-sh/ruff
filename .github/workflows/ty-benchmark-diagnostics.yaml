@@ -76,7 +76,8 @@ jobs:
             rustup show
             rustc --version --verbose
             uv --version
-            uv run --only-dev cargo codspeed --version
+            uv run --only-dev python -c \
+              'from importlib.metadata import version; print("cargo-codspeed package", version("astral-dev-toolchain-cargo-codspeed"))'
           } | tee build-results/toolchain.txt
 
       # Preserve the original target selection and feature unification as well as its profile.
