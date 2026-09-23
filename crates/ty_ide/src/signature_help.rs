@@ -786,6 +786,44 @@ def ab(a: str):
     }
 
     #[test]
+    fn signature_help_overload_local_dictionary_arity() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def f(*, x: int) -> int: ...
+            @overload
+            def f(*, x: int, y: str) -> str: ...
+            def f(*, x: int, y: str = "") -> int | str: ...
+
+            def caller():
+                kwargs = {"x": 1, "y": "two"}
+                f(**kwargs<CURSOR>)
+            "#,
+        );
+
+        assert_snapshot!(test.signature_help_render(), @"
+
+        ============== active signature =============
+        (*, x: int, y: str) -> str
+        ---------------------------------------------
+
+        -------------- active parameter -------------
+        x: int
+        ---------------------------------------------
+
+        =============== other signature =============
+        (*, x: int) -> int
+        ---------------------------------------------
+
+        -------------- active parameter -------------
+        x: int
+        ---------------------------------------------
+        ");
+    }
+
+    #[test]
     fn signature_help_overload_arity_disambiguated1() {
         let test = CursorTest::builder()
             .source(

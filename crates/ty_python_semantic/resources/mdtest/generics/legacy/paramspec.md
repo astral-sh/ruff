@@ -1312,9 +1312,8 @@ forward_prefix(target, **{"prefix": 0, "x": 1, "y": "wrong"})  # error: [invalid
 
 ### Local dictionary forwarding
 
-The current diagnostic for forwarding a local dictionary through a `ParamSpec` is undesirable: when
-the dictionary contains only `x`, ty reports an incompatible type for `y` instead of a missing
-argument. The return type is retained.
+A local dictionary used only for keyword unpacking retains each argument's type when forwarding a
+`ParamSpec`.
 
 ```py
 from typing import Callable, ParamSpec, TypeVar
@@ -1333,7 +1332,7 @@ def local() -> None:
     reveal_type(forward(target, **kwargs))  # revealed: str
 
     missing = {"x": 1}
-    forward(target, **missing)  # error: [invalid-argument-type]
+    forward(target, **missing)  # error: [missing-argument]
 
     wrong = {"x": 1, "y": 2}
     forward(target, **wrong)  # error: [invalid-argument-type]
