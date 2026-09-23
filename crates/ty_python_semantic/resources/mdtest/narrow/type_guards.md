@@ -326,26 +326,47 @@ def _(d: Any, guarded: object, narrowed: object, other: object, mode: bool):
 
 ## Intersections
 
-Intersections of guard return types retain distinct wrappers, even when their narrowed types are
-disjoint. An always-false `TypeGuard[Never]` function can satisfy both callable types below, so its
-result is not `Never`.
+Guards for overlapping types can share a common subtype. A function returning `TypeGuard[int]`
+satisfies both callable types below and can return `True` for an integer. Calling their intersection
+preserves both guard wrappers.
 
 ```py
 from typing import Callable
 from typing_extensions import Never, TypeGuard, TypeIs
 from ty_extensions import Intersection, Not
 
+def is_int(value: object) -> TypeGuard[int]:
+    return isinstance(value, int)
+
+def check_overlapping_guards(
+    guard: Intersection[Callable[[object], TypeGuard[int | str]], Callable[[object], TypeGuard[int | bytes]]],
+    value: object,
+):
+    reveal_type(guard(value))  # revealed: TypeGuard[int | str] & TypeGuard[int | bytes]
+
+check_overlapping_guards(is_int, 1)
+```
+
+Even guards for disjoint types share `TypeGuard[Never]` as a common subtype. An always-false
+function satisfies both callable types below, so their intersection also remains inhabited.
+
+```py
 def never_true(value: object) -> TypeGuard[Never]:
     return False
 
-def check_guard(
+def check_disjoint_guards(
     guard: Intersection[Callable[[object], TypeGuard[int]], Callable[[object], TypeGuard[str]]],
     value: object,
 ):
     reveal_type(guard(value))  # revealed: TypeGuard[int] & TypeGuard[str]
 
-check_guard(never_true, object())
+check_disjoint_guards(never_true, object())
+```
 
+Distinct wrappers are also preserved in intersections of guard return types, including `TypeIs` and
+mixed guard kinds.
+
+```py
 def _(
     guard: Intersection[TypeGuard[int], TypeGuard[str]],
     type_is: Intersection[TypeIs[int], TypeIs[str]],
