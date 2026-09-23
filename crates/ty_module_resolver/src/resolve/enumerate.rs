@@ -33,7 +33,8 @@ pub(crate) fn list_modules<'db>(
     let is_listable_location =
         |candidate: &ModuleResolutionCandidate| candidate.is_listable_location(db);
     let mut names = BTreeSet::new();
-    for directory in search.listing_directories(is_listable_location) {
+    let listable_directories: Vec<_> = search.listing_directories(is_listable_location).collect();
+    for directory in &listable_directories {
         for entry in directory.entries(db) {
             if let Some(name) = entry.file_name()
                 && let Some(name) = child_module_name(name, entry.file_type(), prefix.is_none())
@@ -43,6 +44,18 @@ pub(crate) fn list_modules<'db>(
         }
     }
 
+    // Check whether the resolved location is allowed by the listing policy.
+    // Top-level locations are allowed. Below a prefix, reuse the checks for
+    // directories already visited and their non-symlink children; otherwise,
+    // check the candidate's full path.
+    let is_listable_location = |candidate: &ModuleResolutionCandidate| {
+        let path = candidate.directory.path();
+        prefix.is_none()
+            || listable_directories
+                .iter()
+                .any(|directory| directory.path() == path || directory.is_child_directory(path))
+            || is_listable_location(candidate)
+    };
     let mut listing = ModuleListing::default();
 
     for component_name in names {

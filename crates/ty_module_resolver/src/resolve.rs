@@ -36,13 +36,14 @@ mod enumerate;
 mod search;
 
 use std::borrow::Cow;
+use std::cell::OnceCell;
 use std::fmt;
 use std::iter::FusedIterator;
 use std::sync::LazyLock;
 
 use compact_str::format_compact;
 use memchr::memmem::Finder;
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use ruff_db::PythonFile;
 use ruff_db::files::{File, FilePath, FileRootKind, directory_listing, system_path_to_file};
@@ -1299,7 +1300,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
         precedence: CandidatePrecedence,
     ) -> Self {
         Self {
-            directory: ModuleDirectory::new(context, search_path.to_module_path()),
+            directory: context.root_directory(search_path),
             module: ResolvedModule::NamespacePackage,
             py_typed: PyTyped::Untyped,
             precedence,
@@ -1534,7 +1535,6 @@ fn resolve_component<'db>(
         // Packages with an initializer take precedence over file modules.
         candidate.module = ResolvedModule::Package(init);
         candidate.py_typed = subdirectory
-            .path()
             .py_typed(context)
             .inherit_parent(candidate.py_typed);
     } else if let Some(file_module) =
@@ -1569,7 +1569,6 @@ fn resolve_component<'db>(
         {
             candidate.module = ResolvedModule::NamespacePackage;
             candidate.py_typed = subdirectory
-                .path()
                 .py_typed(context)
                 .inherit_parent(candidate.py_typed);
         } else {
@@ -1707,7 +1706,9 @@ impl PyTyped {
 pub(super) struct ResolverContext<'db> {
     pub(super) db: &'db dyn Db,
     pub(super) resolver_environment: ResolverEnvironment<'db>,
-    pub(super) mode: ModuleResolveMode,
+    mode: ModuleResolveMode,
+    // Root enumeration prepares these directories once for all sibling names.
+    root_directories: OnceCell<FxHashMap<SearchPath, ModuleDirectory<'db>>>,
 }
 
 impl<'db> ResolverContext<'db> {
@@ -1720,7 +1721,31 @@ impl<'db> ResolverContext<'db> {
             db,
             resolver_environment,
             mode,
+            root_directories: OnceCell::new(),
         }
+    }
+
+    /// Prepares directory listings for an enumeration of sibling root names.
+    fn prepare_root_directories(&self, paths: impl Iterator<Item = &'db SearchPath>) {
+        self.root_directories.get_or_init(|| {
+            paths
+                .map(|path| {
+                    (
+                        path.clone(),
+                        ModuleDirectory::new(self, path.to_module_path()),
+                    )
+                })
+                .collect()
+        });
+    }
+
+    /// Returns this search root's directory, reusing its listing during enumeration.
+    fn root_directory(&self, path: &SearchPath) -> ModuleDirectory<'db> {
+        self.root_directories
+            .get()
+            .and_then(|directories| directories.get(path))
+            .cloned()
+            .unwrap_or_else(|| ModuleDirectory::new(self, path.to_module_path()))
     }
 
     pub(super) fn vendored(&self) -> &VendoredFileSystem {
