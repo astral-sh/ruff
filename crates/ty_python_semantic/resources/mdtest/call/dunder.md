@@ -314,3 +314,59 @@ def _(flag: bool):
     # error: [possibly-missing-implicit-call] "Method `__getitem__` of type `C` may be missing"
     reveal_type(c[0])  # revealed: str
 ```
+
+## Implicit calls preserve intersection receivers
+
+Implicit calls bind `Self` to the full receiver, just like explicit calls to the same method.
+
+```py
+from typing_extensions import Self
+from ty_extensions import Intersection
+
+class C:
+    def __call__(self) -> Self:
+        return self
+
+    def __neg__(self) -> Self:
+        return self
+
+    def __getitem__(self, key: int | None) -> Self:
+        return self
+
+class Other: ...
+
+def narrowed(c: C, key: int | None):
+    if isinstance(c, Other):
+        reveal_type(c.__call__())  # revealed: C & Other
+        reveal_type(c())  # revealed: C & Other
+        reveal_type(-c)  # revealed: C & Other
+        reveal_type(c[0])  # revealed: C & Other
+        reveal_type(c[key])  # revealed: C & Other
+    else:
+        reveal_type(c())  # revealed: C & ~Other
+        reveal_type(-c)  # revealed: C & ~Other
+
+def reversed_order(c: Intersection[Other, C]):
+    reveal_type(c())  # revealed: Other & C
+    reveal_type(-c)  # revealed: Other & C
+```
+
+Each member of a union retains its own intersection receiver, and multiple methods on an
+intersection can contribute call signatures without intersecting the bound method objects.
+
+```py
+class D:
+    def __call__(self) -> Self:
+        return self
+
+    def __neg__(self) -> Self:
+        return self
+
+def union(c: Intersection[C, Other] | Intersection[D, Other]):
+    reveal_type(c())  # revealed: (C & Other) | (D & Other)
+    reveal_type(-c)  # revealed: (C & Other) | (D & Other)
+
+def multiple_providers(c: Intersection[C, D]):
+    reveal_type(c())  # revealed: C & D
+    reveal_type(-c)  # revealed: C & D
+```

@@ -6684,14 +6684,24 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         recursion_guard: &ActiveRecursionDetector<Type<'db>>,
     ) -> Bindings<'db> {
+        self.bindings_with_receiver(db, env, recursion_guard, None)
+    }
+
+    fn bindings_with_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursion_guard: &ActiveRecursionDetector<Type<'db>>,
+        receiver: Option<Type<'db>>,
+    ) -> Bindings<'db> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.bindings_impl(db, env, recursion_guard);
+            return fallback.bindings_with_receiver(db, env, recursion_guard, receiver);
         }
 
         match self {
             Type::Recursive(recursive) => recursive
                 .unfold(db, env)
-                .map(|unfolded| unfolded.bindings_impl(db, env, recursion_guard))
+                .map(|unfolded| unfolded.bindings_with_receiver(db, env, recursion_guard, receiver))
                 .unwrap_or_else(|| CallableBinding::not_callable(self).into()),
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
@@ -6704,14 +6714,13 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.require_bound_or_constraints(db, env) {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        bound.bindings_impl(db, env, recursion_guard)
+                        bound.bindings_with_receiver(db, env, recursion_guard, receiver)
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => Bindings::from_union(
                         self,
-                        constraints
-                            .elements(db)
-                            .iter()
-                            .map(|ty| ty.bindings_impl(db, env, recursion_guard)),
+                        constraints.elements(db).iter().map(|ty| {
+                            ty.bindings_with_receiver(db, env, recursion_guard, receiver)
+                        }),
                     ),
                 }
             }
@@ -7056,12 +7065,15 @@ impl<'db> Type<'db> {
                 // like "`X` is not callable" instead of "`<type of illegal '__call__'>` is not
                 // callable".
                 match self
-                    .member_lookup_with_policy(
+                    .member_lookup_with_policy_and_receiver(
                         db,
                         env,
                         "__call__",
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        receiver,
                     )
+                    .unwrap_or_else(|error| error.fallback_member(db))
+                    .member(db)
                     .place
                 {
                     Place::Defined(DefinedPlace {
@@ -7089,10 +7101,9 @@ impl<'db> Type<'db> {
             // Note that this correctly returns `None` if none of the union elements are callable.
             Type::Union(union) => Bindings::from_union(
                 self,
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|element| element.bindings_impl(db, env, recursion_guard)),
+                union.elements(db).iter().map(|element| {
+                    element.bindings_with_receiver(db, env, recursion_guard, receiver)
+                }),
             ),
 
             // A narrowed `type[T: Base] & type[Child]` still needs to construct `T & Child`,
@@ -7127,9 +7138,16 @@ impl<'db> Type<'db> {
 
             Type::Intersection(intersection) => Bindings::from_intersection(
                 self,
-                intersection
-                    .positive_elements_or_object(db)
-                    .map(|element| element.bindings_impl(db, env, recursion_guard)),
+                intersection.positive_elements_or_object(db).map(|element| {
+                    // Each callable candidate describes the same object, so bind its
+                    // `__call__` to the full intersection rather than just this element.
+                    element.bindings_with_receiver(
+                        db,
+                        env,
+                        recursion_guard,
+                        Some(receiver.unwrap_or(self)),
+                    )
+                }),
             ),
 
             Type::EnumComplement(complement) => {
@@ -7201,7 +7219,11 @@ impl<'db> Type<'db> {
                 .instance_fallback(db, env)
                 .bindings_impl(db, env, recursion_guard),
 
-            Type::TypeAlias(alias) => alias.value_type(db).bindings_impl(db, env, recursion_guard),
+            Type::TypeAlias(alias) => {
+                alias
+                    .value_type(db)
+                    .bindings_with_receiver(db, env, recursion_guard, receiver)
+            }
 
             Type::PropertyInstance(_)
             | Type::SlotDescriptor(_)
@@ -7948,9 +7970,34 @@ impl<'db> Type<'db> {
         }
 
         // Implicit calls to dunder methods never access instance members, so we pass
-        // `NO_INSTANCE_FALLBACK` here in addition to other policies:
-        let policy = policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK;
-        match self.member_lookup_with_policy(db, env, name, policy).place {
+        // `NO_INSTANCE_FALLBACK` here in addition to other policies.
+        Self::try_call_dunder_member(
+            db,
+            env,
+            self.member_lookup_with_policy_and_receiver(
+                db,
+                env,
+                name,
+                policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                None,
+            ),
+            argument_types,
+            tcx,
+        )
+    }
+
+    fn try_call_dunder_member(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        member: MemberLookupResult<'db>,
+        argument_types: &mut CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        match member
+            .unwrap_or_else(|error| error.fallback_member(db))
+            .member(db)
+            .place
+        {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
                 definedness: boundness,
@@ -10492,7 +10539,19 @@ impl<'db> IntersectionType<'db> {
         let mut error_provenance = Provenance::Unknown;
 
         for element in positive {
-            match element.try_call_dunder_with_policy(db, env, name, argument_types, tcx, policy) {
+            match Type::try_call_dunder_member(
+                db,
+                env,
+                element.member_lookup_with_policy_and_receiver(
+                    db,
+                    env,
+                    name,
+                    policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    Some(Type::Intersection(self)),
+                ),
+                argument_types,
+                tcx,
+            ) {
                 Ok(bindings) => successful_bindings.push(bindings),
                 Err(err) => {
                     error_provenance = error_provenance.or(err.provenance());
