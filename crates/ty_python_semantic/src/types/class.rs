@@ -1072,12 +1072,33 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
+        self.instance_member_with_policy(
+            db,
+            env,
+            specialization,
+            name,
+            MemberLookupPolicy::default(),
+        )
+    }
+
+    fn instance_member_with_policy(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
         match self {
-            Self::Static(class) => class.instance_member(db, env, specialization, name),
-            Self::Dynamic(class) => class.instance_member(db, env, name),
-            Self::DynamicNamedTuple(namedtuple) => namedtuple.instance_member(db, env, name),
+            Self::Static(class) => {
+                class.instance_member_with_policy(db, env, specialization, name, policy)
+            }
+            Self::Dynamic(class) => class.instance_member(db, env, name, policy),
+            Self::DynamicNamedTuple(namedtuple) => {
+                namedtuple.instance_member(db, env, name, policy)
+            }
             Self::DynamicTypedDict(_) => PlaceAndQualifiers::default(),
-            Self::DynamicEnum(enum_lit) => enum_lit.instance_member(db, env, name),
+            Self::DynamicEnum(enum_lit) => enum_lit.instance_member(db, env, name, policy),
         }
     }
 
@@ -2249,20 +2270,32 @@ impl<'db> ClassType<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
+        self.instance_member_with_policy(db, env, name, MemberLookupPolicy::default())
+    }
+
+    pub(super) fn instance_member_with_policy(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
         match self {
-            Self::NonGeneric(ClassLiteral::Dynamic(class)) => class.instance_member(db, env, name),
+            Self::NonGeneric(ClassLiteral::Dynamic(class)) => {
+                class.instance_member(db, env, name, policy)
+            }
             Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
-                namedtuple.instance_member(db, env, name)
+                namedtuple.instance_member(db, env, name, policy)
             }
             Self::NonGeneric(ClassLiteral::DynamicTypedDict(_)) => PlaceAndQualifiers::default(),
             Self::NonGeneric(ClassLiteral::DynamicEnum(enum_lit)) => {
-                enum_lit.instance_member(db, env, name)
+                enum_lit.instance_member(db, env, name, policy)
             }
             Self::NonGeneric(ClassLiteral::Static(class)) => {
                 if class.is_typed_dict(db) {
                     return Place::Undefined.into();
                 }
-                class.instance_member(db, env, None, name)
+                class.instance_member_with_policy(db, env, None, name, policy)
             }
             Self::Generic(generic) => {
                 let class_literal = generic.origin(db);
@@ -2273,7 +2306,7 @@ impl<'db> ClassType<'db> {
                 }
 
                 class_literal
-                    .instance_member(db, env, specialization, name)
+                    .instance_member_with_policy(db, env, specialization, name, policy)
                     .map_type(|ty| {
                         ty.apply_optional_owner_specialization_to_member(db, specialization)
                     })

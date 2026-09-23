@@ -1501,7 +1501,7 @@ class Outer:
     class Inner(object, metaclass=Meta): ...
     type = Inner.__class__
 
-reveal_type(Outer.Inner.__class__)  # revealed: type[Unknown]
+reveal_type(Outer.Inner.__class__)  # revealed: <class 'Meta'>
 ```
 
 ## PEP 695 generic

@@ -830,5 +830,5 @@ async def main():
     async with asyncio.TaskGroup() as tg:
         reveal_type(tg)  # revealed: TaskGroup
 
-        tg.create_task(long_running_task())
+        await tg.create_task(long_running_task())
 ```

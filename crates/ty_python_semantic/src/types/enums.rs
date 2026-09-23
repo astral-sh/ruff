@@ -419,13 +419,14 @@ pub(super) fn instance_member_for_enum_complement<'db>(
     env: &ProgramEnvironment<'db>,
     complement: EnumComplement<'db>,
     name: &str,
+    policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
     if let Some(member) = special_member_for_enum_complement(db, env, complement, name) {
         member
     } else {
         complement
             .remaining_literal_union(db, env)
-            .instance_member(db, env, name)
+            .instance_member_with_policy(db, env, name, policy)
     }
 }
 

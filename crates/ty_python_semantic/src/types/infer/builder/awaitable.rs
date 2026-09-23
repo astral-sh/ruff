@@ -11,7 +11,7 @@ use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
 use super::TypeInferenceBuilder;
 use crate::types::diagnostic::UNUSED_AWAITABLE;
 use crate::types::function::KnownFunction;
-use crate::types::{KnownClass, Type, TypeContext};
+use crate::types::{KnownClass, MemberLookupPolicy, Type, TypeContext};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_await_expression(
@@ -40,37 +40,53 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     pub(super) fn check_unused_awaitable(&self, expression: &ast::Expr) {
         let db = self.db();
+        let env = self.program_environment();
         let ty = self.expression_type(expression);
-        if ty.is_awaitable(db)
-            && !self.is_known_function_call(expression)
-            && let Some(builder) = self.context.report_lint(&UNUSED_AWAITABLE, expression)
-        {
-            let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Object of type `{}` is not awaited",
-                ty.display(db, self.program_environment()),
-            ));
-            if let Some(fix) = self.await_expression_fix(expression) {
-                diagnostic.help("Did you mean to `await` this expression?");
-                diagnostic.set_fix(fix);
-            }
-        }
-    }
 
-    /// Returns `true` if `expr` is a call to a known diagnostic function
-    /// (e.g., `reveal_type` or `assert_type`) whose return value should not
-    /// trigger the `unused-awaitable` lint.
-    fn is_known_function_call(&self, expr: &ast::Expr) -> bool {
-        let ast::Expr::Call(call) = expr else {
-            return false;
+        // short-circuit for common cases where we want to avoid the diagnostic
+        if matches!(ty, Type::Divergent(_) | Type::Dynamic(_) | Type::Never) {
+            return;
+        }
+
+        // Avoid emitting the lint on `reveal_type` or `assert_type` calls
+        if let ast::Expr::Call(call) = expression
+            && let Type::FunctionLiteral(function) = self.expression_type(&call.func)
+            && matches!(
+                function.known(db),
+                Some(KnownFunction::RevealType | KnownFunction::AssertType)
+            )
+        {
+            return;
+        }
+
+        // Avoid emitting the lint if `__await__` is only present on a dynamic base class
+        // (the class inherits from `Any`) or an intersection with a dynamic type (`X & Unknown`)
+        if ty
+            .try_await_with_policy(
+                db,
+                env,
+                MemberLookupPolicy::REQUIRE_CONCRETE
+                    | MemberLookupPolicy::REQUIRE_INHABITED
+                    | MemberLookupPolicy::NO_GETATTR_LOOKUP,
+            )
+            .is_err()
+        {
+            return;
+        }
+
+        let Some(builder) = self.context.report_lint(&UNUSED_AWAITABLE, expression) else {
+            return;
         };
-        matches!(
-            self.expression_type(&call.func),
-            Type::FunctionLiteral(f)
-                if matches!(
-                    f.known(self.db()),
-                    Some(KnownFunction::RevealType | KnownFunction::AssertType)
-                )
-        )
+
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Object of type `{}` is not awaited",
+            ty.display(db, self.program_environment()),
+        ));
+
+        if let Some(fix) = self.await_expression_fix(expression) {
+            diagnostic.help("Did you mean to `await` this expression?");
+            diagnostic.set_fix(fix);
+        }
     }
 
     /// Returns `true` if adding `await` at `expression` would produce valid Python.

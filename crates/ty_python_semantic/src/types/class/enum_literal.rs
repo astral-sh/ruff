@@ -303,9 +303,10 @@ impl<'db> DynamicEnumLiteral<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
+        policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         if let Some(mixin_class) = self.mixin_class(db, env) {
-            let result = mixin_class.instance_member(db, env, name);
+            let result = mixin_class.instance_member_with_policy(db, env, name, policy);
             if !result.place.is_undefined() {
                 return result;
             }
@@ -313,7 +314,7 @@ impl<'db> DynamicEnumLiteral<'db> {
         let result = self
             .base_class(db)
             .to_instance(db, env)
-            .instance_member(db, env, name);
+            .instance_member_with_policy(db, env, name, policy);
 
         self.with_unknown_member_fallback(db, result)
     }
