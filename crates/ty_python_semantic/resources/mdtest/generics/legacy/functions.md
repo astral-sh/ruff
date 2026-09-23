@@ -2608,6 +2608,69 @@ def _(any_: Intersection[AnySource, StrSource], unknown: Intersection[UnknownSou
     reveal_type(constrained(unknown))  # revealed: Unknown
 ```
 
+## Gradual explicit receivers in intersection inference
+
+An overloaded method's explicit receiver can select a return type for a concrete array shape. A
+gradual shape permits multiple receiver specializations, but does not guarantee that they all apply
+simultaneously. Inference cannot intersect those alternatives and reject an assignment that succeeds
+with the concrete shape.
+
+These helpers model iteration through either an iterator method or integer indexing:
+
+```py
+from typing import Any, Generic, Protocol, TypeVar, overload
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Iterator(Protocol[T_co]):
+    def __next__(self) -> T_co: ...
+
+class SupportsIter(Protocol[T_co]):
+    def __iter__(self) -> T_co: ...
+
+class SupportsIndexing(Protocol[T_co]):
+    def __getitem__(self, index: int, /) -> T_co: ...
+
+@overload
+def iterate(value: SupportsIter[T_co]) -> T_co: ...
+@overload
+def iterate(value: SupportsIndexing[T_co]) -> Iterator[T_co]: ...
+def iterate(value):
+    raise NotImplementedError
+
+def advance(value: Iterator[T_co]) -> T_co:
+    return value.__next__()
+```
+
+Iterating a one-dimensional array produces scalar arrays. Erasing the input shape does not make that
+assignment invalid:
+
+```py
+class Array(Generic[T_co]):
+    @overload
+    def __iter__(self: "Array[tuple[int]]") -> Iterator["Array[tuple[()]]"]: ...
+    @overload
+    def __iter__(self: "Array[tuple[int, int]]") -> Iterator["Array[tuple[int]]"]: ...
+    @overload
+    def __iter__(self: "Array[tuple[int, *tuple[int, ...]]]") -> Iterator["Array[tuple[Any, ...]]"]: ...
+    def __iter__(self):
+        raise NotImplementedError
+    @overload
+    def __getitem__(self: "Array[tuple[int]]", index: int) -> "Array[tuple[()]]": ...
+    @overload
+    def __getitem__(self: "Array[tuple[int, int]]", index: int) -> "Array[tuple[int]]": ...
+    @overload
+    def __getitem__(self: "Array[tuple[int, *tuple[int, ...]]]", index: int) -> "Array[tuple[Any, ...]]": ...
+    def __getitem__(self, index: int):
+        raise NotImplementedError
+
+def concrete(array: Array[tuple[int]]) -> None:
+    scalar: Array[tuple[()]] = advance(iterate(array))
+
+def gradual(array: Array[tuple[Any, ...]]) -> None:
+    scalar: Array[tuple[()]] = advance(iterate(array))
+```
+
 ## Inherited specializations in intersection arguments
 
 Inference finds and combines generic specializations through the MRO of intersected concrete

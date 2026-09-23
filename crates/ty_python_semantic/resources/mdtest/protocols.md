@@ -4476,10 +4476,10 @@ static_assert(not is_assignable_to(NominalReturningOtherClass, UsesSelf))
 static_assert(not is_assignable_to(GenericReceiver, ConcreteMethod))
 static_assert(not is_subtype_of(GenericReceiver, ConcreteMethod))
 
-# Specializing the receiver constraint to `GradualReceiverImplementation` must preserve the
-# assignability relation that produced it; `list[int]` is assignable to, but not a subtype of,
-# `list[Any]`.
+# The explicit receiver permits assignability, but does not establish strict subtyping:
+# `list[int]` is assignable to, but not a subtype of, `list[Any]`.
 static_assert(is_assignable_to(GradualReceiverImplementation, GradualReceiverProtocol))
+static_assert(not is_subtype_of(GradualReceiverImplementation, GradualReceiverProtocol))
 
 # Checking the receiver constraint requires the same protocol relation that is already in
 # progress. The recursive check should terminate and establish the structural relation.
@@ -4518,6 +4518,36 @@ class BadReturnType:
 
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
+```
+
+## Gradual explicit receivers
+
+A gradual receiver is assignable to a concrete explicit `self` annotation, but is not its subtype.
+Protocol matching preserves that distinction instead of treating a possibly available method as
+unconditionally available:
+
+```py
+from typing import Any, Generic, Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, is_subtype_of
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Source(Generic[T_co]):
+    def get(self: "Source[int]") -> int:
+        return 0
+
+class IntSource(Protocol):
+    def get(self) -> int: ...
+
+static_assert(is_assignable_to(Source[Any], IntSource))
+static_assert(is_assignable_to(Source[Unknown], IntSource))
+static_assert(not is_subtype_of(Source[Any], IntSource))
+static_assert(not is_subtype_of(Source[Unknown], IntSource))
+
+static_assert(is_subtype_of(Source[int], IntSource))
+static_assert(not is_assignable_to(Source[str], IntSource))
+static_assert(not is_subtype_of(Source[str], IntSource))
 ```
 
 ## `Self` in generic type aliases during protocol matching
@@ -5111,7 +5141,8 @@ class ClassCollection(metaclass=CollectionMeta):
 static_assert(is_assignable_to(TypeOf[ClassCollection], Membership))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Container[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Container[str]))
-static_assert(is_subtype_of(TypeOf[ClassCollection], Container[int]))
+# The class object is assignable to the gradual receiver `type[Any]`, but is not its subtype.
+static_assert(not is_subtype_of(TypeOf[ClassCollection], Container[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Iterable[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Reversible[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Collection[int]))
