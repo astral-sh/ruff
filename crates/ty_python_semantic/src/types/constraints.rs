@@ -3658,7 +3658,7 @@ impl<'db> CandidateSolutions<'db> {
             node.remove_noninferable(db, env, storage, inferable, source_order, limits)?;
         source_orders.extend(storage.calculate_source_orders(derived_source_order));
 
-        let mut walker = SolutionWalker::new(source_orders);
+        let mut walker = SolutionWalker::new(source_orders, inferable);
         // Sequent discovery must also happen in source order. Sorting the collected paths is
         // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.

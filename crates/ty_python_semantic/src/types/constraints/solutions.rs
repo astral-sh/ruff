@@ -13,7 +13,7 @@ use crate::types::constraints::{
     CandidateTypeVarSolution, ConstraintAssignment, ConstraintId, ConstraintSetStorage, NodeId,
     SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
 };
-use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints};
+use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
@@ -27,6 +27,7 @@ type ProcessSatisfied<'a, 'db, L, B> = dyn FnMut(
 
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,
+    inferable: TypeVarSet<'db>,
 
     /// Candidate solutions for each satisfiable path in the BDD.
     ///
@@ -50,9 +51,10 @@ struct PendingCandidateSolution<'db> {
 }
 
 impl<'db> SolutionWalker<'db> {
-    pub(super) fn new(source_orders: FxIndexSet<ConstraintId>) -> Self {
+    pub(super) fn new(source_orders: FxIndexSet<ConstraintId>, inferable: TypeVarSet<'db>) -> Self {
         Self {
             source_orders,
+            inferable,
             pending: Vec::default(),
             _phantom: PhantomData,
         }
@@ -500,6 +502,55 @@ impl<'db> SolutionWalker<'db> {
                     path,
                     constraints,
                     &mut |this, storage, limits, path| {
+                        // Selecting a concrete constraint must not specialize a caller's fixed
+                        // typevar: `S & str <= int` may hold for some `S`, but not for every `S`.
+                        let constraint_lower = declared_constraint
+                            .constrained_ty
+                            .bottom_materialization(db, env);
+                        let constraint_upper = declared_constraint
+                            .constrained_ty
+                            .top_materialization(db, env);
+                        let (when_lower, when_lower_source_order) = match evidence.evidence_lower {
+                            Some(lower) => storage.load(
+                                db,
+                                env,
+                                &lower.when_assignable_to_owned(
+                                    db,
+                                    env,
+                                    constraint_upper,
+                                    this.inferable,
+                                ),
+                            ),
+                            None => (ALWAYS_TRUE, None),
+                        };
+                        let (when_upper, when_upper_source_order) = evidence
+                            .upper
+                            .iter_evidence()
+                            .fold((ALWAYS_TRUE, None), |(when, when_source_order), upper| {
+                                let (when_upper, when_upper_source_order) = storage.load(
+                                    db,
+                                    env,
+                                    &constraint_lower.when_assignable_to_owned(
+                                        db,
+                                        env,
+                                        upper,
+                                        this.inferable,
+                                    ),
+                                );
+                                let when = when.and(storage, when_upper);
+                                let when_source_order = storage.ordered_source_order(
+                                    when_source_order,
+                                    when_upper_source_order,
+                                );
+                                (when, when_source_order)
+                            });
+                        let when = when_lower.and(storage, when_upper);
+                        let when_source_order = storage
+                            .ordered_source_order(when_lower_source_order, when_upper_source_order);
+                        if when.is_never_satisfied(db, env, storage, when_source_order) {
+                            return ControlFlow::Continue(());
+                        }
+
                         // The candidate solution satisfies this declared constraint, but we still
                         // need to check any remaining constrained typevars.
                         this.validate_constrained_and_then(
