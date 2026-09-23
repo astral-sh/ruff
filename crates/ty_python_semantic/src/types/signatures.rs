@@ -5240,7 +5240,27 @@ impl<'db> Parameters<'db> {
             .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
             .collect();
 
-        Self::new(value, self.data.kind).expand_starred_variadic_annotations(db)
+        let kind = if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. }) {
+            let freshen = |paramspec| {
+                Type::TypeVar(paramspec)
+                    .apply_type_mapping_impl(db, &type_mapping, tcx, visitor)
+                    .as_typevar()
+                    .unwrap_or(paramspec)
+            };
+            // The structural tail and its two component annotations identify the same ParamSpec.
+            match self.data.kind {
+                ParametersKind::ParamSpec(paramspec) => {
+                    ParametersKind::ParamSpec(freshen(paramspec))
+                }
+                ParametersKind::Concatenate(ConcatenateTail::ParamSpec(paramspec)) => {
+                    ParametersKind::Concatenate(ConcatenateTail::ParamSpec(freshen(paramspec)))
+                }
+                kind => kind,
+            }
+        } else {
+            self.data.kind
+        };
+        Self::new(value, kind).expand_starred_variadic_annotations(db)
     }
     pub(crate) fn len(&self) -> usize {
         self.data.value.len()
