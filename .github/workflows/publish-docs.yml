@@ -17,8 +17,7 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: read
+permissions: {}
 
 env:
   UV_LOCKED: 1
@@ -30,12 +29,15 @@ jobs:
   mkdocs:
     environment:
       name: release
+    permissions:
+      contents: read
+      id-token: write # for the credential broker
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
-          persist-credentials: true
+          persist-credentials: false
 
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
@@ -82,8 +84,25 @@ jobs:
       - name: "Build docs"
         run: uv run --only-group=docs mkdocs build --strict -f mkdocs.yml
 
-      - name: "Clone docs repo"
-        run: git clone https://${{ secrets.ASTRAL_DOCS_PAT }}@github.com/astral-sh/docs.git astral-docs
+      - name: "Get docs token"
+        id: token
+        uses: open-security-tools/ost-simple-sts@88f85462c7e9c9e2fb2745bd5ce4ee163aec0420 # v0.0.5
+        with:
+          exchange-url: ${{ secrets.RELEASES_STS_API_URL }}/exchange
+          audience: ${{ secrets.RELEASES_STS_API_URL }}
+          repository: astral-sh/docs
+          permissions: |
+            contents: write
+            pull_requests: write
+
+      - name: "Checkout docs repo"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: astral-sh/docs
+          ref: main
+          path: astral-docs
+          token: ${{ steps.token.outputs.token }}
+          persist-credentials: false
 
       - name: "Copy docs"
         run: rm -rf astral-docs/site/ruff && mkdir -p astral-docs/site && cp -r site/ruff astral-docs/site/
@@ -91,8 +110,8 @@ jobs:
       - name: "Commit docs"
         working-directory: astral-docs
         run: |
-          git config user.name "astral-docs-bot"
-          git config user.email "176161322+astral-docs-bot@users.noreply.github.com"
+          git config user.name "astral-releases-bot[bot]"
+          git config user.email "328004183+astral-releases-bot[bot]@users.noreply.github.com"
 
           git checkout -b "${branch_name}"
           git add site/ruff
@@ -101,7 +120,7 @@ jobs:
       - name: "Create Pull Request"
         working-directory: astral-docs
         env:
-          GITHUB_TOKEN: ${{ secrets.ASTRAL_DOCS_PAT }}
+          GH_TOKEN: ${{ steps.token.outputs.token }}
         run: |
           # set the PR title
           pull_request_title="Update ruff documentation for ${display_name}"
@@ -113,6 +132,7 @@ jobs:
             xargs -I {} gh pr close {}
 
           # push the branch to GitHub
+          gh auth setup-git
           git push origin "${branch_name}"
 
           # create the PR
@@ -127,9 +147,10 @@ jobs:
         if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
         working-directory: astral-docs
         env:
-          GITHUB_TOKEN: ${{ secrets.ASTRAL_DOCS_PAT }}
+          GH_TOKEN: ${{ steps.token.outputs.token }}
         run: |
           # auto-merge the PR if the build was triggered by a release. Manual builds should be reviewed by a human.
           # give the PR a few seconds to be created before trying to auto-merge it
           sleep 10
-          gh pr merge --squash "${branch_name}"
+          # Use admin to bypass required review
+          gh pr merge --squash --admin "${branch_name}"
