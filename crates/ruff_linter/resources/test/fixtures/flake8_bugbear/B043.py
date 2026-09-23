@@ -36,3 +36,7 @@ delattr(
 
 import builtins
 builtins.delattr(foo, "bar")
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/28732
+delattr(1, "real", extra=0)
+delattr(1, "real", **(events.append("kw") or {}))
