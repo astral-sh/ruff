@@ -267,19 +267,28 @@ impl<'db> ModuleDirectory<'db> {
         context: &ResolverContext<'db>,
         name: &str,
     ) -> Option<Self> {
+        let child_type = self.listing.and_then(|listing| listing.file_type(name));
+        let needs_directory_check = self.path.search_path.is_standard_library()
+            || match child_type {
+                Some(FileType::Directory) => false,
+                Some(FileType::Symlink) => true,
+                _ => return None,
+            };
         let mut path = self.path.clone();
         path.push(name);
-        path.is_directory(context).then(|| {
-            let enumeration_allowed = self.enumeration_allowed.map(|parent_allowed| {
-                let child_type = if self.path.search_path.as_vendored_path().is_some() {
-                    Some(FileType::Directory)
-                } else {
-                    self.listing.and_then(|listing| listing.file_type(name))
-                };
-                Self::enumeration_allowed_after_step(parent_allowed, child_type)
-            });
-            Self::new(context, path, enumeration_allowed)
-        })
+        if needs_directory_check && !path.is_directory(context) {
+            return None;
+        }
+
+        let enumeration_allowed = self.enumeration_allowed.map(|parent_allowed| {
+            let child_type = if self.path.search_path.as_vendored_path().is_some() {
+                Some(FileType::Directory)
+            } else {
+                child_type
+            };
+            Self::enumeration_allowed_after_step(parent_allowed, child_type)
+        });
+        Some(Self::new(context, path, enumeration_allowed))
     }
 
     /// Iterates over entries in a system or vendored directory.
@@ -420,13 +429,18 @@ impl<'db> ModuleDirectory<'db> {
 
     /// Reads this package's `py.typed` marker without considering parent packages.
     pub(super) fn py_typed(&self, resolver: &ResolverContext) -> PyTyped {
-        let Some(py_typed_file) = self.path.to_system_path().and_then(|path| {
-            if !directory_contains_file(resolver.db, &path, &["py.typed"]) {
-                return None;
-            }
-            let py_typed_path = path.join("py.typed");
-            system_path_to_file(resolver.db, py_typed_path).ok()
-        }) else {
+        if !matches!(
+            self.listing
+                .and_then(|listing| listing.file_type("py.typed")),
+            Some(FileType::File | FileType::Symlink)
+        ) {
+            return PyTyped::Untyped;
+        }
+        let Some(py_typed_file) = self
+            .path
+            .to_system_path()
+            .and_then(|path| system_path_to_file(resolver.db, path.join("py.typed")).ok())
+        else {
             return PyTyped::Untyped;
         };
 
@@ -481,16 +495,6 @@ impl ModuleDirectoryEntry<'_> {
             },
         }
     }
-}
-
-fn directory_contains_file(db: &dyn Db, directory: &SystemPath, names: &[&str]) -> bool {
-    let Ok(listing) = directory_listing(db, directory) else {
-        return false;
-    };
-
-    names
-        .iter()
-        .any(|name| listing.entry_is_file(db, directory, name))
 }
 
 fn system_path_is_directory(db: &dyn Db, path: &SystemPath) -> bool {
