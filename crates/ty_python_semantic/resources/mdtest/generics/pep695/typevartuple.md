@@ -1270,6 +1270,20 @@ def forward_mixed[*Ts](
     accept_mixed_forwarded(callback, args)
 ```
 
+### Forwarding dictionaries containing callable unions
+
+A dictionary whose values accept either a specific variadic parameter list or arbitrary arguments
+can be forwarded to another function with the same annotation. The callable union does not widen the
+tuple used for the dictionary's keys.
+
+```py
+from collections.abc import Callable
+
+def accept[*Ts](callbacks: dict[tuple[*Ts], Callable[[*Ts], None] | Callable[..., None]]) -> None: ...
+def forward[*Ts](callbacks: dict[tuple[*Ts], Callable[[*Ts], None] | Callable[..., None]]) -> None:
+    accept(callbacks)
+```
+
 ### Callable inference through nested callable parameters
 
 Nested callable parameters make the pack covariant, but inference currently loses its fixed length.

@@ -1881,6 +1881,36 @@ def selects_invalid_overload(value: int | str) -> None:
     assert_type(select(value), bool)
 ```
 
+## A single generic member of a union
+
+Inference through a container in an optional parameter preserves the type variable's bounds and
+constraints. Invariant containers also constrain the other arguments.
+
+```py
+from collections.abc import Sequence
+
+def bounded[T: str](value: Sequence[T] | None) -> T:
+    raise NotImplementedError
+
+def constrained[T: (str, bytes)](value: Sequence[T] | None) -> T:
+    raise NotImplementedError
+
+def invariant[T](value: list[T] | None, other: list[T]) -> T:
+    raise NotImplementedError
+
+def _(strings: list[str] | None, integers: list[int] | None, other: list[int]):
+    reveal_type(bounded(strings))  # revealed: str
+    reveal_type(constrained(strings))  # revealed: str
+    bounded(integers)  # error: [invalid-argument-type]
+    constrained(integers)  # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    invariant(strings, other)
+
+reveal_type(bounded(None))  # revealed: Unknown
+reveal_type(constrained(None))  # revealed: Unknown
+```
+
 ## Gradual bounds in generic union members
 
 A gradual bound does not prevent inference from an invariant union member: `str` satisfies `Any`,

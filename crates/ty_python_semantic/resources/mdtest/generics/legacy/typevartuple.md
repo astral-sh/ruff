@@ -717,6 +717,23 @@ def check(i: int, s: str) -> None:
     two(i, i)  # error: [invalid-argument-type]
 ```
 
+### Forwarding dictionaries containing callable unions
+
+A dictionary whose values accept either a specific variadic parameter list or arbitrary arguments
+can be forwarded to another function with the same annotation. The callable union does not widen the
+tuple used for the dictionary's keys.
+
+```py
+from collections.abc import Callable
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def accept(callbacks: dict[tuple[*Ts], Callable[[*Ts], None] | Callable[..., None]]) -> None: ...
+def forward(callbacks: dict[tuple[*Ts], Callable[[*Ts], None] | Callable[..., None]]) -> None:
+    accept(callbacks)
+```
+
 ## Tuple concatenation with type variables
 
 Concatenation preserves type variables in fixed positions and an unpacked type variable tuple
