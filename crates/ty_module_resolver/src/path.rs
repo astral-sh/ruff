@@ -42,7 +42,7 @@ impl ModulePath {
         )
     }
 
-    fn push(&mut self, component: &str) {
+    pub(crate) fn push(&mut self, component: &str) {
         if let Some(component_extension) = camino::Utf8Path::new(component).extension() {
             assert!(
                 self.relative_path.extension().is_none(),
