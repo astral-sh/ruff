@@ -6289,8 +6289,8 @@ impl<'db> CallInference<'_, 'db> {
             return None;
         }
         // A return variable missing from every alternative can use its default (or `Unknown`)
-        // while other variables refine the return, provided it does not participate in argument
-        // inference. Partial bindings still require the merged fallback.
+        // while other variables refine the return. The resulting specializations must still
+        // validate every argument. Partial bindings still require the merged fallback.
         for (index, variable) in return_variables {
             if alternatives.iter().all(|types| types[index].is_some()) {
                 continue;
@@ -6299,15 +6299,6 @@ impl<'db> CallInference<'_, 'db> {
                 variable.kind(db),
                 TypeVarKind::LegacyTypeVar | TypeVarKind::Pep695TypeVar
             ) || alternatives.iter().any(|types| types[index].is_some())
-                || self.argument_relations().any(|relation| {
-                    [relation.declared_type, relation.argument_type]
-                        .into_iter()
-                        .any(|ty| {
-                            any_over_type_expanding_aliases(db, env, ty, |nested| {
-                                matches!(nested, Type::TypeVar(argument_variable) if argument_variable.identity(db) == variable.identity(db))
-                            })
-                        })
-                })
             {
                 return None;
             }
