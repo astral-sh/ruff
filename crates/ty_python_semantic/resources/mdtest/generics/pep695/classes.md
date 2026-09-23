@@ -1657,6 +1657,109 @@ class WithOverloadedMethod[T]:
 reveal_type(WithOverloadedMethod[int].method)
 ```
 
+## Materialized nested class types
+
+Materializing a generic class preserves its type parameter's upper bound inside nested invariant
+types. Both attributes and method return types expose that bound when read:
+
+```py
+from typing import Any
+from ty_extensions import Bottom, Top
+
+class Box[T]:
+    value: T
+
+class Owner[T: int]:
+    box: Box[T]
+    unrelated: Box[Any]
+
+    def get(self) -> Box[T]:
+        return self.box
+
+    def put(self, box: Box[T]) -> None: ...
+
+def _(top: Top[Owner[Any]]) -> None:
+    reveal_type(top.box.value)  # revealed: int
+    reveal_type(top.get().value)  # revealed: int
+
+def _(bottom: Bottom[Owner[Any]]) -> None:
+    reveal_type(bottom.box.value)  # revealed: Never
+
+def _(bottom: Bottom[Owner[Any]]) -> None:
+    reveal_type(bottom.get().value)  # revealed: Never
+```
+
+Method parameters use the opposite materialization. The bottom materialization accepts any `Box`
+whose type argument satisfies the bound, while the top materialization cannot safely accept one:
+
+```py
+def _(top: Top[Owner[Any]], bottom: Bottom[Owner[Any]], ints: Box[int], strings: Box[str]) -> None:
+    top.put(ints)  # error: [invalid-argument-type]
+    bottom.put(ints)
+    bottom.put(strings)  # error: [invalid-argument-type]
+```
+
+Without materialization, `Any` remains gradual. A static type argument remains unchanged:
+
+```py
+def _(gradual: Owner[Any], concrete: Top[Owner[bool]]) -> None:
+    reveal_type(gradual.box.value)  # revealed: Any
+    reveal_type(gradual.get().value)  # revealed: Any
+    reveal_type(concrete.box.value)  # revealed: bool
+    reveal_type(concrete.get().value)  # revealed: bool
+```
+
+An explicit `Box[Any]` attribute does not depend on the class's type parameter and remains gradual:
+
+```py
+def _(top: Top[Owner[Any]], bottom: Bottom[Owner[Any]]) -> None:
+    reveal_type(top.unrelated.value)  # revealed: Any
+    reveal_type(bottom.unrelated.value)  # revealed: Any
+```
+
+Type aliases preserve the bound in nested return types:
+
+```py
+type Wrapped[T] = Box[T]
+
+class AliasedOwner[T: int]:
+    def get(self) -> Wrapped[T]:
+        raise NotImplementedError
+
+def _(top: Top[AliasedOwner[Any]], bottom: Bottom[AliasedOwner[Any]]) -> None:
+    reveal_type(top.get().value)  # revealed: int
+    reveal_type(bottom.get().value)  # revealed: Never
+```
+
+For a constrained type parameter, reads are limited to the union of the constraints:
+
+```py
+class ConstrainedOwner[T: (int, str)]:
+    box: Box[T]
+
+def _(top: Top[ConstrainedOwner[Any]], bottom: Bottom[ConstrainedOwner[Any]]) -> None:
+    reveal_type(top.box.value)  # revealed: int | str
+    reveal_type(bottom.box.value)  # revealed: Never
+```
+
+## Materialized inherited class types
+
+Inherited attributes retain the upper bound of the subclass's type parameter:
+
+```py
+from typing import Any
+from ty_extensions import Bottom, Top
+
+class Box[T]:
+    value: T
+
+class Inherited[T: int](Box[T]): ...
+
+def _(top: Top[Inherited[Any]], bottom: Bottom[Inherited[Any]]) -> None:
+    reveal_type(top.value)  # revealed: int
+    reveal_type(bottom.value)  # revealed: Never
+```
+
 ## Materialized `TypeIs` return types
 
 A generic `TypeIs` in the return type of a class method is materialized along with the outer class:
@@ -1687,6 +1790,33 @@ An explicit `TypeIs[Any]` return type remains unmaterialized:
 def _(top: Top[Predicate[Any]], bottom: Bottom[Predicate[Any]], value: object) -> None:
     reveal_type(top.unrelated(value))  # revealed: TypeIs[Any @ value]
     reveal_type(bottom.unrelated(value))  # revealed: TypeIs[Any @ value]
+```
+
+A type parameter's upper bound also limits narrowing through a materialized `TypeIs` return type.
+The top materialization narrows the positive branch to the bound and leaves the negative branch
+unchanged:
+
+```py
+class BoundedPredicate[T: int]:
+    def matches(self, value: object) -> TypeIs[T]:
+        return True
+
+def _(top: Top[BoundedPredicate[Any]], value: object) -> None:
+    if top.matches(value):
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: object
+```
+
+The bottom materialization makes the positive branch unreachable and excludes the bound in the
+negative branch:
+
+```py
+def _(bottom: Bottom[BoundedPredicate[Any]], value: object) -> None:
+    if bottom.matches(value):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: ~int
 ```
 
 ## `Callable` return annotations preserve enclosing generic context

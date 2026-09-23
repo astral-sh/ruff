@@ -1254,13 +1254,7 @@ impl<'db> Specialization<'db> {
     pub(super) fn with_typevar_bounds(self, db: &'db dyn Db) -> Self {
         let env = ProgramEnvironment::from_program(self.generic_context(db).program(db));
         let types = self.map_types(db, |_, typevar, ty| {
-            if !any_over_type_expanding_aliases(db, &env, ty, |ty| ty.is_dynamic()) {
-                return ty;
-            }
-            let Some(upper_bound) = typevar.top_materialized_upper_bound(db) else {
-                return ty;
-            };
-            IntersectionType::from_two_elements(db, &env, ty, upper_bound)
+            typevar.bound_type_argument(db, &env, ty)
         });
         if matches!(types, Cow::Borrowed(_)) {
             return self;
@@ -2306,7 +2300,18 @@ impl<'db> ApplySpecialization<'_, 'db> {
         match self {
             ApplySpecialization::Specialization { specialization, .. }
             | ApplySpecialization::TypeAlias(specialization) => {
-                specialization.get(db, bound_typevar)
+                let ty = specialization.get(db, bound_typevar)?;
+                if specialization.materialization_kind(db).is_some() {
+                    // Nested invariant types defer materialization until after substitution.
+                    // When substituting `Any` for `T: int` in `Box[T]`, retain `Any & int` so
+                    // that the nested materialization can still use the outer bound.
+                    let env = ProgramEnvironment::from_program(
+                        specialization.generic_context(db).program(db),
+                    );
+                    Some(bound_typevar.bound_type_argument(db, &env, ty))
+                } else {
+                    Some(ty)
+                }
             }
             ApplySpecialization::Partial {
                 generic_context,
