@@ -54,6 +54,7 @@ use salsa::plumbing::AsId;
 use std::borrow::Cow;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
+use crate::reachability::required_operands_are_inhabited;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
@@ -600,7 +601,7 @@ pub(super) fn infer_expression_types_impl<'db>(
 
     let env = ProgramEnvironment::from_file(program_file);
 
-    TypeInferenceBuilder::new(
+    let mut inference = TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Expression(expression, tcx),
@@ -609,7 +610,19 @@ pub(super) fn infer_expression_types_impl<'db>(
         index,
         &module,
     )
-    .finish_expression()
+    .finish_expression();
+
+    // Reachability needs to distinguish calls such as `bool(never)` from inhabited values,
+    // without changing their inferred return types or caching a second result for every predicate.
+    if !required_operands_are_inhabited(db, &env, expression.node_ref(db).node(&module), &|node| {
+        inference.expression_type(node)
+    }) {
+        inference
+            .extra
+            .get_or_insert_default()
+            .has_uninhabited_operands = true;
+    }
+    inference
 }
 
 fn expression_cycle_initial<'db>(
@@ -1941,6 +1954,9 @@ pub(crate) struct ExpressionInference<'db> {
 /// Extra data that only exists for few inferred expression regions.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ExpressionInferenceExtra<'db> {
+    /// The root expression cannot finish evaluating its operands, even if its type is inhabited.
+    has_uninhabited_operands: bool,
+
     /// Aliases whose type-expression diagnostics are needed by this region.
     implicit_aliases: Box<[Definition<'db>]>,
 
@@ -1999,6 +2015,13 @@ struct ExpressionInferenceExtra<'db> {
 }
 
 impl<'db> ExpressionInference<'db> {
+    /// Whether evaluating a required operand prevents the root expression from producing a value.
+    pub(crate) fn has_uninhabited_operands(&self) -> bool {
+        self.extra
+            .as_ref()
+            .is_some_and(|extra| extra.has_uninhabited_operands)
+    }
+
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {
@@ -2036,6 +2059,11 @@ impl<'db> ExpressionInference<'db> {
 
         if cycle.iteration() > crate::TAINTED_CYCLES {
             self.widen_comparison_truthiness(db, env, previous);
+            // Widen possible evaluation outcomes along with value types. Once an earlier result
+            // could complete, a later iteration cannot exclude that possibility.
+            if let Some(extra) = self.extra.as_mut() {
+                extra.has_uninhabited_operands &= previous.has_uninhabited_operands();
+            }
         }
 
         for (expr, ty) in &mut self.expressions {

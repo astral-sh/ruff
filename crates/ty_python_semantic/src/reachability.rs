@@ -221,7 +221,7 @@ use ty_python_core::{
     FileScopeId, NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, SemanticIndex,
     Truthiness, UseDefMap,
     definition::DefinitionState,
-    expression::{Expression, ExpressionContext},
+    expression::Expression,
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
     place::ScopedPlaceId,
     place_table,
@@ -1935,7 +1935,7 @@ pub(crate) fn analyze_condition_expression(
 /// in `bool(never)`. Most operands are evaluated as values, so only inspect their truthiness when
 /// deciding whether evaluation can short-circuit. Re-testing an intermediate result's mutable
 /// truthiness can take a different path than testing it directly as a condition.
-fn required_operands_are_inhabited<'db>(
+pub(crate) fn required_operands_are_inhabited<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     node: &ast::Expr,
@@ -2004,8 +2004,8 @@ fn required_operands_are_inhabited<'db>(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| Some(Truthiness::Ambiguous),
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Option<Truthiness>, result: Option<Truthiness>, _, _| {
+    cycle_initial = |_, _, _| Some(Truthiness::Ambiguous),
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Option<Truthiness>, result: Option<Truthiness>, _| {
         // A condition can control whether one of its own inputs is reachable. Expression inference
         // can lose its previous result when it ceases to be a cycle head, so its type widening alone
         // does not ensure that the condition's truthiness converges. Delay widening here to avoid
@@ -2023,32 +2023,21 @@ fn required_operands_are_inhabited<'db>(
     },
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn analyze_predicate_expression<'db>(
-    db: &'db dyn Db,
-    expression: Expression<'db>,
-    context: ExpressionContext,
-) -> Option<Truthiness> {
+fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Option<Truthiness> {
     let env = ProgramEnvironment::from_scope(expression.scope(db));
     let module = parsed_module(db, expression.python_file(db)).load(db);
     let inference = infer_expression_types(db, expression, TypeContext::default());
     let node = expression.node_ref(db).node(&module);
-    let leaf_truthiness = |node: &ast::Expr| {
+    analyze_condition_expression(node, &|node| {
         if !required_operands_are_inhabited(db, &env, node, &|operand| {
             inference.expression_type(operand)
         }) {
             return None;
         }
-        match context {
-            ExpressionContext::Condition => inference
-                .comparison_truthiness(node)
-                .or_else(|| inference.expression_type(node).bool_if_inhabited(db, &env)),
-            ExpressionContext::Value => inference.expression_type(node).bool_if_inhabited(db, &env),
-        }
-    };
-    match context {
-        ExpressionContext::Value => leaf_truthiness(node),
-        ExpressionContext::Condition => analyze_condition_expression(node, &leaf_truthiness),
-    }
+        inference
+            .comparison_truthiness(node)
+            .or_else(|| inference.expression_type(node).bool_if_inhabited(db, &env))
+    })
 }
 
 /// Evaluate a predicate, returning `None` when it cannot produce a boolean outcome.
@@ -2065,12 +2054,31 @@ fn analyze_single(
 
     Some(match predicate.node {
         PredicateNode::Expression(test_expr) => {
-            analyze_predicate_expression(db, test_expr, ExpressionContext::Value)?
+            let inference = infer_expression_types(db, test_expr, TypeContext::default());
+            if inference.has_uninhabited_operands() {
+                return None;
+            }
+            inference
+                .expression_type(test_expr.node_ref(db))
+                .bool_if_inhabited(db, env)?
                 .negate_if(!predicate.is_positive)
         }
-        PredicateNode::Condition(test_expr)
-        | PredicateNode::ChainedComparisonCondition(test_expr) => {
-            analyze_predicate_expression(db, test_expr, ExpressionContext::Condition)?
+        PredicateNode::Condition(test_expr) => {
+            analyze_condition(db, test_expr)?.negate_if(!predicate.is_positive)
+        }
+        PredicateNode::ChainedComparisonCondition(test_expr) => {
+            let inference = infer_expression_types(db, test_expr, TypeContext::default());
+            if inference.has_uninhabited_operands() {
+                return None;
+            }
+            let expression = test_expr.node_ref(db);
+            inference
+                .comparison_truthiness(expression)
+                .or_else(|| {
+                    inference
+                        .expression_type(expression)
+                        .bool_if_inhabited(db, env)
+                })?
                 .negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {

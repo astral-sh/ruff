@@ -12544,6 +12544,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
             self.collection_use_constraints.shrink_to_fit();
             self.diagnostics.shrink_to_fit();
             Box::new(ExpressionInferenceExtra {
+                has_uninhabited_operands: false,
                 implicit_aliases: self.implicit_aliases.into_iter().collect(),
                 string_annotations: FrozenSet::from(self.string_annotations),
                 comparison_truthiness: FrozenMap::from(self.comparison_truthiness),
