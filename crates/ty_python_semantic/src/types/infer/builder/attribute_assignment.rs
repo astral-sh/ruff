@@ -415,7 +415,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     false
                 }
             }
-            AttributeWriteRequirement::ProtocolMember { write, qualifiers } => match write {
+            AttributeWriteRequirement::ProtocolMember {
+                receiver_ty,
+                write,
+                qualifiers,
+            } => match write {
                 Some(ProtocolMemberWriteRequirement::AssignableTo(write_ty)) => {
                     let value_ty =
                         self.infer_value(TypeContext::new(Some(*write_ty)), emit_diagnostics);
@@ -423,7 +427,6 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 }
                 Some(ProtocolMemberWriteRequirement::Descriptor {
                     descriptor_ty,
-                    receiver_ty,
                     domain,
                 }) => {
                     let value_ty = self.infer_value(
