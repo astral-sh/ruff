@@ -733,12 +733,12 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
             }
         }
         ProtocolMemberKind::Property { .. } => {
-            for ty in member
-                .access(ProtocolMemberAccessMode::Instance)
-                .exposed_types(db, env, Some(receiver_ty))
-            {
-                visitor.visit_type(db, ty);
-            }
+            walk_protocol_member_access(
+                db,
+                member.access(ProtocolMemberAccessMode::Instance),
+                Some(receiver_ty),
+                visitor,
+            );
         }
         ProtocolMemberKind::Attribute(attribute) => {
             let attribute = ProtocolAnnotation {
@@ -1479,50 +1479,6 @@ impl<'a, 'db> ProtocolMemberAccess<'a, 'db> {
         })
     }
 
-    fn exposed_types(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        self_type: Option<Type<'db>>,
-    ) -> impl Iterator<Item = Type<'db>> {
-        let write = self.write();
-        let requirement = write.and_then(|write| write.requirement(db, env, self_type));
-        // Without a receiver, visitors still need the accessor when its exposed type cannot
-        // be resolved. Binding an unresolved accessor to a receiver yields no exposed type.
-        let unresolved = |value: Option<ProtocolPropertyType<'db>>| {
-            value
-                .filter(|_| self_type.is_none())
-                .map(ProtocolPropertyType::ty)
-        };
-        [
-            self.read()
-                .and_then(|read| read.result_type(db, env, self_type))
-                .or_else(|| {
-                    if let ProtocolMemberKind::Property { read, .. } = self.declaration.kind
-                        && self.mode == ProtocolMemberAccessMode::Instance
-                    {
-                        unresolved(read)
-                    } else {
-                        None
-                    }
-                }),
-            write.and_then(|write| {
-                requirement
-                    .as_ref()
-                    .and_then(ProtocolMemberWriteRequirement::accepted_type)
-                    .or_else(|| unresolved(write.declaration.domain()))
-            }),
-            match requirement {
-                Some(ProtocolMemberWriteRequirement::Descriptor { descriptor_ty, .. }) => {
-                    Some(descriptor_ty)
-                }
-                _ => None,
-            },
-        ]
-        .into_iter()
-        .flatten()
-    }
-
     fn variances(
         self,
         db: &'db dyn Db,
@@ -1558,6 +1514,50 @@ impl<'a, 'db> ProtocolMemberAccess<'a, 'db> {
                     .and_then(|requirement| requirement.accepted_type())
             }),
         )
+    }
+}
+
+fn walk_protocol_member_access<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    access: ProtocolMemberAccess<'_, 'db>,
+    self_type: Option<Type<'db>>,
+    visitor: &V,
+) {
+    let env = visitor.program_environment();
+    let write = access.write();
+    let requirement = write.and_then(|write| write.requirement(db, env, self_type));
+    // Without a receiver, visitors still need the accessor when its exposed type cannot
+    // be resolved. Binding an unresolved accessor to a receiver yields no exposed type.
+    let unresolved = |value: Option<ProtocolPropertyType<'db>>| {
+        value
+            .filter(|_| self_type.is_none())
+            .map(ProtocolPropertyType::ty)
+    };
+    if let Some(read_ty) = access
+        .read()
+        .and_then(|read| read.result_type(db, env, self_type))
+        .or_else(|| {
+            if let ProtocolMemberKind::Property { read, .. } = access.declaration.kind
+                && access.mode == ProtocolMemberAccessMode::Instance
+            {
+                unresolved(read)
+            } else {
+                None
+            }
+        })
+    {
+        visitor.visit_type(db, read_ty);
+    }
+    if let Some(write_ty) = write.and_then(|write| {
+        requirement
+            .as_ref()
+            .and_then(ProtocolMemberWriteRequirement::accepted_type)
+            .or_else(|| unresolved(write.declaration.domain()))
+    }) {
+        visitor.visit_type(db, write_ty);
+    }
+    if let Some(ProtocolMemberWriteRequirement::Descriptor { descriptor_ty, .. }) = requirement {
+        visitor.visit_type(db, descriptor_ty);
     }
 }
 
@@ -2022,12 +2022,7 @@ fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
             ProtocolMemberAccessMode::Instance,
             ProtocolMemberAccessMode::Class,
         ] {
-            for ty in member
-                .access(mode)
-                .exposed_types(db, visitor.program_environment(), None)
-            {
-                visitor.visit_type(db, ty);
-            }
+            walk_protocol_member_access(db, member.access(mode), None, visitor);
         }
     } else {
         for ty in member.data.kind.member_types() {
