@@ -704,15 +704,6 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
     let env = visitor.program_environment();
     match member.data.kind {
         ProtocolMemberKind::Method(method, kind) => {
-            // TODO: Preserve explicit classmethod receiver annotations during traversal, as we
-            // do for instance methods, and bind only implicit receivers.
-            let method = if let Type::Callable(callable) = method
-                && kind == ProtocolMethodKind::Class
-            {
-                Type::Callable(protocol_bind_self(db, env.program(db), callable, None))
-            } else {
-                method
-            };
             let method = member
                 .materialization
                 .map_or(method, |kind| method.materialization(db, env, kind));
@@ -721,8 +712,20 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
                 return;
             };
             for signature in callable.signatures(db) {
-                if signature.has_implicit_positional_receiver_annotation() {
-                    let signature = signature.bind_self(db, env, Some(receiver_ty));
+                if signature.has_implicit_positional_receiver_annotation()
+                    && kind != ProtocolMethodKind::Static
+                {
+                    let runtime_type = if kind == ProtocolMethodKind::Class {
+                        receiver_ty.to_meta_type(db, env)
+                    } else {
+                        receiver_ty
+                    };
+                    let signature = signature.bind_self_with_receiver(
+                        db,
+                        env,
+                        Some(runtime_type),
+                        Some(receiver_ty),
+                    );
                     walk_signature(db, &signature, visitor);
                 } else {
                     walk_signature(db, signature, visitor);
