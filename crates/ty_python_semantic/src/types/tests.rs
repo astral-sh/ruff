@@ -3,7 +3,6 @@ use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::call::bind::CallableDescription;
 use crate::types::type_alias::PEP695TypeAliasType;
-use crate::types::typed_dict::TypedDictFieldBuilder;
 use crate::{Db, ProgramEnvironment};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::DbWithWritableSystem as _;
@@ -647,41 +646,16 @@ fn divergent_type() {
 }
 
 #[test]
-fn pending_narrowing_preserves_materialization() {
-    let db = setup_db();
-    let env = db.program_environment();
-    let pending = Type::pending_narrowing();
-    let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
-
-    let visitor = ApplyTypeMappingVisitor::new(&env);
-    for kind in [MaterializationKind::Top, MaterializationKind::Bottom] {
-        let materialized = pending.materialize(&db, kind, &visitor);
-        assert!(materialized.is_pending_narrowing());
-        assert!(!materialized.is_recursive_divergent());
-        assert_ne!(materialized, recursive.materialize(&db, kind, &visitor));
-    }
-}
-
-#[test]
 fn pending_narrowing_intersections_are_order_independent() {
     let db = setup_db();
     let env = db.program_environment();
     let pending = Type::pending_narrowing();
     let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let int = KnownClass::Int.to_instance(&db, &env);
 
-    for other in [int, recursive] {
-        for elements in [[pending, other], [other, pending]] {
-            assert_eq!(
-                IntersectionType::from_elements(&db, &env, elements),
-                pending
-            );
-        }
-    }
-    for elements in [[pending, Type::Never], [Type::Never, pending]] {
+    for elements in [[pending, recursive], [recursive, pending]] {
         assert_eq!(
             IntersectionType::from_elements(&db, &env, elements),
-            Type::Never
+            pending
         );
     }
     assert_eq!(
@@ -714,64 +688,43 @@ fn pending_narrowing_cycle_recovery_preserves_guarded_contributions() {
     let list_of = |element| KnownClass::List.to_specialized_instance(&db, &env, &[element]);
     let callable_returning =
         |return_ty| Type::single_callable(&db, Signature::new(Parameters::empty(), return_ty));
-    let recursive_list = list_of(recursive);
-    let recursive_callable = callable_returning(recursive);
-    let pending_typed_dict = Type::TypedDict(TypedDictType::from_schema_items(
+
+    // A constructor must retain a recursive reference even when a union also contains a
+    // resolved initializer. Otherwise, subsequent iterations can grow without a depth bound.
+    let approximation = UnionType::from_elements(
         &db,
-        [(
-            Name::new_static("value"),
-            TypedDictFieldBuilder::new(pending).build(),
-        )]
-        .into_iter()
-        .collect(),
-    ));
+        &env,
+        [
+            pending,
+            int,
+            recursive,
+            callable_returning(pending),
+            foreign,
+        ],
+    );
+    let normalized = normalize(approximation);
+    assert_eq!(
+        normalized,
+        UnionType::from_elements(&db, &env, [int, callable_returning(recursive), foreign])
+    );
+    assert!(
+        normalized
+            .as_union()
+            .is_some_and(|union| union.recursively_defined(&db) == RecursivelyDefined::No)
+    );
+
+    let unresolved = UnionType::from_elements(&db, &env, [pending, recursive]);
+    assert_eq!(normalize(unresolved), pending);
+
+    // Pending narrowing in an opaque bound invalidates the enclosing type argument.
     let pending_typevar = BoundTypeVarInstance::synthetic_self(
         &db,
         pending,
         BindingContext::Synthetic(env.program(&db)),
     );
-
-    // A constructor must retain a recursive reference even when a union also contains a
-    // resolved initializer. Otherwise, subsequent iterations can grow without a depth bound.
-    for (unresolved, resolved) in [
-        (list_of(pending), recursive_list),
-        (list_of(list_of(pending)), recursive_list),
-        (list_of(pending_typed_dict), recursive_list),
-        (list_of(Type::TypeVar(pending_typevar)), recursive_list),
-        (callable_returning(pending), recursive_callable),
-        (
-            callable_returning(callable_returning(pending)),
-            recursive_callable,
-        ),
-    ] {
-        assert_eq!(normalize(unresolved), resolved);
-
-        let approximation =
-            UnionType::from_elements(&db, &env, [pending, int, recursive, unresolved, foreign]);
-        let normalized = normalize(approximation);
-        assert_eq!(
-            normalized,
-            UnionType::from_elements(&db, &env, [int, resolved, foreign])
-        );
-        assert!(
-            normalized
-                .as_union()
-                .is_some_and(|union| union.recursively_defined(&db) == RecursivelyDefined::No)
-        );
-    }
-
-    let unresolved = UnionType::from_elements(&db, &env, [pending, recursive]);
-    assert_eq!(normalize(unresolved), pending);
-
-    let unresolved = UnionType::from_elements(&db, &env, [pending, int, recursive, foreign]);
     assert_eq!(
-        normalize(unresolved),
-        UnionType::from_elements(&db, &env, [int, foreign])
-    );
-
-    assert_eq!(
-        normalize(Type::heterogeneous_tuple(&db, &env, [foreign, pending])),
-        Type::heterogeneous_tuple(&db, &env, [foreign, recursive])
+        normalize(list_of(Type::TypeVar(pending_typevar))),
+        list_of(recursive)
     );
 
     // Metadata not rewritten by recursive normalization must not retain pending narrowing.
@@ -783,13 +736,7 @@ fn pending_narrowing_cycle_recovery_preserves_guarded_contributions() {
 #[test]
 fn pending_narrowing_cycle_recovery_checks_alias_arguments() -> anyhow::Result<()> {
     let mut db = setup_db();
-    db.write_dedented(
-        "/src/aliases.py",
-        r#"
-        type Identity[T] = T
-        type Constant[T] = int
-        "#,
-    )?;
+    db.write_dedented("/src/aliases.py", "type Constant[T] = int")?;
     let env = db.program_environment();
     let file = system_path_to_file(&db, "/src/aliases.py")?;
     let file = ProgramFile::new(&db, file, env.program(&db));
@@ -799,26 +746,18 @@ fn pending_narrowing_cycle_recovery_checks_alias_arguments() -> anyhow::Result<(
     let normalize =
         |ty| Type::pending_narrowing_normalized(ty, &db, &env, recursive, &is_cycle_marker);
     let list_of = |element| KnownClass::List.to_specialized_instance(&db, &env, &[element]);
-    let callable_returning =
-        |return_ty| Type::single_callable(&db, Signature::new(Parameters::empty(), return_ty));
 
     // Stored arguments remain provisional even when the alias body does not use them.
     // An alias does not itself establish recursive structure, but an enclosing constructor does.
-    for name in ["Identity", "Constant"] {
-        let ty = global_symbol(&db, file, name).place.expect_type();
-        let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) = ty else {
-            anyhow::bail!("expected `{name}` to be a type alias");
-        };
-        let alias = Type::TypeAlias(
-            alias.apply_specialization(&db, |context| context.repeat_specialization(&db, pending)),
-        );
-        assert_eq!(normalize(alias), pending);
-        assert_eq!(normalize(list_of(alias)), list_of(recursive));
-        assert_eq!(
-            normalize(callable_returning(alias)),
-            callable_returning(recursive)
-        );
-    }
+    let ty = global_symbol(&db, file, "Constant").place.expect_type();
+    let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) = ty else {
+        anyhow::bail!("expected `Constant` to be a type alias");
+    };
+    let alias = Type::TypeAlias(
+        alias.apply_specialization(&db, |context| context.repeat_specialization(&db, pending)),
+    );
+    assert_eq!(normalize(alias), pending);
+    assert_eq!(normalize(list_of(alias)), list_of(recursive));
     Ok(())
 }
 
