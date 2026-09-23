@@ -719,6 +719,45 @@ reveal_type(any_first(1))  # revealed: int
 reveal_type(int_first(1))  # revealed: int
 ```
 
+## Independent specializations during overload argument expansion
+
+Expanding a union can evaluate the same generic overload with different type arguments.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import TypeVar, overload
+
+T = TypeVar("T")
+
+@overload
+def unpack(value: list[T]) -> T: ...
+@overload
+def unpack(value: bytes, count: int) -> bytes: ...
+```
+
+`valid.py`:
+
+```py
+from overloaded import unpack
+
+def _(values: tuple[list[int]] | tuple[list[str]] | tuple[bytes, int]):
+    reveal_type(values)  # revealed: tuple[list[int]] | tuple[list[str]] | tuple[bytes, int]
+    reveal_type(unpack(*values))  # revealed: int | str | bytes
+    reveal_type(unpack(value=[1]))  # revealed: int
+```
+
+Every union member must match an overload for the call to succeed.
+
+`invalid.py`:
+
+```py
+from overloaded import unpack
+
+def _(values: tuple[list[int]] | tuple[bytes, str]):
+    unpack(*values)  # error: [no-matching-overload]
+```
+
 ## Typevar inference is a unification problem
 
 When inferring typevar assignments in a generic function call, we cannot simply solve constraints

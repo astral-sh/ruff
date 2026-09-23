@@ -3988,16 +3988,12 @@ impl<'db> CallableBinding<'db> {
                 Expansion::Expanded(argument_lists) => argument_lists,
             };
 
-            // This is the merged state of the bindings after evaluating all of the expanded
-            // argument lists. This will be the final state to restore the bindings to if all of
-            // the expanded argument lists evaluated successfully.
-            let mut merged_evaluation_state: Option<CallableBindingSnapshot<'db>> = None;
-
-            // The return types of each of the expanded argument lists that evaluated successfully.
-            let mut return_types = Vec::new();
-            let mut selected_overloads = SmallVec::<[usize; 2]>::new();
+            let mut cases = Vec::with_capacity(expanded_argument_lists.len());
 
             for expanded_arguments in &expanded_argument_lists {
+                // Ambiguity belongs to one expanded argument list. In particular, an earlier
+                // ambiguous case must not replace a later case's equivalent return types.
+                self.overload_call_result = None;
                 // The spec mentions that each expanded argument list should be re-evaluated from
                 // step 2 but we need to re-evaluate from step 1 because our step 1 does more than
                 // what the spec mentions. Step 1 of the spec means only "eliminate impossible
@@ -4034,7 +4030,6 @@ impl<'db> CallableBinding<'db> {
                     "after step 2",
                 );
 
-                let mut is_ambiguous = false;
                 let return_type = match self.matching_overload_index() {
                     MatchingOverloadIndex::None => None,
                     MatchingOverloadIndex::Single(index) => {
@@ -4058,7 +4053,7 @@ impl<'db> CallableBinding<'db> {
                             }
                             MatchingOverloadIndex::Single(_) => Some(self.return_type()),
                             MatchingOverloadIndex::Multiple(indexes) => {
-                                is_ambiguous = self.filter_overloads_using_any_or_unknown(
+                                self.filter_overloads_using_any_or_unknown(
                                     db,
                                     env,
                                     constraints,
@@ -4078,34 +4073,15 @@ impl<'db> CallableBinding<'db> {
                     }
                 };
 
-                // This split between initializing and updating the merged evaluation state is
-                // required because otherwise it's difficult to differentiate between the
-                // following:
-                // 1. An initial unmatched overload becomes a matched overload when evaluating the
-                //    first argument list
-                // 2. An unmatched overload after evaluating the first argument list becomes a
-                //    matched overload when evaluating the second argument list
-                if let Some(merged_evaluation_state) = merged_evaluation_state.as_mut() {
-                    merged_evaluation_state.update(self);
-                } else {
-                    merged_evaluation_state = Some(snapshotter.take(self));
-                }
-
                 if let Some(return_type) = return_type {
-                    return_types.push(return_type);
-                    // The shared call result can still contain ambiguity from an earlier
-                    // expansion. Select overloads using this expansion's result instead.
-                    let matching = self.matching_overloads();
-                    let selected = if is_ambiguous {
-                        Either::Left(matching)
-                    } else {
-                        Either::Right(matching.take(1))
-                    };
-                    for (index, _) in selected {
-                        if !selected_overloads.contains(&index) {
-                            selected_overloads.push(index);
-                        }
-                    }
+                    cases.push(ExpandedCallEvaluation {
+                        return_type,
+                        selected_overloads: self
+                            .selected_overloads()
+                            .map(|(index, _)| index)
+                            .collect(),
+                        snapshot: snapshotter.take(self),
+                    });
                 } else {
                     // No need to check the remaining argument lists if the current argument list
                     // doesn't evaluate successfully. Move on to expanding the next argument type.
@@ -4113,23 +4089,28 @@ impl<'db> CallableBinding<'db> {
                 }
             }
 
-            if return_types.len() == expanded_argument_lists.len() {
-                // Restore the bindings state to the one that merges the bindings state evaluating
-                // each of the expanded argument list.
-                //
-                // Note that this needs to happen *before* setting the return type, because this
-                // will restore the return type to the one before argument type expansion.
-                if let Some(merged_evaluation_state) = merged_evaluation_state {
-                    snapshotter.restore(self, merged_evaluation_state);
+            if cases.len() == expanded_argument_lists.len()
+                && let Some((first, rest)) = cases.split_first()
+            {
+                // The merged view supports consumers that need one binding per overload. Keep
+                // the individual evaluations as well: the same generic overload can infer a
+                // different specialization for each expanded argument list.
+                let mut merged_evaluation_state = first.snapshot.clone();
+                for case in rest {
+                    merged_evaluation_state.update(&case.snapshot);
                 }
+                snapshotter.restore(self, merged_evaluation_state);
 
-                // If the number of return types is equal to the number of expanded argument lists,
-                // they all evaluated successfully. So, we need to combine their return types by
-                // union to determine the final return type.
+                // Every expanded argument list must succeed. Alternative matches within a case
+                // cannot compensate for a different argument list with no matches.
                 self.overload_call_result = Some(OverloadCallResult::ArgumentTypeExpansion(
                     Box::new(ExpandedOverloadCall {
-                        return_type: UnionType::from_elements(db, env, return_types),
-                        selected_overloads,
+                        return_type: UnionType::from_elements(
+                            db,
+                            env,
+                            cases.iter().map(|case| case.return_type),
+                        ),
+                        cases: cases.into_boxed_slice(),
                     }),
                 ));
 
@@ -4205,7 +4186,7 @@ impl<'db> CallableBinding<'db> {
     /// `matching_overload_indexes` and are filtered out by marking them as unmatched overloads
     /// using the [`mark_as_unmatched_overload`] method.
     ///
-    /// Returns whether the remaining overloads have non-equivalent return types, leaving the
+    /// Records whether the remaining overloads have non-equivalent return types, leaving the
     /// call ambiguous. Otherwise, step 6 selects the first remaining overload.
     ///
     /// [`Any`]: crate::types::DynamicType::Any
@@ -4219,7 +4200,7 @@ impl<'db> CallableBinding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
-    ) -> bool {
+    ) {
         struct OverloadFilterSlot<'db> {
             parameter: Type<'db>,
             argument: Type<'db>,
@@ -4398,7 +4379,6 @@ impl<'db> CallableBinding<'db> {
             // Overload matching is ambiguous.
             self.overload_call_result = Some(OverloadCallResult::Ambiguous);
         }
-        !are_return_types_equivalent_for_all_matching_overloads
     }
 
     fn as_result(&self) -> Result<(), CallErrorKind> {
@@ -4511,12 +4491,15 @@ impl<'db> CallableBinding<'db> {
         let Some(result) = &self.overload_call_result else {
             return Either::Left(matching.take(1));
         };
-        Either::Right(matching.filter(move |(index, _)| match result {
-            OverloadCallResult::ArgumentTypeExpansion(expanded) => {
-                expanded.selected_overloads.contains(index)
+        Either::Right(matching.filter(move |(index, _)| {
+            match result {
+                OverloadCallResult::ArgumentTypeExpansion(expanded) => expanded
+                    .cases
+                    .iter()
+                    .any(|case| case.selected_overloads.contains(index)),
+                OverloadCallResult::Ambiguous => true,
+                OverloadCallResult::ArgumentTypeExpansionLimitReached(_) => false,
             }
-            OverloadCallResult::Ambiguous => true,
-            OverloadCallResult::ArgumentTypeExpansionLimitReached(_) => false,
         }))
     }
 
@@ -4866,7 +4849,17 @@ enum OverloadCallResult<'db> {
 #[derive(Debug, Clone)]
 struct ExpandedOverloadCall<'db> {
     return_type: Type<'db>,
+    cases: Box<[ExpandedCallEvaluation<'db>]>,
+}
+
+/// One successful expanded argument list, before its bindings are merged with other cases.
+/// The snapshot retains matching candidates; selection records the overloads that determine
+/// this case's result after resolving equivalent return types or ambiguity.
+#[derive(Debug, Clone)]
+struct ExpandedCallEvaluation<'db> {
+    return_type: Type<'db>,
     selected_overloads: SmallVec<[usize; 2]>,
+    snapshot: CallableBindingSnapshot<'db>,
 }
 
 #[derive(Debug)]
@@ -8577,17 +8570,16 @@ struct CallableBindingSnapshot<'db> {
     matching_overloads: Vec<(usize, BindingSnapshot<'db>)>,
 }
 
-impl<'db> CallableBindingSnapshot<'db> {
-    /// Update the state of the matched overload bindings in this snapshot with the current
-    /// state in the given `binding`.
-    fn update(&mut self, binding: &CallableBinding<'db>) {
-        // Here, the `snapshot` is the state of this binding for the previous argument list and
-        // `binding` would contain the state after evaluating the current argument list.
-        for (snapshot, binding) in self
+impl CallableBindingSnapshot<'_> {
+    /// Merge another expanded argument list's bindings into this snapshot. Both snapshots must
+    /// originate from the same snapshotter, so their overload indexes have the same order.
+    fn update(&mut self, other: &Self) {
+        for ((index, snapshot), (other_index, binding)) in self
             .matching_overloads
             .iter_mut()
-            .map(|(index, snapshot)| (snapshot, &binding.overloads[*index]))
+            .zip(&other.matching_overloads)
         {
+            debug_assert_eq!(index, other_index);
             if binding.errors.is_empty() {
                 // If the binding has no errors, this means that the current argument list was
                 // evaluated successfully and this is the matching overload.
