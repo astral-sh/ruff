@@ -56,8 +56,7 @@ pub(super) enum AttributeWriteRequirement<'db> {
     ///
     /// `write` is `None` for a read-only member. Qualifiers are retained so assignment inference
     /// can distinguish `Final` and `ClassVar` diagnostics from other non-writable members.
-    /// `receiver_ty` is the receiver used to resolve `write`; for a union or intersection,
-    /// it is the individual element whose setter must be called.
+    /// `receiver_ty` is the receiver used to resolve `write`.
     ProtocolMember {
         receiver_ty: Type<'db>,
         write: Option<ProtocolMemberWriteRequirement<'db>>,
@@ -76,9 +75,6 @@ pub(super) enum AttributeWriteRequirement<'db> {
 }
 
 /// How a writable protocol member validates an assigned value.
-///
-/// The enclosing [`AttributeWriteRequirement::ProtocolMember`] retains the receiver
-/// used to resolve this requirement and invoke descriptor setters.
 pub(super) enum ProtocolMemberWriteRequirement<'db> {
     /// Check the assigned value against a directly representable write type.
     AssignableTo(Type<'db>),
@@ -96,7 +92,7 @@ pub(super) enum ProtocolMemberWriteRequirement<'db> {
 }
 
 impl<'db> ProtocolMemberWriteRequirement<'db> {
-    /// The type accepted by assignment, when expressible as a single type.
+    /// The accepted write type.
     pub(super) fn accepted_type(&self) -> Option<Type<'db>> {
         match self {
             Self::AssignableTo(ty) => Some(*ty),

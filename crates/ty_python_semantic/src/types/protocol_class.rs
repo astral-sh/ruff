@@ -602,13 +602,8 @@ impl<'db> ProtocolInterfaceView<'db> {
                 member
                     .access(ProtocolMemberAccessMode::Class)
                     .write()
-                    .and_then(|write| {
-                        write
-                            .requirement(db, env, Some(receiver_ty))
-                            .map(|requirement| {
-                                requirement.accepted_type().unwrap_or_else(Type::unknown)
-                            })
-                    }),
+                    .and_then(|write| write.requirement(db, env, Some(receiver_ty)))
+                    .and_then(|requirement| requirement.accepted_type()),
                 member.qualifiers(),
             )
         })
@@ -876,8 +871,7 @@ impl<'db> ProtocolInterface<'db> {
         env: &'a ProgramEnvironment<'db>,
     ) -> impl Iterator<Item = (Type<'db>, TypeVarVariance)> + 'a {
         self.members(db).flat_map(move |member| {
-            // Instance methods contribute their bound instance signature, not the unbound
-            // receiver exposed through class access.
+            // Instance methods are checked only through their bound instance signature.
             let is_instance_method = member.is_instance_method();
             [
                 ProtocolMemberAccessMode::Instance,
@@ -1178,7 +1172,7 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
     }
 }
 
-/// A type annotation together with the scope of its `typing.Self` references.
+/// A type annotation in a protocol together with the scope of its `typing.Self` references.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 struct ProtocolAnnotation<'db> {
     ty: Type<'db>,
@@ -2738,6 +2732,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     } else {
                         receiver_ty
                     };
+                    // TODO: Check compatibility with the descriptor's full setter contract
+                    // when its accepted write type cannot be represented, rather than using Unknown.
                     write
                         .requirement(db, env, Some(fallback_ty))
                         .map(|requirement| {
@@ -2967,6 +2963,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.never()
                 }
                 (Some(source), Some(target)) => {
+                    // TODO: Compare the full setter contracts when either descriptor's accepted
+                    // write type cannot be represented, rather than substituting Unknown on that side.
                     let (Some(target), Some(source)) = (
                         target
                             .requirement(db, env, Some(source_type))
