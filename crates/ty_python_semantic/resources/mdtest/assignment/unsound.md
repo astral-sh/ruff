@@ -450,18 +450,20 @@ from typing import Any, cast
 
 value: int
 
+# error: [redundant-cast]
 for value in cast(list[Any], []):  # snapshot: unsound-assignment
     pass
 ```
 
 ```snapshot
 error[unsound-assignment]: Unsound assignment
- --> src/mdtest_snippet.py:5:5
+ --> src/mdtest_snippet.py:6:5
   |
 3 | value: int
   |        --- Expected a subtype of `int` because of this annotation
 4 |
-5 | for value in cast(list[Any], []):  # snapshot: unsound-assignment
+5 | # error: [redundant-cast]
+6 | for value in cast(list[Any], []):  # snapshot: unsound-assignment
   |     ^^^^^ Inferred as `Any`
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it

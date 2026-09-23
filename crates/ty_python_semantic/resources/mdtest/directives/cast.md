@@ -102,6 +102,76 @@ def f(x: RecursiveAlias):
     cast(RecursiveAlias, x)  # error: [redundant-cast]
 ```
 
+## Type context
+
+### Redundant casts
+
+The target type of a cast provides type context for its value. This preserves literal types in
+collections and can make the cast redundant.
+
+```py
+from typing import Literal, cast
+from typing_extensions import cast as extension_cast
+
+x = cast(list[Literal["foo"]], ["foo"])  # error: [redundant-cast]
+reveal_type(x)  # revealed: list[Literal["foo"]]
+
+cast(set[Literal["foo"]], {"foo"})  # error: [redundant-cast]
+cast(dict[str, list[Literal["foo"]]], {"key": ["foo"]})  # error: [redundant-cast]
+cast(tuple[list[Literal["foo"]]], (["foo"],))  # error: [redundant-cast]
+
+cast(list[Literal["foo"]], val=["foo"])  # error: [redundant-cast]
+cast(typ=list[Literal["foo"]], val=["foo"])  # error: [redundant-cast]
+cast(val=["foo"], typ=list[Literal["foo"]])  # error: [redundant-cast]
+cast("list[Literal['foo']]", ["foo"])  # error: [redundant-cast]
+extension_cast(list[Literal["foo"]], ["foo"])  # error: [redundant-cast]
+```
+
+Type context also supplies type arguments for constructor calls and identifies dictionary literals
+as `TypedDict` instances.
+
+```py
+from typing import TypedDict
+
+cast(list[int], list())  # error: [redundant-cast]
+
+class Entry(TypedDict):
+    name: str
+
+cast(Entry, {"name": "foo"})  # error: [redundant-cast]
+```
+
+### Incompatible context
+
+A cast permits its value to have a different type from the target. If the context introduces errors
+within the value, we infer the value again without that context.
+
+```py
+from typing import Callable, TypedDict, cast
+
+class Entry(TypedDict):
+    name: str
+
+cast(Entry, {})
+cast(Entry, {"name": 1})
+cast(Entry, {"name": "foo", "extra": True})
+cast(Callable[[int], str], lambda value: value.upper())
+```
+
+Errors intrinsic to the value are still reported.
+
+```py
+cast(Entry, {"name": missing})  # error: [unresolved-reference]
+cast(Entry, {"name": 1 + "foo"})  # error: [unsupported-operator]
+```
+
+The target is validated once, including when it follows the value as a keyword argument.
+
+```py
+cast(1, [])  # error: [invalid-type-form]
+cast(val=[], typ=1)  # error: [invalid-type-form]
+```
+
 ## Redundant casts of tuple classes with unknown elements
 
 A tuple class with an `Unknown` element is not fully static, even when its other element is `object`
