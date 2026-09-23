@@ -3245,7 +3245,7 @@ impl<'db> PathBound<'db> {
         }
     }
 
-    pub(crate) fn has_lower_inference(&self) -> bool {
+    fn has_lower_inference(&self) -> bool {
         self.evidence_lower.is_some() || self.mixed_lower.is_some()
     }
 
