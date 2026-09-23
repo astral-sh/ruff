@@ -62,14 +62,16 @@ where
         }
     }
 
-    /// Return `None` when evaluation cannot produce either boolean outcome.
+    /// Return `Uninhabited` when evaluation cannot produce either boolean outcome.
     pub(crate) fn truthiness(
         &self,
         expression: &ast::Expr,
         context: ExpressionContext,
-    ) -> Option<Truthiness> {
+    ) -> Truthiness {
         self.evaluate(expression, context)
-            .map(|outcome| outcome.truthiness(self.db, self.env))
+            .map_or(Truthiness::Uninhabited, |outcome| {
+                outcome.truthiness(self.db, self.env)
+            })
     }
 
     /// Check completion without testing the result object's truthiness.
@@ -91,46 +93,48 @@ where
 
         match expression {
             ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
-                let short_circuit = Truthiness::from(op.is_or());
-                let mut result = short_circuit.negate();
+                if context == ExpressionContext::Condition {
+                    let truthiness = values.iter().fold(
+                        Truthiness::from(op.is_and()),
+                        |result, operand| match op {
+                            ast::BoolOp::And => {
+                                result.and_then(|| self.truthiness(operand, context))
+                            }
+                            ast::BoolOp::Or => result.or_else(|| self.truthiness(operand, context)),
+                        },
+                    );
+                    return Some(EvaluationOutcome::Condition(truthiness));
+                }
+
                 for (index, operand) in values.iter().enumerate() {
-                    if context == ExpressionContext::Value && index + 1 == values.len() {
+                    if index + 1 == values.len() {
                         self.evaluate(operand, context)?;
                         return value();
                     }
-                    let Some(truthiness) = self.truthiness(operand, context) else {
-                        return result
-                            .is_ambiguous()
-                            .then_some(EvaluationOutcome::Condition(short_circuit));
-                    };
-                    if truthiness == short_circuit || truthiness.is_ambiguous() {
-                        if context == ExpressionContext::Value {
-                            // A short-circuit path can produce an object. Its truthiness may
-                            // change when the caller tests that object again.
-                            return value();
-                        }
-                        if truthiness == short_circuit {
-                            return Some(EvaluationOutcome::Condition(short_circuit));
-                        }
-                        result = Truthiness::Ambiguous;
+                    let truthiness = self.truthiness(operand, context);
+                    if truthiness.is_uninhabited() {
+                        return None;
+                    }
+                    if truthiness == Truthiness::from(op.is_or()) || truthiness.is_ambiguous() {
+                        // A short-circuit path can produce an object. Its truthiness may
+                        // change when the caller tests that object again.
+                        return value();
                     }
                 }
-                match context {
-                    ExpressionContext::Value => value(),
-                    ExpressionContext::Condition => Some(EvaluationOutcome::Condition(result)),
-                }
+                value()
             }
             ast::Expr::UnaryOp(ast::ExprUnaryOp {
                 op: ast::UnaryOp::Not,
                 operand,
                 ..
-            }) if context == ExpressionContext::Condition => self
-                .truthiness(operand, context)
-                .map(|truthiness| EvaluationOutcome::Condition(truthiness.negate())),
+            }) if context == ExpressionContext::Condition => Some(EvaluationOutcome::Condition(
+                self.truthiness(operand, context).negate(),
+            )),
             ast::Expr::If(ast::ExprIf {
                 test, body, orelse, ..
             }) => {
-                let outcome = match self.truthiness(test, ExpressionContext::Condition)? {
+                let outcome = match self.truthiness(test, ExpressionContext::Condition) {
+                    Truthiness::Uninhabited => None,
                     Truthiness::AlwaysTrue => self.evaluate(body, context),
                     Truthiness::AlwaysFalse => self.evaluate(orelse, context),
                     Truthiness::Ambiguous => {
@@ -144,11 +148,7 @@ where
                             (Some(body), Some(orelse)) => {
                                 let body = body.truthiness(self.db, self.env);
                                 let orelse = orelse.truthiness(self.db, self.env);
-                                Some(EvaluationOutcome::Condition(if body == orelse {
-                                    body
-                                } else {
-                                    Truthiness::Ambiguous
-                                }))
+                                Some(EvaluationOutcome::Condition(body.union(orelse)))
                             }
                         }
                     }

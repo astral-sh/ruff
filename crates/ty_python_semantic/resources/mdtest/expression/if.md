@@ -32,6 +32,9 @@ argument can be bypassed by short-circuiting, even when the call itself has type
 ```py
 from typing_extensions import Never
 
+def _(never: Never):
+    reveal_type(1 if never else 2)  # revealed: Never
+
 def _(flag: bool, never: Never):
     reveal_type(1 if flag or bool(never) else 2)  # revealed: Literal[1]
     reveal_type(1 if flag and bool(never) else 2)  # revealed: Literal[2]
