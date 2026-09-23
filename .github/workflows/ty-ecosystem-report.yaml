@@ -40,6 +40,14 @@ jobs:
         with:
           persist-credentials: false
 
+      # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
+      - name: Fetch full history without tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          git fetch --no-tags --filter=blob:none --unshallow origin
+
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
@@ -63,9 +71,6 @@ jobs:
       - name: Create report
         shell: bash
         run: |
-          # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
-          git fetch --no-tags --filter=blob:none --unshallow origin
-
           echo "Enabling configuration overloads (see .github/ty-ecosystem.toml)"
           mkdir -p ~/.config/ty
           cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
