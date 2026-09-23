@@ -65,15 +65,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Other refs need enough history to find their merge base with main.
+          fetch-depth: ${{ (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') && 2 || 0 }}
           persist-credentials: false
-
-      # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
-      - name: Fetch full history without tags
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh auth setup-git
-          git fetch --no-tags --filter=blob:none --unshallow origin
 
       - name: Determine merge base
         id: merge_base
@@ -86,6 +80,8 @@ jobs:
           else
             sha="$(git merge-base HEAD "origin/${BASE_REF}")"
           fi
+          # A missing comparison must fail planning instead of skipping required jobs.
+          git diff --no-ext-diff --no-textconv --name-only "${sha}...HEAD" > /dev/null
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
       - name: Check if release build inputs changed
@@ -831,14 +827,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 2
           persist-credentials: false
-      # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
-      - name: Fetch full history without tags
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh auth setup-git
-          git fetch --no-tags --filter=blob:none --unshallow origin
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
