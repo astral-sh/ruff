@@ -1225,6 +1225,56 @@ impl<'db> Signature<'db> {
         self.bind_self_with_receiver(db, env, self_type, self_type)
     }
 
+    /// The receiver domain declared by a protocol method, after substituting its `Self`.
+    /// An omitted annotation permits any instance of the implementing class.
+    pub(super) fn protocol_receiver_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        self_type: Type<'db>,
+    ) -> Type<'db> {
+        self.parameters
+            .get(0)
+            .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
+            .map_or(receiver_type, |parameter| {
+                parameter.annotated_type().apply_type_mapping(
+                    db,
+                    env,
+                    &TypeMapping::BindSelf(SelfBinding::new(
+                        db,
+                        env,
+                        self_type,
+                        self.definition.map(BindingContext::Definition),
+                    )),
+                    TypeContext::default(),
+                )
+            })
+    }
+
+    /// Make an implicit receiver explicit when comparing it with a protocol's receiver domain.
+    /// For example, a method declared on `C` cannot accept an unrelated `str` receiver.
+    pub(super) fn with_explicit_receiver(&self, receiver_type: Type<'db>) -> Self {
+        if !self.has_implicit_positional_receiver_annotation() {
+            return self.clone();
+        }
+
+        let parameters = self.parameters.with_transformed_parameters(
+            self.parameters
+                .iter()
+                .cloned()
+                .enumerate()
+                .map(|(index, mut parameter)| {
+                    if index == 0 {
+                        parameter.annotated_type = receiver_type;
+                        parameter.inferred_annotation = false;
+                    }
+                    parameter
+                }),
+        );
+        self.clone().with_parameters(parameters)
+    }
+
     /// Binds the receiver while preserving the relation between its runtime type and annotation.
     ///
     /// `typing_self_type` is used separately to replace `typing.Self`; it differs from
