@@ -1399,3 +1399,13 @@ reason = "kept compatible with the upstream annotate-snippets crate"
 crate = "annotate_snippets"
 file = "crates/ruff_annotate_snippets/src/snippet.rs"
 reason = "kept compatible with the upstream annotate-snippets crate"
+
+[[exclude]]
+crate = "unicode_names2"
+file = "crates/ruff_unicode_names2/src/lib.rs"
+reason = "kept compatible with the upstream unicode_names2 crate"
+
+[[exclude]]
+crate = "unicode_names2_generator"
+file = "crates/ruff_unicode_names2_generator/src/lib.rs"
+reason = "kept compatible with the upstream unicode_names2_generator crate"
