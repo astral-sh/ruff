@@ -3497,14 +3497,14 @@ def _(value: CorrelatedA | CorrelatedB) -> None:
 
 ```snapshot
 error[invalid-argument-type]: Argument to function `takes_int` is incorrect
-   --> src/mdtest_snippet.py:347:15
+   --> src/mdtest_snippet.py:346:15
     |
-347 |     takes_int(set_and_get(value, "a", 1))
+346 |     takes_int(set_and_get(value, "a", 1))
     |               ^^^^^^^^^^^^^^^^^^^^^^^^^^ Expected `int`, found `object`
 info: Function defined here
-   --> src/mdtest_snippet.py:343:5
+   --> src/mdtest_snippet.py:342:5
     |
-343 | def takes_int(value: int) -> None: ...
+342 | def takes_int(value: int) -> None: ...
     |     ^^^^^^^^^ ---------- Parameter declared here
 ```
 
