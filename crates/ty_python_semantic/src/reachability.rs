@@ -201,8 +201,8 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
-        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
+        CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, ExpressionEvaluator,
+        KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
         expand_type, infer_expression_types, infer_narrowing_constraints,
         infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
@@ -211,7 +211,6 @@ use crate::{
 };
 use ruff_db::parsed::parsed_module;
 use ruff_index::{Idx, IndexSlice};
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -221,7 +220,7 @@ use ty_python_core::{
     FileScopeId, NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, SemanticIndex,
     Truthiness, UseDefMap,
     definition::DefinitionState,
-    expression::Expression,
+    expression::{Expression, ExpressionContext},
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
     place::ScopedPlaceId,
     place_table,
@@ -1874,134 +1873,6 @@ fn context_manager_suppresses<'db>(
     )
 }
 
-/// Evaluate a condition without re-testing intermediate short-circuit results.
-///
-/// `None` means evaluation cannot produce a result, as for an operand narrowed to `Never`.
-/// This differs from ambiguous truthiness: in `flag and raises()`, where `raises()` returns
-/// `Never`, only the falsy short-circuit path can complete. For `flag or raises()`, only the
-/// truthy path can complete. Callers that cannot represent the absence of a result can
-/// conservatively map `None` to [`Truthiness::Ambiguous`].
-pub(crate) fn analyze_condition_expression(
-    node: &ast::Expr,
-    leaf_truthiness: &impl Fn(&ast::Expr) -> Option<Truthiness>,
-) -> Option<Truthiness> {
-    match node {
-        ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
-            let short_circuit = Truthiness::from(op.is_or());
-            let mut result = short_circuit.negate();
-            for value in values {
-                let Some(truthiness) = analyze_condition_expression(value, leaf_truthiness) else {
-                    return result.is_ambiguous().then_some(short_circuit);
-                };
-                if truthiness == short_circuit {
-                    return Some(short_circuit);
-                }
-                if truthiness.is_ambiguous() {
-                    result = Truthiness::Ambiguous;
-                }
-            }
-            Some(result)
-        }
-        ast::Expr::UnaryOp(ast::ExprUnaryOp {
-            op: ast::UnaryOp::Not,
-            operand,
-            ..
-        }) => analyze_condition_expression(operand, leaf_truthiness).map(Truthiness::negate),
-        ast::Expr::If(ast::ExprIf {
-            test, body, orelse, ..
-        }) => match analyze_condition_expression(test, leaf_truthiness)? {
-            Truthiness::AlwaysTrue => analyze_condition_expression(body, leaf_truthiness),
-            Truthiness::AlwaysFalse => analyze_condition_expression(orelse, leaf_truthiness),
-            Truthiness::Ambiguous => {
-                let body_truthiness = analyze_condition_expression(body, leaf_truthiness);
-                let orelse_truthiness = analyze_condition_expression(orelse, leaf_truthiness);
-                match (body_truthiness, orelse_truthiness) {
-                    (None, truthiness) | (truthiness, None) => truthiness,
-                    (Some(body), Some(orelse)) => Some(if body == orelse {
-                        body
-                    } else {
-                        Truthiness::Ambiguous
-                    }),
-                }
-            }
-        },
-        _ => leaf_truthiness(node),
-    }
-}
-
-/// Check the operands that an expression must evaluate before producing a result.
-///
-/// An uninhabited operand prevents evaluation even when the expression's type is inhabited, as
-/// in `bool(never)`. Most operands are evaluated as values, so only inspect their truthiness when
-/// deciding whether evaluation can short-circuit. Re-testing an intermediate result's mutable
-/// truthiness can take a different path than testing it directly as a condition.
-pub(crate) fn required_operands_are_inhabited<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    node: &ast::Expr,
-    expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
-) -> bool {
-    let can_complete = |operand: &ast::Expr| {
-        !expression_type(operand).is_equivalent_to(db, env, Type::Never)
-            && required_operands_are_inhabited(db, env, operand, expression_type)
-    };
-    match node {
-        ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
-            let Some((last, preceding)) = values.split_last() else {
-                return true;
-            };
-            let short_circuit = Truthiness::from(op.is_or());
-            for operand in preceding {
-                if !can_complete(operand) {
-                    return false;
-                }
-                let Some(truthiness) = expression_type(operand).bool_if_inhabited(db, env) else {
-                    return false;
-                };
-                if truthiness == short_circuit || truthiness.is_ambiguous() {
-                    return true;
-                }
-            }
-            can_complete(last)
-        }
-        ast::Expr::If(ast::ExprIf {
-            test, body, orelse, ..
-        }) => {
-            match analyze_condition_expression(test, &|operand| {
-                can_complete(operand)
-                    .then(|| expression_type(operand).bool_if_inhabited(db, env))
-                    .flatten()
-            }) {
-                Some(Truthiness::AlwaysTrue) => can_complete(body),
-                Some(Truthiness::AlwaysFalse) => can_complete(orelse),
-                Some(Truthiness::Ambiguous) => can_complete(body) || can_complete(orelse),
-                None => false,
-            }
-        }
-        ast::Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => can_complete(operand),
-        ast::Expr::Named(ast::ExprNamed { value, .. })
-        | ast::Expr::Starred(ast::ExprStarred { value, .. }) => can_complete(value),
-        ast::Expr::Call(call) => {
-            can_complete(&call.func)
-                && call
-                    .arguments
-                    .args
-                    .iter()
-                    .chain(call.arguments.keywords.iter().map(|keyword| &keyword.value))
-                    .all(can_complete)
-        }
-        ast::Expr::Compare(compare) => {
-            // Only the first two operands are guaranteed to be evaluated in a comparison chain.
-            can_complete(compare.first_operand())
-                && compare
-                    .iter()
-                    .next()
-                    .is_none_or(|(_, _, right)| can_complete(right))
-        }
-        _ => true,
-    }
-}
-
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _| Some(Truthiness::Ambiguous),
@@ -2028,16 +1899,13 @@ fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Optio
     let module = parsed_module(db, expression.python_file(db)).load(db);
     let inference = infer_expression_types(db, expression, TypeContext::default());
     let node = expression.node_ref(db).node(&module);
-    analyze_condition_expression(node, &|node| {
-        if !required_operands_are_inhabited(db, &env, node, &|operand| {
-            inference.expression_type(operand)
-        }) {
-            return None;
-        }
-        inference
-            .comparison_truthiness(node)
-            .or_else(|| inference.expression_type(node).bool_if_inhabited(db, &env))
-    })
+    ExpressionEvaluator::new(
+        db,
+        &env,
+        |node| inference.expression_type(node),
+        |node| inference.comparison_truthiness(node),
+    )
+    .truthiness(node, ExpressionContext::Condition)
 }
 
 /// Evaluate a predicate, returning `None` when it cannot produce a boolean outcome.
@@ -2055,12 +1923,8 @@ fn analyze_single(
     Some(match predicate.node {
         PredicateNode::Expression(test_expr) => {
             let inference = infer_expression_types(db, test_expr, TypeContext::default());
-            if inference.has_uninhabited_operands() {
-                return None;
-            }
             inference
-                .expression_type(test_expr.node_ref(db))
-                .bool_if_inhabited(db, env)?
+                .value_truthiness(db, env, test_expr.node_ref(db))?
                 .negate_if(!predicate.is_positive)
         }
         PredicateNode::Condition(test_expr) => {
@@ -2068,17 +1932,8 @@ fn analyze_single(
         }
         PredicateNode::ChainedComparisonCondition(test_expr) => {
             let inference = infer_expression_types(db, test_expr, TypeContext::default());
-            if inference.has_uninhabited_operands() {
-                return None;
-            }
-            let expression = test_expr.node_ref(db);
             inference
-                .comparison_truthiness(expression)
-                .or_else(|| {
-                    inference
-                        .expression_type(expression)
-                        .bool_if_inhabited(db, env)
-                })?
+                .comparison_condition_truthiness(db, env, test_expr.node_ref(db))?
                 .negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {

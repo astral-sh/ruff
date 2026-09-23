@@ -54,7 +54,6 @@ use salsa::plumbing::AsId;
 use std::borrow::Cow;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
-use crate::reachability::required_operands_are_inhabited;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
@@ -78,6 +77,8 @@ mod builder;
 mod implicit_alias;
 pub(super) use implicit_alias::implicit_alias_parameters;
 mod comparisons;
+mod expression_evaluation;
+pub(crate) use expression_evaluation::ExpressionEvaluator;
 #[cfg(test)]
 mod tests;
 
@@ -612,15 +613,21 @@ pub(super) fn infer_expression_types_impl<'db>(
     )
     .finish_expression();
 
-    // Reachability needs to distinguish calls such as `bool(never)` from inhabited values,
-    // without changing their inferred return types or caching a second result for every predicate.
-    if !required_operands_are_inhabited(db, &env, expression.node_ref(db).node(&module), &|node| {
-        inference.expression_type(node)
-    }) {
-        inference
-            .extra
-            .get_or_insert_default()
-            .has_uninhabited_operands = true;
+    let node = expression.node_ref(db).node(&module);
+    // A `Never` result already records non-completion. Retain extra data only when the
+    // expression has an inhabited result type but cannot produce a value, as in `bool(never)`.
+    if !inference
+        .expression_type(node)
+        .is_equivalent_to(db, &env, Type::Never)
+        && !ExpressionEvaluator::new(
+            db,
+            &env,
+            |node| inference.expression_type(node),
+            |node| inference.comparison_truthiness(node),
+        )
+        .can_complete(node)
+    {
+        inference.extra.get_or_insert_default().cannot_complete = true;
     }
     inference
 }
@@ -1954,8 +1961,8 @@ pub(crate) struct ExpressionInference<'db> {
 /// Extra data that only exists for few inferred expression regions.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ExpressionInferenceExtra<'db> {
-    /// The root expression cannot finish evaluating its operands, even if its type is inhabited.
-    has_uninhabited_operands: bool,
+    /// The root expression cannot produce a value despite having an inhabited result type.
+    cannot_complete: bool,
 
     /// Aliases whose type-expression diagnostics are needed by this region.
     implicit_aliases: Box<[Definition<'db>]>,
@@ -1979,9 +1986,9 @@ struct ExpressionInferenceExtra<'db> {
     /// `AlwaysFalse`, but its value type must still include objects returned by the first comparison.
     ///
     /// The same distinction matters for `and`/`or`, but their operands have separate expression
-    /// nodes with inferred types. [`crate::reachability::analyze_condition_expression`] can
-    /// reconstruct their condition truthiness by recursively visiting those operands, without
-    /// relying on the compound expression's value type.
+    /// nodes with inferred types. [`ExpressionEvaluator`] can reconstruct their condition
+    /// truthiness by recursively visiting those operands, without relying on the compound
+    /// expression's value type.
     ///
     /// A comparison chain instead has one `ExprCompare` node with the operands and operators.
     /// In `x < 1 < 0`, neither `x < 1` nor `1 < 0` has its own expression node, so their result
@@ -2015,11 +2022,39 @@ struct ExpressionInferenceExtra<'db> {
 }
 
 impl<'db> ExpressionInference<'db> {
-    /// Whether evaluating a required operand prevents the root expression from producing a value.
-    pub(crate) fn has_uninhabited_operands(&self) -> bool {
+    /// Whether completion is ruled out independently of the root expression's type.
+    fn cannot_complete(&self) -> bool {
         self.extra
             .as_ref()
-            .is_some_and(|extra| extra.has_uninhabited_operands)
+            .is_some_and(|extra| extra.cannot_complete)
+    }
+
+    /// Test the root expression's result object, accounting for non-completion.
+    pub(crate) fn value_truthiness(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Truthiness> {
+        if self.cannot_complete() {
+            return None;
+        }
+        self.expression_type(expression).bool_if_inhabited(db, env)
+    }
+
+    /// Test a root comparison chain directly, without re-testing intermediate results.
+    pub(crate) fn comparison_condition_truthiness(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Truthiness> {
+        if self.cannot_complete() {
+            return None;
+        }
+        let expression = expression.into();
+        self.comparison_truthiness(expression)
+            .or_else(|| self.expression_type(expression).bool_if_inhabited(db, env))
     }
 
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
@@ -2062,7 +2097,7 @@ impl<'db> ExpressionInference<'db> {
             // Widen possible evaluation outcomes along with value types. Once an earlier result
             // could complete, a later iteration cannot exclude that possibility.
             if let Some(extra) = self.extra.as_mut() {
-                extra.has_uninhabited_operands &= previous.has_uninhabited_operands();
+                extra.cannot_complete &= previous.cannot_complete();
             }
         }
 
