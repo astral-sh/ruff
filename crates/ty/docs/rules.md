@@ -2354,7 +2354,7 @@ carol = Person(name="Carol", aeg=25)  # typo!
 ## `invalid-legacy-positional-parameter`
 
 <small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.15">0.0.15</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22invalid-legacy-positional-parameter%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1383" target="_blank">View source</a>
@@ -2373,12 +2373,16 @@ positional-only by type checkers. [PEP 570][pep-570], introduced in Python 3.8, 
 syntax for specifying positional-only parameters, rendering the legacy convention obsolete. However,
 some codebases may still use the legacy convention for compatibility with older Python versions.
 
+This rule is disabled by default because modern code may use `__`-prefixed parameter names for other
+purposes. Enable it if your codebase uses the legacy convention and you want to check that it is
+applied consistently.
+
 **Why is this bad?**
 
 
 In most cases, a type checker will not consider a parameter to be positional-only if it comes after
-a positional-or-keyword parameter, even if its name starts with `__`. This may be unexpected to the
-author of the code.
+a positional-or-keyword parameter, even if its name starts with `__`. This may be unexpected if the
+author intended to use the legacy convention.
 
 **Example**
 
