@@ -931,6 +931,45 @@ def _(obj: GradualReader):
         reveal_type(obj.read())  # revealed: Any & int
 ```
 
+## Materialized `TypeIs` narrowing
+
+A `TypeIs[Any]` guard may materialize to any type, and so it narrows its argument to `Never` in the
+negative branch:
+
+```py
+from typing import Any, Callable
+from typing_extensions import TypeIs
+from ty_extensions import Top
+
+def _(predicate: Callable[[object], TypeIs[Any]], value: int) -> None:
+    if predicate(value):
+        reveal_type(value)  # revealed: int & Any
+    else:
+        reveal_type(value)  # revealed: Never
+```
+
+The top materialization of the guard, however, does not narrow its argument, as it describes the
+union of guards for all static types:
+
+```py
+def _(predicate: Top[Callable[[object], TypeIs[Any]]], value: int) -> None:
+    if predicate(value):
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: int
+```
+
+The static component of a top-materialized gradual `TypeIs` guard constrains the possible
+materializations of its argument:
+
+```py
+def _(predicate: Top[Callable[[object], TypeIs[int | Any]]], value: int | str) -> None:
+    if predicate(value):
+        reveal_type(value)  # revealed: int | str
+    else:
+        reveal_type(value)  # revealed: str
+```
+
 ## `TypeIs` narrowing of `NewType` instances
 
 `NewType` constructors return their arguments unchanged, so an integer-based `NewType` can contain a

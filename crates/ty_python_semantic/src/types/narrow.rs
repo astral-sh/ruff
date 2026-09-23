@@ -4615,7 +4615,13 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let place_and_constraint = match return_ty {
             Type::TypeIs(type_is) => {
                 let (_, place) = type_is.place_info(db)?;
-                let target = type_is.return_type(db);
+                let mut target = type_is.return_type(db);
+
+                if let Some(kind) = type_is.materialization_kind(db) {
+                    let kind = if is_positive { kind } else { kind.flip() };
+                    target = target.materialization(db, &self.env, kind);
+                }
+
                 let use_generic_filtering = is_positive
                     && !db
                         .analysis_settings(self.scope().file(db))

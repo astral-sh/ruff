@@ -1713,7 +1713,26 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     .fmt_detailed(f)?;
                 f.write_str(">")
             }
-            Type::TypeIs(type_is) => fmt_type_guard_like(db, self.env, type_is, &self.settings, f),
+            Type::TypeIs(type_is) => {
+                let materialization = match type_is.materialization_kind(db) {
+                    Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
+                    Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
+                    None => None,
+                };
+
+                if let Some((name, form)) = materialization {
+                    f.with_type(Type::SpecialForm(form)).write_str(name)?;
+                    f.write_char('[')?;
+                }
+
+                fmt_type_guard_like(db, self.env, type_is, &self.settings, f)?;
+
+                if materialization.is_some() {
+                    f.write_char(']')?;
+                }
+
+                Ok(())
+            }
             Type::TypeGuard(type_guard) => {
                 fmt_type_guard_like(db, self.env, type_guard, &self.settings, f)
             }
