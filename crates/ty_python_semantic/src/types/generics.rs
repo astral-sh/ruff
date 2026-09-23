@@ -4128,6 +4128,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 let Ok(generic_element) = types_have_typevars.exactly_one() else {
                     return Ok(());
                 };
+                // Composite members can infer ordinary type variables, but re-inferring `Self`
+                // can widen the receiver's specialization, and variadic inference must preserve
+                // the caller's parameter pack instead of widening it through another union arm.
+                if !generic_element.is_type_var()
+                    && any_over_type(db, self.env, *generic_element, false, |ty| {
+                        ty.as_typevar().is_some_and(|typevar| {
+                            typevar.typevar(db).is_self(db)
+                                || typevar.is_paramspec(db)
+                                || typevar.is_typevartuple(db)
+                        })
+                    })
+                {
+                    return Ok(());
+                }
                 if actual_union.elements(db).iter().any(|ty| ty.is_type_var()) {
                     return Ok(());
                 }
