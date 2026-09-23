@@ -1402,6 +1402,10 @@ impl<'db> Signature<'db> {
         builder.add_constraint_set(when).ok()?;
         let concrete_class_receiver =
             matches!(receiver_type, Type::ClassLiteral(_) | Type::GenericAlias(_));
+        let callable_receiver = generic_context
+            .variables(db)
+            .any(|typevar| typevar.is_paramspec(db))
+            && receiver_type.try_upcast_to_callable(db, env).is_some();
         let specialization = builder.build_merged_with(|typevar, bounds| {
             if let Some(bounds) = bounds
                 && let Some(lower) = bounds.evidence_lower()
@@ -1415,12 +1419,15 @@ impl<'db> Signature<'db> {
                 return Some(solution);
             }
 
+            // A callable receiver supplies its parameter list even when the bound method uses
+            // the ParamSpec only in contravariant parameter positions.
             if let Some(bounds) = bounds
-                && concrete_class_receiver
-                && bound_signature
-                    .variance_of(db, env, typevar.identity(db))
-                    .evaluate(db)
-                    .is_covariant()
+                && (concrete_class_receiver || callable_receiver)
+                && (typevar.is_paramspec(db)
+                    || bound_signature
+                        .variance_of(db, env, typevar.identity(db))
+                        .evaluate(db)
+                        .is_covariant())
                 && bounds
                     .evidence_lower()
                     .is_some_and(|lower| !lower.is_never())
