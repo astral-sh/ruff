@@ -2864,7 +2864,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             BoundTypeVarInstance<'db>,
             Option<&PathBound<'db>>,
         ) -> Option<PathBoundSolution<'db>>,
-    ) -> Result<TypeVarInference<'db>, ()> {
+    ) -> Result<TypeVarInference<'db>, Vec<SpecializationError<'db>>> {
         self.solve_pending_with(SolutionBudget::default(), &mut choose)
     }
 
@@ -2948,8 +2948,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             BoundTypeVarInstance<'db>,
             Option<&PathBound<'db>>,
         ) -> Option<PathBoundSolution<'db>>,
-    ) -> Result<TypeVarInference<'db>, ()> {
+    ) -> Result<TypeVarInference<'db>, Vec<SpecializationError<'db>>> {
         let db = self.db;
+        let mut specialization_errors = Vec::new();
         let inference = self.solve_pending_projection(choose, |builder, choose| {
             let solutions = builder.pending.solutions_with(
                 db,
@@ -2969,7 +2970,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 },
             )?;
             Ok(match solutions {
-                Solutions::Unsatisfiable(_) => SolutionProjection::Unsatisfiable,
+                Solutions::Unsatisfiable(solutions) => {
+                    if let SolutionPaths::Complete(paths) = solutions {
+                        specialization_errors = paths
+                            .iter()
+                            .flat_map(Solution::violations)
+                            .filter_map(|violation| builder.constraint_failure_from_violation(violation))
+                            .map(|failure| failure.error)
+                            .collect();
+                    }
+                    SolutionProjection::Unsatisfiable
+                }
                 Solutions::Unconstrained => SolutionProjection::Unconstrained,
                 Solutions::Constrained(solutions) => {
                     let mut merged_types = FxHashMap::default();
@@ -3000,7 +3011,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     })
                 }
             })
-        })?;
+        })
+        .map_err(|()| specialization_errors)?;
+
         Ok(self.finish_inference(inference, budget))
     }
 
@@ -3538,7 +3551,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .as_slice()
                     .iter()
                     .flat_map(Solution::violations)
-                    .filter_map(Self::constraint_failure_from_violation)
+                    .filter_map(|violation| self.constraint_failure_from_violation(violation))
                     .collect();
                 ConstraintSetAnalysis::Unsatisfiable(failures)
             }
@@ -3581,9 +3594,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
     /// Converts a solver-reported solution violation into a diagnostic failure.
     fn constraint_failure_from_violation(
+        &self,
         violation: &SolutionViolation<'db>,
     ) -> Option<ConstraintFailure<'db>> {
         let bound_typevar = violation.bound_typevar;
+        if !bound_typevar.is_inferable(self.db, self.inferable) {
+            return None;
+        }
+
         let argument = violation.argument?;
         let variance = match violation.variance {
             TypeVarVariance::Contravariant => ConstraintFailureVariance::Contravariant,
@@ -4876,7 +4894,7 @@ mod tests {
 
             let inference = builder
                 .build_inference_with(|_, _| None)
-                .map_err(|()| anyhow::anyhow!("expected satisfiable alternatives"))?;
+                .map_err(|_| anyhow::anyhow!("expected satisfiable alternatives"))?;
             let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
                 anyhow::bail!(
                     "expected complete alternatives, got {:?}",
@@ -4928,7 +4946,7 @@ mod tests {
                                 .is_some_and(|bound| bound.inference_lower(db, &env) == Some(str)))
                         .then_some(PathBoundSolution::BudgetExceeded { fallback })
                     })
-                    .map_err(|()| anyhow::anyhow!("incomplete alternatives remain satisfiable"))?;
+                    .map_err(|_| anyhow::anyhow!("incomplete alternatives remain satisfiable"))?;
                 let TypeVarInferenceSolutions::Incomplete(paths) = inference.solutions(db) else {
                     anyhow::bail!(
                         "expected incomplete alternatives, got {:?}",
@@ -4986,7 +5004,7 @@ mod tests {
                 },
                 &mut |_, _| None,
             )
-            .map_err(|()| anyhow::anyhow!("expected a single solution"))?;
+            .map_err(|_| anyhow::anyhow!("expected a single solution"))?;
         assert_eq!(inference.solutions(db), &TypeVarInferenceSolutions::Single);
         assert_eq!(inference.merged_types(db), [Some(int), None]);
         assert_eq!(
@@ -5015,7 +5033,7 @@ mod tests {
 
         let unconstrained = builder
             .build_inference_with(|_, _| None)
-            .map_err(|()| anyhow::anyhow!("unconstrained inference should recover"))?;
+            .map_err(|_| anyhow::anyhow!("unconstrained inference should recover"))?;
         assert_eq!(
             unconstrained.solutions(db),
             &TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::Unconstrained)
@@ -5093,7 +5111,7 @@ mod tests {
                     choices += 1;
                     None
                 })
-                .map_err(|()| anyhow::anyhow!("budget exhaustion should recover"))?;
+                .map_err(|_| anyhow::anyhow!("budget exhaustion should recover"))?;
 
             assert_eq!(choices, expected_choices);
             assert_eq!(
@@ -5134,7 +5152,7 @@ mod tests {
                     },
                     &mut |_, _| None,
                 )
-                .map_err(|()| anyhow::anyhow!("alternative storage exhaustion should recover"))?;
+                .map_err(|_| anyhow::anyhow!("alternative storage exhaustion should recover"))?;
 
             assert_eq!(
                 inference.merged_types(db),
@@ -5195,7 +5213,7 @@ mod tests {
                     && bounds.is_some_and(|bound| bound.inference_lower(db, &env) == Some(str)))
                 .then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
-            .map_err(|()| anyhow::anyhow!("expected satisfiable alternatives"))?;
+            .map_err(|_| anyhow::anyhow!("expected satisfiable alternatives"))?;
         let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
             anyhow::bail!(
                 "expected complete alternatives, got {:?}",
@@ -5245,7 +5263,7 @@ mod tests {
                 };
                 Some(PathBoundSolution::Solved(ty))
             })
-            .map_err(|()| anyhow::anyhow!("an expanding cycle should recover"))?;
+            .map_err(|_| anyhow::anyhow!("an expanding cycle should recover"))?;
         let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
             anyhow::bail!("expected complete alternatives with an unresolved cycle");
         };
@@ -5299,7 +5317,7 @@ mod tests {
             .build_inference_with(|typevar, _| {
                 (typevar == t).then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
-            .map_err(|()| anyhow::anyhow!("expected a satisfiable dependency chain"))?;
+            .map_err(|_| anyhow::anyhow!("expected a satisfiable dependency chain"))?;
         let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
             anyhow::bail!("resolved bindings differ from the merged projection");
         };
@@ -5340,7 +5358,7 @@ mod tests {
             .build_inference_with(|typevar, _| {
                 (typevar == t).then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
-            .map_err(|()| anyhow::anyhow!("a missing dependency remains satisfiable"))?;
+            .map_err(|_| anyhow::anyhow!("a missing dependency remains satisfiable"))?;
         let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
             anyhow::bail!("expected a retained unresolved dependency");
         };
@@ -5371,7 +5389,7 @@ mod tests {
                     t
                 })))
             })
-            .map_err(|()| anyhow::anyhow!("an unanchored cycle remains satisfiable"))?;
+            .map_err(|_| anyhow::anyhow!("an unanchored cycle remains satisfiable"))?;
         let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
             anyhow::bail!("expected a retained unresolved cycle");
         };
@@ -5415,7 +5433,7 @@ mod tests {
                     None
                 }
             })
-            .map_err(|()| anyhow::anyhow!("a cyclic alternative remains satisfiable"))?;
+            .map_err(|_| anyhow::anyhow!("a cyclic alternative remains satisfiable"))?;
         let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
             anyhow::bail!("expected a retained cyclic alternative");
         };
@@ -5467,7 +5485,7 @@ mod tests {
             .build_inference_with(|typevar, _| {
                 (typevar == t).then_some(PathBoundSolution::Solved(Type::TypeVar(outer)))
             })
-            .map_err(|()| anyhow::anyhow!("an outer dependency remains satisfiable"))?;
+            .map_err(|_| anyhow::anyhow!("an outer dependency remains satisfiable"))?;
         let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
             anyhow::bail!("expected resolved alternatives containing the outer type variable");
         };

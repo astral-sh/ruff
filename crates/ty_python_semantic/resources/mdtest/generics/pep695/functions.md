@@ -859,6 +859,204 @@ info: Type variable defined here
   |       ^^^^^^^^^^^^^^
 ```
 
+## Conflicting arguments against a constrained typevar
+
+All arguments of a generic call must be assignable to the chosen bound of a constrained type
+variable. If call inference falls back to a union that violates the constraints of a given type
+variable, the failure diagnostic will still be reported:
+
+```py
+def f[T: (int, str)](x: T, y: T) -> T:
+    return x
+
+def _(x: int, y: str) -> None:
+    reveal_type(f(x, x))  # revealed: int
+
+    # snapshot: invalid-argument-type
+    reveal_type(f(x, y))  # revealed: int | str
+    # error: [invalid-argument-type]
+    reveal_type(f(y, x))  # revealed: str | int
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+ --> src/mdtest_snippet.py:8:17
+  |
+8 |     reveal_type(f(x, y))  # revealed: int | str
+  |                 ^^^^^^^ Argument type `int | str` does not satisfy constraints (`int`, `str`) of type variable `T`
+info: Type variable defined here
+ --> src/mdtest_snippet.py:1:7
+  |
+1 | def f[T: (int, str)](x: T, y: T) -> T:
+  |       ^^^^^^^^^^^^^
+```
+
+The same applies when the type variable is inferred through a covariant wrapper:
+
+```py
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def combine[T: (int, str)](box: Covariant[T], value: T) -> T:
+    return value
+
+def _(box: Covariant[int], value: str) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(combine(box, value))  # revealed: int | str
+```
+
+Or through a type alias:
+
+```py
+type Alias[T] = Covariant[T]
+
+def combine_alias[T: (int, str)](box: Alias[T], value: T) -> T:
+    return value
+
+def _(box: Covariant[int], value: str) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(combine_alias(box, value))  # revealed: int | str
+```
+
+If arguments disagree on the constraints of multiple type variables, a diagnostic for each
+unsatisfied constraint will be reported:
+
+```py
+def g[T: (int, str), U: (bytes, float)](a: T, b: T, c: U, d: U) -> None:
+    pass
+
+def _(x: int, y: str, z: bytes, w: float) -> None:
+    # error: [invalid-argument-type] "Argument type `int | str` does not satisfy constraints (`int`, `str`) of type variable `T`"
+    # error: [invalid-argument-type] "Argument type `bytes | float` does not satisfy constraints (`bytes`, `float`) of type variable `U`"
+    g(x, y, z, w)
+```
+
+Note that a gradual type is compatible with any declared constraint:
+
+```py
+from typing import Any
+
+def _(value: Any, text: str) -> None:
+    reveal_type(f(value, text))  # revealed: str
+```
+
+## Diagnostic recovery with conflicting bounds
+
+If conflicting invariant arguments create an unsatisfiable set of constraints for a given
+constrained type variable, a diagnostic should still be reported for the unsatisfied declared
+constraint:
+
+```py
+def f[T: (int, str)](x: list[T], y: list[T]) -> T:
+    return x[0]
+
+def _(x: list[int], y: list[str]) -> None:
+    # TODO: error: [invalid-argument-type] "Argument type `int | str` does not satisfy constraints (`int`, `str`) of type variable `T`"
+    # error: [invalid-argument-type] "Expected `list[int | str]`, found `list[int]`"
+    # error: [invalid-argument-type] "Expected `list[int | str]`, found `list[str]`"
+    reveal_type(f(x, y))  # revealed: int | str
+```
+
+Similarly, the unsatisfiable constraints of a given type variable should not suppress diagnostics
+from an unrelated type variable whose declared constraints are not satisfied:
+
+```py
+def g[T: (int, str), U](x: T, y: T, a: list[U], b: list[U]) -> T:
+    return x
+
+def _(x: int, y: str, a: list[int], b: list[str]) -> None:
+    # TODO: error: [invalid-argument-type] "Argument type `int | str` does not satisfy constraints (`int`, `str`) of type variable `T`"
+    # error: [invalid-argument-type] "Expected `list[int | str]`, found `list[int]`"
+    # error: [invalid-argument-type] "Expected `list[int | str]`, found `list[str]`"
+    reveal_type(g(x, y, a, b))  # revealed: int | str
+```
+
+## Diagnostic recovery with outer typevars
+
+If a failed argument relation involves an outer bounded type variable, we report the incompatible
+argument without reporting the outer type variable as unsatisfiable:
+
+```py
+from typing import Callable
+
+type Nested[T] = list[Nested[T]]
+
+def f[T](callback: Callable[[T], None], value: T) -> None:
+    pass
+
+def outer[U: int](value: list[U], callback: Callable[[Nested[U]], None]) -> None:
+    # error: [invalid-argument-type] "Expected `(list[Nested[U@outer]] | list[U@outer], /) -> None`, found `(Nested[U@outer], /) -> None`"
+    f(callback, value)
+```
+
+## Overload selection with conflicting constrained arguments
+
+An overload arm which does not satisfy the bounds of a constrained type variable should not be
+chosen through a recovery specialization:
+
+```py
+from typing import Literal, overload
+
+@overload
+def f[T: (int, str)](x: T, y: T) -> Literal[True]: ...
+@overload
+def f(x: object, y: object) -> Literal[False]: ...
+def f(x: object, y: object) -> bool:
+    return True
+
+reveal_type(f(1, 2))  # revealed: Literal[True]
+reveal_type(f("a", "b"))  # revealed: Literal[True]
+
+reveal_type(f(1, "a"))  # revealed: Literal[False]
+reveal_type(f("a", 1))  # revealed: Literal[False]
+```
+
+## Conflicting overloads against a constrained typevar
+
+If every overload conflicts with the bounds of a constrained type variable, we report the diagnostic
+from a single failing alternative:
+
+```py
+from typing import Callable, overload
+
+@overload
+def source(value: int) -> int: ...
+@overload
+def source(value: bytes) -> bytes: ...
+def source(value: int | bytes) -> int | bytes:
+    return value
+
+def f[T: (int, str, bytes)](callback: Callable[..., T], value: T) -> T:
+    return value
+
+def _(value: str) -> None:
+    reveal_type(f(source, 1))  # revealed: int
+    reveal_type(f(source, b"a"))  # revealed: bytes
+
+    # error: [invalid-argument-type] "Argument type `int | str` does not satisfy constraints (`int`, `str`, `bytes`)"
+    f(source, value)
+```
+
+If the overloads fail due to the constraints of different type variables, we report a single failure
+for each type variable:
+
+```py
+@overload
+def source_pair(value: int) -> tuple[int, str]: ...
+@overload
+def source_pair(value: str) -> tuple[str, int]: ...
+def source_pair(value: int | str) -> tuple[int, str] | tuple[str, int]:
+    raise NotImplementedError
+
+def g[U: (int, str), V: (int, str)](callback: Callable[..., tuple[U, V]], x: U, y: V) -> None:
+    pass
+
+# error: [invalid-argument-type] "of type variable `U`"
+# error: [invalid-argument-type] "of type variable `V`"
+g(source_pair, 1, 1)
+```
+
 ## Typevar constraints
 
 If a type parameter has an upper bound, that upper bound constrains which types can be used for that
