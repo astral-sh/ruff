@@ -1501,7 +1501,6 @@ fn resolve_component<'db>(
         // Packages with an initializer take precedence over file modules.
         candidate.module = ResolvedModule::Package(init);
         candidate.py_typed = subdirectory
-            .path()
             .py_typed(context)
             .inherit_parent(candidate.py_typed);
     } else if let Some(file_module) =
@@ -1536,7 +1535,6 @@ fn resolve_component<'db>(
         {
             candidate.module = ResolvedModule::NamespacePackage;
             candidate.py_typed = subdirectory
-                .path()
                 .py_typed(context)
                 .inherit_parent(candidate.py_typed);
         } else {
@@ -1674,7 +1672,7 @@ impl PyTyped {
 pub(super) struct ResolverContext<'db> {
     pub(super) db: &'db dyn Db,
     pub(super) resolver_environment: ResolverEnvironment<'db>,
-    pub(super) mode: ModuleResolveMode,
+    mode: ModuleResolveMode,
 }
 
 impl<'db> ResolverContext<'db> {
