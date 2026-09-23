@@ -3594,40 +3594,26 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
-        let mut normalized = self.pending_narrowing_normalized(db, env, |ty| {
-            ty.is_recursive_divergent()
-                && cycle
+        let normalized =
+            self.pending_narrowing_normalized(db, env, Type::divergent(cycle.id()), &|ty| {
+                cycle
                     .head_ids()
                     .any(|id| ty.same_divergent_marker(Type::divergent(id)))
-        });
-        // A constructor around an unresolved value can grow recursively on subsequent
-        // iterations. Seed its approximation with this query's own recursive marker.
-        // A bare pending value does not establish any recursive structure.
-        if normalized.is_pending_narrowing()
-            && matches!(
-                self,
-                Type::NominalInstance(_)
-                    | Type::GenericAlias(_)
-                    | Type::Callable(_)
-                    | Type::FunctionLiteral(_)
-                    | Type::BoundMethod(_)
-            )
-        {
-            normalized = Type::divergent(cycle.id());
-        }
+            });
         cycle.head_ids().fold(normalized, |ty, id| {
             ty.recursive_type_normalized_impl(db, env, Type::divergent(id), false)
                 .unwrap_or(Type::divergent(id))
         })
     }
 
-    /// Discard contributions that depend on unresolved narrowing. A pending marker carries no
-    /// recursive identity and must not make a union recursively defined.
+    /// Discard unresolved narrowing while preserving recursive structure around it. A bare
+    /// pending marker carries no recursive identity and must not make a union recursively defined.
     fn pending_narrowing_normalized(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        is_cycle_marker: impl Fn(Self) -> bool,
+        recursive: Self,
+        is_cycle_marker: &impl Fn(Self) -> bool,
     ) -> Self {
         let contains_pending = |ty| {
             any_over_type_including_alias_arguments(db, env, ty, |ty| ty.is_pending_narrowing())
@@ -3645,7 +3631,12 @@ impl<'db> Type<'db> {
                 for &element in union.elements(db) {
                     // A bare marker for this cycle provides no independent type information
                     // either. Preserve markers from other queries and nested recursive types.
-                    if !is_cycle_marker(element) && !contains_pending(element) {
+                    if is_cycle_marker(element) {
+                        continue;
+                    }
+                    let element =
+                        element.pending_narrowing_normalized(db, env, recursive, is_cycle_marker);
+                    if !element.is_pending_narrowing() {
                         builder.add_in_place(element);
                     }
                 }
@@ -3653,6 +3644,25 @@ impl<'db> Type<'db> {
                     Self::pending_narrowing()
                 } else {
                     builder.build()
+                }
+            }
+            Type::NominalInstance(_)
+            | Type::GenericAlias(_)
+            | Type::Callable(_)
+            | Type::FunctionLiteral(_)
+            | Type::BoundMethod(_) => {
+                // Preserve the constructor with this query's recursive marker in its unresolved
+                // parts. Dropping `list[PendingNarrowing]` from `int | list[PendingNarrowing]`
+                // would leave no marker to stop subsequent iterations from growing nested lists.
+                let normalized = self
+                    .recursive_type_normalized_impl(db, env, recursive, false)
+                    .unwrap_or(recursive);
+                // Some stored metadata, such as a callable's generic context, is opaque to
+                // recursive normalization. Use a recursive placeholder until that metadata resolves.
+                if contains_pending(normalized) {
+                    recursive
+                } else {
+                    normalized
                 }
             }
             _ => Self::pending_narrowing(),
@@ -3682,7 +3692,20 @@ impl<'db> Type<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        if nested && self.same_divergent_marker(div) {
+        if nested && (self.same_divergent_marker(div) || self.is_pending_narrowing()) {
+            return None;
+        }
+        // These types stay opaque, but pending values in their stored arguments, bounds, or
+        // fields still invalidate the enclosing constructor's approximation.
+        if nested
+            && matches!(
+                self,
+                Type::TypeAlias(_) | Type::Recursive(_) | Type::TypedDict(_) | Type::TypeVar(_)
+            )
+            && any_over_type_including_alias_arguments(db, env, self, |ty| {
+                ty.is_pending_narrowing()
+            })
+        {
             return None;
         }
         match self {

@@ -33,36 +33,33 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
-## Reassigning an inherited attribute
+## Assigning a bound method in a loop
 
-Assigning a narrowed value back to an inherited attribute does not widen the attribute's type. The
-inferred type does not depend on whether we first check the code that reads the attribute or the
-code that initializes it.
-
-`redundant-condition-strict` follows the tested value's definitions to check for exemptions, such as
-conditions derived from `sys.platform`. Resolving those definitions creates an inference cycle here,
-which must not add `Divergent` to the attribute's type.
-
-```toml
-[rules]
-redundant-condition-strict = "error"
-```
+Loop narrowing preserves a bound method's receiver type when inferring an implicit attribute,
+without introducing `Divergent` into the attribute's type.
 
 ```py
-def check(child: "Child"):
-    reveal_type(child.value)  # revealed: str | int
-
-class Base:
-    def __init__(self, value: str | int):
-        self.value = value
-
-class Child(Base):
+class C:
     def __init__(self):
-        # error: [redundant-condition-strict]
-        value = self.value if self.value is not None else None
-        if isinstance(value, str):
-            value = value.strip()
-            self.value = value
+        self.value = 0
+        while isinstance(self.value, int):
+            self.value = [self.value].copy
+
+reveal_type(C().value)  # revealed: int | (() -> list[int])
+```
+
+## Wrapping an attribute in a loop
+
+Recursive container assignments converge even when a loop predicate narrows the attribute.
+
+```py
+class C:
+    def __init__(self):
+        self.value = [0]
+        while isinstance(self.value, list):
+            self.value = [self.value]
+
+reveal_type(C().value)  # revealed: list[int] | list[Divergent]
 ```
 
 ## Concatenating recursively growing tuples
