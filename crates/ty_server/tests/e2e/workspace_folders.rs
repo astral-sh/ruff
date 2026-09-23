@@ -3,6 +3,7 @@ use insta::assert_snapshot;
 use lsp_types::{
     Contents, DocumentDiagnosticReport, Position, RegistrationRequest,
     TextDocumentContentChangeEvent, UnregistrationRequest, WorkspaceDiagnosticReport,
+    WorkspaceSymbolParams, WorkspaceSymbolRequest,
 };
 use ruff_db::system::SystemPath;
 use ruff_python_trivia::textwrap::dedent;
@@ -18,6 +19,107 @@ use crate::{
         shutdown_and_await_workspace_diagnostic,
     },
 };
+
+#[test]
+fn standalone_workspace_round_trip_preserves_current_open_buffers() {
+    for root in [SystemPath::new(""), SystemPath::new("project")] {
+        let main = root.join("main.py");
+        let closed = root.join("closed.py");
+        let mut server = TestServerBuilder::new()
+            .expect("create server")
+            .with_initialization_options(
+                &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            )
+            .with_file(&main, "")
+            .expect("write main file")
+            .with_file(&closed, "class ClosedSymbol: pass")
+            .expect("write closed file")
+            .enable_workspace_diagnostic_refresh(true)
+            .build();
+        server.open_text_document(&main, "first_missing", 1);
+        server.open_text_document(&closed, "second_missing", 1);
+        assert_eq!(
+            server.workspace_diagnostic_request(None, None).items.len(),
+            2
+        );
+        assert!(!has_closed_symbol(&mut server));
+
+        server
+            .add_workspace_folder(root, None)
+            .expect("register workspace");
+        server.change_workspace_folders([root], []);
+        server = server.wait_until_workspaces_are_initialized();
+        server.await_diagnostic_refresh();
+        assert_eq!(
+            condensed_document_diagnostic_snapshot(server.document_diagnostic_request(&main, None)),
+            "0:0..0:13[ERROR]: Name `first_missing` used when not defined",
+        );
+        server.close_text_document(&closed);
+        assert!(has_closed_symbol(&mut server));
+        server.change_text_document(
+            &main,
+            vec![
+                TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                    lsp_types::TextDocumentContentChangeWholeDocument {
+                        text: "latest_missing".to_string(),
+                    },
+                ),
+            ],
+            2,
+        );
+        server.change_workspace_folders([], [root]);
+        server.await_diagnostic_refresh();
+        assert_eq!(
+            condensed_document_diagnostic_snapshot(server.document_diagnostic_request(&main, None)),
+            "0:0..0:14[ERROR]: Name `latest_missing` used when not defined",
+        );
+        assert!(!has_closed_symbol(&mut server));
+        let diagnostics = server.workspace_diagnostic_request(None, None);
+        assert_eq!(diagnostics.items.len(), 1);
+        server.close_text_document(&main);
+    }
+}
+
+#[test]
+fn leaving_the_last_workspace_restores_standalone_settings_and_push_diagnostics() {
+    let path = SystemPath::new("project/main.py");
+    let root = SystemPath::new("project");
+    let mut server = TestServerBuilder::new()
+        .expect("create server")
+        .with_file(path, "missing")
+        .expect("write source")
+        .enable_pull_diagnostics(false)
+        .build();
+    server.open_text_document(path, "missing", 1);
+    let diagnostics = server.await_notification::<lsp_types::PublishDiagnosticsNotification>();
+    assert_eq!(diagnostics.diagnostics.len(), 1);
+    assert!(server.hover_request(path, Position::new(0, 1)).is_some());
+
+    server
+        .add_workspace_folder(
+            root,
+            Some(ClientOptions {
+                global: GlobalOptions {
+                    diagnostic_mode: Some(DiagnosticMode::Off),
+                    ..Default::default()
+                },
+                workspace: WorkspaceOptions {
+                    disable_language_services: Some(true),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }),
+        )
+        .expect("register workspace settings");
+    server.change_workspace_folders([root], []);
+    server = server.wait_until_workspaces_are_initialized();
+    assert!(server.hover_request(path, Position::new(0, 1)).is_none());
+
+    server.change_workspace_folders([], [root]);
+    let restored = server.await_notification::<lsp_types::PublishDiagnosticsNotification>();
+    assert_eq!(restored.diagnostics.len(), 1);
+    assert!(server.hover_request(path, Position::new(0, 1)).is_some());
+}
 
 /// A file-valued workspace initializes successfully and discovers its parent configuration.
 #[test]
@@ -1025,4 +1127,13 @@ fn assert_hover(server: &mut TestServer, path: &SystemPath, position: Position, 
         panic!("expected markup");
     };
     assert_eq!(markup.value, expected);
+}
+
+fn has_closed_symbol(server: &mut TestServer) -> bool {
+    server
+        .send_request_await::<WorkspaceSymbolRequest>(WorkspaceSymbolParams {
+            query: "ClosedSymbol".to_string(),
+            ..Default::default()
+        })
+        .is_some()
 }

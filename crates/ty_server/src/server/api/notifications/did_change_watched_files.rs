@@ -71,9 +71,8 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
 
         let client_capabilities = session.client_capabilities();
         let roots: Vec<_> = session
-            .workspaces()
-            .into_iter()
-            .map(|(root, _)| root.clone())
+            .project_paths()
+            .map(ruff_db::system::SystemPath::to_path_buf)
             .collect();
         for root in roots {
             tracing::debug!("Applying changes to `{root}`");
