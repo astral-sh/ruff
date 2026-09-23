@@ -323,7 +323,7 @@ fn split(hash: u64) -> (u32, u32, u32) {
     )
 }
 
-/// Get a character from a normalized alias name, returning `None` if it is not found.
+/// Get alias value from alias name, returns `None` if the alias is not found.
 fn character_by_alias(name: &[u8]) -> Option<char> {
     ALIASES.get(name).copied()
 }
@@ -678,8 +678,7 @@ mod tests {
 
     #[test]
     fn character_by_alias() {
-        assert_eq!(super::character_by_alias(b"NEWLINE"), Some('\n'));
-        assert_eq!(super::character_by_alias(b"NEW LINE"), None);
+        assert_eq!(super::character_by_alias(b"NEW LINE"), Some('\n'));
         assert_eq!(super::character_by_alias(b"BACKSPACE"), Some('\u{8}'));
         assert_eq!(super::character_by_alias(b"NOT AN ALIAS"), None);
     }
@@ -694,14 +693,6 @@ mod tests {
         assert_eq!(character("tibetan letter  -   a"), Some('\u{F60}'));
         assert_eq!(character("tibetan letter_-_a"), Some('\u{F60}'));
         assert_eq!(character("latinSMALLletterA"), Some('a'));
-
-        assert_eq!(character("CARRIAGE RETURN"), Some('\r'));
-        assert_eq!(
-            character("CHARACTER TABULATION WITH JUSTIFICATION"),
-            Some('\u{89}')
-        );
-        assert_eq!(character("FORM FEED"), Some('\u{c}'));
-        assert_eq!(character("carriage_return"), Some('\r'));
 
         // Test exceptions related to U+1180
         let jungseong_oe = Some('\u{116C}');

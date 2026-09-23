@@ -481,9 +481,6 @@ pub fn generate(unicode_data: &'static str, path: Option<&Path>, truncate: Optio
 pub fn generate_aliases(name_aliases: &'static str, path: &Path) {
     let mut aliases = phf_codegen::Map::new();
     for Alias { code, alias, .. } in get_aliases(name_aliases).into_iter() {
-        let cp = u32::from_str_radix(code, 16).unwrap();
-        let c = char::from_u32(cp).unwrap();
-        let alias = normalise_name(alias, c);
         let formatted = format!("'\\u{{{code}}}'");
         aliases.entry(alias, &formatted);
     }
