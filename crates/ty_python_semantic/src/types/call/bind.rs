@@ -5617,6 +5617,24 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
     }
 }
 
+/// Call-wide constraints and contextual preferences remain available while arguments are checked.
+/// A provisional specialization lets argument checking use the evidence collected so far without
+/// replacing the original return type or discarding the constraints that produced it.
+struct PendingCallInference<'db, 'c> {
+    builder: SpecializationBuilder<'db, 'c>,
+
+    /// Preferred types extracted from the expected result type.
+    ///
+    /// For example, a return type of `list[T]` in a `list[object]` context suggests `T = object`.
+    /// These choices are used only when compatible with the argument evidence; the original
+    /// contextual annotation is not stored here.
+    preferred_type_mappings: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+
+    /// Whether computing the preferred types hit a limit on how large a type can grow.
+    /// If these preferences are used, the call's inference result must also be marked incomplete.
+    preferred_solutions_incomplete: bool,
+}
+
 struct ArgumentTypeChecker<'a, 'db> {
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
@@ -5633,6 +5651,16 @@ struct ArgumentTypeChecker<'a, 'db> {
     is_partial_application: bool,
 
     inferable_typevars: TypeVarSet<'db>,
+
+    /// Pending inference containing the constraints and preferred type mappings from the
+    /// surrounding context.
+    ///
+    /// Adding constraints to this requires [refreshing the inference][`Self::refresh_inference`]
+    /// before using the solutions. This will be [`None`] for non-generic calls.
+    pending_inference: Option<PendingCallInference<'db, 'a>>,
+
+    /// Latest inference result, used for argument checks and final return-type specialization.
+    /// This can be refreshed from `pending_inference` as more evidence becomes available.
     inference: Option<TypeVarInference<'db>>,
 
     /// Argument indices for which specialization inference has already produced a sufficiently
@@ -5757,6 +5785,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             errors,
             is_partial_application,
             inferable_typevars: TypeVarSet::None,
+            pending_inference: None,
             inference: None,
             constraint_set_errors: vec![false; arguments.len()],
         }
@@ -5994,7 +6023,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .map(|inference| inference.merged_specialization(db))
     }
 
-    fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
+    fn start_inference(&mut self, constraints: &'a ConstraintSetBuilder<'db>) {
         let db = self.db;
         let Some(generic_context) = self.signature.generic_context else {
             return;
@@ -6196,6 +6225,22 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         self.errors.extend(specialization_errors);
 
+        self.pending_inference = Some(PendingCallInference {
+            builder,
+            preferred_type_mappings,
+            preferred_solutions_incomplete,
+        });
+        self.refresh_inference(constraints);
+    }
+
+    /// Refresh the provisional solution after collecting constraints. Argument validation and
+    /// finalization can reuse it until new evidence changes the pending inference problem.
+    fn refresh_inference(&mut self, constraints: &ConstraintSetBuilder<'db>) {
+        let db = self.db;
+        let Some(mut pending) = self.pending_inference.take() else {
+            return;
+        };
+
         // Attempt to promote any promotable types assigned to the specialization.
         // The hook receives (typevar, bounds) and returns Some(solution) to override the default
         // solution, or None to keep it.
@@ -6256,7 +6301,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         };
 
         let mut choose = |typevar: BoundTypeVarInstance<'db>, bounds: Option<&PathBound<'db>>| {
-            let preferred_ty = preferred_type_mappings.get(&typevar.identity(db)).copied();
+            let preferred_ty = pending
+                .preferred_type_mappings
+                .get(&typevar.identity(db))
+                .copied();
 
             if let Some(bounds) = bounds {
                 let lower = bounds.evidence_lower()?;
@@ -6267,7 +6315,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             // A contextual fallback remains incomplete when selected for the call.
             preferred_ty.map(|ty| {
-                if preferred_solutions_incomplete {
+                if pending.preferred_solutions_incomplete {
                     PathBoundSolution::BudgetExceeded { fallback: Some(ty) }
                 } else {
                     PathBoundSolution::Solved(ty)
@@ -6275,18 +6323,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             })
         };
 
-        let inference = match builder.build_inference_with(&mut choose) {
+        let inference = match pending.builder.build_inference_with(&mut choose) {
             Ok(inference) => inference,
-            Err(()) => builder.build_diagnostic_inference_with(
+            Err(()) => pending.builder.build_diagnostic_inference_with(
                 self.argument_relations()
                     .map(|relation| (relation.declared_type, relation.argument_type)),
                 choose,
             ),
         };
-        let specialization = inference.merged_specialization(db);
-
-        self.return_ty = self.return_ty.apply_specialization(db, specialization);
         self.inference = Some(inference);
+        self.pending_inference = Some(pending);
     }
 
     /// Infers a variadic type variable tuple from every argument matched to `*args`.
@@ -7209,7 +7255,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        (self.inferable_typevars, self.inference, self.return_ty)
+        let return_ty = self.return_ty.apply_optional_specialization(
+            self.db,
+            self.inference
+                .map(|inference| inference.merged_specialization(self.db)),
+        );
+        (self.inferable_typevars, self.inference, return_ty)
     }
 }
 
@@ -8136,7 +8187,7 @@ impl<'db> Binding<'db> {
 
         // If this overload is generic, first see if we can infer a specialization of the function
         // from the arguments that were passed in.
-        checker.infer_specialization(constraints);
+        checker.start_inference(constraints);
         checker.check_argument_types(constraints);
 
         (self.inferable_typevars, self.inference, self.return_ty) = checker.finish();
