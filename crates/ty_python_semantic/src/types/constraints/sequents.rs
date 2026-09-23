@@ -580,7 +580,14 @@ impl<'db> Constraint<'db> {
         let when = lower
             .bound()
             .when_constraint_set_assignable_to_owned(db, env, upper.bound());
-        Self::add_constraint_set_implication(map, lower.into(), upper.into(), when.as_ref());
+        let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());
+        Self::add_constraint_set_implication(
+            map,
+            provenance,
+            lower.into(),
+            upper.into(),
+            when.as_ref(),
+        );
     }
 
     fn add_sequents_for_equivalence(
@@ -599,12 +606,20 @@ impl<'db> Constraint<'db> {
                 lower
                     .bound()
                     .when_constraint_set_equivalent_to_owned(db, env, upper.bound());
-            Self::add_constraint_set_implication(map, lower.into(), upper.into(), when.as_ref());
+            let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());
+            Self::add_constraint_set_implication(
+                map,
+                provenance,
+                lower.into(),
+                upper.into(),
+                when.as_ref(),
+            );
         }
     }
 
     fn add_constraint_set_implication(
         map: &mut SequentMap<'db>,
+        provenance: ConstraintProvenance,
         lower_constraint: Self,
         upper_constraint: Self,
         when: &OwnedConstraintSet<'db>,
@@ -668,7 +683,9 @@ impl<'db> Constraint<'db> {
                     Node::AlwaysTrue | Node::AlwaysFalse => break,
                     Node::Interior(interior) => {
                         let interior = storage.interior_node_data(interior.node());
-                        let derived = storage.constraint_data(interior.constraint);
+                        let derived = storage
+                            .constraint_data(interior.constraint)
+                            .with_provenance(provenance);
                         if interior.if_true != ALWAYS_FALSE {
                             map.add_pair_implication(lower_constraint, upper_constraint, derived);
                             node = interior.if_true;
@@ -1320,6 +1337,14 @@ impl<'db> ConcreteLowerBound<'db> {
             return;
         }
 
+        // Gradual assignability is not transitive, so only fully static bounds can contribute
+        // additional range sequents.
+        if !self.bound.is_static_sequent_eligible(db, env)
+            || !other.bound.is_static_sequent_eligible(db, env)
+        {
+            return;
+        }
+
         // `(α ≤ T) ∧ (T ≤ β)` simplifies to `T = α` when `α = β`. For ordinary typevars, only
         // simplify when the materialized bounds are the same `Type`; checking semantic equivalence
         // can recursively expand protocol members. ParamSpec bounds still need the semantic check
@@ -1338,13 +1363,7 @@ impl<'db> ConcreteLowerBound<'db> {
             return;
         }
 
-        // Gradual assignability is not transitive, so only fully static bounds can contribute
-        // additional range sequents.
-        if self.bound.is_static_sequent_eligible(db, env)
-            && other.bound.is_static_sequent_eligible(db, env)
-        {
-            Constraint::add_sequents_for_range(db, env, map, self, other);
-        }
+        Constraint::add_sequents_for_range(db, env, map, self, other);
     }
 
     fn add_sequents_with_concrete_equivalence(

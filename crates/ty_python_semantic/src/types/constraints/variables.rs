@@ -26,24 +26,23 @@ use crate::{Db, ProgramEnvironment};
 /// don't want to choose a validity bound as a solution unless we have no other choice. There is
 /// often an evidence bound that is a better choice.
 ///
-/// A bound derived only from validity remains validity. Any derivation that also depends on
-/// evidence is itself evidence.
+/// When we derive a new constraint from both an evidence constraint and a validity constraint, we
+/// produce a _mixed_ constraint. Sometimes we will need to treat that derived constraint the same
+/// as a validity constraint; other times we will need to treat it like an evidence constraint.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum ConstraintProvenance {
     Validity,
+    Mixed,
     Evidence,
 }
 
 impl ConstraintProvenance {
     /// Returns the provenance of a constraint derived from two existing constraints.
-    ///
-    /// Derived constraints must retain any call-site evidence that contributed to them. Otherwise,
-    /// a derivation could downgrade evidence to a background validity restriction, causing the
-    /// solver to ignore a specialization justified by the call site.
     pub(super) const fn derived(left: Self, right: Self) -> Self {
         match (left, right) {
+            (Self::Evidence, Self::Evidence) => Self::Evidence,
             (Self::Validity, Self::Validity) => Self::Validity,
-            _ => Self::Evidence,
+            _ => Self::Mixed,
         }
     }
 
@@ -365,6 +364,17 @@ impl<'db> Constraint<'db> {
             }
             _ => bound,
         }
+    }
+
+    pub(super) fn with_provenance(mut self, provenance: ConstraintProvenance) -> Self {
+        match &mut self {
+            Constraint::ConcreteLower(this) => this.provenance = provenance,
+            Constraint::ConcreteUpper(this) => this.provenance = provenance,
+            Constraint::ConcreteEquivalence(this) => this.provenance = provenance,
+            Constraint::TypeVarRange(this) => this.provenance = provenance,
+            Constraint::TypeVarEquivalence(this) => this.provenance = provenance,
+        }
+        self
     }
 
     pub(super) fn is_reflexive_typevar_relation(self, db: &'db dyn Db) -> bool {

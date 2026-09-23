@@ -633,12 +633,15 @@ class E: ...
             alternatives
                 .map(|ty| CandidateSolution {
                     typevars: Box::new([PathBound::exact(t, ty)]) as Box<[_]>,
+                    validity: SolutionValidity::Valid,
                 })
                 .into(),
         );
 
         assert_eq!(
             paths.try_fold_with(
+                db,
+                &env,
                 |_, bound| CandidateSolutions::default_solve(db, &env, &builder, inferable, bound),
                 Type::object(),
                 &mut ProjectionTypeBudget::new(7),

@@ -2445,7 +2445,7 @@ impl<'db> ClassType<'db> {
         }
 
         let dunder_new_callables = lookup_type
-            .lookup_dunder_new(db, env)
+            .lookup_dunder_new(db, env, MemberLookupPolicy::default())
             .and_then(|place_and_quals| {
                 receiver
                     .resolve_dunder_new_callable(db, env, place_and_quals.place)
