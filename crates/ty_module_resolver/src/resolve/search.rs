@@ -745,7 +745,9 @@ fn discover_roots<'db, 'a>(
         }));
         // Defer file probes after stdlib until we know that stdlib does not win.
         pending_stub_paths.extend(stub_paths.after_stdlib.iter().filter(|search_path| {
-            ModuleDirectory::new(context, search_path.to_module_path()).may_contain_name(stub_name)
+            context
+                .root_directory(search_path)
+                .may_contain_name(stub_name)
         }));
     }
 

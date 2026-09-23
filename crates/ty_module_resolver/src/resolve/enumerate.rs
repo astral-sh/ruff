@@ -71,6 +71,7 @@ impl<'db> ModuleSearchCursor<'_, 'db> {
         let is_listable =
             |candidate: &ModuleResolutionCandidate| is_listable_location(db, candidate);
         let mut names = BTreeSet::new();
+        let mut listable_directories = Vec::new();
         let mut collect = |directory: &ModuleDirectory| {
             directory.for_each_entry(db, |entry, kind| {
                 if let Some(name) = child_module_name(entry, kind, prefix.is_none()) {
@@ -80,18 +81,32 @@ impl<'db> ModuleSearchCursor<'_, 'db> {
         };
 
         if prefix.is_none() {
+            context.prepare_root_directories(self.root_search_paths());
             for path in self.root_search_paths() {
-                collect(&ModuleDirectory::new(context, path.to_module_path()));
+                collect(&context.root_directory(path));
             }
         } else {
             for candidate in self
                 .candidates()
                 .filter(|candidate| is_listable_package(candidate, is_listable))
             {
+                listable_directories.push(&candidate.directory);
                 collect(&candidate.directory);
             }
         }
 
+        // Check whether the resolved location is allowed by the listing policy.
+        // Top-level locations are allowed. Below a prefix, reuse the checks for
+        // directories already visited and their non-symlink children; otherwise,
+        // check the candidate's full path.
+        let is_listable = |candidate: &ModuleResolutionCandidate| {
+            let path = candidate.directory.path();
+            prefix.is_none()
+                || listable_directories
+                    .iter()
+                    .any(|directory| directory.path() == path || directory.is_child_directory(path))
+                || is_listable(candidate)
+        };
         let mut listing = ModuleListing::default();
 
         for component_name in names {
