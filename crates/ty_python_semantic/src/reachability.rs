@@ -201,8 +201,8 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, ExpressionEvaluator,
-        KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
+        CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
+        NarrowingConstraint, SpecialFormType, TruthinessAnalyzer, Type, TypeContext, UnionType,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
         expand_type, infer_expression_types, infer_narrowing_constraints,
         infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
@@ -1899,7 +1899,7 @@ fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Optio
     let module = parsed_module(db, expression.python_file(db)).load(db);
     let inference = infer_expression_types(db, expression, TypeContext::default());
     let node = expression.node_ref(db).node(&module);
-    ExpressionEvaluator::new(
+    TruthinessAnalyzer::new(
         db,
         &env,
         |node| inference.expression_type(node),

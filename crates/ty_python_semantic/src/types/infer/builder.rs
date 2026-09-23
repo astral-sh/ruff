@@ -101,7 +101,7 @@ use crate::types::infer::builder::binary_expressions::BinaryInferenceState;
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{
-    ExpressionEvaluator, StatementInference, StatementInferenceInner, StatementInferenceInnerExtra,
+    StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TruthinessAnalyzer,
     TypeAndRange, TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
     nearest_enclosing_function, original_class_type,
 };
@@ -8597,7 +8597,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         context: ExpressionContext,
     ) -> Option<Truthiness> {
-        ExpressionEvaluator::new(
+        TruthinessAnalyzer::new(
             self.db(),
             self.program_environment(),
             |node| self.expression_type(node),

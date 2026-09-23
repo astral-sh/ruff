@@ -77,8 +77,8 @@ mod builder;
 mod implicit_alias;
 pub(super) use implicit_alias::implicit_alias_parameters;
 mod comparisons;
-mod expression_evaluation;
-pub(crate) use expression_evaluation::ExpressionEvaluator;
+mod expression_truthiness;
+pub(crate) use expression_truthiness::TruthinessAnalyzer;
 #[cfg(test)]
 mod tests;
 
@@ -619,7 +619,7 @@ pub(super) fn infer_expression_types_impl<'db>(
     if !inference
         .expression_type(node)
         .is_equivalent_to(db, &env, Type::Never)
-        && !ExpressionEvaluator::new(
+        && !TruthinessAnalyzer::new(
             db,
             &env,
             |node| inference.expression_type(node),
@@ -1986,7 +1986,7 @@ struct ExpressionInferenceExtra<'db> {
     /// `AlwaysFalse`, but its value type must still include objects returned by the first comparison.
     ///
     /// The same distinction matters for `and`/`or`, but their operands have separate expression
-    /// nodes with inferred types. [`ExpressionEvaluator`] can reconstruct their condition
+    /// nodes with inferred types. [`TruthinessAnalyzer`] can reconstruct their condition
     /// truthiness by recursively visiting those operands, without relying on the compound
     /// expression's value type.
     ///
