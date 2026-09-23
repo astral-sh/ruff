@@ -14,6 +14,7 @@ when deciding which inputs are trusted. Browser integrations have a separate
 - **Trusted local input:** the editor, its extensions and their bundled files, the local machine and
     its file system, and the user's configuration and trust decisions.
 
+Ruff treats workspaces as trusted unless the server starts with `--untrusted-workspace`.
 ty treats workspaces as trusted unless `untrustedWorkspace` is true at initialization. Trust extends
 to everything in the workspace, including source code, configuration, notebooks, and the targets of
 symlinks that point outside it.

@@ -54,6 +54,7 @@ dunce = { workspace = true }
 regex = { workspace = true }
 smallvec = { workspace = true }
 tempfile = { workspace = true }
+test-case = { workspace = true }
 
 [features]
 test-uv = []

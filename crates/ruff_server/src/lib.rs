@@ -36,11 +36,18 @@ const NOTEBOOK_SOURCE_ORGANIZE_IMPORTS_RUFF: CodeActionKind =
 /// result type is needed.
 pub(crate) type Result<T> = anyhow::Result<T>;
 
+/// Whether the server may execute code from the workspace.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum WorkspaceTrust {
+    Trusted,
+    Untrusted,
+}
+
 fn version() -> &'static str {
     ruff_linter::VERSION
 }
 
-pub fn run(preview: Option<bool>) -> Result<()> {
+pub fn run(preview: Option<bool>, workspace_trust: WorkspaceTrust) -> Result<()> {
     let four = NonZeroUsize::new(4).unwrap();
 
     // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
@@ -50,7 +57,7 @@ pub fn run(preview: Option<bool>) -> Result<()> {
 
     let (connection, io_threads) = ConnectionInitializer::stdio();
 
-    let server_result = Server::new(worker_threads, connection, preview, false)
+    let server_result = Server::new(worker_threads, connection, preview, workspace_trust, false)
         .context("Failed to start server")?
         .run();
 
