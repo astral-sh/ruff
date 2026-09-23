@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use compact_str::CompactString;
 use ruff_db::files::directory_listing;
@@ -7,12 +7,15 @@ use ruff_db::system::FileType;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::db::Db;
-use crate::module::Module;
+use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
 use crate::path::ModuleDirectory;
 
 use super::search::ModuleSearchCursor;
-use super::{ModuleResolutionCandidate, ResolvedModule, ResolvedNames, ResolverContext};
+use super::{
+    ModuleNameIngredient, ModuleResolutionCandidate, ModuleResolveModeIngredient, ResolvedModule,
+    ResolvedNames, ResolverContext, search_paths, stub_package_index,
+};
 
 /// Lists top-level modules across the configured search paths.
 pub(crate) fn list_root_modules<'db>(context: &ResolverContext<'db>) -> ModuleListing<'db> {
@@ -43,6 +46,10 @@ pub(crate) fn list_submodules<'db>(
     module: Module<'db>,
 ) -> ModuleListing<'db> {
     let name = module.name(context.db);
+    if module.kind(context.db) == ModuleKind::Module && !may_have_children(context, name) {
+        return ModuleListing::default();
+    }
+
     list_submodules_by_name(context, name)
 }
 
@@ -70,12 +77,15 @@ impl<'db> ModuleSearchCursor<'_, 'db> {
         let prefix = self.prefix();
         let is_listable =
             |candidate: &ModuleResolutionCandidate| is_listable_location(db, candidate);
-        let mut names = BTreeSet::new();
+        let mut names = BTreeMap::<_, ChildNameSummary>::new();
         let mut listable_directories = Vec::new();
         let mut collect = |directory: &ModuleDirectory| {
             directory.for_each_entry(db, |entry, kind| {
                 if let Some(name) = child_module_name(entry, kind, prefix.is_none()) {
-                    names.insert(CompactString::new(name));
+                    // A file module can have descendants from a matching directory in
+                    // another location. Symlinks may also turn out to be directories.
+                    let summary = names.entry(CompactString::new(name)).or_default();
+                    summary.record_entry(kind);
                 }
             });
         };
@@ -109,7 +119,7 @@ impl<'db> ModuleSearchCursor<'_, 'db> {
         };
         let mut listing = ModuleListing::default();
 
-        for component_name in names {
+        for (component_name, summary) in names {
             let Some(name) = self.full_module_name(&component_name) else {
                 continue;
             };
@@ -119,7 +129,9 @@ impl<'db> ModuleSearchCursor<'_, 'db> {
                     let module =
                         candidate.into_module(db, context.resolver_environment, Cow::Owned(name));
                     listing.modules.push(module);
-                    listing.modules_with_possible_children.push(module);
+                    if summary.may_have_children {
+                        listing.modules_with_possible_children.push(module);
+                    }
                 }
 
                 // Resolution succeeded, so move on to the next name. The resolved module
@@ -140,6 +152,55 @@ impl<'db> ModuleSearchCursor<'_, 'db> {
         }
         listing
     }
+}
+
+/// Summarizes entries that supply the same child module name across the directories being listed.
+///
+/// For example, `foo.py`, `foo.pyi`, and `foo/` contribute to one summary. Enumeration
+/// uses this information to decide whether to search for the module's children.
+#[derive(Default)]
+struct ChildNameSummary {
+    may_have_children: bool,
+}
+
+impl ChildNameSummary {
+    /// Updates the summary with an entry supplying this child module name.
+    fn record_entry(&mut self, kind: FileType) {
+        self.may_have_children |= kind != FileType::File;
+    }
+}
+
+/// Uses conservative checks to rule out descendants of a file module before reconstructing
+/// its module search and resolving child names. Returning `true` means the full search
+/// is still needed; it does not guarantee that a child resolves.
+fn may_have_children(context: &ResolverContext, name: &ModuleName) -> bool {
+    // With `acme.py` and a partial `acme-stubs/child.pyi`, `acme` resolves to a file
+    // but `acme.child` still resolves to the stub. The directory-name check below looks
+    // for `acme`, not `acme-stubs`, so environments containing stub packages need the full search.
+    if context.mode.is_typing()
+        && !stub_package_index(context.db, context.resolver_environment)
+            .all()
+            .is_empty()
+    {
+        return true;
+    }
+
+    let parent = match name.parent() {
+        Some(parent) => DirectoryParent::Prefix(ModuleNameIngredient::new(
+            context.db,
+            parent,
+            context.mode,
+            context.resolver_environment,
+        )),
+        None => DirectoryParent::Root(ModuleResolveModeIngredient::new(
+            context.db,
+            context.resolver_environment,
+            context.mode,
+        )),
+    };
+    child_directory_names(context.db, parent)
+        .binary_search_by(|child| child.as_str().cmp(name.last_component()))
+        .is_ok()
 }
 
 /// Whether enumeration may discover child names from this candidate's directory.
@@ -242,9 +303,56 @@ fn child_module_name(entry: &str, file_type: FileType, at_search_root: bool) -> 
     is_identifier(name).then_some(name)
 }
 
+/// Directory names beneath this prefix across the configured search paths.
+///
+/// Sibling modules share this result. Adding a regular file to an existing directory
+/// leaves the summary unchanged because the summary contains only directory names.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn child_directory_names<'db>(db: &'db dyn Db, parent: DirectoryParent<'db>) -> Box<[String]> {
+    let (resolver_environment, mode, parent) = match parent {
+        DirectoryParent::Root(mode) => (mode.resolver_environment(db), mode.mode(db), None),
+        DirectoryParent::Prefix(parent) => (
+            parent.resolver_environment(db),
+            parent.mode(db),
+            Some(parent.name(db)),
+        ),
+    };
+    let context = ResolverContext::new(db, resolver_environment, mode);
+    let mut names = BTreeSet::new();
+
+    for search_path in search_paths(db, context.resolver_environment, context.mode) {
+        let mut path = search_path.to_module_path();
+        if let Some(parent) = parent {
+            for component_name in parent.components() {
+                path.push(component_name);
+            }
+        }
+
+        let directory = ModuleDirectory::new(&context, path);
+        directory.for_each_entry(db, |name, kind| {
+            if matches!(kind, FileType::Directory | FileType::Symlink)
+                && is_identifier(name)
+                && directory.child_directory_path(&context, name).is_some()
+            {
+                names.insert(name.to_owned());
+            }
+        });
+    }
+
+    names.into_iter().collect()
+}
+
+/// Reuses the root or prefix ingredient without interning another combined query key.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype)]
+enum DirectoryParent<'db> {
+    Root(ModuleResolveModeIngredient<'db>),
+    Prefix(ModuleNameIngredient<'db>),
+}
+
 #[cfg(test)]
 mod tests {
-    use ruff_db::system::{DbWithWritableSystem, SystemPath};
+    use ruff_db::files::Files;
+    use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem, SystemPath};
 
     use crate::ModuleName;
     use crate::db::tests::TestDb;
@@ -283,6 +391,34 @@ mod tests {
         let db = enumeration_db(&["/src/leaf.py", "/src/sys.py"], &[]);
         // A local file cannot supply a protected name, even when typeshed omits it.
         db.assert_listing(None, &["leaf"]);
+    }
+
+    #[test]
+    fn identifies_modules_that_may_have_descendants() {
+        let mut db = enumeration_db(
+            &[
+                // A file without a corresponding directory cannot supply children.
+                "/src/leaf.py",
+                // A package remains eligible even when it currently has no children.
+                "/src/pkg/__init__.py",
+                // A file can have children supplied by a partial stub namespace.
+                "/src/acme.py",
+                "/site-packages/acme-stubs/child.pyi",
+            ],
+            &[],
+        );
+        db.write_file("/site-packages/acme-stubs/py.typed", "partial")
+            .expect("mark the stub namespace as partial");
+        let context =
+            ResolverContext::new(&db, db.resolver_environment(), ModuleResolveMode::Typing);
+        let listing = list_root_modules(&context);
+        let possible_parents: Vec<_> = listing
+            .modules_with_possible_children
+            .iter()
+            .map(|module| module.name(&db).as_str())
+            .collect();
+        // `leaf` cannot have children; `acme` can have children despite resolving to a file.
+        assert_eq!(possible_parents, ["acme", "pkg"]);
     }
 
     #[test]
@@ -488,6 +624,103 @@ mod tests {
                 ("acme.stubbed", Some("/extra/acme/stubbed.pyi")),
             ],
         );
+    }
+
+    #[test]
+    #[cfg(target_family = "unix")]
+    fn updates_stub_override_descendants_when_symlink_targets_change() {
+        let (_temp, mut db, root) = os_enumeration_db(&["extra"]);
+        write_empty_file(&mut db, root.join("src/leaf.py"));
+        let extra = root.join("extra");
+
+        // The extra path's entries stay unchanged as the symlink target appears and
+        // disappears. The directory summary must track the target's status too.
+        let target = root.join("stub_override");
+        std::os::unix::fs::symlink(&target, extra.join("leaf"))
+            .expect("create dangling stub override symlink");
+        db.assert_listing(Some("leaf"), &[]);
+
+        write_empty_file(&mut db, target.join("child.pyi"));
+        Files::sync_all(&mut db);
+        db.assert_listing(Some("leaf"), &["leaf.child"]);
+
+        std::fs::remove_dir_all(&target).expect("remove stub override target");
+        Files::sync_all(&mut db);
+        db.assert_listing(Some("leaf"), &[]);
+    }
+
+    #[test]
+    fn updates_top_level_stub_override_descendants_after_directory_changes() -> anyhow::Result<()> {
+        // The extra search root exists before the override directory is created.
+        let mut db = enumeration_db(&["/src/api.py", "/extra/unrelated.py"], &["/extra"]);
+        db.assert_listing(Some("api"), &[]);
+
+        db.write_file("/extra/api/stubbed.pyi", "")?;
+        db.assert_listing(Some("api"), &["api.stubbed"]);
+
+        db.memory_file_system()
+            .remove_file("/extra/api/stubbed.pyi")?;
+        db.memory_file_system().remove_directory("/extra/api")?;
+        Files::sync_all_recursive(&mut db, [SystemPath::new("/extra")]);
+        db.assert_listing(Some("api"), &[]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn updates_nested_stub_override_descendants_when_parent_is_created() -> anyhow::Result<()> {
+        // `/extra` exists, but `/extra/acme` does not.
+        let mut db = enumeration_db(
+            &[
+                "/src/acme/__init__.py",
+                "/src/acme/api.py",
+                "/extra/unrelated.py",
+            ],
+            &["/extra"],
+        );
+        db.assert_listing(Some("acme.api"), &[]);
+
+        db.write_file("/extra/acme/api/stubbed.pyi", "")?;
+        db.assert_listing(Some("acme.api"), &["acme.api.stubbed"]);
+
+        db.memory_file_system()
+            .remove_file("/extra/acme/api/stubbed.pyi")?;
+        db.memory_file_system()
+            .remove_directory("/extra/acme/api")?;
+        db.memory_file_system().remove_directory("/extra/acme")?;
+        Files::sync_all_recursive(&mut db, [SystemPath::new("/extra")]);
+        db.assert_listing(Some("acme.api"), &[]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn updates_nested_stub_override_descendants_with_existing_parent() -> anyhow::Result<()> {
+        // The sibling override keeps `/extra/acme` present throughout the test.
+        let mut db = enumeration_db(
+            &[
+                "/src/acme/__init__.py",
+                "/src/acme/api.py",
+                "/src/acme/reports.py",
+                "/extra/acme/reports/monthly.pyi",
+            ],
+            &["/extra"],
+        );
+        db.assert_listing(Some("acme.api"), &[]);
+        db.assert_listing(Some("acme.reports"), &["acme.reports.monthly"]);
+
+        db.write_file("/extra/acme/api/stubbed.pyi", "")?;
+        db.assert_listing(Some("acme.api"), &["acme.api.stubbed"]);
+
+        db.memory_file_system()
+            .remove_file("/extra/acme/api/stubbed.pyi")?;
+        db.memory_file_system()
+            .remove_directory("/extra/acme/api")?;
+        Files::sync_all_recursive(&mut db, [SystemPath::new("/extra")]);
+        db.assert_listing(Some("acme.api"), &[]);
+        db.assert_listing(Some("acme.reports"), &["acme.reports.monthly"]);
+
+        Ok(())
     }
 
     #[test]
