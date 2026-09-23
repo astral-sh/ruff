@@ -2761,14 +2761,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             // `TypeIs` is invariant.
-            (Type::TypeIs(source), Type::TypeIs(target)) => {
-                let source_type = source.type_argument(db);
-                let target_type = target.type_argument(db);
-                self.check_type_pair(db, source_type, target_type)
-                    .and(db, self.constraints, || {
-                        self.check_type_pair(db, target_type, source_type)
-                    })
-            }
+            (Type::TypeIs(source), Type::TypeIs(target)) => self
+                .check_relation_in_invariant_position(
+                    db,
+                    source.type_argument(db),
+                    source.materialization_kind(db),
+                    target.type_argument(db),
+                    target.materialization_kind(db),
+                ),
 
             // `TypeGuard` is covariant.
             (Type::TypeGuard(source), Type::TypeGuard(target)) => {

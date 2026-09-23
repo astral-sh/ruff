@@ -1657,6 +1657,38 @@ class WithOverloadedMethod[T]:
 reveal_type(WithOverloadedMethod[int].method)
 ```
 
+## Materialized `TypeIs` return types
+
+A generic `TypeIs` in the return type of a class method is materialized along with the outer class:
+
+```py
+from typing import Any, TypeIs
+from ty_extensions import Bottom, Top
+
+class Predicate[T]:
+    def matches(self, value: object) -> TypeIs[T]:
+        return True
+
+    def unrelated(self, value: object) -> TypeIs[Any]:
+        return True
+
+def _(concrete: Predicate[int], gradual: Predicate[Any], value: object) -> None:
+    reveal_type(concrete.matches(value))  # revealed: TypeIs[int @ value]
+    reveal_type(gradual.matches(value))  # revealed: TypeIs[Any @ value]
+
+def _(top: Top[Predicate[Any]], bottom: Bottom[Predicate[Any]], value: object) -> None:
+    reveal_type(top.matches(value))  # revealed: Top[TypeIs[Any @ value]]
+    reveal_type(bottom.matches(value))  # revealed: Bottom[TypeIs[Any @ value]]
+```
+
+An explicit `TypeIs[Any]` return type remains unmaterialized:
+
+```py
+def _(top: Top[Predicate[Any]], bottom: Bottom[Predicate[Any]], value: object) -> None:
+    reveal_type(top.unrelated(value))  # revealed: TypeIs[Any @ value]
+    reveal_type(bottom.unrelated(value))  # revealed: TypeIs[Any @ value]
+```
+
 ## `Callable` return annotations preserve enclosing generic context
 
 When a method annotation contains a `Callable[P, T]` return type, where `P`/`T` are bound by an

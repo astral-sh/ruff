@@ -9585,15 +9585,7 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeIs(type_is) => visitor.visit(db, self, type_mapping, || {
-                type_is.with_type(
-                    db,
-                    type_is.type_argument(db).apply_type_mapping_impl(
-                        db,
-                        type_mapping,
-                        tcx,
-                        visitor,
-                    ),
-                )
+                type_is.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }),
 
             Type::TypeGuard(type_guard) => visitor.visit(db, self, type_mapping, || {
@@ -12039,6 +12031,10 @@ pub(super) struct MetaclassTransformInfo<'db> {
 pub struct TypeIsType<'db> {
     #[returns(copy)]
     type_argument: Type<'db>,
+
+    #[returns(copy)]
+    materialization_kind: Option<MaterializationKind>,
+
     /// The ID of the scope to which the place belongs
     /// and the ID of the place itself within that scope.
     #[returns(copy)]
@@ -12073,7 +12069,7 @@ impl<'db> TypeIsType<'db> {
     ///     return isinstance(value, tuple)
     /// ```
     fn from_type_expression(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        Type::TypeIs(Self::new(db, ty, None))
+        Type::TypeIs(Self::new(db, ty, None, None))
     }
 
     fn return_type(self, db: &'db dyn Db) -> Type<'db> {
@@ -12082,12 +12078,81 @@ impl<'db> TypeIsType<'db> {
 
     #[must_use]
     fn bind(self, db: &'db dyn Db, scope: ScopeId<'db>, place: ScopedPlaceId) -> Type<'db> {
-        Type::TypeIs(Self::new(db, self.type_argument(db), Some((scope, place))))
+        Type::TypeIs(Self::new(
+            db,
+            self.type_argument(db),
+            self.materialization_kind(db),
+            Some((scope, place)),
+        ))
     }
 
     #[must_use]
     fn with_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        Type::TypeIs(Self::new(db, ty, self.place_info(db)))
+        Type::TypeIs(Self::new(
+            db,
+            ty,
+            self.materialization_kind(db),
+            self.place_info(db),
+        ))
+    }
+
+    fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        let argument = self.type_argument(db);
+        let mut materialization = self.materialization_kind(db);
+        let argument = match type_mapping {
+            TypeMapping::Materialize(kind) => {
+                // The top and bottom materializations are already fully static types, so
+                // materializing them further does nothing.
+                if materialization.is_some() {
+                    return Type::TypeIs(self);
+                }
+
+                // `TypeIs` with a static argument is equivalent to its top and bottom materializations.
+                let top = argument.materialize(db, MaterializationKind::Top, visitor);
+                if visitor.is_equivalent_to_materialization(db, argument, top) {
+                    return Type::TypeIs(self);
+                }
+
+                materialization = Some(*kind);
+                argument
+            }
+            TypeMapping::ApplySpecializationWithMaterialization {
+                specialization,
+                materialization_kind,
+            } => {
+                let specialized = argument.apply_type_mapping_impl(
+                    db,
+                    &TypeMapping::ApplySpecialization(*specialization),
+                    tcx,
+                    visitor,
+                );
+
+                // Avoid materializing unrelated gradual types already present in the argument.
+                if materialization.is_none() {
+                    let materialized =
+                        argument.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                    if specialized != materialized {
+                        materialization = Some(*materialization_kind);
+                    }
+                }
+
+                specialized
+            }
+            _ => argument.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        };
+
+        Type::TypeIs(Self::new(
+            db,
+            argument,
+            materialization,
+            self.place_info(db),
+        ))
     }
 
     fn is_bound(self, db: &'db dyn Db) -> bool {

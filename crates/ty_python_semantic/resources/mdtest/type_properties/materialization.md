@@ -187,6 +187,76 @@ def _(top: Top[C3], bottom: Bottom[C3]) -> None:
     reveal_type(bottom)
 ```
 
+## `TypeIs`
+
+`TypeIs` is invariant in its type argument, and so the top and bottom materializations of
+`TypeIs[Any]` cannot simplify to `TypeIs[object]` and `TypeIs[Never]`, and are instead represented
+with the `Top` and `Bottom` special forms:
+
+```py
+from typing import Any
+from typing_extensions import Never, TypeIs
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
+
+def _(top: Top[TypeIs[Any]], bottom: Bottom[TypeIs[Any]]):
+    reveal_type(top)  # revealed: Top[TypeIs[Any]]
+    reveal_type(bottom)  # revealed: Bottom[TypeIs[Any]]
+
+static_assert(not is_equivalent_to(Top[TypeIs[Any]], TypeIs[object]))
+static_assert(not is_equivalent_to(Bottom[TypeIs[Any]], TypeIs[Never]))
+```
+
+`TypeIs[int]` is a subtype of `Top[TypeIs[Any]]`, but not `TypeIs[object]`:
+
+```py
+static_assert(not is_subtype_of(TypeIs[int], TypeIs[object]))
+static_assert(not is_subtype_of(TypeIs[object], TypeIs[int]))
+
+static_assert(is_subtype_of(TypeIs[int], Top[TypeIs[Any]]))
+static_assert(is_subtype_of(Bottom[TypeIs[Any]], TypeIs[int]))
+
+static_assert(not is_subtype_of(Top[TypeIs[Any]], TypeIs[int]))
+static_assert(not is_subtype_of(TypeIs[int], Bottom[TypeIs[Any]]))
+```
+
+A static `TypeIs` type is equivalent to its top and bottom materializations:
+
+```py
+static_assert(is_equivalent_to(Top[TypeIs[int]], TypeIs[int]))
+static_assert(is_equivalent_to(Bottom[TypeIs[int]], TypeIs[int]))
+```
+
+Materializations are fully static, so they are subtypes of themselves and cannot be materialized
+further:
+
+```py
+static_assert(is_subtype_of(Top[TypeIs[Any]], Top[TypeIs[Any]]))
+static_assert(is_subtype_of(Bottom[TypeIs[Any]], Bottom[TypeIs[Any]]))
+
+static_assert(is_equivalent_to(Top[Bottom[TypeIs[Any]]], Bottom[TypeIs[Any]]))
+static_assert(is_equivalent_to(Bottom[Top[TypeIs[Any]]], Top[TypeIs[Any]]))
+```
+
+The static component of a gradual `TypeIs` type constrains the possible materializations of its
+argument:
+
+```py
+static_assert(is_subtype_of(TypeIs[int], Top[TypeIs[int | Any]]))
+static_assert(is_subtype_of(TypeIs[int | str], Top[TypeIs[int | Any]]))
+static_assert(not is_subtype_of(TypeIs[str], Top[TypeIs[int | Any]]))
+```
+
+In contrast, `TypeGuard` is covariant, so the top and bottom materializations of `TypeGuard[Any]`
+simplify to `TypeGuard[object]` and `TypeGuard[Never]`:
+
+```py
+from typing_extensions import TypeGuard
+
+static_assert(is_equivalent_to(Top[TypeGuard[Any]], TypeGuard[object]))
+static_assert(is_equivalent_to(Bottom[TypeGuard[Any]], TypeGuard[Never]))
+```
+
 ## Callable with gradual parameters
 
 For callables with gradual parameters (the `...` form), the top materialization preserves the
