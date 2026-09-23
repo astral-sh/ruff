@@ -84,22 +84,20 @@ impl ModulePath {
                 system_path_is_directory(resolver.db, &search_path.join(relative_path))
             }
             SearchPathInner::StandardLibraryCustom(stdlib_root) => {
-                match query_stdlib_version(relative_path, resolver) {
-                    TypeshedVersionsQueryResult::DoesNotExist => false,
-                    TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => {
-                        system_path_is_directory(resolver.db, &stdlib_root.join(relative_path))
-                    }
-                }
+                system_path_is_directory(resolver.db, &stdlib_root.join(relative_path))
+                    && !matches!(
+                        query_stdlib_version(relative_path, resolver),
+                        TypeshedVersionsQueryResult::DoesNotExist
+                    )
             }
             SearchPathInner::StandardLibraryVendored(stdlib_root) => {
-                match query_stdlib_version(relative_path, resolver) {
-                    TypeshedVersionsQueryResult::DoesNotExist => false,
-                    TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => resolver
-                        .vendored()
-                        .is_directory(stdlib_root.join(relative_path)),
-                }
+                resolver
+                    .vendored()
+                    .is_directory(stdlib_root.join(relative_path))
+                    && !matches!(
+                        query_stdlib_version(relative_path, resolver),
+                        TypeshedVersionsQueryResult::DoesNotExist
+                    )
             }
         }
     }
