@@ -108,12 +108,12 @@ use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, TypeVarSet};
 use crate::types::visitor::{
-    NonAtomicType, TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type,
-    walk_type_with_recursion_guard,
+    NonAtomicType, TypeCollector, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
+    walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
-    TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType, IntersectionType, Type,
+    TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
@@ -3651,8 +3651,14 @@ impl<'db> CandidateSolutions<'db> {
         inferable: TypeVarSet<'db>,
         limits: &mut L,
     ) -> ControlFlow<L::Break, Option<Self>> {
-        let bound_is_ineligible =
-            |ty: Type<'db>| ty.has_typevar(db, env) || ty.has_provisional_marker(db, env);
+        let bound_is_ineligible = |ty: Type<'db>| {
+            any_over_type_expanding_aliases(db, env, ty, |nested| {
+                nested.is_type_var()
+                    || nested
+                        .as_dynamic()
+                        .is_some_and(DynamicType::is_provisional_marker)
+            })
+        };
 
         let mut constraints = Vec::default();
         let mut current = node;
