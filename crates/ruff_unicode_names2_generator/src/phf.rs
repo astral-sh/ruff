@@ -40,14 +40,14 @@ struct Hash {
 
 #[allow(clippy::type_complexity)]
 fn try_phf_table(
-    values: &[(char, String)],
+    values: &[(char, &str)],
     lambda: usize,
     seed: u64,
     rng: &mut StdRng,
 ) -> Option<(Vec<(u32, u32)>, Vec<char>)> {
     let hashes: Vec<_> = values
         .iter()
-        .map(|(n, s)| (split(hash(s, seed)), *n))
+        .map(|&(n, s)| (split(hash(s, seed)), n))
         .collect();
 
     let table_len = hashes.len();
@@ -140,7 +140,7 @@ fn try_phf_table(
 }
 
 pub fn create_phf(
-    data: &[(char, String)],
+    data: &[(char, &str)],
     lambda: usize,
     max_tries: usize,
 ) -> (u64, Vec<(u32, u32)>, Vec<char>) {
