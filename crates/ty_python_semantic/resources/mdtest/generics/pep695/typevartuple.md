@@ -302,14 +302,26 @@ reveal_type(WithDefault[bool, bytes]().attr)  # revealed: tuple[bool, bytes]
 ### Gradual specializations
 
 A type variable tuple remains assignable to an explicitly gradual specialization of its generic
-class.
+class, or its top materialization.
 
 ```py
 from typing import Any
+from ty_extensions import Bottom, Top
 
 class Array[*Ts]:
+    values: tuple[*Ts]
+
     def erase_shape(self) -> "Array[*tuple[Any, ...]]":
         return self
+
+    def erase_shape_top(self) -> "Top[Array[*tuple[Any, ...]]]":
+        return self
+
+    def erase_shape_bottom(self) -> "Bottom[Array[*tuple[Any, ...]]]":
+        return self  # error: [invalid-return-type]
+
+    def fixed_shape(self) -> "Top[Array[Any]]":
+        return self  # error: [invalid-return-type]
 ```
 
 ### Constrained inference from synthetic `Self`
