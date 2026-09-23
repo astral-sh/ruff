@@ -545,7 +545,8 @@ const CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL: usize = 16;
 const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
-        PredicateNode::Expression(expression)
+        PredicateNode::TypeTruthiness(expression)
+        | PredicateNode::Expression(expression)
         | PredicateNode::Condition(expression)
         | PredicateNode::ChainedComparisonCondition(expression)
         | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
@@ -1874,27 +1875,44 @@ fn context_manager_suppresses<'db>(
     )
 }
 
-/// Analyze an expression when reachability needs its truthiness.
-///
-/// The context distinguishes testing the result object from following short-circuit conditions.
-/// Keep this separate from type inference: `bool(never)` has type `bool`, but cannot produce a
-/// boolean outcome. This query caches that distinction and widens it during inference cycles.
+/// Test an expression's result object, accounting for operands that cannot complete.
+/// Separate value and condition queries use the expression directly as their Salsa key, avoiding
+/// an additional interner for pairs of expressions and evaluation contexts.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| Truthiness::Ambiguous,
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _, _| {
-        // A condition can control whether one of its own inputs is reachable. Expression inference
-        // can lose its previous result when it ceases to be a cycle head, so its type widening alone
-        // does not ensure that the condition's truthiness converges. Delay widening here to avoid
-        // retaining imprecise results from the first few iterations.
-        if cycle.iteration() > crate::TAINTED_CYCLES {
-            previous.union(result)
-        } else {
-            result
-        }
-    },
+    cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| widen_truthiness(cycle, *previous, result),
     heap_size = get_size2::GetSize::get_heap_size
 )]
+fn value_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+    expression_truthiness(db, expression, ExpressionContext::Value)
+}
+
+/// Follow short-circuit conditions without testing their result objects again.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| widen_truthiness(cycle, *previous, result),
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn condition_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+    expression_truthiness(db, expression, ExpressionContext::Condition)
+}
+
+fn widen_truthiness(cycle: &salsa::Cycle, previous: Truthiness, result: Truthiness) -> Truthiness {
+    // A condition can control whether one of its own inputs is reachable. Expression inference
+    // can lose its previous result when it ceases to be a cycle head, so its type widening alone
+    // does not ensure that the condition's truthiness converges. Delay widening here to avoid
+    // retaining imprecise results from the first few iterations.
+    if cycle.iteration() > crate::TAINTED_CYCLES {
+        previous.union(result)
+    } else {
+        result
+    }
+}
+
+/// Keep this separate from type inference: `bool(never)` has type `bool`, but cannot produce a
+/// boolean outcome. The calling query caches that distinction and widens it during inference cycles.
 fn expression_truthiness<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
@@ -1922,14 +1940,21 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
     match predicate.node {
+        PredicateNode::TypeTruthiness(test_expr) => {
+            let inference = infer_expression_types(db, test_expr, TypeContext::default());
+            let ty = inference.expression_type(test_expr.node_ref(db));
+            if ty.is_equivalent_to(db, env, Type::Never) {
+                Truthiness::Uninhabited
+            } else {
+                ty.bool(db, env).negate_if(!predicate.is_positive)
+            }
+        }
         PredicateNode::Expression(test_expr) => {
-            expression_truthiness(db, test_expr, ExpressionContext::Value)
-                .negate_if(!predicate.is_positive)
+            value_truthiness(db, test_expr).negate_if(!predicate.is_positive)
         }
         PredicateNode::Condition(test_expr)
         | PredicateNode::ChainedComparisonCondition(test_expr) => {
-            expression_truthiness(db, test_expr, ExpressionContext::Condition)
-                .negate_if(!predicate.is_positive)
+            condition_truthiness(db, test_expr).negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {
             expression,
@@ -2339,7 +2364,7 @@ class TargetB:
                 let predicate = use_def
                     .predicates()
                     .iter()
-                    .find(|predicate| matches!(predicate.node, PredicateNode::Expression(_)))
+                    .find(|predicate| matches!(predicate.node, PredicateNode::TypeTruthiness(_)))
                     .unwrap();
                 let predicates: Predicates = std::iter::repeat_n(*predicate, DEPTH).collect();
 

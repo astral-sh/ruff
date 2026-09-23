@@ -85,7 +85,8 @@ pub(crate) fn infer_narrowing_constraints<'db>(
     Option<NarrowingConstraint<'db>>,
 ) {
     let constraints = match predicate.node {
-        PredicateNode::Expression(expression)
+        PredicateNode::TypeTruthiness(expression)
+        | PredicateNode::Expression(expression)
         | PredicateNode::Condition(expression)
         | PredicateNode::ChainedComparisonCondition(expression) => {
             let constraints = all_narrowing_constraints_for_expression(db, expression);
@@ -1695,7 +1696,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn finish(&mut self) -> Option<FrozenNarrowingConstraints<'db>> {
         let constraints: Option<NarrowingConstraints<'db>> = match self.predicate {
-            PredicateNode::Expression(expression)
+            PredicateNode::TypeTruthiness(expression)
+            | PredicateNode::Expression(expression)
             | PredicateNode::Condition(expression)
             | PredicateNode::ChainedComparisonCondition(expression) => {
                 self.evaluate_expression_predicate(expression, self.is_positive)
@@ -3427,7 +3429,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     fn scope(&self) -> ScopeId<'db> {
         let db = self.db;
         match self.predicate {
-            PredicateNode::Expression(expression)
+            PredicateNode::TypeTruthiness(expression)
+            | PredicateNode::Expression(expression)
             | PredicateNode::Condition(expression)
             | PredicateNode::ChainedComparisonCondition(expression)
             | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
