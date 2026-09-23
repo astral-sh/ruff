@@ -2740,11 +2740,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     } else {
                         receiver_ty
                     };
-                    // TODO: Check compatibility with the descriptor's full setter contract
-                    // when its accepted write type cannot be represented, rather than using Unknown.
                     write
                         .requirement(db, env, Some(fallback_ty))
                         .map(|requirement| {
+                            // TODO: Check if using `Unknown` here is correct
                             requirement.accepted_type().unwrap_or_else(Type::unknown)
                         })
                         .when_some_and(db, self.constraints, |write_ty| {
@@ -2971,17 +2970,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.never()
                 }
                 (Some(source), Some(target)) => {
-                    // TODO: Compare the full setter contracts when either descriptor's accepted
-                    // write type cannot be represented, rather than substituting Unknown on that side.
                     let (Some(target), Some(source)) = (
                         target
                             .requirement(db, env, Some(source_type))
                             .map(|requirement| {
+                                // TODO: Check if using `Unknown` here is correct
                                 requirement.accepted_type().unwrap_or_else(Type::unknown)
                             }),
                         source
                             .requirement(db, env, Some(source_type))
                             .map(|requirement| {
+                                // TODO: Check if using `Unknown` here is correct
                                 requirement.accepted_type().unwrap_or_else(Type::unknown)
                             }),
                     ) else {
