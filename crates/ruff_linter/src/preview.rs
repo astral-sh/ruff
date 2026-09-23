@@ -329,12 +329,6 @@ pub(crate) const fn is_up006_future_annotations_fix_enabled(settings: &LinterSet
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/24071
-// Make sure to stabilize the corresponding formatter preview behavior when stabilizing this preview style.
-pub(crate) const fn is_trailing_pragma_in_line_length_enabled(preview: PreviewMode) -> bool {
-    preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/24371
 pub(crate) const fn is_collapsible_if_fix_safe_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -354,11 +348,6 @@ pub const fn is_human_readable_names_enabled(preview: PreviewMode) -> bool {
 
 // https://github.com/astral-sh/ruff/pull/26113
 pub const fn is_warn_on_unknown_selectors_enabled(preview: PreviewMode) -> bool {
-    preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/27313
-pub(crate) const fn is_pragma_excluded_from_import_width_enabled(preview: PreviewMode) -> bool {
     preview.is_enabled()
 }
 

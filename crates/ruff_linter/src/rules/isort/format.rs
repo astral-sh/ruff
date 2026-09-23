@@ -1,7 +1,6 @@
 use ruff_python_codegen::Stylist;
 
 use crate::line_width::{LineLength, LineWidthBuilder};
-use crate::settings::types::PreviewMode;
 
 use super::types::{AliasData, ImportCommentSet, ImportFromCommentSet, ImportFromData, Importable};
 
@@ -55,7 +54,6 @@ pub(crate) fn format_import_from(
     force_wrap_aliases: bool,
     is_first: bool,
     trailing_comma: bool,
-    preview: PreviewMode,
 ) -> String {
     if aliases.len() == 1
         && aliases
@@ -69,7 +67,6 @@ pub(crate) fn format_import_from(
             is_first,
             stylist,
             indentation_width,
-            preview,
         );
         return single_line;
     }
@@ -98,7 +95,6 @@ pub(crate) fn format_import_from(
             is_first,
             stylist,
             indentation_width,
-            preview,
         );
         if import_width <= line_length || aliases.iter().any(|(alias, _)| alias.name == "*") {
             return single_line;
@@ -118,7 +114,6 @@ fn format_single_line(
     is_first: bool,
     stylist: &Stylist,
     indentation_width: LineWidthBuilder,
-    preview: PreviewMode,
 ) -> (String, LineWidthBuilder) {
     let mut output = String::with_capacity(CAPACITY);
     let mut line_width = indentation_width;
@@ -161,7 +156,7 @@ fn format_single_line(
         output.push(' ');
         output.push(' ');
         output.push_str(comment);
-        line_width = line_width.add_comment(comment, preview);
+        line_width = line_width.add_comment(comment);
     }
 
     for (_, comments) in aliases {
@@ -169,21 +164,21 @@ fn format_single_line(
             output.push(' ');
             output.push(' ');
             output.push_str(comment);
-            line_width = line_width.add_comment(comment, preview);
+            line_width = line_width.add_comment(comment);
         }
 
         for comment in &comments.inline {
             output.push(' ');
             output.push(' ');
             output.push_str(comment);
-            line_width = line_width.add_comment(comment, preview);
+            line_width = line_width.add_comment(comment);
         }
 
         for comment in &comments.trailing {
             output.push(' ');
             output.push(' ');
             output.push_str(comment);
-            line_width = line_width.add_comment(comment, preview);
+            line_width = line_width.add_comment(comment);
         }
     }
 
@@ -191,7 +186,7 @@ fn format_single_line(
         output.push(' ');
         output.push(' ');
         output.push_str(comment);
-        line_width = line_width.add_comment(comment, preview);
+        line_width = line_width.add_comment(comment);
     }
 
     output.push_str(&stylist.line_ending());
