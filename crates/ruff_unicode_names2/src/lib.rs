@@ -46,26 +46,6 @@
 //!     assert_eq!(y, "foo bar ★ baz qux");
 //! }
 //! ```
-//!
-//! # Loose Matching
-//! For name->char retrieval (the `character` function and macros) this crate uses loose matching,
-//! as defined in Unicode Standard Annex #44[^1].
-//! In general, this means case, whitespace and underscore characters are ignored, as well as
-//! _medial hyphens_, which are hyphens (`-`) that come between two alphanumeric characters[^1].
-//!
-//! Under this scheme, the query `Low_Line` will find `U+005F LOW LINE`, as well as `l o w L-I-N-E`,
-//! `lowline`, and `low\nL-I-N-E`, but not `low- line`.
-//! Similarly, `tibetan letter -a` will find `U+0F60 TIBETAN LETTER -A`, as well as
-//! `tibetanletter - a` and `TIBETAN L_ETTE_R-  __a__`, but not `tibetan letter-a` or
-//! `TIBETAN LETTER A`.
-//!
-//! In the implementation of this crate, 'whitespace' is determined by the [`is_ascii_whitespace`]
-//! method on `u8` and `char`. See its documentation for more info.
-//!
-//! [^1]: See [UAX44-LM2] for precise details.
-//!
-//! [UAX44-LM2]: https://www.unicode.org/reports/tr44/tr44-34.html#UAX44-LM2
-//! [`is_ascii_whitespace`]: char::is_ascii_whitespace
 
 #![cfg_attr(feature = "no_std", no_std)]
 #![cfg_attr(test, feature(test))]
@@ -77,7 +57,7 @@ extern crate std;
 
 use core::{char, fmt};
 use generated::{
-    LONGEST_NAME_LEN, PHRASEBOOK_OFFSETS1, PHRASEBOOK_OFFSETS2, PHRASEBOOK_OFFSET_SHIFT,
+    MAX_NAME_LENGTH, PHRASEBOOK_OFFSETS1, PHRASEBOOK_OFFSETS2, PHRASEBOOK_OFFSET_SHIFT,
 };
 
 #[allow(dead_code)]
@@ -104,9 +84,7 @@ static ALIASES: phf::Map<&'static [u8], char> =
 mod iter_str;
 
 static HANGUL_SYLLABLE_PREFIX: &str = "HANGUL SYLLABLE ";
-static NORMALISED_HANGUL_SYLLABLE_PREFIX: &str = "HANGULSYLLABLE";
 static CJK_UNIFIED_IDEOGRAPH_PREFIX: &str = "CJK UNIFIED IDEOGRAPH-";
-static NORMALISED_CJK_UNIFIED_IDEOGRAPH_PREFIX: &str = "CJKUNIFIEDIDEOGRAPH";
 
 fn is_cjk_unified_ideograph(ch: char) -> bool {
     generated::CJK_IDEOGRAPH_RANGES
@@ -114,17 +92,11 @@ fn is_cjk_unified_ideograph(ch: char) -> bool {
         .any(|&(lo, hi)| lo <= ch && ch <= hi)
 }
 
-/// An iterator over the components of a code point's name. Notably implements `Display`.
+/// An iterator over the components of a code point's name, it also
+/// implements `Show`.
 ///
-/// To reconstruct the full Unicode name from this iterator, you can concatenate every string slice
-/// yielded from it. Each such slice is either a word matching `[A-Z0-9]*`, a space `" "`, or a
-/// hyphen `"-"`. (In particular, words can be the empty string `""`).
-///
-/// The [size hint] returns an exact size, by cloning the iterator and iterating it fully.
-/// Cloning and iteration are cheap, and all names are relatively short, so this should not have a
-/// high impact.
-///
-/// [size hint]: std::iter::Iterator::size_hint
+/// The size hint is exact for the number of pieces, but iterates
+/// (although iteration is cheap and all names are short).
 #[derive(Clone)]
 pub struct Name {
     data: Name_,
@@ -178,7 +150,6 @@ impl Name {
 
 impl Iterator for Name {
     type Item = &'static str;
-
     fn next(&mut self) -> Option<&'static str> {
         match self.data {
             Name_::Plain(ref mut s) => s.next(),
@@ -239,16 +210,20 @@ impl fmt::Display for Name {
 
 /// Find the name of `c`, or `None` if `c` has no name.
 ///
-/// The return value is an iterator that yields `&'static str` components of the name successively
-/// (including spaces and hyphens). It implements `Display`, so can be used naturally to build
-/// `String`s or be printed. See also the [type-level docs][Name].
+/// The return value is an iterator that yields `&str` components of
+/// the name successively (including spaces and hyphens). It
+/// implements `Show`, and thus can be used naturally to build
+/// `String`s, or be printed, etc.
 ///
 /// # Example
 ///
 /// ```rust
-/// assert_eq!(unicode_names2::name('a').unwrap().to_string(), "LATIN SMALL LETTER A");
-/// assert_eq!(unicode_names2::name('\u{2605}').unwrap().to_string(), "BLACK STAR");
-/// assert_eq!(unicode_names2::name('☃').unwrap().to_string(), "SNOWMAN");
+/// assert_eq!(unicode_names2::name('a').map(|n| n.to_string()),
+///            Some("LATIN SMALL LETTER A".to_string()));
+/// assert_eq!(unicode_names2::name('\u{2605}').map(|n| n.to_string()),
+///            Some("BLACK STAR".to_string()));
+/// assert_eq!(unicode_names2::name('☃').map(|n| n.to_string()),
+///            Some("SNOWMAN".to_string()));
 ///
 /// // control code
 /// assert!(unicode_names2::name('\x00').is_none());
@@ -331,31 +306,32 @@ fn character_by_alias(name: &[u8]) -> Option<char> {
 /// Find the character called `name`, or `None` if no such character
 /// exists.
 ///
-/// This function uses the [UAX44-LM2] loose matching scheme for lookup. For more information, see
-/// the [crate-level docs][self].
-///
-/// [UAX44-LM2]: https://www.unicode.org/reports/tr44/tr44-34.html#UAX44-LM2
+/// This searches case-insensitively.
 ///
 /// # Example
 ///
 /// ```rust
 /// assert_eq!(unicode_names2::character("LATIN SMALL LETTER A"), Some('a'));
-/// assert_eq!(unicode_names2::character("latinsmalllettera"), Some('a'));
-/// assert_eq!(unicode_names2::character("Black_Star"), Some('★'));
+/// assert_eq!(unicode_names2::character("latin SMALL letter A"), Some('a'));
+/// assert_eq!(unicode_names2::character("latin small letter a"), Some('a'));
+/// assert_eq!(unicode_names2::character("BLACK STAR"), Some('★'));
 /// assert_eq!(unicode_names2::character("SNOWMAN"), Some('☃'));
 /// assert_eq!(unicode_names2::character("BACKSPACE"), Some('\x08'));
 ///
 /// assert_eq!(unicode_names2::character("nonsense"), None);
 /// ```
 pub fn character(search_name: &str) -> Option<char> {
-    let original_name = search_name;
-    let mut buf = [0; LONGEST_NAME_LEN];
-    let len = normalise_name(search_name, &mut buf);
-    let search_name = &buf[..len];
+    // + 1 so that we properly handle the case when `name` has a
+    // prefix of the longest name, but isn't exactly equal.
+    let mut buf = [0; MAX_NAME_LENGTH + 1];
+    for (place, byte) in buf.iter_mut().zip(search_name.bytes()) {
+        *place = byte.to_ascii_uppercase();
+    }
+    let search_name = buf.get(..search_name.len())?;
 
     // try `HANGUL SYLLABLE <choseong><jungseong><jongseong>`
-    if search_name.starts_with(NORMALISED_HANGUL_SYLLABLE_PREFIX.as_bytes()) {
-        let remaining = &search_name[NORMALISED_HANGUL_SYLLABLE_PREFIX.len()..];
+    if search_name.starts_with(HANGUL_SYLLABLE_PREFIX.as_bytes()) {
+        let remaining = &search_name[HANGUL_SYLLABLE_PREFIX.len()..];
         let (choseong, remaining) = jamo::slice_shift_choseong(remaining);
         let (jungseong, remaining) = jamo::slice_shift_jungseong(remaining);
         let (jongseong, remaining) = jamo::slice_shift_jongseong(remaining);
@@ -373,8 +349,8 @@ pub fn character(search_name: &str) -> Option<char> {
     }
 
     // try `CJK UNIFIED IDEOGRAPH-<digits>`
-    if search_name.starts_with(NORMALISED_CJK_UNIFIED_IDEOGRAPH_PREFIX.as_bytes()) {
-        let remaining = &search_name[NORMALISED_CJK_UNIFIED_IDEOGRAPH_PREFIX.len()..];
+    if search_name.starts_with(CJK_UNIFIED_IDEOGRAPH_PREFIX.as_bytes()) {
+        let remaining = &search_name[CJK_UNIFIED_IDEOGRAPH_PREFIX.len()..];
         if remaining.len() > 5 {
             return None;
         } // avoid overflow
@@ -387,7 +363,10 @@ pub fn character(search_name: &str) -> Option<char> {
                 _ => return None,
             }
         }
-        let ch = char::from_u32(v)?;
+        let ch = match char::from_u32(v) {
+            Some(ch) => ch,
+            None => return None,
+        };
 
         // check if the resulting code is indeed in the known ranges
         if is_cjk_unified_ideograph(ch) {
@@ -417,90 +396,26 @@ pub fn character(search_name: &str) -> Option<char> {
     let maybe_name = match name(codepoint) {
         None => {
             if true {
-                debug_assert!(false) // what?
+                debug_assert!(false)
             }
             return character_by_alias(search_name);
         }
         Some(name) => name,
     };
 
-    // `name(codepoint)` returns an iterator yielding words separated by spaces or hyphens.
-    // That means whenever a name contains a non-medial hyphen, it must be emulated by inserting an
-    // artificial empty word (`""`) between the space and the hyphen.
-    let mut cmp_name = search_name;
+    // run through the parts of the name, matching them against the
+    // parts of the input.
+    let mut passed_name = search_name;
     for part in maybe_name {
-        let part = match part {
-            "" => "-",       // Non-medial hyphens are preserved by `normalise_name`, check them.
-            " " => continue, // Spaces and medial hyphens are removed, ignore them.
-            "-" if codepoint != '\u{1180}' => continue, // But the hyphen in U+1180 is preserved.
-            word => word,
-        };
-
-        if let Some(rest) = cmp_name.strip_prefix(part.as_bytes()) {
-            cmp_name = rest;
-        } else {
+        let part = part.as_bytes();
+        let part_l = part.len();
+        if passed_name.len() < part_l || &passed_name[..part_l] != part {
             return character_by_alias(search_name);
         }
-    }
-
-    // "HANGUL JUNGSEONG O-E" is ambiguous, returning U+116C HANGUL JUNGSEONG OE instead.
-    // All other ways of spelling U+1180 will get properly detected, so it's enough to just check
-    // if the hyphen is in the right place.
-    if codepoint == '\u{116C}'
-        && original_name
-            .trim_end_matches(|c: char| c.is_ascii_whitespace() || c == '_')
-            .bytes()
-            .nth_back(1)
-            == Some(b'-')
-    {
-        return Some('\u{1180}');
+        passed_name = &passed_name[part_l..]
     }
 
     Some(codepoint)
-}
-
-/// Convert a Unicode name to a form that can be used for loose matching, as per
-/// [UAX#44](https://www.unicode.org/reports/tr44/tr44-34.html#Matching_Names).
-///
-/// This function matches `unicode_names2_generator::normalise_name` in implementation, except that
-/// the special case of U+1180 HANGUL JUNGSEONG O-E isn't handled here, because we don't yet know
-/// which character is being queried and a string comparison would be expensive to inspect each
-/// query with given it only matches for one character. Thus the case of U+1180 is handled at the
-/// end of [`character`].
-fn normalise_name(search_name: &str, buf: &mut [u8; LONGEST_NAME_LEN]) -> usize {
-    let mut cursor = 0;
-    let bytes = search_name.as_bytes();
-
-    for (i, c) in bytes.iter().map(u8::to_ascii_uppercase).enumerate() {
-        // "Ignore case, whitespace, underscore ('_'), [...]"
-        if c.is_ascii_whitespace() || c == b'_' {
-            continue;
-        }
-
-        // "[...] and all medial hyphens except the hyphen in U+1180 HANGUL JUNGSEONG O-E."
-        // See doc comment for why U+1180 isn't handled
-        if c == b'-'
-            && bytes.get(i - 1).map_or(false, u8::is_ascii_alphanumeric)
-            && bytes.get(i + 1).map_or(false, u8::is_ascii_alphanumeric)
-        {
-            continue;
-        }
-
-        if !c.is_ascii_alphanumeric() && c != b'-' {
-            // All unicode names comprise only of alphanumeric characters and hyphens after
-            // stripping spaces and underscores. Returning 0 effectively serves as returning `None`.
-            return 0;
-        }
-
-        if cursor >= buf.len() {
-            // No Unicode character has this long a name.
-            return 0;
-        }
-        buf[cursor] = c;
-        cursor += 1;
-    }
-
-    cursor
 }
 
 #[cfg(test)]
@@ -584,9 +499,9 @@ mod tests {
 
     #[test]
     fn character_negative() {
-        let long_name = "x".repeat(generated::LONGEST_NAME_LEN + 1);
-        let prefix = format!("{}x", generated::LONGEST_NAME); // This name would appear valid if truncated
-        let names = ["", "x", "öäå", "SPAACE", &long_name, &prefix];
+        let long_name = "x".repeat(100);
+        assert!(long_name.len() > MAX_NAME_LENGTH); // Otherwise this test is pointless
+        let names = ["", "x", "öäå", "SPAACE", &long_name];
         for &n in names.iter() {
             assert_eq!(character(n), None);
         }
@@ -681,31 +596,6 @@ mod tests {
         assert_eq!(super::character_by_alias(b"NEW LINE"), Some('\n'));
         assert_eq!(super::character_by_alias(b"BACKSPACE"), Some('\u{8}'));
         assert_eq!(super::character_by_alias(b"NOT AN ALIAS"), None);
-    }
-
-    #[test]
-    fn test_uax44() {
-        assert_eq!(character(" L_O_W l_i_n_e"), Some('_'));
-        assert_eq!(character("space \x09\x0a\x0c\x0d"), Some(' '));
-        assert_eq!(character("FULL S-T-O-P"), Some('.'));
-        assert_eq!(character("tibetan letter -a"), Some('\u{F60}'));
-        assert_eq!(character("tibetan letter- a"), Some('\u{F60}'));
-        assert_eq!(character("tibetan letter  -   a"), Some('\u{F60}'));
-        assert_eq!(character("tibetan letter_-_a"), Some('\u{F60}'));
-        assert_eq!(character("latinSMALLletterA"), Some('a'));
-
-        // Test exceptions related to U+1180
-        let jungseong_oe = Some('\u{116C}');
-        let jungseong_o_e = Some('\u{1180}');
-        assert_eq!(character("HANGUL JUNGSEONG OE"), jungseong_oe);
-        assert_eq!(character("HANGUL JUNGSEONG O_E"), jungseong_oe);
-        assert_eq!(character("HANGUL JUNGSEONG O E"), jungseong_oe);
-        assert_eq!(character("HANGUL JUNGSEONG O-E"), jungseong_o_e);
-        assert_eq!(character("HANGUL JUNGSEONG O-E\n"), jungseong_o_e);
-        assert_eq!(character("HANGUL JUNGSEONG O-E__"), jungseong_o_e);
-        assert_eq!(character("HANGUL JUNGSEONG O- E"), jungseong_o_e);
-        assert_eq!(character("HANGUL JUNGSEONG O -E"), jungseong_o_e);
-        assert_eq!(character("HANGUL JUNGSEONG O_-_E"), jungseong_o_e);
     }
 
     #[bench]
