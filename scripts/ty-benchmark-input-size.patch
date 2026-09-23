@@ -1,0 +1,44 @@
+--- a/crates/ruff_benchmark/benches/ty.rs
++++ b/crates/ruff_benchmark/benches/ty.rs
+@@ -1789,23 +1789,25 @@
+     ];
+ 
+     for (name, statement, repetitions) in cases {
+-        let mut code = String::from(
+-            "from contextlib import suppress\n\ndef may_raise(value: int) -> int:\n    return value\n\ndef f() -> int:\n    value = 0\n",
+-        );
+-        code.push_str(&statement.repeat(repetitions));
+-        code.push_str("    return value\n");
+-
+-        criterion.bench_function(name, |b| {
+-            b.iter_batched_ref(
+-                || setup_micro_case(&code),
+-                |case| {
+-                    let Case { db } = case;
+-                    let result = db.check();
+-                    assert_eq!(result.len(), 0);
+-                },
+-                BatchSize::SmallInput,
++        for multiplier in [1, 2, 3] {
++            let mut code = String::from(
++                "from contextlib import suppress\n\ndef may_raise(value: int) -> int:\n    return value\n\ndef f() -> int:\n    value = 0\n",
+             );
+-        });
++            code.push_str(&statement.repeat(repetitions * multiplier));
++            code.push_str("    return value\n");
++
++            criterion.bench_function(&format!("{name}/input_{multiplier}"), |b| {
++                b.iter_batched_ref(
++                    || setup_micro_case(&code),
++                    |case| {
++                        let Case { db } = case;
++                        let result = db.check();
++                        assert_eq!(result.len(), 0);
++                    },
++                    BatchSize::SmallInput,
++                );
++            });
++        }
+     }
+ }
+ 

@@ -1,10 +1,11 @@
-name: Temporary ty benchmark diagnostics
+name: Temporary ty benchmark input-size experiment
 
-# Compare existing binaries across hosts without publishing experimental CodSpeed results.
+# Rebuild the original regression with larger Python inputs without publishing CodSpeed results.
 on:
   pull_request:
     paths:
       - .github/workflows/ty-benchmark-diagnostics.yaml
+      - scripts/ty-benchmark-input-size.patch
   workflow_dispatch:
 
 permissions:
@@ -15,16 +16,111 @@ defaults:
   run:
     shell: bash
 
+env:
+  UV_LOCKED: 1
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_PROFILE_DEV_LTO: "false"
+  CARGO_PROFILE_DEV_OPT_LEVEL: 0
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+
 jobs:
+  build:
+    name: "Build original ${{ matrix.variant }} with input-size cases"
+    if: github.repository == 'astral-sh/ruff'
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: base
+            source: 4d322b8eca59d5d0f8cb4fd2c6bfd9f9ba673688
+          # This is the merge commit that produced the original #28712 benchmark artifact.
+          - variant: head
+            source: 6b0fd7a9550b28f7c81d15770264181bcccf150d
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Preserve the experimental harness patch
+        run: cp scripts/ty-benchmark-input-size.patch "$RUNNER_TEMP/ty-benchmark-input-size.patch"
+
+      - name: Check out the original benchmark source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.source }}
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.11"
+          checksum: "4ae93e0f148a18434cc094072547cec88912fc4a72b984183c7d0d0e9586cb5e"
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: false
+
+      - name: Apply the identical input-size harness
+        run: |
+          git apply --check "$RUNNER_TEMP/ty-benchmark-input-size.patch"
+          git apply "$RUNNER_TEMP/ty-benchmark-input-size.patch"
+          mkdir -p build-results
+          git diff --check
+          git diff > build-results/harness.patch
+          {
+            git rev-parse HEAD
+            sha256sum "$RUNNER_TEMP/ty-benchmark-input-size.patch" Cargo.lock uv.lock
+            rustup show
+            rustc --version --verbose
+            uv --version
+            uv run --only-dev cargo codspeed --version
+          } | tee build-results/toolchain.txt
+
+      # Preserve the original target selection and feature unification as well as its profile.
+      - name: Build with the original instrumented benchmark settings
+        run: |
+          uv run --only-dev cargo codspeed build -m simulation -m memory \
+            --features "codspeed,module_resolution,ty_instrumented" --profile profiling \
+            --no-default-features -p ruff_benchmark \
+            --bench module_resolution --bench ty --bench ty_constraint_set
+
+      - name: Capture compiled code and binary identity
+        run: |
+          cp target/codspeed/analysis/ruff_benchmark/ty build-results/ty
+          sha256sum build-results/ty | tee build-results/binary-sha256.txt
+          nm --defined-only --print-size build-results/ty > build-results/symbols.txt
+          awk '$3 ~ /^[Tt]$/ && $4 ~ /sync_context_manager_suppresses|analyze_single/ { print $4 }' \
+            build-results/symbols.txt > build-results/hot-symbols.txt
+          test -s build-results/hot-symbols.txt
+          while read -r symbol; do
+            objdump --disassemble="$symbol" build-results/ty
+          done < build-results/hot-symbols.txt > build-results/hot-disassembly.txt
+          grep -Eq '^[[:space:]]+[[:xdigit:]]+:' build-results/hot-disassembly.txt
+          gzip build-results/hot-disassembly.txt
+          gzip build-results/symbols.txt
+
+      - name: Upload compiled benchmark and code-generation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-benchmark-input-size-${{ matrix.variant }}-binary
+          path: build-results
+          compression-level: 1
+          retention-days: 7
+
   compare:
-    name: "Compare benchmark binaries (host ${{ matrix.host }})"
+    name: "Compare original binaries with ${{ matrix.input }}x Python input"
+    needs: build
     if: github.repository == 'astral-sh/ruff'
     runs-on: depot-ubuntu-24.04
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        host: [1, 2, 3]
+        input: [1, 2, 3]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -39,18 +135,14 @@ jobs:
       - name: Download baseline binary
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: benchmarks-instrumented-ty-binary
+          name: ty-benchmark-input-size-base-binary
           path: base-artifact
-          run-id: 35718148708
-          github-token: ${{ github.token }}
 
       - name: Download PR binary
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: benchmarks-instrumented-ty-binary
+          name: ty-benchmark-input-size-head-binary
           path: head-artifact
-          run-id: 35746936084
-          github-token: ${{ github.token }}
 
       - name: Capture host and original library versions
         run: |
@@ -98,13 +190,8 @@ jobs:
 
       - name: Prepare identical benchmark invocation
         run: |
-          printf '%s  %s\n' \
-            2c843a85b29783c5404368c3e0e1dffe304222a02d715586d7869a458cb21484 \
-            base-artifact/analysis/ruff_benchmark/ty \
-            4c6adfbdcc2062a16d56f56a3bf8fd905054dfe6859ee76411e3b8e5d95869e0 \
-            head-artifact/analysis/ruff_benchmark/ty | sha256sum --check
           for variant in base head; do
-            cp "$variant-artifact/analysis/ruff_benchmark/ty" "diagnostic-$variant"
+            cp "$variant-artifact/ty" "diagnostic-$variant"
             chmod +x "diagnostic-$variant"
             sha256sum "diagnostic-$variant"
             ldd "diagnostic-$variant"
@@ -114,8 +201,8 @@ jobs:
           #!/usr/bin/env bash
           set -euo pipefail
           variant="$1"
-          repetition="$2"
-          output="$PWD/diagnostic-results/$variant-$repetition"
+          input="$2"
+          output="$PWD/diagnostic-results/$variant-input-$input"
           mkdir -p "$output/profiles"
           cp diagnostic-results/*.txt "$output/"
           # Keep the executable's path and argv identical between base and head.
@@ -125,7 +212,7 @@ jobs:
             codspeed run --mode simulation --skip-setup --skip-upload \
             --cycle-estimation=true --exclude-allocations=false \
             --profile-folder "$output/profiles" \
-            -- "./diagnostic-ty 'ty_micro\[[^a-l]'" \
+            -- "./diagnostic-ty 'repeated_suppressing_context_managers.*input_$input$'" \
             2>&1 | tee "$output/runner.log"
           # Callgrind can append multiple benchmark parts to the same .out file.
           find "$output/profiles" -type f -name '*.out*' -exec awk '
@@ -139,34 +226,38 @@ jobs:
           ' {} + | tee "$output/context-manager-totals.txt"
           SCRIPT
 
-      - name: Measure base, first repetition
-        run: bash "$RUNNER_TEMP/run-ty-benchmark-diagnostic.sh" base 1
+      - name: Measure base
+        env:
+          INPUT_MULTIPLIER: ${{ matrix.input }}
+        run: bash "$RUNNER_TEMP/run-ty-benchmark-diagnostic.sh" base "$INPUT_MULTIPLIER"
 
-      - name: Upload base, first repetition
+      - name: Upload base measurements
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ty-benchmark-diagnostics-${{ matrix.host }}-base-1
-          path: diagnostic-results/base-1
+          name: ty-benchmark-input-size-${{ matrix.input }}-base
+          path: diagnostic-results/base-input-${{ matrix.input }}
           compression-level: 6
-          retention-days: 3
+          retention-days: 7
 
-      - name: Measure head, first repetition
-        run: bash "$RUNNER_TEMP/run-ty-benchmark-diagnostic.sh" head 1
+      - name: Measure head
+        env:
+          INPUT_MULTIPLIER: ${{ matrix.input }}
+        run: bash "$RUNNER_TEMP/run-ty-benchmark-diagnostic.sh" head "$INPUT_MULTIPLIER"
 
-      - name: Upload head, first repetition
+      - name: Upload head measurements
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ty-benchmark-diagnostics-${{ matrix.host }}-head-1
-          path: diagnostic-results/head-1
+          name: ty-benchmark-input-size-${{ matrix.input }}-head
+          path: diagnostic-results/head-input-${{ matrix.input }}
           compression-level: 6
-          retention-days: 3
+          retention-days: 7
 
       - name: Upload host metadata
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ty-benchmark-diagnostics-${{ matrix.host }}-metadata
+          name: ty-benchmark-input-size-${{ matrix.input }}-metadata
           path: diagnostic-results/*.txt
-          retention-days: 3
+          retention-days: 7
