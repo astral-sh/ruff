@@ -1333,8 +1333,8 @@ impl<'db> IntersectionBuilder<'db> {
             let union = UnionType::from_elements(
                 self.db,
                 &self.env,
-                std::mem::take(&mut self.intersections)
-                    .into_iter()
+                self.intersections
+                    .drain(..)
                     .map(|inner| inner.build(self.db, &self.env)),
             );
             let mut inner = InnerIntersectionBuilder::default();
@@ -2376,24 +2376,16 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 continue;
             };
             let narrowed = union.filter(db, |element| {
+                let is_disjoint = |other, polarity| {
+                    simplify_intersection_pair(db, env, *element, other, polarity)
+                        == IntersectionSimplification::Disjoint
+                };
                 !self.positive.iter().any(|other| {
-                    *other != positive
-                        && simplify_intersection_pair(
-                            db,
-                            env,
-                            *element,
-                            *other,
-                            IntersectionPolarity::Positive,
-                        ) == IntersectionSimplification::Disjoint
-                }) && !self.negative.iter().any(|negative| {
-                    simplify_intersection_pair(
-                        db,
-                        env,
-                        *element,
-                        *negative,
-                        IntersectionPolarity::Mixed,
-                    ) == IntersectionSimplification::Disjoint
-                })
+                    *other != positive && is_disjoint(*other, IntersectionPolarity::Positive)
+                }) && !self
+                    .negative
+                    .iter()
+                    .any(|negative| is_disjoint(*negative, IntersectionPolarity::Mixed))
             });
             if narrowed == positive {
                 index += 1;

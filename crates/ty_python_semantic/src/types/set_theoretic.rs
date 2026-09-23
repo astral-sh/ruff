@@ -957,9 +957,8 @@ impl<'db> IntersectionType<'db> {
                     ),
                 )
             };
-        let env = env.clone();
         Some(alternatives.map(move |(element, negative)| {
-            let mut builder = IntersectionBuilder::new(db, &env);
+            let mut builder = IntersectionBuilder::new(db, env);
             if negative {
                 builder.add_negative_in_place(element);
             } else {

@@ -284,8 +284,6 @@ both: Both = AV()
 
 def members(value: Both):
     reveal_type(value)  # revealed: (A | B | C | D | E) & (V | W | X | Y | Z)
-    left: Left = value
-    right: Right = value
     assert_type(value.left, int)
     assert_type(value.right, str)
 ```

@@ -1521,14 +1521,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         intersection: IntersectionType<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        intersection.split_disjunction(db, self.env).map_or_else(
-            || self.never(),
-            |alternatives| {
-                alternatives.when_all(db, self.constraints, |alternative| {
-                    self.check_type_pair(db, alternative, target)
-                })
-            },
-        )
+        let Some(alternatives) = intersection.split_disjunction(db, self.env) else {
+            return self.never();
+        };
+        alternatives.when_all(db, self.constraints, |alternative| {
+            self.check_type_pair(db, alternative, target)
+        })
     }
 
     /// Return the collected error context, or an empty tree if collection was disabled.
@@ -3362,14 +3360,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         intersection: IntersectionType<'db>,
         other: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        intersection.split_disjunction(db, self.env).map_or_else(
-            || self.never(),
-            |alternatives| {
-                alternatives.when_all(db, self.constraints, |alternative| {
-                    self.check_type_pair(db, alternative, other)
-                })
-            },
-        )
+        let Some(alternatives) = intersection.split_disjunction(db, self.env) else {
+            return self.never();
+        };
+        alternatives.when_all(db, self.constraints, |alternative| {
+            self.check_type_pair(db, alternative, other)
+        })
     }
 
     pub(super) fn check_type_pair(
