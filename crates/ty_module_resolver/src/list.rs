@@ -25,7 +25,7 @@ fn all_modules_impl<'db>(
     let mut stack = vec![list_modules_impl(db, resolver_environment)];
     while let Some(listing) = stack.pop() {
         modules.extend_from_slice(&listing.modules);
-        for module in &listing.modules {
+        for module in &listing.modules_with_possible_children {
             stack.extend(module.submodule_listing(db));
         }
         // Reach local stub overrides through unresolved names;
@@ -1569,6 +1569,19 @@ not_a_directory
         assert_eq!(enumerated_names(&db), ["acme", "acme.runtime"]);
 
         Ok(())
+    }
+
+    #[test]
+    fn enumeration_includes_partial_stub_descendants_of_source_modules() {
+        let db = TestCaseBuilder::new()
+            .with_src_files(&[("acme.py", "")])
+            .with_site_packages_files(&[
+                ("acme-stubs/child.pyi", ""),
+                ("acme-stubs/py.typed", "partial"),
+            ])
+            .build()
+            .db;
+        assert_eq!(enumerated_names(&db), ["acme", "acme.child"]);
     }
 
     #[test]
