@@ -8,6 +8,7 @@ use crate::{TestServer, TestServerBuilder};
 #[test]
 fn batch_updates_only_indexed_sources() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new(""), None)?
         .with_files([
             ("old.py", ""),
             ("other.py", ""),
@@ -64,6 +65,7 @@ old",
 #[test]
 fn batch_renames_a_package_and_a_module_file() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new(""), None)?
         .with_files([
             ("old_pkg/__init__.py", "from old_pkg.helpers import VALUE"),
             ("old_pkg/helpers.py", "VALUE = 1"),
@@ -126,6 +128,7 @@ fn batch_renames_a_package_and_a_module_file() -> anyhow::Result<()> {
 #[test]
 fn unsupported_renames_do_not_suppress_supported_edits() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new(""), None)?
         .with_files([("old.py", ""), ("use.py", "import old"), ("notes.txt", "")])?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -212,6 +215,7 @@ fn combines_project_edits_and_skips_conflicting_files() -> anyhow::Result<()> {
 #[test]
 fn disabled_language_services_suppress_file_rename_edits() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new(""), None)?
         .with_initialization_options(&ClientOptions::default().with_disable_language_services(true))
         .with_files([("old.py", ""), ("use.py", "import old")])?
         .build()
