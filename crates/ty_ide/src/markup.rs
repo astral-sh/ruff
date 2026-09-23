@@ -112,9 +112,14 @@ mod tests {
 
     #[test]
     fn fence_spanning_formatted_values() {
+        let code = std::fmt::from_fn(|f| {
+            f.write_str("``")?;
+            f.write_str("```")
+        });
+
         assert_eq!(
             MarkupKind::Markdown
-                .fenced_code_block(format_args!("{}{}", "``", "```"), "python")
+                .fenced_code_block(code, "python")
                 .to_string(),
             "``````python\n`````\n``````"
         );
