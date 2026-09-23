@@ -12,6 +12,88 @@ use crate::diagnostic_snapshots::condensed_document_diagnostic_snapshot;
 use crate::{TestServer, TestServerBuilder};
 
 #[test]
+fn standalone_analysis_refreshes_dependencies_and_configuration() -> Result<()> {
+    let source = "from dependency import value
+result: int = value
+";
+    let configuration = "[environment]\nextra-paths = ['deps']";
+    let mut server = TestServerBuilder::new()?
+        .with_file("ty.toml", configuration)?
+        .with_file("deps/dependency.py", "value = 1")?
+        .with_watched_file_support(true)
+        .build();
+    let (_, watchers) = watcher_registrations(&mut server)?;
+    assert!(!watchers.is_empty());
+    server.open_text_document("main.py", source, 1);
+    assert!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request("main.py", None))
+            .is_empty()
+    );
+
+    server.write_file("deps/dependency.py", "value = 'changed'")?;
+    server.did_change_watched_file("deps/dependency.py", lsp_types::FileChangeType::Changed);
+    assert!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request("main.py", None))
+            .contains("not assignable")
+    );
+
+    server.write_file(
+        "ty.toml",
+        format!("{configuration}\n[rules]\ninvalid-assignment = 'ignore'"),
+    )?;
+    server.did_change_watched_file("ty.toml", lsp_types::FileChangeType::Changed);
+    assert!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request("main.py", None))
+            .is_empty()
+    );
+
+    Ok(())
+}
+
+#[test]
+fn standalone_analysis_refreshes_dependencies_after_rewatch() -> Result<()> {
+    let external = TestServerBuilder::new()?;
+    let dependency = external.file_path("dependency.py");
+    let configuration = format!(
+        "[environment]\nextra-paths = [{}]",
+        serde_json::to_string(&external.file_path("").as_str())?,
+    );
+    let mut server = TestServerBuilder::new()?
+        .with_file("ty.toml", &configuration)?
+        .with_file(&dependency, "value = 1")?
+        .with_watched_file_support(true)
+        .build();
+    watcher_registrations(&mut server)?;
+    server.open_text_document(
+        "main.py",
+        "from dependency import value
+result: int = value
+",
+        1,
+    );
+    assert!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request("main.py", None))
+            .is_empty()
+    );
+
+    server.write_file("ty.toml", "")?;
+    server.did_change_watched_file("ty.toml", lsp_types::FileChangeType::Changed);
+    watcher_registrations(&mut server)?;
+    server.acknowledge_unregistration()?;
+    server.write_file(&dependency, "value = 'changed'")?;
+    server.write_file("ty.toml", configuration)?;
+    server.did_change_watched_file("ty.toml", lsp_types::FileChangeType::Changed);
+    watcher_registrations(&mut server)?;
+    server.acknowledge_unregistration()?;
+    assert!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request("main.py", None))
+            .contains("not assignable")
+    );
+
+    Ok(())
+}
+
+#[test]
 fn refreshes_script_dependency_after_rewatch() -> Result<()> {
     let script = SystemPath::new("src/script.py");
     let dependency = SystemPath::new("dependencies/dependency.py");

@@ -25,8 +25,8 @@ use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
 use ty_project::{
-    ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ProjectReloadResult,
-    ScriptEnvironmentAvailability, UseUv, UvSyncChanges,
+    ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectIndexing, ProjectMetadata,
+    ProjectReloadResult, ScriptEnvironmentAvailability, UseUv, UvSyncChanges,
 };
 
 use index::DocumentError;
@@ -88,6 +88,10 @@ pub(crate) struct Session {
     /// by a configuration discovery process that might settle on an ancestor
     /// of the workspace).
     projects: BTreeMap<SystemPathBuf, ProjectState>,
+
+    /// Analysis used when the client supplies no workspace folders.
+    /// Its CWD-derived root is not an editor workspace identity.
+    standalone: Option<StandaloneProject>,
 
     /// Initialization options that were provided by the client during server initialization.
     initialization_options: InitializationOptions,
@@ -165,6 +169,31 @@ pub(crate) struct ProjectState {
     pub(crate) db: ProjectDatabase,
 }
 
+struct StandaloneProject {
+    settings: Arc<WorkspaceSettings>,
+    state: ProjectState,
+}
+
+/// The analysis context and, for workspace projects, the identity used to select editor settings.
+enum ProjectSelection<'a> {
+    Workspace {
+        workspace_root: &'a SystemPath,
+        project: &'a ProjectState,
+    },
+    Standalone {
+        project: &'a StandaloneProject,
+    },
+}
+
+impl<'a> ProjectSelection<'a> {
+    fn state(self) -> &'a ProjectState {
+        match self {
+            Self::Workspace { project, .. } => project,
+            Self::Standalone { project } => &project.state,
+        }
+    }
+}
+
 impl Session {
     pub(crate) fn new(
         resolved_client_capabilities: ResolvedClientCapabilities,
@@ -198,6 +227,7 @@ impl Session {
             script_progress: ScriptProgress::default(),
             global_settings: Arc::new(GlobalSettings::default()),
             projects: BTreeMap::new(),
+            standalone: None,
             resolved_client_capabilities,
             request_queue: RequestQueue::new(),
             shutdown_requested: false,
@@ -281,13 +311,31 @@ impl Session {
     pub(crate) fn uv_sync_wakeups(&self) -> Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)> {
         self.projects
             .iter()
-            .map(|(root, state)| (root.clone(), state.db.uv_environments().sync_wakeups()))
+            .map(|(root, state)| (root.as_path(), state))
+            .chain(
+                self.standalone
+                    .iter()
+                    .map(|project| (self.native_system.current_directory(), &project.state)),
+            )
+            .map(|(root, state)| {
+                (
+                    root.to_path_buf(),
+                    state.db.uv_environments().sync_wakeups(),
+                )
+            })
             .collect()
     }
 
     /// Gives one project's uv environments an opportunity to make progress.
     pub(crate) fn poll_uv_sync(&mut self, client: &Client, project_root: &SystemPath) {
-        let Some(project) = self.projects.get_mut(project_root) else {
+        let project = if project_root == self.native_system.current_directory()
+            && self.standalone.is_some()
+        {
+            self.standalone.as_mut().map(|project| &mut project.state)
+        } else {
+            self.projects.get_mut(project_root)
+        };
+        let Some(project) = project else {
             tracing::debug!(
                 "Ignored uv synchronization wakeup for removed project `{project_root}`"
             );
@@ -337,7 +385,8 @@ impl Session {
             client.send_request::<lsp_types::DiagnosticRefreshRequest>(self, (), |_, ()| {});
         } else if changes.project.is_some() {
             publish_all_document_diagnostics(self, client);
-        } else if let Some(project) = self.projects.get(project_root) {
+        } else {
+            let project = self.project_state(&AnySystemPath::System(project_root.to_path_buf()));
             for file in changes.scripts {
                 if let Some(document) = project.db.document(file) {
                     let document = OpenDocumentHandle::from_document(document);
@@ -481,10 +530,20 @@ impl Session {
 
     /// Returns an iterator, in arbitrary order, over all project databases
     /// in this session.
-    pub(crate) fn project_dbs(&self) -> impl Iterator<Item = &ProjectDatabase> {
+    pub(crate) fn project_dbs(&self) -> impl Iterator<Item = &ProjectDatabase> + Clone {
         self.projects
             .values()
+            .chain(self.standalone.iter().map(|project| &project.state))
             .map(|project_state| &project_state.db)
+    }
+
+    /// Returns one path selecting each active project, including standalone analysis.
+    pub(crate) fn project_paths(&self) -> impl Iterator<Item = &SystemPath> {
+        self.projects.keys().map(SystemPathBuf::as_path).chain(
+            self.standalone
+                .iter()
+                .map(|_| self.native_system.current_directory()),
+        )
     }
 
     /// Returns a mutable reference to the project's [`ProjectDatabase`] in which the given `path`
@@ -506,7 +565,7 @@ impl Session {
     /// If the path is a virtual path, it will return the first project database in the session.
     fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
         self.project_state_for_document(path)
-            .map(|(_, project)| project)
+            .map(ProjectSelection::state)
             .expect("To always have at least one project")
     }
 
@@ -517,10 +576,17 @@ impl Session {
     ///
     /// [`project_db`]: Session::project_db
     pub(crate) fn project_state_mut(&mut self, path: &AnySystemPath) -> &mut ProjectState {
-        self.project_state_for_document(path)
-            .map(|(root, _)| root.to_path_buf())
-            .and_then(|root| self.projects.get_mut(&root))
-            .expect("To always have at least one project")
+        match self.project_state_for_document(path) {
+            Some(ProjectSelection::Workspace { workspace_root, .. }) => {
+                let root = workspace_root.to_path_buf();
+                self.projects.get_mut(&root)
+            }
+            Some(ProjectSelection::Standalone { .. }) => {
+                self.standalone.as_mut().map(|project| &mut project.state)
+            }
+            None => None,
+        }
+        .expect("To always have at least one project")
     }
 
     /// Selects a project to use for analysis of the given document (identified
@@ -531,14 +597,10 @@ impl Session {
     /// path whose import search paths contain the file. If no project matches, or the path is virtual,
     /// we select the project associated with the workspace root path that sorts first lexicographically.
     ///
-    /// Returns a tuple where the first element is the workspace root of the
-    /// selected project and the second element is the state object for the selected project.
+    /// With no workspace projects, selects standalone analysis if initialized.
     ///
     /// Returns None when no projects exist.
-    fn project_state_for_document(
-        &self,
-        path: &AnySystemPath,
-    ) -> Option<(&SystemPath, &ProjectState)> {
+    fn project_state_for_document(&self, path: &AnySystemPath) -> Option<ProjectSelection<'_>> {
         path.as_system()
             .and_then(|path| {
                 self.projects
@@ -551,7 +613,15 @@ impl Session {
                     })
             })
             .or_else(|| self.projects.first_key_value())
-            .map(|(workspace_root, project)| (workspace_root.as_path(), project))
+            .map(|(workspace_root, project)| ProjectSelection::Workspace {
+                workspace_root: workspace_root.as_path(),
+                project,
+            })
+            .or_else(|| {
+                self.standalone
+                    .as_ref()
+                    .map(|project| ProjectSelection::Standalone { project })
+            })
     }
 
     pub(crate) fn apply_changes(
@@ -594,7 +664,9 @@ impl Session {
 
     /// Returns a mutable iterator over all projects.
     fn project_states_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectState> + '_ {
-        self.projects.values_mut()
+        self.projects
+            .values_mut()
+            .chain(self.standalone.iter_mut().map(|project| &mut project.state))
     }
 
     /// Initializes a sequence of workspace folders identified by URI
@@ -663,6 +735,7 @@ impl Session {
         // Note that this is a divergence from previous behavior:
         // https://github.com/astral-sh/ruff/pull/19614
         let mut global_options: Option<GlobalOptions> = None;
+        let mut initialized_roots = Vec::new();
 
         for (uri, options) in workspace_folders {
             // Last setting wins.
@@ -676,7 +749,14 @@ impl Session {
             if !options.unknown.is_empty() {
                 warn_about_unknown_options(client, Some(&uri), &options.unknown);
             }
-            self.initialize_workspace_folder(client, &uri, options.workspace);
+            if let Some(root) = self.initialize_workspace_folder(client, &uri, options.workspace) {
+                initialized_roots.push(root);
+            }
+        }
+
+        if self.workspaces.workspaces.is_empty() {
+            global_options = Some(self.initialization_options.options.global.clone());
+            self.initialize_standalone_project(client);
         }
 
         if let Some(global_options) = global_options {
@@ -689,7 +769,27 @@ impl Session {
             }
         }
 
+        self.initialize_open_documents(client, &initialized_roots);
+        if !self.projects.is_empty()
+            && let Some(standalone) = self.standalone.take()
+        {
+            for uri in standalone.state.untracked_files_with_pushed_diagnostics {
+                self.clear_diagnostics(client, &uri);
+            }
+        }
+
+        self.bump_revision();
         self.register_capabilities(client);
+        for root in initialized_roots {
+            publish_settings_diagnostics(self, client, root);
+        }
+        if self.standalone.is_some() {
+            publish_settings_diagnostics(
+                self,
+                client,
+                self.native_system.current_directory().to_path_buf(),
+            );
+        }
 
         // New workspace settings can affect diagnostics in existing workspaces. Re-registering
         // diagnostic support does not invalidate the client's cached results. There are no
@@ -701,6 +801,10 @@ impl Session {
         {
             client.send_request::<lsp_types::DiagnosticRefreshRequest>(self, (), |_, ()| {});
         }
+        if self.workspace_configuration_initialized {
+            publish_all_document_diagnostics(self, client);
+        }
+        self.resume_suspended_workspace_diagnostic_request(client);
         self.workspace_configuration_initialized = true;
     }
 
@@ -717,7 +821,7 @@ impl Session {
         client: &Client,
         uri: &Uri,
         options: WorkspaceOptions,
-    ) {
+    ) -> Option<SystemPathBuf> {
         let options = self
             .initialization_options
             .options
@@ -729,7 +833,7 @@ impl Session {
 
         let Ok(root) = uri.to_file_path() else {
             tracing::debug!("Ignoring workspace with non-path root: {uri}");
-            return;
+            return None;
         };
 
         // Realistically I don't think this can fail because we got the path from a Uri
@@ -740,7 +844,7 @@ impl Session {
                     "Ignoring workspace with non-UTF8 root: {root}",
                     root = root.display()
                 );
-                return;
+                return None;
             }
         };
 
@@ -758,36 +862,84 @@ impl Session {
         let settings = options.into_settings(workspace_directory, client, &*self.native_system);
         let Some(workspace) = self.workspaces.workspaces.get_mut(&root) else {
             tracing::debug!("Ignoring workspace `{uri}` since it was not registered");
-            return;
+            return None;
         };
         if workspace.is_initialized() {
             tracing::debug!(
                 "Ignoring workspace initialization for `{uri}` \
                  since it has already been initialized"
             );
-            return;
+            return None;
         }
         workspace.initialize(settings);
+        let settings = workspace.settings_arc();
 
         // For now, create one project database per workspace. Future support for nested projects
         // may instead manage the project collection inside ProjectDatabase.
+        let db = self.create_project(
+            client,
+            workspace_directory,
+            &settings,
+            ProjectIndexing::ProjectRoot,
+        );
+        let untracked = self
+            .projects
+            .remove(&root)
+            .map(|state| state.untracked_files_with_pushed_diagnostics)
+            .unwrap_or_default();
+        self.projects.insert(
+            root.clone(),
+            ProjectState {
+                db,
+                untracked_files_with_pushed_diagnostics: untracked,
+            },
+        );
+        Some(root)
+    }
+
+    fn initialize_standalone_project(&mut self, client: &Client) {
+        let root = self.native_system.current_directory();
+        let settings = self
+            .initialization_options
+            .options
+            .workspace
+            .clone()
+            .into_settings(root, client, &*self.native_system);
+        let mut db = self.create_project(client, root, &settings, ProjectIndexing::Disabled);
+        db.set_check_mode(CheckMode::OpenFiles);
+        self.standalone = Some(StandaloneProject {
+            settings: Arc::new(settings),
+            state: ProjectState {
+                db,
+                untracked_files_with_pushed_diagnostics: Vec::new(),
+            },
+        });
+    }
+
+    fn create_project(
+        &self,
+        client: &Client,
+        root: &SystemPath,
+        settings: &WorkspaceSettings,
+        indexing: ProjectIndexing,
+    ) -> ProjectDatabase {
         let system = LSPSystem::new(
             self.index.as_ref().unwrap().clone(),
             self.native_system.clone(),
             self.initialization_options.workspace_trust,
         );
 
-        let configuration_file = workspace.settings.configuration_file();
+        let configuration_file = settings.configuration_file();
 
         let metadata = if let Some(configuration_file) = configuration_file {
             ProjectMetadata::from_config_file(
                 configuration_file.clone(),
-                workspace_directory,
+                root,
                 &system,
                 self.use_uv,
             )
         } else {
-            ProjectMetadata::discover_with_uv(workspace_directory, &system, self.use_uv)
+            ProjectMetadata::discover_with_uv(root, &system, self.use_uv)
         };
 
         let (mut metadata, discovery_result) =
@@ -796,7 +948,7 @@ impl Session {
                 Err(err) => {
                     let Ok(metadata) = ProjectMetadata::from_options(
                         Options::default(),
-                        workspace_directory.to_path_buf(),
+                        root.to_path_buf(),
                         None,
                         &UseDefaultStrategy,
                     );
@@ -804,11 +956,11 @@ impl Session {
                 }
             };
 
-        if let Some(fallback_options) = workspace.settings.fallback_options() {
+        if let Some(fallback_options) = settings.fallback_options() {
             metadata.set_fallback_options(fallback_options.clone());
         }
 
-        if let Some(override_options) = workspace.settings.override_options() {
+        if let Some(override_options) = settings.override_options() {
             metadata.set_override_options(override_options.clone());
         }
 
@@ -822,22 +974,20 @@ impl Session {
             .and_then(|()| ProjectDatabase::fallible(metadata.clone(), system.clone()));
 
         let mut db = project.unwrap_or_else(|err| {
+            let uri = Uri::from_file_path(root.as_std_path())
+                .map_or_else(|()| root.to_string(), |uri| uri.to_string());
             tracing::error!(
-                "Failed to load project for workspace `{uri}`: {err:#}. \
+                "Failed to load project at `{uri}`: {err:#}. \
                  Continuing with valid settings"
             );
             client.show_error_message(format!(
-                "Failed to load project for workspace {uri}. {}",
+                "Failed to load project at {uri}. {}",
                 self.client_name.log_guidance(),
             ));
             ProjectDatabase::use_defaults(metadata, system)
         });
 
-        // Carry forward diagnostic state if any exists
-        let previous = self.projects.remove(&root);
-        let untracked = previous
-            .map(|state| state.untracked_files_with_pushed_diagnostics)
-            .unwrap_or_default();
+        db.project().set_indexing(&mut db, indexing);
         let scripts: Vec<_> = db.project().script_files(&db).iter().collect();
         Self::synchronize_closed_scripts(
             &mut db,
@@ -846,15 +996,84 @@ impl Session {
             self.resolved_client_capabilities,
             &self.script_progress,
         );
-        self.projects.insert(
-            root.clone(),
-            ProjectState {
-                db,
-                untracked_files_with_pushed_diagnostics: untracked,
-            },
-        );
+        db
+    }
 
-        publish_settings_diagnostics(self, client, root);
+    /// Seeds new databases from the session's documents; buffers never move between projects.
+    fn initialize_open_documents(&mut self, client: &Client, initialized_roots: &[SystemPathBuf]) {
+        let capabilities = self.resolved_client_capabilities;
+        let progress = self.script_progress.clone();
+        let index = self.index.clone();
+        let use_uv = self.use_uv;
+        let documents: Vec<_> = self
+            .index()
+            .file_documents()
+            .map(|document| {
+                (
+                    OpenDocumentHandle::from_document(document),
+                    document.language_id(),
+                )
+            })
+            .collect();
+        for (document, language_id) in documents {
+            let selection = self.project_state_for_document(document.notebook_or_file_path());
+            let (state, is_standalone) = match selection {
+                Some(ProjectSelection::Workspace { workspace_root, .. }) => {
+                    if !initialized_roots
+                        .iter()
+                        .any(|root| root.as_path() == workspace_root)
+                    {
+                        continue;
+                    }
+                    let root = workspace_root.to_path_buf();
+                    (self.projects.get_mut(&root), false)
+                }
+                Some(ProjectSelection::Standalone { .. }) => (
+                    self.standalone.as_mut().map(|project| &mut project.state),
+                    true,
+                ),
+                None => continue,
+            };
+            let Some(state) = state else { continue };
+            if let AnySystemPath::System(path) = document.notebook_or_file_path() {
+                // As on didOpen, synchronize saved script metadata before analyzing the buffer.
+                // The new database shares the session's overlay, so temporarily hide it here.
+                if use_uv != UseUv::Off
+                    && language_id == Some(LanguageId::Python)
+                    && let Some(index) = &index
+                {
+                    if let Some(system) = state
+                        .db
+                        .system_mut()
+                        .as_any_mut()
+                        .downcast_mut::<LSPSystem>()
+                    {
+                        system.set_index(Arc::new(Index::new()));
+                    }
+                    File::sync_path(&mut state.db, path);
+                    if let Ok(file) = system_path_to_file(&state.db, path) {
+                        Self::request_script_sync(
+                            &mut state.db,
+                            file,
+                            client,
+                            capabilities,
+                            ScriptEnvironmentAvailability::Pending,
+                            &progress,
+                        );
+                    }
+                    if let Some(system) = state
+                        .db
+                        .system_mut()
+                        .as_any_mut()
+                        .downcast_mut::<LSPSystem>()
+                    {
+                        system.set_index(index.clone());
+                    }
+                }
+                state.db.apply_changes(&[ChangeEvent::Opened(path.clone())]);
+            }
+            Self::open_document_in_db(&mut state.db, &document, language_id, is_standalone);
+        }
     }
 
     /// Adds an uninitialized workspace to this session.
@@ -891,6 +1110,10 @@ impl Session {
         &mut self,
         client: &Client,
     ) {
+        if self.workspaces.workspaces.is_empty() && self.standalone.is_none() {
+            self.initialize_workspace_folders(client, Vec::new());
+            return;
+        }
         // When all workspaces are already initialized, then
         // there's nothing to do.
         if self.workspaces().all_initialized() {
@@ -1046,6 +1269,9 @@ impl Session {
             self.clear_diagnostics_if_needed(&doc, client);
         }
 
+        if self.workspaces.workspaces.is_empty() {
+            self.initialize_workspace_folders(client, Vec::new());
+        }
         self.bump_revision();
 
         self.update_file_watcher(client);
@@ -1167,7 +1393,12 @@ impl Session {
         let Some(file_watcher) = &mut self.file_watcher else {
             return;
         };
-        if let Some(update) = file_watcher.update(self.projects.values().map(|state| &state.db)) {
+        let projects = self
+            .projects
+            .values()
+            .chain(self.standalone.iter().map(|project| &project.state))
+            .map(|state| &state.db);
+        if let Some(update) = file_watcher.update(projects) {
             update.apply(self, client);
         }
     }
@@ -1230,7 +1461,12 @@ impl Session {
             global_settings: self.global_settings.clone(),
             workspace_settings: self
                 .project_state_for_document(document.notebook_or_file_path())
-                .and_then(|(workspace_root, _)| self.workspaces.settings_for_path(workspace_root))
+                .and_then(|selection| match selection {
+                    ProjectSelection::Workspace { workspace_root, .. } => {
+                        self.workspaces.settings_for_path(workspace_root)
+                    }
+                    ProjectSelection::Standalone { project } => Some(project.settings.clone()),
+                })
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
             document,
@@ -1264,18 +1500,13 @@ impl Session {
 
         // A request needs a project, but the file need not belong to it:
         // unrelated files use the same fallback project as open files.
-        !self.projects.is_empty()
+        self.project_dbs().next().is_some()
     }
 
     /// Creates a snapshot of the current state of the [`Session`].
     pub(crate) fn snapshot_session(&self) -> SessionSnapshot {
         SessionSnapshot {
-            projects: self
-                .projects
-                .values()
-                .map(|project| &project.db)
-                .cloned()
-                .collect(),
+            projects: self.project_dbs().cloned().collect(),
             index: self.index.clone().unwrap(),
             global_settings: self.global_settings.clone(),
             position_encoding: self.position_encoding,
@@ -1325,7 +1556,7 @@ impl Session {
         document: NotebookDocument,
     ) -> OpenDocumentHandle {
         let handle = self.index_mut().open_notebook_document(document);
-        self.open_document_in_db(client, &handle, None);
+        self.open_document(client, &handle, None);
         handle
     }
 
@@ -1370,39 +1601,59 @@ impl Session {
             }
         }
         let handle = self.index_mut().open_text_document(document);
-        self.open_document_in_db(client, &handle, Some(language_id));
+        self.open_document(client, &handle, Some(language_id));
         handle
     }
 
-    fn open_document_in_db(
+    fn open_document(
         &mut self,
         client: &Client,
         document: &OpenDocumentHandle,
         language_id: Option<LanguageId>,
     ) {
         let path = document.notebook_or_file_path();
+        if let AnySystemPath::System(system_path) = path {
+            self.apply_changes(client, path, &[ChangeEvent::Opened(system_path.clone())]);
+        }
+        let is_standalone = matches!(
+            self.project_state_for_document(path),
+            Some(ProjectSelection::Standalone { .. })
+        );
+        Self::open_document_in_db(
+            self.project_db_mut(path),
+            document,
+            language_id,
+            is_standalone,
+        );
+        self.bump_revision();
+        self.update_file_watcher(client);
+    }
 
+    fn open_document_in_db(
+        db: &mut ProjectDatabase,
+        document: &OpenDocumentHandle,
+        language_id: Option<LanguageId>,
+        is_standalone: bool,
+    ) {
         // When we know the document isn't a Python source file
         // then we'll avoid adding it to the project. (But we
         // still track it as part of the index.)
         let is_not_python = matches!(language_id, Some(LanguageId::Other));
 
-        match path {
+        match document.notebook_or_file_path() {
             AnySystemPath::System(system_path) => {
-                self.apply_changes(client, path, &[ChangeEvent::Opened(system_path.clone())]);
-
                 if is_not_python {
                     return;
                 }
 
-                let db = self.project_db_mut(path);
                 match system_path_to_file(db, system_path) {
                     Ok(file) => {
                         let project = db.project();
 
-                        // Only mark this file as open if it's part of the project.
-                        // This ensures that we don't show diagnostics for files outside the project.
-                        if project.is_file_included(db, system_path).is_included() {
+                        // Standalone files need diagnostics without indexed membership.
+                        // Workspace projects retain their normal inclusion rules.
+                        if is_standalone || project.is_file_included(db, system_path).is_included()
+                        {
                             project.open_file(db, file);
                         }
                     }
@@ -1414,14 +1665,10 @@ impl Session {
                     return;
                 }
 
-                let db = self.project_db_mut(path);
                 let virtual_file = db.files().virtual_file(db, virtual_path);
                 db.project().open_file(db, virtual_file.file());
             }
         }
-
-        self.bump_revision();
-        self.update_file_watcher(client);
     }
 
     /// Returns a reference to the index.
@@ -2106,7 +2353,7 @@ impl OpenDocumentHandle {
             ),
         };
 
-        if containing_workspace.is_some() || is_virtual {
+        if containing_workspace.is_some() || is_virtual || session.standalone.is_some() {
             // A containing workspace determines the project for a system file, while virtual
             // documents select a single, arbitrary project. Neither selection depends on import
             // search paths, so update only the selected database.

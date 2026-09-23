@@ -13,6 +13,43 @@ use crate::diagnostic_snapshots::condensed_workspace_diagnostic_snapshot;
 
 #[test]
 #[cfg(feature = "test-uv")]
+fn standalone_scripts_are_prepared_after_workspace_transitions() -> Result<()> {
+    let root = SystemPath::new("project");
+    let path = root.join("script.py");
+    let source = "# /// script
+# requires-python = \">=3.12\"
+# dependencies = []
+# ///
+missing
+";
+    let mut server = TestServerBuilder::new()?
+        .with_file(&path, source)?
+        .with_real_uv(UseUv::Scripts)?
+        .enable_workspace_diagnostic_refresh(true)
+        .build();
+    server.open_text_document(&path, source, 1);
+    server.await_diagnostic_refresh();
+    server.add_workspace_folder(root, None)?;
+    server.change_workspace_folders([root], []);
+    server = server.wait_until_workspaces_are_initialized();
+    server.await_diagnostic_refresh();
+    server.await_diagnostic_refresh();
+    server.change_workspace_folders([], [root]);
+    server.await_diagnostic_refresh();
+    server.await_diagnostic_refresh();
+    let diagnostics = crate::diagnostic_snapshots::condensed_document_diagnostic_snapshot(
+        server.document_diagnostic_request(&path, None),
+    );
+    assert_eq!(
+        diagnostics,
+        "4:0..4:7[ERROR]: Name `missing` used when not defined"
+    );
+
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "test-uv")]
 fn closed_scripts_are_prepared_at_startup() -> Result<()> {
     let ordinary = SystemPath::new("src/main.py");
     let script = SystemPath::new("src/script.py");

@@ -1,12 +1,14 @@
 use anyhow::Result;
 use lsp_types::{
     Code, Position, PublishDiagnosticsNotification, RegistrationRequest, ShowMessageNotification,
+    WorkspaceSymbolParams, WorkspaceSymbolRequest,
 };
 use ruff_db::system::SystemPath;
 use serde_json::{Value, json};
 use ty_server::{ClientOptions, DiagnosticMode};
 
 use crate::TestServerBuilder;
+use crate::diagnostic_snapshots::condensed_document_diagnostic_snapshot;
 
 #[test]
 #[should_panic(expected = "Invalid initialization options: Invalid `untrustedWorkspace` setting")]
@@ -63,6 +65,78 @@ fn empty_workspace_folders() -> Result<()> {
     let initialization_result = server.initialization_result().unwrap();
 
     insta::assert_json_snapshot!("initialization", initialization_result);
+
+    Ok(())
+}
+
+#[test]
+fn standalone_analysis_checks_open_files_without_indexing() -> Result<()> {
+    for mode in [DiagnosticMode::OpenFilesOnly, DiagnosticMode::Workspace] {
+        let mut server = TestServerBuilder::new()?
+            .with_file("closed.py", "class ClosedSymbol: pass")?
+            .with_file("ty.toml", "[rules]\nunresolved-reference = 'warn'")?
+            .with_raw_initialization_options(json!({
+                "diagnosticMode": mode,
+                "completions": { "autoImport": false },
+            }))
+            .build();
+        server.open_text_document("first.py", "missing", 1);
+        server.open_text_document("second.py", "missing", 1);
+        assert_eq!(
+            condensed_document_diagnostic_snapshot(
+                server.document_diagnostic_request("first.py", None)
+            ),
+            "0:0..0:7[WARNING]: Name `missing` used when not defined",
+        );
+        let symbols = server.send_request_await::<WorkspaceSymbolRequest>(WorkspaceSymbolParams {
+            query: "ClosedSymbol".to_string(),
+            ..Default::default()
+        });
+        assert!(symbols.is_none());
+        if mode == DiagnosticMode::Workspace {
+            assert_eq!(
+                server.workspace_diagnostic_request(None, None).items.len(),
+                2
+            );
+        }
+        server.close_text_document("second.py");
+        if mode == DiagnosticMode::Workspace {
+            assert_eq!(
+                server.workspace_diagnostic_request(None, None).items.len(),
+                1
+            );
+        }
+        server.open_text_document("completion.py", "ClosedS", 1);
+        let completions =
+            server.completion_request(&server.file_uri("completion.py"), Position::new(0, 7));
+        assert!(
+            !completions
+                .iter()
+                .any(|item| item.label.contains("ClosedSymbol"))
+        );
+    }
+
+    Ok(())
+}
+
+#[test]
+fn standalone_analysis_renames_local_definitions_outside_cwd() -> Result<()> {
+    let external = TestServerBuilder::new()?;
+    let path = external.file_path("main.py");
+    let source = "
+value = 1
+result = value
+";
+    let mut server = TestServerBuilder::new()?.build();
+    server.open_text_document(&path, source, 1);
+    assert!(server.hover_request(&path, Position::new(1, 1)).is_some());
+    let edits = server
+        .rename(&server.file_uri(&path), Position::new(1, 1), "renamed")
+        .expect("rename local definition")
+        .expect("rename edits");
+    let changes = edits.changes.expect("document edits");
+    assert_eq!(changes.len(), 1);
+    assert_eq!(changes[&server.file_uri(&path)].len(), 2);
 
     Ok(())
 }
@@ -536,7 +610,7 @@ fn missing_virtual_env_does_not_panic() -> Result<()> {
 
     let show_message_params = server.await_notification::<ShowMessageNotification>();
 
-    insta::assert_snapshot!(show_message_params.message, @"Failed to load project for workspace file://<temp_dir>/project. Please refer to the logs for more details.");
+    insta::assert_snapshot!(show_message_params.message, @"Failed to load project at file://<temp_dir>/project. Please refer to the logs for more details.");
 
     Ok(())
 }

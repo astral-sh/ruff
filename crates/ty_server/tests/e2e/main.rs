@@ -319,9 +319,12 @@ impl TestServer {
     /// This will wait until the client receives a `workspace/configuration` request from the
     /// server, and handles the request.
     ///
-    /// This should only be called if the server is expected to send this request.
+    /// Standalone sessions initialize without a configuration request.
     #[track_caller]
     pub(crate) fn wait_until_workspaces_are_initialized(mut self) -> Self {
+        if self.workspace_configurations.is_empty() {
+            return self;
+        }
         let (request_id, params) = self.await_request::<ConfigurationRequest>();
         self.handle_workspace_configuration_request(request_id, &params);
         self
@@ -1715,6 +1718,36 @@ impl TestContext {
     }
 }
 
+#[test]
+fn tempdir_filter_redacts_native_and_json_paths() {
+    for (root, path) in [
+        ("/tmp/.tmpProject", "/tmp/.tmpProject/src"),
+        (
+            r"C:\Users\Alice\Temp\.tmpProject",
+            r"C:\Users\Alice\Temp\.tmpProject\src",
+        ),
+        (
+            "/C:/Users/Alice/Temp/.tmpProject",
+            "/C:/Users/Alice/Temp/.tmpProject/src",
+        ),
+    ] {
+        let filter = regex::Regex::new(&tempdir_filter(root)).expect("compile path filter");
+        assert_eq!(
+            filter.replace_all(path, "<temp_dir>/"),
+            "<temp_dir>/src",
+            "{path}"
+        );
+        let json = serde_json::to_string(path).expect("serialize path");
+        assert_eq!(
+            filter.replace_all(&json, "<temp_dir>/"),
+            r#""<temp_dir>/src""#,
+            "{path}",
+        );
+    }
+}
+
+/// Matches native paths and their JSON-escaped forms, including the trailing separator.
 fn tempdir_filter(path: impl AsRef<str>) -> String {
-    format!(r"{}\\?/?", regex::escape(path.as_ref()))
+    let escaped = regex::escape(path.as_ref()).replace(r"\\", r"\\{1,2}");
+    format!(r"{escaped}(?:\\{{1,2}}|/)?")
 }
