@@ -3043,14 +3043,14 @@ struct InteriorNodeData {
 /// determines the effective minimum. Upper clauses retain their individual provenance and stay
 /// factored to avoid distributing intersections over unions.
 #[derive(Default)]
-struct CandidateTypeVarRangeSolutionBuilder<'db> {
+struct CandidateTypeVarRangeSolver<'db> {
     evidence_lower: FxIndexSet<Type<'db>>,
     mixed_lower: FxIndexSet<Type<'db>>,
     validity_lower: FxIndexSet<Type<'db>>,
     upper: UpperBound<'db>,
 }
 
-impl<'db> CandidateTypeVarRangeSolutionBuilder<'db> {
+impl<'db> CandidateTypeVarRangeSolver<'db> {
     fn add_lower(&mut self, provenance: ConstraintProvenance, ty: Type<'db>) {
         // Lower bounds are unioned. Our type representation is in DNF, so unioning a new
         // element is typically cheap (in that it does not involve a combinatorial
@@ -3735,10 +3735,8 @@ impl<'db> CandidateSolutions<'db> {
             }
         }
 
-        let mut mappings: FxIndexMap<
-            BoundTypeVarInstance<'db>,
-            CandidateTypeVarRangeSolutionBuilder<'db>,
-        > = FxIndexMap::default();
+        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, CandidateTypeVarRangeSolver<'db>> =
+            FxIndexMap::default();
         constraints.sort_by_key(|(_, source_order)| *source_order);
         for (constraint, _) in constraints {
             match constraint {
@@ -5845,7 +5843,7 @@ mod tests {
         let env = db.program_environment();
         let t = create_typevar(db, "T");
         let builder = ConstraintSetBuilder::new();
-        let mut bounds = CandidateTypeVarRangeSolutionBuilder::default();
+        let mut bounds = CandidateTypeVarRangeSolver::default();
         bounds.add_lower(
             ConstraintProvenance::Evidence,
             known_instance(db, KnownClass::Int),
@@ -5896,7 +5894,7 @@ mod tests {
                 ))
             });
             for lower_evidence in [false, true] {
-                let mut bounds = CandidateTypeVarRangeSolutionBuilder::default();
+                let mut bounds = CandidateTypeVarRangeSolver::default();
                 if lower_evidence {
                     bounds.add_lower(ConstraintProvenance::Evidence, lower);
                 } else {
@@ -5962,7 +5960,7 @@ mod tests {
 
         // Each tuple position could be satisfied separately, but invariance requires one E
         // to equal both int and str. Neither declared constraint satisfies the whole path.
-        let mut bounds = CandidateTypeVarRangeSolutionBuilder::default();
+        let mut bounds = CandidateTypeVarRangeSolver::default();
         bounds.add_lower(ConstraintProvenance::Evidence, lower);
         let mut storage = builder.storage.borrow_mut();
         let bounds = bounds
@@ -6053,7 +6051,7 @@ class E: ...
         let inferable = TypeVarSet::from_typevars(db, [t, u]);
 
         for lower in [None, Some(Type::any())] {
-            let mut bounds = CandidateTypeVarRangeSolutionBuilder::default();
+            let mut bounds = CandidateTypeVarRangeSolver::default();
             if let Some(lower) = lower {
                 bounds.add_lower(ConstraintProvenance::Evidence, lower);
             }
@@ -6116,7 +6114,7 @@ class E: ...
         let gradual_upper =
             [left, right].map(|upper| UnionType::from_two_elements(db, &env, upper, Type::any()));
         assert!(IntersectionType::bounded_from_elements(db, &env, gradual_upper).is_none());
-        let mut bounds = CandidateTypeVarRangeSolutionBuilder::default();
+        let mut bounds = CandidateTypeVarRangeSolver::default();
         for upper in gradual_upper {
             bounds.add_upper(ConstraintProvenance::Evidence, upper);
         }
