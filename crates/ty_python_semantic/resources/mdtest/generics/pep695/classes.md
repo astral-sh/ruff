@@ -334,6 +334,57 @@ If a typevar does not provide a default, we use `Unknown`:
 reveal_type(C())  # revealed: C[Unknown]
 ```
 
+## Inferring generic class parameters from bounded receivers
+
+The nominal specialization of a generic class can be inferred from the upper bound of `Self`:
+
+```py
+class Box[T = None]:
+    def get(self) -> T:
+        reveal_type(read(self))  # revealed: T@Box
+        reveal_type(identity(self))  # revealed: Self@get
+        return read(self)
+
+def read[T = None](box: Box[T]) -> T:
+    raise NotImplementedError
+
+def identity[T](value: T) -> T:
+    return value
+```
+
+The same applies to a type variable with an explicit upper bound:
+
+```py
+def _[S: Box[int]](box: S) -> None:
+    reveal_type(read(box))  # revealed: int
+    reveal_type(identity(box))  # revealed: S@_
+```
+
+The specialization inferred from the bound cannot violate the bounds of a constrained type variable:
+
+```py
+def combine[T: (int, str)](box: Box[T], value: T) -> T:
+    return value
+
+def _[S: Box[int]](box: S) -> None:
+    reveal_type(combine(box, 1))  # revealed: int
+    # error: [invalid-argument-type] "does not satisfy constraints"
+    combine(box, "")
+```
+
+A type variable cannot be substituted for its bound in non-covariant position:
+
+```py
+class Consumer[T]:
+    def consume(self, value: T) -> None: ...
+
+def accept_list[T](boxes: list[Box[T]]) -> None: ...
+def accept_consumer[T](consumer: Consumer[Box[T]]) -> None: ...
+def _[S: Box[int]](boxes: list[S], consumer: Consumer[S]) -> None:
+    accept_list(boxes)  # error: [invalid-argument-type]
+    accept_consumer(consumer)  # error: [invalid-argument-type]
+```
+
 ## Calls within the generic class
 
 A call to a generic class from one of its own methods creates an independent generic occurrence. The
