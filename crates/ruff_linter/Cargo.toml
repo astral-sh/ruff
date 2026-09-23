@@ -31,6 +31,7 @@ ruff_python_trivia = { workspace = true }
 ruff_ranged_value = { workspace = true }
 ruff_source_file = { workspace = true, features = ["serde"] }
 ruff_text_size = { workspace = true }
+ruff_unicode_names2 = { workspace = true }
 
 aho-corasick = { workspace = true }
 anyhow = { workspace = true }
@@ -66,7 +67,6 @@ toml = { workspace = true }
 typed-arena = { workspace = true }
 unicode-normalization = { workspace = true }
 unicode-width = { workspace = true }
-unicode_names2 = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
