@@ -89,10 +89,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
         | PredicateNode::Condition(expression)
         | PredicateNode::ChainedComparisonCondition(expression) => {
             let constraints = all_narrowing_constraints_for_expression(db, expression);
-            (
-                constraints.get(place, true).cloned(),
-                constraints.get(place, false).cloned(),
-            )
+            (constraints.get(place, true), constraints.get(place, false))
         }
         PredicateNode::Pattern(pattern) => {
             let positive = all_narrowing_constraints_for_pattern(db, pattern)
@@ -144,7 +141,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, _, _| ExpressionNarrowingConstraints::default(),
+    cycle_initial=|_, _, _| ExpressionNarrowingConstraints::Inferred { positive: None, negative: None },
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn all_narrowing_constraints_for_expression<'db>(
@@ -156,9 +153,18 @@ fn all_narrowing_constraints_for_expression<'db>(
     let env = ProgramEnvironment::from_file(program_file);
     let module = parsed_module(db, python_file).load(db);
     let predicate = PredicateNode::Expression(expression);
-    ExpressionNarrowingConstraints {
-        positive: NarrowingConstraintsBuilder::new(db, &env, &module, predicate, true).finish(),
-        negative: NarrowingConstraintsBuilder::new(db, &env, &module, predicate, false).finish(),
+    let mut positive = NarrowingConstraintsBuilder::new(db, &env, &module, predicate, true);
+    let positive_constraints = positive.finish();
+    let mut negative = NarrowingConstraintsBuilder::new(db, &env, &module, predicate, false);
+    let negative_constraints = negative.finish();
+
+    if positive.is_provisional || negative.is_provisional {
+        ExpressionNarrowingConstraints::Provisional
+    } else {
+        ExpressionNarrowingConstraints::Inferred {
+            positive: positive_constraints,
+            negative: negative_constraints,
+        }
     }
 }
 
@@ -1360,18 +1366,26 @@ impl<'db> PatternNarrowingResult<'db> {
     }
 }
 
-#[derive(Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-struct ExpressionNarrowingConstraints<'db> {
-    positive: Option<FrozenNarrowingConstraints<'db>>,
-    negative: Option<FrozenNarrowingConstraints<'db>>,
+#[derive(PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+enum ExpressionNarrowingConstraints<'db> {
+    Inferred {
+        positive: Option<FrozenNarrowingConstraints<'db>>,
+        negative: Option<FrozenNarrowingConstraints<'db>>,
+    },
+    /// A predicate's type is not yet available during cycle recovery. The semantic index already
+    /// restricts narrowing to places this predicate could affect, so the fallback applies to any
+    /// requested place until inference resolves the predicate.
+    Provisional,
 }
 
 impl<'db> ExpressionNarrowingConstraints<'db> {
-    fn get(&self, place: ScopedPlaceId, is_positive: bool) -> Option<&NarrowingConstraint<'db>> {
-        if is_positive {
-            self.positive.as_ref()?.get(&place)
-        } else {
-            self.negative.as_ref()?.get(&place)
+    fn get(&self, place: ScopedPlaceId, is_positive: bool) -> Option<NarrowingConstraint<'db>> {
+        match self {
+            Self::Provisional => Some(NarrowingConstraint::intersection(Type::pending_narrowing())),
+            Self::Inferred { positive, negative } => if is_positive { positive } else { negative }
+                .as_ref()?
+                .get(&place)
+                .cloned(),
         }
     }
 }
@@ -1658,6 +1672,7 @@ struct NarrowingConstraintsBuilder<'db, 'ast> {
     module: &'ast ParsedModuleRef,
     predicate: PredicateNode<'db>,
     is_positive: bool,
+    is_provisional: bool,
 }
 
 impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
@@ -1674,10 +1689,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             module,
             predicate,
             is_positive,
+            is_provisional: false,
         }
     }
 
-    fn finish(mut self) -> Option<FrozenNarrowingConstraints<'db>> {
+    fn finish(&mut self) -> Option<FrozenNarrowingConstraints<'db>> {
         let constraints: Option<NarrowingConstraints<'db>> = match self.predicate {
             PredicateNode::Expression(expression)
             | PredicateNode::Condition(expression)
@@ -4456,6 +4472,15 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     ) -> Option<NarrowingConstraints<'db>> {
         let db = self.db;
         let inference = infer_expression_types(db, expression, TypeContext::default());
+
+        // During loop inference, even the callee can temporarily be `Divergent`. Treating that
+        // as a call with no narrowing would expose unguarded alternatives to the loop body. For
+        // example, `while isinstance(x, list): x = x[0]` could subscript an `int` alternative and
+        // feed the resulting recovery `Unknown` back into every subsequent cycle iteration.
+        if inference.is_provisional() {
+            self.is_provisional = true;
+            return None;
+        }
 
         if let Some(type_guard_call_constraints) =
             self.evaluate_type_guard_call(inference, expr_call, is_positive)

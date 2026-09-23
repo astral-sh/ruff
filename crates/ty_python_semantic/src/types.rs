@@ -1936,7 +1936,7 @@ impl<'db> DataclassParams<'db> {
 pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
     Dynamic(DynamicType<'db>),
-    /// A cycle marker used during recursive type inference.
+    /// An unresolved value during cyclic inference, or a recursive type marker.
     Divergent(DivergentType),
     /// A recursive type whose references are bound by its body.
     /// See the module documentation in `recursive.rs` for details.
@@ -2243,6 +2243,34 @@ impl<'db> Type<'db> {
         })
     }
 
+    const fn pending_narrowing() -> Self {
+        Self::Divergent(DivergentType {
+            origin: DivergentOrigin::PendingNarrowing,
+            flags: DivergentFlags::empty(),
+            materialization: None,
+        })
+    }
+
+    const fn is_pending_narrowing(&self) -> bool {
+        matches!(
+            self,
+            Self::Divergent(DivergentType {
+                origin: DivergentOrigin::PendingNarrowing,
+                ..
+            })
+        )
+    }
+
+    const fn is_recursive_divergent(&self) -> bool {
+        matches!(
+            self,
+            Self::Divergent(DivergentType {
+                origin: DivergentOrigin::Recursive(_),
+                ..
+            })
+        )
+    }
+
     const fn is_divergent(&self) -> bool {
         matches!(self, Type::Divergent(_))
     }
@@ -2254,8 +2282,8 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Returns `true` if both `self` and `other` are `Divergent` types originating from the
-    /// same cycle (i.e., sharing the same query ID), regardless of materialization state.
+    /// Returns `true` if both types reference the same recursive query, or both represent
+    /// pending narrowing, regardless of materialization state.
     fn same_divergent_marker(self, other: Type<'db>) -> bool {
         match (self, other) {
             (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
@@ -3566,10 +3594,79 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
-        cycle.head_ids().fold(self, |ty, id| {
+        let normalized =
+            self.pending_narrowing_normalized(db, env, Type::divergent(cycle.id()), &|ty| {
+                cycle
+                    .head_ids()
+                    .any(|id| ty.same_divergent_marker(Type::divergent(id)))
+            });
+        cycle.head_ids().fold(normalized, |ty, id| {
             ty.recursive_type_normalized_impl(db, env, Type::divergent(id), false)
                 .unwrap_or(Type::divergent(id))
         })
+    }
+
+    /// Discard unresolved narrowing while preserving recursive structure around it. A bare
+    /// pending marker carries no recursive identity and must not make a union recursively defined.
+    fn pending_narrowing_normalized(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: Self,
+        is_cycle_marker: &impl Fn(Self) -> bool,
+    ) -> Self {
+        let contains_pending = |ty| {
+            any_over_type_including_alias_arguments(db, env, ty, |ty| ty.is_pending_narrowing())
+        };
+        if !contains_pending(self) {
+            return self;
+        }
+        match self {
+            Type::Divergent(_) => self,
+            Type::Union(union) => {
+                let mut builder = UnionBuilder::new(db, env)
+                    .unpack_aliases(false)
+                    .cycle_recovery(true)
+                    .or_recursively_defined(union.recursively_defined(db));
+                for &element in union.elements(db) {
+                    // A bare marker for this cycle provides no independent type information
+                    // either. Preserve markers from other queries and nested recursive types.
+                    if is_cycle_marker(element) {
+                        continue;
+                    }
+                    let element =
+                        element.pending_narrowing_normalized(db, env, recursive, is_cycle_marker);
+                    if !element.is_pending_narrowing() {
+                        builder.add_in_place(element);
+                    }
+                }
+                if builder.is_empty() {
+                    Self::pending_narrowing()
+                } else {
+                    builder.build()
+                }
+            }
+            Type::NominalInstance(_)
+            | Type::GenericAlias(_)
+            | Type::Callable(_)
+            | Type::FunctionLiteral(_)
+            | Type::BoundMethod(_) => {
+                // Preserve the constructor with this query's recursive marker in its unresolved
+                // parts. Dropping `list[PendingNarrowing]` from `int | list[PendingNarrowing]`
+                // would leave no marker to stop subsequent iterations from growing nested lists.
+                let normalized = self
+                    .recursive_type_normalized_impl(db, env, recursive, false)
+                    .unwrap_or(recursive);
+                // Some stored metadata, such as a callable's generic context, is opaque to
+                // recursive normalization. Use a recursive placeholder until that metadata resolves.
+                if contains_pending(normalized) {
+                    recursive
+                } else {
+                    normalized
+                }
+            }
+            _ => Self::pending_narrowing(),
+        }
     }
 
     /// Normalizes types including divergent types (recursive types), which is necessary for convergence of fixed-point iteration.
@@ -3595,7 +3692,20 @@ impl<'db> Type<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        if nested && self.same_divergent_marker(div) {
+        if nested && (self.same_divergent_marker(div) || self.is_pending_narrowing()) {
+            return None;
+        }
+        // These types stay opaque, but pending values in their stored arguments, bounds, or
+        // fields still invalidate the enclosing constructor's approximation.
+        if nested
+            && matches!(
+                self,
+                Type::TypeAlias(_) | Type::Recursive(_) | Type::TypedDict(_) | Type::TypeVar(_)
+            )
+            && any_over_type_including_alias_arguments(db, env, self, |ty| {
+                ty.is_pending_narrowing()
+            })
+        {
             return None;
         }
         match self {
@@ -10945,15 +11055,25 @@ bitflags! {
 
 impl get_size2::GetSize for DivergentFlags {}
 
-/// A type that is determined to be divergent during recursive type inference.
-/// This type must never be eliminated by dynamic type reduction
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum DivergentOrigin {
+    /// A back-reference to the query that caused a recursive inference cycle.
+    Recursive(salsa::Id),
+    /// A predicate's narrowing is not yet known. This carries no recursive type identity.
+    PendingNarrowing,
+}
+
+/// An internal marker used while resolving cyclic type inference.
+///
+/// Recursive markers identify a query whose result is needed to infer its own inputs. Pending
+/// narrowing instead records that a predicate's constraints are not yet available; it does not
+/// reference a recursive type. Both must survive dynamic type reduction
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reduced to `@Todo`).
 /// Otherwise, type inference cannot converge properly.
 /// For detailed properties of this type, see the unit test at the end of the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DivergentType {
-    /// The query ID that caused the cycle.
-    id: salsa::Id,
+    origin: DivergentOrigin,
     flags: DivergentFlags,
     /// If this divergent marker has been materialized, preserve whether it should behave like the
     /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
@@ -10966,14 +11086,14 @@ impl get_size2::GetSize for DivergentType {}
 impl DivergentType {
     const fn new(id: salsa::Id) -> Self {
         Self {
-            id,
+            origin: DivergentOrigin::Recursive(id),
             flags: DivergentFlags::empty(),
             materialization: None,
         }
     }
 
     fn same_marker(self, other: Self) -> bool {
-        self.id == other.id
+        self.origin == other.origin
     }
 
     const fn materialized(self, kind: MaterializationKind) -> Self {

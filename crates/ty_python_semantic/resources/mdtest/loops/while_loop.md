@@ -738,6 +738,211 @@ recovery logic doesn't carry that result forward.
 Addendum: #23563 fixed the implementation of `Type::cycle_normalized`, so that such "tainted
 previous values" are no longer unioned.
 
+### Narrowing recursive list contents
+
+Loop inference preserves narrowing from call predicates even when the predicate and assignments
+depend on each other's inferred types. Temporary cycle-recovery results do not introduce `Unknown`
+into an otherwise fully static type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+Nested = list["Nested"] | int
+
+def unwrap(value: Nested) -> Nested:
+    while isinstance(value, list):
+        value = value[0]
+        reveal_type(value)  # revealed: Nested
+    reveal_type(value)  # revealed: int
+    return value
+```
+
+Explicit `TypeAlias` declarations follow the same narrowing rules as implicit aliases.
+
+```py
+from typing import TypeAlias
+
+ExplicitNested: TypeAlias = list["ExplicitNested"] | int
+
+def unwrap_explicit(value: ExplicitNested) -> ExplicitNested:
+    while isinstance(value, list):
+        value = value[0]
+        reveal_type(value)  # revealed: ExplicitNested
+    reveal_type(value)  # revealed: int
+    return value
+```
+
+These narrowing rules also apply to recursive aliases declared with PEP 695 syntax.
+
+```py
+from typing import assert_type
+
+type DeclaredNested = list[DeclaredNested] | int
+
+def unwrap_declared(value: DeclaredNested) -> DeclaredNested:
+    while isinstance(value, list):
+        value = value[0]
+        assert_type(value, DeclaredNested)
+    reveal_type(value)  # revealed: int
+    return value
+```
+
+### Narrowing non-recursive list contents
+
+Call predicates also constrain non-recursive unions during loop inference. Operations in the loop
+body are checked against the narrowed type, so excluded union members do not contribute recovery
+types.
+
+```py
+def unwrap(value: list[int] | int) -> int:
+    while isinstance(value, list):
+        value = value[0]
+        reveal_type(value)  # revealed: int
+    reveal_type(value)  # revealed: int
+    return value
+```
+
+### Loop narrowing through keyword arguments
+
+Cyclic inference preserves both positive and negative `TypeIs` narrowing when the subject is passed
+by keyword.
+
+```py
+from typing_extensions import TypeIs
+
+Nested = list["Nested"] | int
+
+def is_list(value: Nested) -> TypeIs[list[Nested]]:
+    return isinstance(value, list)
+
+def unwrap(value: Nested) -> Nested:
+    while is_list(value=value):
+        value = value[0]
+        reveal_type(value)  # revealed: Nested
+    reveal_type(value)  # revealed: int
+    return value
+```
+
+### Loop narrowing through unbound methods
+
+For an unbound method, `TypeGuard` narrowing targets the argument after the instance argument,
+including during cyclic inference. A false `TypeGuard` result imposes no narrowing constraint.
+
+```py
+from typing import TypeGuard
+
+Nested = list["Nested"] | int
+
+class Guard:
+    def is_list(self, value: Nested) -> TypeGuard[list[Nested]]:
+        return isinstance(value, list)
+
+def unwrap(value: Nested) -> Nested:
+    while Guard.is_list(Guard(), value):
+        value = value[0]
+        reveal_type(value)  # revealed: Nested
+    reveal_type(value)  # revealed: Nested
+    return value
+```
+
+### Loop narrowing through boolean expressions
+
+Both `bool` wrappers and conjunctions preserve narrowing from call predicates during cyclic
+inference.
+
+```py
+Nested = list["Nested"] | int
+
+def unwrap(value: Nested) -> Nested:
+    while bool(isinstance(value, list)):
+        value = value[0]
+    reveal_type(value)  # revealed: int
+    return value
+
+def unwrap_while(value: Nested, proceed: bool) -> Nested:
+    while proceed and isinstance(value, list):
+        value = value[0]
+        reveal_type(value)  # revealed: Nested
+    return value
+```
+
+### Loop predicates without narrowing
+
+Ordinary `bool` predicates do not narrow their arguments. Cyclic inference retains all reachable
+binding types once such a predicate is resolved.
+
+```py
+def keep(value: object) -> bool:
+    return bool(value)
+
+def stringify(initial: int) -> int | str:
+    value = initial
+    while keep(value):
+        value = str(value)
+    reveal_type(value)  # revealed: int | str
+    return value
+```
+
+### Recursive assignments guarded by predicates
+
+Conditional loop inference preserves recursive type structure introduced by assignments, including
+through intermediate values. Resolving the condition does not leave pending narrowing in the type.
+
+```py
+def keep(value: object) -> bool:
+    return bool(value)
+
+def wrap(initial: int):
+    value = initial
+    while keep(value):
+        value = (value,)
+    reveal_type(value)  # revealed: int | tuple[Divergent] | tuple[int | tuple[Divergent]]
+
+def wrap_indirectly(initial: int):
+    value = initial
+    while keep(value):
+        box = [(value,)]
+        value = box[0]
+    reveal_type(value)  # revealed: int | tuple[Divergent] | tuple[int | tuple[Divergent]]
+```
+
+Bound methods also preserve recursive structure in their receivers during cyclic inference.
+
+```py
+def wrap_method(initial: int):
+    value = initial
+    while keep(value):
+        value = [value].copy
+    reveal_type(value)  # revealed: int | Divergent | (bound method list[int | Divergent].copy() -> list[int | Divergent])
+```
+
+### Compound conditions in nested loops
+
+Integer arithmetic preserves the counter's type across nested loops, including when a compound
+condition combines a predicate call with the counter's truthiness.
+
+```py
+def predicate(value: int) -> bool:
+    return True
+
+def decrement(tokens: list[int], branch: int, value: int):
+    while True:
+        if predicate(0) or value:
+            continue
+        if branch == 1:
+            while tokens:
+                value = reveal_type(value - 2)  # revealed: int
+        elif branch == 2:
+            while tokens[0]:
+                value = reveal_type(value - 2)  # revealed: int
+        else:
+            while 1 < value and tokens[1] == 0:
+                value = reveal_type(value - 2)  # revealed: int
+```
+
 ### `global` and `nonlocal` keywords in a loop
 
 We need to make sure that the loop header definition doesn't count as a "use" prior to the

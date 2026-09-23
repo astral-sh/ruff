@@ -33,6 +33,35 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Assigning a bound method in a loop
+
+Loop narrowing preserves a bound method's receiver type when inferring an implicit attribute,
+without introducing `Divergent` into the attribute's type.
+
+```py
+class C:
+    def __init__(self):
+        self.value = 0
+        while isinstance(self.value, int):
+            self.value = [self.value].copy
+
+reveal_type(C().value)  # revealed: int | (() -> list[int])
+```
+
+## Wrapping an attribute in a loop
+
+Recursive container assignments converge even when a loop predicate narrows the attribute.
+
+```py
+class C:
+    def __init__(self):
+        self.value = [0]
+        while isinstance(self.value, list):
+            self.value = [self.value]
+
+reveal_type(C().value)  # revealed: list[int] | list[Divergent]
+```
+
 ## Concatenating recursively growing tuples
 
 Repeatedly appending or prepending elements to an inferred attribute can produce tuples of arbitrary
