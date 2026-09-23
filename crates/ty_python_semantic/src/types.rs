@@ -1281,6 +1281,10 @@ bitflags! {
         /// Constructor methods reached through a fixed class-object value such as `type[T]` use
         /// the class's type variables, but those variables are not inference targets for the call.
         /// A method's own generic context remains inferable.
+          ///
+        /// TODO: Arguably this does not deserve to be a member lookup policy; instead, we should
+        /// track the owned and inherited generic contexts separately in `Signature` and not
+        /// preemptively merge them.
         const NO_INHERITED_GENERIC_CONTEXT = 1 << 6;
     }
 }
