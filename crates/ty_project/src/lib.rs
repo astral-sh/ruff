@@ -93,29 +93,11 @@ pub struct Project {
     #[returns(ref)]
     pub program_settings: ProgramSettings,
 
-    /// The paths that should be included when checking this project.
-    ///
-    /// The default (when this list is empty) is to include all files in the project root
-    /// (that satisfy the configured include and exclude patterns).
-    /// However, it's sometimes desired to only check a subset of the project, e.g. to see
-    /// the diagnostics for a single file or a folder.
-    ///
-    /// This list gets initialized by the paths passed to `ty check <paths>`
-    ///
-    /// ## How is this different from `open_files`?
-    ///
-    /// The `included_paths` is closely related to `open_files`. The only difference is that
-    /// `open_files` is already a resolved set of files whereas `included_paths` is only a list of paths
-    /// that are resolved to files by indexing them. The other difference is that
-    /// new files added to any directory in `included_paths` will be indexed and added to the project
-    /// whereas `open_files` needs to be updated manually (e.g. by the IDE).
-    ///
-    /// In short, `open_files` is cheaper in contexts where the set of files is known, like
-    /// in an IDE when the user only wants to check the open tabs. This could be modeled
-    /// with `included_paths` too but it would require an explicit walk dir step that's simply unnecessary.
+    /// How to discover project files, independently of open-file bookkeeping and import resolution.
+    /// Unlike `open_fileset`, indexing discovers new files beneath its configured paths.
     #[default]
-    #[returns(deref)]
-    included_paths_list: Vec<SystemPathBuf>,
+    #[returns(ref)]
+    indexing_mode: ProjectIndexing,
 
     /// Diagnostics that were generated when resolving the project settings.
     #[returns(deref)]
@@ -137,6 +119,18 @@ pub struct Project {
     #[default]
     #[returns(copy)]
     force_exclude_flag: bool,
+}
+
+/// Controls discovery of indexed project members, not imports or open-file analysis.
+#[derive(Default, Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+pub enum ProjectIndexing {
+    /// Discover files beneath the project root, applying the project's file filters.
+    #[default]
+    ProjectRoot,
+    /// Discover files from explicit paths, applying the project's file filters.
+    Paths(Box<[SystemPathBuf]>),
+    /// Keep indexed membership empty, including when files are opened or created.
+    Disabled,
 }
 
 /// A progress reporter.
@@ -242,7 +236,7 @@ impl Project {
         let program_settings = self.program_settings(db).clone();
         let metadata = Box::new(self.metadata(db).clone());
         let settings = Box::new(self.settings(db).clone());
-        let included_paths = self.included_paths_list(db).to_vec();
+        let indexing = self.indexing_mode(db).clone();
         let check_mode = self.check_mode(db);
         let verbose = self.verbose_flag(db);
         let force_exclude = self.force_exclude_flag(db);
@@ -256,9 +250,9 @@ impl Project {
         self.set_program_settings(db)
             .with_durability(durability)
             .to(program_settings);
-        self.set_included_paths_list(db)
+        self.set_indexing_mode(db)
             .with_durability(durability)
-            .to(included_paths);
+            .to(indexing);
         self.set_check_mode(db)
             .with_durability(durability)
             .to(check_mode);
@@ -350,7 +344,7 @@ impl Project {
         self.settings(db).to_rules()
     }
 
-    /// Returns whether `path` is part of the project and included (see `included_paths_list`).
+    /// Returns whether `path` is included by the indexing policy and project file filters.
     ///
     /// Unlike [Self::files], this method does not respect `.gitignore` files. It only checks
     /// the project's include and exclude settings as well as the paths that were passed to `ty check <paths>`.
@@ -578,9 +572,19 @@ impl Project {
     }
 
     pub fn set_included_paths(self, db: &mut dyn Db, paths: Vec<SystemPathBuf>) {
-        tracing::debug!("Setting included paths: {paths}", paths = paths.len());
+        self.set_indexing(
+            db,
+            if paths.is_empty() {
+                ProjectIndexing::ProjectRoot
+            } else {
+                ProjectIndexing::Paths(paths.into_boxed_slice())
+            },
+        );
+    }
 
-        self.set_included_paths_list(db).to(paths);
+    /// Changes project-file discovery and invalidates any previously indexed membership.
+    fn set_indexing(self, db: &mut dyn Db, indexing: ProjectIndexing) {
+        self.set_indexing_mode(db).to(indexing);
         self.reload_files(db);
     }
 
@@ -604,7 +608,7 @@ impl Project {
         self.force_exclude_flag(db)
     }
 
-    /// Returns the paths that should be checked.
+    /// Returns indexing roots, or no paths when indexing is disabled.
     ///
     /// The default is to check the entire project in which case this method returns
     /// the project root. However, users can specify to only check specific sub-folders or
@@ -615,9 +619,10 @@ impl Project {
     /// This can be useful to check arbitrary files, but it isn't something we recommend.
     /// We should try to support this use case but it's okay if there are some limitations around it.
     fn included_paths_or_root(self, db: &dyn Db) -> &[SystemPathBuf] {
-        match self.included_paths_list(db) {
-            [] => std::slice::from_ref(&self.metadata(db).root),
-            paths => paths,
+        match self.indexing_mode(db) {
+            ProjectIndexing::ProjectRoot => std::slice::from_ref(&self.metadata(db).root),
+            ProjectIndexing::Paths(paths) => paths,
+            ProjectIndexing::Disabled => &[],
         }
     }
 
