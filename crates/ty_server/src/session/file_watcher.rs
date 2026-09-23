@@ -74,7 +74,7 @@ impl LspFileWatcher {
     /// Updates project watch paths, starting a new reconciliation cycle when idle.
     pub(super) fn update<'db>(
         &mut self,
-        projects: impl ExactSizeIterator<Item = &'db ProjectDatabase> + Clone,
+        projects: impl Iterator<Item = &'db ProjectDatabase> + Clone,
     ) -> Option<FileWatcherUpdate> {
         // The pending response will reconcile current paths, so this update
         // stays within the same reconciliation limit.
@@ -89,7 +89,7 @@ impl LspFileWatcher {
     /// if there are any changes to the watched paths.
     fn reconcile<'db>(
         &mut self,
-        projects: impl ExactSizeIterator<Item = &'db ProjectDatabase> + Clone,
+        projects: impl Iterator<Item = &'db ProjectDatabase> + Clone,
     ) -> Option<FileWatcherUpdate> {
         // Wait for the client's response before preparing another registration;
         // its handler will reconcile the latest project paths.
@@ -101,7 +101,7 @@ impl LspFileWatcher {
         // We can remove this once ty supports multiple project and
         // workspace-folders is migrated to that feature.
         let mut hasher = DefaultHasher::new();
-        projects.len().hash(&mut hasher);
+        projects.clone().count().hash(&mut hasher);
         for db in projects.clone() {
             watch_paths(db, db.project()).cache_key().hash(&mut hasher);
         }
@@ -280,7 +280,13 @@ impl FileWatcherUpdate {
                     // Refreshing a newly covered `site-packages` can reveal an edited
                     // `.pth` file with another search path that needs a watch.
                     if let Some(update) = session.file_watcher.as_mut().and_then(|watcher| {
-                        watcher.reconcile(session.projects.values().map(|state| &state.db))
+                        watcher.reconcile(
+                            session
+                                .projects
+                                .values()
+                                .chain(session.standalone.iter().map(|project| &project.state))
+                                .map(|state| &state.db),
+                        )
                     }) {
                         update.apply(session, client);
                     }
@@ -307,8 +313,8 @@ impl FileWatcherCompletion {
         // A client could respond before its watches are active, leaving a small
         // gap that the protocol does not let us close completely.
         if !self.newly_covered_paths.is_empty() {
-            for state in session.projects.values_mut() {
-                Files::sync_all_recursive(&mut state.db, &self.newly_covered_paths);
+            for db in session.projects_mut() {
+                Files::sync_all_recursive(db, &self.newly_covered_paths);
             }
 
             // A previous refresh may have run before these unwatched paths were scanned.
