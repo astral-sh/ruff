@@ -1244,15 +1244,12 @@ impl<'db> ProtocolAnnotation<'db> {
 
 /// The source of the type obtained by reading a member or accepted by assignment to it.
 ///
-/// This also models ordinary annotated attributes: the write requirement for `name: str`
-/// uses `Annotation`, even though the attribute is not a Python `property`.
-///
 /// Accessors remain lazy: resolving every property while constructing a protocol interface
 /// would expand return-type unions even when the property is unrelated to the current check.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum ProtocolPropertyType<'db> {
-    /// An annotation that is already available, without inspecting an accessor signature.
-    /// For example, the write requirement for this attribute uses the annotation `str`:
+    /// The type is provided directly by the stored annotation.
+    /// For example, this attribute provides the annotation `str`:
     ///
     /// ```python
     /// class Named(Protocol):
@@ -1261,8 +1258,8 @@ enum ProtocolPropertyType<'db> {
     ///
     /// The annotation can still require `Self` substitution when used.
     Annotation(ProtocolAnnotation<'db>),
-    /// A getter callable whose return annotation determines the type obtained by reading
-    /// the property. We retain the callable and extract that annotation only when needed:
+    /// The type should be extracted from the return annotation of the stored getter callable.
+    /// For example:
     ///
     /// ```python
     /// class Named(Protocol):
@@ -1272,8 +1269,8 @@ enum ProtocolPropertyType<'db> {
     ///
     /// Here, reading `name` produces `str`.
     PropertyGetter(Type<'db>),
-    /// A setter callable whose assigned-argument annotation determines the type accepted
-    /// by assignment. We retain the callable and extract that annotation only when needed:
+    /// The type should be extracted from the `value`-parameter annotation of the stored
+    /// setter callable. For example:
     ///
     /// ```python
     /// class Named(Protocol):
