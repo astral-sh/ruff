@@ -10,8 +10,8 @@ syntax for specifying positional-only parameters, rendering the legacy conventio
 some codebases may still use the legacy convention for compatibility with older Python versions.
 
 This rule is disabled by default because modern code may use `__`-prefixed parameter names for other
-purposes, such as avoiding collisions with `**kwargs`. Enable it if your codebase uses the legacy
-convention and you want to check that it is applied consistently.
+purposes. Enable it if your codebase uses the legacy convention and you want to check that it is
+applied consistently.
 
 ## Why is this bad?
 
