@@ -180,9 +180,8 @@ impl<'db> AllMembers<'db> {
             }
             Type::Union(union) => {
                 fn is_dynamic(db: &dyn Db, ty: Type<'_>) -> bool {
-                    // We don't need to use recursion here because
-                    // `Type` guarantees that unions/intersections
-                    // are kept in DNF (i.e., they are flattened).
+                    // Ignore explicitly gradual alternatives so they do not hide members
+                    // contributed by the concrete alternatives.
                     ty.is_dynamic()
                         || match ty {
                             Type::Intersection(intersection) => {

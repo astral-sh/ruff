@@ -1229,6 +1229,36 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
     });
 }
 
+/// Paired guards retain an intersection of unions instead of enumerating all combinations.
+fn benchmark_factored_isinstance_narrowing(criterion: &mut Criterion) {
+    const GUARDS: usize = 11;
+
+    setup_rayon();
+    let mut code = String::new();
+    for index in 0..2 * GUARDS {
+        writeln!(&mut code, "class C{index}: pass").ok();
+    }
+    code.push_str("\ndef narrow(value: object):\n");
+    for index in 0..GUARDS {
+        writeln!(
+            &mut code,
+            "    if not isinstance(value, (C{}, C{})):\n        return",
+            2 * index,
+            2 * index + 1,
+        )
+        .ok();
+    }
+    code.push_str("    return value\n");
+
+    criterion.bench_function("ty_micro[factored_isinstance_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Benchmark for narrowing through a long `isinstance` elif chain.
 ///
 /// This pattern is common in visitor-style dispatch code (e.g. koda-validate's
@@ -2105,6 +2135,7 @@ criterion_group!(
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
+    benchmark_factored_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,

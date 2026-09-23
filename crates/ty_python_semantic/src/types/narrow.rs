@@ -811,6 +811,21 @@ fn filter_generic_narrowing_constraint<'db>(
     subject: Type<'db>,
     target: Type<'db>,
 ) -> Type<'db> {
+    // Non-generic nominal targets need no argument inference. Intersect them as a whole so a
+    // sequence of paired isinstance checks can retain its union factors instead of enumerating
+    // every combination. Keep TypedDict's separate runtime-domain handling below.
+    let plain_nominal_target = |ty: Type<'db>| {
+        matches!(ty, Type::NominalInstance(instance)
+            if instance.class_literal(db, env).generic_context(db).is_none())
+    };
+    let is_plain_nominal_target = match target {
+        Type::Union(union) => union.elements(db).iter().copied().all(plain_nominal_target),
+        target => plain_nominal_target(target),
+    };
+    if is_plain_nominal_target && !is_typed_dict_runtime_domain(db, env, subject) {
+        return IntersectionType::from_two_elements(db, env, subject, target);
+    }
+
     match (subject, target) {
         (Type::Union(union), target) => union.map(db, env, |element| {
             filter_generic_narrowing_constraint(db, env, *element, target)

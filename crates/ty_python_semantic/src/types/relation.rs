@@ -1310,12 +1310,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         let check_expanded_source = || {
-            // Normally non-unions cannot directly contain unions in our model due to the fact that
-            // we enforce a DNF structure on our set-theoretic types. However, it *is* possible for
-            // there to be a newtype of a union, for an intersection to contain a newtype of a
-            // union, or for a non-inferable typevar (possibly inside an intersection) to widen to a
-            // bound or set of constraints that exposes a union; this requires special handling.
+            // A union can also be exposed by a factored intersection, a NewType base, or a
+            // non-inferable type variable's bound. Its alternatives may match different target
+            // alternatives, even when the entire source fits in none of them individually.
             match source {
+                Type::Intersection(intersection) if intersection.is_factored(db) => intersection
+                    .positive(db)
+                    .iter()
+                    .when_any(db, self.constraints, |positive| {
+                        self.check_type_pair(db, *positive, target)
+                    })
+                    .or(db, self.constraints, || {
+                        self.check_factored_source(db, intersection, target)
+                    }),
                 Type::TypeVar(typevar)
                     if !typevar.is_inferable(db, self.inferable)
                         && let Some(bound_or_constraints) =
@@ -1487,7 +1494,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         target,
                     )
                 } else {
-                    self.never()
+                    self.check_factored_source(db, intersection, target)
                 }
             });
 
@@ -1505,6 +1512,23 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         result
+    }
+
+    /// Check factored source alternatives lazily when no individual factor proves the relation.
+    fn check_factored_source(
+        &self,
+        db: &'db dyn Db,
+        intersection: IntersectionType<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        intersection.split_disjunction(db, self.env).map_or_else(
+            || self.never(),
+            |alternatives| {
+                alternatives.when_all(db, self.constraints, |alternative| {
+                    self.check_type_pair(db, alternative, target)
+                })
+            },
+        )
     }
 
     /// Return the collected error context, or an empty tree if collection was disabled.
@@ -3325,7 +3349,27 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                                 .check_type_pair(db, other, neg_ty)
                         })
                 })
+                .or(db, self.constraints, || {
+                    self.check_factored_intersection(db, intersection, other)
+                })
         })
+    }
+
+    /// Prove disjointness for each alternative of one factor without expanding the full product.
+    fn check_factored_intersection(
+        &self,
+        db: &'db dyn Db,
+        intersection: IntersectionType<'db>,
+        other: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        intersection.split_disjunction(db, self.env).map_or_else(
+            || self.never(),
+            |alternatives| {
+                alternatives.when_all(db, self.constraints, |alternative| {
+                    self.check_type_pair(db, alternative, other)
+                })
+            },
+        )
     }
 
     pub(super) fn check_type_pair(
@@ -3555,6 +3599,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                                         self.constraints,
                                         |&pos_ty| self.check_type_pair(db, pos_ty, left),
                                     )
+                                })
+                                .or(db, self.constraints, || {
+                                    self.check_factored_intersection(db, left_intersection, right)
+                                })
+                                .or(db, self.constraints, || {
+                                    self.check_factored_intersection(db, right_intersection, left)
                                 })
                         })
                     }

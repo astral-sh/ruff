@@ -1802,8 +1802,8 @@ enum SourceOrder {
 /// A factored conjunction of upper-bound clauses accumulated for one typevar.
 ///
 /// Validity and evidence clauses are stored separately. Clauses may be unions, keeping
-/// bounds such as `(A | B) & (C | D)` factored rather than distributing them into the DNF
-/// representation used by [`Type`].
+/// bounds such as `(A | B) & (C | D)` factored rather than constructing their effective [`Type`]
+/// at every step.
 ///
 /// An empty validity set represents an unconstrained validity upper bound of `object`. This avoids
 /// allocating or checking the intersection identity on every path. An explicit evidence bound of
@@ -3051,10 +3051,8 @@ struct PathBoundBuilder<'db> {
 
 impl<'db> PathBoundBuilder<'db> {
     fn add_lower(&mut self, provenance: ConstraintProvenance, ty: Type<'db>) {
-        // Lower bounds are unioned. Our type representation is in DNF, so unioning a new
-        // element is typically cheap (in that it does not involve a combinatorial
-        // explosion from distributing the clause through an existing disjunction). So we
-        // don't need to be as clever here as in `add_upper`.
+        // Unioning lower bounds does not distribute intersections over unions, so it cannot
+        // introduce the combinatorial expansion that `add_upper` needs to avoid.
         match provenance {
             ConstraintProvenance::Evidence => {
                 self.evidence_lower.insert(ty);

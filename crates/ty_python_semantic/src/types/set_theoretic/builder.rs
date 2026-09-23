@@ -7,11 +7,9 @@
 //!   * The same type should never appear more than once in a union or intersection. (This should
 //!     be expanded to cover subtyping -- see below -- but for now we only implement it for type
 //!     identity.)
-//!   * Disjunctive normal form (DNF): the tree of unions and intersections can never be deeper
-//!     than a union-of-intersections. Unions cannot contain other unions (the inner union just
-//!     flattens into the outer one), intersections cannot contain other intersections (also
-//!     flattens), and intersections cannot contain unions (the intersection distributes over the
-//!     union, inverting it into a union-of-intersections).
+//!   * Adjacent unions and adjacent positive intersections are flattened. Small intersections
+//!     distribute over unions into disjunctive normal form (DNF). Larger products retain their
+//!     union factors, avoiding an exponentially large representation without losing alternatives.
 //!   * No type in a union can be a subtype of any other type in the union (just eliminate the
 //!     subtype from the union).
 //!   * No type in an intersection can be a supertype of any other type in the intersection (just
@@ -1305,17 +1303,16 @@ impl IntersectionLimits for BoundedIntersection {
 
 #[derive(Clone)]
 pub(crate) struct IntersectionBuilder<'db> {
-    // Really this builds a union-of-intersections, because we always keep our set-theoretic types
-    // in disjunctive normal form (DNF), a union of intersections. In the simplest case there's
-    // just a single intersection in this vector, and we are building a single intersection type,
-    // but if a union is added to the intersection, we'll distribute ourselves over that union and
-    // create a union of intersections.
+    // Small products are expanded into a union of intersections. Once the product becomes too
+    // large, a single inner builder retains the remaining disjunctions as factors.
     intersections: Vec<InnerIntersectionBuilder<'db>>,
     db: &'db dyn Db,
     env: ProgramEnvironment<'db>,
     // One disjunction does not multiply alternatives. Only subsequent distributions consume
     // the bounded constructor's budget, after impossible and redundant branches are removed.
     has_disjunction: bool,
+    /// Retain union factors once distribution would make the representation too large.
+    factored: bool,
 }
 
 impl<'db> IntersectionBuilder<'db> {
@@ -1325,7 +1322,35 @@ impl<'db> IntersectionBuilder<'db> {
             env: env.clone(),
             intersections: vec![InnerIntersectionBuilder::default()],
             has_disjunction: false,
+            factored: false,
         }
+    }
+
+    /// Keep the alternatives accumulated so far as one factor of the intersection.
+    fn factor(&mut self) {
+        self.factored = true;
+        if self.intersections.len() > 1 {
+            let union = UnionType::from_elements(
+                self.db,
+                &self.env,
+                std::mem::take(&mut self.intersections)
+                    .into_iter()
+                    .map(|inner| inner.build(self.db, &self.env)),
+            );
+            let mut inner = InnerIntersectionBuilder::default();
+            inner.add_positive(self.db, &self.env, union);
+            self.intersections.push(inner);
+        }
+    }
+
+    fn should_factor<L: IntersectionLimits>(&self, alternatives: usize) -> bool {
+        // This limit selects an exact representation; it never discards narrowing information.
+        const MAX_EXPANDED_INTERSECTION_TERMS: usize = 16;
+        !L::BOUNDED
+            && (self.factored
+                || (self.has_disjunction
+                    && self.intersections.len().saturating_mul(alternatives)
+                        > MAX_EXPANDED_INTERSECTION_TERMS))
     }
 
     /// Add DNF branches, dropping `Never` and duplicate branches so later distribution does not
@@ -1475,6 +1500,14 @@ impl<'db> IntersectionBuilder<'db> {
                 self.add_positive_impl::<L>(value_type, seen_aliases)?;
             }
             Type::Union(union) => {
+                if self.should_factor::<L>(union.elements(db).len()) {
+                    self.factor();
+                    for inner in &mut self.intersections {
+                        inner.add_positive(db, &self.env, ty);
+                    }
+                    self.has_disjunction = true;
+                    return ControlFlow::Continue(());
+                }
                 // Distribute ourself over this union: for each union element, clone ourself and
                 // intersect with that union element, then create a new union-of-intersections with all
                 // of those sub-intersections in it. E.g. if `self` is a simple intersection `T1 & T2`
@@ -1494,6 +1527,9 @@ impl<'db> IntersectionBuilder<'db> {
             }
             // `(A & B & ~C) & (D & E & ~F)` -> `A & B & D & E & ~C & ~F`
             Type::Intersection(other) => {
+                if !L::BOUNDED && other.is_factored(db) {
+                    self.factor();
+                }
                 for pos in other.positive(db) {
                     self.add_positive_impl::<L>(*pos, seen_aliases)?;
                 }
@@ -1552,6 +1588,25 @@ impl<'db> IntersectionBuilder<'db> {
                 }
             }
             Type::Intersection(intersection) => {
+                // `~(~A & ~B)` is the single union factor `A | B`, even when a preceding
+                // factor prevents us from distributing that union across the intersection.
+                if !L::BOUNDED && intersection.positive(db).is_empty() {
+                    let union = UnionType::from_elements(
+                        db,
+                        &self.env,
+                        intersection.negative(db).iter().copied(),
+                    );
+                    return self.add_positive_impl::<L>(union, seen_aliases);
+                }
+                let branches = intersection.positive(db).len() + intersection.negative(db).len();
+                if branches > 1 && self.should_factor::<L>(branches) {
+                    self.factor();
+                    for inner in &mut self.intersections {
+                        inner.add_negative(db, &self.env, ty);
+                    }
+                    self.has_disjunction = true;
+                    return ControlFlow::Continue(());
+                }
                 // (A | B) & ~(C & ~D)
                 // -> (A | B) & (~C | D)
                 // -> ((A | B) & ~C) | ((A | B) & D)
@@ -1562,7 +1617,6 @@ impl<'db> IntersectionBuilder<'db> {
                 let mut distributed = FxIndexSet::default();
                 // A single negative element can encode double negation. It only introduces a
                 // disjunction if expanding that element does, for example `~~Alias` for a union.
-                let branches = intersection.positive(db).len() + intersection.negative(db).len();
                 let check_budget = self.has_disjunction && branches > 1;
                 let mut has_disjunction = self.has_disjunction || branches > 1;
                 // We negate all the positive constraints while distributing.
@@ -1834,6 +1888,16 @@ impl<'db> InnerIntersectionBuilder<'db> {
         env: &ProgramEnvironment<'db>,
         mut new_positive: Type<'db>,
     ) {
+        if let Type::Intersection(intersection) = new_positive {
+            for positive in intersection.positive(db) {
+                self.add_positive(db, env, *positive);
+            }
+            for negative in intersection.negative(db) {
+                self.add_negative(db, env, *negative);
+            }
+            return;
+        }
+
         // `Never & T` -> `Never`
         if self.positive.contains(&Type::Never) {
             return;
@@ -2112,14 +2176,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
         };
 
         match new_negative {
-            Type::Intersection(inter) => {
-                for pos in inter.positive(db) {
-                    self.add_negative(db, env, *pos);
-                }
-                for neg in inter.negative(db) {
-                    self.add_positive(db, env, *neg);
-                }
-            }
             Type::Never => {
                 // Adding ~Never to an intersection is a no-op.
             }
@@ -2311,7 +2367,47 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
     }
 
+    /// Eliminate impossible alternatives without distributing the other union factors.
+    fn simplify_union_factors(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) {
+        let mut index = 0;
+        while let Some(positive) = self.positive.get_index(index).copied() {
+            let Type::Union(union) = positive else {
+                index += 1;
+                continue;
+            };
+            let narrowed = union.filter(db, |element| {
+                !self.positive.iter().any(|other| {
+                    *other != positive
+                        && simplify_intersection_pair(
+                            db,
+                            env,
+                            *element,
+                            *other,
+                            IntersectionPolarity::Positive,
+                        ) == IntersectionSimplification::Disjoint
+                }) && !self.negative.iter().any(|negative| {
+                    simplify_intersection_pair(
+                        db,
+                        env,
+                        *element,
+                        *negative,
+                        IntersectionPolarity::Mixed,
+                    ) == IntersectionSimplification::Disjoint
+                })
+            });
+            if narrowed == positive {
+                index += 1;
+            } else {
+                self.positive.swap_remove_index(index);
+                self.add_positive(db, env, narrowed);
+                // A reduced factor can eliminate alternatives from a factor already visited.
+                index = 0;
+            }
+        }
+    }
+
     fn build(mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        self.simplify_union_factors(db, env);
         if self.has_empty_enum_complement(db, env) {
             return Type::Never;
         }

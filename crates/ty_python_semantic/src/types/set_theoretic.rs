@@ -673,6 +673,8 @@ impl KnownUnion {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct IntersectionType<'db> {
     /// The intersection type includes only values in all of these types.
+    ///
+    /// Large products can retain unions as positive factors instead of distributing into DNF.
     #[returns(ref)]
     pub(crate) positive: FxOrderSet<Type<'db>>,
 
@@ -916,6 +918,67 @@ pub(crate) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
 
 #[salsa::tracked]
 impl<'db> IntersectionType<'db> {
+    /// Whether this intersection retains disjunctions instead of distributing them into DNF.
+    pub(crate) fn is_factored(self, db: &'db dyn Db) -> bool {
+        self.positive(db).iter().copied().any(Type::is_union)
+            || self.negative(db).iter().copied().any(Type::is_intersection)
+    }
+
+    /// Split one disjunctive factor, leaving the other factors shared by its alternatives.
+    ///
+    /// Consumers can stop as soon as they prove or disprove their relation, without materializing
+    /// the Cartesian product of all the factors.
+    pub(crate) fn split_disjunction(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<impl Iterator<Item = Type<'db>>> {
+        let (factor, negated, alternatives) =
+            if let Some(union) = self.positive(db).iter().find_map(|ty| ty.as_union()) {
+                (
+                    Type::Union(union),
+                    false,
+                    Either::Left(union.elements(db).iter().map(|ty| (*ty, false))),
+                )
+            } else {
+                let intersection = self
+                    .negative(db)
+                    .iter()
+                    .find_map(|ty| ty.as_intersection())?;
+                (
+                    Type::Intersection(intersection),
+                    true,
+                    Either::Right(
+                        intersection
+                            .positive(db)
+                            .iter()
+                            .map(|ty| (*ty, true))
+                            .chain(intersection.negative(db).iter().map(|ty| (*ty, false))),
+                    ),
+                )
+            };
+        let env = env.clone();
+        Some(alternatives.map(move |(element, negative)| {
+            let mut builder = IntersectionBuilder::new(db, &env);
+            if negative {
+                builder.add_negative_in_place(element);
+            } else {
+                builder.add_positive_in_place(element);
+            }
+            for positive in self.positive(db) {
+                if negated || *positive != factor {
+                    builder.add_positive_in_place(*positive);
+                }
+            }
+            for negative in self.negative(db) {
+                if !negated || *negative != factor {
+                    builder.add_negative_in_place(*negative);
+                }
+            }
+            builder.build()
+        }))
+    }
+
     /// Return the compact enum-complement view of this intersection, if it has one.
     pub(crate) fn enum_complement(
         self,
@@ -992,10 +1055,10 @@ impl<'db> IntersectionType<'db> {
     /// Create an intersection type `E1 & E2 & ... & En` from a list of (positive) elements, while
     /// ensuring that we only expand an intersection of unions within a limited budget.
     ///
-    /// Our `Type` representation is in DNF, which means that the size of an intersection of unions
-    /// grows as the product of all of the union sizes. [`from_elements`][Self::from_elements] will
-    /// blindly calculate that full expansion. This method detects when we exceed a fixed budget of
-    /// work, and if so, returns `None`. (Redundant terms do not count toward the budget.)
+    /// Expanding an intersection of unions into DNF grows as the product of the union sizes.
+    /// Unlike [`from_elements`][Self::from_elements], this constructor returns `None` instead of
+    /// retaining factors when expansion exceeds its budget. Redundant terms do not count toward
+    /// the budget.
     ///
     /// Like [`from_elements`][Self::from_elements], a successful result is exact.
     pub(crate) fn bounded_from_elements<I, T>(

@@ -178,8 +178,8 @@ def nested(
 
 ### Union of intersections
 
-We always normalize our representation to a _union of intersections_, so when we add a _union to an
-intersection_, we distribute the union over the respective elements:
+Small intersections of unions are normalized to a _union of intersections_ by distributing the union
+over the respective elements. Larger products retain their factors to avoid exponential growth:
 
 ```py
 class P: ...
@@ -224,6 +224,111 @@ def simplifications_for_same_elements(
     # = P | P & Q | Q
     # = P | Q
     reveal_type(i4)  # revealed: P | Q
+```
+
+### Factored intersections
+
+An intersection of larger unions retains its factors instead of enumerating every combination. Both
+factors still contribute to assignability and member lookup:
+
+```py
+from typing import Never, assert_type
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import is_equivalent_to, is_subtype_of, is_disjoint_from
+
+class A:
+    left: int
+
+class B:
+    left: int
+
+class C:
+    left: int
+
+class D:
+    left: int
+
+class E:
+    left: int
+
+class V:
+    right: str
+
+class W:
+    right: str
+
+class X:
+    right: str
+
+class Y:
+    right: str
+
+class Z:
+    right: str
+
+type Left = A | B | C | D | E
+type Right = V | W | X | Y | Z
+type Both = Intersection[Left, Right]
+type Expanded = (
+    Intersection[A, Right] | Intersection[B, Right] | Intersection[C, Right] | Intersection[D, Right] | Intersection[E, Right]
+)
+
+static_assert(is_equivalent_to(Both, Expanded))
+static_assert(is_subtype_of(Both, Left))
+static_assert(is_subtype_of(Both, Right))
+static_assert(not is_subtype_of(Left, Both))
+
+class AV(A, V): ...
+
+both: Both = AV()
+
+def members(value: Both):
+    reveal_type(value)  # revealed: (A | B | C | D | E) & (V | W | X | Y | Z)
+    left: Left = value
+    right: Right = value
+    assert_type(value.left, int)
+    assert_type(value.right, str)
+```
+
+Later checks eliminate alternatives within a factor while retaining the other factors. Excluding
+every alternative makes the intersection empty:
+
+```py
+def narrow(value: Both):
+    if isinstance(value, A):
+        reveal_type(value)  # revealed: (V | W | X | Y | Z) & A
+        assert_type(value.right, str)
+    if not isinstance(value, A):
+        reveal_type(value)  # revealed: (V | W | X | Y | Z) & (B | C | D | E) & ~A
+
+def impossible(value: Both & ~A & ~B & ~C & ~D & ~E):
+    assert_type(value, Never)
+```
+
+Negation preserves De Morgan's laws, and the factored type remains disjoint from the complement of
+either factor:
+
+```py
+type NotLeft = ~(A | B | C | D | E)
+type NotBoth = ~((A | B | C | D | E) & (V | W | X | Y | Z))
+type EitherNot = ~(A | B | C | D | E) | ~(V | W | X | Y | Z)
+
+static_assert(is_disjoint_from(Both, NotLeft))
+static_assert(is_equivalent_to(NotBoth, EitherNot))
+
+type Negative = ~(A & B & C & D & E) & ~(V & W & X & Y & Z)
+type NegativeExpanded = (
+    (~A & ~(V & W & X & Y & Z))
+    | (~B & ~(V & W & X & Y & Z))
+    | (~C & ~(V & W & X & Y & Z))
+    | (~D & ~(V & W & X & Y & Z))
+    | (~E & ~(V & W & X & Y & Z))
+)
+
+static_assert(is_equivalent_to(Negative, NegativeExpanded))
+
+def double_negation(value: ~~((A | B | C | D | E) & (V | W | X | Y | Z))):
+    reveal_type(value)  # revealed: (A | B | C | D | E) & (V | W | X | Y | Z)
 ```
 
 ### Union of intersections with disjoint exclusions
