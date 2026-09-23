@@ -1187,22 +1187,7 @@ Run Ruff on every keystroke (`onType`) or on save (`onSave`).
 
     This setting is deprecated as of Ruff 0.17. The Ruff extension will always use the native language server.
 
-Whether to use the native language server, [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) or
-automatically decide between the two based on the Ruff version and extension settings.
-
-- `"on"`: Use the native language server. A warning will be displayed if deprecated settings are
-    detected.
-- `"off"`: Use [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp). A warning will be displayed if
-    settings specific to the native server are detected.
-- `"auto"`: Automatically select between the native language server and
-    [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) based on the following conditions:
-    1. If the Ruff version is >= `0.5.3`, use the native language server unless any deprecated
-        settings are detected. In that case, show a warning and use
-        [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) instead.
-    1. If the Ruff version is < `0.5.3`, use [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp). A
-        warning will be displayed if settings specific to the native server are detected.
-- `true`: Same as `on`
-- `false`: Same as `off`
+Whether to use the native language server, [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) or automatically decide between the two based on the Ruff version and extension settings.
 
 **Default value**: `"auto"`
 
