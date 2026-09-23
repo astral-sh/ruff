@@ -9,6 +9,31 @@ use crate::{Db, ProgramEnvironment, types::Type};
 ///
 /// Value context preserves the inferred result type, including objects whose truthiness can change
 /// between tests. Condition context follows short-circuit paths without re-testing their results.
+/// For example, `items and False` is always false as a condition, but its value can be `items`:
+///
+/// ```python
+/// items = []
+/// if items and False:
+///     print("unreachable")
+///
+/// saved = items and False  # Produces the empty list itself.
+/// items.append(1)
+/// if saved:
+///     print("reachable")  # Tests the same list again, now that it is nonempty.
+/// ```
+///
+/// An expression can also fail to produce any value. Short-circuiting can bypass such an expression:
+///
+/// ```python
+/// from typing import Never
+///
+/// def check(flag: bool, value: Never):
+///     if flag or bool(value):
+///         print("reachable when flag is true")
+///     else:
+///         print("unreachable")  # Evaluating value cannot produce a result.
+/// ```
+///
 /// The callbacks read existing inference results; this analyzer does not infer or cache types.
 pub(crate) struct TruthinessAnalyzer<'a, 'db, T, C> {
     db: &'db dyn Db,
