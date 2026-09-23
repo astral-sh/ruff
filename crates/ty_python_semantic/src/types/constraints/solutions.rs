@@ -813,16 +813,17 @@ impl<'db> SolutionWalker<'db> {
         let typevars: Option<Box<[_]>> = mappings
             .into_iter()
             .map(|(bound_typevar, solver)| {
+                let range = solver.finish(db, env, storage, bound_typevar)?;
                 let (solution, argument) = match self
                     .declared_constraint_solutions
                     .get(&bound_typevar.identity(db))
                 {
                     Some(&ty) => {
-                        let solution = CandidateTypeVarSolution::exact(bound_typevar, ty);
+                        let solution =
+                            CandidateTypeVarSolution::exact(bound_typevar, ty, range.variance());
                         (solution, Some(ty))
                     }
                     None => {
-                        let range = solver.finish(db, env, storage, bound_typevar)?;
                         let argument = range.inference_lower(db, env);
                         let solution = CandidateTypeVarSolution::range(bound_typevar, range);
                         (solution, argument)

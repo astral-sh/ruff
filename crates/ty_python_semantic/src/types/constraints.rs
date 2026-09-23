@@ -3233,7 +3233,7 @@ pub(crate) struct CandidateTypeVarSolution<'db> {
 #[cfg_attr(target_pointer_width = "64", expect(clippy::large_enum_variant))]
 pub(crate) enum CandidateTypeVarSolutionKind<'db> {
     Range(CandidateTypeVarRangeSolution<'db>),
-    Exact(Type<'db>),
+    Exact(Type<'db>, TypeVarVariance),
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
@@ -3257,10 +3257,14 @@ impl<'db> CandidateTypeVarSolution<'db> {
         }
     }
 
-    pub(crate) fn exact(bound_typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) -> Self {
+    pub(crate) fn exact(
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+        variance: TypeVarVariance,
+    ) -> Self {
         Self {
             bound_typevar,
-            kind: CandidateTypeVarSolutionKind::Exact(ty),
+            kind: CandidateTypeVarSolutionKind::Exact(ty, variance),
         }
     }
 
@@ -3279,7 +3283,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
                 Some(lower)
             }
             CandidateTypeVarSolutionKind::Range(_) => None,
-            CandidateTypeVarSolutionKind::Exact(ty) => Some(*ty),
+            CandidateTypeVarSolutionKind::Exact(ty, _) => Some(*ty),
         }
     }
 
@@ -3291,14 +3295,14 @@ impl<'db> CandidateTypeVarSolution<'db> {
     ) -> Option<Type<'db>> {
         match &self.kind {
             CandidateTypeVarSolutionKind::Range(range) => range.inference_lower(db, env),
-            CandidateTypeVarSolutionKind::Exact(ty) => Some(*ty),
+            CandidateTypeVarSolutionKind::Exact(ty, _) => Some(*ty),
         }
     }
 
     fn variance(&self) -> TypeVarVariance {
         match &self.kind {
             CandidateTypeVarSolutionKind::Range(range) => range.variance(),
-            CandidateTypeVarSolutionKind::Exact(_) => TypeVarVariance::Invariant,
+            CandidateTypeVarSolutionKind::Exact(_, variance) => *variance,
         }
     }
 
@@ -3314,7 +3318,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
             CandidateTypeVarSolutionKind::Range(range) => {
                 range.restrict_gradual_solution(db, env, self.bound_typevar, solution)
             }
-            CandidateTypeVarSolutionKind::Exact(_) => Some(solution),
+            CandidateTypeVarSolutionKind::Exact(_, _) => Some(solution),
         }
     }
 }
@@ -4007,7 +4011,7 @@ impl<'db> CandidateSolutions<'db> {
         // Choose a solution type that satisfies the constraints on this path.
         let range = match &path_bound.kind {
             CandidateTypeVarSolutionKind::Range(range) => range,
-            CandidateTypeVarSolutionKind::Exact(ty) => {
+            CandidateTypeVarSolutionKind::Exact(ty, _) => {
                 return PathBoundSolution::Solved(*ty);
             }
         };
@@ -5672,7 +5676,7 @@ mod tests {
                 db,
                 &env,
                 &builder,
-                &CandidateTypeVarSolution::exact(t, Type::Never)
+                &CandidateTypeVarSolution::exact(t, Type::Never, TypeVarVariance::Invariant)
             ),
             PathBoundSolution::Solved(Type::Never)
         );
@@ -5784,12 +5788,20 @@ class E: ...
             for reverse in [false, true] {
                 let mut paths = vec![
                     CandidateSolution {
-                        typevars: vec![exhausted.clone(), CandidateTypeVarSolution::exact(u, str)]
-                            .into_boxed_slice(),
+                        typevars: vec![
+                            exhausted.clone(),
+                            CandidateTypeVarSolution::exact(u, str, TypeVarVariance::Invariant),
+                        ]
+                        .into_boxed_slice(),
                         validity: SolutionValidity::Valid,
                     },
                     CandidateSolution {
-                        typevars: vec![CandidateTypeVarSolution::exact(t, int)].into_boxed_slice(),
+                        typevars: vec![CandidateTypeVarSolution::exact(
+                            t,
+                            int,
+                            TypeVarVariance::Invariant,
+                        )]
+                        .into_boxed_slice(),
                         validity: SolutionValidity::Valid,
                     },
                 ];
