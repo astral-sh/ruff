@@ -14,11 +14,18 @@ Editors, playgrounds, and repository automation have [separate models](threat-mo
 
 ## Trust boundaries and assumptions
 
-- **Attacker-controlled:** project files used during analysis, including source code, project
-    configuration, and dependency source code.
+- **Attacker-controlled:** the names and contents of project files supplied for analysis, including
+    source code, project configuration, and dependency source code. The attacker chooses what is
+    supplied but does not have write access to the copies being analyzed on the user's
+    machine or CI worker.
 - **Trusted local input:** the operating system, installed programs, environment variables, `PATH`,
-    caches, user configuration, explicit command-line choices, and user-managed filesystem state that
+    caches, user configuration, command-line arguments, and user-managed filesystem state that
     the attacker cannot change.
+
+The CLI treats command-line options and response files as instructions from its caller. Integrations
+that construct commands from untrusted input, including repository filenames, must ensure that
+intended file arguments are interpreted as files rather than options or response-file references.
+The contents of selected project and configuration files remain attacker-controlled.
 
 ## Security invariants
 
