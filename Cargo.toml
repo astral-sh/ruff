@@ -246,7 +246,6 @@ typed-arena = { version = "2.0.2", default-features = false, features = ["std"] 
 unicode-ident = { version = "1.0.12", default-features = false }
 unicode-normalization = { version = "0.1.23", default-features = false, features = ["std"] }
 unicode-width = { version = "0.2.0", default-features = false }
-unicode_names2 = { version = "1.2.2", default-features = false }
 url = { version = "2.5.0", default-features = false, features = ["std"] }
 uuid = { version = "1.6.1", default-features = false, features = ["std"] }
 walkdir = { version = "2.3.2", default-features = false }
