@@ -29,6 +29,33 @@ type CheckCache<'a, 'db, L, B> = dyn FnMut(
     ) -> ControlFlow<B, bool>
     + 'a;
 
+/// A callback used by [`visit_node_and_then`][SolutionWalker::visit_node_and_then] to determine
+/// whether we must walk its outgoing edges to determine its satisfiability. (We keep track of the
+/// node's support — the typevars mentioned in any constraints reachable from it. If none of those
+/// constraints can affect the solution we've already discovered for the path, there is no need to
+/// walk further in the BDD.)
+type PrunePath<'a, 'db, L, B> = dyn FnMut(
+        &mut SolutionWalker<'db>,
+        &mut ConstraintSetStorage<'db>,
+        &mut L,
+        &mut PathAssignments,
+        NodeId,
+    ) -> ControlFlow<B, PathIs>
+    + 'a;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PathIs {
+    /// The current path is already satisfied, and the current node (and its descendants) cannot
+    /// affect the solution.
+    Satisfied,
+    /// The current path is currently satisfied, but all paths from the current node introduce
+    /// contradictions that make it unsatisfied.
+    Unsatisfied,
+    /// The current path is currently satisfied, but the current node can influence the solutions
+    /// that we report, and so we must walk its outgoing edges in full.
+    Uncertain,
+}
+
 /// A callback that is invoked by [`visit_node_and_then`][SolutionWalker::visit_node_and_then]
 /// whenever a satisfied path to the `true` terminal is found.
 type ProcessSatisfied<'a, 'db, L, B> = dyn FnMut(
@@ -159,6 +186,27 @@ impl<'db> SolutionWalker<'db> {
                 let key = (node, relevant_path);
                 ControlFlow::Continue(this.explored_nodes.insert(key))
             },
+            &mut |this, storage, limits, path, node| {
+                // Next see if anything in this node can affect the solution we've already
+                // calculated on the current path.
+                let mut visible_typevars = this.inferable_support.clone();
+                visible_typevars
+                    .close_over_constraints(storage, Self::constrained_assignments(path));
+                if let Some(node_support) = storage.node_support(node)
+                    && visible_typevars.overlaps_with(node_support)
+                {
+                    return ControlFlow::Continue(PathIs::Uncertain);
+                }
+
+                // This node cannot affect the solution we've found. Make sure that the node has
+                // _at least one_ satisfiable path, without walking them all. As long as it does,
+                // we can report the solution we have so far as-is.
+                if this.node_is_satisfiable_on_path(db, env, storage, limits, path, node)? {
+                    ControlFlow::Continue(PathIs::Satisfied)
+                } else {
+                    ControlFlow::Continue(PathIs::Unsatisfied)
+                }
+            },
             &mut |this, storage, limits, path| match all_typevars {
                 Some(all_typevars) => {
                     let validations = validations.get_or_insert_with(|| {
@@ -219,6 +267,7 @@ impl<'db> SolutionWalker<'db> {
         path: &mut PathAssignments,
         node: NodeId,
         check_cache: &mut CheckCache<'_, 'db, L, L::Break>,
+        prune_path: &mut PrunePath<'_, 'db, L, L::Break>,
         process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break> {
         limits.visit_node()?;
@@ -233,6 +282,12 @@ impl<'db> SolutionWalker<'db> {
         // If the current node is ALWAYS_TRUE, we can immediately report the current solution.
         if node == ALWAYS_TRUE {
             return process_satisfied(self, storage, limits, path);
+        }
+
+        match prune_path(self, storage, limits, path, node)? {
+            PathIs::Satisfied => return process_satisfied(self, storage, limits, path),
+            PathIs::Unsatisfied => return ControlFlow::Continue(()),
+            PathIs::Uncertain => {}
         }
 
         // At this point we actually have to walk the outgoing edges of this node.
@@ -252,10 +307,77 @@ impl<'db> SolutionWalker<'db> {
                 assignment,
                 child,
                 check_cache,
+                prune_path,
                 process_satisfied,
             )?;
         }
         ControlFlow::Continue(())
+    }
+
+    /// Returns whether there is _any_ satisfiable path in `node`, assuming that the assignments in
+    /// `path` already hold. Avoids walking the entire subtree if possible, by returning early once
+    /// we find the first satisfied path.
+    fn node_is_satisfiable_on_path<L: SolutionLimits>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        path: &mut PathAssignments,
+        node: NodeId,
+    ) -> ControlFlow<L::Break, bool> {
+        /// A custom [`SolutionLimits`] that lets us return early either when the budget is
+        /// exhausted, or when we detect the first satisfiable path.
+        struct AllowEarlyBreak<'a, L>(&'a mut L);
+
+        enum Break<B> {
+            Limits(B),
+            FoundSolution,
+        }
+
+        impl<L> SolutionLimits for AllowEarlyBreak<'_, L>
+        where
+            L: SolutionLimits,
+        {
+            type Break = Break<L::Break>;
+
+            fn visit_node(&mut self) -> ControlFlow<Self::Break> {
+                self.0.visit_node().map_break(Break::Limits)
+            }
+
+            fn satisfied_path(&mut self) -> ControlFlow<Self::Break> {
+                self.0.satisfied_path().map_break(Break::Limits)
+            }
+        }
+
+        let result = self.visit_node_and_then(
+            db,
+            env,
+            storage,
+            &mut AllowEarlyBreak(limits),
+            path,
+            node,
+            // never cache
+            &mut |_this, _storage, _limits, _path, _node| ControlFlow::Continue(true),
+            // fully process every node
+            &mut |_this, _storage, _limits, _path, _node| ControlFlow::Continue(PathIs::Uncertain),
+            // break when we find the first solution
+            &mut |this, storage, _limits, path| {
+                if this
+                    .pending_candidate_solution(db, env, storage, path, None)
+                    .is_some()
+                {
+                    ControlFlow::Break(Break::FoundSolution)
+                } else {
+                    ControlFlow::Continue(())
+                }
+            },
+        );
+        match result {
+            ControlFlow::Break(Break::Limits(b)) => ControlFlow::Break(b),
+            ControlFlow::Break(Break::FoundSolution) => ControlFlow::Continue(true),
+            ControlFlow::Continue(()) => ControlFlow::Continue(false),
+        }
     }
 
     /// Visits one of the outgoing edges from a BDD node.
@@ -273,6 +395,7 @@ impl<'db> SolutionWalker<'db> {
         assignment: ConstraintAssignment,
         child: NodeId,
         check_cache: &mut CheckCache<'_, 'db, L, L::Break>,
+        prune_path: &mut PrunePath<'_, 'db, L, L::Break>,
         process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break> {
         // Don't bother adding the assignment and checking the sequent map if the edge takes us to
@@ -296,6 +419,7 @@ impl<'db> SolutionWalker<'db> {
                         path,
                         child,
                         check_cache,
+                        prune_path,
                         process_satisfied,
                     )?;
                 }
