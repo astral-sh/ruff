@@ -1242,14 +1242,50 @@ impl<'db> ProtocolAnnotation<'db> {
     }
 }
 
-/// The declaration from which a property read or write type is obtained.
+/// The source of the type obtained by reading a member or accepted by assignment to it.
+///
+/// This also models ordinary annotated attributes: the write requirement for `name: str`
+/// uses `Annotation`, even though the attribute is not a Python `property`.
 ///
 /// Accessors remain lazy: resolving every property while constructing a protocol interface
 /// would expand return-type unions even when the property is unrelated to the current check.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum ProtocolPropertyType<'db> {
+    /// An annotation that is already available, without inspecting an accessor signature.
+    /// For example, the write requirement for this attribute uses the annotation `str`:
+    ///
+    /// ```python
+    /// class Named(Protocol):
+    ///     name: str
+    /// ```
+    ///
+    /// The annotation can still require `Self` substitution when used.
     Annotation(ProtocolAnnotation<'db>),
+    /// A getter callable whose return annotation determines the type obtained by reading
+    /// the property. We retain the callable and extract that annotation only when needed:
+    ///
+    /// ```python
+    /// class Named(Protocol):
+    ///     @property
+    ///     def name(self) -> str: ...
+    /// ```
+    ///
+    /// Here, reading `name` produces `str`.
     PropertyGetter(Type<'db>),
+    /// A setter callable whose assigned-argument annotation determines the type accepted
+    /// by assignment. We retain the callable and extract that annotation only when needed:
+    ///
+    /// ```python
+    /// class Named(Protocol):
+    ///     @property
+    ///     def name(self) -> str: ...
+    ///
+    ///     @name.setter
+    ///     def name(self, value: str | None) -> None: ...
+    /// ```
+    ///
+    /// Here, assignment to `name` accepts `str | None`, from the `value` parameter.
+    /// The setter's return annotation `None` does not describe what can be assigned.
     PropertySetter(Type<'db>),
 }
 
@@ -2473,7 +2509,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         required: ProtocolMemberAccess<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
-        // Reading a member as `object` imposes no constraint on its value type. A class
+        // Reading a member as `object` imposes no constraint on the type read. A class
         // attribute establishes presence without inferring a shadowing instance assignment.
         if !member.is_method()
             && required
@@ -3198,7 +3234,7 @@ impl<'db> ProtocolMemberCandidate<'db> {
     ) {
         match self.ty {
             Type::PropertyInstance(property) => {
-                // A property exposes its getter return and setter value types. Walking the
+                // A property exposes its getter return and setter parameter types. Walking the
                 // accessor callables themselves would also visit their receiver and make every
                 // generic protocol property appear recursive.
                 for member in [
