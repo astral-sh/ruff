@@ -160,6 +160,9 @@ impl<'ast> StatementCall<'ast> {
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PredicateNode<'db> {
+    /// The truthiness of a name or literal, determined by its inferred type alone.
+    /// These predicates do not need a separate expression-evaluation query.
+    TypeTruthiness(Expression<'db>),
     /// The truthiness of an expression's resulting value.
     Expression(Expression<'db>),
     /// A boolean operation, `not`, or conditional expression evaluated directly as a condition.
