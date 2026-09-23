@@ -39,6 +39,8 @@ has already been formatted by Black.
 ### Pragma comments are ignored when computing line width
 
 Pragma comments (`# type`, `# noqa`, `# pyright`, `# pylint`, etc.) are ignored when computing the width of a line.
+For mixed comments such as `# explanation  # noqa: F401`, only the pragma suffix is ignored;
+the preceding comment text still contributes to the line width.
 This prevents Ruff from moving pragma comments around, thereby modifying their meaning and behavior:
 
 See Ruff's [pragma comment handling proposal](https://github.com/astral-sh/ruff/discussions/6670)
