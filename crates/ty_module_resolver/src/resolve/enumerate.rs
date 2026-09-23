@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
-use compact_str::CompactString;
+use compact_str::{CompactString, format_compact};
 use ruff_db::files::directory_listing;
 use ruff_db::system::FileType;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -9,12 +9,13 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
-use crate::path::ModuleDirectory;
+use crate::path::{ModuleDirectory, SearchPath};
 
 use super::search::ModuleSearchCursor;
 use super::{
-    ModuleNameIngredient, ModuleResolutionCandidate, ModuleResolveModeIngredient, ResolvedModule,
-    ResolvedNames, ResolverContext, search_paths, stub_package_index,
+    ComponentFileFilter, ModuleNameIngredient, ModuleResolutionCandidate,
+    ModuleResolveModeIngredient, ResolvedModule, ResolvedNames, ResolverContext,
+    resolve_file_module_with_filter, search_paths, stub_package_index,
 };
 
 /// Lists top-level modules across the configured search paths.
@@ -79,13 +80,23 @@ impl<'db> ModuleSearchCursor<'_, 'db> {
             |candidate: &ModuleResolutionCandidate| is_listable_location(db, candidate);
         let mut names = BTreeMap::<_, ChildNameSummary>::new();
         let mut listable_directories = Vec::new();
-        let mut collect = |directory: &ModuleDirectory| {
+        let mut has_symlinks = false;
+        let mut collect = |directory: &ModuleDirectory, search_path: Option<&'db SearchPath>| {
             directory.for_each_entry(db, |entry, kind| {
+                // Even excluded directory symlinks can shadow a `.py` or `.pyi` file.
+                has_symlinks |= kind.is_symlink();
+
                 if let Some(name) = child_module_name(entry, kind, prefix.is_none()) {
                     // A file module can have descendants from a matching directory in
                     // another location. Symlinks may also turn out to be directories.
-                    let summary = names.entry(CompactString::new(name)).or_default();
-                    summary.record_entry(kind);
+                    let summary =
+                        names
+                            .entry(CompactString::new(name))
+                            .or_insert_with(|| ChildNameSummary {
+                                search_path,
+                                ..ChildNameSummary::default()
+                            });
+                    summary.record_entry(entry, kind, search_path);
                 }
             });
         };
@@ -93,7 +104,7 @@ impl<'db> ModuleSearchCursor<'_, 'db> {
         if prefix.is_none() {
             context.prepare_root_directories(self.root_search_paths());
             for path in self.root_search_paths() {
-                collect(&context.root_directory(path));
+                collect(&context.root_directory(path), Some(path));
             }
         } else {
             for candidate in self
@@ -101,7 +112,7 @@ impl<'db> ModuleSearchCursor<'_, 'db> {
                 .filter(|candidate| is_listable_package(candidate, is_listable))
             {
                 listable_directories.push(&candidate.directory);
-                collect(&candidate.directory);
+                collect(&candidate.directory, None);
             }
         }
 
@@ -118,11 +129,52 @@ impl<'db> ModuleSearchCursor<'_, 'db> {
                 || is_listable(candidate)
         };
         let mut listing = ModuleListing::default();
+        let single_candidate = self.single_candidate();
 
         for (component_name, summary) in names {
             let Some(name) = self.full_module_name(&component_name) else {
                 continue;
             };
+
+            let root_directory = summary
+                .search_path
+                .filter(|path| {
+                    path.is_standard_library()
+                        || !context.mode.is_non_shadowable(
+                            context.resolver_environment.python_version(db).minor,
+                            name.as_str(),
+                        )
+                })
+                .map(|path| context.root_directory(path));
+            if let Some(directory) = root_directory
+                .as_ref()
+                .or_else(|| Some(&single_candidate?.directory))
+                && !summary.may_have_children
+                && !has_symlinks
+            {
+                // With one directory and no package at this name, only file precedence applies.
+                let file = if summary.has_stub {
+                    resolve_file_module_with_filter(
+                        directory,
+                        context,
+                        &component_name,
+                        ComponentFileFilter::ByMode,
+                    )
+                } else {
+                    directory.resolve_file(context, &format_compact!("{component_name}.py"))
+                };
+                if let Some(file) = file {
+                    listing.modules.push(Module::file_module(
+                        db,
+                        file,
+                        context.resolver_environment,
+                        Cow::Owned(name),
+                        ModuleKind::Module,
+                        directory.path().search_path().clone(),
+                    ));
+                }
+                continue;
+            }
 
             if let Some(candidates) = self.resolve_child(&component_name) {
                 if let Some(candidate) = select_candidate_for_listing(candidates, is_listable) {
@@ -157,16 +209,24 @@ impl<'db> ModuleSearchCursor<'_, 'db> {
 /// Summarizes entries that supply the same child module name across the directories being listed.
 ///
 /// For example, `foo.py`, `foo.pyi`, and `foo/` contribute to one summary. Enumeration
-/// uses this information to decide whether to search for the module's children.
+/// uses this information to simplify resolution of the name and decide whether
+/// to search for its children.
 #[derive(Default)]
-struct ChildNameSummary {
+struct ChildNameSummary<'db> {
     may_have_children: bool,
+    has_stub: bool,
+    /// The sole search root containing this name, if discovered at the root.
+    search_path: Option<&'db SearchPath>,
 }
 
-impl ChildNameSummary {
+impl<'db> ChildNameSummary<'db> {
     /// Updates the summary with an entry supplying this child module name.
-    fn record_entry(&mut self, kind: FileType) {
+    fn record_entry(&mut self, entry: &str, kind: FileType, search_path: Option<&'db SearchPath>) {
+        if self.search_path != search_path {
+            self.search_path = None;
+        }
         self.may_have_children |= kind != FileType::File;
+        self.has_stub |= entry.strip_suffix(".pyi").is_some();
     }
 }
 

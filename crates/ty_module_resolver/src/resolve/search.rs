@@ -151,6 +151,23 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
         }
     }
 
+    /// Returns the sole prefix candidate when there is no separate stub override search.
+    pub(super) fn single_candidate(&self) -> Option<&ModuleResolutionCandidate<'db>> {
+        let candidates = match &self.position {
+            Position::Prefix(PrefixResolver::Typing(resolver))
+                if resolver.stub_override_candidates.is_empty() =>
+            {
+                resolver.full_search_candidates(self.context)
+            }
+            Position::Prefix(PrefixResolver::Runtime(resolver)) => &resolver.candidates,
+            _ => return None,
+        };
+        let [candidate] = candidates.as_slice() else {
+            return None;
+        };
+        Some(candidate)
+    }
+
     /// Appends a component name to this search's module name prefix.
     pub(super) fn full_module_name(&self, component_name: &str) -> Option<ModuleName> {
         full_module_name(self.prefix(), component_name)
