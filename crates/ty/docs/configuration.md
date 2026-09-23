@@ -457,7 +457,7 @@ For some language features, ty can also understand conditionals based on compari
 with `sys.version_info`. These are commonly found in typeshed, for example,
 to reflect the differing contents of the standard library across Python versions.
 
-**Default value**: `"3.14"`
+**Default value**: `"3.15"`
 
 **Type**: `"3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | "3.15"`
 
