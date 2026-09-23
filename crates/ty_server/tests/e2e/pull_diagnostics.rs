@@ -13,7 +13,7 @@ use lsp_types::{TextDocumentContentChangeWholeDocument, WorkspaceDiagnosticReque
 use ruff_db::system::SystemPath;
 use ty_server::{ClientOptions, DiagnosticMode};
 
-use crate::workspace_folders::condensed_document_diagnostic_snapshot;
+use crate::diagnostic_snapshots::condensed_document_diagnostic_snapshot;
 use crate::{AwaitResponseError, TestServer, TestServerBuilder};
 
 #[test]

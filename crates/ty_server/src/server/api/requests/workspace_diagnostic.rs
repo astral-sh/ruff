@@ -412,7 +412,7 @@ impl<'a> ResponseWriter<'a> {
         let key = DocumentKey::from_uri(&uri);
         let version = self
             .index
-            .document_handle(&uri)
+            .open_document_handle(&uri)
             .map(|doc| doc.version())
             .ok();
 

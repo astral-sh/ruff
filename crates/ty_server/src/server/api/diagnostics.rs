@@ -24,7 +24,7 @@ use ty_project::{Db as _, ProjectDatabase};
 use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::session::client::Client;
-use crate::session::{DocumentHandle, GlobalSettings};
+use crate::session::{GlobalSettings, OpenDocumentHandle};
 use crate::system::{AnySystemPath, file_to_uri};
 use crate::{DIAGNOSTIC_NAME, Db, DiagnosticMode};
 use crate::{PositionEncoding, Session};
@@ -211,7 +211,7 @@ pub(crate) fn publish_all_document_diagnostics(session: &Session, client: &Clien
 ///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
 pub(crate) fn publish_diagnostics_if_needed(
-    document: &DocumentHandle,
+    document: &OpenDocumentHandle,
     session: &Session,
     client: &Client,
 ) {
@@ -225,16 +225,27 @@ pub(crate) fn publish_diagnostics_if_needed(
 
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
 /// notification].
-pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, client: &Client) {
+pub(super) fn publish_diagnostics(
+    document: &OpenDocumentHandle,
+    session: &Session,
+    client: &Client,
+) {
     if session.global_settings().diagnostic_mode().is_off() {
         return;
     }
 
     let db = session.project_db(document.notebook_or_file_path());
 
+    let Some(file) = document.notebook_or_file(db) else {
+        tracing::info!(
+            "No file found for snapshot for `{}`",
+            document.notebook_or_file_path()
+        );
+        return;
+    };
     let Some(diagnostics) = compute_diagnostics(
         db,
-        document,
+        file,
         session.position_encoding(),
         session.global_settings(),
     ) else {
@@ -266,7 +277,7 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
             )]
             for (cell_uri, diagnostics) in cell_diagnostics {
                 let version = session
-                    .document_handle(&cell_uri)
+                    .open_document_handle(&cell_uri)
                     .map(|document| document.version())
                     .ok();
                 publish_diagnostics_notification(cell_uri, version, diagnostics);
@@ -372,18 +383,10 @@ pub(crate) fn publish_settings_diagnostics(
 
 pub(super) fn compute_diagnostics(
     db: &ProjectDatabase,
-    document: &DocumentHandle,
+    file: File,
     encoding: PositionEncoding,
     global_settings: &GlobalSettings,
 ) -> Option<Diagnostics> {
-    let Some(file) = document.notebook_or_file(db) else {
-        tracing::info!(
-            "No file found for snapshot for `{}`",
-            document.notebook_or_file_path()
-        );
-        return None;
-    };
-
     // The first uv result supplies the module paths needed for correct diagnostics. Do not analyze
     // the script until that result is available. Waiting would not help: publishing the environment
     // advances the database revision and cancels this snapshot, so the request must retry anyway.
