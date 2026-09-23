@@ -42,7 +42,7 @@ impl ModulePath {
         )
     }
 
-    fn push(&mut self, component: &str) {
+    pub(crate) fn push(&mut self, component: &str) {
         if let Some(component_extension) = camino::Utf8Path::new(component).extension() {
             assert!(
                 self.relative_path.extension().is_none(),
@@ -253,7 +253,11 @@ impl<'db> ModuleDirectory<'db> {
     }
 
     /// Returns an existing child directory's path without reading its contents.
-    fn child_directory_path(&self, context: &ResolverContext, name: &str) -> Option<ModulePath> {
+    pub(crate) fn child_directory_path(
+        &self,
+        context: &ResolverContext,
+        name: &str,
+    ) -> Option<ModulePath> {
         if !self.path.search_path.is_standard_library() {
             match self.listing.and_then(|listing| listing.file_type(name)) {
                 Some(FileType::Directory) => {
