@@ -66,7 +66,9 @@ use ty_python_core::{Truthiness, expression::ExpressionContext, predicate::State
 use crate::{
     Db,
     lint::LintMetadata,
-    reachability::{analyze_condition_expression, is_non_terminal_call},
+    reachability::{
+        analyze_condition_expression, is_non_terminal_call, required_operands_are_inhabited,
+    },
     types::{
         CallableTypes, KnownClass, KnownInstanceType, Type,
         constraints::ConstraintSetBuilder,
@@ -458,6 +460,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let env = self.program_environment();
         analyze_condition_expression(test, &|node| {
+            if !required_operands_are_inhabited(db, env, node, &|operand| {
+                self.expression_type(operand)
+            }) {
+                return None;
+            }
             self.comparison_truthiness
                 .get(&node.into())
                 .copied()
@@ -823,6 +830,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } else {
             ConditionKind::Value
         };
+
+        // A fixed result type does not imply that evaluating its operands can finish.
+        // This also covers value-context tests such as `not always_true(never)`.
+        if !required_operands_are_inhabited(db, env, expression, &|operand| {
+            self.expression_type(operand)
+        }) {
+            return None;
+        }
 
         Some(RedundantCondition {
             expression,
