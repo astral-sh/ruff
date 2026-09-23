@@ -703,7 +703,16 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
 ) {
     let env = visitor.program_environment();
     match member.data.kind {
-        ProtocolMemberKind::Method(method, _) => {
+        ProtocolMemberKind::Method(method, kind) => {
+            // TODO: Preserve explicit classmethod receiver annotations during traversal, as we
+            // do for instance methods, and bind only implicit receivers.
+            let method = if let Type::Callable(callable) = method
+                && kind == ProtocolMethodKind::Class
+            {
+                Type::Callable(protocol_bind_self(db, env.program(db), callable, None))
+            } else {
+                method
+            };
             let method = member
                 .materialization
                 .map_or(method, |kind| method.materialization(db, env, kind));
@@ -779,7 +788,7 @@ impl<'db> ProtocolInterface<'db> {
             .map(|(name, callable)| {
                 (
                     Name::new(name),
-                    ProtocolMemberData::method(db, env, callable, None),
+                    ProtocolMemberData::method(db, callable, None),
                 )
             })
             .collect();
@@ -1561,9 +1570,12 @@ impl<'db> ProtocolMemberReadAccess<'_, 'db> {
     ) -> Option<Type<'db>> {
         let annotation = match self.access.declaration.kind {
             ProtocolMemberKind::Method(ty, kind) => {
+                // TODO: Bind with the runtime receiver and the instance type for `Self`, instead
+                // of substituting `Self` after removing the receiver parameter.
                 let ty = if let Type::Callable(callable) = ty
-                    && kind == ProtocolMethodKind::Instance
-                    && self.access.mode == ProtocolMemberAccessMode::Instance
+                    && (kind == ProtocolMethodKind::Class
+                        || (kind == ProtocolMethodKind::Instance
+                            && self.access.mode == ProtocolMemberAccessMode::Instance))
                 {
                     Type::Callable(protocol_bind_self(db, env.program(db), callable, None))
                 } else {
@@ -1679,15 +1691,11 @@ pub(super) struct ProtocolMemberData<'db> {
 impl<'db> ProtocolMemberData<'db> {
     fn method(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
         callable: CallableType<'db>,
         definition: Option<Definition<'db>>,
     ) -> Self {
         let (method_kind, callable) = if callable.is_classmethod_like(db) {
-            (
-                ProtocolMethodKind::Class,
-                protocol_bind_self(db, env.program(db), callable, None),
-            )
+            (ProtocolMethodKind::Class, callable)
         } else if callable.is_staticmethod_like(db) {
             (ProtocolMethodKind::Static, callable.into_regular(db))
         } else {
@@ -3420,14 +3428,14 @@ fn cached_protocol_interface<'db>(
                 definition,
             ),
             Type::Callable(callable) if bound_on_class.is_yes() && callable.is_method_like(db) => {
-                ProtocolMemberData::method(db, &env, callable, definition)
+                ProtocolMemberData::method(db, callable, definition)
             }
             Type::FunctionLiteral(function)
                 if bound_on_class.is_yes()
                     || function.is_staticmethod(db)
                     || function.is_classmethod(db) =>
             {
-                ProtocolMemberData::method(db, &env, function.into_callable_type(db), definition)
+                ProtocolMemberData::method(db, function.into_callable_type(db), definition)
             }
             _ if bound_on_class.is_yes()
                 && definition.is_some_and(|definition| definition.kind(db).is_function_def()) =>
