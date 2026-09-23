@@ -1390,12 +1390,15 @@ error[invalid-assignment]: Object of type `Concrete[T@diagnose]` is not assignab
    |              ----------   ^^^^^ Incompatible value of type `Concrete[T@diagnose]`
    |              |
    |              Declared type
-info: type `Concrete[T@diagnose]` is not assignable to protocol `Chain[int]`
-info: └── protocol member `child` is incompatible
-info:     └── incompatible return types: `Concrete[str]` is not assignable to `Chain[int]`
-info:         └── type `Concrete[str]` is not assignable to protocol `Chain[int]`
-info:             └── protocol member `value` is incompatible
-info:                 └── incompatible return types: `str` is not assignable to `int`
+info: type `Concrete[T@diagnose]` is not assignable to protocol `Outer[int]`
+info: └── protocol member `expose` is incompatible
+info:     └── incompatible return types: `Concrete[T@diagnose]` is not assignable to `Chain[int]`
+info:         └── type `Concrete[T@diagnose]` is not assignable to protocol `Chain[int]`
+info:             └── protocol member `child` is incompatible
+info:                 └── incompatible return types: `Concrete[str]` is not assignable to `Chain[int]`
+info:                     └── type `Concrete[str]` is not assignable to protocol `Chain[int]`
+info:                         └── protocol member `value` is incompatible
+info:                             └── incompatible return types: `str` is not assignable to `int`
 ```
 
 ## Recursive protocols in a union after overload comparison
