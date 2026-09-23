@@ -69,7 +69,11 @@ jobs:
 
       # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
       - name: Fetch full history without tags
-        run: git fetch --no-tags --filter=blob:none --unshallow origin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          git fetch --no-tags --filter=blob:none --unshallow origin
 
       - name: Determine merge base
         id: merge_base
@@ -830,7 +834,11 @@ jobs:
           persist-credentials: false
       # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
       - name: Fetch full history without tags
-        run: git fetch --no-tags --filter=blob:none --unshallow origin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          git fetch --no-tags --filter=blob:none --unshallow origin
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
