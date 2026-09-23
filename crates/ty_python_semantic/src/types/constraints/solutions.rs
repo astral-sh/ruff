@@ -447,15 +447,15 @@ impl<'db> SolutionWalker<'db> {
         // something useful with the different possible solutions.
         //
         // However, if the candidate solution maps this typevar to a dynamic type, or to another
-        // typevar, and that solution satisfies _all_ of the declared constraints, then we _don't_
-        // want to report separate tightened solutions for each declared constraint. Rather, we
+        // typevar, and that solution satisfies more than one declared constraint, then we _don't_
+        // want to report separate tightened solutions for each compatible constraint. Rather, we
         // want to report the dynamic type or typevar itself as the solution.
 
-        // First see if we should return a "family" solution. If _every_ declared constraint is
+        // First see if we should return a "family" solution. If multiple declared constraints are
         // satisfied, _and_ the solution is either dynamic or another typevar, then we can consider
         // using the solution as-is, rather than trying to force it to be exactly equal to one of
-        // the declared constraints. (We call this a "family" solution since it's a single solution
-        // that satisfies the entire family of declared constraints.)
+        // those constraints. (We call this a "family" solution since it's a single solution that
+        // satisfies a family of compatible declared constraints.)
         //
         // Note that a fixed caller typevar can only be preserved when its constraints are a subset
         // of this typevar's constraints. A bounded typevar may specialize below its bound, so it
@@ -495,11 +495,10 @@ impl<'db> SolutionWalker<'db> {
             || has_preservable_typevar_evidence;
 
         if has_non_concrete_evidence {
-            let mut any_trivial_failures = false;
+            let mut potentially_satisfied_constraint_count = 0;
             for declared_constraint in &constrained_typevar.declared_constraints {
                 let Some(constraints) = declared_constraint.constraints.as_deref() else {
-                    any_trivial_failures = true;
-                    break;
+                    continue;
                 };
 
                 let mut satisfied = false;
@@ -520,17 +519,18 @@ impl<'db> SolutionWalker<'db> {
                     },
                 )?;
 
-                if !satisfied {
-                    any_trivial_failures = true;
-                    break;
+                if satisfied {
+                    potentially_satisfied_constraint_count += 1;
                 }
             }
 
-            if !any_trivial_failures {
+            if potentially_satisfied_constraint_count > 1 {
                 // We're eligible to return a family solution, but first we need to find it! First
                 // check any remaining constrained typevars with _no_ validity assignment for this
                 // typevar.
-                let mut family_solution_is_valid = false;
+                let previously_pending = self.pending.len();
+                let mut has_family_solution = false;
+                let mut individual_solution_is_required = false;
                 self.validate_constrained(
                     db,
                     env,
@@ -539,12 +539,12 @@ impl<'db> SolutionWalker<'db> {
                     path,
                     constrained,
                     &mut |this, storage, limits, path| {
-                        // If we find a solution for the remaining constrained typevars, we still
-                        // have to validate that solution satisfies each of the individual declared
-                        // constraints. Note that we _don't_ update the candidate solution for
-                        // those declared constraints — we want to return the family solution,
-                        // after all. We just want to make sure that the individual declared
-                        // constraints don't _invalidate_ that solution.
+                        // Check which declared constraints are compatible with this complete
+                        // solution for the remaining constrained typevars. Note that we _don't_
+                        // update the candidate solution for those declared constraints — we want
+                        // to return the family solution, after all. We just want to make sure that
+                        // the individual declared constraints don't _invalidate_ that solution.
+                        let mut satisfied_constraint_count = 0;
                         for declared_constraint in &constrained_typevar.declared_constraints {
                             let mut satisfied = false;
                             if let Some(constraints) = declared_constraint.constraints.as_deref() {
@@ -577,30 +577,57 @@ impl<'db> SolutionWalker<'db> {
                                     },
                                 )?;
                             }
-                            if !satisfied {
-                                // This family solution does _not_ satisfy at least one of the
-                                // declared constraints, so we cannot use it. Return without
-                                // recording the solution.
-                                return ControlFlow::Continue(());
+                            if satisfied {
+                                satisfied_constraint_count += 1;
                             }
                         }
 
-                        // This family solution satisfies all of the declared constraints
-                        // individually, so we can record it.
-                        family_solution_is_valid = true;
-                        process_satisfied(this, storage, limits, path)
+                        match satisfied_constraint_count {
+                            0 => {
+                                // This family solution does not satisfy _any_ of the declared
+                                // constraints. It definitely cannot be used as a solution, and
+                                // also does not affect whether any other potential family
+                                // solutions can be used.
+                                ControlFlow::Continue(())
+                            }
+                            1 => {
+                                // This family solution satisfies exactly one declared constraint.
+                                // Family solutions are only used when the can consolidate more
+                                // than one declared constraint. That means we don't want to use
+                                // this family solution _or any other_. We'll create one or more
+                                // individual solutions below.
+                                individual_solution_is_required = true;
+                                ControlFlow::Continue(())
+                            }
+                            _ => {
+                                // This solution satisfies more than one declared constraint, so
+                                // it's one of the eligible family solutions that we can report.
+                                has_family_solution = true;
+                                process_satisfied(this, storage, limits, path)
+                            }
+                        }
                     },
                 )?;
 
-                // If the family solution is valid, go ahead and return it.
-                if family_solution_is_valid {
+                // If we found at least one valid family solution, we can go ahead and return them.
+                // If any potential family solution only matched a single declared constraint, we
+                // need to fall through and find individual solutions
+                // If every valid assignment for the remaining typevars admitted a family
+                // solution, there is no need to also record the individual constraints.
+                if has_family_solution && !individual_solution_is_required {
                     return ControlFlow::Continue(());
                 }
+
+                // If any family solution only matched a single declared constraint; or if we
+                // didn't find any family solutions at all, we have to fall through and look for
+                // individual solutions. Before proceeding, we remove any potential family
+                // solutions we might have found during our search.
+                self.pending.truncate(previously_pending);
             }
         }
 
-        // The family solution isn't valid, so we have to see which individual declared constraints
-        // we can use as in the solution.
+        // We cannot return only family solutions, so also check which individual declared
+        // constraints can be used in the solution.
         let previously_pending = self.pending.len();
         let mut constraint_satisfied = SmallVec::<[bool; 4]>::default();
         let mut constraint_solutions = SmallVec::<[Range<usize>; 4]>::default();

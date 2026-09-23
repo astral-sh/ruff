@@ -2754,6 +2754,30 @@ reveal_type(set(values))
 reveal_type(set(choose("x")))
 ```
 
+## Ambiguous constrained TypeVar inference from a partial constraint family
+
+Non-concrete evidence can rule out some declared constraints while remaining ambiguous among others.
+In that case, we preserve the evidence instead of choosing or unioning the compatible constraints.
+
+```py
+from typing import Any
+
+def preserve_shape[
+    Shape: (
+        tuple[()],
+        tuple[int],
+        tuple[int, int],
+        tuple[int, int, int],
+        tuple[int, ...],
+    )
+](value: Shape) -> Shape:
+    return value
+
+def check_shape(value: tuple[Any, Any]) -> None:
+    # revealed: tuple[Any, Any]
+    reveal_type(preserve_shape(value))
+```
+
 ## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar
 
 A constrained TypeVar should be assignable to a different constrained TypeVar if each constraint of
