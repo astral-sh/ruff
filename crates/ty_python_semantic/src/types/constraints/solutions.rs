@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 
 use indexmap::map::Slice;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use crate::types::constraints::paths::PathAssignments;
@@ -17,6 +17,20 @@ use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeV
 use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, any_over_type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
+/// A callback used by [`visit_node_and_then`][SolutionWalker::visit_node_and_then] to determine
+/// whether we've already processed a node. Returns whether the node is new and should be
+/// processed.
+type CheckCache<'a, 'db, L, B> = dyn FnMut(
+        &mut SolutionWalker<'db>,
+        &mut ConstraintSetStorage<'db>,
+        &mut L,
+        &mut PathAssignments,
+        NodeId,
+    ) -> ControlFlow<B, bool>
+    + 'a;
+
+/// A callback that is invoked by [`visit_node_and_then`][SolutionWalker::visit_node_and_then]
+/// whenever a satisfied path to the `true` terminal is found.
 type ProcessSatisfied<'a, 'db, L, B> = dyn FnMut(
         &mut SolutionWalker<'db>,
         &mut ConstraintSetStorage<'db>,
@@ -28,7 +42,15 @@ type ProcessSatisfied<'a, 'db, L, B> = dyn FnMut(
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,
     inferable: TypeVarSet<'db>,
+    inferable_support: Support,
+
     declared_constraint_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+
+    /// Nodes that we have already explored. We can't cache this only on the node ID, since the
+    /// constraints that are in scope when we encounter the node can affect how we interpret its
+    /// downstream edges. But we also don't want to consider _all_ of the constraints on the path;
+    /// we only want to consider the ones that are relevant to the node and its descendants.
+    explored_nodes: FxHashSet<(NodeId, Vec<(ConstraintAssignment, ConstraintId)>)>,
 
     /// Candidate solutions for each satisfiable path in the BDD.
     ///
@@ -52,14 +74,49 @@ struct PendingCandidateSolution<'db> {
 }
 
 impl<'db> SolutionWalker<'db> {
-    pub(super) fn new(source_orders: FxIndexSet<ConstraintId>, inferable: TypeVarSet<'db>) -> Self {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        storage: &mut ConstraintSetStorage<'db>,
+        source_orders: FxIndexSet<ConstraintId>,
+        inferable: TypeVarSet<'db>,
+    ) -> Self {
+        let inferable_support = Support::from_typevar_set(db, storage, inferable);
         Self {
             source_orders,
             inferable,
+            inferable_support,
             declared_constraint_solutions: FxHashMap::default(),
+            explored_nodes: FxHashSet::default(),
             pending: Vec::default(),
             _phantom: PhantomData,
         }
+    }
+
+    /// Returns an iterator of the positive and negative constraints on the current path
+    fn constrained_assignments(
+        path: &PathAssignments,
+    ) -> impl Iterator<Item = ConstraintId> + Clone {
+        path.assignments
+            .iter()
+            .filter_map(|(assignment, _)| assignment.as_constrained())
+    }
+
+    /// Returns an iterator of the constraints on the current path that mention any typevar in the
+    /// given support
+    fn constrained_assignments_mentioning(
+        storage: &ConstraintSetStorage<'db>,
+        path: &PathAssignments,
+        support: &Support,
+    ) -> impl Iterator<Item = (ConstraintAssignment, ConstraintId)> {
+        path.assignments
+            .iter()
+            .filter_map(|(assignment, (source_constraint, _))| {
+                let constraint = assignment.as_constrained()?;
+                let constraint_support = storage.constraint_support(constraint);
+                constraint_support
+                    .overlaps_with(support)
+                    .then_some((*assignment, *source_constraint))
+            })
     }
 
     /// Visit a BDD node and all of its descendants. We will add pending candidate solutions for
@@ -83,6 +140,25 @@ impl<'db> SolutionWalker<'db> {
             limits,
             path,
             node,
+            &mut |this, storage, _limits, path, node| {
+                // See if we've already visited this node on an "equivalent" path, where we only
+                // consider the typevars that can affect the solutions we'd find if we were to
+                // continue walking down the node.
+                let mut relevant_typevars = this.inferable_support.clone();
+                let node_support = storage.node_support(node);
+                if let Some(node_support) = node_support {
+                    relevant_typevars |= node_support;
+                }
+                relevant_typevars
+                    .close_over_constraints(storage, Self::constrained_assignments(path));
+                let mut relevant_path: Vec<_> =
+                    Self::constrained_assignments_mentioning(storage, path, &relevant_typevars)
+                        .collect();
+                relevant_path
+                    .sort_unstable_by_key(|(assignment, _)| assignment.constraint().ordering());
+                let key = (node, relevant_path);
+                ControlFlow::Continue(this.explored_nodes.insert(key))
+            },
             &mut |this, storage, limits, path| match all_typevars {
                 Some(all_typevars) => {
                     let validations = validations.get_or_insert_with(|| {
@@ -142,10 +218,15 @@ impl<'db> SolutionWalker<'db> {
         limits: &mut L,
         path: &mut PathAssignments,
         node: NodeId,
+        check_cache: &mut CheckCache<'_, 'db, L, L::Break>,
         process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break> {
         limits.visit_node()?;
         if node == ALWAYS_FALSE {
+            return ControlFlow::Continue(());
+        }
+
+        if !check_cache(self, storage, limits, path, node)? {
             return ControlFlow::Continue(());
         }
 
@@ -170,6 +251,7 @@ impl<'db> SolutionWalker<'db> {
                 path,
                 assignment,
                 child,
+                check_cache,
                 process_satisfied,
             )?;
         }
@@ -190,6 +272,7 @@ impl<'db> SolutionWalker<'db> {
         path: &mut PathAssignments,
         assignment: ConstraintAssignment,
         child: NodeId,
+        check_cache: &mut CheckCache<'_, 'db, L, L::Break>,
         process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break> {
         // Don't bother adding the assignment and checking the sequent map if the edge takes us to
@@ -212,6 +295,7 @@ impl<'db> SolutionWalker<'db> {
                         limits,
                         path,
                         child,
+                        check_cache,
                         process_satisfied,
                     )?;
                 }
