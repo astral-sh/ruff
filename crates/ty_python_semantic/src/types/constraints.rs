@@ -3083,6 +3083,7 @@ impl<'db> CandidateTypeVarRangeSolutionBuilder<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<CandidateTypeVarRangeSolution<'db>> {
         let Self {
             evidence_lower,
@@ -3093,16 +3094,20 @@ impl<'db> CandidateTypeVarRangeSolutionBuilder<'db> {
 
         // Classify the original evidence bounds before aggregation, as gradual and static argument
         // evidence may collapse into a single gradual union.
-        let mut evidence = evidence_lower
-            .iter()
-            .copied()
-            .chain(upper.iter_evidence())
-            .filter(|ty| !ty.has_unspecialized_type_var(db, env))
-            .peekable();
-        let has_only_gradual_evidence = evidence.peek().is_some()
-            && evidence
-                .all(|ty| ty.bottom_materialization(db, env) != ty.top_materialization(db, env));
-        drop(evidence);
+        //
+        // Note that we only compute this flag for constrained typevars.
+        let has_only_gradual_evidence = bound_typevar.typevar(db).is_constrained(db).then(|| {
+            let mut evidence = evidence_lower
+                .iter()
+                .copied()
+                .chain(upper.iter_evidence())
+                .filter(|ty| !ty.has_unspecialized_type_var(db, env))
+                .peekable();
+
+            evidence.peek().is_some()
+                && evidence
+                    .all(|ty| ty.bottom_materialization(db, env) != ty.top_materialization(db, env))
+        });
 
         let evidence_lower =
             (!evidence_lower.is_empty()).then(|| UnionType::from_elements(db, env, evidence_lower));
@@ -3197,7 +3202,7 @@ pub(crate) struct CandidateTypeVarRangeSolution<'db> {
     validity_lower: Type<'db>,
     upper: UpperBound<'db>,
     /// Whether the path contains gradual evidence and no static evidence.
-    has_only_gradual_evidence: bool,
+    has_only_gradual_evidence: Option<bool>,
 }
 
 impl<'db> CandidateTypeVarSolution<'db> {
@@ -3791,7 +3796,7 @@ impl<'db> CandidateSolutions<'db> {
         limits.satisfied_path()?;
         let mut typevars = Vec::with_capacity(mappings.len());
         for (bound_typevar, bounds) in mappings {
-            let Some(range) = bounds.finish(db, env, storage) else {
+            let Some(range) = bounds.finish(db, env, storage, bound_typevar) else {
                 // If any of the typevars doesn't have a solution (either because the constraint set is
                 // overly restrictive, or because a candidate solution doesn't satisfy the declared
                 // upper bounds), fall back on the slow path to construct useful diagnostics.
@@ -4231,7 +4236,7 @@ impl<'db> CandidateSolutions<'db> {
                 // constraint. (Checking `int` against `T: (int, int | str)` selects `T = int`.)
                 if multiple_compatible_constraints
                     && let CandidateTypeVarSolutionKind::Range(range) = &path_bound.kind
-                    && range.has_only_gradual_evidence
+                    && range.has_only_gradual_evidence == Some(true)
                 {
                     if range.has_lower_inference() {
                         PathBoundSolution::Solved(range.effective_lower(db, env))
@@ -5813,7 +5818,7 @@ mod tests {
             mixed_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::unconstrained(),
-            has_only_gradual_evidence: false,
+            has_only_gradual_evidence: None,
         };
         let path_bound = CandidateTypeVarSolution::range(t, range);
         let inferable = TypeVarSet::from_typevars(db, [t]);
@@ -5850,7 +5855,7 @@ mod tests {
             known_instance(db, KnownClass::Str),
         );
         let mut storage = builder.storage.borrow_mut();
-        let invalid = bounds.finish(db, &env, &mut storage);
+        let invalid = bounds.finish(db, &env, &mut storage, t);
         assert_eq!(invalid, None);
         drop(storage);
         let inferable = TypeVarSet::from_typevars(db, [t]);
@@ -5899,7 +5904,7 @@ mod tests {
                 }
                 let mut storage = builder.storage.borrow_mut();
                 let path_bound = bounds
-                    .finish(db, &env, &mut storage)
+                    .finish(db, &env, &mut storage, t)
                     .expect("expected a valid solution");
                 drop(storage);
                 let path_bound = CandidateTypeVarSolution::range(t, path_bound);
@@ -5961,7 +5966,7 @@ mod tests {
         bounds.add_lower(ConstraintProvenance::Evidence, lower);
         let mut storage = builder.storage.borrow_mut();
         let bounds = bounds
-            .finish(db, &env, &mut storage)
+            .finish(db, &env, &mut storage, t)
             .expect("expected a valid solution");
         drop(storage);
         let bounds = CandidateTypeVarSolution::range(t, bounds);
@@ -6056,7 +6061,7 @@ class E: ...
             bounds.add_upper(ConstraintProvenance::Evidence, right);
             let mut storage = builder.storage.borrow_mut();
             let exhausted = bounds
-                .finish(db, &env, &mut storage)
+                .finish(db, &env, &mut storage, t)
                 .expect("expected a valid solution");
             let exhausted = CandidateTypeVarSolution::range(t, exhausted);
             drop(storage);
@@ -6117,10 +6122,10 @@ class E: ...
         }
         let mut storage = builder.storage.borrow_mut();
         let exhausted = bounds
-            .finish(db, &env, &mut storage)
+            .finish(db, &env, &mut storage, constrained)
             .expect("expected a valid solution");
         drop(storage);
-        assert!(exhausted.has_only_gradual_evidence);
+        assert_eq!(exhausted.has_only_gradual_evidence, Some(true));
         let exhausted = CandidateTypeVarSolution::range(constrained, exhausted);
         let inferable = TypeVarSet::from_typevars(db, [constrained]);
         assert_eq!(

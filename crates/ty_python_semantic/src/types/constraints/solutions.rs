@@ -380,7 +380,7 @@ impl<'db> SolutionWalker<'db> {
         let typevars: Option<Box<[_]>> = mappings
             .into_iter()
             .map(|(bound_typevar, bounds)| {
-                let range = bounds.finish(db, env, storage)?;
+                let range = bounds.finish(db, env, storage, bound_typevar)?;
 
                 if let Some(upper_bound_violations) = upper_bound_violations
                     && upper_bound_violations.contains(&bound_typevar)
