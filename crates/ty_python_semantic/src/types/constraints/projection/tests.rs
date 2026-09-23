@@ -632,7 +632,8 @@ class E: ...
         let paths = CandidateSolutions::Constrained(
             alternatives
                 .map(|ty| CandidateSolution {
-                    typevars: Box::new([CandidateTypeVarSolution::exact(t, ty)]) as Box<[_]>,
+                    typevars: Box::new([CandidateTypeVarSolution::exact(db, &env, t, ty)])
+                        as Box<[_]>,
                     validity: SolutionValidity::Valid,
                 })
                 .into(),

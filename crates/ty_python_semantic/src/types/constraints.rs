@@ -3089,20 +3089,16 @@ impl<'db> PathBoundBuilder<'db> {
 
         // Classify the original evidence bounds before aggregation, as gradual and static argument
         // evidence may collapse into a single gradual union.
-        //
-        // Note that we only compute this flag for constrained typevars.
-        let has_only_gradual_evidence = bound_typevar.typevar(db).is_constrained(db).then(|| {
-            let mut evidence = evidence_lower
-                .iter()
-                .copied()
-                .chain(upper.iter_evidence())
-                .filter(|ty| !ty.has_unspecialized_type_var(db, env))
-                .peekable();
-
-            evidence.peek().is_some()
-                && evidence
-                    .all(|ty| ty.bottom_materialization(db, env) != ty.top_materialization(db, env))
-        });
+        let mut evidence = evidence_lower
+            .iter()
+            .copied()
+            .chain(upper.iter_evidence())
+            .filter(|ty| !ty.has_unspecialized_type_var(db, env))
+            .peekable();
+        let has_only_gradual_evidence = evidence.peek().is_some()
+            && evidence
+                .all(|ty| ty.bottom_materialization(db, env) != ty.top_materialization(db, env));
+        drop(evidence);
 
         let evidence_lower =
             (!evidence_lower.is_empty()).then(|| UnionType::from_elements(db, env, evidence_lower));
@@ -3174,20 +3170,25 @@ pub(crate) struct CandidateTypeVarSolution<'db> {
     validity_lower: Type<'db>,
     upper: UpperBound<'db>,
     /// Whether the path contains gradual evidence and no static evidence.
-    ///
-    /// Note that this is only computed for constrained typevars.
-    has_only_gradual_evidence: Option<bool>,
+    has_only_gradual_evidence: bool,
 }
 
 impl<'db> CandidateTypeVarSolution<'db> {
-    pub(crate) fn exact(bound_typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) -> Self {
+    pub(crate) fn exact(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+    ) -> Self {
+        let has_only_gradual_evidence = !ty.has_unspecialized_type_var(db, env)
+            && ty.bottom_materialization(db, env) != ty.top_materialization(db, env);
         Self {
             bound_typevar,
             evidence_lower: Some(ty),
             mixed_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::from_clause(ty),
-            has_only_gradual_evidence: None,
+            has_only_gradual_evidence,
         }
     }
 
@@ -4098,9 +4099,7 @@ impl<'db> CandidateSolutions<'db> {
                 // as the result if it's gradual. (Checking `Any` against `T: (int, str)` selects
                 // `T = Any`) If the path solution is fully static, we choose the "tightest"
                 // constraint. (Checking `int` against `T: (int, int | str)` selects `T = int`.)
-                if multiple_compatible_constraints
-                    && path_bound.has_only_gradual_evidence == Some(true)
-                {
+                if multiple_compatible_constraints && path_bound.has_only_gradual_evidence {
                     if path_bound.has_lower_inference() {
                         PathBoundSolution::Solved(path_bound.effective_lower(db, env))
                     } else if path_bound.has_upper_inference() {
@@ -5686,7 +5685,7 @@ mod tests {
             mixed_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::unconstrained(),
-            has_only_gradual_evidence: None,
+            has_only_gradual_evidence: false,
         };
         let inferable = TypeVarSet::from_typevars(db, [t]);
 
@@ -5739,7 +5738,7 @@ mod tests {
                 &env,
                 &builder,
                 inferable,
-                &CandidateTypeVarSolution::exact(t, Type::Never)
+                &CandidateTypeVarSolution::exact(db, &env, t, Type::Never)
             ),
             PathBoundSolution::Solved(Type::Never)
         );
@@ -5941,12 +5940,16 @@ class E: ...
             for reverse in [false, true] {
                 let mut paths = vec![
                     CandidateSolution {
-                        typevars: vec![exhausted.clone(), CandidateTypeVarSolution::exact(u, str)]
-                            .into_boxed_slice(),
+                        typevars: vec![
+                            exhausted.clone(),
+                            CandidateTypeVarSolution::exact(db, &env, u, str),
+                        ]
+                        .into_boxed_slice(),
                         validity: SolutionValidity::Valid,
                     },
                     CandidateSolution {
-                        typevars: vec![CandidateTypeVarSolution::exact(t, int)].into_boxed_slice(),
+                        typevars: vec![CandidateTypeVarSolution::exact(db, &env, t, int)]
+                            .into_boxed_slice(),
                         validity: SolutionValidity::Valid,
                     },
                 ];
@@ -5983,7 +5986,7 @@ class E: ...
                         validity: SolutionValidity::Valid,
                     },
                     CandidateSolution {
-                        typevars: Box::new([CandidateTypeVarSolution::exact(t, int)]),
+                        typevars: Box::new([CandidateTypeVarSolution::exact(db, &env, t, int)]),
                         validity: SolutionValidity::Valid,
                     },
                 ]));
@@ -6012,7 +6015,7 @@ class E: ...
         }
         let exhausted = bounds.finish(db, &env, constrained);
         let inferable = TypeVarSet::from_typevars(db, [constrained]);
-        assert_eq!(exhausted.has_only_gradual_evidence, Some(true));
+        assert!(exhausted.has_only_gradual_evidence);
         assert_eq!(
             CandidateSolutions::preliminary_solve(db, &env, &builder, inferable, &exhausted),
             PathBoundSolution::BudgetExceeded { fallback: None }
