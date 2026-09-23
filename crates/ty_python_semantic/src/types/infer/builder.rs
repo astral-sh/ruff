@@ -8596,7 +8596,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         expression: &ast::Expr,
         context: ExpressionContext,
-    ) -> Option<Truthiness> {
+    ) -> Truthiness {
         TruthinessAnalyzer::new(
             self.db(),
             self.program_environment(),
@@ -8644,9 +8644,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let test_truthiness = match test_ty.try_bool(db, env) {
-            Ok(_) => self
-                .expression_truthiness(test, ExpressionContext::Condition)
-                .unwrap_or(Truthiness::Ambiguous),
+            Ok(_) => self.expression_truthiness(test, ExpressionContext::Condition),
             Err(err) => {
                 err.report_diagnostic(&self.context, &**test);
                 err.fallback_truthiness()
@@ -8659,6 +8657,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Truthiness::AlwaysTrue => body_ty,
             Truthiness::AlwaysFalse => orelse_ty,
             Truthiness::Ambiguous => UnionType::from_two_elements(db, env, body_ty, orelse_ty),
+            Truthiness::Uninhabited => Type::Never,
         }
     }
 
@@ -11621,6 +11620,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
 
                     match (truthiness, op) {
+                        (Truthiness::Uninhabited, _) => {
+                            done = true;
+                            Type::Never
+                        }
                         (Truthiness::AlwaysTrue, ast::BoolOp::And) => Type::Never,
                         (Truthiness::AlwaysFalse, ast::BoolOp::Or) => Type::Never,
 

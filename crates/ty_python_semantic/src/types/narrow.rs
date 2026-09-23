@@ -1855,8 +1855,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     binding_type(db, definition),
                     definition.place(db),
                 );
-                // `Never` cannot produce either outcome, even though its truthiness is ambiguous.
-                ty.is_never() || ty.bool(db, &self.env) == Truthiness::from(!is_positive)
+                !ty.bool(db, &self.env).negate_if(!is_positive).may_be_true()
             })
     }
 
@@ -1921,6 +1920,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .bool(db, &self.env);
 
         match test_truthiness {
+            Truthiness::Uninhabited => None,
             Truthiness::AlwaysTrue => {
                 self.evaluate_expression_node_predicate(&expr_if.body, expression, is_positive)
             }
@@ -5258,9 +5258,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 .is_none_or(|attribute_type| {
                     let truthiness = attribute_type.bool(db, &self.env);
                     if is_positive {
-                        !truthiness.is_always_false()
+                        truthiness.may_be_true()
                     } else {
-                        !truthiness.is_always_true()
+                        truthiness.may_be_false()
                     }
                 })
         });

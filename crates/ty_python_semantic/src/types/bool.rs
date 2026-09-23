@@ -17,6 +17,10 @@ impl<'db> Type<'db> {
     /// This method should only be used outside type checking or when evaluating if a type
     /// is truthy or falsy in a context where Python doesn't make an implicit `bool` call.
     /// Use [`try_bool`](Self::try_bool) for type checking or implicit `bool` calls.
+    ///
+    /// Uninhabited types return [`Truthiness::Uninhabited`]: neither boolean outcome is possible.
+    /// This describes the value type; a compound expression can also fail to complete because
+    /// of its operands, even when its inferred result type is inhabited.
     pub(crate) fn bool(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Truthiness {
         self.try_bool_impl(
             db,
@@ -25,23 +29,6 @@ impl<'db> Type<'db> {
             &TryBoolVisitor::new(Ok(Truthiness::Ambiguous)),
         )
         .unwrap_or_else(|err| err.fallback_truthiness())
-    }
-
-    /// Like [`Self::bool`], but returns `None` for a type equivalent to [`Type::Never`].
-    ///
-    /// An uninhabited type cannot produce either boolean outcome, unlike
-    /// [`Truthiness::Ambiguous`]. Condition analysis uses this distinction to retain the
-    /// short-circuit outcome of expressions like `flag and stop()`, where `stop` returns `Never`.
-    /// The equivalence check also handles aliases and type variables bounded by `Never`.
-    ///
-    /// This classifies a value type, not a compound condition's evaluation. It preserves
-    /// [`Self::bool`]'s error fallback and conservative handling of `__bool__` returning `Never`.
-    pub(crate) fn bool_if_inhabited(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<Truthiness> {
-        (!self.is_equivalent_to(db, env, Type::Never)).then(|| self.bool(db, env))
     }
 
     /// Resolves the boolean value of a type.
@@ -202,7 +189,7 @@ impl<'db> Type<'db> {
         };
 
         let try_union = |union: UnionType<'db>| {
-            let mut truthiness = None;
+            let mut truthiness = Truthiness::Uninhabited;
             let mut all_not_callable = true;
             let mut has_errors = false;
 
@@ -217,14 +204,9 @@ impl<'db> Type<'db> {
                         }
                     };
 
-                truthiness.get_or_insert(element_truthiness);
-
-                if Some(element_truthiness) != truthiness {
-                    truthiness = Some(Truthiness::Ambiguous);
-
-                    if allow_short_circuit {
-                        return Ok(Truthiness::Ambiguous);
-                    }
+                truthiness = truthiness.union(element_truthiness);
+                if allow_short_circuit && truthiness.is_ambiguous() {
+                    return Ok(Truthiness::Ambiguous);
                 }
             }
 
@@ -234,12 +216,9 @@ impl<'db> Type<'db> {
                         not_boolable_type: *self,
                     });
                 }
-                return Err(BoolError::Union {
-                    union,
-                    truthiness: truthiness.unwrap_or(Truthiness::Ambiguous),
-                });
+                return Err(BoolError::Union { union, truthiness });
             }
-            Ok(truthiness.unwrap_or(Truthiness::Ambiguous))
+            Ok(truthiness)
         };
 
         let truthiness = match self {
@@ -252,11 +231,12 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_)
             | Type::Divergent(_)
-            | Type::Never
             | Type::Callable(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypeForm(_) => Truthiness::Ambiguous,
+
+            Type::Never => Truthiness::Uninhabited,
 
             Type::Recursive(recursive) => recursive
                 .unfold(db, env)

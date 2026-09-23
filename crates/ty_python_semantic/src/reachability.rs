@@ -798,10 +798,10 @@ fn evaluate_reachability_path<'db>(
                 evaluate_reachability_checkpoint(db, scope, id)
             } else {
                 id = match analyze_single(db, &env, &predicates[node.atom()]) {
-                    Some(Truthiness::AlwaysTrue) => node.if_true(),
-                    Some(Truthiness::Ambiguous) => node.if_ambiguous(),
-                    Some(Truthiness::AlwaysFalse) => node.if_false(),
-                    None => {
+                    Truthiness::AlwaysTrue => node.if_true(),
+                    Truthiness::Ambiguous => node.if_ambiguous(),
+                    Truthiness::AlwaysFalse => node.if_false(),
+                    Truthiness::Uninhabited => {
                         // An uninhabited condition cannot take either branch. Retain only paths
                         // that bypass the condition, which are represented in both branches.
                         pending.push(node.if_false());
@@ -1445,10 +1445,10 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let node = self.constraints.get_interior_node(id);
                     let predicate = self.predicates[node.atom];
                     let branch = match analyze_single(db, self.env, &predicate) {
-                        Some(Truthiness::AlwaysTrue) => node.if_true,
-                        Some(Truthiness::AlwaysFalse) => node.if_false,
-                        None => ScopedNarrowingConstraint::ALWAYS_FALSE,
-                        Some(Truthiness::Ambiguous) => {
+                        Truthiness::AlwaysTrue => node.if_true,
+                        Truthiness::AlwaysFalse => node.if_false,
+                        Truthiness::Uninhabited => ScopedNarrowingConstraint::ALWAYS_FALSE,
+                        Truthiness::Ambiguous => {
                             unreachable!(
                                 "statically decidable predicates should never be Ambiguous"
                             )
@@ -1477,13 +1477,13 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         // Since the predicate `P` cannot narrow this place, remove it while retaining only branches that `P` can take.
                         // Including a statically unreachable branch could erase narrowing from the reachable branch.
                         match analyze_single(self.db, self.env, &self.predicates[node.atom]) {
-                            Some(Truthiness::AlwaysTrue) => self.or(if_true, if_uncertain),
-                            Some(Truthiness::AlwaysFalse) => self.or(if_false, if_uncertain),
-                            Some(Truthiness::Ambiguous) => {
+                            Truthiness::AlwaysTrue => self.or(if_true, if_uncertain),
+                            Truthiness::AlwaysFalse => self.or(if_false, if_uncertain),
+                            Truthiness::Ambiguous => {
                                 let either = self.or(if_true, if_false);
                                 self.or(either, if_uncertain)
                             }
-                            None => if_uncertain,
+                            Truthiness::Uninhabited => if_uncertain,
                         }
                     } else {
                         self.add_node(ProjectedNarrowingNode {
@@ -1674,9 +1674,10 @@ fn analyze_single_pattern_predicate_kind<'db>(
                     (Truthiness::Ambiguous, _) | (_, Truthiness::Ambiguous) => {
                         ControlFlow::Continue(Truthiness::Ambiguous)
                     }
-                    (Truthiness::AlwaysFalse, Truthiness::AlwaysFalse) => {
-                        ControlFlow::Continue(Truthiness::AlwaysFalse)
-                    }
+                    (
+                        Truthiness::AlwaysFalse | Truthiness::Uninhabited,
+                        Truthiness::AlwaysFalse | Truthiness::Uninhabited,
+                    ) => ControlFlow::Continue(Truthiness::AlwaysFalse),
                 });
             truthiness
         }
@@ -1875,26 +1876,21 @@ fn context_manager_suppresses<'db>(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _| Some(Truthiness::Ambiguous),
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Option<Truthiness>, result: Option<Truthiness>, _| {
+    cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| {
         // A condition can control whether one of its own inputs is reachable. Expression inference
         // can lose its previous result when it ceases to be a cycle head, so its type widening alone
         // does not ensure that the condition's truthiness converges. Delay widening here to avoid
         // retaining imprecise results from the first few iterations.
         if cycle.iteration() > crate::TAINTED_CYCLES {
-            match (*previous, result) {
-                // No outcome contributes nothing when widening the set of possible outcomes.
-                (None, result) | (result, None) => result,
-                (Some(previous), Some(result)) if previous == result => Some(result),
-                (Some(_), Some(_)) => Some(Truthiness::Ambiguous),
-            }
+            previous.union(result)
         } else {
             result
         }
     },
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Option<Truthiness> {
+fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
     let env = ProgramEnvironment::from_scope(expression.scope(db));
     let module = parsed_module(db, expression.python_file(db)).load(db);
     let inference = infer_expression_types(db, expression, TypeContext::default());
@@ -1908,32 +1904,28 @@ fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Optio
     .truthiness(node, ExpressionContext::Condition)
 }
 
-/// Evaluate a predicate, returning `None` when it cannot produce a boolean outcome.
+/// Evaluate a predicate, returning `Uninhabited` when it cannot produce a boolean outcome.
 ///
 /// Unlike ambiguous truthiness, an uninhabited condition does not make either branch reachable.
 /// In particular, treating `Never` as ambiguous can introduce loop bindings that then exclude each
 /// other, causing inference to settle on different types depending on file-checking order.
-fn analyze_single(
-    db: &dyn Db,
-    env: &ProgramEnvironment<'_>,
-    predicate: &Predicate,
-) -> Option<Truthiness> {
+fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predicate) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
-    Some(match predicate.node {
+    match predicate.node {
         PredicateNode::Expression(test_expr) => {
             let inference = infer_expression_types(db, test_expr, TypeContext::default());
             inference
-                .value_truthiness(db, env, test_expr.node_ref(db))?
+                .value_truthiness(db, env, test_expr.node_ref(db))
                 .negate_if(!predicate.is_positive)
         }
         PredicateNode::Condition(test_expr) => {
-            analyze_condition(db, test_expr)?.negate_if(!predicate.is_positive)
+            analyze_condition(db, test_expr).negate_if(!predicate.is_positive)
         }
         PredicateNode::ChainedComparisonCondition(test_expr) => {
             let inference = infer_expression_types(db, test_expr, TypeContext::default());
             inference
-                .comparison_condition_truthiness(db, env, test_expr.node_ref(db))?
+                .comparison_condition_truthiness(db, env, test_expr.node_ref(db))
                 .negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {
@@ -1977,7 +1969,7 @@ fn analyze_single(
                             symbol.name(),
                             program_file.file(db).path(db)
                         );
-                        return Some(Truthiness::AlwaysFalse);
+                        return Truthiness::AlwaysFalse;
                     }
                 }
                 None => None,
@@ -2003,7 +1995,7 @@ fn analyze_single(
                 Place::Undefined => Truthiness::AlwaysFalse,
             }
         }
-    })
+    }
 }
 
 /// Check whether a diagnostic emitted at `range` is in reachable code, considering both

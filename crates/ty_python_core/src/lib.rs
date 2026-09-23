@@ -1010,6 +1010,8 @@ pub enum Truthiness {
     AlwaysFalse,
     /// For an object `x`, `bool(x)` could return either `True` or `False`
     Ambiguous,
+    /// No object or boolean outcome is possible, as with a value of type `Never`.
+    Uninhabited,
 }
 
 impl Truthiness {
@@ -1017,16 +1019,20 @@ impl Truthiness {
         matches!(self, Truthiness::Ambiguous)
     }
 
+    pub const fn is_uninhabited(self) -> bool {
+        matches!(self, Truthiness::Uninhabited)
+    }
+
     pub const fn is_always_false(self) -> bool {
         matches!(self, Truthiness::AlwaysFalse)
     }
 
     pub const fn may_be_true(self) -> bool {
-        !self.is_always_false()
+        matches!(self, Self::AlwaysTrue | Self::Ambiguous)
     }
 
     pub const fn may_be_false(self) -> bool {
-        !self.is_always_true()
+        matches!(self, Self::AlwaysFalse | Self::Ambiguous)
     }
 
     pub const fn is_always_true(self) -> bool {
@@ -1039,6 +1045,7 @@ impl Truthiness {
             Self::AlwaysTrue => Self::AlwaysFalse,
             Self::AlwaysFalse => Self::AlwaysTrue,
             Self::Ambiguous => Self::Ambiguous,
+            Self::Uninhabited => Self::Uninhabited,
         }
     }
 
@@ -1047,13 +1054,24 @@ impl Truthiness {
         if condition { self.negate() } else { self }
     }
 
+    /// Combine the possible outcomes of alternative paths or types.
+    #[must_use]
+    pub fn union(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Uninhabited, other) | (other, Self::Uninhabited) => other,
+            (left, right) if left == right => left,
+            _ => Self::Ambiguous,
+        }
+    }
+
+    /// Combine conditions using Python's short-circuit `and` semantics.
     #[must_use]
     pub fn and(self, other: Self) -> Self {
         match self {
             Truthiness::AlwaysTrue => other,
-            Truthiness::AlwaysFalse => self,
+            Truthiness::AlwaysFalse | Truthiness::Uninhabited => self,
             Truthiness::Ambiguous => match other {
-                Truthiness::AlwaysFalse => Truthiness::AlwaysFalse,
+                Truthiness::AlwaysFalse | Truthiness::Uninhabited => Truthiness::AlwaysFalse,
                 Truthiness::AlwaysTrue | Truthiness::Ambiguous => Truthiness::Ambiguous,
             },
         }
@@ -1063,18 +1081,19 @@ impl Truthiness {
     #[must_use]
     pub fn and_then(self, other: impl FnOnce() -> Self) -> Self {
         match self {
-            Truthiness::AlwaysFalse => self,
+            Truthiness::AlwaysFalse | Truthiness::Uninhabited => self,
             Truthiness::AlwaysTrue | Truthiness::Ambiguous => self.and(other()),
         }
     }
 
+    /// Combine conditions using Python's short-circuit `or` semantics.
     #[must_use]
     pub fn or(self, other: Self) -> Self {
         match self {
-            Truthiness::AlwaysTrue => self,
+            Truthiness::AlwaysTrue | Truthiness::Uninhabited => self,
             Truthiness::AlwaysFalse => other,
             Truthiness::Ambiguous => match other {
-                Truthiness::AlwaysTrue => Truthiness::AlwaysTrue,
+                Truthiness::AlwaysTrue | Truthiness::Uninhabited => Truthiness::AlwaysTrue,
                 Truthiness::AlwaysFalse | Truthiness::Ambiguous => Truthiness::Ambiguous,
             },
         }
@@ -1083,12 +1102,8 @@ impl Truthiness {
     #[must_use]
     pub fn or_else(self, other: impl Fn() -> Self) -> Self {
         match self {
-            Truthiness::AlwaysTrue => self,
-            Truthiness::AlwaysFalse => other(),
-            Truthiness::Ambiguous => match other() {
-                Truthiness::AlwaysTrue => Truthiness::AlwaysTrue,
-                Truthiness::AlwaysFalse | Truthiness::Ambiguous => Truthiness::Ambiguous,
-            },
+            Truthiness::AlwaysTrue | Truthiness::Uninhabited => self,
+            Truthiness::AlwaysFalse | Truthiness::Ambiguous => self.or(other()),
         }
     }
 }
@@ -1165,7 +1180,7 @@ impl HasTrackedScope for ast::Identifier {}
 
 #[cfg(test)]
 mod tests {
-    use std::assert_matches;
+    use std::{assert_matches, cell::Cell};
 
     use ruff_db::{
         files::{File, system_path_to_file},
@@ -1174,7 +1189,7 @@ mod tests {
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
 
-    use super::Truthiness::{AlwaysFalse, AlwaysTrue, Ambiguous};
+    use super::Truthiness::{AlwaysFalse, AlwaysTrue, Ambiguous, Uninhabited};
     use super::*;
 
     use crate::{
@@ -1236,32 +1251,90 @@ mod tests {
     }
 
     #[test]
-    fn truthiness_and() {
-        for (left, right, expected) in [
-            (AlwaysTrue, AlwaysTrue, AlwaysTrue),
-            (AlwaysTrue, AlwaysFalse, AlwaysFalse),
-            (AlwaysTrue, Ambiguous, Ambiguous),
-            (AlwaysFalse, AlwaysTrue, AlwaysFalse),
-            (AlwaysFalse, AlwaysFalse, AlwaysFalse),
-            (AlwaysFalse, Ambiguous, AlwaysFalse),
-            (Ambiguous, AlwaysTrue, Ambiguous),
-            (Ambiguous, AlwaysFalse, AlwaysFalse),
-            (Ambiguous, Ambiguous, Ambiguous),
+    fn truthiness_short_circuit() {
+        for (left, right, expected_and, expected_or, expected_union) in [
+            (AlwaysTrue, AlwaysTrue, AlwaysTrue, AlwaysTrue, AlwaysTrue),
+            (AlwaysTrue, AlwaysFalse, AlwaysFalse, AlwaysTrue, Ambiguous),
+            (AlwaysTrue, Ambiguous, Ambiguous, AlwaysTrue, Ambiguous),
+            (AlwaysTrue, Uninhabited, Uninhabited, AlwaysTrue, AlwaysTrue),
+            (AlwaysFalse, AlwaysTrue, AlwaysFalse, AlwaysTrue, Ambiguous),
+            (
+                AlwaysFalse,
+                AlwaysFalse,
+                AlwaysFalse,
+                AlwaysFalse,
+                AlwaysFalse,
+            ),
+            (AlwaysFalse, Ambiguous, AlwaysFalse, Ambiguous, Ambiguous),
+            (
+                AlwaysFalse,
+                Uninhabited,
+                AlwaysFalse,
+                Uninhabited,
+                AlwaysFalse,
+            ),
+            (Ambiguous, AlwaysTrue, Ambiguous, AlwaysTrue, Ambiguous),
+            (Ambiguous, AlwaysFalse, AlwaysFalse, Ambiguous, Ambiguous),
+            (Ambiguous, Ambiguous, Ambiguous, Ambiguous, Ambiguous),
+            (Ambiguous, Uninhabited, AlwaysFalse, AlwaysTrue, Ambiguous),
+            (
+                Uninhabited,
+                AlwaysTrue,
+                Uninhabited,
+                Uninhabited,
+                AlwaysTrue,
+            ),
+            (
+                Uninhabited,
+                AlwaysFalse,
+                Uninhabited,
+                Uninhabited,
+                AlwaysFalse,
+            ),
+            (Uninhabited, Ambiguous, Uninhabited, Uninhabited, Ambiguous),
+            (
+                Uninhabited,
+                Uninhabited,
+                Uninhabited,
+                Uninhabited,
+                Uninhabited,
+            ),
         ] {
-            assert_eq!(left.and(right), expected, "{left:?}.and({right:?})");
+            assert_eq!(left.and(right), expected_and, "{left:?}.and({right:?})");
+            assert_eq!(left.or(right), expected_or, "{left:?}.or({right:?})");
+            assert_eq!(
+                left.union(right),
+                expected_union,
+                "{left:?}.union({right:?})"
+            );
 
             let mut calls = 0;
             let lazy_result = left.and_then(|| {
                 calls += 1;
                 right
             });
-            assert_eq!(lazy_result, expected, "{left:?}.and_then(|| {right:?})");
+            assert_eq!(lazy_result, expected_and, "{left:?}.and_then(|| {right:?})");
             assert_eq!(
                 calls,
-                usize::from(left != AlwaysFalse),
+                usize::from(left.may_be_true()),
                 "{left:?}.and_then call count"
             );
+
+            let calls = Cell::new(0);
+            let lazy_result = left.or_else(|| {
+                calls.set(calls.get() + 1);
+                right
+            });
+            assert_eq!(lazy_result, expected_or, "{left:?}.or_else(|| {right:?})");
+            assert_eq!(calls.get(), usize::from(left.may_be_false()));
         }
+    }
+
+    #[test]
+    fn uninhabited_truthiness() {
+        assert!(!Uninhabited.may_be_true());
+        assert!(!Uninhabited.may_be_false());
+        assert_eq!(Uninhabited.negate(), Uninhabited);
     }
 
     #[test]

@@ -10442,6 +10442,7 @@ impl<'db> Type<'db> {
             Truthiness::AlwaysTrue => Type::bool_literal(true),
             Truthiness::AlwaysFalse => Type::bool_literal(false),
             Truthiness::Ambiguous => KnownClass::Bool.to_instance(db, env),
+            Truthiness::Uninhabited => Type::Never,
         }
     }
 

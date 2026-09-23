@@ -1933,14 +1933,7 @@ fn widen_comparison_truthiness(
                 .and_then(|overrides| overrides.get(expression))
                 .copied()
                 .unwrap_or_else(|| previous_fallback(*expression));
-            (
-                *expression,
-                if truthiness == previous_truthiness {
-                    truthiness
-                } else {
-                    Truthiness::Ambiguous
-                },
-            )
+            (*expression, truthiness.union(previous_truthiness))
         })
         .collect()
 }
@@ -2035,11 +2028,11 @@ impl<'db> ExpressionInference<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         expression: impl Into<ExpressionNodeKey>,
-    ) -> Option<Truthiness> {
+    ) -> Truthiness {
         if self.cannot_complete() {
-            return None;
+            return Truthiness::Uninhabited;
         }
-        self.expression_type(expression).bool_if_inhabited(db, env)
+        self.expression_type(expression).bool(db, env)
     }
 
     /// Test a root comparison chain directly, without re-testing intermediate results.
@@ -2048,13 +2041,13 @@ impl<'db> ExpressionInference<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         expression: impl Into<ExpressionNodeKey>,
-    ) -> Option<Truthiness> {
+    ) -> Truthiness {
         if self.cannot_complete() {
-            return None;
+            return Truthiness::Uninhabited;
         }
         let expression = expression.into();
         self.comparison_truthiness(expression)
-            .or_else(|| self.expression_type(expression).bool_if_inhabited(db, env))
+            .unwrap_or_else(|| self.expression_type(expression).bool(db, env))
     }
 
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {

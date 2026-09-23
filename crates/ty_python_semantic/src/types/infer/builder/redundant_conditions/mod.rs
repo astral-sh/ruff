@@ -208,8 +208,7 @@ impl ConditionKind<'_> {
 struct BooleanTest<'ast, 'db> {
     expression: &'ast ast::Expr,
     value_type: Type<'db>,
-    // `None` means the expression cannot produce an outcome.
-    truthiness: Option<Truthiness>,
+    truthiness: Truthiness,
     evaluation: ExpressionContext,
 }
 
@@ -308,10 +307,8 @@ impl BooleanTest<'_, '_> {
             }
         }
 
-        let Some(truthiness) = self.truthiness else {
-            return Truthiness::Ambiguous;
-        };
-        if truthiness.is_ambiguous() {
+        let truthiness = self.truthiness;
+        if truthiness.is_ambiguous() || truthiness.is_uninhabited() {
             return Truthiness::Ambiguous;
         }
 
@@ -712,7 +709,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             truthiness,
             ..
         } = test;
-        let truthiness = truthiness?;
+        if truthiness.is_uninhabited() {
+            return None;
+        }
 
         if matches!(
             expression,
@@ -911,11 +910,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         preference: BooleanDiagnosticPreference,
         conditions: &mut Vec<RedundantCondition<'ast, 'db>>,
     ) -> ConditionCheckResult {
-        let operand_preference = if test.truthiness.is_none_or(Truthiness::is_ambiguous) {
-            preference
-        } else {
-            BooleanDiagnosticPreference::EnclosingCondition
-        };
+        let operand_preference =
+            if test.truthiness.is_ambiguous() || test.truthiness.is_uninhabited() {
+                preference
+            } else {
+                BooleanDiagnosticPreference::EnclosingCondition
+            };
 
         let mut operand_result = ConditionCheckResult::empty();
 
@@ -1171,9 +1171,9 @@ fn suite_ends_with_exit(
         .is_some_and(|stmt| match stmt {
             ast::Stmt::Raise(_) => true,
             ast::Stmt::Break(_) | ast::Stmt::Continue(_) => kind == SuiteExitKind::Any,
-            ast::Stmt::Assert(ast::StmtAssert { test, .. }) => builder
+            ast::Stmt::Assert(ast::StmtAssert { test, .. }) => !builder
                 .expression_truthiness(test, ExpressionContext::Condition)
-                .is_none_or(Truthiness::may_be_false),
+                .is_always_true(),
             ast::Stmt::Expr(ast::StmtExpr { value, .. })
                 if let Some(StatementCall { call, is_await }) =
                     StatementCall::from_expression(value) =>
