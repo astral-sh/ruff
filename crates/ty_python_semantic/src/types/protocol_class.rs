@@ -1524,37 +1524,36 @@ fn walk_protocol_member_access<'db, V: super::visitor::TypeVisitor<'db> + ?Sized
     visitor: &V,
 ) {
     let env = visitor.program_environment();
-    let write = access.write();
-    let requirement = write.and_then(|write| write.requirement(db, env, self_type));
-    // Without a receiver, visitors still need the accessor when its exposed type cannot
-    // be resolved. Binding an unresolved accessor to a receiver yields no exposed type.
-    let unresolved = |value: Option<ProtocolPropertyType<'db>>| {
-        value
-            .filter(|_| self_type.is_none())
-            .map(ProtocolPropertyType::ty)
-    };
-    if let Some(read_ty) = access
+    let read_ty = access
         .read()
-        .and_then(|read| read.result_type(db, env, self_type))
-        .or_else(|| {
-            if let ProtocolMemberKind::Property { read, .. } = access.declaration.kind
-                && access.mode == ProtocolMemberAccessMode::Instance
-            {
-                unresolved(read)
-            } else {
-                None
-            }
-        })
-    {
+        .and_then(|read| read.result_type(db, env, self_type));
+    if let Some(read_ty) = read_ty {
         visitor.visit_type(db, read_ty);
+    } else if self_type.is_none()
+        && access.mode == ProtocolMemberAccessMode::Instance
+        && let ProtocolMemberKind::Property {
+            read: Some(read), ..
+        } = access.declaration.kind
+    {
+        // If no receiver type was supplied, fall back to the accessor callable when
+        // its read type cannot be extracted.
+        visitor.visit_type(db, read.ty());
     }
-    if let Some(write_ty) = write.and_then(|write| {
-        requirement
-            .as_ref()
-            .and_then(ProtocolMemberWriteRequirement::accepted_type)
-            .or_else(|| unresolved(write.declaration.domain()))
-    }) {
+
+    let Some(write) = access.write() else {
+        return;
+    };
+    let requirement = write.requirement(db, env, self_type);
+    let write_ty = requirement
+        .as_ref()
+        .and_then(ProtocolMemberWriteRequirement::accepted_type);
+    if let Some(write_ty) = write_ty {
         visitor.visit_type(db, write_ty);
+    } else if self_type.is_none()
+        && let Some(domain) = write.declaration.domain()
+    {
+        // Apply the same accessor fallback when the write type cannot be extracted.
+        visitor.visit_type(db, domain.ty());
     }
     if let Some(ProtocolMemberWriteRequirement::Descriptor { descriptor_ty, .. }) = requirement {
         visitor.visit_type(db, descriptor_ty);
@@ -1840,8 +1839,6 @@ impl<'db> ProtocolMemberData<'db> {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum ProtocolMemberKind<'db> {
-    // Keep the complete callable type, including unions produced by ParamSpec specialization
-    // and the divergent placeholders used while normalizing recursive protocols.
     Method(Type<'db>, ProtocolMethodKind),
     Property {
         read: Option<ProtocolPropertyType<'db>>,
