@@ -583,7 +583,7 @@ impl Project {
     }
 
     /// Changes project-file discovery and invalidates any previously indexed membership.
-    fn set_indexing(self, db: &mut dyn Db, indexing: ProjectIndexing) {
+    pub fn set_indexing(self, db: &mut dyn Db, indexing: ProjectIndexing) {
         self.set_indexing_mode(db).to(indexing);
         self.reload_files(db);
     }
