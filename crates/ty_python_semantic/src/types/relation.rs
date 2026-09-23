@@ -4045,6 +4045,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
+            // Guard wrappers describe boolean results. Different narrowed types or guard kinds
+            // do not prove that those results are disjoint.
+            (Type::TypeIs(_) | Type::TypeGuard(_), Type::TypeIs(_) | Type::TypeGuard(_)) => {
+                self.never()
+            }
+
             (Type::TypeIs(_) | Type::TypeGuard(_), Type::LiteralValue(literal))
             | (Type::LiteralValue(literal), Type::TypeIs(_) | Type::TypeGuard(_)) => {
                 ConstraintSet::from_bool(self.constraints, !literal.is_bool())

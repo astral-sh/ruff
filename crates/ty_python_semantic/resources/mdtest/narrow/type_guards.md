@@ -324,6 +324,87 @@ def _(d: Any, guarded: object, narrowed: object, other: object, mode: bool):
         reveal_type(narrowed)  # revealed: int
 ```
 
+## Intersections
+
+Guards for overlapping types can share a common subtype. A function returning `TypeGuard[int]`
+satisfies both callable types below and can return `True` for an integer. Calling their intersection
+preserves both guard wrappers.
+
+```py
+from typing import Callable
+from typing_extensions import Never, TypeGuard, TypeIs
+from ty_extensions import Intersection, Not
+
+def is_int(value: object) -> TypeGuard[int]:
+    return isinstance(value, int)
+
+def check_overlapping_guards(
+    guard: Intersection[Callable[[object], TypeGuard[int | str]], Callable[[object], TypeGuard[int | bytes]]],
+    value: object,
+):
+    reveal_type(guard(value))  # revealed: TypeGuard[int | str] & TypeGuard[int | bytes]
+
+check_overlapping_guards(is_int, 1)
+```
+
+Even guards for disjoint types share `TypeGuard[Never]` as a common subtype. An always-false
+function satisfies both callable types below, so their intersection also remains inhabited.
+
+```py
+def never_true(value: object) -> TypeGuard[Never]:
+    return False
+
+def check_disjoint_guards(
+    guard: Intersection[Callable[[object], TypeGuard[int]], Callable[[object], TypeGuard[str]]],
+    value: object,
+):
+    reveal_type(guard(value))  # revealed: TypeGuard[int] & TypeGuard[str]
+
+check_disjoint_guards(never_true, object())
+```
+
+Distinct wrappers are also preserved in intersections of guard return types, including `TypeIs` and
+mixed guard kinds.
+
+```py
+def _(
+    guard: Intersection[TypeGuard[int], TypeGuard[str]],
+    type_is: Intersection[TypeIs[int], TypeIs[str]],
+    mixed: Intersection[TypeGuard[int], TypeIs[str]],
+):
+    reveal_type(guard)  # revealed: TypeGuard[int] & TypeGuard[str]
+    reveal_type(type_is)  # revealed: TypeIs[int] & TypeIs[str]
+    reveal_type(mixed)  # revealed: TypeGuard[int] & TypeIs[str]
+```
+
+Redundant components still simplify away. `TypeGuard` is covariant, whereas `TypeIs` is invariant.
+
+```py
+def _(
+    covariant: Intersection[TypeGuard[int], TypeGuard[bool]],
+    reversed: Intersection[TypeGuard[bool], TypeGuard[int]],
+    invariant: Intersection[TypeIs[int], TypeIs[bool]],
+    repeated: Intersection[TypeIs[int], TypeIs[int]],
+    boolean: Intersection[TypeGuard[int], bool],
+):
+    reveal_type(covariant)  # revealed: TypeGuard[bool]
+    reveal_type(reversed)  # revealed: TypeGuard[bool]
+    reveal_type(invariant)  # revealed: TypeIs[int] & TypeIs[bool]
+    reveal_type(repeated)  # revealed: TypeIs[int]
+    reveal_type(boolean)  # revealed: TypeGuard[int]
+```
+
+Excluding a different guard retains the exclusion. Excluding a supertype still yields `Never`.
+
+```py
+def _(
+    different: Intersection[TypeGuard[int], Not[TypeGuard[str]]],
+    supertype: Intersection[TypeGuard[bool], Not[TypeGuard[int]]],
+):
+    reveal_type(different)  # revealed: TypeGuard[int] & ~TypeGuard[str]
+    reveal_type(supertype)  # revealed: Never
+```
+
 ## Narrowing
 
 ```toml

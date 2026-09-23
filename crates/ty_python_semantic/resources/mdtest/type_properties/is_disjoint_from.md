@@ -1035,6 +1035,26 @@ static_assert(is_disjoint_from(Literal[1], TypeGuard[str]))
 static_assert(is_disjoint_from(Literal[0], TypeIs[str]))
 ```
 
+Guards with overlapping narrowed types are not disjoint, including when neither narrowed type is a
+subtype of the other.
+
+```py
+static_assert(not is_disjoint_from(TypeGuard[int], TypeGuard[int]))
+static_assert(not is_disjoint_from(TypeIs[int], TypeIs[int]))
+static_assert(not is_disjoint_from(TypeGuard[int | str], TypeGuard[int | bytes]))
+static_assert(not is_disjoint_from(TypeIs[int | str], TypeIs[int | bytes]))
+```
+
+Even disjoint narrowed types do not make guard return types disjoint: their boolean results can
+still overlap. This also applies when the two wrappers differ.
+
+```py
+static_assert(not is_disjoint_from(TypeGuard[int], TypeGuard[str]))
+static_assert(not is_disjoint_from(TypeIs[int], TypeIs[str]))
+static_assert(not is_disjoint_from(TypeGuard[int], TypeIs[str]))
+static_assert(not is_disjoint_from(TypeIs[str], TypeGuard[int]))
+```
+
 ### `Protocol`
 
 A protocol is disjoint from another type if any of the protocol's members are available as an
