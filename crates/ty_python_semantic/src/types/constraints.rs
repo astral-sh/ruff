@@ -3237,6 +3237,18 @@ impl<'db> CandidateTypeVarSolution<'db> {
         }
     }
 
+    /// Returns lower-bound inference evidence without supplying a default for a missing bound.
+    pub(crate) fn inference_lower(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        match &self.kind {
+            CandidateTypeVarSolutionKind::Range(range) => range.inference_lower(db, env),
+            CandidateTypeVarSolutionKind::Exact(ty) => Some(*ty),
+        }
+    }
+
     fn variance(&self) -> TypeVarVariance {
         match &self.kind {
             CandidateTypeVarSolutionKind::Range(range) => range.variance(),
@@ -3262,7 +3274,6 @@ impl<'db> CandidateTypeVarSolution<'db> {
 }
 
 impl<'db> CandidateTypeVarRangeSolution<'db> {
-    /// Returns lower-bound inference evidence without supplying a default for a missing bound.
     pub(crate) fn inference_lower(
         &self,
         db: &'db dyn Db,
@@ -3899,12 +3910,7 @@ impl<'db> CandidateSolutions<'db> {
                 PathBoundSolution::ViolatesDeclaredConstraints => {
                     violations.push(SolutionViolation {
                         bound_typevar: path_bound.bound_typevar,
-                        argument: match &path_bound.kind {
-                            CandidateTypeVarSolutionKind::Range(range) => {
-                                range.inference_lower(db, env)
-                            }
-                            CandidateTypeVarSolutionKind::Exact(ty) => Some(*ty),
-                        },
+                        argument: path_bound.inference_lower(db, env),
                         variance: path_bound.variance(),
                         kind: SolutionViolationKind::Constraints,
                     });
@@ -4078,9 +4084,7 @@ impl<'db> CandidateSolutions<'db> {
                 let mut compatible_constraint = None;
                 let mut multiple_compatible_constraints = false;
                 let has_lower_evidence = match &path_bound.kind {
-                    CandidateTypeVarSolutionKind::Range(range) => {
-                        range.evidence_lower.is_some() || range.mixed_lower.is_some()
-                    }
+                    CandidateTypeVarSolutionKind::Range(range) => range.has_lower_inference(),
                     CandidateTypeVarSolutionKind::Exact(_) => true,
                 };
                 let is_tighter_solution = |candidate: Type<'db>, current_best: Type<'db>| {

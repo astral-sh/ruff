@@ -4804,7 +4804,6 @@ impl<'db> SpecializationError<'db> {
 mod tests {
     use super::*;
 
-    use crate::types::constraints::CandidateTypeVarSolutionKind;
     use crate::types::constraints::resolution::SolutionType::{Resolved, Unresolved};
 
     use ruff_db::files::system_path_to_file;
@@ -4923,12 +4922,9 @@ mod tests {
 
                 let inference = builder
                     .build_inference_with(|typevar, bounds| {
-                        let lower = bounds.as_ref().and_then(|bounds| match &bounds.kind {
-                            CandidateTypeVarSolutionKind::Range(range) => {
-                                range.inference_lower(db, &env)
-                            }
-                            CandidateTypeVarSolutionKind::Exact(ty) => Some(*ty),
-                        });
+                        let lower = bounds
+                            .as_ref()
+                            .and_then(|bounds| bounds.inference_lower(db, &env));
                         (typevar == t && lower == Some(str))
                             .then_some(PathBoundSolution::BudgetExceeded { fallback })
                     })
@@ -5195,10 +5191,9 @@ mod tests {
 
         let inference = builder
             .build_inference_with(|typevar, bounds| {
-                let lower = bounds.as_ref().and_then(|bounds| match &bounds.kind {
-                    CandidateTypeVarSolutionKind::Range(range) => range.inference_lower(db, &env),
-                    CandidateTypeVarSolutionKind::Exact(ty) => Some(*ty),
-                });
+                let lower = bounds
+                    .as_ref()
+                    .and_then(|bounds| bounds.inference_lower(db, &env));
                 (typevar == t && lower == Some(str))
                     .then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
@@ -5245,10 +5240,7 @@ mod tests {
         // individual path still contains the cycle after merging with object.
         let inference = builder
             .build_inference_with(|typevar, bounds| {
-                let lower = match &bounds?.kind {
-                    CandidateTypeVarSolutionKind::Range(range) => range.inference_lower(db, &env),
-                    CandidateTypeVarSolutionKind::Exact(ty) => Some(*ty),
-                };
+                let lower = bounds?.inference_lower(db, &env);
                 let ty = match (typevar, lower) {
                     (typevar, Some(lower)) if typevar == t && lower == int => list_of_u,
                     (typevar, Some(lower)) if typevar == u && lower == str => Type::TypeVar(t),
