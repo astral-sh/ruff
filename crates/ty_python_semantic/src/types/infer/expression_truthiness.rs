@@ -73,7 +73,7 @@ where
     }
 
     /// Check completion without testing the result object's truthiness.
-    pub(crate) fn can_complete(&self, expression: &ast::Expr) -> bool {
+    fn can_complete(&self, expression: &ast::Expr) -> bool {
         self.evaluate(expression, ExpressionContext::Value)
             .is_some()
     }

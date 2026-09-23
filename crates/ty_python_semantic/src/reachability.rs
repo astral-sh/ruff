@@ -1873,10 +1873,15 @@ fn context_manager_suppresses<'db>(
     )
 }
 
+/// Analyze an expression when reachability needs its truthiness.
+///
+/// The context distinguishes testing the result object from following short-circuit conditions.
+/// Keep this separate from type inference: `bool(never)` has type `bool`, but cannot produce a
+/// boolean outcome. This query caches that distinction and widens it during inference cycles.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _| Some(Truthiness::Ambiguous),
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Option<Truthiness>, result: Option<Truthiness>, _| {
+    cycle_initial = |_, _, _, _| Some(Truthiness::Ambiguous),
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Option<Truthiness>, result: Option<Truthiness>, _, _| {
         // A condition can control whether one of its own inputs is reachable. Expression inference
         // can lose its previous result when it ceases to be a cycle head, so its type widening alone
         // does not ensure that the condition's truthiness converges. Delay widening here to avoid
@@ -1894,7 +1899,11 @@ fn context_manager_suppresses<'db>(
     },
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Option<Truthiness> {
+fn expression_truthiness<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+    context: ExpressionContext,
+) -> Option<Truthiness> {
     let env = ProgramEnvironment::from_scope(expression.scope(db));
     let module = parsed_module(db, expression.python_file(db)).load(db);
     let inference = infer_expression_types(db, expression, TypeContext::default());
@@ -1905,7 +1914,7 @@ fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Optio
         |node| inference.expression_type(node),
         |node| inference.comparison_truthiness(node),
     )
-    .truthiness(node, ExpressionContext::Condition)
+    .truthiness(node, context)
 }
 
 /// Evaluate a predicate, returning `None` when it cannot produce a boolean outcome.
@@ -1922,18 +1931,12 @@ fn analyze_single(
 
     Some(match predicate.node {
         PredicateNode::Expression(test_expr) => {
-            let inference = infer_expression_types(db, test_expr, TypeContext::default());
-            inference
-                .value_truthiness(db, env, test_expr.node_ref(db))?
+            expression_truthiness(db, test_expr, ExpressionContext::Value)?
                 .negate_if(!predicate.is_positive)
         }
-        PredicateNode::Condition(test_expr) => {
-            analyze_condition(db, test_expr)?.negate_if(!predicate.is_positive)
-        }
-        PredicateNode::ChainedComparisonCondition(test_expr) => {
-            let inference = infer_expression_types(db, test_expr, TypeContext::default());
-            inference
-                .comparison_condition_truthiness(db, env, test_expr.node_ref(db))?
+        PredicateNode::Condition(test_expr)
+        | PredicateNode::ChainedComparisonCondition(test_expr) => {
+            expression_truthiness(db, test_expr, ExpressionContext::Condition)?
                 .negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {
