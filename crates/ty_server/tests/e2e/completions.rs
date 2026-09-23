@@ -80,6 +80,41 @@ walktr
 }
 
 #[test]
+fn external_file_uses_fallback_workspace_auto_import_setting() {
+    for auto_import in [false, true] {
+        let path = SystemPath::new("scratch.py");
+        let source = "walktr";
+        // Register tools before app/src to check that path order determines the fallback.
+        // Leave initialization options unset so the workspaces retain distinct settings.
+        let mut server = TestServerBuilder::new()
+            .expect("create test server builder")
+            .with_workspace(
+                SystemPath::new("tools"),
+                Some(ClientOptions::default().with_auto_import(!auto_import)),
+            )
+            .expect("register tools workspace")
+            .with_workspace(
+                SystemPath::new("app/src"),
+                Some(ClientOptions::default().with_auto_import(auto_import)),
+            )
+            .expect("register app/src workspace")
+            .with_files([(SystemPath::new("app/ty.toml"), ""), (path, source)])
+            .expect("write project configuration and external file")
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(path, source, 1);
+        let completions = server.completion_request(&server.file_uri(path), Position::new(0, 6));
+        assert_eq!(
+            completions
+                .iter()
+                .any(|completion| completion.label == "walktree (import inspect)"),
+            auto_import,
+        );
+    }
+}
+
+#[test]
 fn complete_function_parentheses_disabled_by_default() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
