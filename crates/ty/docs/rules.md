@@ -2375,9 +2375,7 @@ some codebases may still use the legacy convention for compatibility with older 
 
 This rule is disabled by default because modern code may use `__`-prefixed parameter names for other
 purposes, such as avoiding collisions with `**kwargs`. Enable it if your codebase uses the legacy
-convention and you want to check that it is applied consistently, using
-`--warn invalid-legacy-positional-parameter` or the corresponding rule setting in your configuration
-file.
+convention and you want to check that it is applied consistently.
 
 **Why is this bad?**
 
