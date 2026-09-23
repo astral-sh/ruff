@@ -38,8 +38,8 @@ pub fn can_rename(
     for target in &declaration_targets {
         let target_file = target.file();
 
-        // If definition is outside the project, refuse rename
-        if !is_file_in_project(db, target_file) {
+        // Local definitions can be renamed even when the current file isn't indexed.
+        if target_file != source_file && !is_file_in_project(db, target_file) {
             return None;
         }
 
@@ -102,6 +102,7 @@ mod tests {
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span};
     use ruff_db::files::FileRange;
     use ruff_text_size::Ranged;
+    use ty_project::{Db as _, ProjectIndexing};
 
     impl CursorTest {
         fn prepare_rename(&self) -> String {
@@ -182,6 +183,58 @@ mod tests {
 
             main
         }
+    }
+
+    #[test]
+    fn rename_without_indexing_updates_only_local_references() {
+        let mut test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+                <CURSOR>value = 1
+                result = value
+                ",
+            )
+            .source("other.py", "from main import value")
+            .build();
+        test.db
+            .project()
+            .set_indexing(&mut test.db, ProjectIndexing::Disabled);
+        let file = test.program_file(test.cursor.file);
+        assert!(can_rename(&test.db, file, test.cursor.offset).is_some());
+        let locations =
+            rename(&test.db, file, test.cursor.offset, "renamed").expect("rename local definition");
+        assert_eq!(locations.len(), 2);
+        assert!(
+            locations
+                .iter()
+                .all(|location| location.file() == test.cursor.file)
+        );
+    }
+
+    #[test]
+    fn rename_without_indexing_rejects_imported_definitions() {
+        let mut test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+                from other import value
+                result = <CURSOR>value
+                ",
+            )
+            .source("other.py", "value = 1")
+            .build();
+        test.db
+            .project()
+            .set_indexing(&mut test.db, ProjectIndexing::Disabled);
+        assert!(
+            can_rename(
+                &test.db,
+                test.program_file(test.cursor.file),
+                test.cursor.offset
+            )
+            .is_none()
+        );
     }
 
     #[test]
