@@ -3139,18 +3139,20 @@ impl<'db> CandidateTypeVarRangeSolver<'db> {
         // evidence may collapse into a single gradual union.
         //
         // Note that we only compute this flag for constrained typevars.
-        let has_only_gradual_evidence = bound_typevar.typevar(db).is_constrained(db).then(|| {
-            let mut evidence = evidence_lower
-                .iter()
-                .copied()
-                .chain(upper.iter_evidence())
-                .filter(|ty| !ty.has_unspecialized_type_var(db, env))
-                .peekable();
-
-            evidence.peek().is_some()
-                && evidence
-                    .all(|ty| ty.bottom_materialization(db, env) != ty.top_materialization(db, env))
-        });
+        let has_only_non_concrete_evidence =
+            bound_typevar.typevar(db).is_constrained(db).then(|| {
+                let mut evidence = evidence_lower
+                    .iter()
+                    .copied()
+                    .chain(upper.iter_evidence())
+                    .filter(|ty| !ty.has_unspecialized_type_var(db, env))
+                    .peekable();
+                evidence.peek().is_some()
+                    && evidence.all(|ty| {
+                        ty.is_type_var()
+                            || ty.bottom_materialization(db, env) != ty.top_materialization(db, env)
+                    })
+            });
 
         let evidence_lower =
             (!evidence_lower.is_empty()).then(|| UnionType::from_elements(db, env, evidence_lower));
@@ -3168,7 +3170,7 @@ impl<'db> CandidateTypeVarRangeSolver<'db> {
             mixed_lower,
             validity_lower,
             upper,
-            has_only_gradual_evidence,
+            has_only_non_concrete_evidence,
         };
         let lower = range.effective_lower(db, env);
         if !range.upper.is_satisfied_by(db, env, lower) {
@@ -3242,8 +3244,8 @@ pub(crate) struct CandidateTypeVarRangeSolution<'db> {
     mixed_lower: Option<Type<'db>>,
     validity_lower: Type<'db>,
     upper: UpperBound<'db>,
-    /// Whether the path contains gradual evidence and no static evidence.
-    has_only_gradual_evidence: Option<bool>,
+    /// Whether every original evidence bound is gradual or another `TypeVar`.
+    has_only_non_concrete_evidence: Option<bool>,
 }
 
 impl<'db> CandidateTypeVarSolution<'db> {
@@ -5630,7 +5632,7 @@ mod tests {
             mixed_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::unconstrained(),
-            has_only_gradual_evidence: None,
+            has_only_non_concrete_evidence: None,
         };
         let path_bound = CandidateTypeVarSolution::range(t, range);
 
@@ -5842,7 +5844,7 @@ class E: ...
             .finish(db, &env, &mut storage, constrained)
             .expect("expected a valid solution");
         drop(storage);
-        assert_eq!(exhausted.has_only_gradual_evidence, Some(true));
+        assert_eq!(exhausted.has_only_non_concrete_evidence, Some(true));
         let exhausted = CandidateTypeVarSolution::range(constrained, exhausted);
         assert_eq!(
             CandidateSolutions::preliminary_solve(db, &env, &builder, &exhausted),

@@ -2787,6 +2787,25 @@ reveal_type(narrow(1))  # revealed: int
 reveal_type(narrow("hello"))  # revealed: str
 ```
 
+A fixed constrained TypeVar can occur alongside gradual evidence when another context validates the
+inferred type. Checking its declared constraints must not add the individual constraints to that
+type: `result` remains `list[Any | Fixed]`.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+class A: ...
+class B: ...
+
+def check[Fixed: (A, B)](marker: Fixed, value: Any) -> None:
+    result = [marker]
+    result.append(value)
+    expected: list[Fixed] = result
+    static_assert(is_equivalent_to(TypeOf[result], list[Any | Fixed]))
+```
+
 But a constrained TypeVar with constraints not satisfied by the formal TypeVar should still error:
 
 ```py

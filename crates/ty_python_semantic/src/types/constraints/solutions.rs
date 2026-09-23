@@ -491,7 +491,7 @@ impl<'db> SolutionWalker<'db> {
                     .as_single_upper_bound(db, env)
                     .is_some_and(is_preservable_typevar);
         let has_non_concrete_evidence = has_no_evidence
-            || evidence.has_only_gradual_evidence == Some(true)
+            || evidence.has_only_non_concrete_evidence == Some(true)
             || has_preservable_typevar_evidence;
 
         if has_non_concrete_evidence {
