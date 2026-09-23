@@ -1009,7 +1009,7 @@ impl<'db> Type<'db> {
         // If the class defines `__getitem__`, return its return type.
         //
         // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
-        match Type::try_call_dunder_member(
+        match Type::try_call_dunder_member_impl(
             db,
             env,
             value_ty.member_lookup_with_policy_and_receiver(

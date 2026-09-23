@@ -7971,7 +7971,7 @@ impl<'db> Type<'db> {
 
         // Implicit calls to dunder methods never access instance members, so we pass
         // `NO_INSTANCE_FALLBACK` here in addition to other policies.
-        Self::try_call_dunder_member(
+        Self::try_call_dunder_member_impl(
             db,
             env,
             self.member_lookup_with_policy_and_receiver(
@@ -7986,7 +7986,7 @@ impl<'db> Type<'db> {
         )
     }
 
-    fn try_call_dunder_member(
+    fn try_call_dunder_member_impl(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         member: MemberLookupResult<'db>,
@@ -10539,7 +10539,7 @@ impl<'db> IntersectionType<'db> {
         let mut error_provenance = Provenance::Unknown;
 
         for element in positive {
-            match Type::try_call_dunder_member(
+            match Type::try_call_dunder_member_impl(
                 db,
                 env,
                 element.member_lookup_with_policy_and_receiver(
