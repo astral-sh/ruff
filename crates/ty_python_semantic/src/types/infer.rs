@@ -602,7 +602,7 @@ pub(super) fn infer_expression_types_impl<'db>(
 
     let env = ProgramEnvironment::from_file(program_file);
 
-    let mut inference = TypeInferenceBuilder::new(
+    TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Expression(expression, tcx),
@@ -611,25 +611,7 @@ pub(super) fn infer_expression_types_impl<'db>(
         index,
         &module,
     )
-    .finish_expression();
-
-    let node = expression.node_ref(db).node(&module);
-    // A `Never` result already records non-completion. Retain extra data only when the
-    // expression has an inhabited result type but cannot produce a value, as in `bool(never)`.
-    if !inference
-        .expression_type(node)
-        .is_equivalent_to(db, &env, Type::Never)
-        && !TruthinessAnalyzer::new(
-            db,
-            &env,
-            |node| inference.expression_type(node),
-            |node| inference.comparison_truthiness(node),
-        )
-        .can_complete(node)
-    {
-        inference.extra.get_or_insert_default().cannot_complete = true;
-    }
-    inference
+    .finish_expression()
 }
 
 fn expression_cycle_initial<'db>(
@@ -1954,9 +1936,6 @@ pub(crate) struct ExpressionInference<'db> {
 /// Extra data that only exists for few inferred expression regions.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ExpressionInferenceExtra<'db> {
-    /// The root expression cannot produce a value despite having an inhabited result type.
-    cannot_complete: bool,
-
     /// Aliases whose type-expression diagnostics are needed by this region.
     implicit_aliases: Box<[Definition<'db>]>,
 
@@ -2015,41 +1994,6 @@ struct ExpressionInferenceExtra<'db> {
 }
 
 impl<'db> ExpressionInference<'db> {
-    /// Whether completion is ruled out independently of the root expression's type.
-    fn cannot_complete(&self) -> bool {
-        self.extra
-            .as_ref()
-            .is_some_and(|extra| extra.cannot_complete)
-    }
-
-    /// Test the root expression's result object, accounting for non-completion.
-    pub(crate) fn value_truthiness(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Truthiness {
-        if self.cannot_complete() {
-            return Truthiness::Uninhabited;
-        }
-        self.expression_type(expression).bool(db, env)
-    }
-
-    /// Test a root comparison chain directly, without re-testing intermediate results.
-    pub(crate) fn comparison_condition_truthiness(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Truthiness {
-        if self.cannot_complete() {
-            return Truthiness::Uninhabited;
-        }
-        let expression = expression.into();
-        self.comparison_truthiness(expression)
-            .unwrap_or_else(|| self.expression_type(expression).bool(db, env))
-    }
-
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {
@@ -2087,11 +2031,6 @@ impl<'db> ExpressionInference<'db> {
 
         if cycle.iteration() > crate::TAINTED_CYCLES {
             self.widen_comparison_truthiness(db, env, previous);
-            // Widen possible evaluation outcomes along with value types. Once an earlier result
-            // could complete, a later iteration cannot exclude that possibility.
-            if let Some(extra) = self.extra.as_mut() {
-                extra.cannot_complete &= previous.cannot_complete();
-            }
         }
 
         for (expr, ty) in &mut self.expressions {
