@@ -1,5 +1,5 @@
 # Trailing pragma after another comment - the pragma portion should not count
-# toward reserved width in preview mode.
+# toward reserved width.
 
 # The expression is long enough that the formatter would break it if the full
 # comment width were reserved, but short enough to fit if only the non-pragma
@@ -9,9 +9,9 @@ i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # comment
 i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # comment  # pyright: ignore
 i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  ## noqa: F401
 
-# Plain pragma (no nested comment) - should behave the same in stable and preview
+# Plain pragma (no nested comment) - should not reserve any width
 i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # noqa: F401
 i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # type: ignore
 
-# Not a pragma - should reserve full width in both modes
+# Not a pragma - should reserve full width
 i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # comment  # not a pragma

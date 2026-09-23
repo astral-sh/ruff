@@ -17,21 +17,15 @@ I001 [*] Import block is un-sorted or un-formatted
 11 | | from d.prometheus.metrics import TERMINAL_CURRENTLY_RUNNING_TOTAL, OTHER_RUNNING_TOTAL  # type:ignore[attr-defined]
    | |______________________________________________________________________________________^
 help: Organize imports
-   |
-3  | )
-   -
-4  | from b.prometheus.metrics import (
-5  |     TERMINAL_CURRENTLY_RUNNING_TOTAL,  # type:ignore[attr-defined]
-6  | )
-   -
-   - from c.prometheus.metrics import TERMINAL_CURRENTLY_RUNNING_TOTAL  # type:ignore[attr-defined]
-   -
-   - from d.prometheus.metrics import TERMINAL_CURRENTLY_RUNNING_TOTAL, OTHER_RUNNING_TOTAL  # type:ignore[attr-defined]
-7  + from c.prometheus.metrics import (
-8  +     TERMINAL_CURRENTLY_RUNNING_TOTAL,  # type:ignore[attr-defined]
-9  + )
-10 + from d.prometheus.metrics import (  # type:ignore[attr-defined]
-11 +     OTHER_RUNNING_TOTAL,
-12 +     TERMINAL_CURRENTLY_RUNNING_TOTAL,
-13 + )
-   |
+  |
+3 | )
+  -
+4 | from b.prometheus.metrics import (
+5 |     TERMINAL_CURRENTLY_RUNNING_TOTAL,  # type:ignore[attr-defined]
+6 | )
+  -
+7 | from c.prometheus.metrics import TERMINAL_CURRENTLY_RUNNING_TOTAL  # type:ignore[attr-defined]
+  -
+  - from d.prometheus.metrics import TERMINAL_CURRENTLY_RUNNING_TOTAL, OTHER_RUNNING_TOTAL  # type:ignore[attr-defined]
+8 + from d.prometheus.metrics import OTHER_RUNNING_TOTAL, TERMINAL_CURRENTLY_RUNNING_TOTAL  # type:ignore[attr-defined]
+  |
