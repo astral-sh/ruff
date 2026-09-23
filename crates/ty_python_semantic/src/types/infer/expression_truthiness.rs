@@ -1,4 +1,4 @@
-//! Evaluation of already-inferred expressions, including paths that cannot produce a value.
+//! Truthiness of already-inferred expressions, including paths that cannot produce a value.
 
 use ruff_python_ast as ast;
 use ty_python_core::{Truthiness, expression::ExpressionContext};
@@ -9,15 +9,15 @@ use crate::{Db, ProgramEnvironment, types::Type};
 ///
 /// Value context preserves the inferred result type, including objects whose truthiness can change
 /// between tests. Condition context follows short-circuit paths without re-testing their results.
-/// The callbacks read existing inference results; this evaluator does not infer or cache types.
-pub(crate) struct ExpressionEvaluator<'a, 'db, T, C> {
+/// The callbacks read existing inference results; this analyzer does not infer or cache types.
+pub(crate) struct TruthinessAnalyzer<'a, 'db, T, C> {
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
     expression_type: T,
     comparison_truthiness: C,
 }
 
-impl<'a, 'db, T, C> ExpressionEvaluator<'a, 'db, T, C>
+impl<'a, 'db, T, C> TruthinessAnalyzer<'a, 'db, T, C>
 where
     T: Fn(&ast::Expr) -> Type<'db>,
     C: Fn(&ast::Expr) -> Option<Truthiness>,
