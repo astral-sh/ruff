@@ -33,7 +33,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: 4b2e70d08cb2ccd26d1fba73588de41c7a5d50b7 # frozen: v0.25
+    rev: 17e12779811926f000bdfa1795f9e3735dd71ac3 # frozen: 0.26
     hooks:
       - id: validate-pyproject
         priority: 0
@@ -118,14 +118,14 @@ repos:
         priority: 0
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: eec2b3c4f52295313b08b04f928ab2479e468b5c # frozen: 0.12.15
+    rev: 9b16a472943852b803af3785c45041dcf10b9f12 # frozen: 0.12.18
     hooks:
       - id: uv-lock
         priority: 0
         args: [--default-index=https://pypi.org/simple, --check, --refresh]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: e8f7d69b957a30acb2c875078d5fd012de24b64c # frozen: v0.16.7
+    rev: 2eeb5678de71a00c0902cbda7105d328432f72cb # frozen: v0.16.8
     hooks:
       - id: ruff-format
         types_or: [python, pyi, jupyter]
@@ -134,7 +134,7 @@ repos:
 
   # Priority 1: Second-pass fixers (e.g., markdownlint-fix runs after mdformat).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: e8f7d69b957a30acb2c875078d5fd012de24b64c # frozen: v0.16.7
+    rev: 2eeb5678de71a00c0902cbda7105d328432f72cb # frozen: v0.16.8
     hooks:
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
@@ -157,7 +157,7 @@ repos:
 
   # Priority 2: ruffen-docs runs after markdownlint-fix (both modify markdown).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: e8f7d69b957a30acb2c875078d5fd012de24b64c # frozen: v0.16.7
+    rev: 2eeb5678de71a00c0902cbda7105d328432f72cb # frozen: v0.16.8
     hooks:
       - id: ruff-format
         name: mdtest format
