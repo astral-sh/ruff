@@ -1179,7 +1179,7 @@ fn config_file_python_setting_directory_with_unsupported_python_version() -> any
     success: false
     exit_code: 1
     ----- stdout -----
-    warning[unsupported-python-version]: Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead.
+    warning[unsupported-python-version]: Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.15 instead.
      --> venv/pyvenv.cfg:2:16
       |
     2 | version_info = 3.16.0
