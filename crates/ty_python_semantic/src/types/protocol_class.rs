@@ -1260,10 +1260,15 @@ impl<'db> ProtocolAnnotation<'db> {
     }
 }
 
-/// The source of the type obtained by reading a member or accepted by assignment to it.
+/// Describes where to obtain a protocol member's read type or accepted write type.
 ///
-/// Accessors remain lazy: resolving every property while constructing a protocol interface
-/// would expand return-type unions even when the property is unrelated to the current check.
+/// The type is either given directly by an annotation or extracted from a property accessor (the
+/// return annotation of a getter or the value-parameter annotation of a setter). This also supports
+/// ordinary attributes such as `name: str`, whose write type is given directly by `str`.
+///
+/// Accessor callables are retained until their annotations are needed. Resolving every property
+/// while constructing a protocol interface would expand return-type unions even when the property
+/// is unrelated to the current check.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum ProtocolPropertyType<'db> {
     /// The type is provided directly by the stored annotation.
@@ -1300,7 +1305,6 @@ enum ProtocolPropertyType<'db> {
     /// ```
     ///
     /// Here, assignment to `name` accepts `str | None`, from the `value` parameter.
-    /// The setter's return annotation `None` does not describe what can be assigned.
     PropertySetter(Type<'db>),
 }
 
@@ -1412,8 +1416,7 @@ impl<'db> ProtocolPropertyType<'db> {
     }
 }
 
-/// An instance or class access to a declaration. Read and write types are derived on demand
-/// rather than stored alongside the declaration.
+/// Describes instance or class-based access to a protocol member.
 #[derive(Debug, Copy, Clone)]
 struct ProtocolMemberAccess<'a, 'db> {
     declaration: &'a ProtocolMemberData<'db>,
@@ -1573,8 +1576,11 @@ impl<'db> ProtocolMemberReadAccess<'_, 'db> {
     ) -> Option<Type<'db>> {
         let annotation = match self.access.declaration.kind {
             ProtocolMemberKind::Method(ty, kind) => {
-                // TODO: Bind with the runtime receiver and the instance type for `Self`, instead
-                // of substituting `Self` after removing the receiver parameter.
+                // TODO: Passing `None` binds the method without a concrete receiver type.
+                // Supply the actual receiver type instead. For `Example.create()`, a classmethod
+                // receives `cls: type[Example]`, while `Self` must be replaced with `Example`.
+                // Binding therefore needs separate types for the receiver and for `Self`.
+                // See https://github.com/astral-sh/ruff/pull/28671.
                 let ty = if let Type::Callable(callable) = ty
                     && (kind == ProtocolMethodKind::Class
                         || (kind == ProtocolMethodKind::Instance

@@ -92,7 +92,10 @@ pub(super) enum ProtocolMemberWriteRequirement<'db> {
 }
 
 impl<'db> ProtocolMemberWriteRequirement<'db> {
-    /// The accepted write type.
+    /// Which type is accepted in a write to this protocol member?
+    ///
+    /// Returns `None` if that type cannot be represented directly (if the protocol
+    /// member is a custom descriptor whose domain cannot be represented directly).
     pub(super) fn accepted_type(&self) -> Option<Type<'db>> {
         match self {
             Self::AssignableTo(ty) => Some(*ty),
