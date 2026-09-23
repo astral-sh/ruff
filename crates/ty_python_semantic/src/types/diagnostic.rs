@@ -1385,7 +1385,7 @@ declare_lint! {
     pub(crate) static INVALID_LEGACY_POSITIONAL_PARAMETER = {
         summary: "detects incorrect usage of the legacy convention for specifying positional-only parameters",
         status: LintStatus::stable("0.0.15"),
-        default_level: Level::Warn,
+        default_level: Level::Ignore,
     }
 }
 

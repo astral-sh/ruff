@@ -5466,6 +5466,11 @@ accepts_optional_kwargs(a="bad")
 
 ### Invalid `Unpack` signatures
 
+```toml
+[rules]
+invalid-legacy-positional-parameter = "warn"
+```
+
 These signatures should be rejected. Some of them use a well-formed `Unpack[...]` expression, but
 the overall `**kwargs` signature is still invalid: mixing explicit parameters with conflicting
 unpacked names, using a type variable, or using a union instead of a concrete `TypedDict`.
