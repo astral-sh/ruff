@@ -572,7 +572,7 @@ def f_okay(c: Callable[[], None]):
         # into a writable attribute...? What would that look like? Something like this?
         if (
             hasattr(type(c), "__qualname__")
-            and isinstance(descriptor := type(c).__qualname__, property)
+            and isinstance(descriptor := vars(type(c)).get("__qualname__"), property)
             and descriptor.fset is not None
         ):
             c.__qualname__ = "my_callable"  # error: [invalid-assignment]
