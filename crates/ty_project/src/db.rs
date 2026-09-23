@@ -965,8 +965,56 @@ mod tests {
     use ty_python_semantic::Db as _;
 
     use crate::db::testing::TestDb;
-    use crate::watch::ChangeEvent;
-    use crate::{Db, ProjectDatabase, ProjectMetadata, UseUv};
+    use crate::watch::{ChangeEvent, CreatedKind};
+    use crate::{Db, ProjectDatabase, ProjectIndexing, ProjectMetadata, UseUv};
+
+    #[test]
+    fn disabled_indexing_stays_empty_after_file_events_and_configuration_reload() {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/project");
+        let path = root.join("main.py");
+        system
+            .memory_file_system()
+            .write_file_all(&path, "missing")
+            .expect("create source file");
+        let metadata = ProjectMetadata::discover(&root, &system).expect("discover project");
+        let mut db = ProjectDatabase::fallible(metadata, system).expect("create database");
+        let project = db.project();
+        assert_eq!(project.files(&db).len(), 1);
+
+        project.set_indexing(&mut db, ProjectIndexing::Disabled);
+        assert!(project.files(&db).is_empty());
+        assert!(!project.is_file_included(&db, &path).is_included());
+
+        db.apply_changes(&[
+            ChangeEvent::Opened(path.clone()),
+            ChangeEvent::Created {
+                path: root.clone(),
+                kind: CreatedKind::Directory,
+            },
+        ]);
+        let file = system_path_to_file(&db, &path).expect("resolve source file");
+        project.open_file(&mut db, file);
+        assert!(project.files(&db).is_empty());
+        assert!(db.is_open_file(file));
+        assert!(!db.check_file(file).is_empty());
+
+        let config = root.join("ty.toml");
+        db.write_file(&config, "[src]\nexclude = ['ignored.py']")
+            .expect("write configuration");
+        db.apply_changes(&[ChangeEvent::Created {
+            path: config,
+            kind: CreatedKind::File,
+        }]);
+        assert!(project.files(&db).is_empty());
+        assert!(db.is_open_file(file));
+
+        db.apply_changes(&[ChangeEvent::Rescan]);
+        assert!(project.files(&db).is_empty());
+
+        project.set_indexing(&mut db, ProjectIndexing::ProjectRoot);
+        assert!(project.files(&db).contains(file));
+    }
 
     #[test]
     fn checks_use_available_script_environment_without_running_uv() -> anyhow::Result<()> {
