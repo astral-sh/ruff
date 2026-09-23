@@ -18,14 +18,15 @@ use crate::module_name::ModuleName;
 use crate::resolve::{PyTyped, ResolverContext};
 use crate::typeshed::TypeshedVersionsQueryResult;
 
-/// A path that points to a Python module.
+/// A path to a possible Python module or a directory searched for modules.
 ///
 /// A `ModulePath` is made up of two elements:
-/// - The [`SearchPath`] that was used to find this module.
+/// - The [`SearchPath`] containing the location.
 ///   This could point to a directory on disk or a directory
 ///   in the vendored zip archive.
-/// - A relative path from the search path to the file
-///   that contains the source code of the Python module in question.
+/// - A relative path from the search path to a file or directory.
+///
+/// The path does not establish that a module exists or that resolution selects it.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) struct ModulePath {
     search_path: SearchPath,
@@ -100,41 +101,6 @@ impl ModulePath {
                         .is_directory(stdlib_root.join(relative_path)),
                 }
             }
-        }
-    }
-
-    /// Get the `py.typed` info for this package (not considering parent packages)
-    pub(super) fn py_typed(&self, resolver: &ResolverContext) -> PyTyped {
-        let Some(py_typed_file) = self.to_system_path().and_then(|path| {
-            if !directory_contains_file(resolver.db, &path, &["py.typed"]) {
-                return None;
-            }
-            let py_typed_path = path.join("py.typed");
-            system_path_to_file(resolver.db, py_typed_path).ok()
-        }) else {
-            return PyTyped::Untyped;
-        };
-
-        // Different module names revisit the same package. Share the tracked contents instead of
-        // reading its marker from disk again for every module resolution.
-        let py_typed_contents = source_text(resolver.db, py_typed_file);
-        // If we fail to read it let's say that's like it doesn't exist
-        // (right now the difference between Untyped and Full is academic)
-        if py_typed_contents.read_error().is_some() {
-            return PyTyped::Untyped;
-        }
-
-        // The python typing spec says to look for "partial\n" but in the wild we've seen:
-        //
-        // * PARTIAL\n
-        // * partial\\n (as in they typed "\n")
-        // * partial/n
-        //
-        // since the py.typed file never really grew any other contents, let's be permissive
-        if py_typed_contents.to_ascii_lowercase().contains("partial") {
-            PyTyped::Partial
-        } else {
-            PyTyped::Full
         }
     }
 
@@ -449,6 +415,41 @@ impl<'db> ModuleDirectory<'db> {
                     }
                 }
             }
+        }
+    }
+
+    /// Reads this package's `py.typed` marker without considering parent packages.
+    pub(super) fn py_typed(&self, resolver: &ResolverContext) -> PyTyped {
+        let Some(py_typed_file) = self.path.to_system_path().and_then(|path| {
+            if !directory_contains_file(resolver.db, &path, &["py.typed"]) {
+                return None;
+            }
+            let py_typed_path = path.join("py.typed");
+            system_path_to_file(resolver.db, py_typed_path).ok()
+        }) else {
+            return PyTyped::Untyped;
+        };
+
+        // Different module names revisit the same package. Share the tracked contents instead of
+        // reading its marker from disk again for every module resolution.
+        let py_typed_contents = source_text(resolver.db, py_typed_file);
+        // If we fail to read it let's say that's like it doesn't exist
+        // (right now the difference between Untyped and Full is academic)
+        if py_typed_contents.read_error().is_some() {
+            return PyTyped::Untyped;
+        }
+
+        // The python typing spec says to look for "partial\n" but in the wild we've seen:
+        //
+        // * PARTIAL\n
+        // * partial\\n (as in they typed "\n")
+        // * partial/n
+        //
+        // since the py.typed file never really grew any other contents, let's be permissive
+        if py_typed_contents.to_ascii_lowercase().contains("partial") {
+            PyTyped::Partial
+        } else {
+            PyTyped::Full
         }
     }
 }
