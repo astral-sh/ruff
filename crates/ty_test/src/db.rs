@@ -350,8 +350,6 @@ fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> 
         // `missing-override-decorator` is an exception: because it is extremely pedantic we have
         // chosen to keep it opt-in to minimize churn in unrelated tests.
         "missing-override-decorator",
-        // Check the legacy positional-only convention only in tests that opt into it.
-        "invalid-legacy-positional-parameter",
         // `experimental-syntax` is also an exception: we make use of `&` and `~` for intersection and
         // negation types in our tests for better readability.
         "experimental-syntax",

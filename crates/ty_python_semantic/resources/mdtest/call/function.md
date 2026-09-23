@@ -245,11 +245,6 @@ def _(flag: bool):
 
 <!-- snapshot-diagnostics -->
 
-```toml
-[rules]
-invalid-legacy-positional-parameter = "warn"
-```
-
 PEP 570, introduced in Python 3.8, added dedicated Python syntax for denoting positional-only
 parameters (the `/` in a function signature). However, functions implemented in C were able to have
 positional-only parameters prior to Python 3.8 (there was just no syntax for expressing this at the
@@ -360,19 +355,6 @@ C(42).method(__x=1)
 # error: [positional-only-parameter-as-kwarg]
 C.class_method(__x="1")
 C.static_method("x", __x=42)  # fine
-```
-
-## Legacy positional-only diagnostics are disabled by default
-
-Double-underscore-prefixed parameters can also be used to avoid collisions with `**kwargs`. By
-default, ty does not diagnose violations of the legacy convention:
-
-```py
-def f(x: int, __y: str): ...
-def wrapper(*args: object, __current_user: object, **kwargs: object): ...
-
-f(x=1, __y="foo")
-wrapper(__current_user=object())
 ```
 
 ## Splatted arguments
