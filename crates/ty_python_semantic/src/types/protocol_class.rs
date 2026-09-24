@@ -2554,6 +2554,40 @@ struct ProtocolCallableSource<'db> {
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// Bind a complete method contract after its permitted receiver domain is known.
+    ///
+    /// Receiver annotations can recursively refer to the member being compared. Keep the current
+    /// checker's recursion guards while filtering overloads so these comparisons can detect cycles.
+    fn bind_protocol_method_receiver(
+        &self,
+        db: &'db dyn Db,
+        callable: CallableType<'db>,
+        receiver: Type<'db>,
+        self_type: Type<'db>,
+        implicit_receiver: Option<Type<'db>>,
+    ) -> CallableType<'db> {
+        if callable.kind(db) == CallableTypeKind::DunderParamSpec {
+            return callable.into_regular(db);
+        }
+        let explicit = implicit_receiver.map(|receiver| {
+            CallableSignature::from_overloads(
+                callable
+                    .signatures(db)
+                    .iter()
+                    .map(|signature| signature.with_explicit_receiver(receiver)),
+            )
+        });
+        callable
+            .with_signatures(
+                db,
+                explicit
+                    .as_ref()
+                    .unwrap_or_else(|| callable.signatures(db))
+                    .bind_method_receiver_with_checker(db, self, receiver, self_type),
+            )
+            .into_regular(db)
+    }
+
     /// Compare methods on every receiver allowed by the protocol. Retaining the receiver
     /// parameter lets `self: Self & Other` restrict when the method may be called without
     /// requiring the implementing class itself to inherit `Other`.
@@ -2593,9 +2627,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             } else {
                                 source_receiver.runtime_type
                             };
-                        let target = Type::Callable(protocol_bind_receiver(
+                        let target = Type::Callable(self.bind_protocol_method_receiver(
                             db,
-                            self,
                             target.with_signatures(
                                 db,
                                 CallableSignature::single(target_signature.clone()),
@@ -2611,9 +2644,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         });
                         sources.iter().when_all(db, self.constraints, |source| {
                             let source = if source_is_method {
-                                protocol_bind_receiver(
+                                self.bind_protocol_method_receiver(
                                     db,
-                                    self,
                                     *source,
                                     source_domain,
                                     source_receiver.self_type,
@@ -3705,41 +3737,6 @@ fn protocol_bind_self<'db>(
             callable
                 .signatures(db)
                 .bind_self_with_receiver(db, &env, self_type, self_type),
-        )
-        .into_regular(db)
-}
-
-/// Bind a complete method contract after its permitted receiver domain is known.
-///
-/// Receiver annotations can recursively refer to the member being compared. Keep the current
-/// checker's recursion guards while filtering overloads, rather than starting a cached query
-/// with an independent relation traversal.
-fn protocol_bind_receiver<'db>(
-    db: &'db dyn Db,
-    checker: &TypeRelationChecker<'_, '_, 'db>,
-    callable: CallableType<'db>,
-    receiver: Type<'db>,
-    self_type: Type<'db>,
-    implicit_receiver: Option<Type<'db>>,
-) -> CallableType<'db> {
-    if callable.kind(db) == CallableTypeKind::DunderParamSpec {
-        return callable.into_regular(db);
-    }
-    let explicit = implicit_receiver.map(|receiver| {
-        CallableSignature::from_overloads(
-            callable
-                .signatures(db)
-                .iter()
-                .map(|signature| signature.with_explicit_receiver(receiver)),
-        )
-    });
-    callable
-        .with_signatures(
-            db,
-            explicit
-                .as_ref()
-                .unwrap_or_else(|| callable.signatures(db))
-                .bind_method_receiver_with_checker(db, checker, receiver, self_type),
         )
         .into_regular(db)
 }

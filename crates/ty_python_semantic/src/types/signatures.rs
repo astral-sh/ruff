@@ -109,6 +109,50 @@ fn function_signature_type_expression_flags<'db>(
     }
 }
 
+/// Returns whether a concrete receiver violates a direct receiver type variable's domain.
+///
+/// Unbounded or non-concrete receivers do not provably violate the domain and return `false`,
+/// leaving the original receiver relation available to normal inference. Transparent PEP 695
+/// receiver aliases are resolved by the caller before this check.
+///
+/// ```python
+/// class C:
+///     def method[T: int](self: T) -> None: ...
+/// ```
+///
+/// A protocol bound can refer back to the method being bound. Assume it accepts the receiver
+/// while checking that cycle; an incompatible member can still disprove the relation.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, _, _, _, _| false,
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn receiver_violates_typevar_domain<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    receiver: Type<'db>,
+    typevar: BoundTypeVarInstance<'db>,
+) -> bool {
+    let env = &ProgramEnvironment::from_program(program);
+    let Some(domain) = typevar.typevar(db).bound_or_constraints(db, env) else {
+        return false;
+    };
+    if receiver.has_typevar(db, env) {
+        return false;
+    }
+
+    !match domain {
+        TypeVarBoundOrConstraints::UpperBound(bound) => {
+            receiver.is_assignable_to(db, env, bound.top_materialization(db, env))
+        }
+        TypeVarBoundOrConstraints::Constraints(constraints) => {
+            constraints.elements(db).iter().any(|constraint| {
+                receiver.is_assignable_to(db, env, constraint.top_materialization(db, env))
+            })
+        }
+    }
+}
+
 /// The signature of a single callable. If the callable is overloaded, there is a separate
 /// [`Signature`] for each overload.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
@@ -1398,7 +1442,7 @@ impl<'db> Signature<'db> {
                     _ => None,
                 };
                 if receiver_typevar.is_some_and(|typevar| {
-                    Self::receiver_violates_typevar_domain(db, env, receiver, typevar)
+                    receiver_violates_typevar_domain(db, env.program(db), receiver, typevar)
                 }) {
                     return std::borrow::Cow::Owned(OwnedConstraintSet::default());
                 }
@@ -1438,58 +1482,6 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
         }
-    }
-
-    /// Returns whether a concrete receiver violates a direct receiver type variable's domain.
-    ///
-    /// Unbounded or non-concrete receivers do not provably violate the domain and return `false`,
-    /// leaving the original receiver relation available to normal inference. Transparent PEP 695
-    /// receiver aliases are resolved by the caller before this check.
-    ///
-    /// ```python
-    /// class C:
-    ///     def method[T: int](self: T) -> None: ...
-    /// ```
-    fn receiver_violates_typevar_domain(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        receiver: Type<'db>,
-        typevar: BoundTypeVarInstance<'db>,
-    ) -> bool {
-        // A protocol bound can refer back to this method. Assume it accepts the receiver
-        // while checking that cycle; an incompatible member can still disprove the relation.
-        #[salsa::tracked(
-            returns(copy),
-            cycle_initial=|_, _, _, _, _| false,
-            heap_size=ruff_memory_usage::heap_size
-        )]
-        fn inner<'db>(
-            db: &'db dyn Db,
-            program: Program<'db>,
-            receiver: Type<'db>,
-            typevar: BoundTypeVarInstance<'db>,
-        ) -> bool {
-            let env = &ProgramEnvironment::from_program(program);
-            let Some(domain) = typevar.typevar(db).bound_or_constraints(db, env) else {
-                return false;
-            };
-            if receiver.has_typevar(db, env) {
-                return false;
-            }
-
-            !match domain {
-                TypeVarBoundOrConstraints::UpperBound(bound) => {
-                    receiver.is_assignable_to(db, env, bound.top_materialization(db, env))
-                }
-                TypeVarBoundOrConstraints::Constraints(constraints) => {
-                    constraints.elements(db).iter().any(|constraint| {
-                        receiver.is_assignable_to(db, env, constraint.top_materialization(db, env))
-                    })
-                }
-            }
-        }
-
-        inner(db, env.program(db), receiver, typevar)
     }
 
     /// Specializes this signature using the type variables determined by its bound receiver.
