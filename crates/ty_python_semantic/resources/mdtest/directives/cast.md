@@ -102,19 +102,6 @@ def f(x: RecursiveAlias):
     cast(RecursiveAlias, x)  # error: [redundant-cast]
 ```
 
-The target type of a cast does not provide type context for its value. In the following example,
-inferring `[42]` using the cast's target, `list[object]`, would make the cast appear redundant.
-However, removing the cast changes the loop variable's type from `object` to `Literal[42]`, so
-reporting `redundant-cast` would be incorrect here.
-
-```py
-for x in cast(list[object], [42]):  # no redundant-cast diagnostic
-    reveal_type(x)  # revealed: object
-
-for x in [42]:  # no diagnostic
-    reveal_type(x)  # revealed: Literal[42]
-```
-
 ## Outer type context
 
 The outer type context of the cast() call passes through to the casted value argument. A list
@@ -872,6 +859,43 @@ from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     x = cast(int, ...)  # no diagnostic
+```
+
+### Casts involving collection literals that are inferred as having a disjoint type due to no type context
+
+The target type of a cast does not provide type context for its value. In the following example,
+inferring `[42]` using the cast's target, `list[object]`, would make the cast appear redundant.
+However, removing the cast changes the loop variable's type from `object` to `Literal[42]`, so
+reporting `redundant-cast` would be incorrect here:
+
+```py
+from typing import cast
+
+# revealed: list[int]
+for x in cast(list[object], reveal_type([42])):  # no redundant-cast or disjoint-cast diagnostic
+    reveal_type(x)  # revealed: object
+
+for x in [42]:  # no diagnostic
+    reveal_type(x)  # revealed: Literal[42]
+```
+
+As a result of not using the casted type as type context, however, we infer the list literal as
+`list[int]`, which is disjoint from the casted type (`list[object]`). Nonetheless, we recover from
+this at the point where we might otherwise emit a `disjoint-cast` diagnostic by detecting that
+`[42]` could equally well have been inferred as `list[object]` if it had been inferred with the
+right type context.
+
+The same principle is applied to other collection literals:
+
+```py
+# revealed: set[str]
+for x in cast(set[object], reveal_type({"foo", "bar"})):  # no redundant-cast or disjoint-cast diagnostic
+    reveal_type(x)  # revealed: object
+
+# revealed: dict[str, int]
+for x, y in cast(dict[object, object], reveal_type({"foo": 42})).items():  # no redundant-cast or disjoint-cast diagnostic
+    reveal_type(x)  # revealed: object
+    reveal_type(y)  # revealed: object
 ```
 
 ## Diagnostic snapshots

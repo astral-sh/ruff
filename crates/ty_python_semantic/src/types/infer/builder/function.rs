@@ -1807,99 +1807,107 @@ impl KnownFunction {
                     && source_type.is_disjoint_from(db, env, casted_type)
                     && !casted_type.is_equivalent_to(db, env, Type::Never)
                     && !source_type.is_equivalent_to(db, env, Type::Never)
-                    && let Some(value_expr) =
-                        call_expression.arguments.find_argument_value("val", 1)
-                    && builder
-                        .speculate_without_diagnostics()
-                        .infer_expression(value_expr, TypeContext::new(Some(casted_type)))
-                        .is_disjoint_from(db, env, casted_type)
-                    && let Some(diagnostic) =
-                        builder.context.report_lint(&DISJOINT_CAST, call_expression)
                 {
-                    let types = [*source_type, casted_type];
-                    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, types);
-                    let source_display = source_type.display_with(db, env, settings.clone());
-                    let casted_display = casted_type.display_with(db, env, settings.clone());
-                    let mut diagnostic = diagnostic.into_diagnostic("Cast to a disjoint type");
-                    diagnostic.set_concise_message(format_args!(
-                        "Cast from `{source_display}` to disjoint type `{casted_display}`",
-                    ));
-                    if let Some(arg) = call_expression.arguments.find_argument_value("typ", 0) {
-                        diagnostic.annotate(
+                    if call_expression
+                        .arguments
+                        .find_argument_value("val", 1)
+                        .is_none_or(|value_expr| {
                             builder
-                                .context
-                                .secondary(arg)
-                                .message("Disjoint from the inferred type"),
-                        );
-                    }
-                    if let Some(arg) = call_expression.arguments.find_argument_value("val", 1) {
-                        diagnostic.annotate(
-                            builder
-                                .context
-                                .secondary(arg)
-                                .message(format_args!("Inferred as `{source_display}`")),
-                        );
-                    }
-
-                    // deduplicate definitions before attaching a subdiagnostic to each definition,
-                    // or we'd have multiple subdiagnostics pointing to a single definition
-                    // if the two types are specializations of the same generic class.
-                    let definitions: FxIndexMap<Definition<'db>, String> = types
-                        .into_iter()
-                        .filter_map(|ty| ty.definition(db, env))
-                        .filter_map(|definition| definition.definition())
-                        .filter_map(|definition| Some((definition, definition.name(db)?)))
-                        .collect();
-
-                    for (definition, name) in definitions {
-                        let file = definition.python_file(db);
-                        let module = parsed_module(db, file).load(db);
-                        let mut range = definition.focus_range(db, &module);
-                        if let DefinitionKind::Class(class) = definition.kind(db) {
-                            let definition_types = infer_definition_types(db, definition);
-                            if let Some(decorator) =
-                                class.node(&module).decorator_list.iter().find(|decorator| {
-                                    definition_types
-                                        .expression_type(&decorator.expression)
-                                        .as_function_literal()
-                                        .is_some_and(|func| func.is_known(db, KnownFunction::Final))
-                                })
-                            {
-                                range = range.cover_range(decorator.range());
-                            }
+                                .speculate_without_diagnostics()
+                                .infer_expression(value_expr, TypeContext::new(Some(casted_type)))
+                                .is_disjoint_from(db, env, casted_type)
+                        })
+                        && let Some(diagnostic) =
+                            builder.context.report_lint(&DISJOINT_CAST, call_expression)
+                    {
+                        let types = [*source_type, casted_type];
+                        let settings =
+                            DisplaySettings::from_possibly_ambiguous_types(db, env, types);
+                        let source_display = source_type.display_with(db, env, settings.clone());
+                        let casted_display = casted_type.display_with(db, env, settings.clone());
+                        let mut diagnostic = diagnostic.into_diagnostic("Cast to a disjoint type");
+                        diagnostic.set_concise_message(format_args!(
+                            "Cast from `{source_display}` to disjoint type `{casted_display}`",
+                        ));
+                        if let Some(arg) = call_expression.arguments.find_argument_value("typ", 0) {
+                            diagnostic.annotate(
+                                builder
+                                    .context
+                                    .secondary(arg)
+                                    .message("Disjoint from the inferred type"),
+                            );
                         }
-                        diagnostic.annotate(
-                            Annotation::secondary(Span::from(range))
-                                .message(format_args!("`{name}` defined here")),
-                        );
-                    }
+                        if let Some(arg) = call_expression.arguments.find_argument_value("val", 1) {
+                            diagnostic.annotate(
+                                builder
+                                    .context
+                                    .secondary(arg)
+                                    .message(format_args!("Inferred as `{source_display}`")),
+                            );
+                        }
 
-                    if casted_type.is_protocol_instance() {
-                        if source_type.is_protocol_instance() {
-                            diagnostic.info(format_args!(
-                                "protocol `{casted_display}` is disjoint \
+                        // deduplicate definitions before attaching a subdiagnostic to each definition,
+                        // or we'd have multiple subdiagnostics pointing to a single definition
+                        // if the two types are specializations of the same generic class.
+                        let definitions: FxIndexMap<Definition<'db>, String> = types
+                            .into_iter()
+                            .filter_map(|ty| ty.definition(db, env))
+                            .filter_map(|definition| definition.definition())
+                            .filter_map(|definition| Some((definition, definition.name(db)?)))
+                            .collect();
+
+                        for (definition, name) in definitions {
+                            let file = definition.python_file(db);
+                            let module = parsed_module(db, file).load(db);
+                            let mut range = definition.focus_range(db, &module);
+                            if let DefinitionKind::Class(class) = definition.kind(db) {
+                                let definition_types = infer_definition_types(db, definition);
+                                if let Some(decorator) =
+                                    class.node(&module).decorator_list.iter().find(|decorator| {
+                                        definition_types
+                                            .expression_type(&decorator.expression)
+                                            .as_function_literal()
+                                            .is_some_and(|func| {
+                                                func.is_known(db, KnownFunction::Final)
+                                            })
+                                    })
+                                {
+                                    range = range.cover_range(decorator.range());
+                                }
+                            }
+                            diagnostic.annotate(
+                                Annotation::secondary(Span::from(range))
+                                    .message(format_args!("`{name}` defined here")),
+                            );
+                        }
+
+                        if casted_type.is_protocol_instance() {
+                            if source_type.is_protocol_instance() {
+                                diagnostic.info(format_args!(
+                                    "protocol `{casted_display}` is disjoint \
                                 from protocol `{source_display}`"
+                                ));
+                            } else {
+                                diagnostic.info(format_args!(
+                                    "protocol `{casted_display}` is disjoint \
+                                from `{source_display}`"
+                                ));
+                            }
+                        } else if source_type.is_protocol_instance() {
+                            diagnostic.info(format_args!(
+                                "`{casted_display}` is disjoint \
+                            from protocol `{source_display}`"
                             ));
                         } else {
                             diagnostic.info(format_args!(
-                                "protocol `{casted_display}` is disjoint \
-                                from `{source_display}`"
+                                "`{casted_display}` is disjoint from `{source_display}`"
                             ));
                         }
-                    } else if source_type.is_protocol_instance() {
-                        diagnostic.info(format_args!(
-                            "`{casted_display}` is disjoint \
-                            from protocol `{source_display}`"
-                        ));
-                    } else {
-                        diagnostic.info(format_args!(
-                            "`{casted_display}` is disjoint from `{source_display}`"
-                        ));
-                    }
 
-                    source_type
-                        .disjointness_error_context(db, env, casted_type)
-                        .attach_to(db, env, &mut diagnostic);
+                        source_type
+                            .disjointness_error_context(db, env, casted_type)
+                            .attach_to(db, env, &mut diagnostic);
+                    }
                 }
             }
 
