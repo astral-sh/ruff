@@ -3,7 +3,7 @@ use ruff_db::PythonFile;
 use ruff_db::files::{File, FilePath};
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
-use ruff_python_ast::find_node::{CoveringNode, covering_node};
+use ruff_python_ast::find_node::CoveringNode;
 use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
 use ruff_python_ast::{Expr, ExprRef, name::Name};
 use ruff_python_parser::Parsed;
@@ -642,11 +642,13 @@ impl<'db> SemanticModel<'db> {
 
     /// Returns completion candidates from a string's expected type and dictionary initializer.
     ///
+    /// If provided, `subscript` must have `string_expr` as its complete slice.
     /// Initializer keys are suggestions, not a guarantee that a mutable dictionary still contains
     /// them or that it contains no other keys.
     pub fn expected_string_literal_completions(
         &self,
         string_expr: &ast::ExprStringLiteral,
+        subscript: Option<&ast::ExprSubscript>,
     ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
         struct StringLiteralCandidates;
         type StringLiteralCandidatesVisitor<'db> = CycleDetector<
@@ -703,29 +705,21 @@ impl<'db> SemanticModel<'db> {
             .unwrap_or_default();
         // Finite choices from the expected type take precedence. A string used as the complete
         // subscript key can fall back to initializer keys that fit any known expected type.
-        if candidates.is_empty() && self.in_string_annotation_expr.is_none() {
-            // Parsed string annotations have a separate AST and cannot be located
-            // through the module AST.
-            let module = parsed_module(db, self.python_file()).load(db);
-            let node = covering_node(module.syntax().into(), string_expr.range());
-            if let Some(ast::AnyNodeRef::ExprSubscript(subscript)) = node
-                .ancestors()
-                .skip_while(|node| !matches!(node, ast::AnyNodeRef::ExprStringLiteral(_)))
-                .nth(1)
-                && subscript.slice.range() == string_expr.range()
-            {
-                self.dictionary_initializer_keys(
-                    &subscript.value,
-                    &mut FxHashSet::default(),
-                    &mut candidates,
-                );
-                if let Some(expected_ty) = expected_ty {
-                    candidates.retain(|candidate| {
-                        candidate
-                            .ty
-                            .is_assignable_to(db, &self.program_environment(), expected_ty)
-                    });
-                }
+        if candidates.is_empty()
+            && self.in_string_annotation_expr.is_none()
+            && let Some(subscript) = subscript
+        {
+            self.dictionary_initializer_keys(
+                &subscript.value,
+                &mut FxHashSet::default(),
+                &mut candidates,
+            );
+            if let Some(expected_ty) = expected_ty {
+                candidates.retain(|candidate| {
+                    candidate
+                        .ty
+                        .is_assignable_to(db, &self.program_environment(), expected_ty)
+                });
             }
         }
         candidates.sort_unstable_by(|left, right| left.value.cmp(&right.value));

@@ -64,6 +64,7 @@ pub fn completion<'db>(
         add_string_literal_completions(
             &model,
             string_expr,
+            context.cursor.subscript_for_string(string_expr),
             context.cursor.string_quote_style(),
             &mut completions,
         );
@@ -1032,6 +1033,29 @@ impl<'m> ContextCursor<'m> {
             Some(ast::AnyNodeRef::ExprStringLiteral(string_expr)) => Some(string_expr),
             _ => None,
         }
+    }
+
+    /// Returns the subscript whose complete slice is this string.
+    fn subscript_for_string(
+        &self,
+        string_expr: &ast::ExprStringLiteral,
+    ) -> Option<&'m ast::ExprSubscript> {
+        let parent = self
+            .covering_node
+            .ancestors()
+            .skip_while(|node| {
+                !matches!(
+                    node,
+                    ast::AnyNodeRef::ExprStringLiteral(expr)
+                        if expr.range() == string_expr.range()
+                )
+            })
+            .nth(1)?;
+        let ast::AnyNodeRef::ExprSubscript(subscript) = parent else {
+            return None;
+        };
+
+        (subscript.slice.range() == string_expr.range()).then_some(subscript)
     }
 
     /// Returns the quote style of the string literal that the cursor is positioned within, if any.
@@ -2319,6 +2343,7 @@ fn add_keyword_completions<'db>(
 fn add_string_literal_completions<'db>(
     model: &SemanticModel<'db>,
     string_expr: &ast::ExprStringLiteral,
+    subscript: Option<&ast::ExprSubscript>,
     quote_style: Option<Quote>,
     completions: &mut Completions<'db>,
 ) {
@@ -2354,7 +2379,7 @@ fn add_string_literal_completions<'db>(
         Some(force_escape_quote(&out, quote))
     }
 
-    let candidates = model.expected_string_literal_completions(string_expr);
+    let candidates = model.expected_string_literal_completions(string_expr, subscript);
     if candidates.is_empty() {
         return;
     }
