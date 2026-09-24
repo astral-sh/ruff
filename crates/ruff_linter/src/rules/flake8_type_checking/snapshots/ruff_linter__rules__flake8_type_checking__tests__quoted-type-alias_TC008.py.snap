@@ -518,9 +518,13 @@ TC008 [*] Remove quotes from type alias
 71 | r: TypeAlias = """int | None"""
 72 | type R = """int | None"""
    |          ^^^^^^^^^^^^^^^^
+73 |
+74 | # Recursive type aliases must stay quoted, even if an earlier binding
+   |
 help: Remove quotes
    |
 71 | r: TypeAlias = """int | None"""
    - type R = """int | None"""
 72 + type R = int | None
+73 |
    |

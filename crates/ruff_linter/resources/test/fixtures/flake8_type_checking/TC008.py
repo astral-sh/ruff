@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TypeAlias, TYPE_CHECKING
+from typing import TypeAlias, TYPE_CHECKING, Union
 
 from foo import Foo
 
@@ -70,3 +70,13 @@ type Q = """(int
 
 r: TypeAlias = """int | None"""
 type R = """int | None"""
+
+# Recursive type aliases must stay quoted, even if an earlier binding
+# with the same name exists (https://github.com/astral-sh/ruff/issues/16688)
+S = int
+S: TypeAlias = Union[type, tuple["S", ...]]  # OK
+
+if condition:
+    T: TypeAlias = type | tuple["T", ...]
+else:
+    T: TypeAlias = Union[type, tuple["T", ...]]  # OK

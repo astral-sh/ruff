@@ -395,6 +395,11 @@ fn quotes_are_unremovable(
             false
         }
         Expr::Name(name) => {
+            // A recursive type alias has to refer to itself using quotes. Without them, the
+            // name would resolve to an earlier binding (or raise a `NameError`) at runtime.
+            if is_type_alias_target(semantic, name) {
+                return true;
+            }
             semantic.resolve_name(name).is_some()
                 && semantic
                     .simulate_runtime_load(name, semantic.in_type_checking_block().into())
@@ -402,4 +407,15 @@ fn quotes_are_unremovable(
         }
         _ => false,
     }
+}
+
+/// Returns `true` if `name` refers to the target of the type alias being defined
+/// (e.g., `A` in `A: TypeAlias = list["A"]`).
+fn is_type_alias_target(semantic: &SemanticModel, name: &ast::ExprName) -> bool {
+    let Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) = semantic.current_statement() else {
+        return false;
+    };
+    target
+        .as_name_expr()
+        .is_some_and(|target| target.id == name.id)
 }
