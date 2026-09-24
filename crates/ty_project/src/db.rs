@@ -278,9 +278,12 @@ impl ProjectDatabase {
         )
     }
 
-    /// Returns a [`SalsaMemoryDump`] that can be use to dump Salsa memory usage information
+    /// Returns a [`SalsaMemoryDump`] that can be used to dump Salsa memory usage information
     /// to the CLI after a typechecker run.
-    pub fn salsa_memory_dump(&self) -> SalsaMemoryDump {
+    ///
+    /// Triggers cancellation and waits for all other database handles to be dropped.
+    /// This can deadlock if the current thread owns another handle.
+    pub fn salsa_memory_dump(&mut self) -> SalsaMemoryDump {
         let memory_usage = ruff_memory_usage::attach_tracker(StandardTracker::new(), || {
             <dyn salsa::Database>::memory_usage(self)
         });
