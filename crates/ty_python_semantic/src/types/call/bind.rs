@@ -54,6 +54,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
+    TypeVarInferenceFallback, TypeVarInferenceSolutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::known_instance::{
@@ -5772,6 +5773,7 @@ struct InferredCall<'db> {
 struct CallInference<'a, 'db> {
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
+    constructor_kind: Option<ConstructorCallableKind>,
     /// Signature used for argument matching, before this call's specialization.
     signature: &'a Signature<'db>,
     /// Argument types for each available type context, including synthetic receivers.
@@ -6007,29 +6009,146 @@ impl<'db> CallInference<'_, 'db> {
                 constraint_set_errors,
             };
         };
+        if generic_context
+            .variables(db)
+            .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db))
+        {
+            return self.infer_variadic_specialization(constraints, generic_context);
+        }
 
         let mut builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
+        let mut specialization_errors = Vec::new();
+        self.infer_argument_constraints(
+            &mut builder,
+            &mut specialization_errors,
+            &mut constraint_set_errors,
+        );
 
-        // TODO: ParamSpec and TypeVarTuple inference still uses legacy type mappings, which
-        // cannot distinguish validity constraints from inference evidence.
-        let use_legacy_solver = self.call_expression_tcx.is_declared()
-            || generic_context
-                .variables(db)
-                .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db));
+        // An unsolved variable marker carries no return-context constraint.
+        let mut return_context = self
+            .call_expression_tcx
+            .annotation
+            .filter(|annotation| *annotation != Type::Dynamic(DynamicType::UnspecializedTypeVar))
+            .and_then(|tcx| {
+                if !self.call_expression_tcx.is_declared() {
+                    let validity = self.return_ty.when_constraint_set_assignable_to(
+                        db,
+                        self.env,
+                        tcx,
+                        constraints,
+                    );
+                    builder.intersect_validity_constraints(validity);
+                    return None;
+                }
+                let return_ty = self
+                    .return_ty
+                    .discard_disjoint_union_elements(db, self.env, tcx, self.inferable_typevars)
+                    .or_never();
+                let tcx = tcx
+                    .discard_disjoint_union_elements(
+                        db,
+                        self.env,
+                        return_ty,
+                        self.inferable_typevars,
+                    )
+                    .or_never();
+                let declared_constraints =
+                    return_ty.when_constraint_set_assignable_to(db, self.env, tcx, constraints);
+                builder.intersect_declared_constraints(declared_constraints);
+                Some((return_ty, tcx, declared_constraints))
+            });
 
-        let declared_return_context = match self.call_expression_tcx.annotation {
-            Some(tcx) if !use_legacy_solver => {
-                let validity = self.return_ty.when_constraint_set_assignable_to(
-                    db,
-                    self.env,
-                    tcx,
+        let mut inference =
+            self.build_generic_inference(constraints, &mut builder, &mut specialization_errors);
+
+        // Ignore an incompatible return context to infer more precise argument diagnostics.
+        // Constructors can still prefer an assignable declared candidate: an invalid argument
+        // should not also produce a misleading assignment error for the constructed instance.
+        if let Some((_, _, declared_constraints)) = return_context
+            && matches!(
+                inference.solutions(db),
+                TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::Unsatisfiable)
+            )
+        {
+            specialization_errors.clear();
+            constraint_set_errors.fill(false);
+            if self.constructor_kind.is_some() {
+                let mut declared_builder =
+                    SpecializationBuilder::new(db, self.env, constraints, generic_context);
+                declared_builder.intersect_declared_constraints(declared_constraints);
+                let declared = self.build_generic_inference(
                     constraints,
+                    &mut declared_builder,
+                    &mut Vec::new(),
                 );
-                builder.intersect_validity_constraints(validity);
-                None
+
+                builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
+                self.infer_argument_constraints(
+                    &mut builder,
+                    &mut specialization_errors,
+                    &mut constraint_set_errors,
+                );
+                let inferred = self.build_generic_inference(
+                    constraints,
+                    &mut builder,
+                    &mut specialization_errors,
+                );
+                inference = inferred.prefer_assignable_declared_candidates(db, self.env, declared);
+            } else {
+                builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
+                self.infer_argument_constraints(
+                    &mut builder,
+                    &mut specialization_errors,
+                    &mut constraint_set_errors,
+                );
+                return_context = None;
+                inference = self.build_generic_inference(
+                    constraints,
+                    &mut builder,
+                    &mut specialization_errors,
+                );
             }
-            tcx => tcx,
-        };
+        }
+
+        if let Some((return_ty, tcx, _)) = return_context {
+            if let Some(contextual) =
+                inference.select_return_context_solution(db, self.env, return_ty, tcx)
+            {
+                inference = contextual;
+            } else {
+                builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
+                specialization_errors.clear();
+                constraint_set_errors.fill(false);
+                self.infer_argument_constraints(
+                    &mut builder,
+                    &mut specialization_errors,
+                    &mut constraint_set_errors,
+                );
+                inference = self.build_generic_inference(
+                    constraints,
+                    &mut builder,
+                    &mut specialization_errors,
+                );
+            }
+        }
+
+        InferredCall {
+            inferable_typevars: self.inferable_typevars,
+            inference: Some(inference),
+            errors: specialization_errors,
+            constraint_set_errors,
+        }
+    }
+
+    // TODO: Infer ParamSpec and TypeVarTuple with the constraint solver.
+    fn infer_variadic_specialization(
+        self,
+        constraints: &ConstraintSetBuilder<'db>,
+        generic_context: GenericContext<'db>,
+    ) -> InferredCall<'db> {
+        let db = self.db;
+        let mut constraint_set_errors = vec![false; self.arguments.len()];
+        let mut builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
 
         // Type variables for which we inferred a declared type based on a partially specialized
         // type from an outer generic context. For these type variables, we may infer types that
@@ -6047,16 +6166,11 @@ impl<'db> CallInference<'_, 'db> {
         // the return type is `list[T]` and the type context is `list[int]`, the check produces
         // `T = int`, from which we extract the preferred type `int`.
         //
-        // TODO: This two-phase approach (extract preferred types from the type context, then check
-        // argument compatibility) should eventually be replaced by conjoining the type context
-        // constraint set directly with the argument constraint sets in the builder. The current
-        // solution-level filtering (variance, inferable typevars, concrete content) works around
-        // extracting solutions too early. When the builder maintains a single constraint set, the
-        // combined set `(return_ty ≤ tcx) ∧ (∧ᵢ actual_i ≤ formal_i)` will naturally resolve the
-        // tension between type context preferences and argument constraints. If the combined set
-        // is unsatisfiable, we will fall back to argument constraints alone (which the current
-        // code does via `assignable_to_declared_type`).
-        let (preferred_type_mappings, preferred_solutions_incomplete) = declared_return_context
+        // TODO: Remove preferred-type extraction once ParamSpec and TypeVarTuple use the
+        // constraint solver. Their legacy mappings cannot conjoin argument and return constraints.
+        let (preferred_type_mappings, preferred_solutions_incomplete) = self
+            .call_expression_tcx
+            .annotation
             .and_then(|tcx| {
                 if !tcx
                     .filter_union(db, self.env, |ty| ty.may_prefer_declared_type(db, self.env))
@@ -6191,12 +6305,20 @@ impl<'db> CallInference<'_, 'db> {
             .unwrap_or_default();
 
         let mut specialization_errors = Vec::new();
-        let assignable_to_declared_type = self.infer_argument_constraints(
+        self.infer_argument_constraints(
             &mut builder,
-            &preferred_type_mappings,
-            &partially_specialized_declared_type,
             &mut specialization_errors,
             &mut constraint_set_errors,
+        );
+        let assignable_to_declared_type = self.infer_typevartuple_argument_constraints(
+            &mut builder,
+            !preferred_type_mappings.is_empty(),
+            &mut specialization_errors,
+        ) && preferred_type_mappings.iter().all(
+            |(&identity, &preferred_ty)| {
+                partially_specialized_declared_type.contains(&identity)
+                    || builder.inferred_type_is_assignable_to(identity, preferred_ty)
+            },
         );
 
         // If we failed to prefer the declared type, attempt inference again, ignoring
@@ -6211,10 +6333,13 @@ impl<'db> CallInference<'_, 'db> {
 
             self.infer_argument_constraints(
                 &mut builder,
-                &FxHashMap::default(),
-                &FxHashSet::default(),
                 &mut specialization_errors,
                 &mut constraint_set_errors,
+            );
+            self.infer_typevartuple_argument_constraints(
+                &mut builder,
+                false,
+                &mut specialization_errors,
             );
         }
 
@@ -6251,62 +6376,6 @@ impl<'db> CallInference<'_, 'db> {
     ) -> TypeVarInference<'db> {
         let db = self.db;
 
-        // Attempt to promote any promotable types assigned to the specialization.
-        // The hook receives (typevar, bounds) and returns Some(solution) to override the default
-        // solution, or None to keep it.
-        let maybe_promote = |typevar: BoundTypeVarInstance<'db>,
-                             bounds: &CandidateTypeVarSolution<'db>| {
-            let bound_or_constraints = typevar.typevar(db).bound_or_constraints(db, self.env);
-
-            // For constrained TypeVars, the inferred type is already one of the
-            // constraints. Promoting literals would produce a type that doesn't
-            // match any constraint.
-            if matches!(
-                bound_or_constraints,
-                Some(TypeVarBoundOrConstraints::Constraints(_))
-            ) {
-                return None;
-            }
-
-            let mut variance_in_return = TypeVarVariance::Bivariant;
-
-            // Find all occurrences of the type variable in the return type.
-            self.return_ty
-                .visit_specialization(db, self.env, |ty, variance| {
-                    if ty != Type::TypeVar(typevar) {
-                        return;
-                    }
-
-                    variance_in_return = variance_in_return.join(variance);
-                });
-
-            // Promotion is only useful if the type variable is in non-covariant position
-            // in the return type.
-            if variance_in_return.is_covariant() {
-                return None;
-            }
-
-            // Promotion must preserve unsatisfiable outcomes and the completeness of fallbacks.
-            Some(
-                CandidateSolutions::default_solve(db, self.env, constraints, bounds).map(
-                    |solution| {
-                        let promoted = solution.promote(db, self.env);
-
-                        // If the TypeVar has an upper bound, only use the promoted type if it
-                        // still satisfies the bound.
-                        if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
-                            bound_or_constraints
-                            && !promoted.is_assignable_to(db, self.env, bound)
-                        {
-                            return solution;
-                        }
-
-                        promoted
-                    },
-                ),
-            )
-        };
-
         let preferred_specialization = (!preferred_type_mappings.is_empty()).then(|| {
             generic_context.specialize(
                 db,
@@ -6338,7 +6407,7 @@ impl<'db> CallInference<'_, 'db> {
                         .apply_optional_specialization(db, preferred_specialization)
                         .is_assignable_to(db, self.env, ty)
                 }) {
-                    return maybe_promote(typevar, bounds);
+                    return self.promote_inferred_type(constraints, typevar, bounds);
                 }
             }
 
@@ -6352,6 +6421,103 @@ impl<'db> CallInference<'_, 'db> {
             })
         };
 
+        match builder.build_inference_with(&mut choose) {
+            Ok(inference) => inference,
+            Err(errors) => {
+                let inference = builder.build_diagnostic_inference_with(
+                    self.argument_relations()
+                        .map(|relation| (relation.declared_type, relation.argument_type)),
+                    choose,
+                );
+
+                for error in errors {
+                    // Report at-most one failure per type variable to avoid redundant diagnostics.
+                    if specialization_errors.iter().any(|existing| {
+                        matches!(
+                            existing,
+                            BindingError::SpecializationError { error: existing, .. }
+                                if existing.bound_typevar() == error.bound_typevar()
+                        )
+                    }) {
+                        continue;
+                    }
+
+                    specialization_errors.push(BindingError::SpecializationError {
+                        error,
+                        argument_index: None,
+                        argument: None,
+                    });
+                }
+
+                inference
+            }
+        }
+    }
+
+    fn promote_inferred_type(
+        &self,
+        constraints: &ConstraintSetBuilder<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        bounds: &CandidateTypeVarSolution<'db>,
+    ) -> Option<PathBoundSolution<'db>> {
+        let db = self.db;
+        let bound_or_constraints = typevar.typevar(db).bound_or_constraints(db, self.env);
+
+        // For constrained TypeVars, the inferred type is already one of the
+        // constraints. Promoting literals would produce a type that doesn't
+        // match any constraint.
+        if matches!(
+            bound_or_constraints,
+            Some(TypeVarBoundOrConstraints::Constraints(_))
+        ) {
+            return None;
+        }
+
+        let mut variance_in_return = TypeVarVariance::Bivariant;
+
+        // Find all occurrences of the type variable in the return type.
+        self.return_ty
+            .visit_specialization(db, self.env, |ty, variance| {
+                if ty != Type::TypeVar(typevar) {
+                    return;
+                }
+
+                variance_in_return = variance_in_return.join(variance);
+            });
+
+        // Promotion is only useful if the type variable is in non-covariant position
+        // in the return type.
+        if variance_in_return.is_covariant() {
+            return None;
+        }
+
+        // Promotion must preserve unsatisfiable outcomes and the completeness of fallbacks.
+        Some(
+            CandidateSolutions::default_solve(db, self.env, constraints, bounds).map(|solution| {
+                let promoted = solution.promote(db, self.env);
+
+                // If the TypeVar has an upper bound, only use the promoted type if it
+                // still satisfies the bound.
+                if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints
+                    && !promoted.is_assignable_to(db, self.env, bound)
+                {
+                    return solution;
+                }
+
+                promoted
+            }),
+        )
+    }
+
+    fn build_generic_inference<'c>(
+        &self,
+        constraints: &ConstraintSetBuilder<'db>,
+        builder: &mut SpecializationBuilder<'db, 'c>,
+        specialization_errors: &mut Vec<BindingError<'db>>,
+    ) -> TypeVarInference<'db> {
+        let mut choose = |typevar, bounds: Option<&CandidateTypeVarSolution<'db>>| {
+            self.promote_inferred_type(constraints, typevar, bounds?)
+        };
         match builder.build_inference_with(&mut choose) {
             Ok(inference) => inference,
             Err(errors) => {
@@ -6660,11 +6826,9 @@ impl<'db> CallInference<'_, 'db> {
     fn infer_argument_constraints<'c>(
         &self,
         builder: &mut SpecializationBuilder<'db, 'c>,
-        preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
-        partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
         constraint_set_errors: &mut [bool],
-    ) -> bool {
+    ) {
         let db = self.db;
         for relation in self.argument_relations() {
             // Fixed elements can infer normally; the complete variadic pack is inferred below.
@@ -6700,17 +6864,6 @@ impl<'db> CallInference<'_, 'db> {
                 });
             }
         }
-
-        self.infer_typevartuple_argument_constraints(
-            builder,
-            !preferred_type_mappings.is_empty(),
-            specialization_errors,
-        ) && preferred_type_mappings
-            .iter()
-            .all(|(&identity, &preferred_ty)| {
-                partially_specialized_declared_type.contains(&identity)
-                    || builder.inferred_type_is_assignable_to(identity, preferred_ty)
-            })
     }
 }
 
@@ -7032,9 +7185,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         }
 
                         let parameter = &self.signature.parameters()[parameter_index];
-                        let argument_type = argument_types
-                            .matched_type(parameter.annotated_type(), None)
-                            .unwrap_or(Type::unknown());
+                        let argument_type = if is_cast_value_parameter(
+                            self.db,
+                            self.signature_type,
+                            parameter_index,
+                        ) {
+                            argument_types.source_types().get_without_context()
+                        } else {
+                            argument_types.matched_type(parameter.annotated_type(), None)
+                        }
+                        .unwrap_or(Type::unknown());
                         let relation = ArgumentRelation::new(
                             argument_index,
                             adjusted_argument_index,
@@ -7367,6 +7527,19 @@ impl<'db> MatchedArgument<'db> {
     fn iter(&self) -> impl Iterator<Item = MatchedParameter<'db>> + '_ {
         self.parameters.iter().copied()
     }
+}
+
+// The value passed to `cast` is inferred without context: its `Any` parameter must not make
+// a nested generic call return `Any`, which would make the cast appear redundant.
+fn is_cast_value_parameter<'db>(
+    db: &'db dyn Db,
+    signature_type: Type<'db>,
+    parameter_index: usize,
+) -> bool {
+    parameter_index == 1
+        && signature_type
+            .as_function_literal()
+            .is_some_and(|function| function.is_known(db, KnownFunction::Cast))
 }
 
 /// The type context to use when inferring a call-site argument, for a given binding.
@@ -7834,8 +8007,10 @@ impl<'db> Binding<'db> {
             .annotated_type();
         // Preserve gradual context such as `Callable[[int], Any]`, while marking unsolved
         // type variables in the same way as for arguments to an ordinary generic call.
-        Some(parameter_type.apply_optional_specialization(
+        Some(specialized_overload.apply_type_context_specialization(
             db,
+            env,
+            parameter_type,
             specialized_overload.argument_type_context_specialization(
                 db,
                 env,
@@ -7936,6 +8111,10 @@ impl<'db> Binding<'db> {
             return None;
         };
 
+        if is_cast_value_parameter(db, self.signature_type, matched_parameter.index) {
+            return None;
+        }
+
         let parameter = &self.signature.parameters()[matched_parameter.index];
         let original_parameter_type = parameter.annotated_type();
         let mut parameter_type = matched_parameter
@@ -8004,7 +8183,8 @@ impl<'db> Binding<'db> {
                 ));
             }
 
-            parameter_type = parameter_type.apply_optional_specialization(db, specialization());
+            parameter_type =
+                self.apply_type_context_specialization(db, env, parameter_type, specialization());
             if let Some(expected_return_ty) = call_expression_tcx.annotation
                 && let Some(expected) = self.typevartuple_argument_context(
                     db,
@@ -8034,6 +8214,23 @@ impl<'db> Binding<'db> {
         ))
     }
 
+    fn apply_type_context_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> Type<'db> {
+        let Some(specialization) = specialization else {
+            return ty;
+        };
+        if self.inference.is_some() {
+            ty.apply_specialization_for_type_context(db, env, specialization)
+        } else {
+            ty.apply_specialization(db, specialization)
+        }
+    }
+
     /// Returns the specialization that should be applied to the parameters of this overload for
     /// type context.
     ///
@@ -8049,13 +8246,47 @@ impl<'db> Binding<'db> {
     ) -> Option<Specialization<'db>> {
         let generic_context = self.signature.generic_context?;
 
+        // Once argument inference has run, its solution already accounts for the return context.
+        // Solving the return constraints separately can widen a callback parameter beyond what
+        // the arguments permit, as with `T | None` returned from a call that requires `T = str`.
+        if let Some(inference) = self.inference {
+            // The marker distinguishes unsolved type variables without defaults from gradual
+            // types inferred from arguments. Only the former are ignored during fixpoint iteration.
+            let specialization = inference.merged_specialization_with(db, |typevar, inferred| {
+                (inferred.is_none() && typevar.default_type(db).is_none())
+                    .then_some(Type::Dynamic(DynamicType::UnspecializedTypeVar))
+            });
+
+            return Some(generic_context.specialize_recursive(
+                db,
+                generic_context.variables(db).map(|typevar| {
+                    let ty = specialization
+                        .get(db, typevar)
+                        .filter(|ty| !ty.has_provisional_marker(db, env))
+                        .map(|ty| {
+                            let promoted = ty.promote(db, env);
+                            // Context for other arguments must still satisfy the type variable's
+                            // bound. For example, `Literal["a"]` satisfies `LiteralString`, but
+                            // promoting it to `str` would violate that bound.
+                            if let Some(bound) = typevar.typevar(db).upper_bound(db, env)
+                                && !promoted.is_assignable_to(db, env, bound)
+                            {
+                                ty
+                            } else {
+                                promoted
+                            }
+                        });
+                    Some(ty.unwrap_or(Type::Dynamic(DynamicType::UnspecializedTypeVar)))
+                }),
+            ));
+        }
+
+        // Before inferring the arguments, use the return context to specialize their parameters.
         let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
             FxHashMap::default();
         if let Some(declared_return_ty) = call_expression_tcx.annotation {
             let inferable = generic_context.inferable_typevars(db);
-            let normalized_return_ty = self
-                .normalized_constructor_return(db)
-                .unwrap_or(self.signature.return_ty);
+            let normalized_return_ty = self.unspecialized_return_type(db);
             let path_bounds = normalized_return_ty.assignable_solutions_with_inferable(
                 db,
                 env,
@@ -8086,15 +8317,6 @@ impl<'db> Binding<'db> {
             }
         }
 
-        // The marker distinguishes unsolved type variables without defaults from gradual types
-        // inferred from arguments. Only the former are ignored during fixpoint iteration.
-        let argument_specialization = self.inference.map(|inference| {
-            inference.merged_specialization_with(db, |typevar, inferred| {
-                (inferred.is_none() && typevar.default_type(db).is_none())
-                    .then_some(Type::Dynamic(DynamicType::UnspecializedTypeVar))
-            })
-        });
-
         // TODO: Note that specializing parameter types for type context using this specialization is
         // not strictly correct, as it requires eagerly choosing a solution for a given type variable,
         // which may conflate upper and lower bounds when applied transitively to parameter types
@@ -8105,32 +8327,10 @@ impl<'db> Binding<'db> {
         Some(generic_context.specialize_recursive(
             db,
             generic_context.variables(db).map(|typevar| {
-                let identity = typevar.identity(db);
-
-                let call_expression_constraints = return_type_solutions.get(&identity).copied();
-                let argument_constraints = argument_specialization
-                    .and_then(|specialization| specialization.get(db, typevar))
-                    .filter(|ty| !ty.has_provisional_marker(db, env))
-                    .map(|ty| {
-                        let promoted = ty.promote(db, env);
-                        // Context for other arguments must still satisfy the type variable's
-                        // bound. For example, `Literal["a"]` satisfies `LiteralString`, but
-                        // promoting it to `str` would violate that bound.
-                        if let Some(bound) = typevar.typevar(db).upper_bound(db, env)
-                            && !promoted.is_assignable_to(db, env, bound)
-                        {
-                            ty
-                        } else {
-                            promoted
-                        }
-                    });
-
-                // TODO: We should similarly combine both the call expression and argument constraints
-                // here. We currently only rely on argument constraints when there is no explicit declared
-                // type for the call expression.
                 Some(
-                    call_expression_constraints
-                        .or(argument_constraints)
+                    return_type_solutions
+                        .get(&typevar.identity(db))
+                        .copied()
                         // Default specialize any type variables to a marker type, which will be ignored
                         // during argument inference, allowing the concrete subset of the parameter
                         // type to still affect argument inference.
@@ -8246,6 +8446,7 @@ impl<'db> Binding<'db> {
         let inferred = CallInference {
             db,
             env,
+            constructor_kind: self.constructor_context.map(ConstructorContext::kind),
             signature: &self.signature,
             arguments,
             argument_matches: &self.argument_matches,

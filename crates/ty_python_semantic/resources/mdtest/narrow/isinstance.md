@@ -1988,10 +1988,10 @@ def narrow_aliased_typed_dict_to_dict(value: PayloadAlias) -> None:
 ## Iterable element types with permissive generic narrowing
 
 After narrowing `Iterable[T] | T` to a non-sized iterable, `T` might itself be an iterable whose
-items have a different type. Permissive narrowing represents that possibility with `Unknown`, so the
-constructor infers `list[T | Unknown]`. Its acceptance as `Collection[T] | T` is unsound; it does
-not establish that all elements have type `T`. The same inferred type appears with and without a
-return context.
+items have a different type. Permissive narrowing represents that possibility with `Unknown`.
+Without a return context, the constructor infers `list[T | Unknown]`; the return context instead
+selects `list[T]`. Accepting this constructor call is unsound: narrowing does not establish that all
+elements have type `T`.
 
 ```toml
 [environment]
@@ -2008,15 +2008,17 @@ def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
     if isinstance(value, Iterable) and not isinstance(value, Sized):
         # revealed: list[T@maybe_iterable_to_list | Unknown]
         reveal_type(list(value))
-        # revealed: list[T@maybe_iterable_to_list | Unknown]
+        # revealed: list[T@maybe_iterable_to_list]
         return reveal_type(list(value))
     raise NotImplementedError
 ```
 
 ## Iterable element types with strict generic narrowing
 
-Strict narrowing represents the unknown iterable element type with `object`. The constructor
-therefore infers `list[object]`, and returning it as `Collection[T] | T` is correctly rejected.
+Strict narrowing represents the unknown iterable element type with `object`. Without a return
+context, the constructor infers `list[object]`. The return context selects `list[T]`, but the
+constructor rejects its argument because narrowing does not establish that all elements have type
+`T`.
 
 ```toml
 [environment]
@@ -2033,8 +2035,8 @@ def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
     if isinstance(value, Iterable) and not isinstance(value, Sized):
         # revealed: list[object]
         reveal_type(list(value))
-        # error: [invalid-return-type]
-        # revealed: list[object]
+        # error: [invalid-argument-type]
+        # revealed: list[T@maybe_iterable_to_list]
         return reveal_type(list(value))
     raise NotImplementedError
 ```

@@ -414,7 +414,9 @@ def _(xs: Unknown):
 
     reveal_type(map("{}".format, xs))  # revealed: map[str]
 
-    reveal_type("".join(map("{}".format, xs)))  # revealed: str
+    # TODO: The gradual iterable permits the context to select the `LiteralString` overload.
+    # This should reveal `str`.
+    reveal_type("".join(map("{}".format, xs)))  # revealed: LiteralString
 ```
 
 ## Mapping methods accept arbitrary object types
@@ -554,6 +556,14 @@ from typing import Any
 
 def _(values: list[tuple[Any, ...]]):
     reveal_type(dict(values))  # revealed: dict[Any, Any]
+```
+
+Unpacking an unknown sequence of iterables into `zip` also produces gradual-length tuples, which can
+be used as key-value pairs.
+
+```py
+def copy_unknown(values) -> None:
+    dict(zip(*values))
 ```
 
 ## Failed `dict` calls do not expose internal type variables

@@ -1186,6 +1186,22 @@ class D(Generic[V]):
 reveal_type(D().x)  # revealed: Unknown
 ```
 
+A return context can override a standalone default. Without context, this call uses the `int`
+default; a `list[Any]` annotation supplies `Any` instead.
+
+```py
+from typing import Any
+
+T_default = TypeVar("T_default", default=int)
+
+def f() -> list[T_default]:
+    raise NotImplementedError
+
+reveal_type(f())  # revealed: list[int]
+result: list[Any] = reveal_type(f())  # revealed: list[Any]
+reveal_type(result)  # revealed: list[Any]
+```
+
 ### Defaults through recursive aliases
 
 A default that refers to its own type variable through a recursive alias falls back to `Unknown`.
@@ -1209,6 +1225,91 @@ class NestedBox(Generic[N]): ...
 
 reveal_type(Box())  # revealed: Box[Unknown]
 reveal_type(NestedBox())  # revealed: NestedBox[Unknown]
+```
+
+### Defaults depending on inferred type variables
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+Defaults that depend on argument inference are preserved when the return context supplies a wider
+static type. This also applies when the dependency goes through another type variable's default.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U", default=T)
+V = TypeVar("V", default=U)
+
+def f(value: T) -> tuple[T, U, V]:
+    raise NotImplementedError
+
+reveal_type(f(1))  # revealed: tuple[Literal[1], Literal[1], Literal[1]]
+x1: tuple[int, object, object] = f(1)
+reveal_type(x1)  # revealed: tuple[Literal[1], Literal[1], Literal[1]]
+```
+
+A gradual context takes precedence over a mutually assignable type obtained from a dependent
+default:
+
+```py
+from typing import Any
+
+def same(value: T) -> tuple[T, U]:
+    raise NotImplementedError
+
+def _(value: int):
+    result: tuple[int, Any] = reveal_type(same(value))  # revealed: tuple[int, Any]
+```
+
+An incompatible return context overrides these defaults:
+
+```py
+x2: tuple[int, str, bytes] = f(1)
+reveal_type(x2)  # revealed: tuple[Literal[1], str, bytes]
+```
+
+The defaults can contain the inferred type inside a generic type, rather than referencing it
+directly:
+
+```py
+U2 = TypeVar("U2", default=tuple[T])
+V2 = TypeVar("V2", default=tuple[U2])
+
+def g(value: T) -> tuple[T, U2, V2]:
+    raise NotImplementedError
+
+x3: tuple[int, object, object] = g(1)
+reveal_type(x3)  # revealed: tuple[Literal[1], tuple[Literal[1]], tuple[tuple[Literal[1]]]]
+```
+
+An alias preserves the same dependency on the inferred type:
+
+```py
+from typing import TypeAliasType
+
+Wrap = TypeAliasType("Wrap", tuple[T], type_params=(T,))
+U3 = TypeVar("U3", default=Wrap[T])
+
+def h(value: T) -> tuple[T, U3]:
+    raise NotImplementedError
+
+x4: tuple[int, object] = h(1)
+reveal_type(x4[1][0])  # revealed: Literal[1]
+```
+
+If the type variable referenced by the default has no inferred type, the return context supplies the
+candidate instead:
+
+```py
+def make() -> tuple[T, U]:
+    raise NotImplementedError
+
+x5: tuple[object, int] = make()
+reveal_type(x5)  # revealed: tuple[object, int]
 ```
 
 ## Regression
@@ -1248,7 +1349,9 @@ reveal_type(f())  # revealed: C
 ### Specialization cycle recovery prevents oscillating defaults
 
 A type variable's default can depend on an overloaded call that itself uses the same type variable.
-Specialization must converge even when overload selection changes between cycle iterations.
+Specialization must converge even when overload selection changes between cycle iterations. The
+branch that chooses a class at runtime cannot supply a type variable's default, so it contributes
+`Unknown` alongside the `str` from the other branch.
 
 ```toml
 [environment]
@@ -1273,9 +1376,13 @@ if f():
 else:
     Default = choose(f())
 
-T = TypeVar("T", default=Default)
+T = TypeVar("T", default=Default)  # error: [invalid-type-form]
 
-reveal_type(f())  # revealed: Unknown
+result = f()
+reveal_type(result)  # revealed: str | Unknown
+
+# TODO: An outer generic call should preserve the gradual alternative.
+reveal_type(f())  # revealed: str
 ```
 
 ### Use of typevar with default inside a function body that binds it

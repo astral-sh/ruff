@@ -787,6 +787,21 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         })
     }
 
+    /// Marks inference evidence as coming from a call's expected type, preserving validity bounds.
+    pub(crate) fn with_declared_evidence(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> Self {
+        self.verify_builder(builder);
+        self.map_constraints(|constraint| {
+            constraint
+                .with_provenance(constraint.provenance().as_declared())
+                .new_node(db, env, &mut self.builder.storage.borrow_mut())
+        })
+    }
+
     /// Applies a type mapping to every constraint in this constraint set.
     pub(crate) fn apply_type_mapping_impl(
         self,
@@ -3002,9 +3017,14 @@ struct InteriorNodeData {
 #[derive(Default)]
 struct CandidateTypeVarSolver<'db> {
     evidence_lower: FxIndexSet<Type<'db>>,
+    inferred_lower: FxIndexSet<Type<'db>>,
+    declared_lower: FxIndexSet<Type<'db>>,
     mixed_lower: FxIndexSet<Type<'db>>,
+    inferred_mixed_lower: FxIndexSet<Type<'db>>,
+    declared_mixed_lower: FxIndexSet<Type<'db>>,
     validity_lower: FxIndexSet<Type<'db>>,
     upper: UpperBound<'db>,
+    has_declared_evidence: bool,
 }
 
 impl<'db> CandidateTypeVarSolver<'db> {
@@ -3056,18 +3076,30 @@ impl<'db> CandidateTypeVarSolver<'db> {
         // element is typically cheap (in that it does not involve a combinatorial
         // explosion from distributing the clause through an existing disjunction). So we
         // don't need to be as clever here as in `add_upper`.
+        let inferred = provenance.contains(ConstraintProvenance::INFERRED);
+        let declared = provenance.contains(ConstraintProvenance::DECLARED);
+        let validity = provenance.contains(ConstraintProvenance::VALIDITY);
+        self.has_declared_evidence |= declared;
         if provenance.is_evidence() {
-            if provenance.contains(ConstraintProvenance::VALIDITY) {
+            if validity {
                 self.mixed_lower.insert(ty);
             } else {
                 self.evidence_lower.insert(ty);
             }
-        } else if !ty.is_never() {
-            self.validity_lower.insert(ty);
         }
+        let bounds = match (inferred, declared, validity) {
+            (true, false, false) => &mut self.inferred_lower,
+            (false, true, false) => &mut self.declared_lower,
+            (true, false, true) => &mut self.inferred_mixed_lower,
+            (false, true, true) => &mut self.declared_mixed_lower,
+            (false, false, _) if !ty.is_never() => &mut self.validity_lower,
+            _ => return,
+        };
+        bounds.insert(ty);
     }
 
     fn add_upper(&mut self, provenance: ConstraintProvenance, ty: Type<'db>) {
+        self.has_declared_evidence |= provenance.contains(ConstraintProvenance::DECLARED);
         self.upper.add_clause(provenance, ty);
     }
 
@@ -3083,34 +3115,40 @@ impl<'db> CandidateTypeVarSolver<'db> {
     ) -> Option<CandidateTypeVarSolution<'db>> {
         let Self {
             evidence_lower,
+            inferred_lower,
+            declared_lower,
             mixed_lower,
+            inferred_mixed_lower,
+            declared_mixed_lower,
             validity_lower,
             mut upper,
+            has_declared_evidence,
         } = self;
 
-        // Classify the original evidence bounds before aggregation, as gradual and static argument
-        // evidence may collapse into a single gradual union.
-        //
-        // Note that we only compute this flag for constrained typevars.
-        let has_only_non_concrete_evidence =
-            bound_typevar.typevar(db).is_constrained(db).then(|| {
-                let mut evidence = evidence_lower
-                    .iter()
-                    .copied()
-                    .chain(upper.iter_evidence())
-                    .filter(|ty| !ty.has_unspecialized_type_var(db, env))
-                    .peekable();
-                evidence.peek().is_some()
-                    && evidence.all(|ty| {
-                        ty.is_type_var()
-                            || ty.bottom_materialization(db, env) != ty.top_materialization(db, env)
-                    })
-            });
-
-        let evidence_lower =
-            (!evidence_lower.is_empty()).then(|| UnionType::from_elements(db, env, evidence_lower));
-        let mixed_lower =
-            (!mixed_lower.is_empty()).then(|| UnionType::from_elements(db, env, mixed_lower));
+        let evidence = PathEvidence::from_bounds(
+            db,
+            env,
+            bound_typevar,
+            evidence_lower,
+            mixed_lower,
+            upper.iter_evidence(),
+        );
+        let inferred = PathEvidence::from_bounds(
+            db,
+            env,
+            bound_typevar,
+            inferred_lower,
+            inferred_mixed_lower,
+            upper.evidence.iter().copied(),
+        );
+        let declared = PathEvidence::from_bounds(
+            db,
+            env,
+            bound_typevar,
+            declared_lower,
+            declared_mixed_lower,
+            upper.declared.iter().copied(),
+        );
         let validity_lower = if validity_lower.is_empty() {
             Type::Never
         } else {
@@ -3120,11 +3158,12 @@ impl<'db> CandidateTypeVarSolver<'db> {
 
         let range = CandidateTypeVarSolution {
             bound_typevar,
-            evidence_lower,
-            mixed_lower,
+            evidence,
+            inferred,
+            declared,
             validity_lower,
             upper,
-            has_only_non_concrete_evidence,
+            has_declared_evidence,
             selected_declared_constraint: None,
         };
         let lower = range.effective_lower(db, env);
@@ -3179,16 +3218,76 @@ impl<'db> PathBoundSolution<'db> {
     }
 }
 
+/// The lower-bound union and classification of one source's evidence on a path.
+#[derive(
+    Clone, Copy, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue,
+)]
+struct PathEvidence<'db> {
+    lower: Option<Type<'db>>,
+    /// Validity-derived evidence participates in solving, but not evidence classification.
+    mixed_lower: Option<Type<'db>>,
+    /// Whether every original evidence bound is gradual or another type variable.
+    /// Only computed for constrained typevars.
+    has_only_non_concrete: Option<bool>,
+}
+
+impl<'db> PathEvidence<'db> {
+    fn from_bounds(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        lower: FxIndexSet<Type<'db>>,
+        mixed_lower: FxIndexSet<Type<'db>>,
+        upper: impl Iterator<Item = Type<'db>>,
+    ) -> Self {
+        // Classify the original bounds before aggregation, as gradual and static evidence may
+        // collapse into a single gradual union.
+        let has_only_non_concrete =
+            Self::classify(db, env, bound_typevar, lower.iter().copied().chain(upper));
+        Self {
+            lower: (!lower.is_empty()).then(|| UnionType::from_elements(db, env, lower)),
+            mixed_lower: (!mixed_lower.is_empty())
+                .then(|| UnionType::from_elements(db, env, mixed_lower)),
+            has_only_non_concrete,
+        }
+    }
+
+    fn classify(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        bounds: impl Iterator<Item = Type<'db>>,
+    ) -> Option<bool> {
+        bound_typevar.typevar(db).is_constrained(db).then(|| {
+            let mut evidence = bounds
+                .filter(|ty| !ty.has_unspecialized_type_var(db, env))
+                .peekable();
+            evidence.peek().is_some()
+                && evidence.all(|ty| {
+                    ty.is_type_var()
+                        || ty.bottom_materialization(db, env) != ty.top_materialization(db, env)
+                })
+        })
+    }
+}
+
+#[derive(Clone, Copy)]
+enum EvidenceSource {
+    Inferred,
+    Declared,
+}
+
 /// The range of possible solutions for one of the typevars in a [`CandidateSolution`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct CandidateTypeVarSolution<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
-    evidence_lower: Option<Type<'db>>,
-    mixed_lower: Option<Type<'db>>,
+    evidence: PathEvidence<'db>,
+    inferred: PathEvidence<'db>,
+    declared: PathEvidence<'db>,
     validity_lower: Type<'db>,
     upper: UpperBound<'db>,
-    /// Whether every original evidence bound is gradual or another `TypeVar`.
-    has_only_non_concrete_evidence: Option<bool>,
+    /// Includes combined evidence, which cannot be recovered from the declared bounds alone.
+    has_declared_evidence: bool,
     /// The declared constraint selected for this range, if the typevar is constrained.
     selected_declared_constraint: Option<Type<'db>>,
 }
@@ -3198,15 +3297,144 @@ impl<'db> CandidateTypeVarSolution<'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
     ) -> Self {
+        let evidence = PathEvidence {
+            lower: Some(ty),
+            ..PathEvidence::default()
+        };
         Self {
             bound_typevar,
-            evidence_lower: Some(ty),
-            mixed_lower: None,
+            evidence,
+            inferred: evidence,
+            declared: PathEvidence::default(),
             validity_lower: Type::Never,
             upper: UpperBound::from_clause(ty),
-            has_only_non_concrete_evidence: None,
+            has_declared_evidence: false,
             selected_declared_constraint: None,
         }
+    }
+
+    pub(crate) fn has_declared_evidence(&self) -> bool {
+        self.has_declared_evidence
+    }
+
+    /// Selects the candidate supplied by argument evidence on this path.
+    pub(crate) fn inferred_solution(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
+    ) -> PathBoundSolution<'db> {
+        if self.has_declared_evidence() {
+            CandidateSolutions::default_solve(
+                db,
+                env,
+                builder,
+                &self.evidence_view(EvidenceSource::Inferred),
+            )
+        } else {
+            CandidateSolutions::default_solve(db, env, builder, self)
+        }
+    }
+
+    fn evidence_view(&self, source: EvidenceSource) -> Self {
+        let (evidence, upper, mixed_upper) = match source {
+            EvidenceSource::Declared => (
+                self.declared,
+                &self.upper.declared,
+                &self.upper.declared_mixed,
+            ),
+            EvidenceSource::Inferred => (self.inferred, &self.upper.evidence, &self.upper.mixed),
+        };
+        Self {
+            bound_typevar: self.bound_typevar,
+            evidence,
+            inferred: evidence,
+            declared: PathEvidence::default(),
+            validity_lower: self.validity_lower,
+            upper: UpperBound {
+                evidence: upper.clone(),
+                mixed: mixed_upper.clone(),
+                validity: self.upper.validity.clone(),
+                ..UpperBound::default()
+            },
+            has_declared_evidence: false,
+            selected_declared_constraint: self.selected_declared_constraint,
+        }
+    }
+
+    /// Chooses between argument and declared evidence on this compatible constraint path.
+    ///
+    /// Prefer the declared candidate when it is mutually assignable with the inferred candidate.
+    /// A static contextual upper bound does not replace `Any` or `Unknown` argument evidence:
+    /// assignability allows that materialization, but the context does not establish the argument's
+    /// runtime type.
+    /// Otherwise, retain the inferred candidate if it satisfies the complete path. Candidates
+    /// come from the same path, so alternatives ruled out by the context cannot affect this choice.
+    /// A default resolved from this path's argument candidates supplies otherwise missing evidence.
+    pub(crate) fn preferred_solution(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
+        inferable: TypeVarSet<'db>,
+        default: impl FnOnce() -> Option<Type<'db>>,
+    ) -> PathBoundSolution<'db> {
+        let combined = CandidateSolutions::default_solve(db, env, builder, self);
+        if !self.has_declared_evidence() || !matches!(combined, PathBoundSolution::Solved(_)) {
+            return combined;
+        }
+
+        let inferred = match self.inferred_solution(db, env, builder) {
+            PathBoundSolution::Solved(inferred) => Some(inferred),
+            PathBoundSolution::Unsolved => default(),
+            PathBoundSolution::Unsatisfiable | PathBoundSolution::BudgetExceeded { .. } => {
+                return combined;
+            }
+        }
+        .filter(|candidate| !candidate.has_provisional_marker(db, env));
+        let declared = match self
+            .evidence_view(EvidenceSource::Declared)
+            .solve_declared(db, env, builder, inferable)
+        {
+            PathBoundSolution::Solved(declared) => Some(declared),
+            PathBoundSolution::Unsolved | PathBoundSolution::Unsatisfiable => None,
+            PathBoundSolution::BudgetExceeded { .. } => return combined,
+        }
+        .filter(|candidate| !candidate.has_provisional_marker(db, env));
+
+        let candidates = match (inferred, declared) {
+            // TODO: Preserve gradual alternatives in compound types as well. These can also
+            // carry static evidence, which must remain compatible through nested-call inference.
+            (Some(inferred), Some(declared))
+                if self.declared.lower.is_none()
+                    && self.declared.mixed_lower.is_none()
+                    && self
+                        .inferred
+                        .lower
+                        .is_some_and(|lower| lower.is_non_divergent_dynamic())
+                    && inferred.is_non_divergent_dynamic()
+                    && declared.is_fully_static(db, env) =>
+            {
+                [Some(inferred), None]
+            }
+            (Some(inferred), Some(declared))
+                if inferred.is_assignable_to(db, env, declared)
+                    && declared.is_assignable_to(db, env, inferred) =>
+            {
+                [Some(declared), Some(inferred)]
+            }
+            (Some(inferred), _) => [Some(inferred), None],
+            (None, declared) => [declared, None],
+        };
+        for candidate in candidates.into_iter().flatten() {
+            if let Some(solution) =
+                self.valid_preferred_solution(db, env, builder, inferable, candidate)
+            {
+                return solution;
+            }
+        }
+
+        combined
     }
 
     pub(crate) fn as_exact(
@@ -3225,13 +3453,147 @@ impl<'db> CandidateTypeVarSolution<'db> {
         }
     }
 
+    /// Preserve a valid candidate supplied by a declared type context.
+    ///
+    /// The ordinary upper-only solver intersects contextual bounds with the type variable's
+    /// declared bound. That intersection is appropriate for argument inference, but it can change
+    /// an explicitly requested gradual specialization. For example, a contextual `tuple[Any, ...]`
+    /// should remain available as a candidate for `T: tuple[int, ...]` instead of first becoming
+    /// `tuple[Any, ...] & tuple[int, ...]`.
+    fn solve_declared(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> PathBoundSolution<'db> {
+        let candidate = match self.inference_lower(db, env) {
+            Some(lower) => Some(lower),
+            None if self.has_upper_inference() => {
+                let candidate = UpperBound::single_bound_from_iterator(
+                    db,
+                    env,
+                    self.upper.iter_evidence().chain(self.upper.iter_mixed()),
+                )
+                .or_else(|| {
+                    IntersectionType::bounded_from_elements(
+                        db,
+                        env,
+                        self.upper.iter_evidence().chain(self.upper.iter_mixed()),
+                    )
+                });
+                let Some(candidate) = candidate else {
+                    return PathBoundSolution::BudgetExceeded { fallback: None };
+                };
+                Some(candidate)
+            }
+            None => None,
+        };
+
+        if let Some(candidate) = candidate
+            // A rigid outer variable may satisfy a bound only after intersecting with it. In that
+            // case, the unconstrained variable is not itself a valid contextual specialization.
+            && !matches!(
+                self.bound_typevar.typevar(db).bound_or_constraints(db, env),
+                Some(TypeVarBoundOrConstraints::UpperBound(bound))
+                    if !candidate.is_assignable_to(db, env, bound)
+            )
+            && let Some(solution) =
+                self.valid_preferred_solution(db, env, builder, inferable, candidate)
+        {
+            return solution;
+        }
+
+        CandidateSolutions::default_solve(db, env, builder, self)
+    }
+
+    /// Checks a preferred candidate against this path, retaining any budget-exhaustion fallback.
+    ///
+    /// The candidate must be above the path's existing lower bound. The default solver then
+    /// validates it against the path's upper bound and any declared constraint selected for this
+    /// path. Gradual candidates may be restricted by the upper bounds.
+    pub(crate) fn valid_preferred_solution(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
+        inferable: TypeVarSet<'db>,
+        candidate: Type<'db>,
+    ) -> Option<PathBoundSolution<'db>> {
+        // Other variables from this call can still be specialized to satisfy the lower bound.
+        // Type variables from an enclosing scope must remain fixed.
+        let satisfies_lower = |candidate| {
+            self.bound_typevar.is_paramspec(db)
+                || !self
+                    .effective_lower(db, env)
+                    .when_assignable_to(db, env, candidate, builder, inferable)
+                    .is_never_satisfied(db, env, inferable)
+        };
+        if !satisfies_lower(candidate) {
+            return None;
+        }
+
+        // Selecting a declared constraint validates this path, but does not require us to
+        // materialize a compatible gradual candidate supplied by the return context. For example,
+        // `Any` can preserve an explicit gradual context even when this path selected `T = str`.
+        if let Some(selected) = self.selected_declared_constraint
+            && !candidate.is_fully_static(db, env)
+            && candidate.is_assignable_to(db, env, selected)
+            && selected.is_assignable_to(db, env, candidate)
+        {
+            if !self.upper.is_satisfied_by(db, env, candidate) {
+                let mut storage = builder.storage.borrow_mut();
+                let (when_upper, source_order) =
+                    self.upper
+                        .when_satisfied_by(db, env, &mut storage, candidate);
+                if when_upper.is_never_satisfied(
+                    db,
+                    env,
+                    &mut storage,
+                    TypeVarSet::None,
+                    source_order,
+                ) {
+                    return None;
+                }
+            }
+            return Some(PathBoundSolution::Solved(candidate));
+        }
+
+        // Keep the original evidence sources and the path's selected declared constraint while
+        // checking the replacement lower bound.
+        let mut candidate_bound = self.clone();
+        candidate_bound.evidence = PathEvidence {
+            lower: Some(candidate),
+            mixed_lower: None,
+            has_only_non_concrete: PathEvidence::classify(
+                db,
+                env,
+                self.bound_typevar,
+                iter::once(candidate).chain(self.upper.iter_evidence()),
+            ),
+        };
+        match CandidateSolutions::default_solve(db, env, builder, &candidate_bound) {
+            PathBoundSolution::Unsolved | PathBoundSolution::Unsatisfiable => None,
+            // Solving can promote or restrict the candidate. The resulting type must still
+            // accept the original lower bound, not just the replacement used for validation.
+            outcome
+                if outcome.as_type().is_some_and(|solution| {
+                    solution != candidate && !satisfies_lower(solution)
+                }) =>
+            {
+                None
+            }
+            outcome => Some(outcome),
+        }
+    }
+
     /// Returns lower-bound inference evidence without supplying a default for a missing bound.
     pub(crate) fn inference_lower(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Type<'db>> {
-        match (self.evidence_lower, self.mixed_lower) {
+        match (self.evidence.lower, self.evidence.mixed_lower) {
             (inference, None) | (None, inference) => inference,
             (Some(evidence), Some(mixed)) => {
                 Some(UnionType::from_two_elements(db, env, evidence, mixed))
@@ -3249,11 +3611,12 @@ impl<'db> CandidateTypeVarSolution<'db> {
     }
 
     fn effective_lower(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        if self.evidence_lower.is_none() && self.mixed_lower.is_none() {
+        if self.evidence.lower.is_none() && self.evidence.mixed_lower.is_none() {
             return self.validity_lower;
         }
 
-        if let (Some(lower), None) | (None, Some(lower)) = (self.evidence_lower, self.mixed_lower)
+        if let (Some(lower), None) | (None, Some(lower)) =
+            (self.evidence.lower, self.evidence.mixed_lower)
             && self.validity_lower.is_never()
         {
             return lower;
@@ -3263,8 +3626,8 @@ impl<'db> CandidateTypeVarSolution<'db> {
             db,
             env,
             [
-                self.evidence_lower.unwrap_or(Type::Never),
-                self.mixed_lower.unwrap_or(Type::Never),
+                self.evidence.lower.unwrap_or(Type::Never),
+                self.evidence.mixed_lower.unwrap_or(Type::Never),
                 self.validity_lower,
             ],
         )
@@ -3280,7 +3643,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
     }
 
     fn has_lower_inference(&self) -> bool {
-        self.evidence_lower.is_some() || self.mixed_lower.is_some()
+        self.evidence.lower.is_some() || self.evidence.mixed_lower.is_some()
     }
 
     fn has_upper_inference(&self) -> bool {
@@ -3309,10 +3672,23 @@ impl<'db> CandidateTypeVarSolution<'db> {
             return Some(solution);
         }
 
+        // Contextual bounds do not narrow wholly gradual evidence supplied by the arguments. They
+        // can still refine a gradual contextual candidate when the arguments supplied static evidence.
+        let preserve_gradual_evidence = self
+            .inferred
+            .lower
+            .is_some_and(|lower| lower.is_non_divergent_dynamic());
+        let upper_bounds = self.upper.evidence.iter().copied().chain(
+            self.upper
+                .declared
+                .iter()
+                .chain(&self.upper.combined)
+                .copied()
+                .filter(|_| !preserve_gradual_evidence),
+        );
+
         // `Divergent` is not safely reflexive, so we cannot intersect identical bounds.
-        if UpperBound::single_bound_from_iterator(db, env, self.upper.iter_evidence())
-            == Some(solution)
-        {
+        if UpperBound::single_bound_from_iterator(db, env, upper_bounds.clone()) == Some(solution) {
             return Some(solution);
         }
 
@@ -3330,7 +3706,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
             _ => None,
         };
 
-        let mut upper_bounds = self.upper.iter_evidence().filter_map(materialize_upper);
+        let mut upper_bounds = upper_bounds.filter_map(materialize_upper);
         let Some(first_upper) = upper_bounds.next() else {
             return Some(solution);
         };
@@ -5283,11 +5659,12 @@ mod tests {
         let builder = ConstraintSetBuilder::new();
         let path_bound = CandidateTypeVarSolution {
             bound_typevar: t,
-            evidence_lower: None,
-            mixed_lower: None,
+            evidence: PathEvidence::default(),
+            inferred: PathEvidence::default(),
+            declared: PathEvidence::default(),
             validity_lower: Type::Never,
             upper: UpperBound::unconstrained(),
-            has_only_non_concrete_evidence: None,
+            has_declared_evidence: false,
             selected_declared_constraint: None,
         };
 
@@ -5494,7 +5871,7 @@ class E: ...
             .finish(db, &env, &mut storage, constrained)
             .expect("expected a valid solution");
         drop(storage);
-        assert_eq!(exhausted.has_only_non_concrete_evidence, Some(true));
+        assert_eq!(exhausted.evidence.has_only_non_concrete, Some(true));
         assert_eq!(
             CandidateSolutions::preliminary_solve(db, &env, &builder, &exhausted),
             PathBoundSolution::BudgetExceeded { fallback: None }

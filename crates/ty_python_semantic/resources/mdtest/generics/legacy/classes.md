@@ -972,8 +972,8 @@ attribute: NameAttribute[str] = NameAttribute("Alice")
 ### Constructing the class from its own type variable
 
 A constructor call inside a generic class can use a value whose type is one of the class's type
-variables. The constructed instance keeps that type variable instead of falling back to `Unknown`,
-so an incompatible type context is rejected.
+variables. Without an expected type, the constructed instance keeps that type variable instead of
+falling back to `Unknown`. An incompatible expected specialization is rejected at the argument.
 
 ```py
 from typing_extensions import Generic, TypeVar
@@ -984,7 +984,7 @@ class C(Generic[T]):
     def __init__(self, value: T) -> None:
         reveal_type(C(value))  # revealed: C[T@C]
 
-        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
+        # error: [invalid-argument-type] "Expected `int`, found `T@C`"
         invalid: C[int] = C(value)
 ```
 
@@ -1114,11 +1114,7 @@ class Box(Generic[T, U]):
         return result
 
     def wrong_wrap(self, value: T) -> "Box[T, T]":
-        # TODO: Only report the return error. The explicitly specialized constructor accepts
-        # `value: T` and `self: Self`; the incompatible return context should not reject them.
-        # error: [invalid-argument-type]
-        # error: [invalid-return-type]
-        return Box[T, Self](value, self)
+        return Box[T, Self](value, self)  # error: [invalid-return-type]
 ```
 
 ### Constructing through a classmethod receiver
@@ -1273,6 +1269,71 @@ reveal_type(generic_context(D))
 reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(D(1))  # revealed: D[int]
+```
+
+### Independent type variables in `__new__`
+
+Each argument supplies evidence for its own method type variable. The implicit `cls` receiver does
+not couple those variables when the return type combines them into a generic specialization. The
+recursive union exercises inference with multiple bounds for every variable.
+
+```pyi
+from typing import Generic, Iterable, Iterator, Protocol, Sequence, TypeVar
+from typing_extensions import assert_type
+
+class Hashable(Protocol):
+    def __hash__(self) -> int: ...
+
+Label = Hashable | tuple["Label", ...]
+T_co = TypeVar("T_co", covariant=True)
+A = TypeVar("A")
+B = TypeVar("B")
+C = TypeVar("C")
+D = TypeVar("D")
+E = TypeVar("E")
+F = TypeVar("F")
+G = TypeVar("G")
+
+class Product(Generic[T_co]):
+    def __new__(
+        cls,
+        a: Iterable[A],
+        b: Iterable[B],
+        c: Iterable[C],
+        d: Iterable[D],
+        e: Iterable[E],
+        f: Iterable[F],
+        g: Iterable[G],
+    ) -> Product[tuple[A, B, C, D, E, F, G]]: ...
+    def __iter__(self) -> Iterator[T_co]: ...
+
+def _(values: Sequence[Label]) -> None:
+    result = list(Product(values, values, values, values, values, values, values))
+    assert_type(result, list[tuple[Label, Label, Label, Label, Label, Label, Label]])
+```
+
+### Enclosing `Self` in constructor arguments
+
+An explicit `Self` type argument belongs to the enclosing method, not the constructor's implicit
+receiver. Binding the receiver preserves that type argument and still rejects an incompatible
+return.
+
+```pyi
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T, U]):
+    def __new__(cls, value: T, receiver: U) -> Box[T, U]: ...
+    def wrap(self, value: T) -> Box[T, Self]:
+        result = Box[T, Self](value, self)
+        reveal_type(result)  # revealed: Box[T@Box, Self@wrap]
+        return result
+
+    def wrong_wrap(self, value: T) -> Box[T, T]:
+        return Box[T, Self](value, self)  # error: [invalid-return-type]
 ```
 
 ### Generic class inherits `__init__` from generic base class
@@ -1462,7 +1523,7 @@ class's own type variables.
 class Remapped(Generic[T]):
     def __init__(self: "Remapped[list[V]]", value: V) -> None: ...
 
-reveal_type(Remapped(1))  # revealed: Remapped[list[Literal[1]]]
+reveal_type(Remapped(1))  # revealed: Remapped[list[int]]
 ```
 
 ### Type variables from enclosing scopes in `__init__` receiver annotations
@@ -1582,6 +1643,53 @@ reveal_type(generic_context(into_regular_callable(D)))
 reveal_type(D("string"))  # revealed: D[str, Literal["string"]]
 reveal_type(D(1))  # revealed: D[str, Literal[1]]
 reveal_type(D(1, "string"))  # revealed: D[int, Literal["string"]]
+```
+
+### Gradual tuple specializations from `__init__`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+A constructor's explicit `self` annotation determines the result's specialization. A gradual tuple
+satisfies a nonempty tuple bound without adding the bound as an intersection to the result.
+
+```py
+from typing import Any, Generic, TypeVar
+
+Shape = TypeVar("Shape", bound=tuple[int, *tuple[int, ...]], covariant=True)
+
+class Box(Generic[Shape]):
+    def __init__(self: "Box[tuple[Any, ...]]") -> None: ...
+
+reveal_type(Box())  # revealed: Box[tuple[Any, ...]]
+```
+
+### Gradual tuple arguments to overloaded constructors
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+A gradual tuple can satisfy either constructor signature below. The first overload remains eligible:
+an unknown tuple length does not justify skipping it in favor of the one-element specialization.
+
+```py
+from typing import Any, Generic, TypeVar, overload
+
+Shape = TypeVar("Shape", bound=tuple[int, *tuple[int, ...]], covariant=True)
+
+class Box(Generic[Shape]):
+    @overload
+    def __init__(self: "Box[tuple[Any, ...]]", value: tuple[object, object]) -> None: ...
+    @overload
+    def __init__(self: "Box[tuple[int]]", value: tuple[int]) -> None: ...
+    def __init__(self, value) -> None: ...
+
+def check(value: tuple[Any, ...]) -> None:
+    reveal_type(Box(value))  # revealed: Box[tuple[Any, ...]]
 ```
 
 ### Synthesized methods with dataclasses
@@ -3148,6 +3256,42 @@ def compare(first: dict[str, T], second: dict[str, int]) -> None:
         for key, data in current.items():  # no diagnostic
             reveal_type(data)  # revealed: T@compare | int
             reveal_type(current.get(key))  # revealed: T@compare | None | int
+```
+
+## Class types specialized with gradual protocols
+
+Specializing `type[T]` with a protocol intersection preserves structural compatibility. A class need
+not inherit from the protocol to satisfy the specialized annotation.
+
+```py
+from typing import Any, Generic, Protocol, TypeVar
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+
+class SupportsInt(Protocol):
+    def __int__(self) -> int: ...
+
+class Box(Generic[T]):
+    cls: type[T]
+
+def _(box: Box[Intersection[SupportsInt, Any]]):
+    box.cls = int
+    box.cls = str  # error: [invalid-assignment]
+```
+
+The same intersection can be inferred from a gradual return context and a callback parameter:
+
+```py
+from collections.abc import Callable
+
+class Converter(Generic[T]):
+    def __init__(self, cls: type[T], convert: Callable[[T], object]): ...
+
+def convert(value: SupportsInt) -> object: ...
+
+x1 = Converter(int, convert)
+x2: Converter[Any] = Converter(int, convert)
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

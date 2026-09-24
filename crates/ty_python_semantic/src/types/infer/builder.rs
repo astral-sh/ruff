@@ -8768,6 +8768,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Extract the annotated parameter types.
         //
         // Note that `Callable` annotations are only valid for positional parameters.
+        // Unsolved type variables do not provide context for a lambda's parameters.
         let mut parameter_types = match callable_tcx {
             None => [].iter(),
             Some(signature) => signature.parameters().into_iter(),
@@ -8786,7 +8787,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .replace_parameter_defaults(db, env)
                         }));
 
-                    if let Some(annotated_type) = parameter_types.next() {
+                    if let Some(annotated_type) = parameter_types.next()
+                        && !matches!(
+                            annotated_type,
+                            Type::Dynamic(DynamicType::UnspecializedTypeVar)
+                        )
+                    {
                         parameter.with_annotated_type(annotated_type)
                     } else {
                         parameter
@@ -8804,7 +8810,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .replace_parameter_defaults(db, env)
                         }));
 
-                    if let Some(annotated_type) = parameter_types.next() {
+                    if let Some(annotated_type) = parameter_types.next()
+                        && !matches!(
+                            annotated_type,
+                            Type::Dynamic(DynamicType::UnspecializedTypeVar)
+                        )
+                    {
                         parameter.with_annotated_type(annotated_type)
                     } else {
                         parameter

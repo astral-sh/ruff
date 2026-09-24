@@ -669,7 +669,13 @@ impl<'db> SolutionWalker<'db> {
         for constraint in constraints {
             let constraint = storage.constraint_data(constraint);
             if constraint.provides_bound_for(db, bound_typevar)
-                && constraint.provenance() == ConstraintProvenance::INFERRED
+                && constraint.provenance().is_evidence()
+                && !constraint
+                    .provenance()
+                    .contains(ConstraintProvenance::VALIDITY)
+                && constraint
+                    .as_concrete()
+                    .is_none_or(|(_, bound)| !bound.has_unspecialized_type_var(db, env))
             {
                 evidence.add_constraint(db, bound_typevar, constraint);
             }
@@ -687,7 +693,7 @@ impl<'db> SolutionWalker<'db> {
     ) -> bool {
         let constraint_lower = constrained_ty.bottom_materialization(db, env);
         let constraint_upper = constrained_ty.top_materialization(db, env);
-        let (when_lower, when_lower_source_order) = match evidence.evidence_lower {
+        let (when_lower, when_lower_source_order) = match evidence.evidence.lower {
             Some(lower) => storage.load(
                 db,
                 env,
@@ -774,10 +780,16 @@ impl<'db> SolutionWalker<'db> {
             current = interior.if_true;
             let constraint_id = interior.constraint;
             let constraint = storage.constraint_data(constraint_id);
-            if constraint.provenance() != ConstraintProvenance::INFERRED {
+            if !constraint.provenance().is_evidence()
+                || constraint
+                    .provenance()
+                    .contains(ConstraintProvenance::VALIDITY)
+            {
                 continue;
             }
-            if let Some(upper) = constraint.upper_bound_for(db, bound_typevar) {
+            if let Some(upper) = constraint.upper_bound_for(db, bound_typevar)
+                && !upper.has_unspecialized_type_var(db, env)
+            {
                 let order = self
                     .source_orders
                     .get_index_of(&constraint_id)
@@ -973,7 +985,7 @@ impl<'db> SolutionWalker<'db> {
             // constraints can possibly be satisfied.
             return ControlFlow::Continue(());
         };
-        let has_no_evidence = evidence.evidence_lower.is_none() && !evidence.upper.has_evidence();
+        let has_no_evidence = evidence.evidence.lower.is_none() && !evidence.upper.has_evidence();
         let is_preservable_typevar = |ty| {
             let Type::TypeVar(typevar) = ty else {
                 return false;
@@ -996,17 +1008,18 @@ impl<'db> SolutionWalker<'db> {
         let contains_preservable_typevar =
             |ty| any_over_type(db, env, ty, false, is_preservable_typevar);
         let has_bare_preservable_typevar_evidence =
-            evidence.evidence_lower.is_some_and(is_preservable_typevar)
+            evidence.evidence.lower.is_some_and(is_preservable_typevar)
                 || evidence
                     .as_single_upper_bound(db, env)
                     .is_some_and(is_preservable_typevar);
         let has_non_concrete_evidence = has_no_evidence
-            || evidence.has_only_non_concrete_evidence == Some(true)
+            || evidence.evidence.has_only_non_concrete == Some(true)
             || has_bare_preservable_typevar_evidence;
 
         if has_non_concrete_evidence {
             let has_preservable_typevar_evidence = evidence
-                .evidence_lower
+                .evidence
+                .lower
                 .is_some_and(contains_preservable_typevar)
                 || evidence
                     .as_single_upper_bound(db, env)
@@ -1351,36 +1364,52 @@ impl<'db> SolutionWalker<'db> {
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, CandidateTypeVarSolver<'db>> =
             FxIndexMap::default();
 
+        // An unspecialized outer variable supplies no inference evidence. Keep validity bounds,
+        // and keep provisional lambda parameters: the enclosing callable still carries concrete
+        // information even before its parameter types have stabilized.
+        let retain_bound = |provenance: ConstraintProvenance, bound: Type<'db>| {
+            provenance.contains(ConstraintProvenance::VALIDITY)
+                || !bound.has_unspecialized_type_var(db, env)
+        };
+
         for (constraint, _) in typevars {
             let constraint = storage.constraint_data(constraint);
             match constraint {
-                Constraint::ConcreteLower(lower) => {
-                    if lower.typevar.is_inferable(db, self.inferable) {
-                        let solver = mappings.entry(lower.typevar).or_default();
-                        solver.add_constraint(db, lower.typevar, constraint);
-                    }
+                Constraint::ConcreteLower(lower)
+                    if lower.typevar.is_inferable(db, self.inferable)
+                        && retain_bound(lower.provenance, lower.bound) =>
+                {
+                    let solver = mappings.entry(lower.typevar).or_default();
+                    solver.add_constraint(db, lower.typevar, constraint);
                 }
-                Constraint::ConcreteUpper(upper) => {
-                    if upper.typevar.is_inferable(db, self.inferable) {
-                        let solver = mappings.entry(upper.typevar).or_default();
-                        solver.add_constraint(db, upper.typevar, constraint);
-                    }
+                Constraint::ConcreteUpper(upper)
+                    if upper.typevar.is_inferable(db, self.inferable)
+                        && retain_bound(upper.provenance, upper.bound) =>
+                {
+                    let solver = mappings.entry(upper.typevar).or_default();
+                    solver.add_constraint(db, upper.typevar, constraint);
                 }
-                Constraint::ConcreteEquivalence(equivalence) => {
-                    if equivalence.typevar.is_inferable(db, self.inferable) {
-                        let solver = mappings.entry(equivalence.typevar).or_default();
-                        solver.add_constraint(db, equivalence.typevar, constraint);
-                    }
+                Constraint::ConcreteEquivalence(equivalence)
+                    if equivalence.typevar.is_inferable(db, self.inferable)
+                        && retain_bound(equivalence.provenance, equivalence.bound) =>
+                {
+                    let solver = mappings.entry(equivalence.typevar).or_default();
+                    solver.add_constraint(db, equivalence.typevar, constraint);
                 }
                 Constraint::TypeVarRange(bound) => {
                     // A direct relationship between an inferable and non-inferable typevar must
                     // contribute bounds for both endpoints. Contextual inference relies on the
                     // reverse, non-inferable binding to preserve relationships to outer typevars.
-                    if bound.left.is_inferable(db, self.inferable)
-                        || bound.right.is_inferable(db, self.inferable)
+                    if !bound.left.is_inferable(db, self.inferable)
+                        && !bound.right.is_inferable(db, self.inferable)
                     {
+                        continue;
+                    }
+                    if retain_bound(bound.provenance, Type::TypeVar(bound.right)) {
                         let solver = mappings.entry(bound.left).or_default();
                         solver.add_constraint(db, bound.left, constraint);
+                    }
+                    if retain_bound(bound.provenance, Type::TypeVar(bound.left)) {
                         let solver = mappings.entry(bound.right).or_default();
                         solver.add_constraint(db, bound.right, constraint);
                     }
@@ -1390,15 +1419,23 @@ impl<'db> SolutionWalker<'db> {
                     // contribute bounds for both endpoints. Contextual inference relies on the
                     // reverse, non-inferable binding to preserve relationships to outer typevars.
                     let (left, right) = bound.in_builder(db, storage);
-                    if left.is_inferable(db, self.inferable)
-                        || right.is_inferable(db, self.inferable)
+                    if !left.is_inferable(db, self.inferable)
+                        && !right.is_inferable(db, self.inferable)
                     {
+                        continue;
+                    }
+                    if retain_bound(bound.provenance, Type::TypeVar(right)) {
                         let solver = mappings.entry(left).or_default();
                         solver.add_constraint(db, left, constraint);
+                    }
+                    if retain_bound(bound.provenance, Type::TypeVar(left)) {
                         let solver = mappings.entry(right).or_default();
                         solver.add_constraint(db, right, constraint);
                     }
                 }
+                Constraint::ConcreteLower(_)
+                | Constraint::ConcreteUpper(_)
+                | Constraint::ConcreteEquivalence(_) => {}
             }
         }
 
