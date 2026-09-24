@@ -159,7 +159,9 @@ impl<'db> SolutionWalker<'db> {
         all_typevars: Option<&Support>,
         node: NodeId,
     ) -> ControlFlow<L::Break> {
-        let mut validations = None;
+        let validations = all_typevars
+            .map(|all_typevars| Validations::from_support(db, env, storage, all_typevars));
+        let validations = validations.as_ref();
         self.visit_node_and_then(
             db,
             env,
@@ -201,18 +203,21 @@ impl<'db> SolutionWalker<'db> {
                 // This node cannot affect the solution we've found. Make sure that the node has
                 // _at least one_ satisfiable path, without walking them all. As long as it does,
                 // we can report the solution we have so far as-is.
-                if this.node_is_satisfiable_on_path(db, env, storage, limits, path, node)? {
+                if this.node_is_satisfiable_on_path(
+                    db,
+                    env,
+                    storage,
+                    limits,
+                    path,
+                    node,
+                    validations,
+                )? {
                     ControlFlow::Continue(PathIs::Satisfied)
                 } else {
                     ControlFlow::Continue(PathIs::Unsatisfied)
                 }
             },
             &mut |this, storage, limits, path| {
-                let validations = all_typevars.map(|all_typevars| {
-                    validations.get_or_insert_with(|| {
-                        Validations::from_support(db, env, storage, all_typevars)
-                    }) as &_
-                });
                 let mut satisfied = false;
                 this.validate_satisfied_path(
                     db,
@@ -315,6 +320,7 @@ impl<'db> SolutionWalker<'db> {
     /// Returns whether there is _any_ satisfiable path in `node`, assuming that the assignments in
     /// `path` already hold. Avoids walking the entire subtree if possible, by returning early once
     /// we find the first satisfied path.
+    #[expect(clippy::too_many_arguments)]
     fn node_is_satisfiable_on_path<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
@@ -323,6 +329,7 @@ impl<'db> SolutionWalker<'db> {
         limits: &mut L,
         path: &mut PathAssignments,
         node: NodeId,
+        validations: Option<&Validations<'db>>,
     ) -> ControlFlow<L::Break, bool> {
         /// A custom [`SolutionLimits`] that lets us return early either when the budget is
         /// exhausted, or when we detect the first satisfiable path.
@@ -360,15 +367,25 @@ impl<'db> SolutionWalker<'db> {
             // fully process every node
             &mut |_this, _storage, _limits, _path, _node| ControlFlow::Continue(PathIs::Uncertain),
             // break when we find the first solution
-            &mut |this, storage, _limits, path| {
-                if this
-                    .pending_candidate_solution(db, env, storage, path, None)
-                    .is_some()
-                {
-                    ControlFlow::Break(Break::FoundSolution)
-                } else {
-                    ControlFlow::Continue(())
-                }
+            &mut |this, storage, limits, path| {
+                this.validate_satisfied_path(
+                    db,
+                    env,
+                    storage,
+                    limits,
+                    path,
+                    validations,
+                    &mut |this, storage, _limits, path| {
+                        if this
+                            .pending_candidate_solution(db, env, storage, path, None)
+                            .is_some()
+                        {
+                            ControlFlow::Break(Break::FoundSolution)
+                        } else {
+                            ControlFlow::Continue(())
+                        }
+                    },
+                )
             },
         );
         match result {
