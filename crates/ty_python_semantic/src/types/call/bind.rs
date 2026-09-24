@@ -6839,12 +6839,58 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 Type::SubclassOf(subclass_of) if subclass_of.into_type_var().is_some()
             );
 
+        // Recovery can leave a variable unsolved when one argument imposes contradictory bounds,
+        // as in `(int) -> str` assigned to `(T) -> T`. Check available recovered bindings without
+        // filling missing ones with `Unknown`, which would hide the incompatibility. A recovered
+        // `T = Any`, on the other hand, legitimately makes this callback compatible.
+        let incompatible_recovery = self.inference.is_some_and(|inference| {
+            if !matches!(
+                inference.solutions(db),
+                TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::Unsatisfiable)
+            ) || inference
+                .generic_context(db)
+                .variables(db)
+                .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db))
+            {
+                return false;
+            }
+
+            let recovery = inference.recovery_specialization(db, self.env);
+            argument_type
+                .apply_specialization(db, recovery)
+                .when_constraint_set_assignable_to(
+                    db,
+                    self.env,
+                    declared_type.apply_specialization(db, recovery),
+                    constraints,
+                )
+                .is_never_satisfied(db, self.env)
+        });
+
         let mut expected_ty = declared_type;
         if let Some(specialization) = self.merged_specialization() {
-            if !constructor_receiver {
-                argument_type = argument_type.apply_specialization(db, specialization);
+            let specialized_argument = if constructor_receiver {
+                argument_type
+            } else {
+                argument_type.apply_specialization(db, specialization)
+            };
+            let specialized_expected = expected_ty.apply_specialization(db, specialization);
+
+            // Prefer a concrete diagnostic when recovery still exposes the incompatibility.
+            if !incompatible_recovery
+                || specialized_argument
+                    .when_assignable_to(
+                        db,
+                        self.env,
+                        specialized_expected,
+                        constraints,
+                        self.inferable_typevars,
+                    )
+                    .is_never_satisfied(db, self.env)
+            {
+                argument_type = specialized_argument;
+                expected_ty = specialized_expected;
             }
-            expected_ty = expected_ty.apply_specialization(db, specialization);
         }
 
         // Some typing special forms are valid class-info arguments at runtime but are not
@@ -6885,15 +6931,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             && !constructor_receiver
             && (!has_starred_annotation || matched_parameter.expected_type.is_some())
             && !is_valid_isinstance_target()
-            && argument_type
-                .when_assignable_to(
-                    db,
-                    self.env,
-                    expected_ty,
-                    constraints,
-                    self.inferable_typevars,
-                )
-                .is_never_satisfied(db, self.env)
+            && (incompatible_recovery
+                || argument_type
+                    .when_assignable_to(
+                        db,
+                        self.env,
+                        expected_ty,
+                        constraints,
+                        self.inferable_typevars,
+                    )
+                    .is_never_satisfied(db, self.env))
             && !self.should_defer_typevartuple_callable_check(
                 parameter.annotated_type(),
                 expected_ty,

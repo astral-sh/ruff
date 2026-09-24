@@ -843,6 +843,46 @@ class NameAttribute(Generic[T]):
 attribute: NameAttribute[str] = NameAttribute("Alice")
 ```
 
+### Gradual constructor context resolves incompatible static bounds
+
+A callback from `str` to `int` cannot choose one static type for both positions. A declared `Any`
+specialization accepts the callback, just as an explicitly specialized constructor does. Static
+contexts that disagree with either position still produce an argument error.
+
+```py
+from typing import Any, Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Setting(Generic[T]):
+    def __init__(self, callback: Callable[[T], T]) -> None:
+        self.callback = callback
+
+def parse(value: str) -> int:
+    return len(value)
+
+setting: Setting[Any] = Setting(parse)
+reveal_type(setting)  # revealed: Setting[Any]
+Setting[Any](parse)
+
+wrong_input: Setting[int] = Setting(parse)  # error: [invalid-argument-type]
+wrong_output: Setting[str] = Setting(parse)  # error: [invalid-argument-type]
+Setting(parse)  # error: [invalid-argument-type]
+```
+
+Recovering one type variable from context does not solve an unrelated type variable. The second
+callback still has incompatible static bounds and must not silently receive `Unknown`.
+
+```py
+U = TypeVar("U")
+
+class Pair(Generic[T]):
+    def __init__(self, first: Callable[[T], T], second: Callable[[U], U]) -> None:
+        self.first = first
+
+pair: Pair[Any] = Pair(parse, parse)  # error: [invalid-argument-type]
+```
+
 ### Constructing the class from its own type variable
 
 A constructor call inside a generic class can use a value whose type is one of the class's type

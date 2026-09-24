@@ -1307,3 +1307,75 @@ callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
+
+## Contradictory bounds from a callback
+
+A callback's parameter and return types can impose incompatible bounds on the same type variable. We
+reject the argument even when inference cannot produce a specialization, with or without a declared
+return context.
+
+```py
+from typing import Any, Callable, TypeVar, overload
+
+T = TypeVar("T")
+
+def f(callback: Callable[[T], T]) -> list[T]:
+    raise NotImplementedError
+
+def incompatible(value: int) -> str:
+    return str(value)
+
+f(incompatible)  # error: [invalid-argument-type]
+result: list[int] = f(incompatible)  # error: [invalid-argument-type]
+
+def compatible(value: int) -> int:
+    return value
+
+def gradual(value: Any) -> Any:
+    return value
+
+valid: list[int] = f(compatible)
+dynamic: list[int] = f(gradual)
+```
+
+Overloads do not resolve the contradiction when every alternative has incompatible parameter and
+return types.
+
+```py
+@overload
+def crossed(value: int) -> str: ...
+@overload
+def crossed(value: str) -> int: ...
+def crossed(value: int | str) -> int | str:
+    raise NotImplementedError
+
+f(crossed)  # error: [invalid-argument-type]
+overloaded: list[int] = f(crossed)  # error: [invalid-argument-type]
+```
+
+The same contradiction is diagnosed for generic constructors. A declared specialization can make the
+diagnostic more precise, but cannot make the callback compatible.
+
+```py
+from typing import Generic
+from typing_extensions import Self
+
+class Init(Generic[T]):
+    def __init__(self, callback: Callable[[T], T]) -> None: ...
+
+class New(Generic[T]):
+    def __new__(cls, callback: Callable[[T], T]) -> Self:
+        return super().__new__(cls)
+
+Init(incompatible)  # error: [invalid-argument-type]
+# error: [invalid-argument-type] "Expected `(int, /) -> int`"
+invalid_init: Init[int] = Init(incompatible)
+New(incompatible)  # error: [invalid-argument-type]
+# error: [invalid-argument-type] "Expected `(int, /) -> int`"
+invalid_new: New[int] = New(incompatible)
+
+reveal_type(Init(compatible))  # revealed: Init[int]
+valid_init: Init[int] = Init(compatible)
+reveal_type(New(compatible))  # revealed: New[int]
+valid_new: New[int] = New(compatible)
+```
