@@ -254,8 +254,8 @@ exclude = [
 line-length = 88
 indent-width = 4
 
-# Assume Python 3.10
-target-version = "py310"
+# Assume Python 3.11
+target-version = "py311"
 
 [lint]
 # select = [...]  # See the Default Rules page for the full listing.
