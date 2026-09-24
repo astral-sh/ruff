@@ -36,13 +36,14 @@ mod enumerate;
 mod search;
 
 use std::borrow::Cow;
+use std::cell::OnceCell;
 use std::fmt;
 use std::iter::FusedIterator;
 use std::sync::LazyLock;
 
 use compact_str::format_compact;
 use memchr::memmem::Finder;
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use ruff_db::PythonFile;
 use ruff_db::files::{File, FilePath, FileRootKind, directory_listing, system_path_to_file};
@@ -57,7 +58,7 @@ use ruff_python_ast::{
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::{ImportingFile, ModuleName};
-use crate::path::{ModuleDirectory, ModulePath, SearchPath, SystemOrVendoredPathRef};
+use crate::path::{ModuleDirectory, SearchPath, SystemOrVendoredPathRef};
 use crate::strategy::MisconfigurationStrategy;
 use crate::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::{ResolverEnvironment, ResolverFile, SearchPathSettings, SearchPathSettingsError};
@@ -1299,7 +1300,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
         precedence: CandidatePrecedence,
     ) -> Self {
         Self {
-            directory: ModuleDirectory::new(context, search_path.to_module_path()),
+            directory: context.root_directory(search_path),
             module: ResolvedModule::NamespacePackage,
             py_typed: PyTyped::Untyped,
             precedence,
@@ -1311,7 +1312,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
         match self.module {
             ResolvedModule::NamespacePackage => true,
             ResolvedModule::Package(init) => {
-                is_legacy_namespace_package(self.directory.path(), context, init)
+                is_legacy_namespace_package(context, self.directory.search_path(), init)
             }
             ResolvedModule::Module(_) => false,
         }
@@ -1374,7 +1375,6 @@ impl<'db> ModuleResolutionCandidate<'db> {
         match self.module {
             ResolvedModule::NamespacePackage => Cow::Owned(
                 self.directory
-                    .path()
                     .to_system_path()
                     .unwrap_or_default()
                     .to_string(),
@@ -1390,11 +1390,10 @@ impl<'db> ModuleResolutionCandidate<'db> {
     /// This supports symlinked search roots and top-level package aliases while preventing
     /// recursive enumeration from following directory cycles indefinitely.
     fn is_listable_location(&self, db: &dyn Db) -> bool {
-        let path = self.directory.path();
-        let Some(search_root) = path.search_path().as_system_path() else {
+        let Some(search_root) = self.directory.search_path().as_system_path() else {
             return true;
         };
-        let Some(directory) = path.to_system_path() else {
+        let Some(directory) = self.directory.to_system_path() else {
             return false;
         };
         let Ok(relative) = directory.strip_prefix(search_root) else {
@@ -1534,7 +1533,6 @@ fn resolve_component<'db>(
         // Packages with an initializer take precedence over file modules.
         candidate.module = ResolvedModule::Package(init);
         candidate.py_typed = subdirectory
-            .path()
             .py_typed(context)
             .inherit_parent(candidate.py_typed);
     } else if let Some(file_module) =
@@ -1565,11 +1563,10 @@ fn resolve_component<'db>(
         // A namespace package is not backed by a file, so it cannot satisfy a stub-only lookup.
         if file_filter != ComponentFileFilter::StubOnly
             && let Some(subdirectory) = &subdirectory
-            && !subdirectory.path().search_path().is_standard_library()
+            && !subdirectory.search_path().is_standard_library()
         {
             candidate.module = ResolvedModule::NamespacePackage;
             candidate.py_typed = subdirectory
-                .path()
                 .py_typed(context)
                 .inherit_parent(candidate.py_typed);
         } else {
@@ -1633,14 +1630,14 @@ fn resolve_file_module_with_filter(
 /// contents, they all "need" to have the legacy namespace idiom (we do nothing to enforce that,
 /// we will just get confused if you mess it up).
 fn is_legacy_namespace_package(
-    package_path: &ModulePath,
     context: &ResolverContext,
+    search_path: &SearchPath,
     init: File,
 ) -> bool {
     static PKG_FINDER: LazyLock<Finder<'static>> = LazyLock::new(|| Finder::new("pkg"));
 
     // Just an optimization, the stdlib and typeshed are never legacy namespace packages
-    if package_path.search_path().is_standard_library() {
+    if search_path.is_standard_library() {
         return false;
     }
 
@@ -1707,7 +1704,9 @@ impl PyTyped {
 pub(super) struct ResolverContext<'db> {
     pub(super) db: &'db dyn Db,
     pub(super) resolver_environment: ResolverEnvironment<'db>,
-    pub(super) mode: ModuleResolveMode,
+    mode: ModuleResolveMode,
+    // Root enumeration prepares these directories once for all sibling names.
+    root_directories: OnceCell<FxHashMap<SearchPath, ModuleDirectory<'db>>>,
 }
 
 impl<'db> ResolverContext<'db> {
@@ -1720,7 +1719,26 @@ impl<'db> ResolverContext<'db> {
             db,
             resolver_environment,
             mode,
+            root_directories: OnceCell::new(),
         }
+    }
+
+    /// Prepares directory listings for an enumeration of sibling root names.
+    fn prepare_root_directories(&self, paths: impl Iterator<Item = &'db SearchPath>) {
+        self.root_directories.get_or_init(|| {
+            paths
+                .map(|path| (path.clone(), ModuleDirectory::new(self, path.clone())))
+                .collect()
+        });
+    }
+
+    /// Returns this search root's directory, reusing its listing during enumeration.
+    fn root_directory(&self, path: &SearchPath) -> ModuleDirectory<'db> {
+        self.root_directories
+            .get()
+            .and_then(|directories| directories.get(path))
+            .cloned()
+            .unwrap_or_else(|| ModuleDirectory::new(self, path.clone()))
     }
 
     pub(super) fn vendored(&self) -> &VendoredFileSystem {

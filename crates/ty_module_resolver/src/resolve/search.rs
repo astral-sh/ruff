@@ -147,9 +147,13 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
     ) -> impl Iterator<Item = Cow<'_, ModuleDirectory<'db>>> {
         match &self.position {
             Position::Root(paths) => {
-                Either::Left(paths.iter(self.context).map(|path| {
-                    Cow::Owned(ModuleDirectory::new(self.context, path.to_module_path()))
-                }))
+                self.context
+                    .prepare_root_directories(paths.iter(self.context));
+                Either::Left(
+                    paths
+                        .iter(self.context)
+                        .map(|path| Cow::Owned(self.context.root_directory(path))),
+                )
             }
             Position::Prefix(resolver) => Either::Right(
                 resolver
@@ -279,7 +283,7 @@ struct CachedCandidate {
 impl CachedCandidate {
     fn restore<'db>(&self, context: &ResolverContext<'db>) -> ModuleResolutionCandidate<'db> {
         ModuleResolutionCandidate {
-            directory: ModuleDirectory::new(context, self.path.clone()),
+            directory: ModuleDirectory::from_module_path(context, &self.path),
             module: self.module,
             py_typed: self.py_typed,
             precedence: self.precedence,
@@ -290,7 +294,7 @@ impl CachedCandidate {
 impl From<&ModuleResolutionCandidate<'_>> for CachedCandidate {
     fn from(candidate: &ModuleResolutionCandidate<'_>) -> Self {
         Self {
-            path: candidate.directory.path().clone(),
+            path: candidate.directory.to_module_path(),
             module: candidate.module,
             py_typed: candidate.py_typed,
             precedence: candidate.precedence,
@@ -750,7 +754,9 @@ fn discover_roots<'db, 'a>(
         }));
         // Defer file probes after stdlib until we know that stdlib does not win.
         pending_stub_paths.extend(stub_paths.after_stdlib.iter().filter(|search_path| {
-            ModuleDirectory::new(context, search_path.to_module_path()).may_contain_name(stub_name)
+            context
+                .root_directory(search_path)
+                .may_contain_name(stub_name)
         }));
     }
 
