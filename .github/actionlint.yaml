@@ -21,6 +21,10 @@ self-hosted-runner:
     - codspeed-macro
 
 paths:
+  ".github/workflows/promote-pull-request.yml":
+    ignore:
+      # actionlint 1.7.12 doesn't yet recognize GitHub's $/ self-repository references.
+      - '^reusable workflow call "\$/\.github/workflows/update-pull-request-parent\.yml" at "uses" is not following the format '
   ".github/workflows/{ty-ecosystem-report,ty-ecosystem-analyzer,memory_report}.yaml":
     ignore:
       # actionlint doesn't yet support the cache-mode feature.

@@ -2,9 +2,10 @@
 
 This port follows uv's promotion workflow at
 [`3db665232544`](https://github.com/astral-sh/uv/blob/3db665232544183edcb80dd7077b8051b365e236/.github/workflows/promote-pull-request.yml).
-It retains the invalid `$/.github/workflows/update-pull-request-parent.yml`
-reference, which blocks workflow validation. That upstream issue must be resolved
-before activation.
+The `$/.github/workflows/update-pull-request-parent.yml` reference uses GitHub's
+[self-repository syntax](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#calling-a-reusable-workflow).
+The actionlint configuration suppresses the unsupported-syntax diagnostic for this
+reference until actionlint supports it.
 
 A repository writer can publish a pull request from `astral-sh/ruff-security` by
 adding `bot:promote`. Draft pull requests are eligible. Marking a pull request ready
