@@ -231,6 +231,24 @@ def chain_uts[U, T, S]() -> None:
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
 ```
 
+## Non-inferable bound checks are ordering-independent
+
+Changing the internal constraint order must not allow a non-inferable type variable to violate its
+declared bound.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def noninferable_declared_bound[T, U: str]() -> None:
+    constraints = ConstraintSet.equality(U, int) & ConstraintSet.equality(T, bytes)
+    # revealed: None
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+
+    reversed_constraints = ConstraintSet.equality(T, bytes) & ConstraintSet.equality(U, int)
+    # revealed: None
+    reveal_type(reversed_constraints.solutions(inferable=tuple[T]))
+```
+
 ## Abstraction and non-inferable typevars
 
 Removing non-inferable typevars rebuilds the TDD with `ite`; irrelevant positive decisions must not
