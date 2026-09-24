@@ -6279,11 +6279,31 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let inference = match builder.build_inference_with(&mut choose) {
             Ok(inference) => inference,
-            Err(()) => builder.build_diagnostic_inference_with(
-                self.argument_relations()
-                    .map(|relation| (relation.declared_type, relation.argument_type)),
-                choose,
-            ),
+            Err(errors) => {
+                for error in errors {
+                    // Report at-most one failure per type variable to avoid redundant diagnostics.
+                    if self.errors.iter().any(|existing| {
+                        matches!(
+                            existing,
+                            BindingError::SpecializationError { error: existing, .. }
+                                if existing.bound_typevar() == error.bound_typevar()
+                        )
+                    }) {
+                        continue;
+                    }
+
+                    self.errors.push(BindingError::SpecializationError {
+                        error,
+                        argument_index: None,
+                    });
+                }
+
+                builder.build_diagnostic_inference_with(
+                    self.argument_relations()
+                        .map(|relation| (relation.declared_type, relation.argument_type)),
+                    choose,
+                )
+            }
         };
         let specialization = inference.merged_specialization(db);
 
