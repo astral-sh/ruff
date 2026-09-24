@@ -1244,6 +1244,38 @@ fn invalid_exclude_pattern() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn response_files_preserve_literal_at_paths() -> anyhow::Result<()> {
+    // Preserve existing @-prefixed paths so filenames from integrations cannot select unrelated files.
+    let case = CliTest::with_files([
+        ("@list.py", "value: int = 'literal'"),
+        ("list.py", "other.py\n"),
+        ("@package/main.py", "value: int = 'directory'"),
+        ("package", "other.py\n"),
+        ("other.py", ""),
+        ("outer.args", "@inner.args\n"),
+        ("inner.args", "@package\n"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().args([
+        "--output-format",
+        "concise",
+        "@list.py",
+        "--",
+        "@outer.args",
+    ]), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    @list.py:1:14: error[invalid-assignment] Object of type `Literal["literal"]` is not assignable to `int`
+    @package/main.py:1:14: error[invalid-assignment] Object of type `Literal["directory"]` is not assignable to `int`
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
+    Ok(())
+}
+
 /// Test that ty works correctly with Bazel's symlinked file structure
 #[test]
 #[cfg(unix)]

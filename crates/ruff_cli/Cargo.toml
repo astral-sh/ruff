@@ -1,0 +1,17 @@
+[package]
+name = "ruff_cli"
+version = "0.0.14"
+description = "This is an internal component crate of Ruff"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+argfile = { workspace = true }
+
+[lints]
+workspace = true
