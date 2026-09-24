@@ -466,6 +466,35 @@ mod tests {
     }
 
     #[test]
+    fn hover_dynamic_class_with_markdown_fence() {
+        let test = hover_test(
+            r#"
+        Injected = type("name\n```\n![image](https://example.invalid/)\n```", (), {})
+        value = Injected()
+        value<CURSOR>
+        "#,
+        );
+
+        let rendered = hover(
+            &test.db,
+            test.program_file(test.cursor.file),
+            test.cursor.offset,
+        )
+        .map(|hover| {
+            (
+                hover.display(&test.db, MarkupKind::PlainText).to_string(),
+                hover.display(&test.db, MarkupKind::Markdown).to_string(),
+            )
+        });
+
+        let code = "name\n```\n![image](https://example.invalid/)\n```";
+        assert_eq!(
+            rendered,
+            Some((code.to_string(), format!("````python\n{code}\n````")))
+        );
+    }
+
+    #[test]
     fn hover_function() {
         let test = hover_test(
             r#"
