@@ -1261,7 +1261,9 @@ impl<'db> ConcreteLowerBound<'db> {
 
         // `⊤ ≤ T` implies `T = ⊤`
         if self.bound == self.typevar.domain(db).top(db) {
-            let derived = ConcreteEquivalenceBound::new(self.provenance, self.typevar, self.bound);
+            // The implied upper bound comes from the type variable's domain, not inference evidence.
+            let provenance = self.provenance | ConstraintProvenance::VALIDITY;
+            let derived = ConcreteEquivalenceBound::new(provenance, self.typevar, self.bound);
             map.add_single_implication(self.into(), derived.into());
         }
     }
@@ -1490,7 +1492,9 @@ impl<'db> ConcreteUpperBound<'db> {
 
         // `T ≤ ⊥` implies `T = ⊥`
         if self.bound == self.typevar.domain(db).bottom(db) {
-            let derived = ConcreteEquivalenceBound::new(self.provenance, self.typevar, self.bound);
+            // The implied lower bound comes from the type variable's domain, not inference evidence.
+            let provenance = self.provenance | ConstraintProvenance::VALIDITY;
+            let derived = ConcreteEquivalenceBound::new(provenance, self.typevar, self.bound);
             map.add_single_implication(self.into(), derived.into());
         }
     }

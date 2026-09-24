@@ -1157,7 +1157,26 @@ def _[T]():
     static_assert(not lower_any.satisfies(lower_str))
 ```
 
-As well as gradual types in contravariant position.
+Fully static bounds retain ordinary subtype relationships in each direction.
+
+```py
+class Base: ...
+class Sub(Base): ...
+
+def _[T]():
+    upper_base = ConstraintSet.upper_bound(T, Base)
+    upper_sub = ConstraintSet.upper_bound(T, Sub)
+    static_assert(upper_sub.satisfies(upper_base))
+    static_assert(not upper_base.satisfies(upper_sub))
+
+    lower_base = ConstraintSet.lower_bound(Base, T)
+    lower_sub = ConstraintSet.lower_bound(Sub, T)
+    static_assert(lower_base.satisfies(lower_sub))
+    static_assert(not lower_sub.satisfies(lower_base))
+```
+
+Gradual types in contravariant positions also describe a range of possible bounds. An `Any`
+parameter does not imply a particular parameter type.
 
 ```py
 from collections.abc import Callable
@@ -1180,6 +1199,34 @@ A gradual range remains valid when an upper bound eliminates incompatible altern
 def _[T]():
     alternatives = is_constraint_set_assignable_to(Any, T) | ConstraintSet.lower_bound(object, T)
     constraints = alternatives & ConstraintSet.upper_bound(T, int)
+    static_assert(constraints.solutions_for(T, inferable=tuple[T]) is not None)
+```
+
+Distinct type variables remain independent, even when they share the same gradual bound. Comparing
+constraints cannot choose specializations for those variables to make an implication hold.
+
+```py
+def _[T, U: tuple[Any], V: tuple[Any]]():
+    upper_u = ConstraintSet.upper_bound(T, U)
+    upper_v = ConstraintSet.upper_bound(T, V)
+    static_assert(not upper_u.satisfies(upper_v))
+    static_assert(not upper_v.satisfies(upper_u))
+
+    upper_tuple_u = ConstraintSet.upper_bound(T, tuple[U])
+    upper_tuple_v = ConstraintSet.upper_bound(T, tuple[V])
+    static_assert(not upper_tuple_u.satisfies(upper_tuple_v))
+    static_assert(not upper_tuple_v.satisfies(upper_tuple_u))
+```
+
+A gradual alternative must not acquire incompatible bounds from other alternatives. This union
+permits `Any`, `object`, and `str`; the first alternative does not imply both `T = object` and
+`T <= str`.
+
+```py
+def _[T]():
+    gradual = is_constraint_set_assignable_to(Any, T) & is_constraint_set_assignable_to(T, Any)
+    constraints = gradual | ConstraintSet.equality(T, object) | ConstraintSet.upper_bound(T, str)
+    static_assert(constraints != ConstraintSet.never())
     static_assert(constraints.solutions_for(T, inferable=tuple[T]) is not None)
 ```
 
