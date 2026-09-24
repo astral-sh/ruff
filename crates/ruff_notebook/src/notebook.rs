@@ -550,7 +550,10 @@ mod tests {
         notebook.write(&mut serialized)?;
         let reloaded = Notebook::from_source_code(std::str::from_utf8(&serialized)?)?;
 
-        // Updating preserves cell membership, while reloading classifies the cell again.
+        // Updating preserves the original Python cell selection, so the edited source still
+        // contains this cell. Reloading recognizes `%%markdown` and excludes it instead.
+        // The raw cells match, but the Python source returned to callers differs, so comparing
+        // only the raw notebook would incorrectly treat these notebooks as equal.
         assert_eq!(notebook.cells(), reloaded.cells());
         assert_eq!(notebook.source_code(), transformed);
         assert_eq!(reloaded.source_code(), "\n");
