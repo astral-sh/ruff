@@ -9,9 +9,9 @@ use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{Constraint, ConstraintProvenance};
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, ConstraintAssignment,
-    ConstraintId, ConstraintSetStorage, NodeId, PathBoundBuilder, SolutionLimits, SolutionValidity,
-    SolutionViolation, SolutionViolationKind,
+    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, CandidateTypeVarRangeSolver,
+    CandidateTypeVarSolution, ConstraintAssignment, ConstraintId, ConstraintSetStorage, NodeId,
+    SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
 };
 use crate::types::typevar::TypeVarBoundOrConstraints;
 use crate::types::{BoundTypeVarInstance, Type};
@@ -336,39 +336,39 @@ impl<'db> SolutionWalker<'db> {
             .collect();
 
         // Then collect the combined lower and upper bounds for each typevar.
-        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, PathBoundBuilder<'db>> =
+        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, CandidateTypeVarRangeSolver<'db>> =
             FxIndexMap::default();
 
         for (constraint, _) in typevars {
             let constraint = storage.constraint_data(constraint);
             match constraint {
                 Constraint::ConcreteLower(lower) => {
-                    let bounds = mappings.entry(lower.typevar).or_default();
-                    bounds.add_lower(lower.provenance, lower.bound);
+                    let solver = mappings.entry(lower.typevar).or_default();
+                    solver.add_lower(lower.provenance, lower.bound);
                 }
                 Constraint::ConcreteUpper(upper) => {
-                    let bounds = mappings.entry(upper.typevar).or_default();
-                    bounds.add_upper(upper.provenance, upper.bound);
+                    let solver = mappings.entry(upper.typevar).or_default();
+                    solver.add_upper(upper.provenance, upper.bound);
                 }
                 Constraint::ConcreteEquivalence(equivalence) => {
-                    let bounds = mappings.entry(equivalence.typevar).or_default();
-                    bounds.add_lower(equivalence.provenance, equivalence.bound);
-                    bounds.add_upper(equivalence.provenance, equivalence.bound);
+                    let solver = mappings.entry(equivalence.typevar).or_default();
+                    solver.add_lower(equivalence.provenance, equivalence.bound);
+                    solver.add_upper(equivalence.provenance, equivalence.bound);
                 }
                 Constraint::TypeVarRange(bound) => {
-                    let bounds = mappings.entry(bound.left).or_default();
-                    bounds.add_upper(bound.provenance, Type::TypeVar(bound.right));
-                    let bounds = mappings.entry(bound.right).or_default();
-                    bounds.add_lower(bound.provenance, Type::TypeVar(bound.left));
+                    let solver = mappings.entry(bound.left).or_default();
+                    solver.add_upper(bound.provenance, Type::TypeVar(bound.right));
+                    let solver = mappings.entry(bound.right).or_default();
+                    solver.add_lower(bound.provenance, Type::TypeVar(bound.left));
                 }
                 Constraint::TypeVarEquivalence(bound) => {
                     let (left, right) = bound.in_builder(db, storage);
-                    let bounds = mappings.entry(left).or_default();
-                    bounds.add_lower(bound.provenance, Type::TypeVar(right));
-                    bounds.add_upper(bound.provenance, Type::TypeVar(right));
-                    let bounds = mappings.entry(right).or_default();
-                    bounds.add_lower(bound.provenance, Type::TypeVar(left));
-                    bounds.add_upper(bound.provenance, Type::TypeVar(left));
+                    let solver = mappings.entry(left).or_default();
+                    solver.add_lower(bound.provenance, Type::TypeVar(right));
+                    solver.add_upper(bound.provenance, Type::TypeVar(right));
+                    let solver = mappings.entry(right).or_default();
+                    solver.add_lower(bound.provenance, Type::TypeVar(left));
+                    solver.add_upper(bound.provenance, Type::TypeVar(left));
                 }
             }
         }
@@ -376,32 +376,21 @@ impl<'db> SolutionWalker<'db> {
         let mut violations = Vec::new();
         let typevars: Option<Box<[_]>> = mappings
             .into_iter()
-            .map(|(bound_typevar, bounds)| {
-                let path_bound = bounds.finish(db, env, bound_typevar);
-
-                let lower = path_bound.effective_lower(db, env);
-                if !path_bound.upper.is_satisfied_by(db, env, lower) {
-                    let (when_upper, source_order) =
-                        path_bound.upper.when_satisfied_by(db, env, storage, lower);
-                    if when_upper.is_never_satisfied(db, env, storage, source_order) {
-                        // This path does not satisfy the accumulated upper bound, and is
-                        // therefore not a valid specialization.
-                        return None;
-                    }
-                }
+            .map(|(bound_typevar, solver)| {
+                let range = solver.finish(db, env, storage, bound_typevar)?;
 
                 if let Some(upper_bound_violations) = upper_bound_violations
                     && upper_bound_violations.contains(&bound_typevar)
                 {
                     violations.push(SolutionViolation {
                         bound_typevar,
-                        argument: path_bound.inference_lower(db, env),
-                        variance: path_bound.variance(),
+                        argument: range.inference_lower(db, env),
+                        variance: range.variance(),
                         kind: SolutionViolationKind::UpperBound,
                     });
                 }
 
-                Some(path_bound)
+                Some(CandidateTypeVarSolution::range(bound_typevar, range))
             })
             .collect();
         let typevars = typevars?;

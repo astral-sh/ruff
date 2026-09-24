@@ -23,8 +23,8 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    CandidateSolutions, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
-    OwnedConstraintSet, Solutions,
+    CandidateSolutions, CandidateTypeVarSolutionKind, ConstraintSet, ConstraintSetBuilder,
+    IteratorConstraintsExtension, OwnedConstraintSet, Solutions,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -1404,10 +1404,7 @@ impl<'db> Signature<'db> {
             matches!(receiver_type, Type::ClassLiteral(_) | Type::GenericAlias(_));
         let specialization = builder.build_merged_with(|typevar, bounds| {
             if let Some(bounds) = bounds
-                && let Some(lower) = bounds.inference_lower(db, env)
-                && bounds.has_upper_inference()
-                && let Some(upper) = bounds.as_single_upper_bound(db, env)
-                && lower.is_equivalent_to(db, env, upper)
+                && bounds.as_exact(db, env).is_some()
                 && let Some(solution) =
                     CandidateSolutions::default_solve(db, env, &constraints, inferable, bounds)
                         .as_type()
@@ -1421,7 +1418,8 @@ impl<'db> Signature<'db> {
                     .variance_of(db, env, typevar.identity(db))
                     .evaluate(db)
                     .is_covariant()
-                && bounds
+                && let CandidateTypeVarSolutionKind::Range(range) = &bounds.kind
+                && range
                     .inference_lower(db, env)
                     .is_some_and(|lower| !lower.is_never())
                 && let Some(solution) =
