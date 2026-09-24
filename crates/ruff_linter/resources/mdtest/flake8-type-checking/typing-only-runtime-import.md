@@ -130,6 +130,97 @@ from pathlib import Path  # error: [typing-only-standard-library-import] "type-c
 def load(value: Path): ...
 ```
 
+## Type-checking block fixes on older Python versions
+
+```toml
+target-version = "py314"
+lint.select = ["TC003"]
+```
+
+### Late `TYPE_CHECKING` import
+
+No fix is offered when `TYPE_CHECKING` is imported after the annotation that uses the module.
+
+```py
+import pathlib  # snapshot: typing-only-standard-library-import
+
+def load(path: pathlib.Path): ...
+
+from typing import TYPE_CHECKING
+```
+
+```snapshot
+error[TC003]: Move standard library import `pathlib` into a type-checking block
+ --> src/mdtest_snippet.py:1:8
+  |
+1 | import pathlib  # snapshot: typing-only-standard-library-import
+  |        ^^^^^^^
+help: Move into type-checking block
+```
+
+### Inline block
+
+The fix inserts the import into the existing inline block.
+
+```py
+from typing import TYPE_CHECKING
+import pathlib  # snapshot: typing-only-standard-library-import
+
+if TYPE_CHECKING: import os
+
+def load(path: pathlib.Path): ...
+```
+
+```snapshot
+error[TC003]: Move standard library import `pathlib` into a type-checking block
+ --> src/mdtest_snippet.py:2:8
+  |
+2 | import pathlib  # snapshot: typing-only-standard-library-import
+  |        ^^^^^^^
+help: Move into type-checking block
+  |
+1 | from typing import TYPE_CHECKING
+  - import pathlib  # snapshot: typing-only-standard-library-import
+2 |
+  - if TYPE_CHECKING: import os
+3 + if TYPE_CHECKING: import pathlib; import os
+4 |
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+### Locally assigned `TYPE_CHECKING`
+
+The fix reuses the existing block without importing `TYPE_CHECKING` from `typing`.
+
+```py
+import pathlib  # snapshot: typing-only-standard-library-import
+
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    from types import TracebackType
+
+def load(path: pathlib.Path, tb: TracebackType): ...
+```
+
+```snapshot
+error[TC003]: Move standard library import `pathlib` into a type-checking block
+ --> src/mdtest_snippet.py:1:8
+  |
+1 | import pathlib  # snapshot: typing-only-standard-library-import
+  |        ^^^^^^^
+help: Move into type-checking block
+  |
+  - import pathlib  # snapshot: typing-only-standard-library-import
+1 |
+2 | TYPE_CHECKING = False
+3 | if TYPE_CHECKING:
+4 +     import pathlib
+5 |     from types import TracebackType
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
 ## Lazy import policies
 
 Imports prohibited by `ban-lazy` retain the type-checking-block fix. An excluded module can still be

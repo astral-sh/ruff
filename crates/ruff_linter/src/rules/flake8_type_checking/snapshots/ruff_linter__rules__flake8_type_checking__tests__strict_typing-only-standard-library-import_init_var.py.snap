@@ -24,20 +24,17 @@ help: Move into type-checking block
    |
 note: This is an unsafe fix and may change runtime behavior
 
-TC003 [*] Move standard library import `pathlib.Path` into a type-checking block
+TC003 [*] Make standard library import `pathlib.Path` lazy
  --> init_var.py:6:21
   |
 5 | from dataclasses import FrozenInstanceError, InitVar, dataclass
 6 | from pathlib import Path
   |                     ^^^^
-help: Move into type-checking block
-   |
-5  | from dataclasses import FrozenInstanceError, InitVar, dataclass
-   - from pathlib import Path
-6  + from typing import TYPE_CHECKING
-7  +
-8  + if TYPE_CHECKING:
-9  +     from pathlib import Path
-10 |
-   |
+help: Convert to a lazy import (or move into a type-checking block)
+  |
+5 | from dataclasses import FrozenInstanceError, InitVar, dataclass
+  - from pathlib import Path
+6 + lazy from pathlib import Path
+7 |
+  |
 note: This is an unsafe fix and may change runtime behavior
