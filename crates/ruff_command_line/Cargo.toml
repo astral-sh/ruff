@@ -1,5 +1,5 @@
 [package]
-name = "ruff_cli"
+name = "ruff_command_line"
 version = "0.0.14"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
