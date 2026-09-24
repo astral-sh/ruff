@@ -484,6 +484,24 @@ def _[T, U]() -> None:
     ~ConstraintSet.range(Sub, T, Base) & ~ConstraintSet.range(Sub, U, Base)
 ```
 
+### Declared bounds of non-inferable typevars
+
+A path is only satisfiable if every type variable on the path satisfies its declared bound,
+including type variables that are not being inferred.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def noninferable_declared_bound[T, U: str]() -> None:
+    constraints = ConstraintSet.equality(U, int) & ConstraintSet.equality(T, bytes)
+    # revealed: None
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+
+    reversed_constraints = ConstraintSet.equality(T, bytes) & ConstraintSet.equality(U, int)
+    # revealed: None
+    reveal_type(reversed_constraints.solutions(inferable=tuple[T]))
+```
+
 ### Intersection of two ranges
 
 The intersection of two ranges is where the ranges "overlap".
