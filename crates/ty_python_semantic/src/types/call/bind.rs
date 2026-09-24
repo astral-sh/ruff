@@ -7823,21 +7823,6 @@ impl<'db> Binding<'db> {
 
         let parameter = &self.signature.parameters()[matched_parameter.index];
         let original_parameter_type = parameter.annotated_type();
-
-        // Infer the value passed to `cast` with the context it would receive without the cast.
-        // This lets container literals retain the element types expected by the outer context,
-        // so a redundant cast does not instead appear to cast between disjoint specializations.
-        if matched_parameter.index == 1
-            && let Some(annotation) = call_expression_tcx.annotation
-            && let Type::FunctionLiteral(function) = binding.callable_type
-            && function.is_known(db, KnownFunction::Cast)
-        {
-            return Some(ArgumentTypeContext::standard(
-                original_parameter_type,
-                annotation,
-            ));
-        }
-
         let mut parameter_type = matched_parameter
             .expected_type
             .unwrap_or(original_parameter_type);
