@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "repositories": {
+    "ruff-security": {
+      "name": "astral-sh/ruff-security",
+      "id": 1373465128
+    }
+  },
+  "rules": [
+    {
+      "repository": "ruff-security",
+      "on": {
+        "pull_request": ["labeled"]
+      },
+      "conditions": {
+        "/label/name": "bot:promote",
+        "/sender/type": "User"
+      },
+      "allow_draft": true,
+      "workflow": "promote-pull-request.yml"
+    }
+  ]
+}

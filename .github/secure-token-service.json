@@ -13,7 +13,23 @@
       "owner_id": 115962839
     }
   },
+  "installations": {
+    "automations": 146796415
+  },
   "rules": [
+    {
+      "caller": "ruff-security",
+      "environment": "automations",
+      "caller_workflow": "promote-pull-request.yml",
+      "on": ["workflow_dispatch"],
+      "permissions": {
+        "contents": "write",
+        "pull_requests": "write",
+        "workflows": "write"
+      },
+      "targets": ["ruff", "ruff-security"],
+      "installation": "automations"
+    },
     {
       "caller": "ruff",
       "environment": "automations",
