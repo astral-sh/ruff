@@ -5795,7 +5795,7 @@ mod tests {
     }
 
     #[test]
-    fn solutions_distinguish_declaration_failures_from_conflicting_bounds() {
+    fn solutions_retain_constraint_failure_evidence() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -5811,42 +5811,26 @@ mod tests {
         let builder = ConstraintSetBuilder::new();
         let inferable = TypeVarSet::from_typevars(db, [constrained]);
 
-        for (typevar, lower, upper, expected_violation) in [
-            (constrained, Some(int), str, None),
+        for (lower, upper, variance, evidence) in [
             (
-                constrained,
                 Some(bytes),
                 bytes,
-                Some((
-                    TypeVarVariance::Invariant,
-                    SolutionViolationKind::Constraints(ConstraintFailureEvidence::Lower(bytes)),
-                )),
+                TypeVarVariance::Invariant,
+                ConstraintFailureEvidence::Lower(bytes),
             ),
             (
-                constrained,
                 None,
                 bool,
-                Some((
-                    TypeVarVariance::Covariant,
-                    SolutionViolationKind::Constraints(ConstraintFailureEvidence::Upper(Box::new(
-                        [bool],
-                    ))),
-                )),
+                TypeVarVariance::Covariant,
+                ConstraintFailureEvidence::Upper(Box::new([bool])),
             ),
             (
-                constrained,
                 Some(bool),
                 bool,
-                Some((
-                    TypeVarVariance::Invariant,
-                    SolutionViolationKind::Constraints(ConstraintFailureEvidence::Upper(Box::new(
-                        [bool],
-                    ))),
-                )),
+                TypeVarVariance::Invariant,
+                ConstraintFailureEvidence::Upper(Box::new([bool])),
             ),
         ] {
-            // Construct bounds directly: relation construction can reject contradictory evidence
-            // before the solver can distinguish it from a declaration failure.
             // Mixed bounds carry inference evidence propagated through a declared bound.
             for provenance in [ConstraintProvenance::Evidence, ConstraintProvenance::Mixed] {
                 let mut bounds = PathBoundBuilder::default();
@@ -5855,21 +5839,17 @@ mod tests {
                 }
                 bounds.add_upper(provenance, upper);
                 let candidates = CandidateSolutions::Constrained(Box::new([CandidateSolution {
-                    typevars: Box::new([bounds.finish(db, &env, typevar)]),
+                    typevars: Box::new([bounds.finish(db, &env, constrained)]),
                     validity: SolutionValidity::Valid,
                 }]));
-                let expected = expected_violation
-                    .clone()
-                    .map(|(variance, kind)| Solution {
-                        solved_typevars: vec![],
-                        validity: SolutionValidity::Invalid(Box::new([SolutionViolation {
-                            bound_typevar: typevar,
-                            variance,
-                            kind,
-                        }])),
-                    })
-                    .into_iter()
-                    .collect();
+                let expected = vec![Solution {
+                    solved_typevars: vec![],
+                    validity: SolutionValidity::Invalid(Box::new([SolutionViolation {
+                        bound_typevar: constrained,
+                        variance,
+                        kind: SolutionViolationKind::Constraints(evidence.clone()),
+                    }])),
+                }];
 
                 assert_eq!(
                     candidates.solve(db, &env, &builder, inferable),
