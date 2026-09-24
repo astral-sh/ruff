@@ -262,6 +262,14 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 }
             };
 
+            // CPython resolves the escape sequences of each part before concatenating them, so an
+            // octal escape at the end of one part can't absorb the digits that the next part starts
+            // with: `"\1" "2"` is `"\x012"`, whereas the joined `"\12"` is `"\n"`. Keep such
+            // strings split.
+            if merge_changes_value(string, context) {
+                return None;
+            }
+
             Some(AnyStringFlags::new(prefix, quote, TripleQuotes::No))
         }
 
@@ -418,4 +426,90 @@ impl Format<PyFormatContext<'_>> for FormatLiteralContent {
         }
         Ok(())
     }
+}
+
+/// Returns `true` if merging the parts of `string` into a single literal would change its value
+/// because an escape sequence at the end of one part absorbs a digit from the next part.
+fn merge_changes_value(string: StringLike<'_>, context: &PyFormatContext) -> bool {
+    let source = context.source();
+    let mut ends_with = None;
+
+    for part in string.parts() {
+        let Some((starts_with, new_ends_with)) = text_edges(part, source) else {
+            // Parts that contribute no text don't create a boundary of their own.
+            continue;
+        };
+
+        if ends_with.is_some_and(|ends_with| escape_absorbs(ends_with, starts_with)) {
+            return true;
+        }
+
+        ends_with = Some(new_ends_with);
+    }
+
+    false
+}
+
+/// The character the text a part contributes starts with and the text it ends with, or `None` if
+/// the part contributes no text at all. Replacement fields contribute braces.
+fn text_edges<'a>(part: StringLikePart<'_>, source: &'a str) -> Option<(char, &'a str)> {
+    match part {
+        StringLikePart::String(_) | StringLikePart::Bytes(_) => {
+            let content = &source[part.content_range()];
+            Some((content.chars().next()?, content))
+        }
+        StringLikePart::FString(FString { elements, .. })
+        | StringLikePart::TString(TString { elements, .. }) => {
+            let text = |element: &InterpolatedStringElement| match element {
+                InterpolatedStringElement::Literal(literal) => &source[literal.range()],
+                InterpolatedStringElement::Interpolation(_) => "{}",
+            };
+
+            let starts_with = elements.iter().map(text).find(|text| !text.is_empty())?;
+            let ends_with = elements
+                .iter()
+                .rev()
+                .map(text)
+                .find(|text| !text.is_empty())?;
+
+            Some((starts_with.chars().next()?, ends_with))
+        }
+    }
+}
+
+/// Returns `true` if `ends_with` ends with an octal escape that `starts_with` extends, changing
+/// the literal's value once the parts are joined.
+///
+/// Octal escapes are the only ones that can span the boundary: `\ooo` takes one to three digits,
+/// so a part can end with an escape that is still hungry for digits. The other escapes can't:
+/// `\xhh`, `\uhhhh`, `\Uhhhhhhhh` and `\N{...}` demand their full syntax, which means a part
+/// ending with them parses as a complete escape on its own, and a plain `\c` escape is a single
+/// character that no following digit can join.
+fn escape_absorbs(ends_with: &str, starts_with: char) -> bool {
+    if !matches!(starts_with, '0'..='7') {
+        return false;
+    }
+
+    let bytes = ends_with.as_bytes();
+
+    // The digits the escape at the end of the part has consumed so far.
+    let mut digits = bytes.len();
+    while digits > 0 && matches!(bytes[digits - 1], b'0'..=b'7') {
+        digits -= 1;
+    }
+
+    matches!(bytes.len() - digits, 1 | 2) && trailing_backslashes(&ends_with[..digits]) % 2 == 1
+}
+
+/// The number of backslashes `text` ends with. A backslash only opens an escape sequence if the
+/// number of backslashes preceding it is even; an odd number means it escapes another backslash.
+fn trailing_backslashes(text: &str) -> usize {
+    let bytes = text.as_bytes();
+
+    let mut backslashes = 0;
+    while backslashes < bytes.len() && bytes[bytes.len() - 1 - backslashes] == b'\\' {
+        backslashes += 1;
+    }
+
+    backslashes
 }

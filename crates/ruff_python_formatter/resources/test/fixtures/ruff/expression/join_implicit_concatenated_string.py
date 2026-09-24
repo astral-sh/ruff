@@ -398,3 +398,22 @@ f"aaaaaaaaaaaaaaaa \
     "cccccccccccccc \
             ddddddddddddddddddd"  # comment 4
 )
+
+# Joining these would change the value of the literal: an octal escape at the end of one part
+# absorbs the digits the next part starts with, so the parts stay split.
+# https://github.com/astral-sh/ruff/issues/28842
+b"A\0" b"1\0"
+"\1" "2"
+"\12" "3"
+"\1" "" "2"
+"\1" f"2"
+f"a\1" "2"
+b"\7" b"7"
+
+# These joins are safe: the escape is complete, the next part doesn't start with an octal
+# digit, or the trailing backslash escapes itself.
+"\123" "4"
+"\12" "8"
+"\1" "a"
+"\1" "\2"
+"a\\1" "2"
