@@ -247,10 +247,9 @@ def noninferable_nested[T, U, V]() -> None:
     ) | ConstraintSet.lower_bound(bytes, V)
 
     # `U` is deliberately non-inferable here.
-    # TODO: We should not include a solution for non-inferable U.
-    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=Never, V=bytes], Solution[V=bytes]]
-    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=list[int], V=bytes], Solution[V=bytes]]
-    # revealed: tuple[Solution[T=list[int], U=int], Solution[V=bytes]]
+    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=Never, V=bytes], Solution[V=bytes]]
+    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=list[int], V=bytes], Solution[V=bytes]]
+    # revealed: tuple[Solution[T=list[int]], Solution[V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, V]))
     # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=Never], Solution[]]
     # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=list[int]], Solution[]]
