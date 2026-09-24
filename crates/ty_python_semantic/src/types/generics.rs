@@ -2503,7 +2503,7 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     /// Keep the first supplied parameter list. Argument checking still validates later
     /// occurrences against the chosen list.
     ///
-    /// TODO: Combine repeated ParamSpec bounds using unions and intersections of parameter lists
+    /// TODO: Combine repeated `ParamSpec` bounds using unions and intersections of parameter lists
     /// instead of keeping only the first occurrence's contribution.
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
 }
