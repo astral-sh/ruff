@@ -207,15 +207,37 @@ impl<'db> SolutionWalker<'db> {
                     ControlFlow::Continue(PathIs::Unsatisfied)
                 }
             },
-            &mut |this, storage, limits, path| match all_typevars {
-                Some(all_typevars) => {
-                    let validations = validations.get_or_insert_with(|| {
+            &mut |this, storage, limits, path| {
+                let validations = all_typevars.map(|all_typevars| {
+                    validations.get_or_insert_with(|| {
                         Validations::from_support(db, env, storage, all_typevars)
-                    });
+                    }) as &_
+                });
+                let mut satisfied = false;
+                this.validate_satisfied_path(
+                    db,
+                    env,
+                    storage,
+                    limits,
+                    path,
+                    validations,
+                    &mut |this, storage, limits, path| {
+                        if this.found_satisfied_path(db, env, storage, limits, path)? {
+                            satisfied = true;
+                        }
+                        ControlFlow::Continue(())
+                    },
+                )?;
+
+                // If this path is not satisfied, we want to identify which particular upper
+                // bounds or constraints were violated. To do that, we have to re-check this
+                // path against each one individually.
+                if let Some(validations) = validations
+                    && !satisfied
+                {
                     let upper_bounds = validations.upper_bounds.as_slice();
                     let constrained = validations.constrained.as_slice();
-                    let mut satisfied = false;
-                    this.validate_satisfied_path(
+                    this.attribute_typevar_failures(
                         db,
                         env,
                         storage,
@@ -223,34 +245,10 @@ impl<'db> SolutionWalker<'db> {
                         path,
                         upper_bounds,
                         constrained,
-                        &mut |this, storage, limits, path| {
-                            if this.found_satisfied_path(db, env, storage, limits, path)? {
-                                satisfied = true;
-                            }
-                            ControlFlow::Continue(())
-                        },
                     )?;
-
-                    // If this path is not satisfied, we want to identify which particular upper
-                    // bounds or constraints were violated. To do that, we have to re-check this
-                    // path against each one individually.
-                    if !satisfied {
-                        this.attribute_typevar_failures(
-                            db,
-                            env,
-                            storage,
-                            limits,
-                            path,
-                            upper_bounds,
-                            constrained,
-                        )?;
-                    }
-
-                    ControlFlow::Continue(())
                 }
-                None => this
-                    .found_satisfied_path(db, env, storage, limits, path)
-                    .map_continue(|_| ()),
+
+                ControlFlow::Continue(())
             },
         )
     }
@@ -547,12 +545,17 @@ impl<'db> SolutionWalker<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
-        upper_bounds: &Slice<BoundTypeVarInstance<'db>, UpperBound>,
-        constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
+        validations: Option<&Validations<'db>>,
         process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break> {
+        let Some(validations) = validations else {
+            return process_satisfied(self, storage, limits, path);
+        };
+
         // We have a path that represents a valid solution to the constraint set. Check if the
         // solution satisfies all of the typevars' declared upper bounds (TODO and constraints).
+        let upper_bounds = validations.upper_bounds.as_slice();
+        let constrained = validations.constrained.as_slice();
         self.validate_upper_bound(
             db,
             env,
