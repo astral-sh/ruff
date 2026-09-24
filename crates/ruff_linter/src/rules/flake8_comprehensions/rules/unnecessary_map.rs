@@ -66,10 +66,9 @@ use crate::{FixAvailability, Violation};
 /// diagnostic is still reported in such cases.
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as it may occasionally drop comments
-/// when rewriting the call. In most cases, though, comments will be preserved.
-/// The fix is also unsafe because it can change how errors propagate out of the
-/// resulting iterator, as described under "Known problems" above.
+/// This rule's fix is marked as unsafe because it can change how errors propagate
+/// out of the resulting iterator, as described above. It may also drop comments
+/// when rewriting the call.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.74")]
 pub(crate) struct UnnecessaryMap {
