@@ -4431,10 +4431,6 @@ impl InteriorNode {
                 .expect("every BDD constraint should have a source-order entry")
         });
 
-        if !self.node().is_single_conjunction(storage) {
-            return PathAssignments::new(constraints, FxHashSet::default());
-        }
-
         let bound_is_concrete = |bound: Type<'db>| {
             !bound.has_typevar(db, env)
                 && !bound.has_unspecialized_type_var(db, env)
