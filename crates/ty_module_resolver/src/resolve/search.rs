@@ -33,7 +33,7 @@ use super::{
     CandidatePrecedence, ComponentFileFilter, ModuleNameIngredient, ModuleResolutionCandidate,
     ModuleResolveMode, PyTyped, ResolvedModule, ResolvedNames, ResolverContext, StubPackageIndex,
     StubPackagePaths, normalize_candidates, resolve_component, resolve_stub_package_in_search_path,
-    search_paths, stub_package_index,
+    stub_package_index,
 };
 
 /// Recursively lists all available modules and submodules.
@@ -81,10 +81,7 @@ pub(crate) fn list_submodules<'db>(db: &'db dyn Db, module: Module<'db>) -> Modu
     // Desperate resolution can use a search path absent from the configuration.
     // Preserve that path when listing the module's submodules.
     let paths = match module.search_path(db) {
-        Some(path)
-            if !search_paths(db, resolver_environment, ModuleResolveMode::Typing)
-                .any(|configured| configured == path) =>
-        {
+        Some(path) if !context.search_paths().any(|configured| configured == path) => {
             RootSearchPaths::Supplied(std::slice::from_ref(path))
         }
         _ => RootSearchPaths::Configured,
@@ -150,8 +147,8 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
                 let key = ModuleNameIngredient::new(
                     context.db,
                     module_name_prefix,
-                    context.mode,
-                    context.resolver_environment,
+                    context.mode(),
+                    context.resolver_environment(),
                 );
                 Self::restore(context, key)
             }
@@ -238,7 +235,7 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
 
             if let Some(candidates) = self.resolve_child(&component_name) {
                 if let Some(candidate) = candidates.into_iter().next() {
-                    let module = candidate.into_module(db, context.resolver_environment, &name);
+                    let module = candidate.into_module(db, context.resolver_environment(), &name);
                     modules.push(module);
                     if has_directory {
                         modules_with_possible_children.push(module);
@@ -574,7 +571,7 @@ impl<'db> PrefixResolver<'db> {
         component_name: &str,
     ) -> Option<Self> {
         let prefix = ModuleName::new(component_name)?;
-        if context.mode.is_typing() {
+        if context.mode().is_typing() {
             TypingModeResolver::new(context, paths, prefix).map(Self::Typing)
         } else {
             RuntimeModeResolver::new(context, paths, prefix).map(Self::Runtime)
@@ -714,14 +711,13 @@ impl<'db> TypingModeResolver<'db> {
         let resolver = match paths {
             RootSearchPaths::Configured => {
                 let (extra_stub_package_paths, _) =
-                    stub_package_index(context.db, context.resolver_environment)
+                    stub_package_index(context.db, context.resolver_environment())
                         .split_by_extra_paths();
                 let root_candidates = discover_roots(
                     context,
                     prefix.as_str(),
                     false,
-                    search_paths(context.db, context.resolver_environment, context.mode)
-                        .take_while(|path| path.is_extra()),
+                    context.search_paths().take_while(|path| path.is_extra()),
                     extra_stub_package_paths,
                 );
                 let stub_override_candidates =
@@ -881,7 +877,8 @@ impl<'db> TypingModeResolver<'db> {
     fn full_search_candidates(&self, context: &ResolverContext<'db>) -> &ResolvedNames<'db> {
         self.full_search_candidates.get_or_init(|| {
             let (_, remaining_stub_package_paths) =
-                stub_package_index(context.db, context.resolver_environment).split_by_extra_paths();
+                stub_package_index(context.db, context.resolver_environment())
+                    .split_by_extra_paths();
 
             // Combine candidates across all search paths before traversing the
             // module name prefix, so that an ordinary package in one search path
@@ -895,8 +892,7 @@ impl<'db> TypingModeResolver<'db> {
                 context,
                 self.prefix.first_component(),
                 false,
-                search_paths(context.db, context.resolver_environment, context.mode)
-                    .skip_while(|path| path.is_extra()),
+                context.search_paths().skip_while(|path| path.is_extra()),
                 remaining_stub_package_paths,
             ));
             candidates = normalize_candidates(context, candidates, true);
@@ -1003,9 +999,9 @@ impl<'db> RootSearchPaths<'db> {
         for_module_name_prefix: bool,
     ) -> ResolvedNames<'db> {
         let is_non_shadowable = !for_module_name_prefix
-            && context.mode.is_non_shadowable(
+            && context.mode().is_non_shadowable(
                 context
-                    .resolver_environment
+                    .resolver_environment()
                     .python_version(context.db)
                     .minor,
                 name.as_str(),
@@ -1014,10 +1010,11 @@ impl<'db> RootSearchPaths<'db> {
         // Typing mode requires us to consider stub-only packages (such as the package named
         // `acme-stubs`, which only contains `.pyi` files) when resolving a module name
         // (e.g., the name `acme`), so we must select all stub package paths here.
-        let stub_packages = context.mode.is_typing().then(|| match self {
-            Self::Configured => {
-                Cow::Borrowed(stub_package_index(context.db, context.resolver_environment))
-            }
+        let stub_packages = context.mode().is_typing().then(|| match self {
+            Self::Configured => Cow::Borrowed(stub_package_index(
+                context.db,
+                context.resolver_environment(),
+            )),
             Self::Supplied(paths) => Cow::Owned(StubPackageIndex::from_search_paths(
                 context.db,
                 paths.iter(),
@@ -1043,11 +1040,7 @@ impl<'db> RootSearchPaths<'db> {
 
     fn iter(&self, context: &ResolverContext<'db>) -> impl Iterator<Item = &'db SearchPath> {
         match self {
-            Self::Configured => Either::Left(search_paths(
-                context.db,
-                context.resolver_environment,
-                context.mode,
-            )),
+            Self::Configured => Either::Left(context.search_paths()),
             Self::Supplied(paths) => Either::Right(paths.iter()),
         }
     }

@@ -532,12 +532,12 @@ fn query_stdlib_version(
         return TypeshedVersionsQueryResult::DoesNotExist;
     };
     context
-        .resolver_environment
+        .resolver_environment()
         .search_paths(context.db)
         .typeshed_versions()
         .query_module(
             &module_name,
-            context.resolver_environment.python_version(context.db),
+            context.resolver_environment().python_version(context.db),
         )
 }
 

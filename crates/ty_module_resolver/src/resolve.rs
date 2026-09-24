@@ -212,6 +212,21 @@ pub(crate) struct ModuleResolveModeIngredient<'db> {
     mode: ModuleResolveMode,
 }
 
+impl<'db> ModuleResolveModeIngredient<'db> {
+    /// Iterates over search paths using this already-interned environment and mode.
+    fn search_paths(self, db: &'db dyn Db) -> SearchPathIterator<'db> {
+        let search_paths = self.resolver_environment(db).search_paths(db);
+
+        SearchPathIterator {
+            db,
+            static_paths: search_paths.static_paths.iter(),
+            stdlib_path: search_paths.stdlib(self.mode(db)),
+            dynamic_paths: None,
+            mode: self,
+        }
+    }
+}
+
 impl ModuleResolveMode {
     fn is_typing(self) -> bool {
         matches!(self, Self::Typing)
@@ -453,15 +468,7 @@ pub fn search_paths<'db>(
     resolver_environment: ResolverEnvironment<'db>,
     resolve_mode: ModuleResolveMode,
 ) -> SearchPathIterator<'db> {
-    let search_paths = resolver_environment.search_paths(db);
-
-    SearchPathIterator {
-        db,
-        static_paths: search_paths.static_paths.iter(),
-        stdlib_path: search_paths.stdlib(resolve_mode),
-        dynamic_paths: None,
-        mode: ModuleResolveModeIngredient::new(db, resolver_environment, resolve_mode),
-    }
+    ModuleResolveModeIngredient::new(db, resolver_environment, resolve_mode).search_paths(db)
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -1559,7 +1566,7 @@ fn resolve_file_module_with_filter(
     name: &str,
     filter: ComponentFileFilter,
 ) -> Option<File> {
-    let stub_file = if resolver_state.mode.is_typing() {
+    let stub_file = if resolver_state.mode().is_typing() {
         directory.resolve_file(resolver_state, &format_compact!("{name}.pyi"))
     } else {
         None
@@ -1624,7 +1631,7 @@ fn is_legacy_namespace_package(
         PythonFile::new(
             context.db,
             init,
-            context.resolver_environment.python_version(context.db),
+            context.resolver_environment().python_version(context.db),
         ),
     )
 }
@@ -1673,8 +1680,7 @@ impl PyTyped {
 
 pub(super) struct ResolverContext<'db> {
     pub(super) db: &'db dyn Db,
-    pub(super) resolver_environment: ResolverEnvironment<'db>,
-    pub(super) mode: ModuleResolveMode,
+    mode: ModuleResolveModeIngredient<'db>,
 }
 
 impl<'db> ResolverContext<'db> {
@@ -1683,11 +1689,28 @@ impl<'db> ResolverContext<'db> {
         resolver_environment: ResolverEnvironment<'db>,
         mode: ModuleResolveMode,
     ) -> Self {
-        Self {
+        Self::from_mode(
             db,
-            resolver_environment,
-            mode,
-        }
+            ModuleResolveModeIngredient::new(db, resolver_environment, mode),
+        )
+    }
+
+    /// Builds a context without interning an existing environment and mode again.
+    fn from_mode(db: &'db dyn Db, mode: ModuleResolveModeIngredient<'db>) -> Self {
+        Self { db, mode }
+    }
+
+    /// Returns the environment shared by this context's module searches.
+    pub(super) fn resolver_environment(&self) -> ResolverEnvironment<'db> {
+        self.mode.resolver_environment(self.db)
+    }
+
+    fn mode(&self) -> ModuleResolveMode {
+        self.mode.mode(self.db)
+    }
+
+    fn search_paths(&self) -> SearchPathIterator<'db> {
+        self.mode.search_paths(self.db)
     }
 
     pub(super) fn vendored(&self) -> &VendoredFileSystem {
