@@ -196,6 +196,7 @@ impl TestServer {
         test_context: TestContext,
         capabilities: ClientCapabilities,
         initialization_options: Option<serde_json::Value>,
+        workspace_trust: WorkspaceTrust,
     ) -> Self {
         setup_tracing();
 
@@ -211,7 +212,7 @@ impl TestServer {
                 worker_threads,
                 server_connection,
                 None,
-                WorkspaceTrust::Trusted,
+                workspace_trust,
                 true,
             ) {
                 Ok(server) => {
@@ -974,6 +975,7 @@ pub(crate) struct TestServerBuilder {
     workspaces: Vec<WorkspaceFolder>,
     initialization_options: Option<serde_json::Value>,
     client_capabilities: ClientCapabilities,
+    workspace_trust: WorkspaceTrust,
 }
 
 impl TestServerBuilder {
@@ -1008,11 +1010,16 @@ impl TestServerBuilder {
             test_context: TestContext::new()?,
             initialization_options: None,
             client_capabilities,
+            workspace_trust: WorkspaceTrust::Trusted,
         })
     }
 
+    pub(crate) fn with_workspace_trust(mut self, workspace_trust: WorkspaceTrust) -> Self {
+        self.workspace_trust = workspace_trust;
+        self
+    }
+
     /// Set the initial client options for the test server
-    #[expect(dead_code)]
     pub(crate) fn with_initialization_options(mut self, options: serde_json::Value) -> Self {
         self.initialization_options = Some(options);
         self
@@ -1155,6 +1162,7 @@ impl TestServerBuilder {
             self.test_context,
             self.client_capabilities,
             self.initialization_options,
+            self.workspace_trust,
         )
     }
 }
