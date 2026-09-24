@@ -3674,6 +3674,10 @@ impl<'db> CandidateSolutions<'db> {
         // constraints are still checked by `preliminary_solve`, so they do not introduce a
         // disjunction during extraction.
         //
+        // Keeping constrained typevars on this path preserves their inferred bounds for
+        // diagnostics. In the general walker, `T <= str` and `T <= bytes` imply `T <= Never`,
+        // which replaces both original bounds in the collected solution.
+        //
         // Unlike the more general `SolutionWalker`, here we only have to consider the typevars
         // that are actually mentioned in the solution we found, rather than incorporating the
         // validity constraints of _every_ typevar. For this fast path, we have already ensured
