@@ -102,6 +102,60 @@ def f(x: RecursiveAlias):
     cast(RecursiveAlias, x)  # error: [redundant-cast]
 ```
 
+## Outer type context
+
+The expected type of a `cast()` call also provides type context for its value argument. A list
+literal therefore retains its literal element type when passed to a parameter that expects it, even
+through an intervening cast. The cast is redundant in this case.
+
+```py
+from typing import Literal, cast
+from typing_extensions import cast as extension_cast
+
+def f(x: list[Literal["foo"]]) -> None: ...
+
+f(["foo"])
+f(cast(list[Literal["foo"]], ["foo"]))  # error: [redundant-cast]
+f(cast(val=["foo"], typ=list[Literal["foo"]]))  # error: [redundant-cast]
+f(extension_cast(list[Literal["foo"]], ["foo"]))  # error: [redundant-cast]
+```
+
+The context propagates through nested casts as well:
+
+```py
+# error: [redundant-cast]
+# error: [redundant-cast]
+f(cast(list[Literal["foo"]], cast(list[Literal["foo"]], ["foo"])))
+```
+
+Annotated assignments and return types also supply type context through a cast:
+
+```py
+items: list[Literal["foo"]] = cast(list[Literal["foo"]], ["foo"])  # error: [redundant-cast]
+
+def make_items() -> list[Literal["foo"]]:
+    return cast(list[Literal["foo"]], ["foo"])  # error: [redundant-cast]
+```
+
+A value incompatible with the outer context still produces a disjoint-cast diagnostic:
+
+```py
+f(cast(list[Literal["foo"]], [42]))  # error: [disjoint-cast]
+```
+
+The outer context can also provide the `TypedDict` type of a dictionary literal:
+
+```py
+from typing import TypedDict
+
+class Item(TypedDict):
+    name: str
+
+def accept_item(item: Item) -> None: ...
+
+accept_item(cast(Item, {"name": "foo"}))  # error: [redundant-cast]
+```
+
 ## Redundant casts of tuple classes with unknown elements
 
 A tuple class with an `Unknown` element is not fully static, even when its other element is `object`
