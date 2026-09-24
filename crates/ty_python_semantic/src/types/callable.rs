@@ -197,6 +197,9 @@ impl<'db> Type<'db> {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
             Type::Callable(callable) => Some(CallableTypes::one(callable)),
+            Type::DataclassDecorator(decorator) => decorator
+                .callable(db)
+                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context),
 
             Type::Dynamic(_) => Some(CallableTypes::one(CallableType::function_like(
                 db,
@@ -429,8 +432,7 @@ impl<'db> Type<'db> {
                 .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, receiver),
 
             // TODO
-            Type::DataclassDecorator(_)
-            | Type::ModuleLiteral(_)
+            Type::ModuleLiteral(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::PropertyInstance(_)

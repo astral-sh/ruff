@@ -1973,6 +1973,17 @@ Person(name="Alice", age=20)
 Person(name="Alice", something_else=7)  # error: [unknown-argument]
 ```
 
+Calling the decorator with options also preserves the class's fields and synthesized constructor.
+
+```py
+@dataclass(kw_only=True)
+class KeywordOnly:
+    name: str
+
+reveal_type(KeywordOnly(name="Alice").name)  # revealed: str
+reveal_type(KeywordOnly.__init__)  # revealed: (self: KeywordOnly, *, name: str) -> None
+```
+
 ## Inherited `ModelMetaclass`
 
 Pydantic's metaclass-based `@dataclass_transform` metadata should continue to apply when a custom

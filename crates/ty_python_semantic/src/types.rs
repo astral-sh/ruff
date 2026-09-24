@@ -1890,9 +1890,7 @@ impl From<DataclassTransformerFlags> for DataclassFlags {
     }
 }
 
-/// Metadata for a dataclass. Stored inside a `Type::DataclassDecorator(…)`
-/// instance that we use as the return type of a `dataclasses.dataclass` and
-/// dataclass-transformer decorator calls.
+/// Metadata for a dataclass or dataclass-like class.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct DataclassParams<'db> {
     #[returns(copy)]
@@ -1946,6 +1944,45 @@ impl<'db> DataclassParams<'db> {
     }
 }
 
+/// A callable carrying the dataclass semantics of a decorator factory.
+///
+/// The wrapped type remains authoritative for signatures, return types, and attributes. When
+/// its type is unknown, calls use the standard dataclass decorator signature as a fallback.
+/// The metadata describes the dataclass behavior to apply when it decorates a class.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct DataclassDecorator<'db> {
+    #[returns(copy)]
+    pub(crate) callable: Type<'db>,
+
+    #[returns(copy)]
+    pub(crate) params: DataclassParams<'db>,
+}
+
+impl get_size2::GetSize for DataclassDecorator<'_> {}
+
+impl<'db> DataclassDecorator<'db> {
+    /// The standard dataclass decorator signature, also used when a transform factory leaves
+    /// its returned callable unannotated. Explicit callable signatures take precedence.
+    fn default_signature(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Signature<'db> {
+        let typevar = BoundTypeVarInstance::synthetic(
+            db,
+            env,
+            Name::new_static("T"),
+            TypeVarVariance::Invariant,
+        );
+        let class_type = SubclassOfType::from(db, env, typevar);
+        // Intersect with `Any` for the return type to reflect the fact that the `dataclass()`
+        // decorator adds methods to the class.
+        let return_type = IntersectionType::from_two_elements(db, env, class_type, Type::any());
+        Signature::new_generic(
+            Some(GenericContext::from_typevar_instances(db, env, [typevar])),
+            Parameters::standard([Parameter::positional_only(Some(Name::new_static("cls")))
+                .with_annotated_type(class_type)]),
+            return_type,
+        )
+    }
+}
+
 /// Representation of a type: a set of possible values at runtime.
 ///
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
@@ -1994,10 +2031,8 @@ pub enum Type<'db> {
     /// TODO: Similar to above, this could eventually be replaced by a generic `Callable`
     /// type.
     WrapperDescriptor(WrapperDescriptorKind),
-    /// A special callable that is returned by a `dataclass(…)` call. It is usually
-    /// used as a decorator. Note that this is only used as a return type for actual
-    /// `dataclass` calls, not for the argumentless `@dataclass` decorator.
-    DataclassDecorator(DataclassParams<'db>),
+    /// A callable returned by a dataclass decorator factory, with its dataclass metadata.
+    DataclassDecorator(DataclassDecorator<'db>),
     /// A special callable that is returned by a `dataclass_transform(…)` call.
     DataclassTransformer(DataclassTransformerParams<'db>),
     /// The type of an arbitrary callable object with a certain specified signature.
@@ -2751,7 +2786,6 @@ impl<'db> Type<'db> {
             | Type::LiteralValue(_)
             | Type::ModuleLiteral(_)
             | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::BoundSuper(_)
             | Type::SpecialForm(_) => self,
@@ -3300,6 +3334,7 @@ impl<'db> Type<'db> {
             // types without a declared alias.
             Type::TypeAlias(_) | Type::Recursive(_) => true,
             Type::TypeForm(typeform) => typeform.type_argument(db).is_spellable(db),
+            Type::DataclassDecorator(decorator) => decorator.callable(db).is_spellable(db),
             Type::Intersection(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
             Type::Divergent(_)
@@ -3316,7 +3351,6 @@ impl<'db> Type<'db> {
             | Type::FunctionLiteral(_)
             | Type::ModuleLiteral(_)
             | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ClassLiteral(_)
             | Type::GenericAlias(_)
@@ -3329,6 +3363,7 @@ impl<'db> Type<'db> {
     /// in a "Did you mean...?" hint message in diagnostics
     fn is_hintable(&self, db: &'db dyn Db) -> bool {
         match self {
+            Type::DataclassDecorator(decorator) => decorator.callable(db).is_hintable(db),
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
@@ -3355,7 +3390,6 @@ impl<'db> Type<'db> {
             | Type::FunctionLiteral(_)
             | Type::ModuleLiteral(_)
             | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ClassLiteral(_)
             | Type::GenericAlias(_)
@@ -3738,6 +3772,17 @@ impl<'db> Type<'db> {
             Type::Callable(callable) => callable
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::Callable),
+            Type::DataclassDecorator(decorator) => {
+                Some(Type::DataclassDecorator(DataclassDecorator::new(
+                    db,
+                    decorator
+                        .callable(db)
+                        .recursive_type_normalized_impl(db, env, div, nested)?,
+                    decorator
+                        .params(db)
+                        .recursive_type_normalized_impl(db, env, div, nested)?,
+                )))
+            }
             Type::ProtocolInstance(protocol) => protocol
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::ProtocolInstance),
@@ -3801,7 +3846,6 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::Never
             | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::SpecialForm(_)
@@ -3991,7 +4035,8 @@ impl<'db> Type<'db> {
                 // (this variant represents `f.__get__`, where `f` is any function)
                 false
             }
-            Type::DataclassDecorator(_) | Type::DataclassTransformer(_) => false,
+            Type::DataclassDecorator(decorator) => decorator.callable(db).is_singleton(db, env),
+            Type::DataclassTransformer(_) => false,
             Type::NominalInstance(instance) => instance.is_singleton(db),
             Type::PropertyInstance(_) | Type::SlotDescriptor(_) => false,
             Type::Union(..) => {
@@ -4160,13 +4205,15 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => alias
                 .value_type(db)
                 .find_name_in_mro_with_policy(db, env, name, policy),
+            Type::DataclassDecorator(decorator) => decorator
+                .callable(db)
+                .find_name_in_mro_with_policy(db, env, name, policy),
 
             Type::FunctionLiteral(_)
             | Type::Callable(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
-            | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::SpecialForm(_)
@@ -4260,6 +4307,11 @@ impl<'db> Type<'db> {
         tracing::trace!("class_member: {}.{}", ty.display(db, env), name);
         if let Some(fallback) = ty.materialized_divergent_fallback() {
             return fallback.class_member_with_policy(db, env, name, policy);
+        }
+        if let Type::DataclassDecorator(decorator) = ty {
+            return decorator
+                .callable(db)
+                .class_member_with_policy(db, env, name, policy);
         }
         if let Type::ProtocolInstance(protocol) = ty
             && let Some(origin) = protocol.materialized_origin(db)
@@ -4699,9 +4751,9 @@ impl<'db> Type<'db> {
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType
                 .to_instance(db, env)
                 .instance_member(db, env, name),
-            Type::DataclassDecorator(_) => KnownClass::FunctionType
-                .to_instance(db, env)
-                .instance_member(db, env, name),
+            Type::DataclassDecorator(decorator) => {
+                decorator.callable(db).instance_member(db, env, name)
+            }
             Type::Callable(_) | Type::DataclassTransformer(_) => {
                 Type::object().instance_member(db, env, name)
             }
@@ -6151,8 +6203,22 @@ impl<'db> Type<'db> {
                 Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType
                     .to_instance(db, env)
                     .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
-                Type::DataclassDecorator(_) => KnownClass::FunctionType
-                    .to_instance(db, env)
+                Type::DataclassDecorator(decorator) if name_str == "__call__" => {
+                    let member = decorator
+                        .callable(db)
+                        .member_lookup_with_policy_and_receiver(
+                            db, env, name_str, policy, receiver,
+                        );
+                    map_member_lookup_type(db, member, |callable| {
+                        Type::DataclassDecorator(DataclassDecorator::new(
+                            db,
+                            callable,
+                            decorator.params(db),
+                        ))
+                    })
+                }
+                Type::DataclassDecorator(decorator) => decorator
+                    .callable(db)
                     .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
 
                 Type::Callable(callable)
@@ -6904,6 +6970,7 @@ impl<'db> Type<'db> {
 
                 Some(KnownFunction::Dataclass) => {
                     let python_version = env.python_version(db);
+                    let decorator_signature = DataclassDecorator::default_signature(db, env);
                     let bool_parameter = |name: &'static str, default: bool| {
                         Parameter::keyword_only(Name::new_static(name))
                             .with_annotated_type(KnownClass::Bool.to_instance(db, env))
@@ -6931,32 +6998,34 @@ impl<'db> Type<'db> {
                         decorator_factory_parameters.push(bool_parameter("weakref_slot", false));
                     }
 
-                    let parameters_with_cls = |cls_ty| {
-                        let mut parameters =
-                            Vec::with_capacity(decorator_factory_parameters.len() + 1);
-                        parameters.push(
-                            Parameter::positional_only(Some(Name::new_static("cls")))
-                                .with_annotated_type(cls_ty),
-                        );
-                        parameters.extend_from_slice(&decorator_factory_parameters);
-                        parameters
-                    };
+                    let direct_signature = Signature::new_generic(
+                        decorator_signature.generic_context,
+                        Parameters::standard(
+                            decorator_signature
+                                .parameters()
+                                .iter()
+                                .chain(&decorator_factory_parameters)
+                                .cloned(),
+                        ),
+                        decorator_signature.return_ty,
+                    );
+                    let decorator_type = Type::function_like_callable(db, decorator_signature);
 
                     CallableBinding::from_overloads(
                         self,
                         [
-                            // def dataclass(cls: None, /, *, ...) -> Callable[[type[_T]], type[_T]]: ...
+                            // def dataclass(cls: None, /, *, ...) -> Callable[[type[_T]], type[_T] & Any]: ...
                             Signature::new(
-                                Parameters::standard(parameters_with_cls(Type::none(db, env))),
-                                Type::unknown(),
+                                Parameters::standard(
+                                    [Parameter::positional_only(Some(Name::new_static("cls")))
+                                        .with_annotated_type(Type::none(db, env))]
+                                    .into_iter()
+                                    .chain(decorator_factory_parameters.iter().cloned()),
+                                ),
+                                decorator_type,
                             ),
-                            // def dataclass(cls: type[_T], /, *, ...) -> type[_T]: ...
-                            Signature::new(
-                                Parameters::standard(parameters_with_cls(
-                                    KnownClass::Type.to_instance(db, env),
-                                )),
-                                Type::unknown(),
-                            ),
+                            // def dataclass(cls: type[_T], /, *, ...) -> type[_T] & Any: ...
+                            direct_signature,
                             // def dataclass(
                             //     *,
                             //     init: bool = True,
@@ -6969,10 +7038,10 @@ impl<'db> Type<'db> {
                             //     kw_only: bool = False,
                             //     slots: bool = False,
                             //     weakref_slot: bool = False,
-                            // ) -> Callable[[type[_T]], type[_T]]: ...
+                            // ) -> Callable[[type[_T]], type[_T] & Any]: ...
                             Signature::new(
                                 Parameters::standard(decorator_factory_parameters),
-                                Type::unknown(),
+                                decorator_type,
                             ),
                         ],
                     )
@@ -7156,27 +7225,14 @@ impl<'db> Type<'db> {
                     .bindings_impl(db, env, recursion_guard)
             }
 
-            Type::DataclassDecorator(_) => {
-                let typevar = BoundTypeVarInstance::synthetic(
-                    db,
-                    env,
-                    Name::new_static("T"),
-                    TypeVarVariance::Invariant,
-                );
-                let typevar_meta = SubclassOfType::from(db, env, typevar);
-                let context = GenericContext::from_typevar_instances(db, env, [typevar]);
-                let parameters = [Parameter::positional_only(Some(Name::new_static("cls")))
-                    .with_annotated_type(typevar_meta)];
-                // Intersect with `Any` for the return type to reflect the fact that the `dataclass()`
-                // decorator adds methods to the class
-                let returns =
-                    IntersectionType::from_two_elements(db, env, typevar_meta, Type::any());
-                let signature = Signature::new_generic(
-                    Some(context),
-                    Parameters::standard(parameters),
-                    returns,
-                );
-                Binding::single(self, signature).into()
+            Type::DataclassDecorator(decorator) => {
+                let callable = decorator.callable(db);
+                let bindings = if callable.is_unknown() {
+                    Binding::single(self, DataclassDecorator::default_signature(db, env)).into()
+                } else {
+                    callable.bindings_impl(db, env, recursion_guard)
+                };
+                bindings.with_dataclass_params(decorator.params(db))
             }
 
             // TODO: some `SpecialForm`s are callable (e.g. TypedDicts)
@@ -8945,7 +9001,7 @@ impl<'db> Type<'db> {
                 Type::WrapperDescriptor(_) => {
                     KnownClass::WrapperDescriptorType.to_class_literal(db, env)
                 }
-                Type::DataclassDecorator(_) => KnownClass::FunctionType.to_class_literal(db, env),
+                Type::DataclassDecorator(decorator) => decorator.callable(db).to_meta_type(db, env),
                 Type::Callable(callable) if let Some(class) = callable.runtime_class(db) => {
                     class.to_class_literal(db, env)
                 }
@@ -9197,7 +9253,6 @@ impl<'db> Type<'db> {
                 | Type::Divergent(_)
                 | Type::Never
                 | Type::WrapperDescriptor(_)
-                | Type::DataclassDecorator(_)
                 | Type::DataclassTransformer(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
@@ -9553,6 +9608,16 @@ impl<'db> Type<'db> {
                 Type::Callable(callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }),
 
+            Type::DataclassDecorator(decorator) => visitor.visit(db, self, type_mapping, || {
+                Type::DataclassDecorator(DataclassDecorator::new(
+                    db,
+                    decorator
+                        .callable(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    decorator.params(db),
+                ))
+            }),
+
             Type::GenericAlias(generic) => {
                 Type::GenericAlias(generic.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
@@ -9684,7 +9749,6 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetSolutions(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
-            | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::BoundSuper(_)
             | Type::SpecialForm(_) => self,
@@ -9841,6 +9905,16 @@ impl<'db> Type<'db> {
 
             Type::Callable(callable) => {
                 callable.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
+            }
+
+            Type::DataclassDecorator(decorator) => {
+                decorator.callable(db).find_legacy_typevars_impl(
+                    db,
+                    env,
+                    binding_context,
+                    typevars,
+                    visitor,
+                );
             }
 
             Type::PropertyInstance(property) => visitor.visit(db, self, || {
@@ -10047,7 +10121,6 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetSolutions(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
-            | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
@@ -10238,6 +10311,7 @@ impl<'db> Type<'db> {
             },
 
             Self::TypeAlias(alias) => alias.value_type(db).definition(db, env),
+            Self::DataclassDecorator(decorator) => decorator.callable(db).definition(db, env),
             Self::Recursive(recursive) => recursive
                 .unfold(db, env)
                 .into_unfolded()?
@@ -10272,7 +10346,6 @@ impl<'db> Type<'db> {
 
             Self::KnownBoundMethod(_)
             | Self::WrapperDescriptor(_)
-            | Self::DataclassDecorator(_)
             | Self::DataclassTransformer(_)
             | Self::BoundSuper(_) => self.to_meta_type(db, env).definition(db, env),
 
@@ -10687,6 +10760,9 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::Callable(callable_type) => {
                 callable_type.signatures(db).variance_of(db, env, typevar)
             }
+            Type::DataclassDecorator(decorator) => {
+                decorator.callable(db).variance_of(db, env, typevar)
+            }
             // A type variable is always covariant in itself.
             Type::TypeVar(other_typevar) if other_typevar.identity(db) == typevar => {
                 // type variables are covariant in themselves
@@ -10758,7 +10834,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::Never
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
-            | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::LiteralValue(_)

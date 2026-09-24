@@ -206,15 +206,15 @@ This can be overwritten using the `order` argument to the custom decorator:
 from typing_extensions import dataclass_transform
 
 @dataclass_transform()
-def normal(*, order: bool = False):
+def normal(cls: type | None = None, *, order: bool = False):
     raise NotImplementedError
 
 @dataclass_transform(order_default=False)
-def order_default_false(*, order: bool = False):
+def order_default_false(cls: type | None = None, *, order: bool = False):
     raise NotImplementedError
 
 @dataclass_transform(order_default=True)
-def order_default_true(*, order: bool = True):
+def order_default_true(cls: type | None = None, *, order: bool = True):
     raise NotImplementedError
 
 @normal
@@ -1849,8 +1849,8 @@ reveal_type(replace(p, name="Bob"))  # revealed: Person
 
 ## Calling decorator function directly with a class argument
 
-When a function decorated with `@dataclass_transform()` is called directly with a class argument
-(not used as a decorator), it should return the class with the dataclass transformation applied.
+Calling a function decorated with `@dataclass_transform()` uses its inferred return type. When the
+call preserves a concrete class, its result also includes the synthesized dataclass behavior.
 
 ### Basic case
 
@@ -1888,6 +1888,118 @@ B = my_dataclass(A, order=True)
 reveal_type(B)  # revealed: <class 'A'>
 
 reveal_type(B(1) < B(2))  # revealed: bool
+```
+
+### Nonliteral class arguments
+
+A class argument need not be a class literal. When its type is `type[C]`, the call preserves the
+inferred return type, including when the argument is passed by keyword. The argument does not
+identify a specific class object to transform, so ty attaches no new dataclass metadata to the
+result. These calls use ordinary return-type inference.
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform()
+def model[T](cls: type[T]) -> type[T]:
+    return cls
+
+class C: ...
+
+def decorate(cls: type[C]) -> type[C]:
+    reveal_type(model(cls))  # revealed: type[C]
+    reveal_type(model(cls=cls))  # revealed: type[C]
+    return model(cls)
+```
+
+### Explicit class return annotations
+
+With a class literal argument, a matching `type[Input]` return annotation produces that class with
+dataclass metadata. A different `type[Output]` return annotation keeps its declared type, without
+synthesizing a dataclass constructor.
+
+```py
+from typing import dataclass_transform
+
+class Input:
+    x: int
+
+class Output:
+    x: int
+
+@dataclass_transform()
+def preserve(cls: type[Input]) -> type[Input]:
+    return cls
+
+@dataclass_transform()
+def model(cls: type[Input]) -> type[Output]:
+    return Output
+
+preserved = preserve(Input)
+reveal_type(preserved)  # revealed: <class 'Input'>
+preserved(1)
+
+replacement = model(Input)
+reveal_type(replacement)  # revealed: type[Output]
+replacement(1)  # error: [too-many-positional-arguments]
+```
+
+### Protocol class return annotations
+
+Some transforms, including Pydantic's dataclass decorator, use `type[Protocol]` to describe the
+interface added to the input class. For these returns, ty assumes the first parameter receives the
+class being transformed and preserves that class and its dataclass constructor. Additional members
+described by the protocol are not currently added to the class.
+
+```py
+from typing import Protocol, dataclass_transform
+
+class DataclassInterface(Protocol):
+    def serialize(self) -> str: ...
+
+@dataclass_transform()
+def model(cls: type, *, config: type | None = None) -> type[DataclassInterface]:
+    raise NotImplementedError
+
+@model
+class Direct:
+    x: int
+
+reveal_type(Direct(1).x)  # revealed: int
+Direct("wrong")  # error: [invalid-argument-type]
+reveal_type(model(cls=Direct))  # revealed: <class 'Direct'>
+```
+
+The same heuristic applies to a saved decorator returned by a factory. For a callable instance, the
+class argument follows the implicit `self` parameter.
+
+```py
+class Decorator:
+    def __call__(self, cls: type) -> type[DataclassInterface]:
+        raise NotImplementedError
+
+@dataclass_transform()
+def configured() -> Decorator:
+    raise NotImplementedError
+
+decorator = configured()
+
+@decorator
+class Configured:
+    x: int
+
+reveal_type(Configured(1).x)  # revealed: int
+Configured("wrong")  # error: [invalid-argument-type]
+```
+
+A nonliteral class argument keeps the declared return type. A class passed as configuration does not
+become the transformed class instead.
+
+```py
+class Config: ...
+
+def decorate(cls: type[Direct]):
+    reveal_type(model(cls, config=Config))  # revealed: type[DataclassInterface]
 ```
 
 ### Overloaded decorator function
@@ -1944,6 +2056,9 @@ When a `@dataclass_transform()` decorated function takes a class as a parameter 
 decorator factory (returns a decorator), the dataclass behavior should be applied to the decorated
 class, not to the parameter class.
 
+The returned decorator retains dataclass metadata when saved in a variable, even though this factory
+has no return annotation.
+
 ```py
 from typing_extensions import dataclass_transform
 
@@ -1959,7 +2074,7 @@ class Target:
 decorator = hydrated_dataclass(Target)
 reveal_type(decorator)  # revealed: <decorator produced by dataclass-like function>
 
-@hydrated_dataclass(Target)
+@decorator
 class Model:
     x: int
 
@@ -1968,34 +2083,163 @@ Model(x=1)
 reveal_type(Model.__init__)  # revealed: (self: Model, x: int) -> None
 ```
 
-### Decorator return types are still metadata-only in decorator position
-
-When a `@dataclass_transform()`-decorated function is used as a class decorator, we currently use it
-to shape the class like a dataclass but do not yet let an explicit non-class return annotation
-replace the public class binding.
+The saved decorator also supports direct calls, even though the factory has no return annotation.
 
 ```py
-from typing import Protocol, TypeVar
+class DirectModel:
+    x: int
+
+decorated = decorator(DirectModel)
+reveal_type(decorated)  # revealed: <class 'DirectModel'>
+decorated(x=1)
+decorated(x="")  # error: [invalid-argument-type]
+```
+
+### Decorator factory signatures
+
+A decorator factory preserves the type of its returned callable, including its attributes and
+required parameters. Dataclass behavior is applied when that callable receives a class.
+
+```py
+from typing import Protocol, dataclass_transform
+
+class Decorator(Protocol):
+    label: str
+
+    def __call__[T](self, cls: type[T], *, token: str) -> type[T]: ...
+
+@dataclass_transform()
+def model() -> Decorator:
+    raise NotImplementedError
+
+decorator = model()
+reveal_type(decorator)  # revealed: Decorator
+reveal_type(decorator.label)  # revealed: str
+typed_decorator: Decorator = decorator
+decorator.label = "example"
+decorator.label = 42  # error: [invalid-assignment]
+
+class C:
+    x: int
+
+decorator(C)  # error: [missing-argument]
+decorated = decorator(C, token="example")
+decorated(x=1)
+decorated(x="")  # error: [invalid-argument-type]
+
+decorator.__call__(C)  # error: [missing-argument]
+explicitly_decorated = decorator.__call__(C, token="example")
+explicitly_decorated(x=1)
+explicitly_decorated(x="")  # error: [invalid-argument-type]
+
+# error: [missing-argument]
+@model()
+class D:
+    x: int
+```
+
+### Decorator factory returning a union
+
+A factory can return either of two callable protocols. Both possible decorators apply dataclass
+behavior, so the decorated class has a constructor that validates its fields.
+
+```py
+from typing import Protocol, dataclass_transform
+
+class First(Protocol):
+    first: int
+
+    def __call__[T](self, cls: type[T]) -> type[T]: ...
+
+class Second(Protocol):
+    second: str
+
+    def __call__[T](self, cls: type[T]) -> type[T]: ...
+
+@dataclass_transform()
+def model() -> First | Second:
+    raise NotImplementedError
+
+reveal_type(model())  # revealed: First | Second
+
+@model()
+class C:
+    x: int
+
+C(1)
+C("")  # error: [invalid-argument-type]
+```
+
+### Decorators returning an instance
+
+A dataclass transform can return an instance instead of the decorated class. The return annotation
+determines the public binding, just as it does for other class decorators.
+
+```py
+from typing import Protocol
 from typing_extensions import dataclass_transform
 
 class Wrapped(Protocol):
     def f(self) -> int: ...
 
-T = TypeVar("T", bound=object)
-
 @dataclass_transform()
-def model(cls: type[T]) -> Wrapped:
+def model(cls: type) -> Wrapped:
     raise NotImplementedError
 
 @model
 class C:
     x: int
 
-reveal_type(C)  # revealed: <class 'C'>
-reveal_type(C.__init__)  # revealed: (self: C, x: int) -> None
+reveal_type(C)  # revealed: Wrapped
+reveal_type(C.f())  # revealed: int
+```
 
-# TODO: Decide whether the explicit `Wrapped` return type should replace the public binding here.
-C.f()  # error: [unresolved-attribute]
+### Decorator factories returning an instance
+
+When a dataclass transform produces a decorator, that decorator's return annotation determines the
+public binding of the decorated class.
+
+```py
+from typing import Callable, Protocol, dataclass_transform
+
+class Wrapped(Protocol):
+    def f(self) -> int: ...
+
+@dataclass_transform()
+def model() -> Callable[[type], Wrapped]:
+    raise NotImplementedError
+
+@model()
+class C:
+    x: int
+
+reveal_type(C)  # revealed: Wrapped
+reveal_type(C.f())  # revealed: int
+```
+
+### Decorator order with replacement returns
+
+An outer decorator receives the value returned by the dataclass transform, which can be a different
+class from the original definition.
+
+```py
+from typing import dataclass_transform
+
+class Replacement: ...
+
+@dataclass_transform()
+def model(cls: type) -> type[Replacement]:
+    return Replacement
+
+def wrap(cls: type[Replacement]) -> str:
+    return "wrapped"
+
+@wrap
+@model
+class C:
+    x: int
+
+reveal_type(C)  # revealed: str
 ```
 
 ## `__dataclass_transform__` compatibility

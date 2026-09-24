@@ -279,7 +279,6 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetSolutions(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
-            | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(..)
             | Type::LiteralValue(_)
@@ -297,6 +296,7 @@ impl<'db> Type<'db> {
 
             Type::BoundMethod(_)
             | Type::Dynamic(_)
+            | Type::DataclassDecorator(_)
             | Type::Divergent(_)
             | Type::Recursive(_)
             | Type::NominalInstance(_)
@@ -1724,6 +1724,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         // Reflexivity and lazy constraints can bypass the RecursiveVar match arm below.
         source.assert_not_recursive_var();
         target.assert_not_recursive_var();
+        if let Type::DataclassDecorator(decorator) = source {
+            return self.check_type_pair(db, decorator.callable(db), target);
+        }
+        if let Type::DataclassDecorator(decorator) = target {
+            return self.check_type_pair(db, source, decorator.callable(db));
+        }
         if let Some(source) = source.materialized_divergent_fallback() {
             return self.check_type_pair(db, source, target);
         }
@@ -3380,6 +3386,13 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             } else {
                 checker.never()
             }
+        }
+
+        if let Type::DataclassDecorator(decorator) = left {
+            return self.check_type_pair(db, decorator.callable(db), right);
+        }
+        if let Type::DataclassDecorator(decorator) = right {
+            return self.check_type_pair(db, left, decorator.callable(db));
         }
 
         if let Some(left) = left.materialized_divergent_fallback() {
