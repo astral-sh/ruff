@@ -1801,6 +1801,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         for item in &dict.items {
             let Some(key) = item.key.as_ref() else {
+                if let ast::Expr::Dict(unpacked) = &item.value {
+                    // The unpacked keys belong to the same target. Recording them in order
+                    // lets later items replace earlier bindings, including nested keys.
+                    self.add_dict_key_assignment_definitions_impl(
+                        target,
+                        unpacked.into(),
+                        assignment,
+                    );
+                }
                 continue;
             };
 

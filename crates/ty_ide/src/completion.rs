@@ -8059,6 +8059,22 @@ d["outer"]["<CURSOR>"]
     }
 
     #[test]
+    fn string_literal_completions_dictionary_unpacking_overwrites_nested_keys() {
+        let builder = completion_test_builder(
+            r#"
+d = {
+    "outer": {"stale": 1},
+    **{"outer": {"current": 2}},
+}
+d["outer"]["<CURSOR>"]
+"#,
+        )
+        .skip_auto_import();
+
+        assert_snapshot!(builder.build().snapshot(), @"current");
+    }
+
+    #[test]
     fn string_literal_completions_dictionary_lookup_in_class_body() {
         let builder = completion_test_builder(
             r#"
