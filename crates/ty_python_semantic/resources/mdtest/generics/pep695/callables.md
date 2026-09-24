@@ -994,9 +994,10 @@ reveal_type(infer(callback))  # revealed: A | Any
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set
 as a whole is compatible with the target callable.
 
-Both `T = str` and `T = bytes` give valid specializations for the same call. We currently merge them
-into `str | bytes`. Refining the return type per specialization should instead infer their
-intersection, `Never`.
+Each overload independently validates the same call, specializing `T` to `str` or `bytes`. Since the
+function receives only a consumer of `T`, it has no way to produce a value of type `T` to return.
+The return type must satisfy both specializations, so their intersection, `Never`, correctly
+captures that no value can be returned.
 
 ```py
 from typing import Callable, overload
@@ -1005,21 +1006,50 @@ def accepts_callable[T](converter: Callable[[T], None]) -> T:
     raise NotImplementedError
 
 @overload
-def f(val: str) -> None: ...
+def overloaded_consumer(val: str) -> None: ...
 @overload
-def f(val: bytes) -> None: ...
-def f(val: str | bytes) -> None:
+def overloaded_consumer(val: bytes) -> None: ...
+def overloaded_consumer(val: str | bytes) -> None:
     pass
 
-# TODO: Refine the return type per specialization to reveal Never.
-reveal_type(accepts_callable(f))  # revealed: str | bytes
+def _() -> None:
+    reveal_type(accepts_callable(overloaded_consumer))  # revealed: Never
 ```
 
-When overloads exchange their input and output types, the inferred return tuple currently contains a
-union for each type variable.
+An additional argument of type `T` supplies the return value and constrains the valid
+specializations. A `str | bytes` value is accepted because the overload set covers both cases:
 
 ```py
-def infer_pair[T, U](converter: Callable[[T], U]) -> tuple[T, U]:
+def accepts_callable_and_value[T](converter: Callable[[T], None], value: T) -> T:
+    converter(value)
+    return value
+
+def _(string: str, data: bytes, either: str | bytes) -> None:
+    reveal_type(accepts_callable_and_value(overloaded_consumer, string))  # revealed: str
+    reveal_type(accepts_callable_and_value(overloaded_consumer, data))  # revealed: bytes
+    reveal_type(accepts_callable_and_value(overloaded_consumer, either))  # revealed: str | bytes
+```
+
+A `str | int` value is rejected because neither overload of the consumer accepts its `int`
+alternative:
+
+```py
+def _(value: str | int) -> None:
+    # TODO: Do not include the consumer's `bytes` alternative in the error-recovery return type.
+    # error: [invalid-argument-type]
+    reveal_type(accepts_callable_and_value(overloaded_consumer, value))  # revealed: str | bytes | int
+```
+
+Type variables inferred from the same overload remain correlated. Here, the valid assignments are
+`T = int, U = str` and `T = str, U = int`; inference does not mix the input type from one overload
+with the return type from the other:
+
+```py
+class Result[T]:
+    def use(self, callback: Callable[[T], int]) -> int:
+        raise NotImplementedError
+
+def infer_pair[T: (int, str), U](converter: Callable[[T], U]) -> Result[tuple[T, U]]:
     raise NotImplementedError
 
 @overload
@@ -1029,9 +1059,8 @@ def swap(value: str) -> int: ...
 def swap(value: int | str) -> int | str:
     raise NotImplementedError
 
-# TODO: Infer the intersection of `tuple[int, str]` and `tuple[str, int]`.
-# Both specializations validate the same call, so its result satisfies both return types.
-reveal_type(infer_pair(swap))  # revealed: tuple[int | str, str | int]
+def _() -> None:
+    reveal_type(infer_pair(swap))  # revealed: Result[tuple[int, str]] & Result[tuple[str, int]]
 ```
 
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated
@@ -1074,6 +1103,87 @@ def singleton[S](flag: bool = False) -> Callable[[Callable[[int], S]], Callable[
         return func
 
     return wrapper
+```
+
+## Unresolved `Self` overloads
+
+The inferred callable retains the argument types accepted by every overload, even when a `Self`
+dependency in one overload cannot be resolved.
+
+```py
+from typing import Callable, Self, overload
+
+def identity[A, B, R](fn: Callable[[A, B], R]) -> Callable[[A, B], R]:
+    return fn
+
+class C:
+    @overload
+    def method(self, value: int) -> "C": ...
+    @overload
+    def method(self, value: str) -> Self: ...
+    def method(self, value: int | str) -> "C":
+        return self
+
+# TODO: Accept the callback without error.
+# error: [invalid-argument-type]
+method = identity(C.method)
+reveal_type(method)  # revealed: (C, int | str, /) -> C
+
+class Sub(C): ...
+
+# TODO: revealed: Sub (preserve the generic `Self` overload)
+reveal_type(method(Sub(), ""))  # revealed: C
+```
+
+## Dependent return types from generic callbacks
+
+A generic identity callback can be used as either `Callable[[A], A]` or `Callable[[B], B]`: it
+returns its argument unchanged:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+```
+
+This overloaded "consumer" can accept either an `A` or a `B`:
+
+```py
+from typing import Callable, overload
+
+class A: ...
+class B: ...
+
+@overload
+def consume(value: A) -> None: ...
+@overload
+def consume(value: B) -> None: ...
+def consume(value: A | B) -> None: ...
+```
+
+If we pass both the callback and the consumer to a generic function, we can solve `T` (and thus also
+`R`) to either `A` or `B`. This should allow us to infer `A & B` as the return type.
+
+```py
+def infer_result[T, R](callback: Callable[[T], R], consumer: Callable[[T], None]) -> R:
+    raise NotImplementedError
+
+# Eager subtype checking cannot yet infer callback-local type variables, so `identity`
+# wrongly fails revalidation against both `Callable[[A], A]` and `Callable[[B], B]`, so
+# we fall back to `A | B` instead of `A & B`.
+# TODO: revealed: A & B
+reveal_type(infer_result(identity, consume))  # revealed: A | B
+```
+
+If we additionally supply a value, that selects the specific consumer overload that accepts it. The
+identity callback's result type follows that selected argument type:
+
+```py
+def infer_result_with_value[T, R](callback: Callable[[T], R], consumer: Callable[[T], None], value: T) -> R:
+    return callback(value)
+
+def _(a: A, b: B) -> None:
+    reveal_type(infer_result_with_value(identity, consume, a))  # revealed: A
+    reveal_type(infer_result_with_value(identity, consume, b))  # revealed: B
 ```
 
 ## Multiple occurrences of a higher-order generic callable

@@ -3438,8 +3438,8 @@ def _(value: AnyExtraItems | OtherAnyExtraItems) -> None:
 ```
 
 Rejected common-constraint probes must not affect fallback protocol inference. Both mappings below
-contain an `int`, so inference should select the `int` constraint. It currently selects the broader
-`object` constraint instead:
+contain an `int`, so inference selects the `int` constraint rather than the broader `object`
+constraint:
 
 ```py
 from typing import Literal, Protocol, TypeVar, TypedDict
@@ -3460,8 +3460,7 @@ def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
 
 def takes_str(value: str) -> None: ...
 def _(value: ValueA | ValueB) -> None:
-    # TODO: revealed int
-    reveal_type(get_value(value))  # revealed: object
+    reveal_type(get_value(value))  # revealed: int
     takes_str(get_value(value))  # error: [invalid-argument-type]
 ```
 
@@ -3498,14 +3497,14 @@ def _(value: CorrelatedA | CorrelatedB) -> None:
 
 ```snapshot
 error[invalid-argument-type]: Argument to function `takes_int` is incorrect
-   --> src/mdtest_snippet.py:347:15
+   --> src/mdtest_snippet.py:346:15
     |
-347 |     takes_int(set_and_get(value, "a", 1))
+346 |     takes_int(set_and_get(value, "a", 1))
     |               ^^^^^^^^^^^^^^^^^^^^^^^^^^ Expected `int`, found `object`
 info: Function defined here
-   --> src/mdtest_snippet.py:343:5
+   --> src/mdtest_snippet.py:342:5
     |
-343 | def takes_int(value: int) -> None: ...
+342 | def takes_int(value: int) -> None: ...
     |     ^^^^^^^^^ ---------- Parameter declared here
 ```
 

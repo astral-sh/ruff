@@ -4476,10 +4476,10 @@ static_assert(not is_assignable_to(NominalReturningOtherClass, UsesSelf))
 static_assert(not is_assignable_to(GenericReceiver, ConcreteMethod))
 static_assert(not is_subtype_of(GenericReceiver, ConcreteMethod))
 
-# Specializing the receiver constraint to `GradualReceiverImplementation` must preserve the
-# assignability relation that produced it; `list[int]` is assignable to, but not a subtype of,
-# `list[Any]`.
+# The explicit receiver permits assignability, but does not establish strict subtyping:
+# `list[int]` is assignable to, but not a subtype of, `list[Any]`.
 static_assert(is_assignable_to(GradualReceiverImplementation, GradualReceiverProtocol))
+static_assert(not is_subtype_of(GradualReceiverImplementation, GradualReceiverProtocol))
 
 # Checking the receiver constraint requires the same protocol relation that is already in
 # progress. The recursive check should terminate and establish the structural relation.
@@ -4518,6 +4518,36 @@ class BadReturnType:
 
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
+```
+
+## Gradual explicit receivers
+
+A gradual receiver is assignable to a concrete explicit `self` annotation, but is not its subtype.
+Protocol matching preserves that distinction instead of treating a possibly available method as
+unconditionally available:
+
+```py
+from typing import Any, Generic, Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, is_subtype_of
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Source(Generic[T_co]):
+    def get(self: "Source[int]") -> int:
+        return 0
+
+class IntSource(Protocol):
+    def get(self) -> int: ...
+
+static_assert(is_assignable_to(Source[Any], IntSource))
+static_assert(is_assignable_to(Source[Unknown], IntSource))
+static_assert(not is_subtype_of(Source[Any], IntSource))
+static_assert(not is_subtype_of(Source[Unknown], IntSource))
+
+static_assert(is_subtype_of(Source[int], IntSource))
+static_assert(not is_assignable_to(Source[str], IntSource))
+static_assert(not is_subtype_of(Source[str], IntSource))
 ```
 
 ## `Self` in generic type aliases during protocol matching
@@ -5111,7 +5141,8 @@ class ClassCollection(metaclass=CollectionMeta):
 static_assert(is_assignable_to(TypeOf[ClassCollection], Membership))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Container[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Container[str]))
-static_assert(is_subtype_of(TypeOf[ClassCollection], Container[int]))
+# The class object is assignable to the gradual receiver `type[Any]`, but is not its subtype.
+static_assert(not is_subtype_of(TypeOf[ClassCollection], Container[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Iterable[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Reversible[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Collection[int]))
@@ -6938,9 +6969,9 @@ static_assert(is_constraint_set_assignable_to(Consumer[Consumer[int]], Consumer[
 ### Recursive members in the source specialization
 
 A protocol member can contain the same protocol in the source specialization but remain finite in
-the target specialization. Its structural requirements must still contribute all valid solutions,
-even when nominal inheritance alone would infer a narrower type. The same members also establish
-assignability when no type variables need to be inferred.
+the target specialization. Its structural requirements still contribute to inference, and each
+retained specialization must accept the original argument. Here, `extract` infers `Consumer[int]`
+for `T`. The same members also establish assignability when no type variables need to be inferred.
 
 ```toml
 [environment]
@@ -6966,8 +6997,7 @@ def extract[T](consumer: Consumer[T]) -> T:
     raise NotImplementedError
 
 def check(value: Consumer[Consumer[int]]) -> None:
-    # TODO: Validate and refine individual specializations to reveal Consumer[int].
-    reveal_type(extract(value))  # revealed: Consumer[int] | int
+    reveal_type(extract(value))  # revealed: Consumer[int]
 ```
 
 An explicit receiver annotation introduces constraints when comparing a bound method with a
@@ -7279,8 +7309,9 @@ bad_assignment: Node[int] = Mismatched(1)  # error: [invalid-assignment]
 def extract[U](node: Node[U]) -> U:
     raise NotImplementedError
 
-# TODO: Refine the structural and inherited specializations separately to reveal str | Literal[1].
-reveal_type(extract(Mismatched(1)))  # revealed: object
+# The structural solution includes both `value`'s `Literal[1]` and `child`'s `str`.
+# Intersecting it with the inherited `Node[object]` solution preserves that precision.
+reveal_type(extract(Mismatched(1)))  # revealed: str | Literal[1]
 ```
 
 ### Recursive legacy generic protocol
