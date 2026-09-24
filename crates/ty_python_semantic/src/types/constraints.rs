@@ -2779,24 +2779,6 @@ impl NodeId {
         result
     }
 
-    fn remove_noninferable<'db, L: SolutionLimits>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        inferable: TypeVarSet<'db>,
-        source_order: Option<SourceOrderId>,
-        limits: &mut L,
-    ) -> ControlFlow<L::Break, (Self, Option<SourceOrderId>)> {
-        match self.node() {
-            Node::AlwaysTrue => ControlFlow::Continue((ALWAYS_TRUE, None)),
-            Node::AlwaysFalse => ControlFlow::Continue((ALWAYS_FALSE, None)),
-            Node::Interior(interior) => {
-                interior.remove_noninferable(db, env, storage, inferable, source_order, limits)
-            }
-        }
-    }
-
     /// Invokes a closure for each unique BDD node that appears anywhere in a BDD.
     ///
     /// This treats the BDD as a DAG and does not revisit shared subgraphs. Use this when the
@@ -3590,7 +3572,7 @@ impl<'db> CandidateSolutions<'db> {
         source_order: Option<SourceOrderId>,
         limits: &mut L,
     ) -> ControlFlow<L::Break, Self> {
-        let mut source_orders = storage.calculate_source_orders(source_order);
+        let source_orders = storage.calculate_source_orders(source_order);
         if let Some(path_bounds) = Self::compute_simple_bound_conjunction(
             db,
             env,
@@ -3603,17 +3585,12 @@ impl<'db> CandidateSolutions<'db> {
             return ControlFlow::Continue(path_bounds);
         }
 
-        let node_support = storage.node_support(node).cloned();
-        let (node, derived_source_order) =
-            node.remove_noninferable(db, env, storage, inferable, source_order, limits)?;
-        source_orders.extend(storage.calculate_source_orders(derived_source_order));
-
         let mut walker = SolutionWalker::new(db, storage, source_orders, inferable);
         // Sequent discovery must also happen in source order. Sorting the collected paths is
         // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
-        let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
-        let mut path = node.path_assignments(db, env, storage, path_source_order);
+        let mut path = node.path_assignments(db, env, storage, source_order);
+        let node_support = storage.node_support(node).cloned();
         walker.visit_node(
             db,
             env,
@@ -4195,37 +4172,6 @@ impl InteriorNode {
             },
         );
         result
-    }
-
-    fn remove_noninferable<'db, L: SolutionLimits>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        inferable: TypeVarSet<'db>,
-        source_order: Option<SourceOrderId>,
-        limits: &mut L,
-    ) -> ControlFlow<L::Break, (NodeId, Option<SourceOrderId>)> {
-        self.abstract_inner(
-            db,
-            env,
-            storage,
-            source_order,
-            limits,
-            // We only want to keep constraints on inferable typevars. If the constraint's typevar
-            // is itself inferable, we keep it. We also need to keep some constraints in
-            // non-inferable typevars, if an evidence bound is a bare inferable typevar. This
-            // ensures that our quantification logic does not depend on typevar ordering.
-            //
-            // For example, `I ≤ N` (where I is inferable and N is non-inferable) could be encoded
-            // either as `Never ≤ I ≤ N` or `I ≤ N ≤ object`, depending on typevar ordering. If we
-            // only checked the inferability of the constrained typevar, we would keep the first
-            // encoding but remove the second.
-            &mut |storage: &ConstraintSetStorage<'_>, constraint| {
-                let constraint = storage.constraint_data(constraint);
-                !constraint.directly_constrains_inferable_typevar(db, inferable)
-            },
-        )
     }
 
     fn abstract_inner<'db, F, L>(
@@ -5075,26 +5021,6 @@ mod tests {
         }
     }
 
-    #[derive(Default)]
-    struct CountSolutionLimits {
-        visits: usize,
-        paths: usize,
-    }
-
-    impl SolutionLimits for CountSolutionLimits {
-        type Break = Infallible;
-
-        fn visit_node(&mut self) -> ControlFlow<Self::Break> {
-            self.visits += 1;
-            ControlFlow::Continue(())
-        }
-
-        fn satisfied_path(&mut self) -> ControlFlow<Self::Break> {
-            self.paths += 1;
-            ControlFlow::Continue(())
-        }
-    }
-
     #[test]
     fn type_mapping_updates_constraint_bounds() {
         // (list[U] ≤ T ≤ list[U])[U ↦ int] = (list[int] ≤ T ≤ list[int])
@@ -5499,75 +5425,6 @@ mod tests {
             Err(ProjectionError::TraversalBudgetExceeded)
         );
         assert_eq!(bounded_path_bounds(db, set, inferable, 1, 2), Ok(expected));
-    }
-
-    #[test]
-    fn bounded_path_collection_shares_preprocessing_visits() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let builder = ConstraintSetBuilder::new();
-        let t = create_typevar(db, "T");
-        let hidden = create_typevar(db, "Hidden");
-        let visible = create_constraint(db, &builder, t, KnownClass::Int);
-        let hidden_alternatives =
-            create_constraint(db, &builder, hidden, KnownClass::Str).or(db, &builder, || {
-                create_constraint(db, &builder, hidden, KnownClass::Bytes)
-            });
-        let set = visible.and(db, &builder, || hidden_alternatives);
-        let inferable = TypeVarSet::from_typevars(db, [t]);
-        let mut storage = builder.storage.borrow_mut();
-        let source_orders = storage.calculate_source_orders(set.source_order);
-        let mut preprocessing = CountSolutionLimits::default();
-        let ControlFlow::Continue(fast_path) = CandidateSolutions::compute_simple_bound_conjunction(
-            db,
-            &env,
-            &mut storage,
-            &source_orders,
-            set.node,
-            inferable,
-            &mut preprocessing,
-        );
-        assert_eq!(fast_path, None);
-        let ControlFlow::Continue(_) = set.node.remove_noninferable(
-            db,
-            &env,
-            &mut storage,
-            inferable,
-            set.source_order,
-            &mut preprocessing,
-        );
-
-        let mut complete = CountSolutionLimits::default();
-        let ControlFlow::Continue(expected) = CandidateSolutions::compute_with_limits(
-            db,
-            &env,
-            &mut storage,
-            set.node,
-            inferable,
-            set.source_order,
-            &mut complete,
-        );
-        assert_eq!(complete.paths, 1);
-        assert!(complete.visits > preprocessing.visits);
-        drop(storage);
-
-        assert_eq!(
-            bounded_path_bounds(db, set, inferable, 1, preprocessing.visits),
-            Err(ProjectionError::TraversalBudgetExceeded)
-        );
-        assert_eq!(
-            bounded_path_bounds(db, set, inferable, 1, complete.visits - 1),
-            Err(ProjectionError::TraversalBudgetExceeded)
-        );
-        assert_eq!(
-            bounded_path_bounds(db, set, inferable, 1, complete.visits),
-            Ok(expected)
-        );
-        assert_eq!(
-            bounded_path_bounds(db, set, inferable, 0, complete.visits),
-            Err(ProjectionError::PathBudgetExceeded)
-        );
     }
 
     #[test]
