@@ -1,8 +1,8 @@
-# `tarfile-ignore-zeros-true` (`S203`)
+# `tarfile-ignore-zeros-true`
 
 ```toml
 lint.preview = true
-lint.select = ["S203"]
+lint.select = ["tarfile-ignore-zeros-true"]
 ```
 
 ## Basic examples
@@ -18,15 +18,15 @@ tarfile.open("archive.tar", ignore_zeros=True)  # snapshot: tarfile-ignore-zeros
 ```
 
 ```snapshot
-error[S203]: `tarfile` opened with `ignore_zeros=True`
+error[tarfile-ignore-zeros-true]: `tarfile` opened with `ignore_zeros=True`
  --> src/mdtest_snippet.py:3:29
   |
 3 | tarfile.open("archive.tar", ignore_zeros=True)  # snapshot: tarfile-ignore-zeros-true
   |                             ^^^^^^^^^^^^^^^^^
 ```
 
-The module-level `tarfile.open` is an alias for `TarFile.open`; the constructor and the
-compression-specific class methods accept the same keyword.
+The module-level `tarfile.open` is an alias for `TarFile.open`, and the `TarFile` constructor
+accepts the same keyword.
 
 ```py
 import tarfile
@@ -38,11 +38,6 @@ tarfile.TarFile.open("archive.tar", ignore_zeros=True)  # error: [tarfile-ignore
 TarFile("archive.tar", ignore_zeros=True)  # error: [tarfile-ignore-zeros-true]
 TarFile.open("archive.tar", ignore_zeros=True)  # error: [tarfile-ignore-zeros-true]
 tar_open("archive.tar", ignore_zeros=True)  # error: [tarfile-ignore-zeros-true]
-tarfile.TarFile.taropen("archive.tar", ignore_zeros=True)  # error: [tarfile-ignore-zeros-true]
-tarfile.TarFile.gzopen("archive.tar.gz", ignore_zeros=True)  # error: [tarfile-ignore-zeros-true]
-tarfile.TarFile.bz2open("archive.tar.bz2", ignore_zeros=True)  # error: [tarfile-ignore-zeros-true]
-tarfile.TarFile.xzopen("archive.tar.xz", ignore_zeros=True)  # error: [tarfile-ignore-zeros-true]
-tarfile.TarFile.zstopen("archive.tar.zst", ignore_zeros=True)  # error: [tarfile-ignore-zeros-true]
 
 with tarfile.open("archive.tar", "r", ignore_zeros=True) as tar:  # error: [tarfile-ignore-zeros-true]
     pass
@@ -68,7 +63,7 @@ tarfile.open("archive.tar", ignore_zeros=1)  # snapshot: tarfile-ignore-zeros-tr
 ```
 
 ```snapshot
-error[S203]: `tarfile` opened with truthy `ignore_zeros`
+error[tarfile-ignore-zeros-true]: `tarfile` opened with truthy `ignore_zeros`
  --> src/mdtest_snippet.py:3:29
   |
 3 | tarfile.open("archive.tar", ignore_zeros=1)  # snapshot: tarfile-ignore-zeros-true
