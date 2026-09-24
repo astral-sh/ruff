@@ -12,8 +12,6 @@ use std::hash::BuildHasherDefault;
 use std::num::NonZeroUsize;
 use ty_static::EnvVars;
 
-#[cfg(feature = "os")]
-pub mod args;
 pub mod cancellation;
 pub mod diagnostic;
 pub mod display;

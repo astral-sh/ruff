@@ -7,7 +7,7 @@ use std::path::Path;
 /// Expands `@path` arguments unless the literal path, including `@`, exists.
 ///
 /// Response files contain one argument per line and may refer to other response files.
-/// All paths are relative to the current working directory. Expansion happens before
+/// Relative paths are resolved from the current working directory. Expansion happens before
 /// option parsing, so the same rules apply before and after `--`.
 pub fn expand_args(args: impl Iterator<Item = OsString>) -> io::Result<Vec<OsString>> {
     let mut expanded = Vec::with_capacity(args.size_hint().0);
@@ -36,10 +36,7 @@ pub fn expand_args(args: impl Iterator<Item = OsString>) -> io::Result<Vec<OsStr
     Ok(expanded)
 }
 
-#[expect(
-    clippy::disallowed_methods,
-    reason = "CLI arguments refer to the real filesystem and may contain non-UTF-8 paths."
-)]
 fn is_response_file(arg: &OsStr) -> bool {
-    arg.as_encoded_bytes().starts_with(b"@") && !Path::new(arg).exists()
+    // Check the directory entry itself so dangling symlinks remain literal paths.
+    arg.as_encoded_bytes().starts_with(b"@") && Path::new(arg).symlink_metadata().is_err()
 }

@@ -25,7 +25,6 @@ ty_static = { workspace = true }
 
 anstyle = { workspace = true }
 arc-swap = { workspace = true }
-argfile = { workspace = true, optional = true }
 camino = { workspace = true }
 compact_str = { workspace = true }
 dashmap = { workspace = true }
@@ -64,7 +63,7 @@ tempfile = { workspace = true }
 [features]
 cache = ["ruff_cache"]
 junit = ["dep:quick-junit"]
-os = ["ignore", "dep:argfile", "dep:etcetera", "dep:same-file", "dep:which"]
+os = ["ignore", "dep:etcetera", "dep:same-file", "dep:which"]
 serde = [
     "camino/serde1",
     "dep:serde",

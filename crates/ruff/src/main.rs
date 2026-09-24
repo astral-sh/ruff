@@ -33,11 +33,11 @@ fn main() -> ExitCode {
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
     let args = wild::args_os();
-    let args =
-        match ruff_db::args::expand_args(args).context("Failed to read CLI arguments from files") {
-            Ok(args) => args,
-            Err(err) => return report_error(&err),
-        };
+    let args = match ruff_cli::expand_args(args).context("Failed to read CLI arguments from files")
+    {
+        Ok(args) => args,
+        Err(err) => return report_error(&err),
+    };
 
     let args = Args::parse_from(args);
 

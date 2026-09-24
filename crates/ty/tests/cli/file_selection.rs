@@ -3,41 +3,6 @@ use insta_cmd::assert_cmd_snapshot;
 use crate::CliTest;
 
 #[test]
-fn response_files_preserve_literal_at_paths() -> anyhow::Result<()> {
-    let case = CliTest::with_files([
-        ("@list.py", "value: int = 'literal'"),
-        ("list.py", "other.py\n"),
-        ("@package/main.py", "value: int = 'directory'"),
-        ("package", "other.py\n"),
-        ("other.py", ""),
-        ("outer.args", "@inner.args\n"),
-        ("inner.args", "@package\n"),
-    ])?;
-
-    let output = case
-        .command()
-        .args([
-            "--output-format",
-            "concise",
-            "@list.py",
-            "--",
-            "@outer.args",
-        ])
-        .output()?;
-    assert_eq!(output.status.code(), Some(1), "{output:?}");
-    assert!(output.stderr.is_empty(), "{output:?}");
-    let stdout = String::from_utf8(output.stdout)?.replace('\\', "/");
-    assert!(stdout.contains("@list.py"), "{stdout}");
-    assert!(stdout.contains("@package/main.py"), "{stdout}");
-    assert_eq!(
-        stdout.matches("error[invalid-assignment]").count(),
-        2,
-        "{stdout}"
-    );
-    Ok(())
-}
-
-#[test]
 fn exclude_scripts_only_applies_to_implicitly_discovered_files() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("main.py", "value: int = 'project'"),
@@ -1276,6 +1241,38 @@ fn invalid_exclude_pattern() -> anyhow::Result<()> {
       |
     "#);
 
+    Ok(())
+}
+
+#[test]
+fn response_files_preserve_literal_at_paths() -> anyhow::Result<()> {
+    // Preserve existing @-prefixed paths so filenames from integrations cannot select unrelated files.
+    let case = CliTest::with_files([
+        ("@list.py", "value: int = 'literal'"),
+        ("list.py", "other.py\n"),
+        ("@package/main.py", "value: int = 'directory'"),
+        ("package", "other.py\n"),
+        ("other.py", ""),
+        ("outer.args", "@inner.args\n"),
+        ("inner.args", "@package\n"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().args([
+        "--output-format",
+        "concise",
+        "@list.py",
+        "--",
+        "@outer.args",
+    ]), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    @list.py:1:14: error[invalid-assignment] Object of type `Literal["literal"]` is not assignable to `int`
+    @package/main.py:1:14: error[invalid-assignment] Object of type `Literal["directory"]` is not assignable to `int`
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
     Ok(())
 }
 
