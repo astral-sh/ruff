@@ -6503,17 +6503,54 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return infer_expression(self, tcx);
         };
 
-        let mut speculative_builder = self.speculate();
-        let ty = infer_expression(&mut speculative_builder, peer_tcx);
+        self.infer_with_type_context_fallback(peer_tcx, tcx, infer_expression)
+    }
 
-        // Peer context is only an inference hint. If it introduces diagnostics, discard it and
-        // infer normally so that only diagnostics intrinsic to the expression are reported.
-        if speculative_builder.context.has_diagnostics() {
-            infer_expression(self, tcx)
+    /// Tries `tcx`, retrying with `fallback_tcx` if inference reports diagnostics other than
+    /// `allowed_lint`. Only the chosen attempt's types and diagnostics are retained.
+    ///
+    /// For a cast's value, the outer context can introduce errors by supplying parameter types to
+    /// an unannotated lambda:
+    ///
+    /// ```py
+    /// from typing import Callable, cast
+    ///
+    /// def convert(value: int) -> str:
+    ///     return str(value)
+    ///
+    /// def callback() -> Callable[[int | None], str]:
+    ///     return cast(Callable[[int | None], str], lambda value: convert(value))  # no diagnostic
+    /// ```
+    ///
+    /// With the outer context, the lambda parameter has type `int | None`, so its call to `convert`
+    /// produces an `invalid-argument-type` diagnostic. Retrying without that context leaves the
+    /// parameter's type unknown, and the cast is neither redundant nor disjoint. Casts allow
+    /// `redundant-cast` diagnostics from nested casts so that those warnings do not interrupt
+    /// context propagation.
+    fn infer_with_type_context_fallback(
+        &mut self,
+        tcx: TypeContext<'db>,
+        fallback_tcx: TypeContext<'db>,
+        mut infer_expression: impl FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        // Cache nested expressions so retries do not lead to exponential inference work.
+        let teardown_expression_cache = self.setup_expression_cache();
+        let mut speculative_builder = self.speculate();
+        let ty = infer_expression(&mut speculative_builder, tcx);
+
+        // This context is only an inference hint. Discard it if inference reports a diagnostic
+        // other than the explicitly allowed lint, then infer with the original context.
+        let ty = if speculative_builder.context.has_diagnostics() {
+            infer_expression(self, fallback_tcx)
         } else {
             self.extend(speculative_builder);
             ty
+        };
+
+        if teardown_expression_cache {
+            self.teardown_expression_cache();
         }
+        ty
     }
 
     #[track_caller]
@@ -9590,10 +9627,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &bindings,
         );
 
+        let cast_value = if call_expression_tcx.annotation.is_some()
+            && let Type::FunctionLiteral(function) = callable_type
+            && function.is_known(db, KnownFunction::Cast)
+        {
+            arguments.find_argument_value("val", 1)
+        } else {
+            None
+        };
+
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
+                if let Some(value) = cast_value
+                    && std::ptr::eq(expr, value)
+                {
+                    // The outer context can make this cast redundant, but must not introduce
+                    // errors in its value, such as missing keys in a partial `TypedDict` literal.
+                    // Redundant casts inside the value are also an intended result of propagation.
+                    return builder.infer_with_type_context_fallback(
+                        call_expression_tcx,
+                        tcx,
+                        |builder, tcx| builder.infer_expression(value, tcx),
+                    );
+                }
+
                 // Permit bare ParamSpecs only in direct names and dotted attributes, so nested
                 // type expressions and calls retain their ordinary validation.
                 if matches!(

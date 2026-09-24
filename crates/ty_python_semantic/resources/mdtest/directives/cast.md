@@ -102,6 +102,127 @@ def f(x: RecursiveAlias):
     cast(RecursiveAlias, x)  # error: [redundant-cast]
 ```
 
+The target type of a cast does not provide type context for its value. In the following example,
+inferring `[42]` using the cast's target, `list[object]`, would make the cast appear redundant.
+However, removing the cast changes the loop variable's type from `object` to `Literal[42]`, so
+reporting `redundant-cast` would be incorrect here.
+
+```py
+for x in cast(list[object], [42]):  # no redundant-cast diagnostic
+    reveal_type(x)  # revealed: object
+
+for x in [42]:  # no diagnostic
+    reveal_type(x)  # revealed: Literal[42]
+```
+
+## Outer type context
+
+The outer type context of the cast() call passes through to the casted value argument. A list
+literal therefore retains its literal element type when passed to a parameter that expects it, even
+through an intervening cast. The cast is redundant in this case.
+
+```py
+from typing import Literal, cast
+from typing_extensions import cast as extension_cast
+
+def f(x: list[Literal["foo"]]) -> None: ...
+
+f(["foo"])  # no diagnostic
+f(cast(list[Literal["foo"]], ["foo"]))  # error: [redundant-cast]
+f(cast(val=["foo"], typ=list[Literal["foo"]]))  # error: [redundant-cast]
+f(extension_cast(list[Literal["foo"]], ["foo"]))  # error: [redundant-cast]
+```
+
+Annotated assignments and return types also supply type context through a cast:
+
+```py
+items: list[Literal["foo"]] = cast(list[Literal["foo"]], ["foo"])  # error: [redundant-cast]
+
+def make_items() -> list[Literal["foo"]]:
+    return cast(list[Literal["foo"]], ["foo"])  # error: [redundant-cast]
+```
+
+A value incompatible with the outer context still produces a disjoint-cast diagnostic:
+
+```py
+f(cast(list[Literal["foo"]], [42]))  # error: [disjoint-cast]
+```
+
+The outer context can also provide the `TypedDict` type of a dictionary literal:
+
+```py
+from typing import TypedDict
+
+class Item(TypedDict):
+    name: str
+
+def accept_item(item: Item) -> None: ...
+
+accept_item(cast(Item, {"name": "foo"}))  # error: [redundant-cast]
+```
+
+## Outer type context with diagnostics
+
+The outer context is an inference hint for the value passed to `cast()`. If inference with that
+context produces diagnostics, we discard the attempt and infer the value without the outer context.
+(In the common case, the first attempt will *usually* be discarded: most casts are not redundant!)
+Casts of incomplete or incompatible `TypedDict` literals therefore do not cause us to emit
+`redundant-cast`.
+
+We do not yet detect disjointness between `dict` and `TypedDict` types. Adding that support may
+cause some of these casts to emit `disjoint-cast` in the future:
+
+```py
+from typing import TypedDict, cast
+from typing_extensions import cast as extension_cast
+
+class Item(TypedDict):
+    name: str
+    count: int
+
+empty: Item = cast(Item, {})  # no redundant-cast diagnostic
+partial: Item = cast(Item, {"name": "foo"})  # no redundant-cast diagnostic
+extra: Item = cast(Item, {"name": "foo", "count": 1, "extra": True})  # no redundant-cast diagnostic
+incompatible: Item = cast(Item, {"name": "foo", "count": "one"})  # no redundant-cast diagnostic
+unpacked: Item = cast(Item, {**{"name": "foo", "count": 1}})  # no redundant-cast diagnostic
+
+def accept_item(item: Item) -> None: ...
+
+accept_item(cast(val={}, typ=Item))  # no redundant-cast diagnostic
+accept_item(extension_cast(Item, {}))  # no redundant-cast diagnostic
+
+def make_item() -> Item:
+    return cast(Item, {})  # no redundant-cast diagnostic
+```
+
+Type context can also introduce diagnostics in lambda bodies. Here, using the outer context would
+make the lambda parameter an `int` and report `call-non-callable`. We therefore fall back to the
+inference attempt that does not use the type context, and emit neither `redundant-cast` nor
+`call-non-callable`:
+
+```py
+from typing import Callable
+
+def callback() -> Callable[[int], str]:
+    return cast(Callable[[int], str], lambda value: value())  # no diagnostic
+```
+
+Diagnostics that occur without the outer context are still reported, once:
+
+```py
+# error: [unresolved-reference]
+item: Item = cast(Item, {"name": undefined, "count": 1})
+
+def make_item_with_error(name: str) -> Item:
+    return cast(  # no diagnostic
+        Item,
+        {
+            "name": cast(str, name),  # error: [redundant-cast]
+            "count": undefined,  # error: [unresolved-reference]
+        },
+    )
+```
+
 ## Redundant casts of tuple classes with unknown elements
 
 A tuple class with an `Unknown` element is not fully static, even when its other element is `object`
