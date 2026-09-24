@@ -13,6 +13,6 @@ body:
     attributes:
       label: Version
       description: What version of ruff are you using? (see `ruff version`)
-      placeholder: e.g., ruff 0.16.8 (ceaa6a0083 2026-09-24)
+      placeholder: e.g., ruff 0.16.8
     validations:
       required: false
