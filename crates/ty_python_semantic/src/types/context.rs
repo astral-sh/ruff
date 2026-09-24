@@ -250,13 +250,6 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         !self.diagnostics.borrow().is_empty()
     }
 
-    pub(super) fn has_diagnostics_other_than(&self, lint: &'static LintMetadata) -> bool {
-        self.diagnostics
-            .borrow()
-            .iter()
-            .any(|diagnostic| diagnostic.id() != DiagnosticId::Lint(lint.name()))
-    }
-
     /// Prevents diagnostic construction for this inference context.
     pub(super) fn suppress_diagnostics(&mut self) {
         debug_assert!(!self.diagnostics_suppressed);

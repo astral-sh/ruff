@@ -35,7 +35,6 @@ use super::{
     infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
-use crate::lint::LintMetadata;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     RequiresExplicitReExport, TypeOrigin, builtins_module_scope, class_body_implicit_symbol,
@@ -73,10 +72,10 @@ use crate::types::diagnostic::{
     INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE,
     INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, REDUNDANT_CAST,
-    TypeCheckDiagnostics, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
-    UNSOUND_ASSIGNMENT, UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind,
-    autofix_with_notimplementederror, hint_if_stdlib_attribute_exists_on_other_versions,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
+    UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
+    hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
     report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_dynamic_function_decorator_return,
@@ -6504,7 +6503,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return infer_expression(self, tcx);
         };
 
-        self.infer_with_type_context_fallback(peer_tcx, tcx, None, infer_expression)
+        self.infer_with_type_context_fallback(peer_tcx, tcx, infer_expression)
     }
 
     /// Tries `tcx`, retrying with `fallback_tcx` if inference reports diagnostics other than
@@ -6532,7 +6531,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         tcx: TypeContext<'db>,
         fallback_tcx: TypeContext<'db>,
-        allowed_lint: Option<&'static LintMetadata>,
         mut infer_expression: impl FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
     ) -> Type<'db> {
         // Cache nested expressions so retries do not lead to exponential inference work.
@@ -6542,12 +6540,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // This context is only an inference hint. Discard it if inference reports a diagnostic
         // other than the explicitly allowed lint, then infer with the original context.
-        let has_diagnostics = if let Some(lint) = allowed_lint {
-            speculative_builder.context.has_diagnostics_other_than(lint)
-        } else {
-            speculative_builder.context.has_diagnostics()
-        };
-        let ty = if has_diagnostics {
+        let ty = if speculative_builder.context.has_diagnostics() {
             infer_expression(self, fallback_tcx)
         } else {
             self.extend(speculative_builder);
@@ -9656,7 +9649,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return builder.infer_with_type_context_fallback(
                         call_expression_tcx,
                         tcx,
-                        Some(&REDUNDANT_CAST),
                         |builder, tcx| builder.infer_expression(value, tcx),
                     );
                 }

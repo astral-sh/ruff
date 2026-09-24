@@ -117,7 +117,7 @@ for x in [42]:  # no diagnostic
 
 ## Outer type context
 
-The expected type of a `cast()` call also provides type context for its value argument. A list
+The outer type context of the cast() call passes through to the casted value argument. A list
 literal therefore retains its literal element type when passed to a parameter that expects it, even
 through an intervening cast. The cast is redundant in this case.
 
@@ -131,14 +131,6 @@ f(["foo"])  # no diagnostic
 f(cast(list[Literal["foo"]], ["foo"]))  # error: [redundant-cast]
 f(cast(val=["foo"], typ=list[Literal["foo"]]))  # error: [redundant-cast]
 f(extension_cast(list[Literal["foo"]], ["foo"]))  # error: [redundant-cast]
-```
-
-The context propagates through nested casts even when an inner cast reports `redundant-cast`:
-
-```py
-# error: [redundant-cast]
-# error: [redundant-cast]
-f(cast(list[Literal["foo"]], cast(list[Literal["foo"]], ["foo"])))
 ```
 
 Annotated assignments and return types also supply type context through a cast:
@@ -172,12 +164,13 @@ accept_item(cast(Item, {"name": "foo"}))  # error: [redundant-cast]
 ## Outer type context with diagnostics
 
 The outer context is an inference hint for the value passed to `cast()`. If inference with that
-context produces diagnostics other than `redundant-cast`, we discard the attempt and infer the value
-without the outer context. Casts of incomplete or incompatible `TypedDict` literals therefore do not
-cause us to emit `redundant-cast`.
+context produces diagnostics, we discard the attempt and infer the value without the outer context.
+(In the common case, the first attempt will *usually* be discarded: most casts are not redundant!)
+Casts of incomplete or incompatible `TypedDict` literals therefore do not cause us to emit
+`redundant-cast`.
 
 We do not yet detect disjointness between `dict` and `TypedDict` types. Adding that support may
-cause some of these casts to emit `disjoint-cast` in the future.
+cause some of these casts to emit `disjoint-cast` in the future:
 
 ```py
 from typing import TypedDict, cast
@@ -202,8 +195,10 @@ def make_item() -> Item:
     return cast(Item, {})  # no redundant-cast diagnostic
 ```
 
-Context can also introduce diagnostics in lambda bodies. Here, using the outer context would make
-the lambda parameter an `int` and report `call-non-callable`:
+Type context can also introduce diagnostics in lambda bodies. Here, using the outer context would
+make the lambda parameter an `int` and report `call-non-callable`. We therefore fall back to the
+inference attempt that does not use the type context, and emit neither `redundant-cast` nor
+`call-non-callable`:
 
 ```py
 from typing import Callable

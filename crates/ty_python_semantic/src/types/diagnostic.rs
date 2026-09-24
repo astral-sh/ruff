@@ -1513,7 +1513,7 @@ impl TypeCheckDiagnostics {
         self.diagnostics.is_empty() && self.used_suppressions.is_empty()
     }
 
-    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
+    fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
         self.diagnostics().iter()
     }
 
