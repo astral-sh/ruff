@@ -314,6 +314,8 @@ version_files = [
     { target = "crates/ruff_linter/src/rules/**/*.rs", replace = "NEXT_RUFF_VERSION" },
     "crates/ruff_wasm/Cargo.toml",
     "scripts/benchmarks/pyproject.toml",
+    ".github/ISSUE_TEMPLATE/1_bug_report.yaml",
+    ".github/ISSUE_TEMPLATE/3_question.yaml",
 ]
 
 [tool.rooster.section-labels]
