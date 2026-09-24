@@ -530,6 +530,11 @@ path/to/code1/
 path/to/code2/
 ```
 
+If a path including the leading `@` exists, Ruff treats it as a literal path instead.
+For example, `ruff check @list.py` checks `@list.py` if it exists, even if `list.py`
+also exists. Otherwise, Ruff reads arguments from `list.py`. This applies to files
+and directories, including arguments after `--` and arguments inside response files.
+
 ### Full command-line interface
 
 See `ruff help` for the full list of Ruff's top-level commands:

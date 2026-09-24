@@ -3095,7 +3095,6 @@ name = "ruff"
 version = "0.16.8"
 dependencies = [
  "anyhow",
- "argfile",
  "assert_fs",
  "bitflags 2.13.1",
  "cachedir",
@@ -3217,6 +3216,7 @@ version = "0.0.14"
 dependencies = [
  "anstyle",
  "arc-swap",
+ "argfile",
  "camino",
  "compact_str",
  "dashmap",
@@ -4652,7 +4652,6 @@ name = "ty"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "argfile",
  "clap",
  "clap_complete_command",
  "clearscreen",

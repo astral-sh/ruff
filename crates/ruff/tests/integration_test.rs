@@ -1869,6 +1869,46 @@ fn check_input_from_argfile() -> Result<()> {
 }
 
 #[test]
+fn check_existing_at_paths_are_literal() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    fs::write(tempdir.path().join("@list.py"), "import os\n")?;
+    fs::create_dir(tempdir.path().join("@package"))?;
+    fs::write(tempdir.path().join("@package/main.py"), "import sys\n")?;
+    fs::write(
+        tempdir.path().join("list.py"),
+        "--output-file\nsentinel.txt\nunrelated.py\n",
+    )?;
+    fs::write(tempdir.path().join("package"), "unrelated.py\n")?;
+    fs::write(tempdir.path().join("unrelated.py"), "")?;
+    fs::write(tempdir.path().join("sentinel.txt"), "unchanged\n")?;
+
+    let output = ruff_cmd()
+        .current_dir(tempdir.path())
+        .args([
+            "check",
+            "--isolated",
+            "--no-cache",
+            "--select",
+            "F401",
+            "@list.py",
+            "--",
+            "@package",
+        ])
+        .output()?;
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    assert!(output.stderr.is_empty(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("@list.py"), "{stdout}");
+    assert!(stdout.contains("@package"), "{stdout}");
+    assert!(stdout.contains("Found 2 errors."), "{stdout}");
+    assert_eq!(
+        fs::read_to_string(tempdir.path().join("sentinel.txt"))?,
+        "unchanged\n"
+    );
+    Ok(())
+}
+
+#[test]
 // Regression test for https://github.com/astral-sh/ruff/issues/20655
 fn missing_argfile_reports_error() {
     let mut cmd = RuffCheck::default().filename("@!.txt").build();

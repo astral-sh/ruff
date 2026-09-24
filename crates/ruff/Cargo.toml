@@ -39,7 +39,6 @@ ruff_text_size = { workspace = true }
 ruff_workspace = { workspace = true }
 
 anyhow = { workspace = true }
-argfile = { workspace = true }
 rkyv = { workspace = true }
 bitflags = { workspace = true }
 cachedir = { workspace = true }
