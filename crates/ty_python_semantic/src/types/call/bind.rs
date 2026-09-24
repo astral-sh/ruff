@@ -6033,7 +6033,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     .or_never();
                 let declared_constraints =
                     return_ty.when_constraint_set_assignable_to(db, self.env, tcx, constraints);
-                builder.intersect_declared_constraints(declared_constraints);
+                builder.intersect_context_constraints(
+                    declared_constraints,
+                    self.call_expression_tcx.kind,
+                );
                 (return_ty, tcx, declared_constraints)
             });
 
@@ -6051,10 +6054,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         {
             specialization_errors.clear();
             self.constraint_set_errors.fill(false);
-            if self.constructor_kind.is_some() {
+            if self.constructor_kind.is_some() && self.call_expression_tcx.is_declared() {
                 let mut declared_builder =
                     SpecializationBuilder::new(db, self.env, constraints, generic_context);
-                declared_builder.intersect_declared_constraints(declared_constraints);
+                declared_builder.intersect_context_constraints(
+                    declared_constraints,
+                    self.call_expression_tcx.kind,
+                );
                 let declared = self.build_generic_inference(
                     constraints,
                     &mut declared_builder,
@@ -6113,7 +6119,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         };
 
-        let return_with_tcx = Some(self.return_ty).zip(self.call_expression_tcx.annotation);
+        let return_with_tcx = Some(self.return_ty).zip(
+            self.call_expression_tcx
+                .annotation
+                .filter(|_| self.call_expression_tcx.is_declared()),
+        );
 
         self.inferable_typevars = generic_context.inferable_typevars(db);
         let mut builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
@@ -7493,9 +7503,8 @@ pub(crate) enum ArgumentTypeContext<'db> {
     Standard {
         /// The raw parameter type from the overload signature.
         raw_parameter_type: Type<'db>,
-        /// The parameter type to use as context, possibly specialized from the call expression's
-        /// declared type.
-        parameter_type: Type<'db>,
+        /// The expected parameter type, possibly specialized from the call expression's context.
+        context: TypeContext<'db>,
     },
 
     ParamSpec {
@@ -7509,12 +7518,12 @@ pub(crate) enum ArgumentTypeContext<'db> {
 impl<'db> ArgumentTypeContext<'db> {
     /// Creates a context for ordinary parameter annotations.
     ///
-    /// `raw_parameter_type` is the lookup key used by later type checking. `parameter_type` is the
+    /// `raw_parameter_type` is the lookup key used by later type checking. `context` is the
     /// possibly-specialized context used to infer the argument expression.
-    fn standard(raw_parameter_type: Type<'db>, parameter_type: Type<'db>) -> Self {
+    fn standard(raw_parameter_type: Type<'db>, context: TypeContext<'db>) -> Self {
         Self::Standard {
             raw_parameter_type,
-            parameter_type,
+            context,
         }
     }
 
@@ -7533,11 +7542,8 @@ impl<'db> ArgumentTypeContext<'db> {
     /// Returns the type context used for inferring the argument expression.
     pub(crate) fn type_context(self) -> TypeContext<'db> {
         match self {
-            Self::Standard { parameter_type, .. }
-            | Self::ParamSpec {
-                declared_type: parameter_type,
-                ..
-            } => TypeContext::new(Some(parameter_type)),
+            Self::Standard { context, .. } => context,
+            Self::ParamSpec { declared_type, .. } => TypeContext::new(Some(declared_type)),
         }
     }
 
@@ -7547,12 +7553,13 @@ impl<'db> ArgumentTypeContext<'db> {
     /// for that type. `ParamSpec` arguments are cached by the concrete forwarded parameter type,
     /// but still inserted through their full context so the original `P.args` or `P.kwargs` lookup
     /// key is populated too.
-    pub(crate) fn inference_cache_key(self) -> Type<'db> {
+    pub(crate) fn inference_cache_key(self) -> TypeContext<'db> {
         match self {
             Self::Standard {
-                raw_parameter_type, ..
-            } => raw_parameter_type,
-            Self::ParamSpec { declared_type, .. } => declared_type,
+                raw_parameter_type,
+                context,
+            } => context.with_annotation(Some(raw_parameter_type)),
+            Self::ParamSpec { declared_type, .. } => TypeContext::new(Some(declared_type)),
         }
     }
 
@@ -8081,9 +8088,10 @@ impl<'db> Binding<'db> {
         };
 
         // If the parameter is a single non-ParamSpec type variable with an upper bound,
-        // e.g., `typing.Self`, use the upper bound as type context. ParamSpec components
-        // need to reach generic call specialization below, where earlier arguments can
-        // specialize the full `ParamSpec`.
+        // e.g., `typing.Self`, use the upper bound as validity-only type context. The bound
+        // restricts the argument's type but does not provide evidence for preferring it over
+        // the argument's inferred type. ParamSpec components need to reach generic call
+        // specialization below, where earlier arguments can specialize the full `ParamSpec`.
         if let Type::TypeVar(typevar) = parameter_type
             && !typevar.is_paramspec(db)
             && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
@@ -8091,7 +8099,7 @@ impl<'db> Binding<'db> {
         {
             return Some(ArgumentTypeContext::standard(
                 original_parameter_type,
-                bound,
+                TypeContext::validity(bound),
             ));
         }
 
@@ -8145,9 +8153,20 @@ impl<'db> Binding<'db> {
             }
         }
 
+        // A provisional specialization derived from a validity-only return context remains
+        // validity-only when it provides context for a nested call. Parameter annotations that
+        // do not depend on that specialization still contribute declared evidence.
+        let context = if !call_expression_tcx.is_declared()
+            && self.inference.is_none()
+            && parameter_type != original_parameter_type
+        {
+            call_expression_tcx.with_annotation(Some(parameter_type))
+        } else {
+            TypeContext::new(Some(parameter_type))
+        };
         Some(ArgumentTypeContext::standard(
             original_parameter_type,
-            parameter_type,
+            context,
         ))
     }
 
