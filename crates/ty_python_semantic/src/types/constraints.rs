@@ -804,44 +804,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         mut map: impl FnMut(Constraint<'db>) -> (NodeId, Option<SourceOrderId>),
     ) -> Self {
-        fn rebuild_node(
-            storage: &mut ConstraintSetStorage<'_>,
-            old_node: NodeId,
-            mapped_constraints: &FxHashMap<ConstraintId, (NodeId, Option<SourceOrderId>)>,
-            mapped_nodes: &mut FxHashMap<NodeId, NodeId>,
-        ) -> NodeId {
-            if old_node.is_terminal() {
-                return old_node;
-            }
-            if let Some(mapped) = mapped_nodes.get(&old_node) {
-                return *mapped;
-            }
-
-            let old_interior = storage.interior_node_data(old_node);
-            let (condition, _) = mapped_constraints[&old_interior.constraint];
-            let if_true = rebuild_node(
-                storage,
-                old_interior.if_true,
-                mapped_constraints,
-                mapped_nodes,
-            );
-            let if_uncertain = rebuild_node(
-                storage,
-                old_interior.if_uncertain,
-                mapped_constraints,
-                mapped_nodes,
-            );
-            let if_false = rebuild_node(
-                storage,
-                old_interior.if_false,
-                mapped_constraints,
-                mapped_nodes,
-            );
-            let mapped = condition.ite_uncertain(storage, if_true, if_uncertain, if_false);
-            mapped_nodes.insert(old_node, mapped);
-            mapped
-        }
-
         // We have to collect this into a temporary vec since we can't hold an open borrow on the
         // storage during the map calls below, since they also need to borrow the storage.
         let storage = self.builder.storage.borrow();
@@ -873,16 +835,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                     },
                 )
             });
-        Self::from_node(
-            self.builder,
-            rebuild_node(
-                &mut storage,
-                self.node,
-                &mapped_constraints,
-                &mut FxHashMap::default(),
-            ),
-            source_order,
-        )
+        let node = self
+            .node
+            .map_constraints(&mut storage, |id| mapped_constraints[&id].0);
+        Self::from_node(self.builder, node, source_order)
     }
 
     /// Universally abstracts constraints involving the given type variables from this TDD.
@@ -2530,6 +2486,39 @@ impl NodeId {
         }
     }
 
+    /// Replaces each constraint with a mapped node, preserving the three branches of every test.
+    /// Rebuilds shared nodes only once. The caller is responsible for remapping source order.
+    fn map_constraints(
+        self,
+        storage: &mut ConstraintSetStorage<'_>,
+        map: impl Fn(ConstraintId) -> Self,
+    ) -> Self {
+        fn rebuild(
+            storage: &mut ConstraintSetStorage<'_>,
+            node: NodeId,
+            map: &impl Fn(ConstraintId) -> NodeId,
+            mapped: &mut FxHashMap<NodeId, NodeId>,
+        ) -> NodeId {
+            if node.is_terminal() {
+                return node;
+            }
+            if let Some(mapped) = mapped.get(&node) {
+                return *mapped;
+            }
+
+            let interior = storage.interior_node_data(node);
+            let condition = map(interior.constraint);
+            let if_true = rebuild(storage, interior.if_true, map, mapped);
+            let if_uncertain = rebuild(storage, interior.if_uncertain, map, mapped);
+            let if_false = rebuild(storage, interior.if_false, map, mapped);
+            let result = condition.ite_uncertain(storage, if_true, if_uncertain, if_false);
+            mapped.insert(node, result);
+            result
+        }
+
+        rebuild(storage, self, &map, &mut FxHashMap::default())
+    }
+
     /// Returns the negation of this BDD.
     fn negate(self, storage: &mut ConstraintSetStorage<'_>) -> Self {
         match self.node() {
@@ -3787,9 +3776,15 @@ impl<'db> CandidateSolutions<'db> {
     /// the path's available bindings, but marks the resulting path family as incomplete.
     pub(crate) fn solve_with(
         &self,
-        choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
+        mut choose: impl FnMut(
+            TypeVarVariance,
+            &CandidateTypeVarSolution<'db>,
+        ) -> PathBoundSolution<'db>,
     ) -> Solutions<'db> {
-        let Ok(solutions) = self.try_solve_with(choose, |_| Ok::<(), Infallible>(()));
+        let Ok(solutions) = self.try_solve_with(
+            |_, variance, bound| choose(variance, bound),
+            |_| Ok::<(), Infallible>(()),
+        );
         solutions
     }
 
@@ -3797,6 +3792,7 @@ impl<'db> CandidateSolutions<'db> {
     fn try_solve_with<E>(
         &self,
         mut choose: impl FnMut(
+            &[CandidateTypeVarSolution<'db>],
             TypeVarVariance,
             &CandidateTypeVarSolution<'db>,
         ) -> PathBoundSolution<'db>,
@@ -3816,7 +3812,10 @@ impl<'db> CandidateSolutions<'db> {
         let mut valid_exceeded_budget = false;
         let mut invalid_exceeded_budget = false;
         for path in paths {
-            let Some((solution, path_exceeded_budget)) = Self::solve_path_with(path, &mut choose)
+            let Some((solution, path_exceeded_budget)) =
+                Self::solve_path_with(path, &mut |variance, bound| {
+                    choose(&path.typevars, variance, bound)
+                })
             else {
                 continue;
             };
