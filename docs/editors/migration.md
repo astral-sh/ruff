@@ -26,12 +26,8 @@ that enumerate some of the common settings and how to migrate them.
 
 The following [`ruff-lsp`][ruff-lsp] settings are not supported by the native server:
 
-- [`lint.run`](settings.md#lintrun): This setting is no longer relevant for the native language
-    server, which runs on every keystroke by default.
-- [`lint.args`](settings.md#lintargs), [`format.args`](settings.md#formatargs): These settings have
-    been replaced by more granular settings in the native server like [`lint.select`](settings.md#select),
-    [`format.preview`](settings.md#format_preview), etc. along with the ability to override any
-    configuration using the [`configuration`](settings.md#configuration) setting.
+- `lint.run`: This setting is no longer relevant for the native language server, which runs on every keystroke by default.
+- `lint.args`, `format.args`: These settings have been replaced by more granular settings in the native server like [`lint.select`](settings.md#select), [`format.preview`](settings.md#format_preview), etc. along with the ability to override any configuration using the [`configuration`](settings.md#configuration) setting.
 
 The following settings are not accepted by the language server but are still used by the [VS Code extension].
 Refer to their respective documentation for more information on how each is used by the extension:
@@ -43,8 +39,8 @@ Refer to their respective documentation for more information on how each is used
 
 Additionally, the following settings are not supported by the native server and should be removed:
 
-- [`ignoreStandardLibrary`](settings.md#ignorestandardlibrary)
-- [`showNotifications`](settings.md#shownotifications)
+- `ignoreStandardLibrary`
+- `showNotifications`
 
 ## New Settings
 
