@@ -1314,6 +1314,7 @@ impl<'db> FunctionType<'db> {
                 type_mapping,
                 TypeMapping::ApplySpecialization(specialization)
                     | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
+                    | TypeMapping::ApplySpecializationForTypeContext { specialization, .. }
                     if specialization.preserves_lazy_signatures()
             ) {
             (

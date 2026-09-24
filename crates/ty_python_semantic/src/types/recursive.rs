@@ -433,6 +433,7 @@ impl<'db> RecursiveType<'db> {
             }
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::ApplySpecializationWithMaterialization { .. }
+            | TypeMapping::ApplySpecializationForTypeContext { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(_)

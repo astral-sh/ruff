@@ -29,20 +29,65 @@ use crate::{Db, ProgramEnvironment};
 /// When we derive a new constraint from both an evidence constraint and a validity constraint, we
 /// produce a _mixed_ constraint. Sometimes we will need to treat that derived constraint the same
 /// as a validity constraint; other times we will need to treat it like an evidence constraint.
+///
+/// The expected type of a call supplies _declared_ evidence. Bounds derived from both argument and
+/// declared evidence constrain the solution, but do not independently contribute to either
+/// source's preferred type. We track those sources separately from validity, including when a
+/// derivation depends on all three.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum ConstraintProvenance {
     Validity,
+    /// Argument evidence combined with validity.
     Mixed,
     Evidence,
+    Declared,
+    /// Declared evidence combined with validity.
+    DeclaredMixed,
+    /// Argument evidence combined with declared evidence.
+    Combined,
+    /// Argument evidence, declared evidence, and validity.
+    CombinedMixed,
 }
 
 impl ConstraintProvenance {
+    pub(super) const fn is_evidence(self) -> bool {
+        !matches!(self, Self::Validity)
+    }
+
+    pub(super) const fn has_validity(self) -> bool {
+        matches!(
+            self,
+            Self::Validity | Self::Mixed | Self::DeclaredMixed | Self::CombinedMixed
+        )
+    }
+
+    pub(super) const fn as_declared(self) -> Self {
+        match self {
+            Self::Validity => self,
+            Self::Evidence | Self::Declared | Self::Combined => Self::Declared,
+            Self::Mixed | Self::DeclaredMixed | Self::CombinedMixed => Self::DeclaredMixed,
+        }
+    }
+
     /// Returns the provenance of a constraint derived from two existing constraints.
     pub(super) const fn derived(left: Self, right: Self) -> Self {
         match (left, right) {
             (Self::Evidence, Self::Evidence) => Self::Evidence,
             (Self::Validity, Self::Validity) => Self::Validity,
-            _ => Self::Mixed,
+            (Self::Declared, Self::Declared) => Self::Declared,
+            (Self::Evidence, Self::Validity)
+            | (Self::Validity, Self::Evidence)
+            | (Self::Mixed, Self::Evidence | Self::Validity | Self::Mixed)
+            | (Self::Evidence | Self::Validity, Self::Mixed) => Self::Mixed,
+            (Self::Declared, Self::Validity)
+            | (Self::Validity, Self::Declared)
+            | (Self::DeclaredMixed, Self::Declared | Self::Validity | Self::DeclaredMixed)
+            | (Self::Declared | Self::Validity, Self::DeclaredMixed) => Self::DeclaredMixed,
+            (Self::Evidence, Self::Declared)
+            | (Self::Declared, Self::Evidence)
+            | (Self::Combined, Self::Evidence | Self::Declared | Self::Combined)
+            | (Self::Evidence | Self::Declared, Self::Combined) => Self::Combined,
+            _ => Self::CombinedMixed,
         }
     }
 
@@ -81,6 +126,16 @@ pub(crate) enum Constraint<'db> {
 }
 
 impl<'db> Constraint<'db> {
+    pub(super) fn provenance(self) -> ConstraintProvenance {
+        match self {
+            Self::ConcreteLower(bound) => bound.provenance,
+            Self::ConcreteUpper(bound) => bound.provenance,
+            Self::ConcreteEquivalence(bound) => bound.provenance,
+            Self::TypeVarRange(bound) => bound.provenance,
+            Self::TypeVarEquivalence(bound) => bound.provenance,
+        }
+    }
+
     pub(super) fn new_node(
         self,
         db: &'db dyn Db,

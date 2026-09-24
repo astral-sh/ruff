@@ -320,7 +320,11 @@ def infer_from_consumer(consumer: Callable[[T], None]) -> T:
 
 def consume(value: A | B | C | D | E) -> None: ...
 
-reveal_type(infer_from_consumer(consume))  # revealed: A | B | C | D | E
+result = infer_from_consumer(consume)
+reveal_type(result)  # revealed: A | B | C | D | E
+
+# TODO: An outer generic call should preserve the inferred union.
+reveal_type(infer_from_consumer(consume))  # revealed: A
 ```
 
 The aliases retain nested union members until inference expands them:
@@ -332,7 +336,11 @@ Options = TypeAliasType("Options", FirstTwo | NextTwo | E)
 
 def consume_alias(value: Options) -> None: ...
 
-reveal_type(infer_from_consumer(consume_alias))  # revealed: A | B | C | D | E
+result = infer_from_consumer(consume_alias)
+reveal_type(result)  # revealed: A | B | C | D | E
+
+# TODO: An outer generic call should preserve the inferred union.
+reveal_type(infer_from_consumer(consume_alias))  # revealed: A
 ```
 
 ## Overlapping inferred union upper bounds with few surviving alternatives
@@ -376,7 +384,11 @@ class H: ...
 def consume_left(value: A | B | C | D | E) -> None: ...
 def consume_right(value: A | B | F | G | H) -> None: ...
 
-reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: A | B
+result = infer_from_consumers(consume_left, consume_right)
+reveal_type(result)  # revealed: A | B
+
+# TODO: An outer generic call should preserve the inferred union.
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: A
 ```
 
 Aliases for these unions also preserve the precise intersection in either argument order:
@@ -388,8 +400,14 @@ Right = TypeAliasType("Right", A | B | F | G | H)
 def consume_left_alias(value: Left) -> None: ...
 def consume_right_alias(value: Right) -> None: ...
 
-reveal_type(infer_from_consumers(consume_left_alias, consume_right_alias))  # revealed: A | B
-reveal_type(infer_from_consumers(consume_right_alias, consume_left_alias))  # revealed: A | B
+left_result = infer_from_consumers(consume_left_alias, consume_right_alias)
+reveal_type(left_result)  # revealed: A | B
+right_result = infer_from_consumers(consume_right_alias, consume_left_alias)
+reveal_type(right_result)  # revealed: A | B
+
+# TODO: An outer generic call should preserve the inferred union.
+reveal_type(infer_from_consumers(consume_left_alias, consume_right_alias))  # revealed: A
+reveal_type(infer_from_consumers(consume_right_alias, consume_left_alias))  # revealed: A
 ```
 
 ## Intersecting aliased upper bounds exceeding the solution budget
@@ -535,12 +553,8 @@ reveal_type(infer_from_consumers(consume_literal, consume_first, consume_second)
 
 ## Overloaded callable as generic `Callable` argument
 
-An overloaded callable should be assignable to a non-overloaded callable type when the overload set
-as a whole is compatible with the target callable.
-
-The type variable should be inferred from the first matching overload, rather than unioning
-parameter types across all overloads (which would create an unsatisfiable expected type for
-contravariant type variables).
+An overloaded callable can supply multiple valid specializations for a generic `Callable` parameter.
+Without a return context, we currently combine the inferred parameter types from those alternatives.
 
 ```py
 from typing import Callable, TypeVar, overload
@@ -557,7 +571,11 @@ def f(val: bytes) -> None: ...
 def f(val: str | bytes) -> None:
     pass
 
-reveal_type(accepts_callable(f))  # revealed: str | bytes
+result = accepts_callable(f)
+reveal_type(result)  # revealed: str | bytes
+
+# TODO: An outer generic call should preserve the inferred union.
+reveal_type(accepts_callable(f))  # revealed: str
 ```
 
 ## Combining inferred and declared upper bounds

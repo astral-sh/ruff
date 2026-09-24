@@ -1041,3 +1041,21 @@ Element = Ts if condition() else int
 def homogeneous_union(values: tuple[Element, ...]) -> None:
     reveal_type(values)  # revealed: tuple[Unknown | int, ...]
 ```
+
+## Unannotated callbacks with variadic arguments
+
+An unsolved `TypeVarTuple` uses an unknown variadic argument shape instead of leaking a provisional
+type variable into an unannotated callback.
+
+```py
+from typing import Callable, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def schedule(callback: Callable[[*Ts], object], *args: *Ts) -> None:
+    callback(*args)
+
+items: list[int] = []
+schedule(lambda item: items.append(item), 1)
+schedule(lambda item, /: items.append(item), 1)
+```

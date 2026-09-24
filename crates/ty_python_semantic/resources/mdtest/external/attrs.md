@@ -65,6 +65,25 @@ reveal_type(p.data)  # revealed: bytes
 p.data = "not a dict"  # error: [invalid-assignment]
 ```
 
+## Validators without defaults
+
+A validator does not supply a field's default value. Fields with validators remain required and can
+be followed by other required fields:
+
+```py
+from typing import Any
+import attr
+
+def validate(instance: Any, attribute: attr.Attribute[Any], value: Any) -> None: ...
+
+@attr.s
+class User:
+    id: int = attr.ib(validator=validate)
+    name: str
+
+reveal_type(User.__init__)  # revealed: (self: User, id: int, name: str) -> None
+```
+
 ## Dedicated support for the `default` decorator?
 
 We currently do not support this:
