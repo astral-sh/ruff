@@ -842,6 +842,36 @@ c = C(f)
 reveal_type(c.f)  # revealed: (x: int, y: str) -> int
 ```
 
+### Generic constructors with bounded return types
+
+A class object can be passed as a callable that constructs instances. `Factory` takes no constructor
+arguments, but its instances have a generic, writable `value` attribute:
+
+```py
+class Factory[T]:
+    value: T
+```
+
+The `construct` helper captures a callable's parameters in `P`, forwards its arguments, and returns
+the resulting instance. The bound on `R` requires that instance to be assignable to
+`Factory[object]`:
+
+```py
+from typing import Callable
+
+def construct[**P, R: Factory[object]](factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+```
+
+`P` captures an empty parameter list, so the forwarded call supplies no information for `T`. The
+result should therefore be `Factory[Unknown]`, which is assignable to `Factory[object]` and
+satisfies `R`'s bound. We accept the call, but currently infer `Factory[object]` instead:
+
+```py
+# TODO: revealed: Factory[Unknown]
+reveal_type(construct(Factory))  # revealed: Factory[object]
+```
+
 ### `ParamSpec` in prepended positional parameters
 
 > If one of these prepended positional parameters contains a free `ParamSpec`, we consider that

@@ -108,8 +108,8 @@ use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, TypeVarSet};
 use crate::types::visitor::{
-    NonAtomicType, TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type,
-    walk_type_with_recursion_guard,
+    NonAtomicType, TypeCollector, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
+    walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
@@ -3133,6 +3133,8 @@ pub(crate) enum PathBoundSolution<'db> {
     Unsolved,
     /// The path's lower and upper bounds cannot be satisfied together
     Unsatisfiable,
+    /// The path does not satisfy the typevar's declared upper bound.
+    ViolatesDeclaredUpperBound(Type<'db>),
     /// The path does not satisfy the typevar's declared constraints.
     ViolatesDeclaredConstraints(ConstraintFailureEvidence<'db>),
     /// Computing the solution exceeded the type-construction budget. A previously known type
@@ -3150,7 +3152,10 @@ impl<'db> PathBoundSolution<'db> {
             Self::BudgetExceeded { fallback } => Self::BudgetExceeded {
                 fallback: fallback.map(f),
             },
-            Self::Unsolved | Self::Unsatisfiable | Self::ViolatesDeclaredConstraints(_) => self,
+            Self::Unsolved
+            | Self::Unsatisfiable
+            | Self::ViolatesDeclaredUpperBound(_)
+            | Self::ViolatesDeclaredConstraints(_) => self,
         }
     }
 
@@ -3159,8 +3164,69 @@ impl<'db> PathBoundSolution<'db> {
     pub(crate) fn as_type(&self) -> Option<Type<'db>> {
         match self {
             Self::Solved(ty) => Some(*ty),
-            Self::Unsolved | Self::Unsatisfiable | Self::ViolatesDeclaredConstraints(_) => None,
+            Self::Unsolved
+            | Self::Unsatisfiable
+            | Self::ViolatesDeclaredUpperBound(_)
+            | Self::ViolatesDeclaredConstraints(_) => None,
             Self::BudgetExceeded { fallback } => *fallback,
+        }
+    }
+
+    /// Checks declarations for solutions containing type variables fixed by an outer caller.
+    ///
+    /// TODO: Remove this check when solving preserves universal validity for non-inferable
+    /// variables. A raw constraint can accept `S <= T` with `T: str` for some `S`, but inferring
+    /// `T = S` is valid only if every type allowed by the caller's `S` satisfies the bound.
+    /// Relations involving other variables being inferred are left for subsequent solving.
+    pub(crate) fn validate_noninferable(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
+        inferable: TypeVarSet<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Self {
+        let Self::Solved(solution) = self else {
+            return self;
+        };
+        let Some(declaration) = bound_typevar.typevar(db).bound_or_constraints(db, env) else {
+            return self;
+        };
+        if !any_over_type_expanding_aliases(db, env, solution, Type::is_type_var)
+            || any_over_type_expanding_aliases(db, env, solution, |nested| {
+                nested
+                    .as_typevar()
+                    .is_some_and(|typevar| typevar.is_inferable(db, inferable))
+            })
+        {
+            return self;
+        }
+
+        let satisfies = |target| {
+            solution
+                .when_assignable_to(db, env, target, builder, inferable)
+                .is_always_satisfied(db, env)
+        };
+        match declaration {
+            TypeVarBoundOrConstraints::UpperBound(bound) if !satisfies(bound) => {
+                Self::ViolatesDeclaredUpperBound(solution)
+            }
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                if let Type::TypeVar(solution_typevar) = solution.resolve_type_alias(db)
+                    && let Some(TypeVarBoundOrConstraints::Constraints(solution_constraints)) =
+                        solution_typevar.typevar(db).bound_or_constraints(db, env)
+                    && solution_constraints.is_subset_of(db, env, constraints)
+                {
+                    return self;
+                }
+
+                if constraints.elements(db).iter().copied().any(satisfies) {
+                    self
+                } else {
+                    Self::ViolatesDeclaredConstraints(ConstraintFailureEvidence::Lower(solution))
+                }
+            }
+            TypeVarBoundOrConstraints::UpperBound(_) => self,
         }
     }
 }
@@ -3816,6 +3882,14 @@ impl<'db> CandidateSolutions<'db> {
                 PathBoundSolution::Solved(ty) => Some(ty),
                 PathBoundSolution::Unsolved => None,
                 PathBoundSolution::Unsatisfiable => return None,
+                PathBoundSolution::ViolatesDeclaredUpperBound(argument) => {
+                    violations.push(SolutionViolation {
+                        bound_typevar: path_bound.bound_typevar,
+                        variance: path_bound.variance(),
+                        kind: SolutionViolationKind::UpperBound(Some(argument)),
+                    });
+                    None
+                }
                 PathBoundSolution::ViolatesDeclaredConstraints(evidence) => {
                     violations.push(SolutionViolation {
                         bound_typevar: path_bound.bound_typevar,

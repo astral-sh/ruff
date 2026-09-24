@@ -258,14 +258,11 @@ def _(
 
     # revealed: (bound method (type[E1] & type[E2]).f() -> list[E1 & E2]) & (bound method (type[E1] & type[E2]).f() -> list[E1 & E2])
     reveal_type(intersection_external.f)
-    # TODO: this should be `list[E1 & E2]`
-    reveal_type(intersection_external.f())  # revealed: Never
+    reveal_type(intersection_external.f())  # revealed: list[E1 & E2]
 
-    # TODO: this should reveal the same type as `intersection_external.f` above
-    # revealed: Never
+    # revealed: (bound method (type[E1] & type[E2]).f() -> list[E1 & E2]) & (bound method (type[E1] & type[E2]).f() -> list[E1 & E2])
     reveal_type(intersection_internal.f)
-    # TODO: this should be `list[E1 & E2]`
-    reveal_type(intersection_internal.f())  # revealed: Never
+    reveal_type(intersection_internal.f())  # revealed: list[E1 & E2]
 ```
 
 This also works with protocols:
@@ -395,13 +392,11 @@ def _(
 
     # revealed: bound method (type[E1] & type[E2]).f() -> list[E1 & E2]
     reveal_type(intersection_external.f)
-    # TODO: This should be list[E1 & E2]
-    reveal_type(intersection_external.f())  # revealed: list[E1]
+    reveal_type(intersection_external.f())  # revealed: list[E1 & E2]
 
     # revealed: bound method (type[E1] & type[E2]).f() -> list[E1 & E2]
     reveal_type(intersection_internal.f)
-    # TODO: This should be list[E1 & E2]
-    reveal_type(intersection_internal.f())  # revealed: list[E1]
+    reveal_type(intersection_internal.f())  # revealed: list[E1 & E2]
 ```
 
 This also works with protocols:

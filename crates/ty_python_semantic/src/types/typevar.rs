@@ -2093,6 +2093,24 @@ impl<'db> TypeVarConstraints<'db> {
         UnionType::from_elements(db, env, self.elements(db))
     }
 
+    /// Whether every constraint in `self` has an equivalent constraint in `other`.
+    ///
+    /// For example, `(int, str)` is a subset of `(int, str, bytes)`, but `(bool, str)` is not
+    /// a subset of `(int, str)`: `bool` is a subtype of `int`, but is not equivalent to it.
+    pub(super) fn is_subset_of(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Self,
+    ) -> bool {
+        self.elements(db).iter().all(|constraint| {
+            other
+                .elements(db)
+                .iter()
+                .any(|other_constraint| constraint.is_equivalent_to(db, env, *other_constraint))
+        })
+    }
+
     fn to_instance(
         self,
         db: &'db dyn Db,
