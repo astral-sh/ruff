@@ -3121,7 +3121,7 @@ dependencies = [
  "regex",
  "rkyv",
  "ruff_cache",
- "ruff_cli",
+ "ruff_command_line",
  "ruff_db",
  "ruff_diagnostics",
  "ruff_graph",
@@ -3212,7 +3212,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ruff_cli"
+name = "ruff_command_line"
 version = "0.0.14"
 dependencies = [
  "argfile",
@@ -4673,7 +4673,7 @@ dependencies = [
  "jiff",
  "rayon",
  "regex",
- "ruff_cli",
+ "ruff_command_line",
  "ruff_db",
  "ruff_diagnostics",
  "ruff_python_ast",

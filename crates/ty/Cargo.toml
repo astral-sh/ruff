@@ -18,7 +18,7 @@ license.workspace = true
 doctest = false
 
 [dependencies]
-ruff_cli = { workspace = true }
+ruff_command_line = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "cache", "junit"] }
 ruff_diagnostics = { workspace = true }
 ruff_python_ast = { workspace = true }

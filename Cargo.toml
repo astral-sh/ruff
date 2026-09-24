@@ -17,7 +17,7 @@ char_str = { version = "0.0.4", default-features = false, features = ["std"] }
 ruff = { version = "0.16.8", path = "crates/ruff" }
 ruff_annotate_snippets = { version = "0.0.14", path = "crates/ruff_annotate_snippets" }
 ruff_cache = { version = "0.0.14", path = "crates/ruff_cache" }
-ruff_cli = { version = "0.0.14", path = "crates/ruff_cli" }
+ruff_command_line = { version = "0.0.14", path = "crates/ruff_command_line" }
 ruff_db = { version = "0.0.14", path = "crates/ruff_db", default-features = false }
 ruff_diagnostics = { version = "0.0.14", path = "crates/ruff_diagnostics" }
 ruff_formatter = { version = "0.0.14", path = "crates/ruff_formatter" }

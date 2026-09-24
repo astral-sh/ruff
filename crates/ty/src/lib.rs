@@ -47,7 +47,8 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
 
     let args = wild::args_os();
-    let args = ruff_cli::expand_args(args).context("Failed to read CLI arguments from file")?;
+    let args =
+        ruff_command_line::expand_args(args).context("Failed to read CLI arguments from file")?;
     let args = Cli::parse_from(args);
 
     match args.command {
