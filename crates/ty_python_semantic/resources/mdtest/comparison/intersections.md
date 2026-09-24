@@ -263,3 +263,55 @@ def _(x: object):
             # No error here!
             reveal_type(2 in x)  # revealed: bool
 ```
+
+## Rich comparisons preserve intersection receivers
+
+Rich comparisons can return non-boolean values. A `Self` return type retains the full intersection
+receiver for both normal and reflected comparisons.
+
+```py
+from typing_extensions import Self
+from ty_extensions import Intersection
+
+class C:
+    def __lt__(self, other: object) -> Self:
+        return self
+
+    def __le__(self, other: object) -> Self:
+        return self
+
+    def __gt__(self, other: object) -> Self:
+        return self
+
+    def __ge__(self, other: object) -> Self:
+        return self
+
+    def __eq__(self, other: object) -> Self:  # error: [invalid-method-override]
+        return self
+
+    def __ne__(self, other: object) -> Self:  # error: [invalid-method-override]
+        return self
+
+class Other: ...
+
+def normal(c: Intersection[C, Other], other: object):
+    reveal_type(c < other)  # revealed: C & Other
+    reveal_type(c <= other)  # revealed: C & Other
+    reveal_type(c > other)  # revealed: C & Other
+    reveal_type(c >= other)  # revealed: C & Other
+    reveal_type(c == other)  # revealed: C & Other
+    reveal_type(c != other)  # revealed: C & Other
+    reveal_type(c < c)  # revealed: C & Other
+
+def reflected(c: Intersection[C, Other], other: object):
+    reveal_type(other < c)  # revealed: C & Other
+    reveal_type(other <= c)  # revealed: C & Other
+    reveal_type(other > c)  # revealed: C & Other
+    reveal_type(other >= c)  # revealed: C & Other
+    reveal_type(other == c)  # revealed: C & Other
+    reveal_type(other != c)  # revealed: C & Other
+
+def negative(c: C, other: object):
+    if not isinstance(c, Other):
+        reveal_type(c < other)  # revealed: C & ~Other
+```

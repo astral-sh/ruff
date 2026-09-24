@@ -330,6 +330,12 @@ class C:
     def __neg__(self) -> Self:
         return self
 
+    def __pos__(self) -> Self:
+        return self
+
+    def __invert__(self) -> Self:
+        return self
+
     def __getitem__(self, key: int | None) -> Self:
         return self
 
@@ -340,6 +346,8 @@ def narrowed(c: C, key: int | None):
         reveal_type(c.__call__())  # revealed: C & Other
         reveal_type(c())  # revealed: C & Other
         reveal_type(-c)  # revealed: C & Other
+        reveal_type(+c)  # revealed: C & Other
+        reveal_type(~c)  # revealed: C & Other
         reveal_type(c[0])  # revealed: C & Other
         reveal_type(c[key])  # revealed: C & Other
     else:
@@ -369,4 +377,133 @@ def union(c: Intersection[C, Other] | Intersection[D, Other]):
 def multiple_providers(c: Intersection[C, D]):
     reveal_type(c())  # revealed: C & D
     reveal_type(-c)  # revealed: C & D
+```
+
+## Arithmetic preserves intersection receivers
+
+Both normal and reflected operators bind `Self` to the full receiver. Augmented assignment retains
+that receiver as well.
+
+```py
+from typing_extensions import Self
+from ty_extensions import Intersection
+
+class C:
+    def __add__(self, other: int) -> Self:
+        return self
+
+    def __radd__(self, other: int) -> Self:
+        return self
+
+    def __iadd__(self, other: int) -> Self:
+        return self
+
+class Other: ...
+
+def _(c: Intersection[C, Other]):
+    reveal_type(c + 1)  # revealed: C & Other
+    reveal_type(1 + c)  # revealed: C & Other
+    c += 1
+    reveal_type(c)  # revealed: C & Other
+```
+
+## Context managers preserve intersection receivers
+
+```py
+from typing import Any
+from typing_extensions import Self
+from ty_extensions import Intersection
+
+class C:
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args: Any) -> None: ...
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *args: Any) -> None: ...
+
+class Other: ...
+
+async def _(c: Intersection[C, Other]):
+    with c as entered:
+        reveal_type(entered)  # revealed: C & Other
+    async with c as entered_async:
+        reveal_type(entered_async)  # revealed: C & Other
+```
+
+## Await preserves intersection receivers
+
+`Self` can also occur inside the return type of a dunder method.
+
+```py
+from typing import Any, Generator
+from typing_extensions import Self
+from ty_extensions import Intersection
+
+class C:
+    def __await__(self) -> Generator[Any, None, Self]:
+        yield
+        return self
+
+class Other: ...
+
+async def _(c: Intersection[C, Other]):
+    reveal_type(await c)  # revealed: C & Other
+```
+
+## Iteration over intersection receivers
+
+```py
+from typing_extensions import Self
+from ty_extensions import Intersection
+
+class C:
+    def __iter__(self) -> Self:
+        return self
+
+    def __next__(self) -> Self:
+        return self
+
+class Other: ...
+
+def _(c: Intersection[C, Other]):
+    reveal_type(c.__iter__())  # revealed: C & Other
+    reveal_type(c.__next__())  # revealed: C & Other
+    # TODO: These should all retain `C & Other`, just like the explicit calls.
+    reveal_type(iter(c))  # revealed: C
+    reveal_type(next(c))  # revealed: C
+    for item in c:
+        reveal_type(item)  # revealed: C
+```
+
+## Async iteration over intersection receivers
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Self
+from ty_extensions import Intersection
+
+class C:
+    def __aiter__(self) -> Self:
+        return self
+
+    async def __anext__(self) -> Self:
+        return self
+
+class Other: ...
+
+async def _(c: Intersection[C, Other]):
+    reveal_type(c.__aiter__())  # revealed: C & Other
+    reveal_type(await c.__anext__())  # revealed: C & Other
+    # TODO: These built-ins should retain `C & Other`, just like the explicit calls.
+    reveal_type(aiter(c))  # revealed: C
+    reveal_type(await anext(c))  # revealed: C
+    async for item in c:
+        reveal_type(item)  # revealed: C & Other
 ```
