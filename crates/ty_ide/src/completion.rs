@@ -64,6 +64,7 @@ pub fn completion<'db>(
         add_string_literal_completions(
             &model,
             string_expr,
+            context.cursor.subscript_for_string(string_expr),
             context.cursor.string_quote_style(),
             &mut completions,
         );
@@ -1032,6 +1033,29 @@ impl<'m> ContextCursor<'m> {
             Some(ast::AnyNodeRef::ExprStringLiteral(string_expr)) => Some(string_expr),
             _ => None,
         }
+    }
+
+    /// Returns the subscript whose complete slice is this string.
+    fn subscript_for_string(
+        &self,
+        string_expr: &ast::ExprStringLiteral,
+    ) -> Option<&'m ast::ExprSubscript> {
+        let parent = self
+            .covering_node
+            .ancestors()
+            .skip_while(|node| {
+                !matches!(
+                    node,
+                    ast::AnyNodeRef::ExprStringLiteral(expr)
+                        if expr.range() == string_expr.range()
+                )
+            })
+            .nth(1)?;
+        let ast::AnyNodeRef::ExprSubscript(subscript) = parent else {
+            return None;
+        };
+
+        (subscript.slice.range() == string_expr.range()).then_some(subscript)
     }
 
     /// Returns the quote style of the string literal that the cursor is positioned within, if any.
@@ -2319,6 +2343,7 @@ fn add_keyword_completions<'db>(
 fn add_string_literal_completions<'db>(
     model: &SemanticModel<'db>,
     string_expr: &ast::ExprStringLiteral,
+    subscript: Option<&ast::ExprSubscript>,
     quote_style: Option<Quote>,
     completions: &mut Completions<'db>,
 ) {
@@ -2354,7 +2379,7 @@ fn add_string_literal_completions<'db>(
         Some(force_escape_quote(&out, quote))
     }
 
-    let candidates = model.expected_string_literal_completions(string_expr);
+    let candidates = model.expected_string_literal_completions(string_expr, subscript);
     if candidates.is_empty() {
         return;
     }
@@ -7986,6 +8011,215 @@ consume("<CURSOR>")
         right :: Literal["right"]
         "#,
         );
+    }
+
+    #[test]
+    fn string_literal_completions_dictionary_initializers() {
+        let builder = completion_test_builder(
+            r#"
+d = {"b": 2, "a": 1, "b": 3}
+d["read_only"]
+d["<CURSOR>"]
+"#,
+        )
+        .skip_auto_import();
+
+        assert_snapshot!(builder.build().snapshot(), @"
+        a
+        b
+        ");
+    }
+
+    #[test]
+    fn string_literal_completions_dictionary_alias() {
+        let builder = completion_test_builder(
+            r#"
+d = {"old": 1}
+alias = d
+d = {"new": 2}
+alias["<CURSOR>"]
+"#,
+        )
+        .skip_auto_import();
+
+        assert_snapshot!(builder.build().snapshot(), @"old");
+    }
+
+    #[test]
+    fn string_literal_completions_nested_dictionary_initializer() {
+        let builder = completion_test_builder(
+            r#"
+d = {"outer": {"nested": 1}}
+d["outer"]["<CURSOR>"]
+"#,
+        )
+        .skip_auto_import();
+
+        assert_snapshot!(builder.build().snapshot(), @"nested");
+    }
+
+    #[test]
+    fn string_literal_completions_dictionary_unpacking_overwrites_nested_keys() {
+        let builder = completion_test_builder(
+            r#"
+d = {
+    "outer": {"stale": 1},
+    **{"outer": {"current": 2}},
+}
+d["outer"]["<CURSOR>"]
+"#,
+        )
+        .skip_auto_import();
+
+        assert_snapshot!(builder.build().snapshot(), @"current");
+    }
+
+    #[test]
+    fn string_literal_completions_dictionary_lookup_in_class_body() {
+        let builder = completion_test_builder(
+            r#"
+d = {"current": 1}
+
+
+class C:
+    d["<CURSOR>"]
+
+
+d = {"future": 2}
+"#,
+        )
+        .skip_auto_import();
+
+        assert_snapshot!(builder.build().snapshot(), @"current");
+    }
+
+    #[test]
+    fn string_literal_completions_implicit_class_attribute_shadows_dictionary() {
+        let builder = completion_test_builder(
+            r#"
+__module__ = {"shadowed": 1}
+
+
+class C:
+    __module__["<CURSOR>"]
+"#,
+        )
+        .skip_auto_import();
+
+        assert_snapshot!(builder.build().snapshot(), @"<No completions found>");
+    }
+
+    #[test]
+    fn string_literal_completions_dictionary_reassigned_in_loop() {
+        let builder = completion_test_builder(
+            r#"
+def f(flag: bool):
+    d = {"initial": 1}
+    while flag:
+        d["<CURSOR>"]
+        d = {"later": 2}
+"#,
+        )
+        .skip_auto_import();
+
+        assert_snapshot!(builder.build().snapshot(), @"
+        initial
+        later
+        ");
+    }
+
+    #[test]
+    fn string_literal_completions_dictionary_incompatible_key_type() {
+        let builder = completion_test_builder(
+            r#"
+original = {"invalid": 1}
+d: dict[int, int] = original
+d["<CURSOR>"]
+"#,
+        )
+        .skip_auto_import();
+
+        assert_snapshot!(builder.build().snapshot(), @"<No completions found>");
+    }
+
+    #[test]
+    fn string_literal_completions_dictionary_rejected_initializer() {
+        let builder = completion_test_builder(
+            r#"
+d: dict[str, int] = {"invalid": "bad"}
+d["<CURSOR>"]
+"#,
+        )
+        .skip_auto_import();
+
+        assert_snapshot!(builder.build().snapshot(), @"<No completions found>");
+    }
+
+    #[test]
+    fn string_literal_completions_reexported_dictionary_initializer() {
+        let builder = CursorTest::builder()
+            .source("pkg/origin.py", r#"d = {"old": 1}"#)
+            .source(
+                "pkg/values.py",
+                r#"
+from .origin import d
+
+d = {"new": 2}
+alias = d
+"#,
+            )
+            .source("pkg/__init__.py", "from .values import *")
+            .source(
+                "main.py",
+                r#"
+from pkg import alias as config
+
+config["<CURSOR>"]
+"#,
+            )
+            .completion_test_builder()
+            .skip_auto_import();
+
+        assert_snapshot!(builder.build().snapshot(), @"new");
+    }
+
+    #[test]
+    fn string_literal_completions_cyclic_dictionary_imports() {
+        let builder = CursorTest::builder()
+            .source("a.py", "from b import d")
+            .source("b.py", "from a import d")
+            .source(
+                "main.py",
+                r#"
+from a import d
+
+d["<CURSOR>"]
+"#,
+            )
+            .completion_test_builder()
+            .skip_auto_import();
+
+        assert_snapshot!(builder.build().snapshot(), @"<No completions found>");
+    }
+
+    #[test]
+    fn string_literal_completions_declared_keys_override_initializer() {
+        let builder = completion_test_builder(
+            r#"
+from typing import TypedDict
+
+
+class D(TypedDict):
+    declared: int
+
+
+d: D = {"invalid": 1}
+d["<CURSOR>"]
+"#,
+        )
+        .skip_auto_import();
+
+        assert_snapshot!(builder.build().snapshot(), @"declared");
     }
 
     #[test]
