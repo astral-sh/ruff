@@ -56,7 +56,9 @@ pub(super) enum AttributeWriteRequirement<'db> {
     ///
     /// `write` is `None` for a read-only member. Qualifiers are retained so assignment inference
     /// can distinguish `Final` and `ClassVar` diagnostics from other non-writable members.
+    /// `receiver_ty` is the receiver used to resolve `write`.
     ProtocolMember {
+        receiver_ty: Type<'db>,
         write: Option<ProtocolMemberWriteRequirement<'db>>,
         qualifiers: TypeQualifiers,
     },
@@ -85,9 +87,21 @@ pub(super) enum ProtocolMemberWriteRequirement<'db> {
     /// cannot be represented precisely.
     Descriptor {
         descriptor_ty: Type<'db>,
-        receiver_ty: Type<'db>,
         domain: Option<Type<'db>>,
     },
+}
+
+impl<'db> ProtocolMemberWriteRequirement<'db> {
+    /// Which type is accepted in a write to this protocol member?
+    ///
+    /// Returns `None` if that type cannot be represented directly (if the protocol
+    /// member is a custom descriptor whose domain cannot be represented directly).
+    pub(super) fn accepted_type(&self) -> Option<Type<'db>> {
+        match self {
+            Self::AssignableTo(ty) => Some(*ty),
+            Self::Descriptor { domain, .. } => *domain,
+        }
+    }
 }
 
 /// The member that governs a write through an instance.
@@ -324,6 +338,7 @@ pub(super) fn attribute_write_requirement<'db>(
             .map_or_else(
                 || instance_attribute_write_requirement(db, env, object_ty, attribute),
                 |(write, qualifiers)| AttributeWriteRequirement::ProtocolMember {
+                    receiver_ty: object_ty,
                     write,
                     qualifiers,
                 },
@@ -358,6 +373,7 @@ pub(super) fn attribute_write_requirement<'db>(
             .map_or_else(
                 || class_attribute_write_requirement(db, env, object_ty, attribute),
                 |(write_ty, qualifiers)| AttributeWriteRequirement::ProtocolMember {
+                    receiver_ty: object_ty,
                     write: write_ty.map(ProtocolMemberWriteRequirement::AssignableTo),
                     qualifiers,
                 },
