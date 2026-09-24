@@ -2593,7 +2593,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             };
                         let target = Type::Callable(protocol_bind_receiver(
                             db,
-                            env.program(db),
+                            self,
                             target.with_signatures(
                                 db,
                                 CallableSignature::single(target_signature.clone()),
@@ -2602,13 +2602,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             target_receiver.self_type,
                             None,
                         ));
-                        let target = target_materialization
-                            .map_or(target, |kind| target.materialization(db, env, kind));
+                        // Materializing a signature can compare protocols again. Reuse the
+                        // visitor so those comparisons retain the active equivalence cycle guard.
+                        let target = target_materialization.map_or(target, |kind| {
+                            target.materialize(db, kind, self.materialization_visitor)
+                        });
                         sources.iter().when_all(db, self.constraints, |source| {
                             let source = if source_is_method {
                                 protocol_bind_receiver(
                                     db,
-                                    env.program(db),
+                                    self,
                                     *source,
                                     source_domain,
                                     source_receiver.self_type,
@@ -2624,8 +2627,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 )
                             };
                             let source = Type::Callable(source);
-                            let source = source_materialization
-                                .map_or(source, |kind| source.materialization(db, env, kind));
+                            let source = source_materialization.map_or(source, |kind| {
+                                source.materialize(db, kind, self.materialization_visitor)
+                            });
                             self.check_type_pair(db, source, target)
                         })
                     })
@@ -3703,16 +3707,14 @@ fn protocol_bind_self<'db>(
         .into_regular(db)
 }
 
-/// Bind a complete method contract after its permitted receiver domain is known. Protocol
-/// receiver annotations can recursively refer to the member being compared.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial=|db, _, _, _, _, _, _| CallableType::bottom(db),
-    heap_size=ruff_memory_usage::heap_size
-)]
+/// Bind a complete method contract after its permitted receiver domain is known.
+///
+/// Receiver annotations can recursively refer to the member being compared. Keep the current
+/// checker's recursion guards while filtering overloads, rather than starting a cached query
+/// with an independent relation traversal.
 fn protocol_bind_receiver<'db>(
     db: &'db dyn Db,
-    program: Program<'db>,
+    checker: &TypeRelationChecker<'_, '_, 'db>,
     callable: CallableType<'db>,
     receiver: Type<'db>,
     self_type: Type<'db>,
@@ -3721,7 +3723,6 @@ fn protocol_bind_receiver<'db>(
     if callable.kind(db) == CallableTypeKind::DunderParamSpec {
         return callable.into_regular(db);
     }
-    let env = ProgramEnvironment::from_program(program);
     let explicit = implicit_receiver.map(|receiver| {
         CallableSignature::from_overloads(
             callable
@@ -3736,7 +3737,7 @@ fn protocol_bind_receiver<'db>(
             explicit
                 .as_ref()
                 .unwrap_or_else(|| callable.signatures(db))
-                .bind_method_receiver(db, &env, receiver, self_type),
+                .bind_method_receiver_with_checker(db, checker, receiver, self_type),
         )
         .into_regular(db)
 }

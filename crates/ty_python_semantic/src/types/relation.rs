@@ -1203,6 +1203,28 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
+    /// Check assignability with a new inferable set while retaining the active recursion guards.
+    pub(super) fn is_assignable_with_inferable_typevars(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> bool {
+        Self::new(
+            self.env,
+            TypeRelation::Assignability,
+            self.constraints,
+            inferable,
+            self.relation_visitor,
+            self.disjointness_visitor,
+            self.signature_relation_visitor,
+            self.materialization_visitor,
+        )
+        .check_type_pair(db, source, target)
+        .is_always_satisfied(db, self.env)
+    }
+
     /// Checks class subtyping without discarding the active recursive relation state.
     pub(super) fn is_class_subtype(
         &self,
