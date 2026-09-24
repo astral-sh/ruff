@@ -70,6 +70,8 @@ jobs:
 
       - name: Create report
         shell: bash
+        env:
+          UV_CONSTRAINT: ${{ github.workspace }}/.github/ty-ecosystem-constraints.txt
         run: |
           echo "Enabling configuration overloads (see .github/ty-ecosystem.toml)"
           mkdir -p ~/.config/ty
