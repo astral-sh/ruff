@@ -2075,6 +2075,64 @@ def _(any_value: Any, unknown_value):
     result: str = reveal_type(f(any_value))  # revealed: Any
 ```
 
+## Nested calls preserve sibling argument constraints
+
+A nested call can infer a narrower type than the outer annotation when sibling arguments require it.
+A provisional specialization from the annotation does not make a gradual argument incompatible with
+those siblings:
+
+```py
+from typing import Any, Callable
+
+class Base: ...
+class Derived(Base): ...
+
+def f[T](callback: Callable[[T], T], value: T) -> T:
+    raise NotImplementedError
+
+def g[T](value: T) -> T:
+    return value
+
+def _(callback: Callable[[Derived], Derived], unknown, any_value: Any):
+    x1 = f(callback, g(unknown))
+    reveal_type(x1)  # revealed: Derived
+
+    x2: Base = f(callback, g(unknown))
+    reveal_type(x2)  # revealed: Derived
+
+    x3: Base = f(callback, g(any_value))
+    reveal_type(x3)  # revealed: Derived
+
+    # error: [invalid-argument-type] "Expected `(Base, /) -> Base`, found `(Derived, /) -> Derived`"
+    x4: Base = f(callback, g(Base()))
+```
+
+This also applies when the nested call produces an iterable of gradual values:
+
+```py
+from functools import reduce
+
+def resolve(value): ...
+def _(callback: Callable[[Derived, Derived], Derived], values: list[Base]):
+    result: Base = reduce(callback, map(resolve, values))
+    reveal_type(result)  # revealed: Derived
+```
+
+Union context uses the first compatible alternative. The `Base` alternative accepts a gradual
+argument without widening it, so the callback still determines the narrower `Derived` result. When
+`Any` comes first, its gradual specialization is preferred:
+
+```py
+def _(callback: Callable[[Derived], Derived], unknown):
+    x1: Base | Any = f(callback, g(unknown))
+    reveal_type(x1)  # revealed: Derived
+    x1.extra()  # error: [unresolved-attribute]
+
+    x2: Any | Base = f(callback, g(unknown))
+    reveal_type(x2)  # revealed: Derived & Any
+    x2.extra()
+```
+
 ## Upper-bound context for dictionary literals
 
 A `TypedDict` upper bound provides the field types needed to infer a dictionary literal:

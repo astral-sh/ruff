@@ -5839,13 +5839,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // iteration to allow call arguments to contribute type context constraints to
             // other siblings.
             let result = if !generic_arguments.is_empty() {
-                speculative_builder.infer_and_check_argument_types_unified(
+                // A retry for an earlier union member must not displace a later compatible
+                // specialization. Only retry after ordinary union narrowing has failed.
+                speculative_builder.infer_and_check_argument_types_unified_impl(
                     &ast_arguments,
                     &mut speculative_argument_types,
                     infer_argument_ty,
                     &mut speculative_bindings,
                     &constraints,
                     narrowed_tcx,
+                    narrowed_tcx,
+                    None,
                     &generic_arguments,
                     max_typevar_occurrences,
                     &overload_candidates,
@@ -6061,6 +6065,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         typevar_occurrences: usize,
         candidates: &OverloadSet,
     ) -> Result<(), CallErrorKind> {
+        let fallback_tcx = call_expression_tcx
+            .annotation
+            .filter(|_| call_expression_tcx.is_declared())
+            .map(TypeContext::validity);
+        self.infer_and_check_argument_types_unified_impl(
+            ast_arguments,
+            argument_types,
+            infer_argument_ty,
+            bindings,
+            constraints,
+            call_expression_tcx,
+            call_expression_tcx,
+            fallback_tcx,
+            generic_arguments,
+            typevar_occurrences,
+            candidates,
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn infer_and_check_argument_types_unified_impl(
+        &mut self,
+        ast_arguments: &ArgumentsIter<'_>,
+        argument_types: &mut CallArguments<'_, 'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        bindings: &mut Bindings<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        call_expression_tcx: TypeContext<'db>,
+        initial_tcx: TypeContext<'db>,
+        fallback_tcx: Option<TypeContext<'db>>,
+        generic_arguments: &SmallVec<[usize; 4]>,
+        typevar_occurrences: usize,
+        candidates: &OverloadSet,
+    ) -> Result<(), CallErrorKind> {
         let db = self.db();
         let requires_overload_evaluation = requires_overload_evaluation(candidates);
 
@@ -6069,7 +6107,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             Some(candidates),
             constraints,
-            call_expression_tcx,
+            initial_tcx,
         );
 
         let mut iteration = 0;
@@ -6154,6 +6192,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &converged_argument_types,
             &self.dataclass_field_specifiers,
         );
+
+        // A return-only specialization can cause nested calls to prefer a type that conflicts
+        // with sibling arguments. Retry without that initial preference, while keeping the
+        // declared return constraints in the joint solve and subsequent fixpoint iterations.
+        // Keep the original inference and diagnostics if this attempt also fails.
+        if result.is_err()
+            && let Some(fallback_tcx) = fallback_tcx
+        {
+            let mut fallback_builder = self.speculate();
+            let mut fallback_bindings = bindings.clone();
+            let mut fallback_argument_types = argument_types.clone();
+            if fallback_builder
+                .infer_and_check_argument_types_unified_impl(
+                    ast_arguments,
+                    &mut fallback_argument_types,
+                    infer_argument_ty,
+                    &mut fallback_bindings,
+                    constraints,
+                    call_expression_tcx,
+                    fallback_tcx,
+                    None,
+                    generic_arguments,
+                    typevar_occurrences,
+                    candidates,
+                )
+                .is_ok()
+            {
+                *argument_types = fallback_argument_types;
+                *bindings = fallback_bindings;
+                self.extend(fallback_builder);
+                return Ok(());
+            }
+        }
 
         // If the set of candidate bindings contained multiple matching overloads, re-infer the argument
         // types against the final set of matching overloads, such that only the relevant diagnostics
