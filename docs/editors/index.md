@@ -20,9 +20,3 @@ autocompletion.
 
 The Ruff Language Server was available first in Ruff [v0.4.5](https://astral.sh/blog/ruff-v0.4.5)
 in beta and stabilized in Ruff [v0.5.3](https://github.com/astral-sh/ruff/releases/tag/0.5.3).
-
-!!! note
-
-    This is the documentation for Ruff's built-in language server written in Rust (`ruff server`).
-    If you are looking for the documentation for the `ruff-lsp` language server, please refer to the
-    [README](https://github.com/astral-sh/ruff-lsp) of the `ruff-lsp` repository.
