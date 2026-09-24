@@ -803,15 +803,12 @@ def _(value: int, objects: list[object], strings: list[str]) -> None:
     into(boxed, strings, value)  # error: [invalid-argument-type]
 ```
 
-### Preserving generic callbacks until invocation
+### Specializing only invoked callbacks
 
-Capturing a generic callback preserves its type parameters; invoking it resolves them.
+Invoking a generic callback specializes the signature returned by its wrapper.
 
 ```py
 from typing import Callable
-
-def capture[**P, R](callback: Callable[P, R]) -> Callable[P, R]:
-    return callback
 
 def checked[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> Callable[P, R]:
     callback(*args, **kwargs)
@@ -820,30 +817,19 @@ def checked[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwar
 def identity[T](value: T) -> T:
     return value
 
-captured = capture(identity)
-reveal_type(captured(1))  # revealed: Literal[1]
-reveal_type(captured("a"))  # revealed: Literal["a"]
-
 def _(value: int) -> None:
     specialized = checked(identity, value)
     reveal_type(specialized)  # revealed: (value: int) -> int
     specialized("a")  # error: [invalid-argument-type]
 ```
 
-### Independent callback invocations
-
 Invoking one occurrence of a generic callback does not specialize another captured occurrence.
 
 ```py
-from typing import Callable
-
 def run_and_keep[**P, **Q, R, S](
     run: Callable[P, R], keep: Callable[Q, S], /, *args: P.args, **kwargs: P.kwargs
 ) -> tuple[R, Callable[Q, S]]:
     return run(*args, **kwargs), keep
-
-def identity[T](value: T) -> T:
-    return value
 
 def _(value: int) -> None:
     result, kept = run_and_keep(identity, identity, value)
@@ -861,34 +847,6 @@ def recursive[T](value: T) -> T:
     result = invoke(recursive, value)
     reveal_type(result)  # revealed: T@recursive
     return result
-```
-
-### Bounds and defaults in forwarded generic calls
-
-A forwarded call checks callback bounds and applies defaults even when no arguments are supplied.
-
-```py
-from typing import Callable
-
-def invoke[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
-    return callback(*args, **kwargs)
-
-def bounded[T: int](value: T) -> list[T]:
-    return [value]
-
-def constrained[C: (int, str)](value: C) -> list[C]:
-    return [value]
-
-def defaulted[D = str]() -> list[D]:
-    return []
-
-def _(value: int, text: str) -> None:
-    reveal_type(invoke(bounded, value))  # revealed: list[int]
-    invoke(bounded, text)  # error: [invalid-argument-type]
-    reveal_type(invoke(constrained, text))  # revealed: list[str]
-    invoke(constrained, b"bad")  # error: [invalid-argument-type]
-
-reveal_type(invoke(defaulted))  # revealed: list[str]
 ```
 
 ### Return type change using `ParamSpec` once
@@ -1354,7 +1312,7 @@ def default[T = Callable[[int], int]](callback: T) -> None: ...
 forward(default, lambda x: reveal_type(x))  # revealed: int
 ```
 
-### Forwarded arguments with type-variable bounds
+### Forwarded arguments with type-variable bounds and defaults
 
 When a type variable is bounded by `LiteralString`, string literals are not promoted to `str` when
 providing context for other arguments. This applies to ordinary calls and calls forwarded through a
@@ -1368,6 +1326,30 @@ def target[T: LiteralString](first: T, values: list[T]) -> None: ...
 
 target("a", ["a"])
 forward(target, "a", ["a"])
+```
+
+Bounds, constraints, and defaults also determine the callback's inferred return type.
+
+```py
+def invoke[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+def bounded[T: int](value: T) -> list[T]:
+    return [value]
+
+def constrained[C: (int, str)](value: C) -> list[C]:
+    return [value]
+
+def defaulted[D = str]() -> list[D]:
+    return []
+
+def _(value: int, text: str) -> None:
+    reveal_type(invoke(bounded, value))  # revealed: list[int]
+    invoke(bounded, text)  # error: [invalid-argument-type]
+    reveal_type(invoke(constrained, text))  # revealed: list[str]
+    invoke(constrained, b"bad")  # error: [invalid-argument-type]
+
+reveal_type(invoke(defaulted))  # revealed: list[str]
 ```
 
 ### Forwarded callbacks with gradual types
