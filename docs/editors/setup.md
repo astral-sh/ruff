@@ -13,11 +13,6 @@ the [migration guide](./migration.md) for more.
     while setting up the Ruff in an editor, please [open an issue](https://github.com/astral-sh/ruff/issues/new)
     for assistance and help in improving this documentation.
 
-!!! tip
-
-    Regardless of the editor, it is recommended to disable the older language server
-    ([`ruff-lsp`](https://github.com/astral-sh/ruff-lsp)) to prevent any conflicts.
-
 ## VS Code
 
 Install the Ruff extension from the [VS Code
