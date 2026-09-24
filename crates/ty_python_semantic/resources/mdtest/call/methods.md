@@ -438,16 +438,6 @@ def _(
     reveal_type(intersection_internal.f())  # revealed: list[P1 & Other]
 ```
 
-The retrieved classmethod also satisfies a callback protocol that returns the full intersection.
-
-```py
-class Callback(Protocol):
-    def __call__(self) -> list[P1 & Other]: ...
-
-def callback(cls: type[P1] & type[Other]) -> Callback:
-    return cls.f
-```
-
 ### Method defined on a single element and a dynamic type
 
 ```py

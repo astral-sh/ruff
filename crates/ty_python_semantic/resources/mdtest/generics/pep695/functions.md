@@ -2775,33 +2775,33 @@ from typing import Protocol, Self
 from ty_extensions import Intersection, static_assert
 from ty_extensions._internal import is_assignable_to
 
-class Other: ...
-class Extra: ...
+class Ready: ...
+class Authorized: ...
 
-class P(Protocol):
-    def method(self: Intersection[Self, Other], value: int) -> int: ...
+class Processor(Protocol):
+    def process(self: Intersection[Self, Ready], value: int) -> int: ...
 
-class Valid:
-    def method[T: Other](self: T, value: int) -> int:
+class ReadyBoundProcessor:
+    def process[T: Ready](self: T, value: int) -> int:
         return value
 
-class Invalid:
-    def method[T: Extra](self: T, value: int) -> int:
+class AuthorizationBoundProcessor:
+    def process[T: Authorized](self: T, value: int) -> int:
         return value
 
-static_assert(is_assignable_to(Valid, P))
-static_assert(not is_assignable_to(Invalid, P))
+static_assert(is_assignable_to(ReadyBoundProcessor, Processor))
+static_assert(not is_assignable_to(AuthorizationBoundProcessor, Processor))
 ```
 
 Receiver constraints also apply to occurrences of the same type variable in ordinary parameters and
 the return type. The receiver here cannot specialize to `int` to satisfy the protocol's return type.
 
 ```py
-class SharedReceiver:
-    def method[T](self: T, value: T) -> T:
+class ReceiverAsResult:
+    def process[T](self: T, value: T) -> T:
         return self
 
-static_assert(not is_assignable_to(SharedReceiver, P))
+static_assert(not is_assignable_to(ReceiverAsResult, Processor))
 ```
 
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md

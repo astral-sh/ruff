@@ -4285,9 +4285,9 @@ reveal_type(Box.first())  # revealed: Box[Unknown]
 
 ## Restricted method receivers
 
-A protocol can restrict a method to receivers that also satisfy another type. An implementation with
-the same restriction satisfies the protocol even when its instances do not themselves satisfy that
-restriction. The receiver's name does not affect compatibility.
+`Processor.process` can only be called on a receiver that also satisfies `Ready`.
+`DeferredProcessor` has the same restriction, so it satisfies `Processor` even though its instances
+are not necessarily ready. Calling the method still requires a `Ready` receiver.
 
 ```toml
 [environment]
@@ -4299,80 +4299,64 @@ from typing import Protocol, Self
 from ty_extensions import Intersection, static_assert
 from ty_extensions._internal import is_assignable_to
 
-class Other: ...
-class Extra: ...
+class Ready: ...
+class Authorized: ...
 
-class P(Protocol):
-    def restricted(self: Intersection[Self, Other], value: int) -> int: ...
+class Processor(Protocol):
+    def process(self: Intersection[Self, Ready], value: int) -> int: ...
 
-class C:
-    def restricted(this: Intersection[Self, Other], value: int) -> int:
+class DeferredProcessor:
+    def process(self: Intersection[Self, Ready], value: int) -> int:
         return value
 
-p: P = C()
+processor: Processor = DeferredProcessor()
 
-def call(p: P, narrowed: Intersection[P, Other]) -> int:
-    p.restricted(1)  # error: [invalid-argument-type]
-    reveal_type(narrowed.restricted(1))  # revealed: int
-    return narrowed.restricted(1)
+def call(processor: Processor, ready_processor: Intersection[Processor, Ready]):
+    processor.process(1)  # error: [invalid-argument-type]
+    reveal_type(ready_processor.process(1))  # revealed: int
 ```
 
-An unrestricted implementation also satisfies the protocol. An implementation that imposes an
-additional receiver restriction, accepts the wrong argument type, or returns the wrong type does
-not.
+An unrestricted implementation also satisfies the protocol. Requiring an additional receiver
+restriction is incompatible: a caller may satisfy the protocol's restriction without satisfying the
+implementation's additional requirement.
 
 ```py
-class Unrestricted:
-    def restricted(self, value: int) -> int:
+class AlwaysAvailableProcessor:
+    def process(self, value: int) -> int:
         return value
 
-class MoreRestricted:
-    def restricted(self: Intersection[Self, Other, Extra], value: int) -> int:
+class AuthorizedProcessor:
+    def process(self: Intersection[Self, Ready, Authorized], value: int) -> int:
         return value
 
-class WrongArgument:
-    def restricted(self: Intersection[Self, Other], value: str) -> int:
-        return 1
-
-class WrongReturn:
-    def restricted(self: Intersection[Self, Other], value: int) -> str:
-        return ""
-
-static_assert(is_assignable_to(Unrestricted, P))
-static_assert(not is_assignable_to(MoreRestricted, P))
-static_assert(not is_assignable_to(WrongArgument, P))
-static_assert(not is_assignable_to(WrongReturn, P))
+static_assert(is_assignable_to(AlwaysAvailableProcessor, Processor))
+static_assert(not is_assignable_to(AuthorizedProcessor, Processor))
 ```
 
 A stored bound method keeps its captured receiver. Narrowing the object that stores it cannot make
-the captured receiver satisfy `Other`.
+the captured receiver satisfy `Ready`.
 
 ```py
-class Stored:
-    restricted = C().restricted
+class StoredUnreadyMethod:
+    process = DeferredProcessor().process
 
-class Narrowed(C, Other): ...
+class ReadyProcessor(DeferredProcessor, Ready): ...
 
-class ValidStored:
-    restricted = Narrowed().restricted
+class StoredReadyMethod:
+    process = ReadyProcessor().process
 
-static_assert(not is_assignable_to(Stored, P))
-static_assert(is_assignable_to(ValidStored, P))
+static_assert(not is_assignable_to(StoredUnreadyMethod, Processor))
+static_assert(is_assignable_to(StoredReadyMethod, Processor))
 ```
 
 The same receiver restrictions are compared when both types are protocols.
 
 ```py
-class Same(Protocol):
-    def restricted(this: Intersection[Self, Other], value: int) -> int: ...
+class AuthorizedProcessorProtocol(Protocol):
+    def process(self: Intersection[Self, Ready, Authorized], value: int) -> int: ...
 
-class Stronger(Protocol):
-    def restricted(self: Intersection[Self, Other, Extra], value: int) -> int: ...
-
-static_assert(is_assignable_to(Same, P))
-static_assert(is_assignable_to(P, Same))
-static_assert(not is_assignable_to(Stronger, P))
-static_assert(is_assignable_to(P, Stronger))
+static_assert(not is_assignable_to(AuthorizedProcessorProtocol, Processor))
+static_assert(is_assignable_to(Processor, AuthorizedProcessorProtocol))
 ```
 
 ## Restricted callback receivers
@@ -4388,23 +4372,22 @@ python-version = "3.14"
 from typing import Protocol, Self
 from ty_extensions import Intersection
 
-class Other: ...
+class Ready: ...
 
-class P(Protocol):
-    def __call__(self: Intersection[Self, Other], value: int) -> int: ...
+class ProcessingCallback(Protocol):
+    def __call__(self: Intersection[Self, Ready], value: int) -> int: ...
 
-class C:
-    def __call__(self: Intersection[Self, Other], value: int) -> int:
+class DeferredCallback:
+    def __call__(self: Intersection[Self, Ready], value: int) -> int:
         return value
 
-p: P = C()
+callback: ProcessingCallback = DeferredCallback()
 ```
 
 ## Restricted classmethod receivers
 
 A classmethod can likewise restrict `cls` to classes whose instances satisfy another type. Matching
-restrictions are compatible, while an additional restriction or an incompatible argument is
-rejected.
+restrictions are compatible, while an additional receiver restriction is rejected.
 
 ```toml
 [environment]
@@ -4416,58 +4399,40 @@ from typing import Protocol, Self
 from ty_extensions import Intersection, static_assert
 from ty_extensions._internal import is_assignable_to
 
-class Other: ...
-class Extra: ...
+class Ready: ...
+class Authorized: ...
 
-class P(Protocol):
+class Processor(Protocol):
     @classmethod
-    def restricted(cls: type[Intersection[Self, Other]], value: int) -> int: ...
+    def process(cls: type[Intersection[Self, Ready]], value: int) -> int: ...
 
-class C:
+class DeferredProcessor:
     @classmethod
-    def restricted(klass: type[Intersection[Self, Other]], value: int) -> int:
+    def process(cls: type[Intersection[Self, Ready]], value: int) -> int:
         return value
 
-class MoreRestricted:
+class AuthorizedProcessor:
     @classmethod
-    def restricted(cls: type[Intersection[Self, Other, Extra]], value: int) -> int:
+    def process(cls: type[Intersection[Self, Ready, Authorized]], value: int) -> int:
         return value
 
-class WrongArgument:
-    @classmethod
-    def restricted(cls: type[Intersection[Self, Other]], value: str) -> int:
-        return 1
+processor: Processor = DeferredProcessor()
+static_assert(not is_assignable_to(AuthorizedProcessor, Processor))
 
-p: P = C()
-static_assert(not is_assignable_to(MoreRestricted, P))
-static_assert(not is_assignable_to(WrongArgument, P))
-
-def call(narrowed: type[Intersection[P, Other]]) -> int:
-    reveal_type(narrowed.restricted(1))  # revealed: int
-    return narrowed.restricted(1)
-```
-
-Equivalent protocol declarations preserve the classmethod's receiver restriction as well.
-
-```py
-class Same(Protocol):
-    @classmethod
-    def restricted(cls: type[Intersection[Self, Other]], value: int) -> int: ...
-
-static_assert(is_assignable_to(Same, P))
-static_assert(is_assignable_to(P, Same))
+def call(ready_processor_class: type[Intersection[Processor, Ready]]):
+    reveal_type(ready_processor_class.process(1))  # revealed: int
 ```
 
 A compatible staticmethod can satisfy the classmethod contract without imposing a receiver
 restriction of its own.
 
 ```py
-class Static:
+class StaticProcessor:
     @staticmethod
-    def restricted(value: int) -> int:
+    def process(value: int) -> int:
         return value
 
-static_assert(is_assignable_to(Static, P))
+static_assert(is_assignable_to(StaticProcessor, Processor))
 ```
 
 ## Overloaded methods with restricted receivers
@@ -4486,33 +4451,33 @@ from typing import Protocol, Self, overload
 from ty_extensions import Intersection, static_assert
 from ty_extensions._internal import is_assignable_to
 
-class Other: ...
-class Extra: ...
+class AcceptsIntegers: ...
+class AcceptsText: ...
 
-class P(Protocol):
+class OverloadedProcessor(Protocol):
     @overload
-    def method(self: Intersection[Self, Other], value: int) -> int: ...
+    def process(self: Intersection[Self, AcceptsIntegers], value: int) -> int: ...
     @overload
-    def method(self: Intersection[Self, Extra], value: str) -> str: ...
+    def process(self: Intersection[Self, AcceptsText], value: str) -> str: ...
 
-class Valid:
+class MatchingOverloads:
     @overload
-    def method(self: Intersection[Self, Other], value: int) -> int: ...
+    def process(self: Intersection[Self, AcceptsIntegers], value: int) -> int: ...
     @overload
-    def method(self: Intersection[Self, Extra], value: str) -> str: ...
-    def method(self, value: int | str) -> int | str:
+    def process(self: Intersection[Self, AcceptsText], value: str) -> str: ...
+    def process(self, value: int | str) -> int | str:
         return value
 
-class Invalid:
+class SwappedReceiverRestrictions:
     @overload
-    def method(self: Intersection[Self, Extra], value: int) -> int: ...
+    def process(self: Intersection[Self, AcceptsText], value: int) -> int: ...
     @overload
-    def method(self: Intersection[Self, Other], value: str) -> str: ...
-    def method(self, value: int | str) -> int | str:
+    def process(self: Intersection[Self, AcceptsIntegers], value: str) -> str: ...
+    def process(self, value: int | str) -> int | str:
         return value
 
-static_assert(is_assignable_to(Valid, P))
-static_assert(not is_assignable_to(Invalid, P))
+static_assert(is_assignable_to(MatchingOverloads, OverloadedProcessor))
+static_assert(not is_assignable_to(SwappedReceiverRestrictions, OverloadedProcessor))
 ```
 
 ## Subtyping of protocols with generic method members
