@@ -271,6 +271,19 @@ def cast_union(value: int | str) -> None:
     cast(int | bytes, value)
 ```
 
+### Disjoint casts with unpacked arguments
+
+Argument unpacking does not prevent us from reporting disjoint casts:
+
+```py
+from typing import cast
+
+cast(str, *(1,))  # error: [disjoint-cast]
+cast(*(str, 1))  # error: [disjoint-cast]
+cast(*(), str, 1)  # error: [disjoint-cast]
+cast(str, **{"val": 1})  # error: [disjoint-cast]
+```
+
 ### Disjoint casts involving generic types
 
 Incompatible generic specializations are rejected:
