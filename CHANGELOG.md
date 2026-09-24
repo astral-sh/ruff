@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.16.9
+
+Released on 2026-09-24.
+
+### Preview features
+
+- \[`ruff`\] Avoid false positives for overloaded division (`RUF069`) ([#28309](https://github.com/astral-sh/ruff/pull/28309))
+
+### Bug fixes
+
+- \[`flake8-bugbear`\] Avoid false positives for calls with keyword arguments (`B009`, `B010`, `B043`) ([#28776](https://github.com/astral-sh/ruff/pull/28776))
+- \[`flake8-tidy-imports`\] Allow lazy imports to be used in deferred annotations (`TID255`) ([#28767](https://github.com/astral-sh/ruff/pull/28767))
+
+### Rule changes
+
+- Update LibCST-based fixes for Python 3.15 ([#28616](https://github.com/astral-sh/ruff/pull/28616))
+- \[`flake8-pyi`\] Mention stubs in the diagnostic message (`PYI002`) ([#28542](https://github.com/astral-sh/ruff/pull/28542))
+
+### Documentation
+
+- Fix horizontal overflow on the rules documentation page ([#28699](https://github.com/astral-sh/ruff/pull/28699))
+- Update rules table with category information ([#28651](https://github.com/astral-sh/ruff/pull/28651))
+- \[`flake8-annotations`\] Clarify that `ANN401` checks return types in addition to arguments ([#28334](https://github.com/astral-sh/ruff/pull/28334))
+- \[`flake8-bugbear`\] Document type-checker interaction (`B010`) ([#28509](https://github.com/astral-sh/ruff/pull/28509))
+- \[`flake8-comprehensions`\] Document `map`/generator exception behavior (`C417`) ([#27794](https://github.com/astral-sh/ruff/pull/27794))
+- \[`ruff`\] Mention related isort settings (`RUF022`) ([#28719](https://github.com/astral-sh/ruff/pull/28719))
+
+### Contributors
+
+- [@qinpei-dev](https://github.com/qinpei-dev)
+- [@sanjayrohith](https://github.com/sanjayrohith)
+- [@ntBre](https://github.com/ntBre)
+- [@webdevsamran](https://github.com/webdevsamran)
+- [@zaniebot](https://github.com/zaniebot)
+- [@ewdurbin](https://github.com/ewdurbin)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@spaceone](https://github.com/spaceone)
+- [@IbrahimKhan12](https://github.com/IbrahimKhan12)
+- [@devtechedge](https://github.com/devtechedge)
+- [@GruffElixir](https://github.com/GruffElixir)
+
 ## 0.16.8
 
 Released on 2026-09-16.
