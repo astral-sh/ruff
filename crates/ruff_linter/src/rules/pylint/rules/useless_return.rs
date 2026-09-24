@@ -1,13 +1,14 @@
+use ruff_diagnostics::{Applicability, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
+use crate::AlwaysFixableViolation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix;
-use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for functions that end with an unnecessary `return` or
@@ -29,6 +30,10 @@ use crate::{AlwaysFixableViolation, Fix};
 /// def f():
 ///     print(5)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe unless deleting the `return` statement
+/// would remove comments, in which case it is marked as unsafe.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Complexity)]
 pub(crate) struct UselessReturn;
@@ -108,7 +113,14 @@ pub(crate) fn useless_return(
 
     let mut diagnostic = checker.report_diagnostic(UselessReturn, last_stmt.range());
     let edit = fix::edits::delete_stmt(last_stmt, Some(stmt), checker.locator(), checker.indexer());
-    diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
-        checker.semantic().current_statement_id(),
-    )));
+    let applicability = if checker.comment_ranges().intersects(edit.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+    diagnostic.set_fix(
+        Fix::applicable_edit(edit, applicability).isolate(Checker::isolation(
+            checker.semantic().current_statement_id(),
+        )),
+    );
 }

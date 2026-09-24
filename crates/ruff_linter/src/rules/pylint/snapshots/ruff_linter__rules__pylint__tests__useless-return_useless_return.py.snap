@@ -14,6 +14,7 @@ help: Remove useless `return` statement
   -     return None  # [useless-return]
 6 |
   |
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1711 [*] Useless `return` statement at end of function
   --> useless_return.py:11:5
@@ -28,6 +29,7 @@ help: Remove useless `return` statement
    -     return None  # [useless-return]
 11 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1711 [*] Useless `return` statement at end of function
   --> useless_return.py:16:5
@@ -42,6 +44,7 @@ help: Remove useless `return` statement
    -     return None  # [useless-return]
 16 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1711 [*] Useless `return` statement at end of function
   --> useless_return.py:22:9
@@ -56,6 +59,7 @@ help: Remove useless `return` statement
    -         return None  # [useless-return]
 22 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1711 [*] Useless `return` statement at end of function
   --> useless_return.py:50:5
@@ -70,6 +74,7 @@ help: Remove useless `return` statement
    -     return None  # [useless-return]
 50 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1711 [*] Useless `return` statement at end of function
   --> useless_return.py:60:9
