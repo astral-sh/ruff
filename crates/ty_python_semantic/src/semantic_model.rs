@@ -16,6 +16,7 @@ use ty_module_resolver::{
 };
 
 use crate::Db;
+use crate::place::definitions::DefinitionResolution;
 use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::place::{
     builtins_module_scope, class_body_implicit_symbol, implicit_builtins_symbol_scope,
@@ -25,7 +26,6 @@ use crate::place_load::{
     ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolutionStep, PlaceLoadSourceKind,
     resolve_place_load,
 };
-use crate::reachability::{ReachabilityConstraintsExtension, is_reachable};
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
@@ -805,18 +805,9 @@ impl<'db> SemanticModel<'db> {
             return Vec::new();
         };
         let mut definitions = Vec::new();
-        let mut add_bindings = |bindings: BindingWithConstraintsIterator<'_, 'db>| {
-            let constraints = bindings.reachability_constraints();
-            let predicates = bindings.predicates();
-            definitions.extend(bindings.filter_map(|binding| {
-                if constraints
-                    .evaluate(self.db, predicates, binding.reachability_constraint)
-                    .is_always_false()
-                {
-                    return None;
-                }
-                binding.binding.definition()
-            }));
+        let mut add_bindings = |bindings: BindingWithConstraintsIterator<'db, 'db>| {
+            let resolution = DefinitionResolution::from_bindings(self.db, bindings);
+            definitions.extend_from_slice(resolution.definitions());
         };
         if let ast::Expr::Name(name) = receiver {
             let mut resolution = resolve_place_load(
@@ -922,13 +913,13 @@ impl<'db> SemanticModel<'db> {
         let Some(id) = index.place_table(FileScopeId::global()).symbol_id(name) else {
             return;
         };
-        let use_def = index.use_def_map(FileScopeId::global());
-        definitions.extend(
-            use_def
-                .end_of_scope_symbol_bindings(id)
-                .filter(|binding| is_reachable(self.db, use_def, binding.reachability_constraint))
-                .filter_map(|binding| binding.binding.definition()),
+        let resolution = DefinitionResolution::from_bindings(
+            self.db,
+            index
+                .use_def_map(FileScopeId::global())
+                .end_of_scope_symbol_bindings(id),
         );
+        definitions.extend_from_slice(resolution.definitions());
     }
 
     fn string_literal_completion_expected_type(
