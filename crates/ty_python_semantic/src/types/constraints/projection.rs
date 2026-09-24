@@ -165,7 +165,29 @@ impl<'db> ConstraintSet<'db, '_> {
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
         budget: SolutionBudget,
-        choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
+        mut choose: impl FnMut(
+            TypeVarVariance,
+            &CandidateTypeVarSolution<'db>,
+        ) -> PathBoundSolution<'db>,
+    ) -> Result<Solutions<'db>, ProjectionError> {
+        self.solutions_with_path(db, env, inferable, budget, |_, variance, bound| {
+            choose(variance, bound)
+        })
+    }
+
+    /// Like [`Self::solutions_with`], but also gives the selector all bounds on the current path.
+    /// This allows dependent defaults to use candidates from the same compatible alternative.
+    pub(crate) fn solutions_with_path(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+        budget: SolutionBudget,
+        choose: impl FnMut(
+            &[CandidateTypeVarSolution<'db>],
+            TypeVarVariance,
+            &CandidateTypeVarSolution<'db>,
+        ) -> PathBoundSolution<'db>,
     ) -> Result<Solutions<'db>, ProjectionError> {
         let path_bounds = self.bounded_path_bounds(db, env, inferable, budget)?;
         let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
