@@ -34,8 +34,8 @@ use crate::types::ProgramEnvironment;
 use crate::types::call::arguments::{CallArgumentExpansions, CallArgumentTypes, Expansion};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    CandidateSolutions, ConstraintSet, ConstraintSetBuilder, PathBound, PathBoundSolution,
-    SolutionPaths, Solutions,
+    CandidateSolutions, ConstraintFailureEvidence, ConstraintSet, ConstraintSetBuilder, PathBound,
+    PathBoundSolution, SolutionPaths, Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
@@ -80,6 +80,7 @@ use crate::types::{
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
+use ty_python_core::definition::Definition;
 use ty_python_core::{ProgramFile, semantic_index};
 
 pub(crate) use self::constructor::ConstructorCallableKind;
@@ -6061,7 +6062,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 // lower/upper bounds on each BDD path.
                 let mut variance_map: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                     FxHashMap::default();
-                let solutions = path_bounds.solve_with(db, self.env, |variance, path_bound| {
+                let solutions = path_bounds.solve_with(|variance, path_bound| {
                     let identity = path_bound.bound_typevar.identity(db);
                     variance_map
                         .entry(identity)
@@ -6374,6 +6375,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     error,
                     argument_index: argument_indices
                         .and_then(|(first, last)| (first == last).then_some(first)),
+                    parameter_definition: parameter.definition(),
+                    expected_ty: formal,
+                    provided_ty: None,
                 });
             }
             return !check_type_context;
@@ -6593,6 +6597,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 specialization_errors.push(BindingError::SpecializationError {
                     error,
                     argument_index: relation.adjusted_argument_index,
+                    parameter_definition: self.signature.parameters()
+                        [relation.matched_parameter.index]
+                        .definition(),
+                    expected_ty: relation.declared_type,
+                    provided_ty: Some(relation.argument_type),
                 });
             }
         }
@@ -7939,7 +7948,7 @@ impl<'db> Binding<'db> {
                 inferable,
             );
 
-            let solutions = path_bounds.solve_with(db, env, |_variance, path_bound| {
+            let solutions = path_bounds.solve_with(|_variance, path_bound| {
                 CandidateSolutions::preliminary_solve(db, env, constraints, inferable, path_bound)
             });
             if let Solutions::Constrained(solutions) = solutions {
@@ -8979,6 +8988,10 @@ pub(crate) enum BindingError<'db> {
     SpecializationError {
         error: SpecializationError<'db>,
         argument_index: Option<usize>,
+        parameter_definition: Option<Definition<'db>>,
+        expected_ty: Type<'db>,
+        /// Absent when inference combines multiple arguments into a variadic tuple.
+        provided_ty: Option<Type<'db>>,
     },
     PropertyHasNoGetter(PropertyInstanceType<'db>),
     PropertyHasNoSetter(PropertyInstanceType<'db>),
@@ -9594,14 +9607,14 @@ impl<'db> BindingError<'db> {
             Self::SpecializationError {
                 error,
                 argument_index,
+                parameter_definition,
+                expected_ty,
+                provided_ty,
             } => {
                 let range = context.get_range(node, *argument_index);
                 let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
                     return;
                 };
-                let argument_type = error.argument_type();
-                let argument_ty_display = argument_type.display(db, env);
-
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
                     callable_description
@@ -9610,7 +9623,11 @@ impl<'db> BindingError<'db> {
                 ));
 
                 match error {
-                    SpecializationError::MismatchedBound { bound_typevar, .. } => {
+                    SpecializationError::MismatchedBound {
+                        bound_typevar,
+                        argument,
+                    } => {
+                        let argument_ty_display = argument.display(db, env);
                         let typevar = bound_typevar.typevar(context.db());
                         let typevar_name = typevar.name(context.db());
                         diag.set_primary_annotation_message(format_args!(
@@ -9624,7 +9641,11 @@ impl<'db> BindingError<'db> {
                                 .display(db, env)
                         ));
                     }
-                    SpecializationError::MismatchedConstraint { bound_typevar, .. } => {
+                    SpecializationError::MismatchedConstraint {
+                        bound_typevar,
+                        evidence: ConstraintFailureEvidence::Lower(argument),
+                    } => {
+                        let argument_ty_display = argument.display(db, env);
                         let typevar = bound_typevar.typevar(context.db());
                         let typevar_name = typevar.name(context.db());
                         diag.set_primary_annotation_message(format_args!(
@@ -9641,6 +9662,58 @@ impl<'db> BindingError<'db> {
                                     ty.display(db, env)
                                 )))
                         ));
+                    }
+                    SpecializationError::MismatchedConstraint {
+                        bound_typevar,
+                        evidence: ConstraintFailureEvidence::Upper(bounds),
+                    } => {
+                        if let Some(provided_ty) = provided_ty {
+                            let display_settings = DisplaySettings::from_possibly_ambiguous_types(
+                                db,
+                                env,
+                                [*provided_ty, *expected_ty],
+                            );
+                            let provided_ty_display =
+                                provided_ty.display_with(db, env, display_settings.clone());
+                            let expected_ty_display =
+                                expected_ty.display_with(db, env, display_settings);
+                            diag.set_primary_annotation_message(format_args!(
+                                "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
+                            ));
+                        }
+
+                        let typevar_name = bound_typevar.typevar(db).name(db);
+                        let explanation = if let [bound] = bounds.as_ref() {
+                            format!(
+                                "No allowed specialization of `{typevar_name}` satisfies \
+                                    the inferred upper bound `{}`",
+                                bound.display(db, env)
+                            )
+                        } else {
+                            format!(
+                                "No allowed specialization of `{typevar_name}` satisfies \
+                                    all inferred upper bounds: {}",
+                                bounds.iter().format_with(", ", |ty, f| f(&format_args!(
+                                    "`{}`",
+                                    ty.display(db, env)
+                                )))
+                            )
+                        };
+                        let concise_message = format!("{}: {explanation}", diag.concise_message());
+                        diag.set_concise_message(concise_message);
+                        diag.info(explanation);
+
+                        if let Some(parameter_definition) = parameter_definition {
+                            let module =
+                                parsed_module(db, parameter_definition.python_file(db)).load(db);
+                            let parameter_span = parameter_definition.full_range(db, &module);
+                            let mut sub = SubDiagnostic::new(
+                                SubDiagnosticSeverity::Info,
+                                "Parameter declared here",
+                            );
+                            sub.annotate(Annotation::primary(parameter_span.into()));
+                            diag.sub(sub);
+                        }
                     }
                 }
 
