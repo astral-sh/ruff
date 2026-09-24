@@ -27,15 +27,6 @@ Released on 2026-09-24.
 - \[`flake8-comprehensions`\] Document `map`/generator exception behavior (`C417`) ([#27794](https://github.com/astral-sh/ruff/pull/27794))
 - \[`ruff`\] Mention related isort settings (`RUF022`) ([#28719](https://github.com/astral-sh/ruff/pull/28719))
 
-### Other changes
-
-- Skip CI on `ruff-security/main` ([#28686](https://github.com/astral-sh/ruff/pull/28686))
-- Use `target` form in `rooster.version_files` ([#28876](https://github.com/astral-sh/ruff/pull/28876))
-- authorize ruff-pre-commit dispatch via OIDC ([#28867](https://github.com/astral-sh/ruff/pull/28867))
-- ci(github): update version number in placeholder of issue template ([#28871](https://github.com/astral-sh/ruff/pull/28871))
-- publish to astral-sh/versions via OIDC ([#28835](https://github.com/astral-sh/ruff/pull/28835))
-- use oidc issued token for docs publication ([#28830](https://github.com/astral-sh/ruff/pull/28830))
-
 ### Contributors
 
 - [@qinpei-dev](https://github.com/qinpei-dev)
