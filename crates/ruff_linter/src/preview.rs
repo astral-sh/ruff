@@ -366,3 +366,8 @@ pub(crate) const fn is_pragma_excluded_from_import_width_enabled(preview: Previe
 pub(crate) const fn is_rule_categories_enabled(preview: PreviewMode) -> bool {
     preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/issues/14185
+pub(crate) const fn is_redundant_literal_union_fix_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
