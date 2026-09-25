@@ -71,8 +71,8 @@ use crate::{
         CallableTypes, KnownClass, KnownInstanceType, Type, UnionType,
         constraints::ConstraintSetBuilder,
         diagnostic::{
-            IMPLICIT_BOOL_CONVERSION, REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT,
-            TRUTHINESS_TEST_OF_CALLABLE, TRUTHINESS_TEST_OF_ITERABLE,
+            REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT, TRUTHINESS_TEST_OF_CALLABLE,
+            TRUTHINESS_TEST_OF_ITERABLE, TRUTHINESS_TEST_OF_NONE_UNION,
         },
         infer::TypeInferenceBuilder,
         typevar::TypeVarSet,
@@ -159,7 +159,7 @@ impl ConditionKind<'_> {
     const fn rule(&self) -> &'static LintMetadata {
         match self {
             Self::Value => &REDUNDANT_CONDITION,
-            Self::NoneUnion(_) => &IMPLICIT_BOOL_CONVERSION,
+            Self::NoneUnion(_) => &TRUTHINESS_TEST_OF_NONE_UNION,
             Self::Iterable => &TRUTHINESS_TEST_OF_ITERABLE,
             Self::Callable(_) => &TRUTHINESS_TEST_OF_CALLABLE,
             Self::Boolean | Self::ShortCircuit | Self::ContainsWalrus => {
@@ -396,7 +396,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             &REDUNDANT_CONDITION_STRICT,
             &TRUTHINESS_TEST_OF_CALLABLE,
             &TRUTHINESS_TEST_OF_ITERABLE,
-            &IMPLICIT_BOOL_CONVERSION,
+            &TRUTHINESS_TEST_OF_NONE_UNION,
         ];
 
         !self.in_string_annotation()
@@ -761,7 +761,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let env = self.program_environment();
 
         let kind = if truthiness.is_ambiguous() {
-            if let Some(union) = self.implicit_bool_conversion_candidate(value_type) {
+            if let Some(union) = self.truthiness_test_of_none_union_candidate(value_type) {
                 ConditionKind::NoneUnion(union)
             } else {
                 let expanded = match value_type.resolve_type_alias(db) {
@@ -844,8 +844,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         })
     }
 
-    /// Return the expanded union corresponding to `ty` if this test is eligible for `implicit-bool-conversion`.
-    fn implicit_bool_conversion_candidate(&self, ty: Type<'db>) -> Option<UnionType<'db>> {
+    /// Return the expanded union corresponding to `ty` if this test is eligible for `truthiness-test-of-none-union`.
+    fn truthiness_test_of_none_union_candidate(&self, ty: Type<'db>) -> Option<UnionType<'db>> {
         let db = self.db();
         let env = self.program_environment();
         let expanded = match ty.resolve_type_alias(db) {

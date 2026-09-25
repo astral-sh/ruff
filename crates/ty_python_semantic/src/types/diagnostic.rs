@@ -193,7 +193,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
     registry.register_lint(&INVALID_TOTAL_ORDERING);
     registry.register_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER);
-    registry.register_lint(&IMPLICIT_BOOL_CONVERSION);
+    registry.register_lint(&TRUTHINESS_TEST_OF_NONE_UNION);
     registry.register_lint(&REDUNDANT_CONDITION);
     registry.register_lint(&REDUNDANT_CONDITION_STRICT);
     registry.register_lint(&TRUTHINESS_TEST_OF_CALLABLE);
@@ -1391,8 +1391,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/implicit-bool-conversion.md")]
-    pub(crate) static IMPLICIT_BOOL_CONVERSION = {
+    #[doc = include_str!("../../resources/lint_docs/truthiness-test-of-none-union.md")]
+    pub(crate) static TRUTHINESS_TEST_OF_NONE_UNION = {
         summary: "detects truthiness checks that conflate `None` with other falsy values",
         status: LintStatus::stable("0.0.84"),
         default_level: Level::Ignore,

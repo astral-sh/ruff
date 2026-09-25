@@ -1,11 +1,11 @@
-# Implicit boolean conversions
+# Truthiness tests of unions with `None`
 
 This opt-in rule detects truthiness checks that may accidentally conflate `None` with other falsy
 values.
 
 ```toml
 [rules]
-implicit-bool-conversion = "warn"
+truthiness-test-of-none-union = "warn"
 ```
 
 ## Basic
@@ -15,14 +15,14 @@ were `None`, which is probably not the intended behavior:
 
 ```py
 def take(items: list[str], limit: int | None = None) -> list[str]:
-    # snapshot: implicit-bool-conversion
+    # snapshot: truthiness-test-of-none-union
     if not limit:
         return items
     return items[:limit]
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test on `int | None` does not distinguish `None` from other falsy values
+warning[truthiness-test-of-none-union]: Boolean test on `int | None` does not distinguish `None` from other falsy values
  --> src/mdtest_snippet.py:3:12
   |
 3 |     if not limit:
@@ -39,39 +39,39 @@ This rule triggers on unions with `None` and other types that have falsy values:
 from typing import Any, Literal
 
 def check(flag: bool | None):
-    if flag:  # error: [implicit-bool-conversion]
+    if flag:  # error: [truthiness-test-of-none-union]
         pass
 
 def check(integer: int | None):
-    if integer:  # error: [implicit-bool-conversion]
+    if integer:  # error: [truthiness-test-of-none-union]
         pass
 
 def check(text: str | None):
-    if text:  # error: [implicit-bool-conversion]
+    if text:  # error: [truthiness-test-of-none-union]
         pass
 
 def check(data: bytes | None):
-    if data:  # error: [implicit-bool-conversion]
+    if data:  # error: [truthiness-test-of-none-union]
         pass
 
 def check(number: float | None):
-    if number:  # error: [implicit-bool-conversion]
+    if number:  # error: [truthiness-test-of-none-union]
         pass
 
 def check(number: complex | None):
-    if number:  # error: [implicit-bool-conversion]
+    if number:  # error: [truthiness-test-of-none-union]
         pass
 
 def check(items: list[int] | None):
-    if items:  # error: [implicit-bool-conversion]
+    if items:  # error: [truthiness-test-of-none-union]
         pass
 
 def check(items: list[Any] | None):
-    if items:  # error: [implicit-bool-conversion]
+    if items:  # error: [truthiness-test-of-none-union]
         pass
 
 def check(mapping: dict[str, int] | None):
-    if mapping:  # error: [implicit-bool-conversion]
+    if mapping:  # error: [truthiness-test-of-none-union]
         pass
 ```
 
@@ -79,7 +79,7 @@ It also triggers if multiple other types could be falsy:
 
 ```py
 def check(value: int | str | None):
-    if value:  # error: [implicit-bool-conversion]
+    if value:  # error: [truthiness-test-of-none-union]
         pass
 ```
 
@@ -87,7 +87,7 @@ It also triggers if there are (additional) types in the union that are always tr
 
 ```py
 def check(value: str | Literal[True] | None):
-    if value:  # error: [implicit-bool-conversion]
+    if value:  # error: [truthiness-test-of-none-union]
         pass
 ```
 
@@ -119,7 +119,7 @@ can be falsy:
 
 ```py
 def check(value: int | Any | None):
-    if value:  # error: [implicit-bool-conversion]
+    if value:  # error: [truthiness-test-of-none-union]
         pass
 ```
 
@@ -131,7 +131,7 @@ from typing import final
 class Custom: ...
 
 def check(value: Custom | None):
-    if value:  # error: [implicit-bool-conversion]
+    if value:  # error: [truthiness-test-of-none-union]
         pass
 
 class AlwaysTruthy:
@@ -161,13 +161,13 @@ verbose to mention that in the diagnostic hint, so we just list `None` and `0` h
 
 ```py
 def check(integer: int | None):
-    # snapshot: implicit-bool-conversion
+    # snapshot: truthiness-test-of-none-union
     if integer:
         pass
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test on `int | None` does not distinguish `None` from other falsy values
+warning[truthiness-test-of-none-union]: Boolean test on `int | None` does not distinguish `None` from other falsy values
  --> src/mdtest_snippet.py:3:8
   |
 3 |     if integer:
@@ -178,13 +178,13 @@ help: Use `bool(...)` if testing truthiness is intentional
 
 ```py
 def check(flag: bool | None):
-    # snapshot: implicit-bool-conversion
+    # snapshot: truthiness-test-of-none-union
     if flag:
         pass
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test on `bool | None` does not distinguish `None` from other falsy values
+warning[truthiness-test-of-none-union]: Boolean test on `bool | None` does not distinguish `None` from other falsy values
  --> src/mdtest_snippet.py:7:8
   |
 7 |     if flag:
@@ -195,13 +195,13 @@ help: Use `bool(...)` if testing truthiness is intentional
 
 ```py
 def check(text: str | None):
-    # snapshot: implicit-bool-conversion
+    # snapshot: truthiness-test-of-none-union
     if text:
         pass
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test on `str | None` does not distinguish `None` from other falsy values
+warning[truthiness-test-of-none-union]: Boolean test on `str | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:11:8
    |
 11 |     if text:
@@ -212,13 +212,13 @@ help: Use `bool(...)` if testing truthiness is intentional
 
 ```py
 def check(data: bytes | None):
-    # snapshot: implicit-bool-conversion
+    # snapshot: truthiness-test-of-none-union
     if data:
         pass
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test on `bytes | None` does not distinguish `None` from other falsy values
+warning[truthiness-test-of-none-union]: Boolean test on `bytes | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:15:8
    |
 15 |     if data:
@@ -229,13 +229,13 @@ help: Use `bool(...)` if testing truthiness is intentional
 
 ```py
 def check(number: float | None):
-    # snapshot: implicit-bool-conversion
+    # snapshot: truthiness-test-of-none-union
     if number:
         pass
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test on `float | None` does not distinguish `None` from other falsy values
+warning[truthiness-test-of-none-union]: Boolean test on `float | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:19:8
    |
 19 |     if number:
@@ -246,13 +246,13 @@ help: Use `bool(...)` if testing truthiness is intentional
 
 ```py
 def check(items: list[int] | None):
-    # snapshot: implicit-bool-conversion
+    # snapshot: truthiness-test-of-none-union
     if items:
         pass
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test on `list[int] | None` does not distinguish `None` from other falsy values
+warning[truthiness-test-of-none-union]: Boolean test on `list[int] | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:23:8
    |
 23 |     if items:
@@ -263,13 +263,13 @@ help: Use `bool(...)` if testing truthiness is intentional
 
 ```py
 def check(mapping: dict[str, int] | None):
-    # snapshot: implicit-bool-conversion
+    # snapshot: truthiness-test-of-none-union
     if mapping:
         pass
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test on `dict[str, int] | None` does not distinguish `None` from other falsy values
+warning[truthiness-test-of-none-union]: Boolean test on `dict[str, int] | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:27:8
    |
 27 |     if mapping:
@@ -283,13 +283,13 @@ explanation:
 
 ```py
 def check(value: str | int | None):
-    # snapshot: implicit-bool-conversion
+    # snapshot: truthiness-test-of-none-union
     if value:
         pass
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test on `str | int | None` does not distinguish `None` from other falsy values
+warning[truthiness-test-of-none-union]: Boolean test on `str | int | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:31:8
    |
 31 |     if value:
@@ -304,13 +304,13 @@ class Custom:
         return False
 
 def check(value: Custom | None):
-    # snapshot: implicit-bool-conversion
+    # snapshot: truthiness-test-of-none-union
     if value:
         pass
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test on `Custom | None` does not distinguish `None` from other falsy values
+warning[truthiness-test-of-none-union]: Boolean test on `Custom | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:39:8
    |
 39 |     if value:
@@ -325,32 +325,32 @@ The rule triggers in all of these Boolean contexts:
 
 ```py
 def check(limit: int | None, items: list[int | None]):
-    if limit:  # error: [implicit-bool-conversion]
+    if limit:  # error: [truthiness-test-of-none-union]
         pass
-    elif limit:  # error: [implicit-bool-conversion]
+    elif limit:  # error: [truthiness-test-of-none-union]
         pass
 
     def _():
-        while limit:  # error: [implicit-bool-conversion]
+        while limit:  # error: [truthiness-test-of-none-union]
             break
 
-    result = 1 if limit else 0  # error: [implicit-bool-conversion]
+    result = 1 if limit else 0  # error: [truthiness-test-of-none-union]
 
-    result = not limit  # error: [implicit-bool-conversion]
+    result = not limit  # error: [truthiness-test-of-none-union]
 
-    filtered = [x for x in items if x]  # error: [implicit-bool-conversion]
+    filtered = [x for x in items if x]  # error: [truthiness-test-of-none-union]
 
     match limit:
-        case _ if limit:  # error: [implicit-bool-conversion]
+        case _ if limit:  # error: [truthiness-test-of-none-union]
             pass
 
     def inner():
-        assert limit  # error: [implicit-bool-conversion]
+        assert limit  # error: [truthiness-test-of-none-union]
 
-    if result := limit:  # error: [implicit-bool-conversion]
+    if result := limit:  # error: [truthiness-test-of-none-union]
         pass
 
-    if not (result := limit):  # error: [implicit-bool-conversion]
+    if not (result := limit):  # error: [truthiness-test-of-none-union]
         pass
 ```
 
@@ -369,12 +369,12 @@ def check(items: list[int] | None, flag: bool, other: bool):
 When the whole expression is used as a condition, each operand is checked:
 
 ```py
-    if items and flag:  # error: [implicit-bool-conversion]
+    if items and flag:  # error: [truthiness-test-of-none-union]
         pass
-    if flag and items:  # error: [implicit-bool-conversion]
+    if flag and items:  # error: [truthiness-test-of-none-union]
         pass
-    if not (items or flag):  # error: [implicit-bool-conversion]
+    if not (items or flag):  # error: [truthiness-test-of-none-union]
         pass
-    if flag and (other or items):  # error: [implicit-bool-conversion]
+    if flag and (other or items):  # error: [truthiness-test-of-none-union]
         pass
 ```

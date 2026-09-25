@@ -21,7 +21,7 @@ provided:
 
 ```py
 def take(items: list[str], limit: int | None = None) -> list[str]:
-    if not limit:  # error: [implicit-bool-conversion]
+    if not limit:  # error: [truthiness-test-of-none-union]
         return items
     return items[:limit]
 ```
@@ -43,7 +43,7 @@ example, the following function intentionally treats both `None` and empty lists
 
 ```py
 def default_preset(presets: list[str] | None) -> str:
-    if presets:  # error: [implicit-bool-conversion]
+    if presets:  # error: [truthiness-test-of-none-union]
         return presets[0]
     return "auto"
 ```
