@@ -1885,6 +1885,10 @@ impl From<DataclassTransformerFlags> for DataclassFlags {
             Self::FROZEN,
             params.contains(DataclassTransformerFlags::FROZEN_DEFAULT),
         );
+        result.set(
+            Self::SLOTS,
+            params.contains(DataclassTransformerFlags::SLOTS_DEFAULT),
+        );
 
         result
     }
