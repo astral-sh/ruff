@@ -30,3 +30,17 @@ def _():
 
 def f():
 	pass 
+
+
+# Multiple form feeds in leading whitespace (errors)
+
+if True:
+  print("!")
+
+if True:
+   print("!")
+
+# Form feed after line continuation is not indentation (no error)
+
+if True:\
+    print("!")

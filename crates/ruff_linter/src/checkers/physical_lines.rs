@@ -67,7 +67,7 @@ pub(crate) fn check_physical_lines(
         }
 
         if context.is_rule_enabled(Rule::IndentedFormFeed) {
-            indented_form_feed(&line, context);
+            indented_form_feed(&line, locator, indexer, context);
         }
     }
 
