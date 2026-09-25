@@ -69,7 +69,7 @@ Do not mention the absence of new panics, overflows, or timeouts. Do not add cha
 **<count> <rule>; <count> <other-rule>**
 
 <details>
-<summary>Report entries (<total> diagnostic hits)</summary>
+<summary>Report entries</summary>
 
 - [<project1 file1.py:line>](<permalink>): <added, removed, or changed> `<rule>`.
 - [<project1 file2.py:line>](<permalink>): <added, removed, or changed> `<other-rule>` (<count> duplicate occurrences).
@@ -103,8 +103,6 @@ if x:
 -->
 
 **<Example description>**
-
-*<count> <rule>; <count> <other-rule>*
 
 ```python
 <minimal reproducer>
