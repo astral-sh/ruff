@@ -830,6 +830,9 @@ def _(x1: X | None, x2: X):
 Truthiness narrowing should not leak into invariant literal container inference:
 
 ```py
+from typing import final
+
+@final
 class A: ...
 
 def _(a: A | None):

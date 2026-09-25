@@ -1,14 +1,9 @@
 # Truthiness tests of unions with `None`
 
-This opt-in rule detects truthiness checks that may accidentally conflate `None` with other falsy
-values.
+The `truthiness-test-of-none-union` opt-in rule detects truthiness checks that may accidentally
+conflate `None` with other falsy values.
 
-```toml
-[rules]
-truthiness-test-of-none-union = "warn"
-```
-
-## Basic
+## Basic idea
 
 Consider the following problematic `take` function where a limit of `0` would be treated as if it
 were `None`, which is probably not the intended behavior:
@@ -22,7 +17,7 @@ def take(items: list[str], limit: int | None = None) -> list[str]:
 ```
 
 ```snapshot
-warning[truthiness-test-of-none-union]: Boolean test on `int | None` does not distinguish `None` from other falsy values
+info[truthiness-test-of-none-union]: Boolean test on `int | None` does not distinguish `None` from other falsy values
  --> src/mdtest_snippet.py:3:12
   |
 3 |     if not limit:
@@ -163,7 +158,7 @@ def check(value: int | Any | None):
 ```
 
 ```snapshot
-warning[truthiness-test-of-none-union]: Boolean test on `int | Any | None` does not distinguish `None` from other falsy values
+info[truthiness-test-of-none-union]: Boolean test on `int | Any | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:83:8
    |
 83 |     if value:
@@ -224,7 +219,7 @@ def check(integer: int | None):
 ```
 
 ```snapshot
-warning[truthiness-test-of-none-union]: Boolean test on `int | None` does not distinguish `None` from other falsy values
+info[truthiness-test-of-none-union]: Boolean test on `int | None` does not distinguish `None` from other falsy values
  --> src/mdtest_snippet.py:3:8
   |
 3 |     if integer:
@@ -243,7 +238,7 @@ def check(flag: bool | None):
 ```
 
 ```snapshot
-warning[truthiness-test-of-none-union]: Boolean test on `bool | None` does not distinguish `None` from other falsy values
+info[truthiness-test-of-none-union]: Boolean test on `bool | None` does not distinguish `None` from other falsy values
  --> src/mdtest_snippet.py:9:8
   |
 9 |     if flag:
@@ -262,7 +257,7 @@ def check(text: str | None):
 ```
 
 ```snapshot
-warning[truthiness-test-of-none-union]: Boolean test on `str | None` does not distinguish `None` from other falsy values
+info[truthiness-test-of-none-union]: Boolean test on `str | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:15:8
    |
 15 |     if text:
@@ -281,7 +276,7 @@ def check(data: bytes | None):
 ```
 
 ```snapshot
-warning[truthiness-test-of-none-union]: Boolean test on `bytes | None` does not distinguish `None` from other falsy values
+info[truthiness-test-of-none-union]: Boolean test on `bytes | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:21:8
    |
 21 |     if data:
@@ -300,7 +295,7 @@ def check(number: float | None):
 ```
 
 ```snapshot
-warning[truthiness-test-of-none-union]: Boolean test on `float | None` does not distinguish `None` from other falsy values
+info[truthiness-test-of-none-union]: Boolean test on `float | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:27:8
    |
 27 |     if number:
@@ -319,7 +314,7 @@ def check(items: list[int] | None):
 ```
 
 ```snapshot
-warning[truthiness-test-of-none-union]: Boolean test on `list[int] | None` does not distinguish `None` from other falsy values
+info[truthiness-test-of-none-union]: Boolean test on `list[int] | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:33:8
    |
 33 |     if items:
@@ -338,7 +333,7 @@ def check(mapping: dict[str, int] | None):
 ```
 
 ```snapshot
-warning[truthiness-test-of-none-union]: Boolean test on `dict[str, int] | None` does not distinguish `None` from other falsy values
+info[truthiness-test-of-none-union]: Boolean test on `dict[str, int] | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:39:8
    |
 39 |     if mapping:
@@ -359,7 +354,7 @@ def check(value: str | int | None):
 ```
 
 ```snapshot
-warning[truthiness-test-of-none-union]: Boolean test on `str | int | None` does not distinguish `None` from other falsy values
+info[truthiness-test-of-none-union]: Boolean test on `str | int | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:45:8
    |
 45 |     if value:
@@ -382,7 +377,7 @@ def check(value: Custom | None):
 ```
 
 ```snapshot
-warning[truthiness-test-of-none-union]: Boolean test on `Custom | None` does not distinguish `None` from other falsy values
+info[truthiness-test-of-none-union]: Boolean test on `Custom | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:55:8
    |
 55 |     if value:

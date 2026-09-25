@@ -616,6 +616,8 @@ class Inventory:
             assert batch
             for item in batch:
                 pass
+            # error: [truthiness-test-of-none-union]
+            # error: [truthiness-test-of-none-union]
             if item and item.after:
                 self.after = item.after
                 reveal_type(self.after)  # revealed: str & ~AlwaysFalsy

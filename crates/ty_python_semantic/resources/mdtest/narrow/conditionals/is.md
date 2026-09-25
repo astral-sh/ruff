@@ -357,7 +357,7 @@ def nonsingleton_newtype_tag(value: Foo | Bar, tag: BoolTag):
         reveal_type(value)  # revealed: Foo | Bar
 
 def boolean_tags_after_truthiness(value: Foo | Bar | None):
-    if not value:
+    if not value:  # error: [truthiness-test-of-none-union]
         return
 
     if value.tag is True:
