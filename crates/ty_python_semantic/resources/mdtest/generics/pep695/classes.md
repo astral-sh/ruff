@@ -2190,6 +2190,29 @@ def probe(value: Tree[int, str]):
     reveal_type(child.value)  # revealed: str
 ```
 
+## Recursive constructor type context
+
+An invariant constructor can use a recursive type alias as context, including when its `__new__`
+method returns `Self`.
+
+```py
+from typing import Self
+
+class Box[T]:
+    value: T
+
+    def __new__(cls, value: T) -> Self:
+        return super().__new__(cls)
+
+type Nested = Box[Nested | int]
+
+def copy(value: Nested) -> Nested:
+    return Box(value.value)
+
+def invalid() -> Nested:
+    return Box("wrong")  # error: [invalid-return-type]
+```
+
 ## Aliased `Self` in explicit receivers
 
 Specializing a generic class also specializes the upper bound of `Self` inside type alias arguments.

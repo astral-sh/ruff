@@ -6256,13 +6256,37 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             )
         };
 
+        let preferred_specialization = (!preferred_type_mappings.is_empty()).then(|| {
+            generic_context.specialize(
+                db,
+                generic_context
+                    .variables(db)
+                    .map(|typevar| {
+                        preferred_type_mappings
+                            .get(&typevar.identity(db))
+                            .copied()
+                            .unwrap_or(Type::TypeVar(typevar))
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        });
+
         let mut choose = |typevar: BoundTypeVarInstance<'db>,
                           bounds: Option<&CandidateTypeVarSolution<'db>>| {
             let preferred_ty = preferred_type_mappings.get(&typevar.identity(db)).copied();
 
             if let Some(bounds) = bounds {
                 let lower = bounds.inference_lower(db, self.env)?;
-                if preferred_ty.is_none_or(|ty| !lower.is_assignable_to(db, self.env, ty)) {
+                // Transitivity can introduce unsolved typevars into a lower bound. For example,
+                // `dict(m)` with a recursive value type can acquire `dict[str, _VT]` as a bound
+                // on `_VT` through the constructor's `Self`. Check that bound with the proposed
+                // contextual types substituted, rather than rejecting the preference because
+                // `_VT` is still unsolved. Variables without a preference retain their identity.
+                if preferred_ty.is_none_or(|ty| {
+                    !lower
+                        .apply_optional_specialization(db, preferred_specialization)
+                        .is_assignable_to(db, self.env, ty)
+                }) {
                     return maybe_promote(typevar, bounds);
                 }
             }
