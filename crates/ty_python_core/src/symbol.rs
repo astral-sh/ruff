@@ -244,6 +244,13 @@ impl SymbolTable {
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Symbol> {
         self.symbols.iter()
     }
+
+    /// Iterate over the symbols in this symbol table.
+    pub(crate) fn iter_enumerated(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (ScopedSymbolId, &Symbol)> + ExactSizeIterator + '_ {
+        self.symbols.iter_enumerated()
+    }
 }
 
 impl PartialEq for SymbolTable {

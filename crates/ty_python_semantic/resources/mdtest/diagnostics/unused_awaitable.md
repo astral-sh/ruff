@@ -52,7 +52,7 @@ async def fetch() -> int:
     return 42
 
 async def main():
-    # TODO: ty should eventually warn about unused coroutines assigned to variables
+    # error: [unused-awaitable]
     coro = fetch()
 ```
 

@@ -1,5 +1,6 @@
 use crate::{
     Db, ProgramEnvironment,
+    place::{DefinedPlace, Place, PlaceWithDefinition, place_from_bindings},
     reachability::ReachabilityConstraintsExtension,
     types::{
         DynamicType, KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner,
@@ -8,11 +9,11 @@ use crate::{
         constraints::ConstraintSetBuilder,
         diagnostic::{
             ABSTRACT_AND_FINAL_METHOD, FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT,
-            INVALID_PARAMSPEC, INVALID_TYPE_FORM, UNSOUND_RETURN_STATEMENT, USELESS_OVERLOAD_BODY,
-            add_type_expression_reference_link, is_invalid_typed_dict_literal,
-            report_implicit_return_type, report_invalid_generator_function_return_type,
-            report_invalid_return_type, report_shadowed_type_variable,
-            report_unsound_return_statement,
+            INVALID_PARAMSPEC, INVALID_TYPE_FORM, UNSOUND_RETURN_STATEMENT, UNUSED_AWAITABLE,
+            USELESS_OVERLOAD_BODY, add_type_expression_reference_link,
+            is_invalid_typed_dict_literal, report_implicit_return_type,
+            report_invalid_generator_function_return_type, report_invalid_return_type,
+            report_shadowed_type_variable, report_unsound_return_statement,
         },
         function::{
             FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
@@ -40,6 +41,7 @@ use crate::{
 use ty_python_core::{
     UseDefMap,
     definition::{Definition, DefinitionKind},
+    place_table,
     scope::NodeWithScopeRef,
 };
 
@@ -220,6 +222,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_body(&function.body);
 
+        let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
+
         if let Some(returns) = function.returns.as_deref() {
             let has_empty_body = self.return_types_and_ranges.is_empty()
                 && function_body_kind(db, env, function, |expr| self.expression_type(expr))
@@ -256,7 +260,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let expected_return = ExpectedReturnType::from_function(db, enclosing_function);
             let expected_ty = expected_return.public();
 
-            let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
             if scope_id.is_generator_function(self.index) {
                 // TODO: `AsyncGeneratorType` and `GeneratorType` are both generic classes.
                 //
@@ -332,73 +335,108 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                 }
-
-                return;
-            }
-
-            for return_statement in
-                self.return_types_and_ranges
-                    .iter()
-                    .copied()
-                    .filter_map(|ty_range| match ty_range.ty {
-                        // We skip `is_assignable_to` checks for `NotImplemented`,
-                        // so we remove it beforehand.
-                        Type::Union(union) => Some(TypeAndRange {
-                            ty: union.filter(db, |ty| !ty.is_notimplemented(db)),
-                            range: ty_range.range,
-                        }),
-                        ty if ty.is_notimplemented(db) => None,
-                        _ => Some(ty_range),
-                    })
-            {
-                if !expected_return.accepts(
-                    db,
-                    env,
-                    return_statement.ty,
-                    TypeRelation::Assignability,
-                ) {
-                    report_invalid_return_type(
-                        &self.context,
-                        return_statement.range,
-                        returns.range(),
-                        declared_ty,
-                        return_statement.ty,
-                    );
-                } else if self.context.is_lint_enabled(&UNSOUND_RETURN_STATEMENT)
-                    && expected_return.public.is_fully_static(db, env)
-                    && !expected_return.accepts(
+            } else {
+                for return_statement in
+                    self.return_types_and_ranges
+                        .iter()
+                        .copied()
+                        .filter_map(|ty_range| match ty_range.ty {
+                            // We skip `is_assignable_to` checks for `NotImplemented`,
+                            // so we remove it beforehand.
+                            Type::Union(union) => Some(TypeAndRange {
+                                ty: union.filter(db, |ty| !ty.is_notimplemented(db)),
+                                range: ty_range.range,
+                            }),
+                            ty if ty.is_notimplemented(db) => None,
+                            _ => Some(ty_range),
+                        })
+                {
+                    if !expected_return.accepts(
                         db,
                         env,
                         return_statement.ty,
-                        TypeRelation::Redundancy { pure: true },
-                    )
+                        TypeRelation::Assignability,
+                    ) {
+                        report_invalid_return_type(
+                            &self.context,
+                            return_statement.range,
+                            returns.range(),
+                            declared_ty,
+                            return_statement.ty,
+                        );
+                    } else if self.context.is_lint_enabled(&UNSOUND_RETURN_STATEMENT)
+                        && expected_return.public.is_fully_static(db, env)
+                        && !expected_return.accepts(
+                            db,
+                            env,
+                            return_statement.ty,
+                            TypeRelation::Redundancy { pure: true },
+                        )
+                    {
+                        // N.B. the implementation here is the ~same as for `UNSOUND_YIELD` and `UNSOUND_ASSIGNMENT`;
+                        // update those too if updating this!
+                        report_unsound_return_statement(
+                            &self.context,
+                            return_statement.range,
+                            returns.range(),
+                            declared_ty,
+                            return_statement.ty,
+                        );
+                    }
+                }
+
+                let use_def = self.index.use_def_map(scope_id);
+                if can_implicitly_return_none(db, use_def)
+                    && !Type::none(db, env).is_assignable_to(db, env, expected_ty)
                 {
-                    // N.B. the implementation here is the ~same as for `UNSOUND_YIELD` and `UNSOUND_ASSIGNMENT`;
-                    // update those too if updating this!
-                    report_unsound_return_statement(
+                    let no_return = self.return_types_and_ranges.is_empty();
+                    report_implicit_return_type(
                         &self.context,
-                        return_statement.range,
                         returns.range(),
                         declared_ty,
-                        return_statement.ty,
+                        has_empty_body,
+                        enclosing_class_context,
+                        no_return,
                     );
                 }
             }
+        }
 
-            let use_def = self.index.use_def_map(scope_id);
-            if can_implicitly_return_none(db, use_def)
-                && !Type::none(db, env).is_assignable_to(db, env, expected_ty)
-            {
-                let no_return = self.return_types_and_ranges.is_empty();
-                report_implicit_return_type(
-                    &self.context,
-                    returns.range(),
-                    declared_ty,
-                    has_empty_body,
-                    enclosing_class_context,
-                    no_return,
-                );
+        let places = place_table(db, scope_id.to_scope_id(db, self.program_file()));
+
+        for (symbol_id, symbol) in places.symbols_and_ids() {
+            if symbol.is_used() {
+                continue;
             }
+            if !symbol.is_bound() {
+                continue;
+            }
+            let PlaceWithDefinition {
+                place: Place::Defined(DefinedPlace { ty, .. }),
+                first_definition: Some(definition),
+            } = place_from_bindings(
+                db,
+                env,
+                self.index
+                    .use_def_map(scope_id)
+                    .end_of_scope_symbol_bindings(symbol_id),
+            )
+            else {
+                continue;
+            };
+            if !ty.is_awaitable(db) {
+                continue;
+            }
+            let Some(builder) = self
+                .context
+                .report_lint(&UNUSED_AWAITABLE, definition.focus_range(db, self.module()))
+            else {
+                continue;
+            };
+            builder.into_diagnostic(format_args!(
+                "Coroutine assigned to `{}` is never awaited",
+                symbol.name()
+            ));
         }
     }
 
