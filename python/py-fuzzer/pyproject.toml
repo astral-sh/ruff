@@ -63,17 +63,17 @@ select = [
 ]
 ignore = [
     # only relevant if you run a script with `python -0`,
-    "B011",
+    "assert-false",
     # These are enforced by, or incompatible with, the ruff formatter:
-    "E203",
-    "E501",
+    "whitespace-before-punctuation",
+    "line-too-long",
 ]
 unfixable = [
-    "F841",   # unused variable. ruff keeps the call, but mostly it's best to get rid of it all
-    "F601",   # automatic fix might obscure issue
-    "F602",   # automatic fix might obscure issue
-    "B018",   # automatic fix might obscure issue
-    "RUF017", # Ruff's fix is faster, but I prefer using itertools.chain_from_iterable
+    "unused-variable",   # unused variable. ruff keeps the call, but mostly it's best to get rid of it all
+    "multi-value-repeated-key-literal",   # automatic fix might obscure issue
+    "multi-value-repeated-key-variable",   # automatic fix might obscure issue
+    "useless-expression",   # automatic fix might obscure issue
+    "quadratic-list-summation", # Ruff's fix is faster, but I prefer using itertools.chain_from_iterable
 ]
 
 [tool.ruff.lint.isort]
