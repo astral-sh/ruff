@@ -506,6 +506,165 @@ fn pep695_type_params() {
     check_typevar("Y", "TypeVar", None, None, None);
 }
 
+/// Both targets in a chained unannotated assignment reuse the cached inference of their common
+/// source instead of retaining a separate copy for each unpacking.
+#[test]
+fn unannotated_unpacking_reuses_value_inference() {
+    let mut db = setup_db();
+    db.write_dedented("src/a.py", r#"first, second = (third, *rest) = [1, "two"]"#)
+        .expect("write the test fixture");
+
+    let file = program_file(
+        &db,
+        system_path_to_file(&db, "src/a.py").expect("find the test fixture"),
+    );
+    let module = parsed_module(&db, file.python_file(&db)).load(&db);
+    let index = semantic_index(&db, file);
+    let assignment = module
+        .syntax()
+        .body
+        .first()
+        .and_then(ast::Stmt::as_assign_stmt)
+        .expect("expected an assignment statement");
+    let value = index.expression(&assignment.value);
+    let inference = infer_expression_types(&db, value, TypeContext::default());
+
+    for target in &assignment.targets {
+        let unpack = index
+            .try_unpack(target)
+            .expect("expected an unpacking target");
+        let unpacked = infer_unpack_types(&db, unpack);
+        assert!(std::ptr::eq(
+            inference,
+            unpacked
+                .value_inferences(&db, value)
+                .next()
+                .expect("unpack result should include source inference")
+        ));
+    }
+}
+
+/// The walrus expression binds `saved` while evaluating the right-hand side; unpacking binds
+/// `values` and `other`. The expression inference should store only `saved`, and the unpack result
+/// should store only the two targets, even when the two inference results are combined.
+#[test]
+fn unpacked_target_bindings_are_separate_from_source_bindings() {
+    let mut db = setup_db();
+    db.write_dedented("src/a.py", "values: int\nvalues, other = ((saved := 1), 2)")
+        .expect("write the test fixture");
+
+    let file = program_file(
+        &db,
+        system_path_to_file(&db, "src/a.py").expect("find the test fixture"),
+    );
+    let module = parsed_module(&db, file.python_file(&db)).load(&db);
+    let index = semantic_index(&db, file);
+    let assignment = module
+        .syntax()
+        .body
+        .get(1)
+        .and_then(ast::Stmt::as_assign_stmt)
+        .expect("expected an assignment statement after the annotation");
+    let target = assignment
+        .targets
+        .first()
+        .expect("expected an unpacking target");
+    let unpack = index
+        .try_unpack(target)
+        .expect("expected the target to be indexed as an unpacking");
+    let tuple = assignment
+        .value
+        .as_tuple_expr()
+        .expect("expected a tuple source");
+    let named = tuple
+        .elts
+        .first()
+        .and_then(ast::Expr::as_named_expr)
+        .expect("expected a named expression in the source");
+    let saved_definition = index
+        .try_definition(named)
+        .expect("expected a source expression binding");
+
+    let unpacked = infer_unpack_types(&db, unpack);
+    let value = index.expression(&assignment.value);
+    let source_bindings = unpacked
+        .value_inferences(&db, value)
+        .next()
+        .expect("unpack result should include source inference")
+        .extra
+        .as_deref()
+        .map(|extra| extra.bindings.as_ref())
+        .unwrap_or_default();
+    assert_eq!(source_bindings.len(), 1);
+    assert_eq!(source_bindings[0].0, saved_definition);
+
+    assert_eq!(unpacked.binding_types().count(), 2);
+    assert!(unpacked.binding_type(saved_definition).is_none());
+}
+
+/// Each unannotated member write records expressions for its receiver and assigned target,
+/// but both unpackings refer to the cached source inference without retaining its tuple twice.
+#[test]
+fn chained_member_unpacking_keeps_source_inference_shared() {
+    let mut db = setup_db();
+    db.write_dedented(
+        "src/a.py",
+        r#"
+        class Holder: pass
+
+        def assign(holder: Holder) -> None:
+            (holder.left, a, b, c, d, e, f, g) = (
+                holder.right, h, i, j, k, l, m, n
+            ) = (0, 1, 2, 3, 4, 5, 6, 7)
+        "#,
+    )
+    .expect("write the test fixture");
+
+    let file = program_file(
+        &db,
+        system_path_to_file(&db, "src/a.py").expect("find the test fixture"),
+    );
+    let module = parsed_module(&db, file.python_file(&db)).load(&db);
+    let index = semantic_index(&db, file);
+    let function = module
+        .syntax()
+        .body
+        .get(1)
+        .and_then(ast::Stmt::as_function_def_stmt)
+        .expect("expected a function after the class");
+    let assignment = function
+        .body
+        .first()
+        .and_then(ast::Stmt::as_assign_stmt)
+        .expect("expected a chained assignment in the function");
+    let value = index.expression(&assignment.value);
+    let source = infer_expression_types(&db, value, TypeContext::default());
+
+    for target in &assignment.targets {
+        let unpack = index
+            .try_unpack(target)
+            .expect("expected each target to be indexed as an unpacking");
+        let unpacked = infer_unpack_types(&db, unpack);
+        let mut inferences = unpacked.value_inferences(&db, value);
+        let shared = inferences.next().expect("expected the shared source");
+        assert!(std::ptr::eq(shared, source));
+
+        let write = inferences.next().expect("expected member-write inference");
+        assert!(inferences.next().is_none());
+        assert!(
+            write.expressions.iter().next().is_some(),
+            "the member write must retain its own expressions"
+        );
+        assert!(
+            write
+                .expressions
+                .iter()
+                .all(|(key, _)| source.expressions.get(key).is_none()),
+            "the member write must not retain any expressions already owned by the shared source"
+        );
+    }
+}
+
 #[test]
 fn simple_assignment_does_not_enter_salsa_cycle() {
     let mut db = setup_db();

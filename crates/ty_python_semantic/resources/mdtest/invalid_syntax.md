@@ -109,11 +109,51 @@ out = (obj[0] := obj).attr
 ## Multiple starred assignment targets
 
 Even when a recovered assignment has more than one starred target, unpacking records types for its
-bindings without panicking.
+bindings without panicking. The second starred target currently receives the last element's type;
+TODO: recover it as a list instead.
 
 ```py
 first, *left, *right = [1, 2, 3]  # error: [invalid-syntax] "Two starred expressions in assignment"
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(left)  # revealed: list[int]
+reveal_type(right)  # revealed: Literal[3]
+
 first, *left, *right = (1, 2, 3)  # error: [invalid-syntax] "Two starred expressions in assignment"
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(left)  # revealed: list[int]
+reveal_type(right)  # revealed: Literal[3]
+```
+
+An annotation on a starred target does not make it possible to distribute the source values between
+two starred targets.
+
+```py
+left: list[int]
+first, *left, *right = (1, 2, 3)  # error: [invalid-syntax] "Two starred expressions in assignment"
+
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(left)  # revealed: list[int]
+reveal_type(right)  # revealed: Literal[3]
+```
+
+An invalid nested target does not prevent an independent target from providing type context. We
+still infer the list assigned to `items` as `list[object]`.
+
+```py
+items: list[object]
+# error: [invalid-syntax] "Two starred expressions in assignment"
+items, (*left, *right) = ([1], (2, 3, 4))
+
+reveal_type(items)  # revealed: list[object]
+reveal_type(left)  # revealed: list[int]
+reveal_type(right)  # revealed: Literal[4]
+
+# error: [invalid-syntax] "Two starred expressions in assignment"
+[items, [*left, *right]] = [[1], [2, 3, 4]]
+
+reveal_type(items)  # revealed: list[object]
+reveal_type(left)  # revealed: list[int]
+reveal_type(right)  # revealed: Literal[4]
 ```
 
 ## Match-pattern alternatives binding different names
