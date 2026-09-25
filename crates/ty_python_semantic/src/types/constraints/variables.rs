@@ -366,6 +366,16 @@ impl<'db> Constraint<'db> {
         }
     }
 
+    pub(super) fn provenance(self) -> ConstraintProvenance {
+        match self {
+            Constraint::ConcreteLower(this) => this.provenance,
+            Constraint::ConcreteUpper(this) => this.provenance,
+            Constraint::ConcreteEquivalence(this) => this.provenance,
+            Constraint::TypeVarRange(this) => this.provenance,
+            Constraint::TypeVarEquivalence(this) => this.provenance,
+        }
+    }
+
     pub(super) fn with_provenance(mut self, provenance: ConstraintProvenance) -> Self {
         match &mut self {
             Constraint::ConcreteLower(this) => this.provenance = provenance,
@@ -407,26 +417,52 @@ impl<'db> Constraint<'db> {
         )
     }
 
-    pub(super) fn as_concrete(
+    pub(super) fn provides_bound_for(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<BoundTypeVarInstance<'db>> {
-        let bound_is_concrete = |bound: Type<'db>| {
-            !bound.has_typevar(db, env)
-                && !bound.has_unspecialized_type_var(db, env)
-                && bound.bottom_materialization(db, env) == bound.top_materialization(db, env)
-        };
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> bool {
         match self {
-            Constraint::ConcreteLower(this) => {
-                bound_is_concrete(this.bound).then_some(this.typevar)
+            Constraint::ConcreteLower(bound) => bound.typevar.is_same_typevar_as(db, bound_typevar),
+            Constraint::ConcreteUpper(bound) => bound.typevar.is_same_typevar_as(db, bound_typevar),
+            Constraint::ConcreteEquivalence(bound) => {
+                bound.typevar.is_same_typevar_as(db, bound_typevar)
             }
-            Constraint::ConcreteUpper(this) => {
-                bound_is_concrete(this.bound).then_some(this.typevar)
+            Constraint::TypeVarRange(bound) => {
+                bound.left.is_same_typevar_as(db, bound_typevar)
+                    || bound.right.is_same_typevar_as(db, bound_typevar)
             }
-            Constraint::ConcreteEquivalence(this) => {
-                bound_is_concrete(this.bound).then_some(this.typevar)
+            Constraint::TypeVarEquivalence(bound) => {
+                bound.left.is_same_typevar_as(db, bound_typevar)
+                    || bound.right.is_same_typevar_as(db, bound_typevar)
             }
+        }
+    }
+
+    pub(super) fn provides_lower_bound_for(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        match self {
+            Constraint::ConcreteLower(bound) => bound.typevar.is_same_typevar_as(db, bound_typevar),
+            Constraint::ConcreteUpper(_) => false,
+            Constraint::ConcreteEquivalence(bound) => {
+                bound.typevar.is_same_typevar_as(db, bound_typevar)
+            }
+            Constraint::TypeVarRange(bound) => bound.right.is_same_typevar_as(db, bound_typevar),
+            Constraint::TypeVarEquivalence(bound) => {
+                bound.left.is_same_typevar_as(db, bound_typevar)
+                    || bound.right.is_same_typevar_as(db, bound_typevar)
+            }
+        }
+    }
+
+    pub(super) fn as_concrete(self) -> Option<(BoundTypeVarInstance<'db>, Type<'db>)> {
+        match self {
+            Constraint::ConcreteLower(this) => Some((this.typevar, this.bound)),
+            Constraint::ConcreteUpper(this) => Some((this.typevar, this.bound)),
+            Constraint::ConcreteEquivalence(this) => Some((this.typevar, this.bound)),
             Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => None,
         }
     }

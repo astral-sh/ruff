@@ -1655,6 +1655,50 @@ y: list[Sub] = f2(Sub())
 reveal_type(y)  # revealed: list[Sub]
 ```
 
+## Receiver evidence does not determine constrained TypeVar solutions
+
+Binding the method adds the lower bound `ConstrainedReceiver ≤ ReceiverT`. Selecting `str` while
+binding the receiver only validates that bound; it does not turn the evidence into an equality. The
+argument can therefore make `object` the final solution.
+
+```py
+from typing import TypeVar
+
+ReceiverT = TypeVar("ReceiverT", str, object)
+
+class ConstrainedReceiver(str):
+    def method(self: ReceiverT, value: ReceiverT) -> ReceiverT:
+        return value
+
+# revealed: str
+reveal_type(ConstrainedReceiver().method("foo"))
+# revealed: object
+reveal_type(ConstrainedReceiver().method(1))
+```
+
+## Nested generic calls preserve constrained TypeVar solutions
+
+Solving a constrained TypeVar as part of a nested generic call should produce the same
+specialization as solving the inner call first. The outer call must not make an incompatible
+declared constraint viable.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", str, bytes)
+
+def choose(value: T) -> list[T]:
+    return [value]
+
+values = choose("x")
+# revealed: list[str]
+reveal_type(values)
+# revealed: set[str]
+reveal_type(set(values))
+# revealed: set[str]
+reveal_type(set(choose("x")))
+```
+
 ## Prefer specific compatible constraints over union constraints
 
 When multiple declared constraints are compatible with a lower bound, we prefer the most specific
@@ -1675,6 +1719,73 @@ def narrow_first(value: NarrowFirst) -> NarrowFirst:
 def check(value: str) -> None:
     reveal_type(broad_first(value))  # revealed: str
     reveal_type(narrow_first(value))  # revealed: str
+```
+
+## Prefer a constraint that is more specific than incomparable alternatives
+
+Encountering two incomparable constraints does not make the result ambiguous when a later constraint
+is more specific than both. The preferred result should not depend on which incomparable constraint
+was declared first.
+
+```py
+from typing import TypeVar
+
+StrFirst = TypeVar("StrFirst", int | str, int | bytes, int)
+BytesFirst = TypeVar("BytesFirst", int | bytes, int | str, int)
+
+def choose_str_first(value: StrFirst) -> StrFirst:
+    return value
+
+def choose_bytes_first(value: BytesFirst) -> BytesFirst:
+    return value
+
+# revealed: int
+reveal_type(choose_str_first(1))
+# revealed: int
+reveal_type(choose_bytes_first(1))
+```
+
+## Prune preferred constraints before combining independent TypeVars
+
+When each constrained TypeVar has one preferred solution, inference should select those solutions
+without exhausting the path budget on combinations that will eventually be discarded.
+
+```py
+from typing import TypeVar
+
+T1 = TypeVar("T1", int, object)
+T2 = TypeVar("T2", int, object)
+T3 = TypeVar("T3", int, object)
+T4 = TypeVar("T4", int, object)
+T5 = TypeVar("T5", int, object)
+T6 = TypeVar("T6", int, object)
+T7 = TypeVar("T7", int, object)
+T8 = TypeVar("T8", int, object)
+T9 = TypeVar("T9", int, object)
+T10 = TypeVar("T10", int, object)
+T11 = TypeVar("T11", int, object)
+T12 = TypeVar("T12", int, object)
+T13 = TypeVar("T13", int, object)
+
+def choose_independent(
+    x1: T1,
+    x2: T2,
+    x3: T3,
+    x4: T4,
+    x5: T5,
+    x6: T6,
+    x7: T7,
+    x8: T8,
+    x9: T9,
+    x10: T10,
+    x11: T11,
+    x12: T12,
+    x13: T13,
+) -> tuple[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13]:
+    raise NotImplementedError
+
+# revealed: tuple[int, int, int, int, int, int, int, int, int, int, int, int, int]
+reveal_type(choose_independent(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1))
 ```
 
 ## Prefer general constraints for upper-bound-only inference
@@ -1754,6 +1865,31 @@ def callback() -> Any:
     return 1
 
 reveal_type(call(callback))  # revealed: Any
+```
+
+## Ambiguous constrained TypeVar inference from a partial constraint family
+
+Non-concrete evidence can rule out some declared constraints while remaining ambiguous among others.
+In that case, we preserve the evidence instead of choosing or unioning the compatible constraints.
+
+```py
+from typing import Any, TypeVar
+
+Shape = TypeVar(
+    "Shape",
+    tuple[()],
+    tuple[int],
+    tuple[int, int],
+    tuple[int, int, int],
+    tuple[int, ...],
+)
+
+def preserve_shape(value: Shape) -> Shape:
+    return value
+
+def check_shape(value: tuple[Any, Any]) -> None:
+    # revealed: tuple[Any, Any]
+    reveal_type(preserve_shape(value))
 ```
 
 ## Bounded TypeVar with callable parameter
@@ -1934,6 +2070,24 @@ def narrow(x: Narrow) -> Narrow:
 
 reveal_type(narrow(1))  # revealed: int
 reveal_type(narrow("hello"))  # revealed: str
+```
+
+A fixed constrained typevar and a gradual argument can provide separate bounds for another
+constrained typevar. Both bounds are non-concrete, so we preserve their combined family solution
+rather than adding the individual constraints `A` and `B` to it.
+
+```py
+from typing import Any
+
+# It is important that this function takes in multiple parameters of type `Result`, so that we
+# exercise a constraint set with multiple constraints in it.
+def merge(left: T, right: T) -> T:
+    return left
+
+def check(marker: S, value: Any) -> None:
+    result = merge(marker, value)
+    # revealed: S@check | Any
+    reveal_type(result)
 ```
 
 ## Inferring a constrained typevar from a bounded typevar

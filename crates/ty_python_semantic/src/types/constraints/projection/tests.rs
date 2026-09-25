@@ -91,7 +91,7 @@ fn collect_paths<'db, 'c>(
         &env,
         inferable,
         budget,
-        |_, bound| CandidateSolutions::default_solve(db, &env, builder, inferable, bound),
+        |_, bound| CandidateSolutions::default_solve(db, &env, builder, bound),
         Paths::default(),
         |mut paths, path, budget| {
             for binding in path {
@@ -136,7 +136,7 @@ fn path_limit_is_checked_before_solving() {
             },
             |_, bound| {
                 selected += 1;
-                CandidateSolutions::default_solve(db, &env, &builder, inferable, bound)
+                CandidateSolutions::default_solve(db, &env, &builder, bound)
             },
             0,
             |count, _, _| {
@@ -503,7 +503,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
         let mut selected = 0;
         let collected = set.solutions_with(db, &env, inferable, budget, |_, bound| {
             selected += 1;
-            CandidateSolutions::default_solve(db, &env, &builder, inferable, bound)
+            CandidateSolutions::default_solve(db, &env, &builder, bound)
         });
         // One additional path is selected to discover that it exceeds the budget; later
         // paths are not solved.
@@ -515,7 +515,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
             &env,
             inferable,
             budget,
-            |_, bound| CandidateSolutions::default_solve(db, &env, &builder, inferable, bound),
+            |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
             Type::Never,
             |accumulated, path, budget| {
                 assert_eq!(path.len(), 1);
@@ -624,7 +624,6 @@ class E: ...
     let right =
         UnionType::from_elements(db, &env, [instance("C")?, instance("D")?, instance("E")?]);
     let t = create_typevar(db, "T");
-    let inferable = TypeVarSet::from_typevars(db, [t]);
     let builder = ConstraintSetBuilder::new();
 
     // These classes can overlap, so distributing the intersection requires six DNF terms.
@@ -634,7 +633,8 @@ class E: ...
         let paths = CandidateSolutions::Constrained(
             alternatives
                 .map(|ty| CandidateSolution {
-                    typevars: Box::new([CandidateTypeVarSolution::exact(t, ty)]) as Box<[_]>,
+                    typevars: Box::new([CandidateTypeVarSolution::from_equivalence(t, ty)])
+                        as Box<[_]>,
                     validity: SolutionValidity::Valid,
                 })
                 .into(),
@@ -642,9 +642,7 @@ class E: ...
 
         assert_eq!(
             paths.try_fold_with(
-                db,
-                &env,
-                |_, bound| CandidateSolutions::default_solve(db, &env, &builder, inferable, bound),
+                |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
                 Type::object(),
                 &mut ProjectionTypeBudget::new(7),
                 |accumulated, path, budget| {

@@ -1473,12 +1473,13 @@ mod tests {
             .storage
             .borrow()
             .calculate_source_orders(set.source_order);
+        let inferable = TypeVarSet::from_typevars(db, [t]);
         let expected = CandidateSolutions::compute(
             db,
             &env,
             &mut builder.storage.borrow_mut(),
             set.node,
-            TypeVarSet::from_typevars(db, [t]),
+            inferable,
             set.source_order,
         );
 
@@ -1496,7 +1497,7 @@ mod tests {
                 remaining_paths,
                 remaining_visits,
             };
-            let mut walker = SolutionWalker::new(source_orders.clone());
+            let mut walker = SolutionWalker::new(source_orders.clone(), inferable);
             assert_eq!(
                 walker.visit_node(
                     db,
@@ -1512,7 +1513,7 @@ mod tests {
             drop(walker);
 
             let mut limits = UnboundedSolutionLimits;
-            let mut walker = SolutionWalker::new(source_orders.clone());
+            let mut walker = SolutionWalker::new(source_orders.clone(), inferable);
             let ControlFlow::Continue(()) = walker.visit_node(
                 db,
                 &env,
