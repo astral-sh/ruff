@@ -3865,9 +3865,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
             ast::CmpOp::Is => {
                 let rhs_identity_ty = rhs_ty.identity_comparison_type(db, &self.env);
-                // Identity transfers the runtime type, not a `NewType` tag or type-variable
-                // selection belonging to the other operand.
-                let mut builder = UnionBuilder::new(db, &self.env).add(rhs_identity_ty);
+                let mut builder = UnionBuilder::new(db, &self.env)
+                    .add(rhs_ty.identity_narrowing_type(db, &self.env));
                 let rhs_resolved = rhs_ty.resolve_type_alias(db);
                 let add_runtime_overlap = |builder: UnionBuilder<'db>, element: Type<'db>| {
                     let overlaps_only_at_runtime = |rhs_element| {
