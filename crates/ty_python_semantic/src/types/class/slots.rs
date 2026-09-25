@@ -151,6 +151,7 @@ impl InstanceDictionary {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Coroutine
             | KnownClass::AsyncIterator
             | KnownClass::ExtensionsTypeVar
             | KnownClass::ExtensionTypedDictFallback
