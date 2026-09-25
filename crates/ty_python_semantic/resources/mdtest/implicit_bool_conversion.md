@@ -329,21 +329,34 @@ def check(limit: int | None, items: list[int | None]):
         pass
     elif limit:  # error: [implicit-bool-conversion]
         pass
-    while limit:  # error: [implicit-bool-conversion]
-        break
+
+    def _():
+        while limit:  # error: [implicit-bool-conversion]
+            break
+
     result = 1 if limit else 0  # error: [implicit-bool-conversion]
+
     result = not limit  # error: [implicit-bool-conversion]
+
     filtered = [x for x in items if x]  # error: [implicit-bool-conversion]
+
     match limit:
         case _ if limit:  # error: [implicit-bool-conversion]
             pass
-    assert limit  # error: [implicit-bool-conversion]
+
+    def inner():
+        assert limit  # error: [implicit-bool-conversion]
+
+    if result := limit:  # error: [implicit-bool-conversion]
+        pass
+
+    if not (result := limit):  # error: [implicit-bool-conversion]
+        pass
 ```
 
-## Short-circuit expressions
+## Boolean expressions
 
-Boolean operators used to compute values are exempt. When the whole expression is used as a
-condition, each operand is checked, including operands of nested boolean operators.
+Boolean operators used to compute values are exempt.
 
 ```py
 def check(items: list[int] | None, flag: bool, other: bool):
@@ -351,6 +364,11 @@ def check(items: list[int] | None, flag: bool, other: bool):
     value = flag or items
     value = items or []
     value = items and flag
+```
+
+When the whole expression is used as a condition, each operand is checked:
+
+```py
     if items and flag:  # error: [implicit-bool-conversion]
         pass
     if flag and items:  # error: [implicit-bool-conversion]
@@ -358,9 +376,5 @@ def check(items: list[int] | None, flag: bool, other: bool):
     if not (items or flag):  # error: [implicit-bool-conversion]
         pass
     if flag and (other or items):  # error: [implicit-bool-conversion]
-        pass
-    if result := items and flag:  # error: [implicit-bool-conversion]
-        pass
-    if result := flag and items:  # error: [implicit-bool-conversion]
         pass
 ```

@@ -67,11 +67,11 @@ use crate::types::context::InferContext;
 use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
-    DYNAMIC_FUNCTION_DECORATOR_RETURN, GeneratorMismatchKind, IMPLICIT_BOOL_CONVERSION,
-    INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
-    INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
-    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+    DYNAMIC_FUNCTION_DECORATOR_RETURN, GeneratorMismatchKind, INEFFECTIVE_FINAL,
+    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_DECLARATION,
+    INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE,
+    INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
     POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics,
     UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
     UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
@@ -2280,7 +2280,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_statement;
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
-        self.check_implicit_bool_conversion(test, test_ty);
 
         if let Err(err) = test_ty.try_bool(db, env) {
             err.report_diagnostic(&self.context, &**test);
@@ -2298,7 +2297,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let Some(test) = &test {
                 let test_ty = self.infer_standalone_expression(test, TypeContext::default());
-                self.check_implicit_bool_conversion(test, test_ty);
 
                 if let Err(err) = test_ty.try_bool(db, env) {
                     err.report_diagnostic(&self.context, test);
@@ -2756,7 +2754,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let Some(guard) = guard.as_deref() {
                 let guard_ty = self.infer_standalone_expression(guard, TypeContext::default());
-                self.check_implicit_bool_conversion(guard, guard_ty);
 
                 if let Err(err) = guard_ty.try_bool(db, self.program_environment()) {
                     err.report_diagnostic(&self.context, guard);
@@ -5284,7 +5281,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = while_statement;
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
-        self.check_implicit_bool_conversion(test, test_ty);
 
         if let Err(err) = test_ty.try_bool(db, self.program_environment()) {
             err.report_diagnostic(&self.context, &**test);
@@ -5304,7 +5300,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = assert;
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
-        self.check_implicit_bool_conversion(test, test_ty);
 
         if let Err(err) = test_ty.try_bool(db, self.program_environment()) {
             err.report_diagnostic(&self.context, &**test);
@@ -8521,7 +8516,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for expr in ifs {
             let test_ty = self.infer_maybe_standalone_expression(expr, TypeContext::default());
-            self.check_implicit_bool_conversion(expr, test_ty);
 
             if let Err(err) = test_ty.try_bool(db, env) {
                 err.report_diagnostic(&self.context, expr);
@@ -8652,7 +8646,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_expression;
 
         let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
-        self.check_implicit_bool_conversion(test, test_ty);
+
         let (body_ty, orelse_ty) = if is_collection_literal(body)
             && prefer_collection_literal_peer_context(db, env, tcx)
         {
@@ -11296,9 +11290,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = unary;
 
         let operand_type = self.infer_expression(operand, TypeContext::default());
-        if op.is_not() {
-            self.check_implicit_bool_conversion(operand, operand_type);
-        }
 
         self.infer_unary_expression_type(*op, operand_type, unary)
     }
@@ -11579,92 +11570,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_),
             ) => fallback_unary_expression_type(),
-        }
-    }
-
-    /// Check for types such as `int | None` or `str | None` that are used as conditions
-    /// or in a Boolean context. Implicitly converting them to a Boolean may be unintended.
-    fn check_implicit_bool_conversion(&self, expression: &ast::Expr, ty: Type<'db>) {
-        if !self.context.is_lint_enabled(&IMPLICIT_BOOL_CONVERSION) || self.in_string_annotation() {
-            return;
-        }
-        if let ast::Expr::BoolOp(boolean) = expression {
-            for value in &boolean.values {
-                self.check_implicit_bool_conversion(value, self.expression_type(value));
-            }
-            return;
-        }
-        if let ast::Expr::Named(named) = expression {
-            self.check_implicit_bool_conversion(&named.value, ty);
-            return;
-        }
-        let db = self.db();
-        let env = self.program_environment();
-        let expanded = match ty.resolve_type_alias(db) {
-            Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
-            ty => ty,
-        };
-
-        // Only check types that are unions with `None`:
-        let Type::Union(union) = expanded else {
-            return;
-        };
-        let elements = union.elements(db);
-        if !elements.iter().any(|element| element.is_none(db)) {
-            return;
-        }
-
-        // Check if one of the non-`None` elements of the union may be falsy.
-        // We exclude dynamic types here as a conservative choice. Otherwise,
-        // types like `Unknown | None` would also trigger this rule, but that's
-        // much less likely to be a mistake.
-        if !elements.iter().any(|element| {
-            !element.is_none(db)
-                && !element.is_dynamic()
-                && element
-                    .try_bool(db, env)
-                    .is_ok_and(Truthiness::may_be_false)
-        }) {
-            return;
-        }
-
-        if let Some(builder) = self
-            .context
-            .report_lint(&IMPLICIT_BOOL_CONVERSION, expression)
-        {
-            let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Boolean test on `{}` does not distinguish `None` from other falsy values",
-                ty.display(db, env)
-            ));
-            let non_none = UnionType::from_elements(
-                db,
-                env,
-                elements
-                    .iter()
-                    .copied()
-                    .filter(|element| !element.is_none(db)),
-            );
-            let known_class = match non_none {
-                Type::NominalInstance(instance) => instance.known_class(db),
-                Type::Union(union) => union.known(db).map(KnownUnion::annotation_class),
-                _ => None,
-            };
-
-            // This list of builtin types does not need to be exhaustive. We just list the ones
-            // that were most commonly encountered in practice (ecosystem results):
-            diagnostic.set_primary_annotation_message(match known_class {
-                Some(KnownClass::Int) => "`None` and `0` are both falsy",
-                Some(KnownClass::Float) => "`None` and `0` are both falsy",
-                Some(KnownClass::Complex) => "`None` and `0` are both falsy",
-                Some(KnownClass::Bool) => "`None` and `False` are both falsy",
-                Some(KnownClass::Str) => "`None` and the empty string are both falsy",
-                Some(KnownClass::Bytes) => "`None` and an empty bytestring are both falsy",
-                Some(KnownClass::List) => "`None` and an empty list are both falsy",
-                Some(KnownClass::Dict) => "`None` and an empty dictionary are both falsy",
-                _ => "Both `None` and non-`None` values can be false",
-            });
-            diagnostic.help("Use `is None` or `is not None` to check for presence of the value");
-            diagnostic.help("Use `bool(...)` if testing truthiness is intentional");
         }
     }
 

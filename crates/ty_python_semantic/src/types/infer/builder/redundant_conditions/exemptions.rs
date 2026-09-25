@@ -185,6 +185,11 @@ impl RedundantConditionContext {
         builder: &TypeInferenceBuilder<'_, '_>,
         condition: &RedundantCondition<'_, '_>,
     ) -> bool {
+        if matches!(condition.kind, ConditionKind::NoneUnion(_)) {
+            // The `None`-union check should always be reported
+            return false;
+        }
+
         let defensive = match self {
             Self::Assertion => matches!(
                 &condition.kind,
