@@ -82,7 +82,7 @@ def check_union(
 ):
     if predicate:  # error: [truthiness-test-of-callable]
         pass
-    if optional:  # error: [truthiness-test-of-none-union]
+    if optional:
         optional()
 ```
 
@@ -289,7 +289,7 @@ An alias that includes `None` can still be tested to check whether a callback is
 type OptionalCallback = Callback | None
 
 def check_optional(callback: OptionalCallback):
-    if callback:  # error: [truthiness-test-of-none-union]
+    if callback:
         callback()
 ```
 
@@ -1499,7 +1499,10 @@ help: Use `is None` or `is not None` to check for presence of the value
 help: Use `bool(...)` if testing truthiness is intentional
 ```
 
-A custom class is also checked for implicit boolean conversion, unless it is always truthy:
+A custom class without any specific evidence that it could be falsy is currently excluded from this
+rule. In principle, a subclass could introduce falsy behavior, but considering this possibility
+leads to many false positives in the ecosystem, since most classes are not final. So the rule does
+not apply here:
 
 ```py
 from typing import final
@@ -1507,6 +1510,38 @@ from typing import final
 class Custom: ...
 
 def check(value: Custom | None):
+    if value:  # no diagnostic
+        pass
+```
+
+However, if the class (or a base class) defines a `__bool__` or `__len__` method, we consider it
+potentially falsy and do apply the rule:
+
+```py
+class AmbiguousTruthiness:
+    def __bool__(self) -> bool:
+        raise NotImplementedError
+
+def check(value: AmbiguousTruthiness | None):
+    if value:  # error: [truthiness-test-of-none-union]
+        pass
+    if bool(value):  # no diagnostic
+        pass
+
+class AmbiguousLength:
+    def __len__(self) -> int:
+        raise NotImplementedError
+
+def check(value: AmbiguousLength | None):
+    if value:  # error: [truthiness-test-of-none-union]
+        pass
+    if bool(value):  # no diagnostic
+        pass
+
+class ChildOfAmbiguousTruthiness(AmbiguousTruthiness):
+    pass
+
+def check(value: ChildOfAmbiguousTruthiness | None):
     if value:  # error: [truthiness-test-of-none-union]
         pass
     if bool(value):  # no diagnostic
@@ -1519,14 +1554,14 @@ class AlwaysTruthy:
 def check(value: AlwaysTruthy | None):
     if value:  # no diagnostic
         pass
-    if bool(value):  # no diagnostic
-        pass
 
-@final
-class AlwaysTruthyFinal: ...
+class AlwaysFalsy:
+    def __bool__(self) -> Literal[False]:
+        return False
 
-def check(value: AlwaysTruthyFinal | None):
-    if value:  # no diagnostic
+# Also add `AlwaysTruthy` to the union or otherwise this would trigger `redundant-condition`
+def check(value: AlwaysFalsy | AlwaysTruthy | None):
+    if value:  # error: [truthiness-test-of-none-union]
         pass
     if bool(value):  # no diagnostic
         pass

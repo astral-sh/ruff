@@ -2797,7 +2797,7 @@ def multiple_tags(x: A | C1):
         reveal_type(x)  # revealed: C1
 
 def truthiness_guard(value: A | B | None):
-    if not value:  # error: [truthiness-test-of-none-union]
+    if not value:
         return
 
     reveal_type(value)  # revealed: (A & ~AlwaysFalsy) | (B & ~AlwaysFalsy)
@@ -2810,7 +2810,7 @@ def truthiness_guard(value: A | B | None):
         reveal_type(value.field_b)  # revealed: str
 
 def nested_attribute_after_truthiness_guard(container: Container):
-    if not container.value:  # error: [truthiness-test-of-none-union]
+    if not container.value:
         return
 
     if container.value.tag == "a":

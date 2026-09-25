@@ -68,7 +68,7 @@ use crate::{
     lint::LintMetadata,
     reachability::{analyze_condition_expression, is_non_terminal_call},
     types::{
-        CallableTypes, KnownClass, KnownInstanceType, Type, UnionType,
+        CallableTypes, KnownClass, KnownInstanceType, MemberLookupPolicy, Type, UnionType,
         constraints::ConstraintSetBuilder,
         diagnostic::{
             REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT, TRUTHINESS_TEST_OF_CALLABLE,
@@ -873,11 +873,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // the gradual guarantee: replacing an always-truthy union element with `Any`
         // or `Unknown` should not introduce a diagnostic.
         if !elements.iter().any(|element| {
-            !element.is_none(db)
-                && !element.is_dynamic()
-                && element
+            if element.is_none(db)
+                || element.is_dynamic()
+                || !element
                     .try_bool(db, env)
                     .is_ok_and(Truthiness::may_be_false)
+            {
+                return false;
+            }
+
+            // Non-final classes without a `__bool__` or `__len__` method have ambiguous
+            // truthiness in the `try_bool` check above, since their truthiness *could* be
+            // affected by a subclass defining one of these methods.
+            // However, for this particular diagnostic, we want to assume that classes
+            // without these methods are always truthy. If we don't do that, we would flag
+            // all Boolean checks on types like `MyClass | None`, based on the assumption
+            // that there *might* be a subclass affecting truthiness. This would lead to
+            // too many false positives, so we make a conservative choice here.
+            ["__bool__", "__len__"].iter().any(|name| {
+                !element
+                    .member_lookup_with_policy(
+                        db,
+                        env,
+                        name,
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .place
+                    .is_undefined()
+            })
         }) {
             return None;
         }
