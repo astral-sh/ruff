@@ -7,11 +7,10 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
-use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
 
 /// ## What it does
-/// Checks for `pytest.raises` calls that expect `ExceptionGroup` or
-/// `BaseExceptionGroup`.
+/// Checks for `pytest.raises`, `pytest.RaisesExc`, `pytest.RaisesGroup`, and
+/// `pytest.mark.xfail` calls that expect `ExceptionGroup` or `BaseExceptionGroup`.
 ///
 /// ## Why is this bad?
 /// `pytest.raises(ExceptionGroup)` checks the group's type, but not the types
@@ -19,7 +18,9 @@ use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
 /// group contains unexpected exceptions.
 ///
 /// Use `pytest.RaisesGroup` to specify the expected exceptions and any nested
-/// groups.
+/// groups. In `pytest.RaisesGroup`, use a nested matcher such as
+/// `pytest.RaisesGroup(pytest.RaisesGroup(ValueError))`. In `pytest.mark.xfail`,
+/// use `raises=pytest.RaisesGroup(ValueError)`.
 ///
 /// ## Example
 /// ```python
@@ -47,32 +48,64 @@ use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
 /// - [Python documentation: Exception groups](https://docs.python.org/3/builtins/exceptions.html#exception-groups)
 /// - [pytest documentation: `pytest.RaisesGroup`](https://docs.pytest.org/en/stable/reference/reference.html#pytest.RaisesGroup)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Suspicious)]
-pub(crate) struct PytestRaisesExceptionGroup;
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Pedantic)]
+pub(crate) struct PytestRaisesExceptionGroup {
+    nested: bool,
+}
 
 impl Violation for PytestRaisesExceptionGroup {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Use `pytest.RaisesGroup` instead of `pytest.raises` for exception groups".to_string()
+        if self.nested {
+            "Use a nested `pytest.RaisesGroup` to specify the expected exceptions".to_string()
+        } else {
+            "Use `pytest.RaisesGroup` to specify expected exceptions in the group".to_string()
+        }
     }
 }
 
 /// ASYNC401
 pub(crate) fn pytest_raises_exception_group(checker: &Checker, call: &ExprCall) {
-    if !is_pytest_raises(&call.func, checker.semantic()) {
-        return;
-    }
-
-    let Some(expected_exception) = call.arguments.args.first().or_else(|| {
-        call.arguments
-            .find_keyword("expected_exception")
-            .map(|keyword| &keyword.value)
-    }) else {
+    let Some(qualified_name) = checker
+        .semantic()
+        .resolve_qualified_name(map_subscript(&call.func))
+    else {
         return;
     };
 
-    if contains_exception_group(expected_exception, checker.semantic()) {
-        checker.report_diagnostic(PytestRaisesExceptionGroup, call.func.range());
+    let is_exception_group = |expr| contains_exception_group(expr, checker.semantic());
+    let expects_exception_group = match qualified_name.segments() {
+        ["pytest", "raises"] => call
+            .arguments
+            .find_argument_value("expected_exception", 0)
+            .is_some_and(is_exception_group),
+        ["pytest", "RaisesExc"] => call.arguments.args.first().is_some_and(is_exception_group),
+        ["pytest", "RaisesGroup"] => {
+            if let Some(exception) = call
+                .arguments
+                .args
+                .iter()
+                .find(|exception| is_exception_group(exception))
+            {
+                checker.report_diagnostic(
+                    PytestRaisesExceptionGroup { nested: true },
+                    exception.range(),
+                );
+            }
+            return;
+        }
+        ["pytest", "mark", "xfail"] => call
+            .arguments
+            .find_keyword("raises")
+            .is_some_and(|keyword| is_exception_group(&keyword.value)),
+        _ => false,
+    };
+
+    if expects_exception_group {
+        checker.report_diagnostic(
+            PytestRaisesExceptionGroup { nested: false },
+            call.func.range(),
+        );
     }
 }
 
