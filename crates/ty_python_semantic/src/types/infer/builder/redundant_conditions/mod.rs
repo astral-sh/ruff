@@ -863,9 +863,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         // Check if one of the non-`None` elements of the union may be falsy.
-        // We exclude dynamic types here as a conservative choice. Otherwise,
-        // types like `Unknown | None` would also trigger this rule, but that's
-        // much less likely to be a mistake.
+        // Dynamic types can materialize to always-truthy types. Excluding them respects
+        // the gradual guarantee: replacing an always-truthy union element with `Any`
+        // or `Unknown` should not introduce a diagnostic.
         if !elements.iter().any(|element| {
             !element.is_none(db)
                 && !element.is_dynamic()

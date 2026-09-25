@@ -185,8 +185,11 @@ impl RedundantConditionContext {
         builder: &TypeInferenceBuilder<'_, '_>,
         condition: &RedundantCondition<'_, '_>,
     ) -> bool {
-        if matches!(condition.kind, ConditionKind::NoneUnion(_)) {
-            // The `None`-union check should always be reported
+        if matches!(
+            condition.kind,
+            ConditionKind::NoneUnion(_) | ConditionKind::Iterable | ConditionKind::Callable(_)
+        ) {
+            // These checks should always be considered suspicious.
             return false;
         }
 

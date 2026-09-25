@@ -762,7 +762,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Some(KnownClass::Bytes) => "`None` and an empty bytestring are both falsy",
                 Some(KnownClass::List) => "`None` and an empty list are both falsy",
                 Some(KnownClass::Dict) => "`None` and an empty dictionary are both falsy",
-                _ => "Both `None` and non-`None` values can be false",
+                _ => "Both `None` and non-`None` values can be falsy",
             });
             diagnostic.help("Use `is None` or `is not None` to check for presence of the value");
             diagnostic.help("Use `bool(...)` if testing truthiness is intentional");

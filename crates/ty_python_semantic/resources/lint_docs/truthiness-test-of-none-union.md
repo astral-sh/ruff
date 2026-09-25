@@ -1,6 +1,6 @@
 ## What it does
 
-Detects truthiness checks of optional values whose non-`None` part can also be false, like an
+Detects truthiness checks of unions with `None` whose non-`None` part can also be falsy, like an
 `if value: ...` check on a value of type `int | None`.
 
 This rule is disabled by default. It can catch mistakes where a valid value is confused with missing
@@ -8,11 +8,12 @@ data, but may also flag code that deliberately treats `None` and other falsy val
 
 ## Why is this bad?
 
-Types like `int | None` or `str | None` are often used to represent values that may or may not be
-present. A Boolean condition such as `if value: ...` does not distinguish `None` from other falsy
-values: integers are falsy when they are zero, strings are falsy when they are empty, and containers
-are falsy when they have no elements. If the intent of the code was to handle those cases
-differently from `None`, a truthiness check can lead to incorrect behavior.
+`None` is a sentinel often used to indicate the absence of a meaningful value. A variable annotated
+as `int | None` can hold an integer or `None`. Since `None` is falsy, testing an object's truthiness
+is a common way to check whether a value is present, but this can lead to incorrect behavior. An
+object of type `int | None` can still be falsy even if it is an integer, since `0` is falsy. Boolean
+tests on objects of type `str | None`, `bytes | None`, or `list | None` have similar pitfalls: an
+empty string, bytestring, or list is also falsy in Python.
 
 ## Examples
 
@@ -51,11 +52,12 @@ def default_preset(presets: list[str] | None) -> str:
 Replacing the condition with `presets is not None` would introduce an `IndexError` for an empty
 list.
 
-An explicit `bool()` call preserves the intended truthiness check without triggering the rule:
+Checking that `presets` is a list before testing its truthiness preserves the intended behavior
+without triggering the rule:
 
 ```py
 def default_preset(presets: list[str] | None) -> str:
-    if bool(presets):
+    if isinstance(presets, list) and presets:
         return presets[0]
     return "auto"
 ```
