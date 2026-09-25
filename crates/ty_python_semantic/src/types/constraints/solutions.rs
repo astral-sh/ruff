@@ -9,9 +9,10 @@ use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{Constraint, ConstraintProvenance, UnsatisfiableBound};
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, CandidateTypeVarRangeSolver,
-    CandidateTypeVarSolution, ConstraintAssignment, ConstraintId, ConstraintSetStorage, NodeId,
-    SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
+    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions,
+    CandidateTypeVarRangeSolution, CandidateTypeVarRangeSolver, CandidateTypeVarSolution,
+    ConstraintAssignment, ConstraintId, ConstraintSetStorage, NodeId, SolutionLimits,
+    SolutionValidity, SolutionViolation, SolutionViolationKind,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::{BoundTypeVarInstance, Type};
@@ -229,6 +230,63 @@ impl<'db> SolutionWalker<'db> {
         )
     }
 
+    fn candidate_evidence(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        path: &PathAssignments,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<CandidateTypeVarRangeSolution<'db>> {
+        let mut evidence = CandidateTypeVarRangeSolver::default();
+        for (constraint, _) in path.positive_constraints() {
+            let constraint = storage.constraint_data(constraint);
+            if constraint.provides_bound_for(db, bound_typevar)
+                && constraint.provenance() == ConstraintProvenance::Evidence
+            {
+                evidence.add_constraint(db, bound_typevar, constraint);
+            }
+        }
+        evidence.finish(db, env, storage, bound_typevar)
+    }
+
+    fn evidence_satisfies_declared_constraint(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        evidence: &CandidateTypeVarRangeSolution<'db>,
+        constrained_ty: Type<'db>,
+    ) -> bool {
+        let constraint_lower = constrained_ty.bottom_materialization(db, env);
+        let constraint_upper = constrained_ty.top_materialization(db, env);
+        let (when_lower, when_lower_source_order) = match evidence.evidence_lower {
+            Some(lower) => storage.load(
+                db,
+                env,
+                &lower.when_assignable_to_owned(db, env, constraint_upper, self.inferable),
+            ),
+            None => (ALWAYS_TRUE, None),
+        };
+        let (when_upper, when_upper_source_order) = evidence.upper.iter_evidence().fold(
+            (ALWAYS_TRUE, None),
+            |(when, when_source_order), upper| {
+                let (when_upper, when_upper_source_order) = storage.load(
+                    db,
+                    env,
+                    &constraint_lower.when_assignable_to_owned(db, env, upper, self.inferable),
+                );
+                let when = when.and(storage, when_upper);
+                let when_source_order =
+                    storage.ordered_source_order(when_source_order, when_upper_source_order);
+                (when, when_source_order)
+            },
+        );
+        let when = when_lower.and(storage, when_upper);
+        let when_source_order =
+            storage.ordered_source_order(when_lower_source_order, when_upper_source_order);
+        !when.is_never_satisfied(db, env, storage, when_source_order)
+    }
+
     /// Having found a satisfiable path in the BDD, validates that path against the declared upper
     /// bound (TODO and constraints) of all relevant typevars.
     #[expect(clippy::too_many_arguments)]
@@ -363,34 +421,41 @@ impl<'db> SolutionWalker<'db> {
         // using the solution as-is, rather than trying to force it to be exactly equal to one of
         // the declared constraints. (We call this a "family" solution since it's a single solution
         // that satisfies the entire family of declared constraints.)
-        let mut evidence = CandidateTypeVarRangeSolver::default();
-        for (constraint, _) in path.positive_constraints() {
-            let constraint = storage.constraint_data(constraint);
-
-            // Constraints involving other typevars are not relevant
-            if !constraint.provides_bound_for(db, bound_typevar) {
-                continue;
-            }
-
-            // Only consider evidence constraints
-            if constraint.provenance() != ConstraintProvenance::Evidence {
-                continue;
-            }
-
-            evidence.add_constraint(db, bound_typevar, constraint);
-        }
-        let Some(evidence) = evidence.finish(db, env, storage, bound_typevar) else {
+        //
+        // Note that a fixed caller typevar can only be preserved when its constraints are a subset
+        // of this typevar's constraints. A bounded typevar may specialize below its bound, so it
+        // must be promoted to an individual declared constraint instead.
+        let Some(evidence) = Self::candidate_evidence(db, env, storage, path, bound_typevar) else {
             // If the evidence is not satisfiable, then we can return early; none of the
             // constraints can possibly be satisfied.
             return ControlFlow::Continue(());
         };
         let has_no_evidence = evidence.evidence_lower.is_none() && !evidence.upper.has_evidence();
+        let is_preservable_typevar = |ty| {
+            let Type::TypeVar(typevar) = ty else {
+                return false;
+            };
+            typevar.is_inferable(db, self.inferable)
+                || typevar
+                    .typevar(db)
+                    .constraints(db, env)
+                    .is_some_and(|actual_constraints| {
+                        actual_constraints.iter().all(|actual| {
+                            constrained_typevar
+                                .declared_constraints
+                                .iter()
+                                .any(|declared| {
+                                    actual.is_equivalent_to(db, env, declared.constrained_ty)
+                                })
+                        })
+                    })
+        };
         let has_non_concrete_evidence = has_no_evidence
             || evidence.has_only_gradual_evidence == Some(true)
-            || evidence.evidence_lower.is_some_and(Type::is_type_var)
+            || evidence.evidence_lower.is_some_and(is_preservable_typevar)
             || evidence
                 .as_single_upper_bound(db, env)
-                .is_some_and(Type::is_type_var);
+                .is_some_and(is_preservable_typevar);
 
         if has_non_concrete_evidence {
             let mut any_trivial_failures = false;
@@ -504,50 +569,13 @@ impl<'db> SolutionWalker<'db> {
                     &mut |this, storage, limits, path| {
                         // Selecting a concrete constraint must not specialize a caller's fixed
                         // typevar: `S & str <= int` may hold for some `S`, but not for every `S`.
-                        let constraint_lower = declared_constraint
-                            .constrained_ty
-                            .bottom_materialization(db, env);
-                        let constraint_upper = declared_constraint
-                            .constrained_ty
-                            .top_materialization(db, env);
-                        let (when_lower, when_lower_source_order) = match evidence.evidence_lower {
-                            Some(lower) => storage.load(
-                                db,
-                                env,
-                                &lower.when_assignable_to_owned(
-                                    db,
-                                    env,
-                                    constraint_upper,
-                                    this.inferable,
-                                ),
-                            ),
-                            None => (ALWAYS_TRUE, None),
-                        };
-                        let (when_upper, when_upper_source_order) = evidence
-                            .upper
-                            .iter_evidence()
-                            .fold((ALWAYS_TRUE, None), |(when, when_source_order), upper| {
-                                let (when_upper, when_upper_source_order) = storage.load(
-                                    db,
-                                    env,
-                                    &constraint_lower.when_assignable_to_owned(
-                                        db,
-                                        env,
-                                        upper,
-                                        this.inferable,
-                                    ),
-                                );
-                                let when = when.and(storage, when_upper);
-                                let when_source_order = storage.ordered_source_order(
-                                    when_source_order,
-                                    when_upper_source_order,
-                                );
-                                (when, when_source_order)
-                            });
-                        let when = when_lower.and(storage, when_upper);
-                        let when_source_order = storage
-                            .ordered_source_order(when_lower_source_order, when_upper_source_order);
-                        if when.is_never_satisfied(db, env, storage, when_source_order) {
+                        if !this.evidence_satisfies_declared_constraint(
+                            db,
+                            env,
+                            storage,
+                            &evidence,
+                            declared_constraint.constrained_ty,
+                        ) {
                             return ControlFlow::Continue(());
                         }
 
@@ -814,6 +842,12 @@ impl<'db> SolutionWalker<'db> {
         }
 
         for (bound_typevar, constrained_typevar) in constrained {
+            let Some(evidence) = Self::candidate_evidence(db, env, storage, path, *bound_typevar)
+            else {
+                violations.insert(*bound_typevar, SolutionViolationKind::Constraints);
+                continue;
+            };
+
             let mut satisfied = false;
             for declared_constraint in &constrained_typevar.declared_constraints {
                 if let Some(constraints) = declared_constraint.constraints.as_deref() {
@@ -825,6 +859,15 @@ impl<'db> SolutionWalker<'db> {
                         path,
                         constraints,
                         &mut |this, storage, _limits, path| {
+                            if !this.evidence_satisfies_declared_constraint(
+                                db,
+                                env,
+                                storage,
+                                &evidence,
+                                declared_constraint.constrained_ty,
+                            ) {
+                                return ControlFlow::Continue(());
+                            }
                             let pending =
                                 this.pending_candidate_solution(db, env, storage, path, None);
                             if pending.is_some() {
