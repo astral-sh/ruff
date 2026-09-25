@@ -4,6 +4,7 @@ use anyhow::Result;
 use rustc_hash::FxHashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{Imported, NodeId, Scope, ScopeId};
 use ruff_text_size::Ranged;
 
@@ -111,7 +112,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
         .lookup_symbol_in_scope("__getattr__", ScopeId::global(), false)
         .is_bound();
 
-    for binding_id in scope.binding_ids() {
+    for (_, binding_id) in scope.all_bindings() {
         let binding = checker.semantic().binding(binding_id);
 
         let Some(import) = binding.as_any_import() else {
@@ -125,10 +126,43 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
         if binding.context.is_typing()
             && let Some(runtime_reference) = binding.references().find_map(|reference_id| {
                 let reference = checker.semantic().reference(reference_id);
+                if reference.in_typing_context() {
+                    return None;
+                }
 
-                (reference.in_runtime_context()
-                    && !(ignore_dunder_all_references && reference.in_dunder_all_definition()))
-                .then_some(reference)
+                if ignore_dunder_all_references && reference.in_dunder_all_definition() {
+                    return None;
+                }
+
+                // for submodule imports we need to check if the reference
+                // actually refers to this submodule, or a different one
+                let Some(submodule_import) = import.as_submodule_import() else {
+                    return Some(reference);
+                };
+
+                let expression_id = reference.expression_id()?;
+                // references should generally point towards an `Expr::Name` node
+                // so by walking the parent expressions in tandem with the segments
+                // of the qualified name should give us a `starts_with` check for
+                // the reference towards the import
+                for (segment, expr) in std::iter::zip(
+                    submodule_import.qualified_name().segments(),
+                    checker.semantic().expressions(expression_id),
+                )
+                // we discard the first pair, since it's guaranteed to match
+                // this also simplifies the loop logic, since we only have to
+                // handle `Expr::Attribute` nodes
+                .skip(1)
+                {
+                    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr else {
+                        // we're past the attribute nodes, so we can stop
+                        break;
+                    };
+                    if *segment != attr.as_str() {
+                        return None;
+                    }
+                }
+                Some(reference)
             })
         {
             let Some(node_id) = binding.source else {
