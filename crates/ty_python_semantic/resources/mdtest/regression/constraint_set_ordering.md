@@ -231,6 +231,38 @@ def chain_uts[U, T, S]() -> None:
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
 ```
 
+## Non-inferable constraint source order and typevar orientation
+
+A non-inferable constraint can appear before or after inferable constraints, and a bare relationship
+can be encoded with either variable as its subject. Unrelated non-inferable variables are omitted,
+but a directly related non-inferable variable must be retained regardless of its orientation.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def noninferable_constraint_first[I, J, N]() -> None:
+    constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(str, I, str) & ConstraintSet.range(bytes, J, bytes)
+    # revealed: tuple[Solution[I=str, J=bytes]]
+    reveal_type(constraints.solutions(inferable=tuple[I, J]))
+
+def noninferable_constraint_last[I, J, N]() -> None:
+    constraints = ConstraintSet.range(str, I, str) & ConstraintSet.range(bytes, J, bytes) & ConstraintSet.range(int, N, int)
+    # revealed: tuple[Solution[I=str, J=bytes]]
+    reveal_type(constraints.solutions(inferable=tuple[I, J]))
+
+def inferable_subject[I, N]() -> None:
+    constraints = ConstraintSet.range(N, I, N)
+    # TODO: sometimes: revealed tuple[Solution[I=N@inferable_subject, N=I@inferable_subject]]
+    # revealed: tuple[Solution[N=I@inferable_subject, I=N@inferable_subject]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+
+def noninferable_subject[N, I]() -> None:
+    constraints = ConstraintSet.range(I, N, I)
+    # TODO: sometimes: revealed tuple[Solution[N=I@noninferable_subject, I=N@noninferable_subject]]
+    # revealed: tuple[Solution[I=N@noninferable_subject, N=I@noninferable_subject]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+```
+
 ## Non-inferable bound checks are ordering-independent
 
 Changing the internal constraint order must not allow a non-inferable type variable to violate its
@@ -251,9 +283,9 @@ def noninferable_declared_bound[T, U: str]() -> None:
 
 ## Abstraction and non-inferable typevars
 
-Removing non-inferable typevars rebuilds the TDD with `ite`; irrelevant positive decisions must not
-leak onto the surviving paths. Universal abstraction of an alternative must likewise leave only the
-unrelated branch.
+Irrelevant non-inferable typevars must not appear in reported solution bindings, and irrelevant
+positive decisions must not leak onto independent alternatives. Universal abstraction of an
+alternative must likewise leave only the unrelated branch.
 
 ```py
 from ty_extensions import static_assert
