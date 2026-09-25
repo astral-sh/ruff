@@ -4009,6 +4009,10 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             KnownInstanceType::Range { .. } => f
                 .with_type(KnownClass::Range.to_class_literal(db, self.env))
                 .write_str("range"),
+            KnownInstanceType::Regex(regex) => regex
+                .instance_fallback(db, self.env)
+                .display_with(db, self.env, self.settings.clone())
+                .fmt_detailed(f),
             KnownInstanceType::FunctoolsPartialCall(partial) => Type::Callable(partial.partial(db))
                 .display_with(db, self.env, DisplaySettings::default().singleline())
                 .fmt_detailed(f),

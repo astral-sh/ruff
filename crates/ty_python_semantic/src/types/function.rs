@@ -2440,6 +2440,22 @@ pub enum KnownFunction {
     Unpack,
     /// `types.new_class`
     NewClass,
+
+    /// `re.compile`
+    #[strum(serialize = "compile")]
+    ReCompile,
+    /// `re.search`
+    #[strum(serialize = "search")]
+    ReSearch,
+    /// `re.match` and `re.prefixmatch`
+    #[strum(serialize = "prefixmatch", to_string = "match")]
+    ReMatch,
+    /// `re.fullmatch`
+    #[strum(serialize = "fullmatch")]
+    ReFullmatch,
+    /// `re.finditer`
+    #[strum(serialize = "finditer")]
+    ReFinditer,
 }
 
 fn call_argument_node<'a>(
@@ -2548,6 +2564,13 @@ impl KnownFunction {
             }
             Self::NewClass => {
                 matches!(module, KnownModule::Types)
+            }
+            Self::ReCompile
+            | Self::ReSearch
+            | Self::ReMatch
+            | Self::ReFullmatch
+            | Self::ReFinditer => {
+                matches!(module, KnownModule::Re)
             }
 
             Self::TypeCheckOnly => matches!(module, KnownModule::Typing),
@@ -3233,6 +3256,11 @@ pub(crate) mod tests {
                 KnownFunction::TotalOrdering => KnownModule::Functools,
                 KnownFunction::Unpack => KnownModule::Struct,
                 KnownFunction::NewClass => KnownModule::Types,
+                KnownFunction::ReCompile
+                | KnownFunction::ReSearch
+                | KnownFunction::ReMatch
+                | KnownFunction::ReFullmatch
+                | KnownFunction::ReFinditer => KnownModule::Re,
             };
 
             if module.is_third_party() {

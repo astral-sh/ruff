@@ -4484,10 +4484,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
             (
                 formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
-                Type::KnownInstance(known_instance @ KnownInstanceType::Range { .. }),
+                Type::KnownInstance(
+                    known_instance
+                    @ (KnownInstanceType::Range { .. } | KnownInstanceType::Regex(_)),
+                ),
             ) => {
-                // `range(...)` is a known instance only to preserve its truthiness; use the
-                // ordinary `range` instance when inferring through generic nominal/protocol types.
+                // These known instances retain additional information about their values; their
+                // nominal types still provide the type arguments for generic inference.
                 return self.infer_map_impl(
                     formal,
                     known_instance.instance_fallback(db, self.env),

@@ -2079,13 +2079,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
-                KnownInstanceType::Range { .. } => {
+                instance @ (KnownInstanceType::Range { .. } | KnownInstanceType::Regex(_)) => {
                     if !self.in_string_annotation() {
                         self.infer_expression(&subscript.slice, TypeContext::default());
                     }
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
-                            "`range` instances cannot be specialized"
+                            "`{}` instances cannot be specialized",
+                            instance.class(db).name(env.python_version(db)),
                         ));
                     }
                     Type::unknown()
