@@ -1,6 +1,8 @@
 #![allow(clippy::disallowed_names)]
 use ruff_benchmark::criterion;
-use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject, TY_ECOSYSTEM_PIN};
+use ruff_benchmark::real_world_projects::{
+    InstalledProject, RealWorldProject, TY_ECOSYSTEM_PIN, check_project,
+};
 
 use std::fmt::Write;
 use std::ops::Range;
@@ -1888,13 +1890,12 @@ fn benchmark_repeated_narrowed_assignments(criterion: &mut Criterion) {
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
-    max_diagnostics: usize,
     freeze_inputs: bool,
     rules: Option<Rules>,
 }
 
 impl<'a> ProjectBenchmark<'a> {
-    fn new(project: RealWorldProject<'a>, max_diagnostics: usize) -> Self {
+    fn new(project: RealWorldProject<'a>) -> Self {
         let setup_project = project.setup().expect("Failed to setup project");
         let fs = setup_project
             .copy_to_memory_fs()
@@ -1903,7 +1904,6 @@ impl<'a> ProjectBenchmark<'a> {
         Self {
             project: setup_project,
             fs,
-            max_diagnostics,
             freeze_inputs: false,
             rules: None,
         }
@@ -1960,24 +1960,6 @@ fn bench_project_named(
     criterion: &mut Criterion,
     benchmark_name: &str,
 ) {
-    fn check_project(db: &mut ProjectDatabase, project_name: &str, max_diagnostics: usize) {
-        let result = db.check();
-        let diagnostics = result.len();
-
-        if diagnostics > max_diagnostics {
-            let details = result
-                .into_iter()
-                .map(|diagnostic| diagnostic.concise_message().to_string())
-                .collect::<Vec<_>>()
-                .join("\n  ");
-            assert!(
-                diagnostics <= max_diagnostics,
-                "{project_name}: Expected <={max_diagnostics} diagnostics \
-                but got {diagnostics}:\n  {details}",
-            );
-        }
-    }
-
     setup_rayon();
 
     let mut group = criterion.benchmark_group("project");
@@ -1985,42 +1967,36 @@ fn bench_project_named(
     group.bench_function(benchmark_name, |b| {
         b.iter_batched_ref(
             || benchmark.setup_iteration(),
-            |db| check_project(db, benchmark_name, benchmark.max_diagnostics),
+            |db| check_project(db, benchmark_name),
             BatchSize::SmallInput,
         );
     });
 }
 
 fn hydra(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(
-        RealWorldProject {
-            name: "hydra-zen",
-            repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
-            commit: "03a01096ea6a7c574fdf0b9990056506e566df2d",
-            paths: &["src", "tests/annotations"],
-            dependencies: &["pydantic", "beartype", "hydra-core"],
-            max_dep_date: TY_ECOSYSTEM_PIN,
-            python_version: SupportedPythonVersion::Py311,
-        },
-        520,
-    );
+    let benchmark = ProjectBenchmark::new(RealWorldProject {
+        name: "hydra-zen",
+        repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
+        commit: "03a01096ea6a7c574fdf0b9990056506e566df2d",
+        paths: &["src", "tests/annotations"],
+        dependencies: &["pydantic", "beartype", "hydra-core"],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    });
 
     bench_project(&benchmark, criterion);
 }
 
 fn attrs(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(
-        RealWorldProject {
-            name: "attrs",
-            repository: "https://github.com/python-attrs/attrs",
-            commit: "89fae8300f484544c1b7678cea5efe58c551fbb9",
-            paths: &["src/attrs", "src/attr", "typing-examples"],
-            dependencies: &[],
-            max_dep_date: TY_ECOSYSTEM_PIN,
-            python_version: SupportedPythonVersion::Py311,
-        },
-        104,
-    );
+    let benchmark = ProjectBenchmark::new(RealWorldProject {
+        name: "attrs",
+        repository: "https://github.com/python-attrs/attrs",
+        commit: "89fae8300f484544c1b7678cea5efe58c551fbb9",
+        paths: &["src/attrs", "src/attr", "typing-examples"],
+        dependencies: &[],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    });
 
     bench_project(&benchmark, criterion);
 
@@ -2034,7 +2010,6 @@ fn attrs(criterion: &mut Criterion) {
             RangedValue::cli("all".to_owned()),
             RangedValue::cli(Level::Error),
         )])),
-        max_diagnostics: 100,
         ..frozen_benchmark
     };
 
@@ -2042,35 +2017,29 @@ fn attrs(criterion: &mut Criterion) {
 }
 
 fn anyio(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(
-        RealWorldProject {
-            name: "anyio",
-            repository: "https://github.com/agronholm/anyio",
-            commit: "ffe91331adb912c5d150f5d373f7cd28a0e96a62",
-            paths: &["src"],
-            dependencies: &["exceptiongroup", "idna", "pytest"],
-            max_dep_date: TY_ECOSYSTEM_PIN,
-            python_version: SupportedPythonVersion::Py311,
-        },
-        110,
-    );
+    let benchmark = ProjectBenchmark::new(RealWorldProject {
+        name: "anyio",
+        repository: "https://github.com/agronholm/anyio",
+        commit: "ffe91331adb912c5d150f5d373f7cd28a0e96a62",
+        paths: &["src"],
+        dependencies: &["exceptiongroup", "idna", "pytest"],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    });
 
     bench_project(&benchmark, criterion);
 }
 
 fn datetype(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(
-        RealWorldProject {
-            name: "DateType",
-            repository: "https://github.com/glyph/DateType",
-            commit: "a6ebb954cd18302a031a29b2f65e077b8e7776d4",
-            paths: &["src"],
-            dependencies: &[],
-            max_dep_date: TY_ECOSYSTEM_PIN,
-            python_version: SupportedPythonVersion::Py311,
-        },
-        17,
-    );
+    let benchmark = ProjectBenchmark::new(RealWorldProject {
+        name: "DateType",
+        repository: "https://github.com/glyph/DateType",
+        commit: "a6ebb954cd18302a031a29b2f65e077b8e7776d4",
+        paths: &["src"],
+        dependencies: &[],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    });
 
     bench_project(&benchmark, criterion);
 }
