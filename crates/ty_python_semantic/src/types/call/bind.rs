@@ -3196,11 +3196,14 @@ impl<'db> Bindings<'db> {
                     Type::ClassLiteral(class) => match class.known(db) {
                         Some(KnownClass::Bool) => match overload.parameter_types() {
                             [Some(arg)] => {
-                                overload.set_return_type(Type::from_truthiness(
-                                    db,
-                                    env,
-                                    arg.bool(db, env),
-                                ));
+                                // Keep the constructor's declared return type when its argument
+                                // cannot produce a value. Reachability tracks non-completion.
+                                let truthiness = arg.bool(db, env);
+                                if !truthiness.is_uninhabited() {
+                                    overload.set_return_type(Type::from_truthiness(
+                                        db, env, truthiness,
+                                    ));
+                                }
                             }
                             [None] => overload.set_return_type(Type::bool_literal(false)),
                             _ => {}

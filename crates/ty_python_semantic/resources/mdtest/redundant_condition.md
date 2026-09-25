@@ -3139,6 +3139,57 @@ def conditional_branch(value: int, select: bool, enabled: bool):
         print(value)
 ```
 
+## Uninhabited operands
+
+A comparison or call cannot finish evaluating an operand of type `Never`, even if its result type is
+`bool`. Such expressions do not make an enclosing condition always true or always false.
+
+```py
+from typing import Callable, Never
+
+def comparisons(value, never: Never):
+    if value in never or value:
+        pass
+    if value != never or not value:
+        pass
+
+def calls(never: Never, flag: bool, predicate: Callable[[object], bool]):
+    if predicate(never) or (flag and never):
+        pass
+```
+
+The same applies to a call with a fixed return type, including when `not` tests its result while
+computing a value:
+
+```py
+from typing import Literal
+
+def always_true(value: object) -> Literal[True]:
+    return True
+
+def fixed_return_type(never: Never):
+    if always_true(never):
+        pass
+    negated = not always_true(never)
+```
+
+## Short-circuiting before an uninhabited operand
+
+A condition can still finish by short-circuiting before the uninhabited operand. We report its fixed
+outcome when that is the only way evaluation can finish.
+
+```py
+from typing import Never
+
+def short_circuit(never: Never, flag: bool):
+    # error: [redundant-condition-strict] "Condition `flag or bool(never)` is always true"
+    if flag or bool(never):
+        pass
+    # error: [redundant-condition-strict] "Condition `flag and bool(never)` is always false"
+    if flag and bool(never):
+        pass
+```
+
 ## Compound conditions with mixed value types
 
 Reporting a subexpression under `redundant-condition` takes precedence over reporting the complete

@@ -392,7 +392,7 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                                     break;
                                 }
                                 Some(Truthiness::AlwaysFalse) => {}
-                                Some(Truthiness::Ambiguous) | None => {
+                                Some(Truthiness::Ambiguous | Truthiness::Uninhabited) | None => {
                                     break;
                                 }
                             }
@@ -401,7 +401,7 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                         }
                     }
                 }
-                Some(Truthiness::Ambiguous) | None => {}
+                Some(Truthiness::Ambiguous | Truthiness::Uninhabited) | None => {}
             },
 
             ast::Stmt::For(..)

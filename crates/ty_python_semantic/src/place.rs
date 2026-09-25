@@ -1563,7 +1563,7 @@ impl<'db> DeclarationsBoundnessEvaluator<'_, 'db> {
                             "If we have at least one declaration, the implicit `unbound` binding should not be definitely visible"
                         )
                     }
-                    Truthiness::AlwaysFalse => Definedness::AlwaysDefined,
+                    Truthiness::AlwaysFalse | Truthiness::Uninhabited => Definedness::AlwaysDefined,
                     Truthiness::Ambiguous => Definedness::PossiblyUndefined,
                 }
             }
@@ -2041,13 +2041,15 @@ fn place_from_bindings_impl<'db>(
                         "If we have at least one binding, the implicit `unbound` binding should not be definitely visible"
                     )
                 }
-                Some(Truthiness::AlwaysFalse) | None => Definedness::AlwaysDefined,
+                Some(Truthiness::AlwaysFalse | Truthiness::Uninhabited) | None => {
+                    Definedness::AlwaysDefined
+                }
                 Some(Truthiness::Ambiguous) => Definedness::PossiblyUndefined,
             },
         };
 
         match deleted_reachability {
-            Truthiness::AlwaysFalse => Place::Defined(
+            Truthiness::AlwaysFalse | Truthiness::Uninhabited => Place::Defined(
                 DefinedPlace::new(ty)
                     .with_definedness(boundness)
                     .with_provenance(provenance),

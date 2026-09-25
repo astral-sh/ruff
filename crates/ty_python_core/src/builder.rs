@@ -2242,6 +2242,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             Some(literal) => PredicateOrLiteral::Literal(literal),
             None => PredicateOrLiteral::Predicate(Predicate {
                 node: match (context, predicate_node) {
+                    (_, node) if node.is_name_expr() || node.is_literal_expr() => {
+                        PredicateNode::TypeTruthiness(expression)
+                    }
                     (
                         ExpressionContext::Condition,
                         ast::Expr::BoolOp(_)
@@ -2392,7 +2395,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let place_table = self.current_place_table();
 
                 match pred.node {
-                    PredicateNode::Expression(expression)
+                    PredicateNode::TypeTruthiness(expression)
+                    | PredicateNode::Expression(expression)
                     | PredicateNode::Condition(expression)
                     | PredicateNode::ChainedComparisonCondition(expression) => {
                         let expression_node = expression.node_ref(self.db).node(self.module);

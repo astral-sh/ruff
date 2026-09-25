@@ -1610,6 +1610,8 @@ fn infer_tuple_rich_comparison<'db>(
                     });
 
                 match eq_truthiness {
+                    // Earlier unequal elements can still have completed the comparison.
+                    Truthiness::Uninhabited => return Ok(builder.build()),
                     // - AlwaysTrue : Continue to the next pair for lexicographic comparison
                     Truthiness::AlwaysTrue => continue,
                     // - AlwaysFalse:

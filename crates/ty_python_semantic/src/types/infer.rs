@@ -77,6 +77,8 @@ mod builder;
 mod implicit_alias;
 pub(super) use implicit_alias::implicit_alias_parameters;
 mod comparisons;
+mod expression_truthiness;
+pub(crate) use expression_truthiness::TruthinessAnalyzer;
 #[cfg(test)]
 mod tests;
 
@@ -1913,14 +1915,7 @@ fn widen_comparison_truthiness(
                 .and_then(|overrides| overrides.get(expression))
                 .copied()
                 .unwrap_or_else(|| previous_fallback(*expression));
-            (
-                *expression,
-                if truthiness == previous_truthiness {
-                    truthiness
-                } else {
-                    Truthiness::Ambiguous
-                },
-            )
+            (*expression, truthiness.union(previous_truthiness))
         })
         .collect()
 }
@@ -1963,9 +1958,9 @@ struct ExpressionInferenceExtra<'db> {
     /// `AlwaysFalse`, but its value type must still include objects returned by the first comparison.
     ///
     /// The same distinction matters for `and`/`or`, but their operands have separate expression
-    /// nodes with inferred types. [`crate::reachability::analyze_condition_expression`] can
-    /// reconstruct their condition truthiness by recursively visiting those operands, without
-    /// relying on the compound expression's value type.
+    /// nodes with inferred types. [`TruthinessAnalyzer`] can reconstruct their condition
+    /// truthiness by recursively visiting those operands, without relying on the compound
+    /// expression's value type.
     ///
     /// A comparison chain instead has one `ExprCompare` node with the operands and operators.
     /// In `x < 1 < 0`, neither `x < 1` nor `1 < 0` has its own expression node, so their result

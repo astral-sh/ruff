@@ -66,7 +66,7 @@ use ty_python_core::{Truthiness, expression::ExpressionContext, predicate::State
 use crate::{
     Db,
     lint::LintMetadata,
-    reachability::{analyze_condition_expression, is_non_terminal_call},
+    reachability::is_non_terminal_call,
     types::{
         CallableTypes, KnownClass, KnownInstanceType, Type,
         constraints::ConstraintSetBuilder,
@@ -307,12 +307,13 @@ impl BooleanTest<'_, '_> {
             }
         }
 
-        if self.truthiness.is_ambiguous() {
+        let truthiness = self.truthiness;
+        if truthiness.is_ambiguous() || truthiness.is_uninhabited() {
             return Truthiness::Ambiguous;
         }
 
-        if truthiness_from_condition(self.expression, condition) == self.truthiness {
-            self.truthiness
+        if truthiness_from_condition(self.expression, condition) == truthiness {
+            truthiness
         } else {
             Truthiness::Ambiguous
         }
@@ -435,7 +436,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return;
         }
 
-        let truthiness = self.condition_truthiness(test);
+        let truthiness = self.expression_truthiness(test, ExpressionContext::Condition);
 
         for condition in self.redundant_conditions(
             BooleanTest {
@@ -448,22 +449,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         ) {
             self.report_redundant_condition(&condition);
         }
-    }
-
-    /// Evaluates an already-inferred expression as a direct condition.
-    ///
-    /// Unlike testing a saved expression's value, this does not re-test intermediate
-    /// short-circuit results, whose truthiness may have changed.
-    fn condition_truthiness(&self, test: &ast::Expr) -> Truthiness {
-        let db = self.db();
-        let env = self.program_environment();
-        analyze_condition_expression(test, &|node| {
-            self.comparison_truthiness
-                .get(&node.into())
-                .copied()
-                .or_else(|| self.expression_type(node).bool_if_inhabited(db, env))
-        })
-        .unwrap_or(Truthiness::Ambiguous)
     }
 
     /// Check whether a `not` expression used as a value contains a redundant boolean test.
@@ -482,12 +467,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// if not ready:  # One `redundant-condition` diagnostic on `ready`.
     ///     print("unreachable")
     /// ```
-    pub(super) fn check_negation_redundancy(
-        &self,
-        unary: &ast::ExprUnaryOp,
-        operand_type: Type<'db>,
-        operand_truthiness: Truthiness,
-    ) {
+    pub(super) fn check_negation_redundancy(&self, unary: &ast::ExprUnaryOp) {
         if !self.should_check_redundant_conditions() {
             return;
         }
@@ -498,12 +478,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         for condition in self.redundant_conditions(
-            BooleanTest {
-                expression: &unary.operand,
-                value_type: operand_type,
-                truthiness: operand_truthiness,
-                evaluation: ExpressionContext::Value,
-            },
+            self.boolean_test(&unary.operand, ExpressionContext::Value),
             RedundantConditionContext::Standalone,
         ) {
             self.report_redundant_condition(&condition);
@@ -734,6 +709,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             truthiness,
             ..
         } = test;
+        if truthiness.is_uninhabited() {
+            return None;
+        }
 
         if matches!(
             expression,
@@ -845,10 +823,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         evaluation: ExpressionContext,
     ) -> BooleanTest<'expr, 'db> {
         let value_type = self.expression_type(expression);
-        let truthiness = match evaluation {
-            ExpressionContext::Condition => self.condition_truthiness(expression),
-            ExpressionContext::Value => value_type.bool(self.db(), self.program_environment()),
-        };
+        let truthiness = self.expression_truthiness(expression, evaluation);
         BooleanTest {
             expression,
             value_type,
@@ -935,11 +910,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         preference: BooleanDiagnosticPreference,
         conditions: &mut Vec<RedundantCondition<'ast, 'db>>,
     ) -> ConditionCheckResult {
-        let operand_preference = if test.truthiness.is_ambiguous() {
-            preference
-        } else {
-            BooleanDiagnosticPreference::EnclosingCondition
-        };
+        let operand_preference =
+            if test.truthiness.is_ambiguous() || test.truthiness.is_uninhabited() {
+                preference
+            } else {
+                BooleanDiagnosticPreference::EnclosingCondition
+            };
 
         let mut operand_result = ConditionCheckResult::empty();
 
@@ -1195,9 +1171,9 @@ fn suite_ends_with_exit(
         .is_some_and(|stmt| match stmt {
             ast::Stmt::Raise(_) => true,
             ast::Stmt::Break(_) | ast::Stmt::Continue(_) => kind == SuiteExitKind::Any,
-            ast::Stmt::Assert(ast::StmtAssert { test, .. }) => {
-                builder.condition_truthiness(test).may_be_false()
-            }
+            ast::Stmt::Assert(ast::StmtAssert { test, .. }) => !builder
+                .expression_truthiness(test, ExpressionContext::Condition)
+                .is_always_true(),
             ast::Stmt::Expr(ast::StmtExpr { value, .. })
                 if let Some(StatementCall { call, is_await }) =
                     StatementCall::from_expression(value) =>

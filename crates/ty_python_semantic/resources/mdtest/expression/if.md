@@ -24,6 +24,22 @@ reveal_type(1 if "" else 2)  # revealed: Literal[2]
 reveal_type(1 if 0 else 2)  # revealed: Literal[2]
 ```
 
+## Conditions with uninhabited operands
+
+Only paths that finish evaluating the condition contribute a result. A call with an uninhabited
+argument can be bypassed by short-circuiting, even when the call itself has type `bool`.
+
+```py
+from typing_extensions import Never
+
+def _(never: Never):
+    reveal_type(1 if never else 2)  # revealed: Never
+
+def _(flag: bool, never: Never):
+    reveal_type(1 if flag or bool(never) else 2)  # revealed: Literal[1]
+    reveal_type(1 if flag and bool(never) else 2)  # revealed: Literal[2]
+```
+
 ## Leaked Narrowing Constraint
 
 (issue #14588)

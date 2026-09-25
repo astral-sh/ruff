@@ -341,6 +341,8 @@ impl<'db> ContainerElementEqualityEvaluator<'db> {
         // Identity can turn a false equality result true, but cannot turn a true result false.
         Ok(match result.try_bool(db, &self.evaluator.env)? {
             Truthiness::AlwaysTrue => Truthiness::AlwaysTrue,
+            // If equality cannot return, shared identity is the only completing path.
+            Truthiness::Uninhabited => Truthiness::AlwaysTrue,
             Truthiness::AlwaysFalse | Truthiness::Ambiguous => Truthiness::Ambiguous,
         })
     }
@@ -1677,7 +1679,7 @@ fn compare_nominal_instances<'db>(
             match evaluate_container_element_equality(evaluator, left, right) {
                 Truthiness::AlwaysTrue => {}
                 Truthiness::AlwaysFalse => return operator.result_from_equality(false),
-                Truthiness::Ambiguous => all_equal = false,
+                Truthiness::Ambiguous | Truthiness::Uninhabited => all_equal = false,
             }
         }
 
