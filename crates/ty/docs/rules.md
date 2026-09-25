@@ -1229,8 +1229,8 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.84">0.0.84</a
 **What it does**
 
 
-Detects truthiness checks of optional values whose non-`None` part can also be false, in
-conditions, assertions, comprehension filters, and boolean operations.
+Detects truthiness checks of optional values whose non-`None` part can also be false, in conditions,
+assertions, comprehension filters, and boolean operations.
 
 **Why is this bad?**
 
