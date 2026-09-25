@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+assertion_line: 260
 ---
 PLR1711 [*] Useless `return` statement at end of function
  --> useless_return.py:6:5
@@ -12,7 +13,8 @@ help: Remove useless `return` statement
   |
 5 |     print(sys.version)
   -     return None  # [useless-return]
-6 |
+6 +     # [useless-return]
+7 |
   |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -26,7 +28,8 @@ help: Remove useless `return` statement
    |
 10 |     print(sys.version)
    -     return None  # [useless-return]
-11 |
+11 +     # [useless-return]
+12 |
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -40,7 +43,8 @@ help: Remove useless `return` statement
    |
 15 |     print(sys.version)
    -     return None  # [useless-return]
-16 |
+16 +     # [useless-return]
+17 |
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -54,7 +58,8 @@ help: Remove useless `return` statement
    |
 21 |         print(sys.version)
    -         return None  # [useless-return]
-22 |
+22 +         # [useless-return]
+23 |
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -68,7 +73,8 @@ help: Remove useless `return` statement
    |
 49 |     print(sys.version)
    -     return None  # [useless-return]
-50 |
+50 +     # [useless-return]
+51 |
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -82,4 +88,19 @@ help: Remove useless `return` statement
    |
 59 |         print(f"{key} not found")
    -         return None
+60 |
+   |
+
+PLR1711 [*] Useless `return` statement at end of function
+  --> useless_return.py:65:5
+   |
+63 | def preserve_trailing_comment():
+64 |     print("hello")
+65 |     return  # keep this comment
+   |     ^^^^^^
+help: Remove useless `return` statement
+   |
+64 |     print("hello")
+   -     return  # keep this comment
+65 +     # keep this comment
    |
