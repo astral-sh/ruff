@@ -801,6 +801,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (PEP8Naming, "816") => rules::pep8_naming::rules::MixedCaseVariableInGlobalScope,
         (PEP8Naming, "817") => rules::pep8_naming::rules::CamelcaseImportedAsAcronym,
         (PEP8Naming, "818") => rules::pep8_naming::rules::ErrorSuffixOnExceptionName,
+        (PEP8Naming, "998") => rules::pep8_naming::rules::NonSnakeCaseModuleName,
         (PEP8Naming, "999") => rules::pep8_naming::rules::InvalidModuleName,
 
         // isort

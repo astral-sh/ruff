@@ -1,0 +1,5 @@
+---
+source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+---
+N998 Module name `0001_Initial` should be snake_case
+--> 0001_Initial.py:1:1
