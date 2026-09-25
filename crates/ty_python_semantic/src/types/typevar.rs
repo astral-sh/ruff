@@ -1448,6 +1448,10 @@ impl<'db> BoundTypeVarInstance<'db> {
                     ))
                 }
             }
+            TypeMapping::UpcastToUnspecializedNominalInstance => self
+                .require_bound_or_constraints(db, visitor.env)
+                .as_type(db, visitor.env)
+                .apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor),
             TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)

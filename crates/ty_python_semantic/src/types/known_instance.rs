@@ -580,6 +580,10 @@ impl<'db> KnownInstanceType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance {
+            return self.class(db).to_instance(db, visitor.env);
+        }
+
         match self {
             KnownInstanceType::TypeVar(typevar) => match type_mapping {
                 TypeMapping::BindLegacyTypevars(binding_context) => {
@@ -602,6 +606,10 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::EagerExpansion
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::ApplyRecursiveSubstitution(_) => Type::KnownInstance(self),
+
+                TypeMapping::UpcastToUnspecializedNominalInstance => {
+                    unreachable!("Handled at the beginning of the function")
+                }
             },
             KnownInstanceType::UnionType(instance) => {
                 Type::KnownInstance(KnownInstanceType::UnionType(

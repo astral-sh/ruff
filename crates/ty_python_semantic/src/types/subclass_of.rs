@@ -211,8 +211,14 @@ impl<'db> SubclassOfType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        match self.subclass_of {
-            SubclassOfInner::Class(class) => Type::SubclassOf(Self {
+        match (self.subclass_of, type_mapping) {
+            (SubclassOfInner::Class(class), TypeMapping::UpcastToUnspecializedNominalInstance) => {
+                class
+                    .metaclass_instance_type(db, visitor.env)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            }
+
+            (SubclassOfInner::Class(class), _) => Type::SubclassOf(Self {
                 subclass_of: SubclassOfInner::Class(class.apply_type_mapping_impl(
                     db,
                     type_mapping,
@@ -220,17 +226,32 @@ impl<'db> SubclassOfType<'db> {
                     visitor,
                 )),
             }),
-            SubclassOfInner::Protocol(protocol) => protocol
+
+            (
+                SubclassOfInner::Protocol(_) | SubclassOfInner::Dynamic(_),
+                TypeMapping::UpcastToUnspecializedNominalInstance,
+            ) => KnownClass::Type.to_instance(db, visitor.env),
+
+            (SubclassOfInner::Protocol(protocol), _) => protocol
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 .to_meta_type(db, visitor.env),
-            SubclassOfInner::Dynamic(_) => match type_mapping {
+
+            (SubclassOfInner::Dynamic(_), _) => match type_mapping {
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => KnownClass::Type.to_instance(db, visitor.env),
                     MaterializationKind::Bottom => Type::Never,
                 },
                 _ => Type::SubclassOf(self),
             },
-            SubclassOfInner::TypeVar(typevar) => {
+
+            // `type[T]` where `T: N` and the class `N` has a metaclass `M` ->
+            //  `<instance of M>`
+            (SubclassOfInner::TypeVar(_), TypeMapping::UpcastToUnspecializedNominalInstance) => {
+                self.to_metaclass_instance(db, visitor.env)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            }
+
+            (SubclassOfInner::TypeVar(typevar), _) => {
                 let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
                 Self::try_from_instance(db, visitor.env, mapped)
                     .unwrap_or_else(|_| visitor.project_meta_type(db, mapped))

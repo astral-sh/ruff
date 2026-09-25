@@ -2839,6 +2839,19 @@ impl<'db> Type<'db> {
         )
     }
 
+    fn upcast_to_unspecialized_nominal_instance(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        self.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::UpcastToUnspecializedNominalInstance,
+            TypeContext::default(),
+        )
+    }
+
     fn has_dynamic(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         any_over_type(db, env, self, false, |ty| ty.is_dynamic())
     }
@@ -9450,6 +9463,11 @@ impl<'db> Type<'db> {
                         ))
                         .promote_impl(db, visitor.env)
                     }
+
+                    TypeMapping::UpcastToUnspecializedNominalInstance => {
+                        function.runtime_class(db).to_instance(db, visitor.env)
+                    }
+
                     _ => Type::FunctionLiteral(function.apply_type_mapping_impl(
                         db,
                         type_mapping,
@@ -9460,7 +9478,16 @@ impl<'db> Type<'db> {
             }),
 
             Type::BoundMethod(method) => {
-                Type::BoundMethod(method.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance {
+                    KnownClass::MethodType.to_instance(db, visitor.env)
+                } else {
+                    Type::BoundMethod(method.apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    ))
+                }
             }
 
             Type::NominalInstance(instance)
@@ -9493,15 +9520,43 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
 
-            Type::NewTypeInstance(newtype) => visitor.visit(db, self, type_mapping, || {
-                Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
-                    class_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                }))
-            }),
+            Type::NewTypeInstance(newtype) => {
+                if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance {
+                    newtype.concrete_base_type(db).apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    )
+                } else {
+                    visitor.visit(db, self, type_mapping, || {
+                        Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
+                            class_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                        }))
+                    })
+                }
+            }
+
+            Type::ProtocolInstance(_)
+            | Type::Callable(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+                if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance =>
+            {
+                Type::unknown()
+            }
 
             Type::ProtocolInstance(instance) => Type::ProtocolInstance(
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             ),
+
+            Type::KnownBoundMethod(method)
+                if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance =>
+            {
+                method.class().to_instance(db, visitor.env)
+            }
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
@@ -9554,34 +9609,82 @@ impl<'db> Type<'db> {
             }),
 
             Type::GenericAlias(generic) => {
-                Type::GenericAlias(generic.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance {
+                    KnownClass::GenericAlias.to_instance(db, visitor.env)
+                } else {
+                    Type::GenericAlias(generic.apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    ))
+                }
             }
 
             Type::TypedDict(typed_dict) => {
-                Type::TypedDict(typed_dict.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance {
+                    KnownClass::Dict.to_instance(db, visitor.env)
+                } else {
+                    Type::TypedDict(typed_dict.apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    ))
+                }
             }
 
             Type::SubclassOf(subclass_of) => {
                 subclass_of.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
 
-            Type::PropertyInstance(property) => Type::PropertyInstance(
-                property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            ),
+            Type::PropertyInstance(property) => {
+                if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance {
+                    KnownClass::Property.to_instance(db, visitor.env)
+                } else {
+                    Type::PropertyInstance(property.apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    ))
+                }
+            }
 
-            Type::SlotDescriptor(descriptor) => Type::SlotDescriptor(SlotDescriptorType::new(
-                db,
-                descriptor
-                    .value_type(db)
-                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            )),
+            Type::SlotDescriptor(descriptor) => {
+                if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance {
+                    KnownClass::MemberDescriptorType.to_instance(db, visitor.env)
+                } else {
+                    Type::SlotDescriptor(SlotDescriptorType::new(
+                        db,
+                        descriptor.value_type(db).apply_type_mapping_impl(
+                            db,
+                            type_mapping,
+                            tcx,
+                            visitor,
+                        ),
+                    ))
+                }
+            }
 
             Type::Union(union) => union.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             Type::Intersection(intersection) => {
                 intersection.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
             Type::EnumComplement(complement) => {
-                complement.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance {
+                    complement
+                        .enum_class(db)
+                        .to_non_generic_instance(db, visitor.env)
+                } else {
+                    complement.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                }
+            }
+
+            Type::TypeIs(_) | Type::TypeGuard(_)
+                if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance =>
+            {
+                KnownClass::Bool.to_instance(db, visitor.env)
             }
 
             Type::TypeIs(type_is) => visitor.visit(db, self, type_mapping, || {
@@ -9600,17 +9703,23 @@ impl<'db> Type<'db> {
                 )
             }),
 
-            Type::TypeForm(typeform) => visitor.visit(db, self, type_mapping, || {
-                TypeFormType::from_type_expression(
-                    db,
-                    typeform.type_argument(db).apply_type_mapping_impl(
-                        db,
-                        type_mapping,
-                        tcx,
-                        visitor,
-                    ),
-                )
-            }),
+            Type::TypeForm(typeform) => {
+                if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance {
+                    Type::unknown()
+                } else {
+                    visitor.visit(db, self, type_mapping, || {
+                        TypeFormType::from_type_expression(
+                            db,
+                            typeform.type_argument(db).apply_type_mapping_impl(
+                                db,
+                                type_mapping,
+                                tcx,
+                                visitor,
+                            ),
+                        )
+                    })
+                }
+            }
 
             Type::TypeAlias(alias) => alias.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
@@ -9631,7 +9740,8 @@ impl<'db> Type<'db> {
                     PromotionMode::On,
                     PromotionKind::ClassLiteralsOnly | PromotionKind::SingletonsOnly,
                 ) => self,
-                TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
+                TypeMapping::UpcastToUnspecializedNominalInstance
+                | TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
                     self.promote_impl(db, visitor.env)
                 }
             },
@@ -9646,6 +9756,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceSelf { .. }
                 | TypeMapping::Promote(..)
                 | TypeMapping::ReplaceParameterDefaults
+                | TypeMapping::UpcastToUnspecializedNominalInstance
                 | TypeMapping::EagerExpansion
                 | TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
@@ -9653,6 +9764,7 @@ impl<'db> Type<'db> {
                     MaterializationKind::Bottom => Type::Never,
                 },
             },
+
             // `Divergent` is an internal cycle marker rather than a gradual type like `Any` or
             // `Unknown`. Preserve the marker across materialization, while recording whether this
             // occurrence should behave like the top (`object`) or bottom (`Never`) bound.
@@ -9662,6 +9774,32 @@ impl<'db> Type<'db> {
                 }
                 _ => self,
             },
+
+            Type::ModuleLiteral(_)
+                if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance =>
+            {
+                KnownClass::ModuleType.to_instance(db, visitor.env)
+            }
+
+            Type::BoundSuper(_)
+                if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance =>
+            {
+                KnownClass::Super.to_instance(db, visitor.env)
+            }
+
+            Type::SpecialForm(form)
+                if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance =>
+            {
+                form.class(db, visitor.env).to_instance(db, visitor.env)
+            }
+
+            Type::ClassLiteral(class)
+                if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance =>
+            {
+                class
+                    .metaclass_instance_type(db, visitor.env)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            }
 
             Type::Never
             | Type::AlwaysTruthy
@@ -10934,7 +11072,9 @@ pub enum TypeMapping<'a, 'db> {
     /// Binds any `typing.Self` typevar with a particular `self` class.
     BindSelf(SelfBinding<'db>),
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
-    ReplaceSelf { new_upper_bound: Type<'db> },
+    ReplaceSelf {
+        new_upper_bound: Type<'db>,
+    },
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
@@ -10943,6 +11083,8 @@ pub enum TypeMapping<'a, 'db> {
     /// Apply eager expansion to the type.
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
+
+    UpcastToUnspecializedNominalInstance,
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
@@ -11005,6 +11147,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
+            | TypeMapping::UpcastToUnspecializedNominalInstance
             | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
@@ -11053,6 +11196,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
+            | TypeMapping::UpcastToUnspecializedNominalInstance
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }

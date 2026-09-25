@@ -1422,6 +1422,9 @@ impl<'db> Specialization<'db> {
             if type_mapping.is_structural() {
                 return ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
             }
+            if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance {
+                return Type::unknown();
+            }
             match (typevar.variance(db), type_mapping) {
                 (
                     TypeVarVariance::Invariant,

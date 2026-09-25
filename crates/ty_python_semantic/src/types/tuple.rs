@@ -304,6 +304,9 @@ impl<'db> TupleType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
+        if type_mapping == &TypeMapping::UpcastToUnspecializedNominalInstance {
+            return TupleType::homogeneous(db, visitor.env, Type::unknown());
+        }
         if type_mapping.is_structural() {
             return TupleType::new_internal(
                 db,
