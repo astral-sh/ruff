@@ -2724,5 +2724,28 @@ def probe(value: Tree[int, str]):
     reveal_type(child.value)  # revealed: str
 ```
 
+## Aliased `Self` in explicit receivers
+
+Specializing a generic class also specializes the upper bound of `Self` inside type alias arguments.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, Self, TypeVar
+
+type Identity[T] = T
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def mutate(self: Identity[Self], value: T) -> None: ...
+
+def check(box: Box[int]) -> None:
+    box.mutate(1)
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

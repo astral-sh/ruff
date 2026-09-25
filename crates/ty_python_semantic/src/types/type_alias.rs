@@ -724,7 +724,12 @@ impl<'db> TypeAliasType<'db> {
                 Type::TypeAlias(self.apply_specialization(db, |generic_context| {
                     self.specialization(db)
                         .unwrap_or_else(|| generic_context.default_specialization(db, None))
-                        .apply_specialization_impl(db, current_specialization, visitor)
+                        .apply_specialization_impl(
+                            db,
+                            current_specialization,
+                            specialization.specialize_self_domain(),
+                            visitor,
+                        )
                 }))
             }
             _ => {
