@@ -1357,27 +1357,6 @@ fn infer_binary_intersection_type_comparison<'db>(
         }
     }
 
-    // Bind rich comparison methods to the full receiver before approximating the
-    // operation on individual elements. Their return types need not be boolean,
-    // and `Self` can retain both positive and negative intersection components.
-    // Ignore `object`'s equality fallback here: an element with no custom method
-    // must not constrain another element's custom return type to `bool`.
-    let (left, right) = match intersection_on {
-        IntersectionOn::Left => (Type::Intersection(intersection), other),
-        IntersectionOn::Right => (other, Type::Intersection(intersection)),
-    };
-    if let NonIdentityOperator::Rich(rich_op) = op
-        && let Ok(result) = infer_rich_comparison(
-            context,
-            left,
-            right,
-            rich_op,
-            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-        )
-    {
-        return Ok(result);
-    }
-
     // If none of the simplifications above apply, we still need to return *some*
     // result type for the comparison 'T_inter `op` T_other' (or reversed), where
     //

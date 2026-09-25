@@ -264,10 +264,10 @@ def _(x: object):
             reveal_type(2 in x)  # revealed: bool
 ```
 
-## Rich comparisons preserve intersection receivers
+## Rich comparisons on intersection receivers
 
-Rich comparisons can return non-boolean values. A `Self` return type retains the full intersection
-receiver for both normal and reflected comparisons.
+Rich comparisons can return non-boolean values. A `Self` return type should retain the full
+intersection receiver for both normal and reflected comparisons.
 
 ```py
 from typing_extensions import Self
@@ -295,23 +295,26 @@ class C:
 class Other: ...
 
 def normal(c: Intersection[C, Other], other: object):
-    reveal_type(c < other)  # revealed: C & Other
-    reveal_type(c <= other)  # revealed: C & Other
-    reveal_type(c > other)  # revealed: C & Other
-    reveal_type(c >= other)  # revealed: C & Other
-    reveal_type(c == other)  # revealed: C & Other
-    reveal_type(c != other)  # revealed: C & Other
-    reveal_type(c < c)  # revealed: C & Other
+    # TODO: These should all be `C & Other`; comparison inference incorrectly intersects with `bool`.
+    reveal_type(c < other)  # revealed: Never
+    reveal_type(c <= other)  # revealed: Never
+    reveal_type(c > other)  # revealed: Never
+    reveal_type(c >= other)  # revealed: Never
+    reveal_type(c == other)  # revealed: Never
+    reveal_type(c != other)  # revealed: Never
+    reveal_type(c < c)  # revealed: Never
 
 def reflected(c: Intersection[C, Other], other: object):
-    reveal_type(other < c)  # revealed: C & Other
-    reveal_type(other <= c)  # revealed: C & Other
-    reveal_type(other > c)  # revealed: C & Other
-    reveal_type(other >= c)  # revealed: C & Other
-    reveal_type(other == c)  # revealed: C & Other
-    reveal_type(other != c)  # revealed: C & Other
+    # TODO: These should all be `C & Other`, just like the normal comparisons.
+    reveal_type(other < c)  # revealed: Never
+    reveal_type(other <= c)  # revealed: Never
+    reveal_type(other > c)  # revealed: Never
+    reveal_type(other >= c)  # revealed: Never
+    reveal_type(other == c)  # revealed: Never
+    reveal_type(other != c)  # revealed: Never
 
 def negative(c: C, other: object):
     if not isinstance(c, Other):
-        reveal_type(c < other)  # revealed: C & ~Other
+        # TODO: This should be `C & ~Other`.
+        reveal_type(c < other)  # revealed: Never
 ```
