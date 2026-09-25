@@ -5,13 +5,13 @@
 //! [`ModuleSearchCursor`] provides an interface that describes traversal of the components
 //! of a module name
 //!
-//! - [`ModuleSearchCursor::enter_package`] returns a search object that can be used to resolve
-//!   the descendants of a module prefix. For example `ModuleSearchCursor::enter_package("acme")`
+//! - [`ModuleSearchCursor::advance`] returns a search object that can be used to resolve
+//!   the descendants of a module prefix. For example `ModuleSearchCursor::advance("acme")`
 //!   initializes a search that can be used to resolve any submodules of `acme` (e.g., `acme.tools`,
 //!   `acme.reports`, etc.).
 //! - [`ModuleSearchCursor::resolve_child`] selects the module candidates for a particular terminal
 //!   component of a module name (e.g. `ModuleSearchCursor::resolve_child("tools")`, to resolve
-//!   `acme.tools` given a prior call to `ModuleSearchCursor::enter_package("acme")`), while leaving the
+//!   `acme.tools` given a prior call to `ModuleSearchCursor::advance("acme")`), while leaving the
 //!   search object reusable for resolving a different child with the same module name prefix.
 
 use std::borrow::Cow;
@@ -60,7 +60,7 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
         let mut components = name.components();
         let last = components.next_back()?;
         for component in components {
-            self = self.enter_package(component)?;
+            self = self.advance(component)?;
         }
         self.resolve_child(last)
     }
@@ -72,10 +72,10 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
     /// For instance, when resolving the module `acme.tools.power`, this method
     /// should be called first with "acme", and then again with "tools" on the
     /// resulting object.
-    fn enter_package(&self, component_name: &str) -> Option<Self> {
+    fn advance(&self, component_name: &str) -> Option<Self> {
         let resolver = match &self.position {
             Position::Root(paths) => PrefixResolver::new(self.context, paths, component_name)?,
-            Position::Prefix(resolver) => resolver.enter_package(self.context, component_name)?,
+            Position::Prefix(resolver) => resolver.advance(self.context, component_name)?,
         };
         Some(Self {
             context: self.context,
@@ -86,7 +86,7 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
     /// Resolves the given terminal component of a module name.
     ///
     /// For instance, when resolving the module `acme.tools.power`, this method
-    /// should be called with "power" after previous calls to [`ModuleSearchCursor::enter_package`]
+    /// should be called with "power" after previous calls to [`ModuleSearchCursor::advance`]
     /// with "acme" and "tools".
     fn resolve_child(&self, component_name: &str) -> Option<ResolvedNames<'db>> {
         match &self.position {
@@ -145,14 +145,10 @@ impl<'db> PrefixResolver<'db> {
 
     /// Returns a resolver advanced by one prefix component, retaining the candidates
     /// needed to resolve its descendants. This resolver remains reusable for siblings.
-    fn enter_package(&self, context: &ResolverContext<'db>, component_name: &str) -> Option<Self> {
+    fn advance(&self, context: &ResolverContext<'db>, component_name: &str) -> Option<Self> {
         match self {
-            Self::Typing(resolver) => resolver
-                .enter_package(context, component_name)
-                .map(Self::Typing),
-            Self::Runtime(resolver) => resolver
-                .enter_package(context, component_name)
-                .map(Self::Runtime),
+            Self::Typing(resolver) => resolver.advance(context, component_name).map(Self::Typing),
+            Self::Runtime(resolver) => resolver.advance(context, component_name).map(Self::Runtime),
         }
     }
 
@@ -221,7 +217,7 @@ struct TypingModeResolver<'db> {
     /// Candidates for the current module name prefix that should be considered
     /// for the full search.
     ///
-    /// When entering a package, we initialize this cell immediately if the parent
+    /// When advancing the search, we initialize this cell immediately if the parent
     /// prefix's cell is already initialized. We do so by advancing the parent's
     /// candidates by one component. Otherwise, we defer initialization until the
     /// stub override search cannot supply a result.
@@ -280,7 +276,7 @@ impl<'db> TypingModeResolver<'db> {
         Some(resolver)
     }
 
-    fn enter_package(&self, context: &ResolverContext<'db>, component_name: &str) -> Option<Self> {
+    fn advance(&self, context: &ResolverContext<'db>, component_name: &str) -> Option<Self> {
         let prefix = full_module_name(Some(&self.prefix), component_name)?;
         let stub_override_candidates = advance_candidates(
             context,
@@ -416,7 +412,7 @@ impl<'db> RuntimeModeResolver<'db> {
         (!candidates.is_empty()).then_some(Self { prefix, candidates })
     }
 
-    fn enter_package(&self, context: &ResolverContext<'db>, component_name: &str) -> Option<Self> {
+    fn advance(&self, context: &ResolverContext<'db>, component_name: &str) -> Option<Self> {
         let prefix = full_module_name(Some(&self.prefix), component_name)?;
         let candidates = advance_candidates(
             context,
@@ -663,7 +659,7 @@ mod tests {
         for mode in [ModuleResolveMode::Typing, ModuleResolveMode::Runtime] {
             let context = ResolverContext::new(&db, db.resolver_environment(), mode);
             let root = ModuleSearchCursor::with_configured_search_paths(&context);
-            let acme = root.enter_package("acme").expect("namespace exists");
+            let acme = root.advance("acme").expect("namespace exists");
 
             assert_resolves_to(&db, &acme, "reports", "/src/acme/reports.py");
             assert_resolves_to(&db, &acme, "tools", "/site-packages/acme/tools.py");
@@ -689,7 +685,7 @@ mod tests {
             let context =
                 ResolverContext::new(&db, db.resolver_environment(), ModuleResolveMode::Typing);
             let acme = ModuleSearchCursor::with_configured_search_paths(&context)
-                .enter_package("acme")
+                .advance("acme")
                 .expect("package has a stub override and full search candidates");
             for child in children {
                 let expected = match child {
@@ -717,14 +713,14 @@ mod tests {
         let context =
             ResolverContext::new(&db, db.resolver_environment(), ModuleResolveMode::Typing);
         let acme = ModuleSearchCursor::with_configured_search_paths(&context)
-            .enter_package("acme")
+            .advance("acme")
             .expect("parent package exists");
 
-        // Enter the nested package before and after a sibling lookup requires
+        // Advance to the nested package before and after a sibling lookup requires
         // the parent's second-phase search across all configured paths.
-        let tools_before = acme.enter_package("tools").expect("nested package exists");
+        let tools_before = acme.advance("tools").expect("nested package exists");
         assert_resolves_to(&db, &acme, "runtime", "/src/acme/runtime.py");
-        let tools_after = acme.enter_package("tools").expect("nested package exists");
+        let tools_after = acme.advance("tools").expect("nested package exists");
 
         for tools in [&tools_before, &tools_after] {
             assert_resolves_to(&db, tools, "patched", "/extra/acme/tools/patched.pyi");
