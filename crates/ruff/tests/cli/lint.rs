@@ -94,6 +94,41 @@ inline-quotes = "single"
     Ok(())
 }
 
+#[test]
+fn warns_for_unmatched_include_pattern() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "ruff.toml",
+            r#"
+include = [
+    "pysrc/**/*.py",
+    "generated/**/*.{py,pyi}",
+    "missing.py",
+    "py-src/main.py",
+]
+
+[lint]
+per-file-ignores = { "old.py" = ["F401"], "missing.py" = ["F401"] }
+"#,
+        ),
+        ("py-src/main.py", "x = 1\n"),
+        ("generated/something/file.py", "x = 2\n"),
+    ])?;
+
+    assert_cmd_snapshot!(test.check_command().arg("."), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: The following `include` patterns in `[TMP]/ruff.toml` did not match any files: missing.py, pysrc/**/*.py
+    warning: The following `lint.per-file-ignores` patterns in `[TMP]/ruff.toml` did not match any files: missing.py, old.py
+    "#);
+
+    Ok(())
+}
+
 /// Tests that configurations from the top-level and `lint` section are merged together.
 #[test]
 fn mixed_levels() -> Result<()> {
