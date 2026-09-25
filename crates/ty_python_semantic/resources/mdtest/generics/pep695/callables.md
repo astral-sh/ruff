@@ -454,7 +454,11 @@ class E: ...
 
 def consume(value: A | B | C | D | E) -> None: ...
 
-reveal_type(infer_from_consumer(consume))  # revealed: A | B | C | D | E
+result = infer_from_consumer(consume)
+reveal_type(result)  # revealed: A | B | C | D | E
+
+# TODO: An outer generic call should preserve the inferred union.
+reveal_type(infer_from_consumer(consume))  # revealed: A
 ```
 
 The same union remains precise when it is defined through nested type aliases:
@@ -466,7 +470,11 @@ type Options = FirstTwo | NextTwo | E
 
 def consume_alias(value: Options) -> None: ...
 
-reveal_type(infer_from_consumer(consume_alias))  # revealed: A | B | C | D | E
+result = infer_from_consumer(consume_alias)
+reveal_type(result)  # revealed: A | B | C | D | E
+
+# TODO: An outer generic call should preserve the inferred union.
+reveal_type(infer_from_consumer(consume_alias))  # revealed: A
 ```
 
 ## Overlapping inferred union upper bounds with few surviving alternatives
@@ -510,7 +518,11 @@ class H: ...
 def consume_left(value: A | B | C | D | E) -> None: ...
 def consume_right(value: A | B | F | G | H) -> None: ...
 
-reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: A | B
+result = infer_from_consumers(consume_left, consume_right)
+reveal_type(result)  # revealed: A | B
+
+# TODO: An outer generic call should preserve the inferred union.
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: A
 ```
 
 Aliases for these unions also preserve the precise intersection in either argument order:
@@ -522,8 +534,14 @@ type Right = A | B | F | G | H
 def consume_left_alias(value: Left) -> None: ...
 def consume_right_alias(value: Right) -> None: ...
 
-reveal_type(infer_from_consumers(consume_left_alias, consume_right_alias))  # revealed: A | B
-reveal_type(infer_from_consumers(consume_right_alias, consume_left_alias))  # revealed: A | B
+left_result = infer_from_consumers(consume_left_alias, consume_right_alias)
+reveal_type(left_result)  # revealed: A | B
+right_result = infer_from_consumers(consume_right_alias, consume_left_alias)
+reveal_type(right_result)  # revealed: A | B
+
+# TODO: An outer generic call should preserve the inferred union.
+reveal_type(infer_from_consumers(consume_left_alias, consume_right_alias))  # revealed: A
+reveal_type(infer_from_consumers(consume_right_alias, consume_left_alias))  # revealed: A
 ```
 
 ## Intersecting aliased upper bounds exceeding the solution budget
@@ -986,17 +1004,17 @@ class A: ...
 
 def callback(value: A | Any) -> None: ...
 
-reveal_type(infer(callback))  # revealed: A | Any
+result = infer(callback)
+reveal_type(result)  # revealed: A | Any
+
+# TODO: An outer generic call should preserve the gradual alternative.
+reveal_type(infer(callback))  # revealed: A
 ```
 
 ## Overloaded callable as generic `Callable` argument
 
-An overloaded callable should be assignable to a non-overloaded callable type when the overload set
-as a whole is compatible with the target callable.
-
-The type variable should be inferred from the first matching overload, rather than unioning
-parameter types across all overloads (which would create an unsatisfiable expected type for
-contravariant type variables).
+An overloaded callable can supply multiple valid specializations for a generic `Callable` parameter.
+Without a return context, we currently combine the inferred parameter types from those alternatives.
 
 ```py
 from typing import Callable, overload
@@ -1011,7 +1029,11 @@ def f(val: bytes) -> None: ...
 def f(val: str | bytes) -> None:
     pass
 
-reveal_type(accepts_callable(f))  # revealed: str | bytes
+result = accepts_callable(f)
+reveal_type(result)  # revealed: str | bytes
+
+# TODO: An outer generic call should preserve the inferred union.
+reveal_type(accepts_callable(f))  # revealed: str
 ```
 
 When overloads exchange their input and output types, the inferred return tuple currently contains a
@@ -1359,4 +1381,73 @@ def make_growing[T](value: Growing[T]) -> Callable[[T], T]:
 callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
+```
+
+## Contradictory bounds from a callback
+
+A callback's parameter and return types can impose incompatible bounds on the same type variable. We
+reject the argument even when inference cannot produce a specialization, with or without a declared
+return context.
+
+```py
+from typing import Any, Callable, overload
+
+def f[T](callback: Callable[[T], T]) -> list[T]:
+    raise NotImplementedError
+
+def incompatible(value: int) -> str:
+    return str(value)
+
+f(incompatible)  # error: [invalid-argument-type]
+result: list[int] = f(incompatible)  # error: [invalid-argument-type]
+
+def compatible(value: int) -> int:
+    return value
+
+def gradual(value: Any) -> Any:
+    return value
+
+valid: list[int] = f(compatible)
+dynamic: list[int] = f(gradual)
+```
+
+Overloads do not resolve the contradiction when every alternative has incompatible parameter and
+return types.
+
+```py
+@overload
+def crossed(value: int) -> str: ...
+@overload
+def crossed(value: str) -> int: ...
+def crossed(value: int | str) -> int | str:
+    raise NotImplementedError
+
+f(crossed)  # error: [invalid-argument-type]
+overloaded: list[int] = f(crossed)  # error: [invalid-argument-type]
+```
+
+The same contradiction is diagnosed for generic constructors. A declared specialization can make the
+diagnostic more precise, but cannot make the callback compatible.
+
+```py
+from typing import Self
+
+class Init[T]:
+    def __init__(self, callback: Callable[[T], T]) -> None: ...
+
+class New[T]:
+    def __new__(cls, callback: Callable[[T], T]) -> Self:
+        return super().__new__(cls)
+
+Init(incompatible)  # error: [invalid-argument-type]
+# error: [invalid-argument-type] "Expected `(int, /) -> int`"
+invalid_init: Init[int] = Init(incompatible)
+New(incompatible)  # error: [invalid-argument-type]
+# error: [invalid-argument-type] "Expected `(int, /) -> int`"
+invalid_new: New[int] = New(incompatible)
+
+reveal_type(Init(compatible))  # revealed: Init[int]
+valid_init: Init[int] = Init(compatible)
+reveal_type(New(compatible))  # revealed: New[int]
+valid_new: New[int] = New(compatible)
 ```

@@ -63,6 +63,11 @@ impl<'db> CallArgumentTypes<'db> {
         }
     }
 
+    /// Returns the type inferred without parameter type context. An outer context may still apply.
+    pub(crate) fn get_without_context(&self) -> Option<Type<'db>> {
+        self.fallback_type
+    }
+
     /// Returns the most appropriate type of this argument when there is no specific declared type.
     pub(crate) fn get_default(&self) -> Option<Type<'db>> {
         // If this type was inferred against exactly one declared type, or was inferred against

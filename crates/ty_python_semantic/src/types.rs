@@ -38,8 +38,8 @@ pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
-    InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
-    infer_definition_types, infer_expression_type, infer_expression_types,
+    InferredDeclaration, TypeContext, TypeContextKind, infer_complete_scope_types,
+    infer_deferred_types, infer_definition_types, infer_expression_type, infer_expression_types,
     infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
 };
 use self::infer::{
@@ -505,6 +505,9 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     bottom_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     top_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     bottom_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    contextual_specialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    contravariant_contextual_specialization:
+        OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
@@ -521,6 +524,8 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             bottom_materialization: OnceCell::default(),
             top_specialization_materialization: OnceCell::default(),
             bottom_specialization_materialization: OnceCell::default(),
+            contextual_specialization: OnceCell::default(),
+            contravariant_contextual_specialization: OnceCell::default(),
             promotion: OnceCell::default(),
             skip_promotion: OnceCell::default(),
             materialization_equivalence: OnceCell::default(),
@@ -562,6 +567,14 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
                 materialization_kind: MaterializationKind::Bottom,
                 ..
             } => &self.bottom_specialization_materialization,
+            TypeMapping::ApplySpecializationForTypeContext {
+                promotion_mode: PromotionMode::On,
+                ..
+            } => &self.contextual_specialization,
+            TypeMapping::ApplySpecializationForTypeContext {
+                promotion_mode: PromotionMode::Off,
+                ..
+            } => &self.contravariant_contextual_specialization,
             TypeMapping::Promote(PromotionMode::On, _) => &self.promotion,
             TypeMapping::Promote(PromotionMode::Off, _) => &self.skip_promotion,
             _ => &self.default,
@@ -3538,6 +3551,26 @@ impl<'db> Type<'db> {
             db,
             env,
             &TypeMapping::Promote(PromotionMode::On, PromotionKind::ClassLiteralsOnly),
+            TypeContext::default(),
+        )
+    }
+
+    /// Expose inferred generic class specializations as callable type context.
+    ///
+    /// A class value such as `list[str]` can be inferred from a `Callable[[], list[str]]` context.
+    /// Its constructor signature preserves that information when inferring arguments again.
+    /// This projection is only for inferred context: an explicit `type[list[str]]` annotation
+    /// does not implicitly specialize a bare `list` value.
+    fn promote_generic_class_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mode: PromotionMode,
+    ) -> Type<'db> {
+        self.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::Promote(mode, PromotionKind::GenericClassCallablesOnly),
             TypeContext::default(),
         )
     }
@@ -9134,6 +9167,26 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Specialize a parameter for contextual argument inference, exposing inferred class values
+    /// as constructor callables only in covariant positions. Explicit class annotations are left
+    /// unchanged, as are class-valued callback parameters in contravariant positions.
+    fn apply_specialization_for_type_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Specialization<'db>,
+    ) -> Type<'db> {
+        self.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::ApplySpecializationForTypeContext {
+                specialization: ApplySpecialization::specialization(specialization),
+                promotion_mode: PromotionMode::On,
+            },
+            TypeContext::default(),
+        )
+    }
+
     /// Projects a member from its generic owner, applying the owner's specialization to both
     /// ordinary occurrences and the domain of any retained synthetic `Self` variable.
     ///
@@ -9323,8 +9376,8 @@ impl<'db> Type<'db> {
 
         // Expand union-valued `ParamSpec`s before specializing a given callable.
         if let TypeMapping::ApplySpecialization(specialization)
-        | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
-            type_mapping
+        | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
+        | TypeMapping::ApplySpecializationForTypeContext { specialization, .. } = type_mapping
         {
             let function_signatures = |function: FunctionType<'db>| {
                 if specialization.preserves_lazy_signatures() {
@@ -9407,6 +9460,13 @@ impl<'db> Type<'db> {
                             } => TypeMapping::ApplySpecializationWithMaterialization {
                                 specialization,
                                 materialization_kind: *materialization_kind,
+                            },
+                            TypeMapping::ApplySpecializationForTypeContext {
+                                promotion_mode,
+                                ..
+                            } => TypeMapping::ApplySpecializationForTypeContext {
+                                specialization,
+                                promotion_mode: *promotion_mode,
                             },
                             _ => TypeMapping::ApplySpecialization(specialization),
                         };
@@ -9553,6 +9613,22 @@ impl<'db> Type<'db> {
                 Type::Callable(callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }),
 
+            Type::GenericAlias(generic)
+                if matches!(
+                    type_mapping,
+                    TypeMapping::Promote(
+                        PromotionMode::On,
+                        PromotionKind::GenericClassCallablesOnly,
+                    )
+                ) =>
+            {
+                // The constructor may refer to this class again. Do not recursively project the
+                // newly produced signature.
+                ClassType::Generic(generic)
+                    .into_callable(db)
+                    .to_type(db, visitor.env)
+            }
+
             Type::GenericAlias(generic) => {
                 Type::GenericAlias(generic.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
@@ -9618,6 +9694,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::ApplyRecursiveSubstitution(_)
+                | TypeMapping::ApplySpecializationForTypeContext { .. }
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf { .. }
@@ -9629,7 +9706,9 @@ impl<'db> Type<'db> {
                 | TypeMapping::Promote(PromotionMode::Off, _)
                 | TypeMapping::Promote(
                     PromotionMode::On,
-                    PromotionKind::ClassLiteralsOnly | PromotionKind::SingletonsOnly,
+                    PromotionKind::ClassLiteralsOnly
+                    | PromotionKind::GenericClassCallablesOnly
+                    | PromotionKind::SingletonsOnly,
                 ) => self,
                 TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
                     self.promote_impl(db, visitor.env)
@@ -9640,6 +9719,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::ApplyRecursiveSubstitution(_)
+                | TypeMapping::ApplySpecializationForTypeContext { .. }
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf(..)
@@ -10800,6 +10880,8 @@ pub enum PromotionKind {
     Regular,
     /// Promote class literals recursively without promoting other literal types.
     ClassLiteralsOnly,
+    /// Expose specialized generic class values as callables for inferred type context.
+    GenericClassCallablesOnly,
     /// Singleton-only promotion recursively descends through nominal instances
     /// without recursing into unions or non-nominal types.
     SingletonsOnly,
@@ -10920,6 +11002,12 @@ pub enum TypeMapping<'a, 'db> {
     },
     /// A structural substitution constructed only by the recursive-type binder.
     ApplyRecursiveSubstitution(RecursiveMapping<'db>),
+    /// Applies a specialization for contextual inference, projecting substituted class values
+    /// to constructor callables in covariant positions without changing explicit annotations.
+    ApplySpecializationForTypeContext {
+        specialization: ApplySpecialization<'a, 'db>,
+        promotion_mode: PromotionMode,
+    },
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode, PromotionKind),
@@ -10968,7 +11056,8 @@ impl<'db> TypeMapping<'_, 'db> {
                 }),
             ),
             TypeMapping::ApplySpecialization(specialization)
-            | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } => {
+            | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
+            | TypeMapping::ApplySpecializationForTypeContext { specialization, .. } => {
                 // Filter out type variables that are already specialized
                 // (i.e., mapped to a non-TypeVar type)
                 let kept = context.variables(db).filter(|bound_typevar| {
@@ -11043,6 +11132,13 @@ impl<'db> TypeMapping<'_, 'db> {
             } => TypeMapping::ApplySpecializationWithMaterialization {
                 specialization: *specialization,
                 materialization_kind: materialization_kind.flip(),
+            },
+            TypeMapping::ApplySpecializationForTypeContext {
+                specialization,
+                promotion_mode,
+            } => TypeMapping::ApplySpecializationForTypeContext {
+                specialization: *specialization,
+                promotion_mode: promotion_mode.flip(),
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)

@@ -519,6 +519,42 @@ class NameAttribute[T: (object, str)]:
 attribute: NameAttribute[str] = NameAttribute("Alice")
 ```
 
+### Gradual constructor context resolves incompatible static bounds
+
+A callback from `str` to `int` cannot choose one static type for both positions. A declared `Any`
+specialization accepts the callback, just as an explicitly specialized constructor does. Static
+contexts that disagree with either position still produce an argument error.
+
+```py
+from typing import Any, Callable
+
+class Setting[T]:
+    def __init__(self, callback: Callable[[T], T]) -> None:
+        self.callback = callback
+
+def parse(value: str) -> int:
+    return len(value)
+
+setting: Setting[Any] = Setting(parse)
+reveal_type(setting)  # revealed: Setting[Any]
+Setting[Any](parse)
+
+wrong_input: Setting[int] = Setting(parse)  # error: [invalid-argument-type]
+wrong_output: Setting[str] = Setting(parse)  # error: [invalid-argument-type]
+Setting(parse)  # error: [invalid-argument-type]
+```
+
+Recovering one type variable from context does not solve an unrelated type variable. The second
+callback still has incompatible static bounds and must not silently receive `Unknown`.
+
+```py
+class Pair[T]:
+    def __init__[U](self, first: Callable[[T], T], second: Callable[[U], U]) -> None:
+        self.first = first
+
+pair: Pair[Any] = Pair(parse, parse)  # error: [invalid-argument-type]
+```
+
 ### Constructing the class from its own type variable
 
 A constructor call inside a generic class can use a value whose type is one of the class's type
@@ -785,6 +821,58 @@ def calls(c_str: C[str], c_int: C[int]) -> None:
 
     # error: [invalid-argument-type]
     C[int].__init__(c_str, 1)
+```
+
+### Independent type variables in `__new__`
+
+Each argument supplies evidence for its own method type variable. The implicit `cls` receiver does
+not couple those variables when the return type combines them into a generic specialization. The
+recursive union exercises inference with multiple bounds for every variable.
+
+```pyi
+from typing import Iterable, Iterator, Protocol, Sequence, assert_type
+
+class Hashable(Protocol):
+    def __hash__(self) -> int: ...
+
+type Label = Hashable | tuple[Label, ...]
+
+class Product[T]:
+    def __new__[A, B, C, D, E, F, G](
+        cls,
+        a: Iterable[A],
+        b: Iterable[B],
+        c: Iterable[C],
+        d: Iterable[D],
+        e: Iterable[E],
+        f: Iterable[F],
+        g: Iterable[G],
+    ) -> Product[tuple[A, B, C, D, E, F, G]]: ...
+    def __iter__(self) -> Iterator[T]: ...
+
+def _(values: Sequence[Label]) -> None:
+    result = list(Product(values, values, values, values, values, values, values))
+    assert_type(result, list[tuple[Label, Label, Label, Label, Label, Label, Label]])
+```
+
+### Enclosing `Self` in constructor arguments
+
+An explicit `Self` type argument belongs to the enclosing method, not the constructor's implicit
+receiver. Binding the receiver preserves that type argument and still rejects an incompatible
+return.
+
+```pyi
+from typing import Self
+
+class Box[T, U]:
+    def __new__(cls, value: T, receiver: U) -> Box[T, U]: ...
+    def wrap(self, value: T) -> Box[T, Self]:
+        result = Box[T, Self](value, self)
+        reveal_type(result)  # revealed: Box[T@Box, Self@wrap]
+        return result
+
+    def wrong_wrap(self, value: T) -> Box[T, T]:
+        return Box[T, Self](value, self)  # error: [invalid-return-type]
 ```
 
 ### Generic class inherits `__init__` from generic base class
@@ -1094,6 +1182,39 @@ reveal_type(generic_context(into_regular_callable(D)))
 reveal_type(D("string"))  # revealed: D[str, Literal["string"]]
 reveal_type(D(1))  # revealed: D[str, Literal[1]]
 reveal_type(D(1, "string"))  # revealed: D[Literal[1], Literal["string"]]
+```
+
+### Gradual tuple specializations from `__init__`
+
+A constructor's explicit `self` annotation determines the result's specialization. A gradual tuple
+satisfies a nonempty tuple bound without adding the bound as an intersection to the result.
+
+```py
+from typing import Any
+
+class Box[Shape: tuple[int, *tuple[int, ...]]]:
+    def __init__(self: "Box[tuple[Any, ...]]") -> None: ...
+
+reveal_type(Box())  # revealed: Box[tuple[Any, ...]]
+```
+
+### Gradual tuple arguments to overloaded constructors
+
+A gradual tuple can satisfy either constructor signature below. The first overload remains eligible:
+an unknown tuple length does not justify skipping it in favor of the one-element specialization.
+
+```py
+from typing import Any, overload
+
+class Box[Shape: tuple[int, *tuple[int, ...]]]:
+    @overload
+    def __init__(self: "Box[tuple[Any, ...]]", value: tuple[object, object]) -> None: ...
+    @overload
+    def __init__(self: "Box[tuple[int]]", value: tuple[int]) -> None: ...
+    def __init__(self, value) -> None: ...
+
+def check(value: tuple[Any, ...]) -> None:
+    reveal_type(Box(value))  # revealed: Box[tuple[Any, ...]]
 ```
 
 ### Synthesized methods with dataclasses
@@ -2188,6 +2309,40 @@ def probe(value: Tree[int, str]):
     child = FirstChild(value)
     reveal_type(child)  # revealed: FirstChild[str]
     reveal_type(child.value)  # revealed: str
+```
+
+## Class types specialized with gradual protocols
+
+Specializing `type[T]` with a protocol intersection preserves structural compatibility. A class need
+not inherit from the protocol to satisfy the specialized annotation.
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Intersection
+
+class SupportsInt(Protocol):
+    def __int__(self) -> int: ...
+
+class Box[T]:
+    cls: type[T]
+
+def _(box: Box[Intersection[SupportsInt, Any]]):
+    box.cls = int
+    box.cls = str  # error: [invalid-assignment]
+```
+
+The same intersection can be inferred from a gradual return context and a callback parameter:
+
+```py
+from collections.abc import Callable
+
+class Converter[T]:
+    def __init__(self, cls: type[T], convert: Callable[[T], object]): ...
+
+def convert(value: SupportsInt) -> object: ...
+
+x1 = Converter(int, convert)
+x2: Converter[Any] = Converter(int, convert)
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

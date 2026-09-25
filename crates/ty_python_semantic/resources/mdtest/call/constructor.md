@@ -603,6 +603,46 @@ class Simple:
 reveal_type(Simple())  # revealed: Simple
 ```
 
+## Binding `Self` in implicit constructor receivers
+
+An implicit `cls` binds `Self` to the class being constructed, including when a subclass inherits
+`__new__`. Other parameters and nested return annotations use that same binding.
+
+```pyi
+from typing_extensions import Self
+
+class Base:
+    def __new__(cls, other: Self | None = None) -> Self: ...
+
+class Child(Base): ...
+
+reveal_type(Base())  # revealed: Base
+reveal_type(Child())  # revealed: Child
+reveal_type(Child(Child()))  # revealed: Child
+
+class Wrapped:
+    def __new__(cls) -> tuple[Self]: ...
+
+class WrappedChild(Wrapped): ...
+
+reveal_type(Wrapped())  # revealed: tuple[Wrapped]
+reveal_type(WrappedChild())  # revealed: tuple[WrappedChild]
+```
+
+Explicit receiver annotations still constrain the class passed to `__new__`.
+
+```pyi
+class Restricted:
+    def __new__(cls: type[Allowed]) -> Restricted: ...
+
+class Allowed(Restricted): ...
+
+reveal_type(Allowed())  # revealed: Restricted
+
+# error: [invalid-argument-type]
+Restricted()
+```
+
 ## `__new__` defined as a classmethod
 
 Marking it as a classmethod, on the other hand, breaks at runtime.

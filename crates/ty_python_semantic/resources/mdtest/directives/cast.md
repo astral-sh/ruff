@@ -223,6 +223,100 @@ def make_item_with_error(name: str) -> Item:
     )
 ```
 
+## Type context for the value
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Without an outer type context, the value passed to `cast` is inferred without type context. The
+`Any` parameter of `cast` does not make a nested generic call return `Any`: otherwise, the cast
+could incorrectly appear redundant.
+
+```py
+from collections.abc import Iterable
+from typing import Any, TypeVar, cast
+
+def first[T](values: Iterable[T]) -> T:
+    return next(iter(values))
+
+T = TypeVar("T")
+
+def first_legacy(values: Iterable[T]) -> T:
+    return next(iter(values))
+
+def _(values: list[int], gradual: list[int | Any]):
+    reveal_type(first(values))  # revealed: int
+    value = cast(Any, first(values))
+    reveal_type(value)  # revealed: Any
+    legacy_value = cast(Any, first_legacy(values))
+    reveal_type(legacy_value)  # revealed: Any
+    gradual_value = cast(Any, next(iter(gradual)))
+    reveal_type(gradual_value)  # revealed: Any
+
+    cast(int, first(values))  # error: [redundant-cast]
+    cast(int, first_legacy(values))  # error: [redundant-cast]
+```
+
+An explicit outer annotation can still supply context for the nested generic call:
+
+```py
+def _(values: list[int]):
+    value: Any = cast(Any, first(values))  # error: [redundant-cast]
+```
+
+Aliases and keyword arguments also avoid using the cast's parameter type as context:
+
+```py
+import typing
+from typing_extensions import cast as extension_cast
+
+alias = cast
+
+def _(values: list[int]):
+    value = typing.cast(Any, first(values))
+    reveal_type(value)  # revealed: Any
+    extension_value = extension_cast(Any, first(values))
+    reveal_type(extension_value)  # revealed: Any
+    alias_value = alias(val=first(values), typ=Any)
+    reveal_type(alias_value)  # revealed: Any
+```
+
+Missing inference evidence remains `Unknown`, even when the cast targets `object`. A value already
+typed as `Any`, on the other hand, can make a cast redundant.
+
+```py
+from ty_extensions._internal import Unknown
+
+def make[T]() -> T:
+    raise NotImplementedError
+
+def _(unknown: Unknown, any_value: Any):
+    reveal_type(make())  # revealed: Unknown
+    value = cast(Any, make())
+    reveal_type(value)  # revealed: Any
+    object_value = cast(object, make())
+    reveal_type(object_value)  # revealed: object
+    cast(Any, unknown)
+    cast(Any, any_value)  # error: [redundant-cast]
+```
+
+When the callee is a union, another callable's parameter annotation can provide context for its own
+argument check. The `cast` binding still uses the value inferred without context.
+
+```py
+def other(typ: object, val: Any) -> Any:
+    return val
+
+def _(condition: bool, values: list[int]):
+    f = cast if condition else other
+    f(Any, first(values))
+
+    g = other if condition else cast
+    g(Any, first(values))
+```
+
 ## Redundant casts of tuple classes with unknown elements
 
 A tuple class with an `Unknown` element is not fully static, even when its other element is `object`

@@ -36,10 +36,11 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, RecursiveType, SubclassOfInner, Type, TypeAliasType,
-    TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    UnionAccumulator, UnionType, binding_type, infer_definition_types, inferred_declaration,
+    ClassLiteral, DynamicType, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType,
+    KnownClass, KnownInstanceType, MaterializationKind, PromotionKind, RecursiveType,
+    SubclassOfInner, Type, TypeAliasType, TypeContext, TypeContextKind, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
+    binding_type, infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -1420,6 +1421,24 @@ impl<'db> Specialization<'db> {
             }
             match (typevar.variance(db), type_mapping) {
                 (
+                    TypeVarVariance::Invariant | TypeVarVariance::Bivariant,
+                    TypeMapping::ApplySpecializationForTypeContext { specialization, .. },
+                ) => {
+                    // Class values must retain their nominal identity in invariant positions.
+                    // Disable contextual projection throughout the argument, rather than merely
+                    // flipping its mode and allowing nested positions to re-enable it.
+                    ty.apply_type_mapping_impl(
+                        db,
+                        &TypeMapping::ApplySpecialization(*specialization),
+                        tcx,
+                        visitor,
+                    )
+                }
+                (
+                    TypeVarVariance::Invariant | TypeVarVariance::Bivariant,
+                    TypeMapping::Promote(_, PromotionKind::GenericClassCallablesOnly),
+                ) => ty,
+                (
                     TypeVarVariance::Invariant,
                     TypeMapping::ApplySpecializationWithMaterialization {
                         specialization,
@@ -2545,6 +2564,49 @@ pub(crate) struct TypeVarInference<'db> {
 impl get_size2::GetSize for TypeVarInference<'_> {}
 
 impl<'db> TypeVarInference<'db> {
+    /// Prefer a declared candidate when the inferred candidate is assignable to it.
+    ///
+    /// This preserves a constructor's context-derived specialization when argument inference
+    /// fails only because the argument requires a narrower type. Other candidate pairs continue
+    /// to use the inferred type so that the assignment receives the diagnostic.
+    pub(crate) fn prefer_assignable_declared_candidates(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        declared: Self,
+    ) -> Self {
+        let generic_context = self.generic_context(db);
+        if generic_context != declared.generic_context(db) {
+            return self;
+        }
+
+        let types: Box<[Option<Type<'db>>]> = self
+            .merged_types(db)
+            .iter()
+            .copied()
+            .zip(declared.merged_types(db).iter().copied())
+            .map(|(inferred, declared)| match (inferred, declared) {
+                (Some(inferred), Some(declared)) => {
+                    Some(if inferred.is_assignable_to(db, env, declared) {
+                        declared
+                    } else {
+                        inferred
+                    })
+                }
+                (inferred, None) => inferred,
+                (None, declared) => declared,
+            })
+            .collect();
+        // These candidates are selected independently after the combined constraints failed.
+        // Their merged mapping is useful for diagnostics, but is not a correlated solution.
+        Self::new(
+            db,
+            generic_context,
+            types,
+            TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::Unsatisfiable),
+        )
+    }
+
     /// Merge the alternatives into one closed specialization, discarding their correlations and
     /// completeness. Compatibility and diagnostic results use their recovery mapping.
     pub(crate) fn merged_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
@@ -2591,6 +2653,82 @@ impl<'db> TypeVarInference<'db> {
             .map(|(typevar, inferred)| choose(typevar, inferred).or(inferred));
 
         self.generic_context(db).specialize_recursive(db, types)
+    }
+
+    /// Substitute recovered bindings without filling missing or cyclic bindings with defaults.
+    ///
+    /// Argument checking must distinguish a recovered `Any` from an unsolved variable that would
+    /// default to `Unknown`: only the former can resolve otherwise incompatible static bounds.
+    pub(crate) fn recovery_specialization(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Specialization<'db> {
+        let generic_context = self.generic_context(db);
+        let bindings: Vec<_> = generic_context
+            .variables(db)
+            .zip(self.merged_types(db))
+            .map(|(bound_typevar, ty)| TypeVarSolution {
+                bound_typevar,
+                solution: ty.unwrap_or(Type::TypeVar(bound_typevar)),
+            })
+            .collect();
+        let resolved = resolve_solution(db, env, generic_context.inferable_typevars(db), &bindings);
+        let types: Vec<_> = generic_context
+            .variables(db)
+            .zip(resolved)
+            .map(|(typevar, solution)| match solution {
+                SolutionType::Resolved(ty) => ty,
+                SolutionType::Unresolved(_) => Type::TypeVar(typevar),
+            })
+            .collect();
+        generic_context.specialize(db, types)
+    }
+
+    /// Select a complete alternative when merging the solutions would violate the return context.
+    /// Returns `None` if no retained solution satisfies the context.
+    pub(crate) fn select_return_context_solution(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        return_ty: Type<'db>,
+        expected: Type<'db>,
+    ) -> Option<Self> {
+        if return_ty
+            .apply_specialization(db, self.merged_specialization(db))
+            .is_assignable_to(db, env, expected)
+        {
+            return Some(self);
+        }
+
+        let TypeVarInferenceSolutions::Alternatives(solutions) = self.solutions(db) else {
+            return None;
+        };
+
+        // For `list[T]` under `list[int | str] | list[int | None]`, either specialization is valid,
+        // but merging them produces `list[int | str | None]`. Keep all variables from one path.
+        let generic_context = self.generic_context(db);
+        let solution = solutions.iter().find_map(|solution| {
+            let types: Box<[Option<Type<'db>>]> = solution
+                .iter()
+                .map(|ty| match ty {
+                    Some(SolutionType::Resolved(ty)) => Some(Some(*ty)),
+                    Some(SolutionType::Unresolved(_)) => None,
+                    None => Some(None),
+                })
+                .collect::<Option<_>>()?;
+            let specialization = generic_context.specialize_recursive(db, types.iter().copied());
+            return_ty
+                .apply_specialization(db, specialization)
+                .is_assignable_to(db, env, expected)
+                .then_some(types)
+        })?;
+        Some(Self::new(
+            db,
+            generic_context,
+            solution,
+            TypeVarInferenceSolutions::Single,
+        ))
     }
 }
 
@@ -2789,6 +2927,27 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         self.infer_from_constraint_set(set)
     }
 
+    /// Conjoin expected-type constraints with the pending inference constraints.
+    pub(crate) fn intersect_context_constraints(
+        &mut self,
+        constraints: ConstraintSet<'db, 'c>,
+        kind: TypeContextKind,
+    ) {
+        if constraints.is_always_satisfied(self.db, self.env) {
+            return;
+        }
+        let constraints = match kind {
+            TypeContextKind::Declared => {
+                constraints.with_declared_evidence(self.db, self.env, self.constraints)
+            }
+            TypeContextKind::Validity => {
+                constraints.with_validity_bounds(self.db, self.env, self.constraints)
+            }
+        };
+        self.pending
+            .intersect(self.db, self.constraints, constraints);
+    }
+
     /// Build a merged specialization, using a caller-provided hook to select the solution for
     /// each typevar. This compatibility API discards correlations and solving completeness.
     ///
@@ -2967,22 +3126,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let db = self.db;
         let mut specialization_errors = Vec::new();
         let inference = self.solve_pending_projection(choose, |builder, choose| {
-            let solutions = builder.pending.solutions_with(
+            let solutions = builder.pending.solutions_with_path(
                 db,
                 builder.env,
                 builder.inferable,
                 budget,
-                |_variance, path_bound| {
-                    choose(path_bound.bound_typevar, Some(path_bound)).unwrap_or_else(|| {
-                        CandidateSolutions::default_solve(
-                            db,
-                            builder.env,
-                            builder.constraints,
-                            builder.inferable,
-                            path_bound,
-                        )
-                    })
-                },
+                |path, _variance, bounds| builder.solve_path_bound(path, bounds, choose),
             )?;
             Ok(match solutions {
                 Solutions::Unsatisfiable(solutions) => {
@@ -3030,6 +3179,127 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         .map_err(|()| specialization_errors)?;
 
         Ok(self.finish_inference(inference, budget))
+    }
+
+    fn solve_path_bound(
+        &self,
+        path: &[CandidateTypeVarSolution<'db>],
+        bounds: &CandidateTypeVarSolution<'db>,
+        choose: &mut impl FnMut(
+            BoundTypeVarInstance<'db>,
+            Option<&CandidateTypeVarSolution<'db>>,
+        ) -> Option<PathBoundSolution<'db>>,
+    ) -> PathBoundSolution<'db> {
+        let db = self.db;
+        let typevar = bounds.bound_typevar;
+        if !bounds.has_declared_evidence() {
+            return choose(typevar, Some(bounds)).unwrap_or_else(|| {
+                CandidateSolutions::default_solve(
+                    db,
+                    self.env,
+                    self.constraints,
+                    self.inferable,
+                    bounds,
+                )
+            });
+        }
+
+        let preferred =
+            bounds.preferred_solution(db, self.env, self.constraints, self.inferable, || {
+                self.inferred_default(typevar, path)
+            });
+        let Some(candidate) = preferred.as_type() else {
+            return preferred;
+        };
+
+        // Promotion must preserve the restrictions that selected this path.
+        let candidate_bound = CandidateTypeVarSolution::exact(typevar, candidate);
+        let Some(promoted) = choose(typevar, Some(&candidate_bound)) else {
+            return preferred;
+        };
+        let Some(candidate) = promoted.as_type() else {
+            return promoted;
+        };
+        let valid = bounds
+            .valid_preferred_solution(db, self.env, self.constraints, self.inferable, candidate)
+            .unwrap_or(preferred);
+        if matches!(preferred, PathBoundSolution::BudgetExceeded { .. })
+            || matches!(promoted, PathBoundSolution::BudgetExceeded { .. })
+        {
+            PathBoundSolution::BudgetExceeded {
+                fallback: valid.as_type(),
+            }
+        } else {
+            valid
+        }
+    }
+
+    /// Resolves a default from argument evidence on this path. Only defaults that depend on an
+    /// inferred variable supply a candidate for the declared-type preference.
+    fn inferred_default(
+        &self,
+        typevar: BoundTypeVarInstance<'db>,
+        path: &[CandidateTypeVarSolution<'db>],
+    ) -> Option<Type<'db>> {
+        let db = self.db;
+        typevar.default_type(db)?;
+
+        // An overload excluded by the return context must not widen another variable's default.
+        let mut inferred_variables = FxHashSet::default();
+        let variables = self.generic_context.variables(db);
+        let mut inferred = Vec::with_capacity(variables.len());
+        for variable in variables {
+            let solution = path
+                .iter()
+                .find(|bounds| bounds.bound_typevar == variable)
+                .map_or(PathBoundSolution::Unsolved, |bounds| {
+                    bounds.inferred_solution(db, self.env, self.constraints, self.inferable)
+                });
+            let ty = match solution {
+                PathBoundSolution::Solved(ty) => {
+                    inferred_variables.insert(variable.identity(db));
+                    Some(self.remove_inferable_typevar_artifacts_from_solution(variable, ty))
+                }
+                PathBoundSolution::Unsolved => variable
+                    .default_type(db)
+                    .is_none()
+                    .then_some(Type::Dynamic(DynamicType::UnspecializedTypeVar)),
+                PathBoundSolution::Unsatisfiable
+                | PathBoundSolution::ViolatesDeclaredConstraints
+                | PathBoundSolution::BudgetExceeded { .. } => {
+                    return None;
+                }
+            };
+            inferred.push(ty);
+        }
+
+        if !self.default_depends_on_inferred(typevar, &inferred_variables, &RefCell::default()) {
+            return None;
+        }
+        self.generic_context
+            .specialize_recursive(db, inferred)
+            .get(db, typevar)
+    }
+
+    fn default_depends_on_inferred(
+        &self,
+        typevar: BoundTypeVarInstance<'db>,
+        inferred: &FxHashSet<BoundTypeVarIdentity<'db>>,
+        visited: &RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
+    ) -> bool {
+        let db = self.db;
+        let Some(default) = typevar.default_type(db) else {
+            return false;
+        };
+        if !visited.borrow_mut().insert(typevar.identity(db)) {
+            return false;
+        }
+        any_over_type_expanding_aliases(db, self.env, default, |ty| {
+            ty.as_typevar().is_some_and(|dependency| {
+                inferred.contains(&dependency.identity(db))
+                    || self.default_depends_on_inferred(dependency, inferred, visited)
+            })
+        })
     }
 
     fn merge_solution(
@@ -3478,9 +3748,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         if bound_typevar.is_paramspec(db) && !self.paramspec_seen.insert(identity) {
             return;
         }
-        self.pending.intersect(db, self.constraints, constraint);
+        self.record_constraint_set(constraint);
     }
 
+    /// Checks a contextual candidate against the legacy argument mapping.
     pub(crate) fn inferred_type_is_assignable_to(
         &mut self,
         bound_typevar: BoundTypeVarIdentity<'db>,
@@ -5563,7 +5834,8 @@ mod tests {
         assert!(!builder.pending.is_always_satisfied(db, &env));
 
         builder.project_for_legacy_fallback(&analysis);
-        assert!(builder.inferred_type_is_assignable_to(typevar.identity(db), int));
+        let types = builder.solve_hash_map_with(context, &mut |_, _| None);
+        assert_eq!(types.get(&typevar.identity(db)), Some(&int));
     }
 
     #[test]
@@ -5653,8 +5925,8 @@ mod tests {
         assert!(analysis.specialization_error(db, &env).is_none());
 
         builder.project_for_legacy_fallback(&analysis);
-        assert!(builder.inferred_type_is_assignable_to(typevar.identity(db), int));
-        assert!(!builder.inferred_type_is_assignable_to(typevar.identity(db), str));
+        let types = builder.solve_hash_map_with(context, &mut |_, _| None);
+        assert_eq!(types.get(&typevar.identity(db)), Some(&int));
     }
 
     #[test]

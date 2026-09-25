@@ -339,37 +339,57 @@ impl<'db> SolutionWalker<'db> {
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, CandidateTypeVarRangeSolver<'db>> =
             FxIndexMap::default();
 
+        // An unspecialized outer variable supplies no inference evidence. Keep validity bounds,
+        // and keep provisional lambda parameters: the enclosing callable still carries concrete
+        // information even before its parameter types have stabilized.
+        let retain_bound = |provenance: ConstraintProvenance, bound: Type<'db>| {
+            provenance.has_validity() || !bound.has_unspecialized_type_var(db, env)
+        };
+
         for (constraint, _) in typevars {
             let constraint = storage.constraint_data(constraint);
             match constraint {
-                Constraint::ConcreteLower(lower) => {
+                Constraint::ConcreteLower(lower) if retain_bound(lower.provenance, lower.bound) => {
                     let solver = mappings.entry(lower.typevar).or_default();
                     solver.add_lower(lower.provenance, lower.bound);
                 }
-                Constraint::ConcreteUpper(upper) => {
+                Constraint::ConcreteUpper(upper) if retain_bound(upper.provenance, upper.bound) => {
                     let solver = mappings.entry(upper.typevar).or_default();
                     solver.add_upper(upper.provenance, upper.bound);
                 }
-                Constraint::ConcreteEquivalence(equivalence) => {
+                Constraint::ConcreteEquivalence(equivalence)
+                    if retain_bound(equivalence.provenance, equivalence.bound) =>
+                {
                     let solver = mappings.entry(equivalence.typevar).or_default();
                     solver.add_lower(equivalence.provenance, equivalence.bound);
                     solver.add_upper(equivalence.provenance, equivalence.bound);
                 }
                 Constraint::TypeVarRange(bound) => {
-                    let solver = mappings.entry(bound.left).or_default();
-                    solver.add_upper(bound.provenance, Type::TypeVar(bound.right));
-                    let solver = mappings.entry(bound.right).or_default();
-                    solver.add_lower(bound.provenance, Type::TypeVar(bound.left));
+                    if retain_bound(bound.provenance, Type::TypeVar(bound.right)) {
+                        let solver = mappings.entry(bound.left).or_default();
+                        solver.add_upper(bound.provenance, Type::TypeVar(bound.right));
+                    }
+                    if retain_bound(bound.provenance, Type::TypeVar(bound.left)) {
+                        let solver = mappings.entry(bound.right).or_default();
+                        solver.add_lower(bound.provenance, Type::TypeVar(bound.left));
+                    }
                 }
                 Constraint::TypeVarEquivalence(bound) => {
                     let (left, right) = bound.in_builder(db, storage);
-                    let solver = mappings.entry(left).or_default();
-                    solver.add_lower(bound.provenance, Type::TypeVar(right));
-                    solver.add_upper(bound.provenance, Type::TypeVar(right));
-                    let solver = mappings.entry(right).or_default();
-                    solver.add_lower(bound.provenance, Type::TypeVar(left));
-                    solver.add_upper(bound.provenance, Type::TypeVar(left));
+                    if retain_bound(bound.provenance, Type::TypeVar(right)) {
+                        let solver = mappings.entry(left).or_default();
+                        solver.add_lower(bound.provenance, Type::TypeVar(right));
+                        solver.add_upper(bound.provenance, Type::TypeVar(right));
+                    }
+                    if retain_bound(bound.provenance, Type::TypeVar(left)) {
+                        let solver = mappings.entry(right).or_default();
+                        solver.add_lower(bound.provenance, Type::TypeVar(left));
+                        solver.add_upper(bound.provenance, Type::TypeVar(left));
+                    }
                 }
+                Constraint::ConcreteLower(_)
+                | Constraint::ConcreteUpper(_)
+                | Constraint::ConcreteEquivalence(_) => {}
             }
         }
 
