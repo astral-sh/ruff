@@ -5,6 +5,7 @@
 # dependencies = ["mypy-primer"]
 #
 # [tool.ty.rules]
+# truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"
 # missing-type-argument = "warn"
 # possibly-unresolved-reference = "warn"
@@ -88,7 +89,7 @@ class _FormatMap:
 def get_ty_command(project: Project, *, ty_binary: str, venv_dir: Path) -> str:
     ty_cmd = project.ty_cmd
     if ty_cmd is None:
-        ty_cmd = "{ty} check {paths}" if project.paths else "{ty} check"
+        ty_cmd = "{ty} check {paths}" if bool(project.paths) else "{ty} check"
     assert "{ty}" in ty_cmd
     ty_cmd = ty_cmd.format_map(_FormatMap(ty=ty_binary, paths=project.paths))
     return f"{ty_cmd} --python {shlex.quote(str(venv_dir))} --output-format concise"
@@ -102,7 +103,7 @@ def clone_project(
     location: str, target_dir: Path, revision: str | None, *, full_history: bool
 ) -> None:
     depth = [] if full_history else ["--depth", "1"]
-    if revision and not full_history:
+    if revision is not None and revision and not full_history:
         # Fetch the requested commit without first downloading the default branch.
         run("git", "init", str(target_dir))
         run("git", "remote", "add", "origin", location, cwd=target_dir)
@@ -112,7 +113,7 @@ def clone_project(
         run("git", "clone", *depth, location, str(target_dir))
         checkout = revision
 
-    if checkout:
+    if checkout is not None and checkout:
         run("git", "checkout", checkout, "--", cwd=target_dir)
 
     # Initialize only the selected revision's submodules. Force checkout so that
@@ -195,7 +196,7 @@ def main() -> None:
         install_base += f" --exclude-newer {shlex.quote(args.exclude_newer)}"
 
     # Run custom install command if the project defines one (matching primer's setup())
-    if project.install_cmd:
+    if project.install_cmd is not None and project.install_cmd:
         assert "{install}" in project.install_cmd
         install_cmd = project.install_cmd.format(install=install_base)
         print(f"Running install command: {install_cmd}")
@@ -203,7 +204,7 @@ def main() -> None:
         subprocess.run(install_cmd, cwd=target_dir, shell=True, check=True)  # ruff: ignore[subprocess-popen-with-shell-equals-true]
 
     # Install listed dependencies (matching primer's setup())
-    if project.deps:
+    if project.deps is not None and project.deps:
         deps_cmd_parts = shlex.split(install_base) + project.deps
         print(f"Installing dependencies: {', '.join(project.deps)}")
         subprocess.run(deps_cmd_parts, cwd=target_dir, check=True)

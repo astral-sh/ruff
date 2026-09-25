@@ -29,6 +29,7 @@ ignore = [
 ]
 
 [tool.ty.rules]
+truthiness-test-of-none-union = "error"
 possibly-unresolved-reference = "error"
 division-by-zero = "error"
 unused-ignore-comment = "error"
