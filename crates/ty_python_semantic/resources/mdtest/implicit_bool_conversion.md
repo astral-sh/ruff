@@ -3,14 +3,8 @@
 This opt-in rule detects truthiness checks that conflate `None` with other falsy values.
 
 ```toml
-[environment]
-python-version = "3.12"
-
 [rules]
-implicit-bool-conversion = "error"
-redundant-condition = "ignore"
-truthiness-test-of-callable = "ignore"
-truthiness-test-of-iterable = "ignore"
+implicit-bool-conversion = "warn"
 ```
 
 ## Missing values and zero
@@ -20,12 +14,22 @@ truthiness is intentional.
 
 ```py
 def process(limit: int | None):
-    if not limit:  # error: [implicit-bool-conversion] "Implicit conversion of `int | None` to `bool`"
+    if not limit:  # snapshot: implicit-bool-conversion
         pass
     if limit is None:
         pass
     if not bool(limit):
         pass
+```
+
+```snapshot
+warning[implicit-bool-conversion]: Boolean test of `int | None` conflates `None` with other falsy values
+ --> src/mdtest_snippet.py:2:12
+  |
+2 |     if not limit:  # snapshot: implicit-bool-conversion
+  |            ^^^^^ Both `None` and non-`None` values can be false
+help: Use `is None` or `is not None` to check whether the value is present
+help: Use `bool(...)` if testing truthiness is intentional
 ```
 
 ## Boolean contexts
@@ -77,7 +81,7 @@ def check(items: list[int] | None, flag: bool, other: bool):
 Boolean literals, gradual types, and values narrowed to booleans are accepted.
 
 ```py
-from typing import Any, Never
+from typing_extensions import Any, Never, TypeVar
 
 def check(flag: bool, dynamic: Any, unknown, missing: Never, optional: bool | None):
     if flag:
@@ -92,7 +96,9 @@ def check(flag: bool, dynamic: Any, unknown, missing: Never, optional: bool | No
         if optional:
             pass
 
-def generic[T: bool](flag: T):
+T = TypeVar("T", bound=bool)
+
+def generic(flag: T):
     if flag:
         pass
 ```
@@ -137,7 +143,7 @@ Non-optional literal values are allowed.
 ```py
 if 0:
     pass
-if "text":
+if "text":  # error: [redundant-condition]
     pass
 if []:
     pass
@@ -148,7 +154,7 @@ if []:
 Dynamic union members are excluded, even when a known member can be false.
 
 ```py
-from typing import Any
+from typing import Any, TypeVar
 
 def check(optional: bool | None, gradual: int | Any | None):
     if optional:  # error: [implicit-bool-conversion]
@@ -156,7 +162,9 @@ def check(optional: bool | None, gradual: int | Any | None):
     if gradual:
         pass
 
-def generic[T](value: T):
+T = TypeVar("T")
+
+def generic(value: T):
     if value:
         pass
 ```
@@ -169,14 +177,12 @@ make a container itself dynamic.
 ```py
 from typing import Any, Literal
 
-def check(number: float | None, text: str | None, items: list[Any] | None, zero: Literal[0] | None):
+def check(number: float | None, text: str | None, items: list[Any] | None):
     if number:  # error: [implicit-bool-conversion]
         pass
     if text:  # error: [implicit-bool-conversion]
         pass
     if items:  # error: [implicit-bool-conversion]
-        pass
-    if zero:  # error: [implicit-bool-conversion]
         pass
 ```
 

@@ -11605,7 +11605,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         let db = self.db();
         let env = self.program_environment();
-        let Type::Union(union) = ty else {
+        let expanded = match ty.resolve_type_alias(db) {
+            Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
+            ty => ty,
+        };
+        let Type::Union(union) = expanded else {
             return;
         };
         let elements = union.elements(db);
@@ -11624,10 +11628,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .context
             .report_lint(&IMPLICIT_BOOL_CONVERSION, expression)
         {
-            builder.into_diagnostic(format_args!(
-                "Implicit conversion of `{}` to `bool`",
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Boolean test of `{}` conflates `None` with other falsy values",
                 ty.display(db, env)
             ));
+            diagnostic
+                .set_primary_annotation_message("Both `None` and non-`None` values can be false");
+            diagnostic.help("Use `is None` or `is not None` to check whether the value is present");
+            diagnostic.help("Use `bool(...)` if testing truthiness is intentional");
         }
     }
 
