@@ -1936,6 +1936,115 @@ reveal_type(narrow(1))  # revealed: int
 reveal_type(narrow("hello"))  # revealed: str
 ```
 
+## Inferring a constrained typevar from a bounded typevar
+
+If the constraints of the caller's type variable are a subset of the callee's, we preserve it
+through the generic call:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str, bytes)
+S = TypeVar("S", int, str)
+
+def double(value: T) -> T:
+    return value + value
+
+def matching_constraints(value: S) -> S:
+    result = double(value)
+    reveal_type(result)  # revealed: S@matching_constraints
+    return result
+```
+
+If the caller's type variable is bounded, however, we solve to a compatible callee constraint, and
+so the caller's type variable is not preserved. Note that even if the caller's upper bound matches a
+callee's constraint exactly, the caller may be specialized to a subtype of its upper bound, and so
+preserving the type variable through the constrained call would be unsound.
+
+```py
+U = TypeVar("U", bound=bool)
+V = TypeVar("V", bound=int)
+
+def bounded(value: U) -> U:
+    reveal_type(double(value))  # revealed: int
+    return double(value)  # error: [invalid-return-type]
+
+def same_bound(value: V) -> None:
+    reveal_type(double(value))  # revealed: int
+```
+
+This also applies when the caller's type variable is nested in a wrapper type:
+
+```py
+def first(values: tuple[T]) -> T:
+    return values[0]
+
+def nested(values: tuple[U]) -> None:
+    reveal_type(first(values))  # revealed: int
+```
+
+A bounded type variable is not assignable to a constrained type variable in non-covariant position,
+even if they share the same bound:
+
+```py
+from collections.abc import Callable
+
+def invariant(values: list[T]) -> T:
+    return values[0]
+
+def contravariant(consume: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def caller(values: list[V], consume: Callable[[V], None]) -> None:
+    # error: [invalid-argument-type] "Argument type `V@caller` does not satisfy constraints"
+    # error: [invalid-argument-type] "Expected `list[int]`, found `list[V@caller]`"
+    invariant(values)
+    # TODO: This should error.
+    reveal_type(contravariant(consume))  # revealed: Unknown
+```
+
+If a type variable with a gradual upper bound matches multiple constraints, we solve to the gradual
+type. The caller's type variable is similarly not preserved.
+
+```py
+from typing import Any
+
+Gradual = TypeVar("Gradual", bound=Any)
+
+def gradual_bound(value: Gradual) -> None:
+    # TODO: This should reveal Any.
+    reveal_type(double(value))  # revealed: Gradual@gradual_bound
+    # TODO: This should reveal Any.
+    reveal_type(first((value,)))  # revealed: Gradual@gradual_bound
+```
+
+This also applies with a nested gradual type:
+
+```py
+ConstrainedList = TypeVar("ConstrainedList", list[int], list[str])
+GradualList = TypeVar("GradualList", bound=list[Any])
+
+def constrained_list(value: ConstrainedList) -> ConstrainedList:
+    return value
+
+def gradual_list_bound(value: GradualList) -> None:
+    # TODO: This should reveal list[Any].
+    reveal_type(constrained_list(value))  # revealed: GradualList@gradual_list_bound
+```
+
+If a type variable with a gradual upper bound matches a single constraint, however, we solve to that
+constraint instead of the gradual type:
+
+```py
+SingleConstraint = TypeVar("SingleConstraint", list[int], str)
+
+def single_constraint(value: SingleConstraint) -> SingleConstraint:
+    return value
+
+def single_matching_constraint(value: GradualList) -> None:
+    reveal_type(single_constraint(value))  # revealed: list[int]
+```
+
 ## Selecting constraints for narrowed caller type variables
 
 Caller type variables are not inferable when selecting a constraint for a callee's type variable:

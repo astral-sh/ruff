@@ -4075,21 +4075,40 @@ impl<'db> CandidateSolutions<'db> {
                 // have to move this disambiguation logic up to the code that combines/chooses
                 // between solutions from multiple paths.
 
-                // Filter out the typevar constraints that aren't satisfied by this path. If
-                // multiple constraints are satisfied, track which one is "tightest".
-                let dependent_solution = match &path_bound.kind {
+                let upper = match &path_bound.kind {
                     CandidateTypeVarSolutionKind::Range(range) => {
-                        if let (ty @ Type::TypeVar(_), _) | (_, Some(ty @ Type::TypeVar(_))) =
-                            (lower, range.as_single_upper_bound(db, env))
-                        {
-                            Some(ty)
-                        } else {
-                            None
-                        }
+                        range.as_single_upper_bound(db, env)
                     }
-                    CandidateTypeVarSolutionKind::Exact(ty @ Type::TypeVar(_)) => Some(*ty),
                     CandidateTypeVarSolutionKind::Exact(_) => None,
                 };
+
+                // A fixed caller type variable can only be preserved if it is constrained, and
+                // its constraints are a subset of the callee's constraints. If the caller type
+                // variable is bounded, we instead solve to a compatible callee constraint, and so
+                // the caller's type variable is not preserved. Note that even if the caller's
+                // upper bound matches a callee's constraint exactly, the caller may be specialized
+                // to a subtype of its upper bound, and so preserving the type variable through the
+                // constrained call would be unsound.
+                let dependent_solution = match (lower, upper) {
+                    (ty @ Type::TypeVar(typevar), _) | (_, Some(ty @ Type::TypeVar(typevar)))
+                        if typevar.is_inferable(db, inferable)
+                            || typevar.typevar(db).constraints(db, env).is_some_and(
+                                |actual_constraints| {
+                                    actual_constraints.iter().all(|actual| {
+                                        constraints.elements(db).iter().any(|constraint| {
+                                            actual.is_equivalent_to(db, env, *constraint)
+                                        })
+                                    })
+                                },
+                            ) =>
+                    {
+                        Some(ty)
+                    }
+                    _ => None,
+                };
+
+                // Filter out the typevar constraints that aren't satisfied by this path. If
+                // multiple constraints are satisfied, track which one is "tightest".
                 let mut compatible_constraint = None;
                 let mut multiple_compatible_constraints = false;
                 let has_lower_evidence = match &path_bound.kind {
