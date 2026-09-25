@@ -38,6 +38,7 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
             # Unknown case sensitivity
         |   (?i:
                 pylint
+            |   pytest
             |   nosec
             |   isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)
             |   (?:en)?coding[:=][\x20\t]*([-_.A-Z0-9]+)
@@ -283,6 +284,8 @@ mod tests {
         assert!(!comment_contains_code("# pylint:disable=A0123", &[]));
         assert!(!comment_contains_code("# pylint: disable = A0123", &[]));
         assert!(!comment_contains_code("# pylint:disable = A0123", &[]));
+        assert!(!comment_contains_code("# pytest: foo=bar", &[]));
+        assert!(!comment_contains_code("# pytest:markers", &[]));
         assert!(!comment_contains_code(
             "# pyright: reportErrorName=true",
             &[]
