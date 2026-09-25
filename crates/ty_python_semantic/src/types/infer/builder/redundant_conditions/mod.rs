@@ -761,7 +761,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let env = self.program_environment();
 
         let kind = if truthiness.is_ambiguous() {
-            if let Some(union) = self.truthiness_test_of_none_union_candidate(value_type) {
+            if let Some(union) =
+                self.truthiness_test_of_none_union_candidate(expression, value_type)
+            {
                 ConditionKind::NoneUnion(union)
             } else {
                 let expanded = match value_type.resolve_type_alias(db) {
@@ -845,7 +847,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     /// Return the expanded union corresponding to `ty` if this test is eligible for `truthiness-test-of-none-union`.
-    fn truthiness_test_of_none_union_candidate(&self, ty: Type<'db>) -> Option<UnionType<'db>> {
+    fn truthiness_test_of_none_union_candidate(
+        &self,
+        expression: &ast::Expr,
+        ty: Type<'db>,
+    ) -> Option<UnionType<'db>> {
         let db = self.db();
         let env = self.program_environment();
         let expanded = match ty.resolve_type_alias(db) {
@@ -876,7 +882,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return None;
         }
 
-        Some(union)
+        // A compound expression can combine `None` and other falsy values from unrelated
+        // operands, as in `enabled and match` with `match: Match[str] | None`. Require a
+        // value-producing operand to qualify independently, including through assignments.
+        // The shared condition traversal prefers operand diagnostics where possible.
+        let is_candidate = |operand: &ast::Expr| {
+            self.truthiness_test_of_none_union_candidate(operand, self.expression_type(operand))
+                .is_some()
+        };
+        let has_suspicious_operand = match expression {
+            ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => values.iter().any(is_candidate),
+            ast::Expr::If(ast::ExprIf { body, orelse, .. }) => {
+                is_candidate(body) || is_candidate(orelse)
+            }
+            ast::Expr::Named(ast::ExprNamed { value, .. }) => is_candidate(value),
+            _ => true,
+        };
+        has_suspicious_operand.then_some(union)
     }
 
     /// Read an already-inferred expression's type and truthiness using the requested

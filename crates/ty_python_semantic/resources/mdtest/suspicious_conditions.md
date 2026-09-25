@@ -1779,3 +1779,50 @@ When the whole expression is used as a condition, each operand is checked:
     if flag and (other or items):  # error: [truthiness-test-of-none-union]
         pass
 ```
+
+### Unions formed by compound conditions
+
+Combining individually unambiguous tests must not introduce a diagnostic merely because their
+results include both `None` and other falsy values. Assignment expressions preserve this behavior.
+
+```py
+from typing import final
+
+@final
+class Match: ...
+
+def check(enabled: bool, match: Match | None, title=None):
+    if enabled and match:  # no diagnostic
+        pass
+    if match or enabled:  # no diagnostic
+        pass
+    if not (enabled and match):  # no diagnostic
+        pass
+    if result := enabled and match:  # no diagnostic
+        pass
+    if result := (inner := match or enabled):  # no diagnostic
+        pass
+    if enabled and title:  # no diagnostic
+        pass
+    if result := enabled and title:  # no diagnostic
+        pass
+    if result := (match if enabled else False):  # no diagnostic
+        pass
+```
+
+Operands that can themselves conflate `None` with another falsy value still trigger the rule,
+including in compound expressions wrapped in assignments.
+
+```py
+def check(enabled: bool, value: int | None):
+    if enabled and value:  # error: [truthiness-test-of-none-union]
+        pass
+    if value or enabled:  # error: [truthiness-test-of-none-union]
+        pass
+    if result := enabled and value:  # error: [truthiness-test-of-none-union]
+        pass
+    if result := (inner := enabled or value):  # error: [truthiness-test-of-none-union]
+        pass
+    if result := (value if enabled else False):  # error: [truthiness-test-of-none-union]
+        pass
+```
