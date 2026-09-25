@@ -2194,11 +2194,6 @@ def probe(value: Tree[int, str]):
 
 Specializing a generic class also specializes the upper bound of `Self` inside type alias arguments.
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 ```py
 from typing import Self
 
