@@ -71,7 +71,7 @@ note: This is a display-only fix and is likely to be incorrect
 ## Unions of callable values
 
 A union of callables still represents callable objects. A union containing `None` may instead be
-testing whether the value is present, which is covered by another rule:
+testing whether the value is present:
 
 ```py
 from typing import Callable
@@ -82,7 +82,7 @@ def check_union(
 ):
     if predicate:  # error: [truthiness-test-of-callable]
         pass
-    if optional:
+    if optional:  # no diagnostic
         optional()
 ```
 
