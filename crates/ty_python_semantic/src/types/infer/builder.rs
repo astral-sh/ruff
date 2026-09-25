@@ -11605,10 +11605,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         let db = self.db();
         let env = self.program_environment();
-        if !ty.is_assignable_to(db, env, KnownClass::Bool.to_instance(db, env))
-            && let Some(builder) = self
-                .context
-                .report_lint(&IMPLICIT_BOOL_CONVERSION, expression)
+        let Type::Union(union) = ty else {
+            return;
+        };
+        let elements = union.elements(db);
+        if elements.iter().any(Type::is_dynamic)
+            || !elements.iter().any(|element| element.is_none(db))
+        {
+            return;
+        }
+        if elements.iter().any(|element| {
+            !element.is_none(db)
+                && matches!(
+                    element.try_bool(db, env),
+                    Ok(Truthiness::AlwaysFalse | Truthiness::Ambiguous)
+                )
+        }) && let Some(builder) = self
+            .context
+            .report_lint(&IMPLICIT_BOOL_CONVERSION, expression)
         {
             builder.into_diagnostic(format_args!(
                 "Implicit conversion of `{}` to `bool`",

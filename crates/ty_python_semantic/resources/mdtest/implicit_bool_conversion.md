@@ -1,6 +1,6 @@
 # Implicit boolean conversions
 
-This opt-in rule requires explicit intent when testing non-boolean values for truthiness.
+This opt-in rule detects truthiness checks that conflate `None` with other falsy values.
 
 ```toml
 [environment]
@@ -31,29 +31,29 @@ def process(limit: int | None):
 ## Boolean contexts
 
 ```py
-def check(items: list[int], count: int):
-    if items:  # error: [implicit-bool-conversion]
+def check(items: list[int | None], count: int | None):
+    if count:  # error: [implicit-bool-conversion]
         pass
     elif count:  # error: [implicit-bool-conversion]
         pass
-    while items:  # error: [implicit-bool-conversion]
+    while count:  # error: [implicit-bool-conversion]
         break
-    assert items  # error: [implicit-bool-conversion]
-    result = 1 if items else 0  # error: [implicit-bool-conversion]
-    result = not items  # error: [implicit-bool-conversion]
+    result = 1 if count else 0  # error: [implicit-bool-conversion]
+    result = not count  # error: [implicit-bool-conversion]
     filtered = [x for x in items if x]  # error: [implicit-bool-conversion]
     match count:
-        case _ if items:  # error: [implicit-bool-conversion]
+        case _ if count:  # error: [implicit-bool-conversion]
             pass
+    assert count  # error: [implicit-bool-conversion]
 ```
 
 ## Short-circuit expressions
 
-Only operands that Python tests for truthiness need to be booleans. The last operand can be any
-value when the result is used as a value. Compound conditions report the individual operands.
+Only operands that Python tests for truthiness are checked. The last operand can be any value when
+the result is used as a value. Compound conditions report the individual operands.
 
 ```py
-def check(items: list[int], flag: bool, other: bool):
+def check(items: list[int] | None, flag: bool, other: bool):
     value = flag and items
     value = flag or items
     value = items or []  # error: [implicit-bool-conversion]
@@ -99,14 +99,14 @@ def generic[T: bool](flag: T):
 
 ## Custom truthiness
 
-Defining `__bool__` does not exempt an object from the rule.
+Optional objects with custom truthiness are checked.
 
 ```py
 class Custom:
     def __bool__(self) -> bool:
         return True
 
-def check(value: Custom):
+def check(value: Custom | None):
     if value:  # error: [implicit-bool-conversion]
         pass
     if bool(value):
@@ -119,7 +119,7 @@ Comparisons usually return booleans, but a custom comparison can return another 
 
 ```py
 class Custom:
-    def __lt__(self, other: "Custom") -> int:
+    def __lt__(self, other: "Custom") -> int | None:
         return 1
 
 def check(left: Custom, right: Custom):
@@ -132,43 +132,117 @@ def check(left: Custom, right: Custom):
 
 ## Constants
 
-The rule also applies to literal values, including falsy ones.
+Non-optional literal values are allowed.
 
 ```py
-if 0:  # error: [implicit-bool-conversion]
+if 0:
     pass
-if "text":  # error: [implicit-bool-conversion]
+if "text":
     pass
-if []:  # error: [implicit-bool-conversion]
+if []:
     pass
 ```
 
 ## Unions and type parameters
 
-Every possible value must be assignable to `bool`; a gradual member does not exempt a known
-non-boolean member of a union.
+Dynamic union members are excluded, even when a known member can be false.
 
 ```py
 from typing import Any
 
-def check(optional: bool | None, gradual: int | Any):
+def check(optional: bool | None, gradual: int | Any | None):
     if optional:  # error: [implicit-bool-conversion]
         pass
-    if gradual:  # error: [implicit-bool-conversion]
+    if gradual:
         pass
 
 def generic[T](value: T):
-    if value:  # error: [implicit-bool-conversion]
+    if value:
+        pass
+```
+
+## Optional values with distinct falsy cases
+
+Empty containers, zero, and `False` can all be confused with `None`. Dynamic element types do not
+make a container itself dynamic.
+
+```py
+from typing import Any, Literal
+
+def check(number: float | None, text: str | None, items: list[Any] | None, zero: Literal[0] | None):
+    if number:  # error: [implicit-bool-conversion]
+        pass
+    if text:  # error: [implicit-bool-conversion]
+        pass
+    if items:  # error: [implicit-bool-conversion]
+        pass
+    if zero:  # error: [implicit-bool-conversion]
+        pass
+```
+
+## Unambiguous presence checks
+
+Always-truthy alternatives make a truthiness test an unambiguous presence check.
+
+```py
+import re
+from typing import Literal, final
+
+@final
+class Present:
+    pass
+
+class AlwaysTrue:
+    def __bool__(self) -> Literal[True]:
+        return True
+
+def check(
+    match: re.Match[str] | None,
+    present: Present | None,
+    custom: AlwaysTrue | None,
+    positive: Literal[1] | None,
+    flag: Literal[True] | None,
+):
+    if match:
+        pass
+    if present:
+        pass
+    if custom:
+        pass
+    if positive:
+        pass
+    if flag:
+        pass
+```
+
+## Non-optional and dynamic values
+
+Ordinary truthiness checks remain valid. A union containing a dynamic alternative is excluded.
+
+```py
+from typing import Any
+
+def check(items: list[str], number: int, text: str, dynamic: Any | None, unknown):
+    if items:
+        pass
+    if number:
+        pass
+    if text:
+        pass
+    if dynamic:
+        pass
+    value = unknown if number else None
+    if value:
         pass
 ```
 
 ## Nested scopes
 
 ```py
-def check(items: list[int]):
-    predicate = lambda: not items  # error: [implicit-bool-conversion]
+def check(items: list[int | None], count: int | None):
+    predicate = lambda: not count  # error: [implicit-bool-conversion]
     filtered = (x for x in items if x)  # error: [implicit-bool-conversion]
-    if count := len(items):  # error: [implicit-bool-conversion]
+    if value := count:  # error: [implicit-bool-conversion]
         pass
 ```
 

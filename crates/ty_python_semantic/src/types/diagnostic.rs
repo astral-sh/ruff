@@ -1393,7 +1393,7 @@ declare_lint! {
 declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/implicit-bool-conversion.md")]
     pub(crate) static IMPLICIT_BOOL_CONVERSION = {
-        summary: "detects implicit conversions of non-boolean values to `bool`",
+        summary: "detects truthiness checks that conflate `None` with other falsy values",
         status: LintStatus::stable("0.0.84"),
         default_level: Level::Ignore,
     }
