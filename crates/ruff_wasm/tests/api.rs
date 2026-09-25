@@ -183,7 +183,7 @@ fn sub_diagnostics() {
 fn diagnostic_tags() {
     ruff_wasm::before_main();
 
-    let config = js_sys::JSON::parse(r#"{"select": ["F401", "RUF071"], "preview": true}"#).unwrap();
+    let config = js_sys::JSON::parse(r#"{"select": ["F401", "RUF071"]}"#).unwrap();
     let output = Workspace::new(config, PositionEncoding::Utf8)
         .unwrap()
         .check("import os\nimport sys\nos.path.commonprefix([])\n")
