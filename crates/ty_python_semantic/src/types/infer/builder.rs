@@ -67,11 +67,11 @@ use crate::types::context::InferContext;
 use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
-    DYNAMIC_FUNCTION_DECORATOR_RETURN, GeneratorMismatchKind, INEFFECTIVE_FINAL,
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_DECLARATION,
-    INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE,
-    INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+    DYNAMIC_FUNCTION_DECORATOR_RETURN, GeneratorMismatchKind, IMPLICIT_BOOL_CONVERSION,
+    INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
+    INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE,
+    INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
+    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
     POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics,
     UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
     UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
@@ -2280,6 +2280,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_statement;
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
+        self.check_implicit_bool_conversion(test, test_ty);
 
         if let Err(err) = test_ty.try_bool(db, env) {
             err.report_diagnostic(&self.context, &**test);
@@ -2297,6 +2298,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let Some(test) = &test {
                 let test_ty = self.infer_standalone_expression(test, TypeContext::default());
+                self.check_implicit_bool_conversion(test, test_ty);
 
                 if let Err(err) = test_ty.try_bool(db, env) {
                     err.report_diagnostic(&self.context, test);
@@ -2754,6 +2756,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let Some(guard) = guard.as_deref() {
                 let guard_ty = self.infer_standalone_expression(guard, TypeContext::default());
+                self.check_implicit_bool_conversion(guard, guard_ty);
 
                 if let Err(err) = guard_ty.try_bool(db, self.program_environment()) {
                     err.report_diagnostic(&self.context, guard);
@@ -5281,6 +5284,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = while_statement;
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
+        self.check_implicit_bool_conversion(test, test_ty);
 
         if let Err(err) = test_ty.try_bool(db, self.program_environment()) {
             err.report_diagnostic(&self.context, &**test);
@@ -5300,6 +5304,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = assert;
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
+        self.check_implicit_bool_conversion(test, test_ty);
 
         if let Err(err) = test_ty.try_bool(db, self.program_environment()) {
             err.report_diagnostic(&self.context, &**test);
@@ -8516,6 +8521,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for expr in ifs {
             let test_ty = self.infer_maybe_standalone_expression(expr, TypeContext::default());
+            self.check_implicit_bool_conversion(expr, test_ty);
 
             if let Err(err) = test_ty.try_bool(db, env) {
                 err.report_diagnostic(&self.context, expr);
@@ -8646,6 +8652,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_expression;
 
         let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
+        self.check_implicit_bool_conversion(test, test_ty);
         let (body_ty, orelse_ty) = if is_collection_literal(body)
             && prefer_collection_literal_peer_context(db, env, tcx)
         {
@@ -11289,6 +11296,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = unary;
 
         let operand_type = self.infer_expression(operand, TypeContext::default());
+        if op.is_not() {
+            self.check_implicit_bool_conversion(operand, operand_type);
+        }
 
         self.infer_unary_expression_type(*op, operand_type, unary)
     }
@@ -11572,6 +11582,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Check the values that Python implicitly converts to `bool`, even when their
+    /// truthiness is not statically known. Boolean operators already check all but
+    /// their final operand during inference; only that final operand remains when
+    /// the whole expression is used as a condition.
+    fn check_implicit_bool_conversion(&self, expression: &ast::Expr, ty: Type<'db>) {
+        if !self.context.is_lint_enabled(&IMPLICIT_BOOL_CONVERSION)
+            || self.in_string_annotation()
+            || self.file().is_stub(self.db())
+        {
+            return;
+        }
+        if let ast::Expr::BoolOp(boolean) = expression
+            && let Some(last) = boolean.values.last()
+        {
+            self.check_implicit_bool_conversion(last, self.expression_type(last));
+            return;
+        }
+        if let ast::Expr::Named(named) = expression {
+            self.check_implicit_bool_conversion(&named.value, ty);
+            return;
+        }
+        let db = self.db();
+        let env = self.program_environment();
+        if !ty.is_assignable_to(db, env, KnownClass::Bool.to_instance(db, env))
+            && let Some(builder) = self
+                .context
+                .report_lint(&IMPLICIT_BOOL_CONVERSION, expression)
+        {
+            builder.into_diagnostic(format_args!(
+                "Implicit conversion of `{}` to `bool`",
+                ty.display(db, env)
+            ));
+        }
+    }
+
     fn infer_boolean_expression(
         &mut self,
         bool_op: &ast::ExprBoolOp,
@@ -11602,6 +11647,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     )
                 };
 
+                if index < values.len() - 1 {
+                    builder.check_implicit_bool_conversion(value, ty);
+                }
                 (ty, value.range())
             },
         )
