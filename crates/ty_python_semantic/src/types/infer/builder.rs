@@ -11582,18 +11582,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Check the values that Python implicitly converts to `bool`, even when their
-    /// truthiness is not statically known. Boolean operators already check all but
-    /// their final operand during inference; only that final operand remains when
-    /// the whole expression is used as a condition.
+    /// Check values used as conditions, even when their truthiness is not statically known.
+    /// Boolean operators are checked operand by operand only when the whole expression
+    /// is used as a condition; value-producing `and` and `or` expressions are exempt.
     fn check_implicit_bool_conversion(&self, expression: &ast::Expr, ty: Type<'db>) {
         if !self.context.is_lint_enabled(&IMPLICIT_BOOL_CONVERSION) || self.in_string_annotation() {
             return;
         }
-        if let ast::Expr::BoolOp(boolean) = expression
-            && let Some(last) = boolean.values.last()
-        {
-            self.check_implicit_bool_conversion(last, self.expression_type(last));
+        if let ast::Expr::BoolOp(boolean) = expression {
+            for value in &boolean.values {
+                self.check_implicit_bool_conversion(value, self.expression_type(value));
+            }
             return;
         }
         if let ast::Expr::Named(named) = expression {
@@ -11687,9 +11686,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     )
                 };
 
-                if index < values.len() - 1 {
-                    builder.check_implicit_bool_conversion(value, ty);
-                }
                 (ty, value.range())
             },
         )

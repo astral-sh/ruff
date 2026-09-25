@@ -224,15 +224,15 @@ def check(limit: int | None, items: list[int | None]):
 
 ## Short-circuit expressions
 
-Only operands that Python tests for truthiness are checked. The last operand can be any value when
-the result is used as a value. Compound conditions report the individual operands.
+Boolean operators used to compute values are exempt. When the whole expression is used as a
+condition, each operand is checked, including operands of nested boolean operators.
 
 ```py
 def check(items: list[int] | None, flag: bool, other: bool):
     value = flag and items
     value = flag or items
-    value = items or []  # error: [implicit-bool-conversion]
-    value = items and flag  # error: [implicit-bool-conversion]
+    value = items or []
+    value = items and flag
     if items and flag:  # error: [implicit-bool-conversion]
         pass
     if flag and items:  # error: [implicit-bool-conversion]
@@ -245,6 +245,25 @@ def check(items: list[int] | None, flag: bool, other: bool):
         pass
     if result := flag and items:  # error: [implicit-bool-conversion]
         pass
+```
+
+The exemption applies to assignments, return values, and call arguments. Explicit boolean contexts
+inside these expressions, such as `not` and conditional-expression tests, are still checked.
+
+```py
+def consume(value: object): ...
+def display_name(name: str | None) -> str:
+    consume(name and name.upper())
+    value = (name and name.upper()) or "Anonymous"
+    return name or "Anonymous"
+
+def check(name: str | None, flag: bool):
+    value = flag and not name  # error: [implicit-bool-conversion]
+    value = flag and (1 if name else 0)  # error: [implicit-bool-conversion]
+    value = not (name or flag)  # error: [implicit-bool-conversion]
+    if (name and flag) or flag:  # error: [implicit-bool-conversion]
+        pass
+    assert name or flag  # error: [implicit-bool-conversion]
 ```
 
 ## Allowed types
