@@ -687,6 +687,67 @@ If a typevar does not provide a default, we use `Unknown`:
 reveal_type(C())  # revealed: C[Unknown]
 ```
 
+## Inferring generic class parameters from bounded receivers
+
+The nominal specialization of a generic class can be inferred from the upper bound of `Self`:
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T", default=None, covariant=True)
+
+class Box(Generic[T]):
+    def get(self) -> T:
+        reveal_type(read(self))  # revealed: T@Box
+        reveal_type(identity(self))  # revealed: Self@get
+        return read(self)
+
+def read(box: Box[T]) -> T:
+    raise NotImplementedError
+
+def identity(value: T) -> T:
+    return value
+```
+
+The same applies to a type variable with an explicit upper bound:
+
+```py
+S = TypeVar("S", bound=Box[int])
+
+def _(box: S) -> None:
+    reveal_type(read(box))  # revealed: int
+    reveal_type(identity(box))  # revealed: S@_
+```
+
+The specialization inferred from the bound cannot violate the bounds of a constrained type variable:
+
+```py
+ConstrainedT = TypeVar("ConstrainedT", int, str)
+
+def combine(box: Box[ConstrainedT], value: ConstrainedT) -> ConstrainedT:
+    return value
+
+def _(box: S) -> None:
+    reveal_type(combine(box, 1))  # revealed: int
+    # error: [invalid-argument-type] "does not satisfy constraints"
+    combine(box, "")
+```
+
+A type variable cannot be substituted for its bound in non-covariant position:
+
+```py
+ContravariantT = TypeVar("ContravariantT", contravariant=True)
+
+class Consumer(Generic[ContravariantT]):
+    def consume(self, value: ContravariantT) -> None: ...
+
+def accept_list(boxes: list[Box[T]]) -> None: ...
+def accept_consumer(consumer: Consumer[Box[T]]) -> None: ...
+def _(boxes: list[S], consumer: Consumer[S]) -> None:
+    accept_list(boxes)  # error: [invalid-argument-type]
+    accept_consumer(consumer)  # error: [invalid-argument-type]
+```
+
 ## Inferring generic class parameters from constructors
 
 If the type of a constructor parameter is a class typevar, we can use that to infer the type
