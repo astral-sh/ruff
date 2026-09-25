@@ -35,8 +35,8 @@ use crate::{
     place_load::{PlaceLoadMode, PlaceLoadResolutionStep, resolve_place_load},
     reachability::is_range_reachable,
     types::{
-        KnownClass, LintDiagnosticGuard, LintDiagnosticGuardBuilder, MemberLookupPolicy, Type,
-        TypeContext,
+        KnownClass, KnownUnion, LintDiagnosticGuard, LintDiagnosticGuardBuilder,
+        MemberLookupPolicy, Type, TypeContext, UnionType,
         call::bind::CallableDescription,
         context::InferContext,
         diagnostic::typing_module_for_fix,
@@ -731,6 +731,42 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 diagnostic
             }
+        } else if let ConditionKind::NoneUnion(union) = kind {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Boolean test on `{}` does not distinguish `None` from other falsy values",
+                test_type.display(db, env)
+            ));
+            let non_none = UnionType::from_elements(
+                db,
+                env,
+                union
+                    .elements(db)
+                    .iter()
+                    .copied()
+                    .filter(|element| !element.is_none(db)),
+            );
+            let known_class = match non_none {
+                Type::NominalInstance(instance) => instance.known_class(db),
+                Type::Union(union) => union.known(db).map(KnownUnion::annotation_class),
+                _ => None,
+            };
+
+            // This list of builtin types does not need to be exhaustive. We just list the ones
+            // that were most commonly encountered in practice (ecosystem results):
+            diagnostic.set_primary_annotation_message(match known_class {
+                Some(KnownClass::Int | KnownClass::Float | KnownClass::Complex) => {
+                    "`None` and `0` are both falsy"
+                }
+                Some(KnownClass::Bool) => "`None` and `False` are both falsy",
+                Some(KnownClass::Str) => "`None` and the empty string are both falsy",
+                Some(KnownClass::Bytes) => "`None` and an empty bytestring are both falsy",
+                Some(KnownClass::List) => "`None` and an empty list are both falsy",
+                Some(KnownClass::Dict) => "`None` and an empty dictionary are both falsy",
+                _ => "Both `None` and non-`None` values can be falsy",
+            });
+            diagnostic.help("Use `is None` or `is not None` to check for presence of the value");
+            diagnostic.help("Use `bool(...)` if testing truthiness is intentional");
+            diagnostic
         } else {
             let add_always_falsy_concise_message = |diagnostic: &mut LintDiagnosticGuard| {
                 if should_quote_test_expression()

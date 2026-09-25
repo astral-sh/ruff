@@ -106,11 +106,11 @@ class C:
 def foo(c: C):
     # The truthiness check `c.value` narrows to `str & ~AlwaysFalsy`.
     # The subsequent `len(c.value)` doesn't narrow further since `str` is not narrowable by len().
-    if c.value and len(c.value):
+    if c.value and len(c.value):  # error: [truthiness-test-of-none-union]
         reveal_type(c.value)  # revealed: str & ~AlwaysFalsy
 
     # error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `str | None`"
-    if len(c.value) and c.value:
+    if len(c.value) and c.value:  # error: [truthiness-test-of-none-union]
         reveal_type(c.value)  # revealed: str & ~AlwaysFalsy
 
     if c.value is None or not len(c.value):
