@@ -48,7 +48,8 @@ def default_preset(presets: list[str] | None) -> str:
     return "auto"
 ```
 
-Replacing the condition with `presets is not None` would introduce an `IndexError` for an empty list.
+Replacing the condition with `presets is not None` would introduce an `IndexError` for an empty
+list.
 
 An explicit `bool()` call preserves the intended truthiness check without triggering the rule:
 

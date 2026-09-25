@@ -22,24 +22,141 @@ def take(items: list[str], limit: int | None = None) -> list[str]:
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test of `int | None` conflates `None` with other falsy values
+warning[implicit-bool-conversion]: Boolean test on `int | None` does not distinguish `None` from other falsy values
  --> src/mdtest_snippet.py:3:12
   |
 3 |     if not limit:
-  |            ^^^^^ Both `None` and `0` are falsy
-help: Use `is None` or `is not None` to check whether the value is present
+  |            ^^^^^ `None` and `0` are both falsy
+help: Use `is None` or `is not None` to check for presence of the value
 help: Use `bool(...)` if testing truthiness is intentional
+```
+
+## Covered types
+
+This rule triggers on unions with `None` and other types that have falsy values:
+
+```py
+from typing import Any, Literal
+
+def check(flag: bool | None):
+    if flag:  # error: [implicit-bool-conversion]
+        pass
+
+def check(integer: int | None):
+    if integer:  # error: [implicit-bool-conversion]
+        pass
+
+def check(text: str | None):
+    if text:  # error: [implicit-bool-conversion]
+        pass
+
+def check(data: bytes | None):
+    if data:  # error: [implicit-bool-conversion]
+        pass
+
+def check(number: float | None):
+    if number:  # error: [implicit-bool-conversion]
+        pass
+
+def check(number: complex | None):
+    if number:  # error: [implicit-bool-conversion]
+        pass
+
+def check(items: list[int] | None):
+    if items:  # error: [implicit-bool-conversion]
+        pass
+
+def check(items: list[Any] | None):
+    if items:  # error: [implicit-bool-conversion]
+        pass
+
+def check(mapping: dict[str, int] | None):
+    if mapping:  # error: [implicit-bool-conversion]
+        pass
+```
+
+It also triggers if multiple other types could be falsy:
+
+```py
+def check(value: int | str | None):
+    if value:  # error: [implicit-bool-conversion]
+        pass
+```
+
+It also triggers if there are (additional) types in the union that are always truthy:
+
+```py
+def check(value: str | Literal[True] | None):
+    if value:  # error: [implicit-bool-conversion]
+        pass
+```
+
+The rule does *not* trigger on unions with `None` where the other types are always truthy, such
+as `Match[str]`:
+
+```py
+import re
+
+def re_match_is_always_truthy(match: re.Match[str]):
+    reveal_type(bool(match))  # revealed: Literal[True]
+
+def check(match: re.Match[str] | None):
+    if match:
+        pass
+```
+
+The rule does *not* trigger on unions with `None` that only include dynamic types. These could
+be problematic in theory, but are much less likely to be a mistake:
+
+```py
+def check(value: Any | None):
+    if value:
+        pass
+```
+
+The rule does trigger, however, if the union includes dynamic types in addition to two types that can be falsy:
+
+```py
+def check(value: int | Any | None):
+    if value:  # error: [implicit-bool-conversion]
+        pass
+```
+
+A custom class is also checked for implicit boolean conversion, unless it is always truthy:
+
+```py
+from typing import final
+
+class Custom: ...
+
+def check(value: Custom | None):
+    if value:  # error: [implicit-bool-conversion]
+        pass
+
+class AlwaysTruthy:
+    def __bool__(self) -> Literal[True]:
+        return True
+
+def check(value: AlwaysTruthy | None):
+    if value:
+        pass
+
+@final
+class AlwaysTruthyFinal: ...
+
+def check(value: AlwaysTruthyFinal | None):
+    if value:
+        pass
 ```
 
 ## Type-specific explanations
 
-```toml
-[rules]
-implicit-bool-conversion = "warn"
-```
+For common builtin types, the annotation identifies the falsy value that can be confused with `None` to
+help users identify the problem.
 
-For common optional builtins, the annotation identifies the falsy value that can be confused with
-`None`.
+Note: for a type like `int | None`, the falsy values that could be confused are not just `None` and `0`.
+`False` and instances of custom subclasses of `int` could also be falsy, but it would be too verbose to
+mention that in the diagnostic hint, so we just list `None` and `0` here:
 
 ```py
 def check(integer: int | None):
@@ -49,63 +166,12 @@ def check(integer: int | None):
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test of `int | None` conflates `None` with other falsy values
+warning[implicit-bool-conversion]: Boolean test on `int | None` does not distinguish `None` from other falsy values
  --> src/mdtest_snippet.py:3:8
   |
 3 |     if integer:
-  |        ^^^^^^^ Both `None` and `0` are falsy
-help: Use `is None` or `is not None` to check whether the value is present
-help: Use `bool(...)` if testing truthiness is intentional
-```
-
-```py
-def check(text: str | None):
-    # snapshot: implicit-bool-conversion
-    if text:
-        pass
-```
-
-```snapshot
-warning[implicit-bool-conversion]: Boolean test of `str | None` conflates `None` with other falsy values
- --> src/mdtest_snippet.py:7:8
-  |
-7 |     if text:
-  |        ^^^^ Both `None` and the empty string are falsy
-help: Use `is None` or `is not None` to check whether the value is present
-help: Use `bool(...)` if testing truthiness is intentional
-```
-
-```py
-def check(data: bytes | None):
-    # snapshot: implicit-bool-conversion
-    if data:
-        pass
-```
-
-```snapshot
-warning[implicit-bool-conversion]: Boolean test of `bytes | None` conflates `None` with other falsy values
-  --> src/mdtest_snippet.py:11:8
-   |
-11 |     if data:
-   |        ^^^^ Both `None` and an empty bytestring are falsy
-help: Use `is None` or `is not None` to check whether the value is present
-help: Use `bool(...)` if testing truthiness is intentional
-```
-
-```py
-def check(number: float | None):
-    # snapshot: implicit-bool-conversion
-    if number:
-        pass
-```
-
-```snapshot
-warning[implicit-bool-conversion]: Boolean test of `float | None` conflates `None` with other falsy values
-  --> src/mdtest_snippet.py:15:8
-   |
-15 |     if number:
-   |        ^^^^^^ Both `None` and `0.0` are falsy
-help: Use `is None` or `is not None` to check whether the value is present
+  |        ^^^^^^^ `None` and `0` are both falsy
+help: Use `is None` or `is not None` to check for presence of the value
 help: Use `bool(...)` if testing truthiness is intentional
 ```
 
@@ -117,12 +183,63 @@ def check(flag: bool | None):
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test of `bool | None` conflates `None` with other falsy values
+warning[implicit-bool-conversion]: Boolean test on `bool | None` does not distinguish `None` from other falsy values
+ --> src/mdtest_snippet.py:7:8
+  |
+7 |     if flag:
+  |        ^^^^ `None` and `False` are both falsy
+help: Use `is None` or `is not None` to check for presence of the value
+help: Use `bool(...)` if testing truthiness is intentional
+```
+
+```py
+def check(text: str | None):
+    # snapshot: implicit-bool-conversion
+    if text:
+        pass
+```
+
+```snapshot
+warning[implicit-bool-conversion]: Boolean test on `str | None` does not distinguish `None` from other falsy values
+  --> src/mdtest_snippet.py:11:8
+   |
+11 |     if text:
+   |        ^^^^ `None` and the empty string are both falsy
+help: Use `is None` or `is not None` to check for presence of the value
+help: Use `bool(...)` if testing truthiness is intentional
+```
+
+```py
+def check(data: bytes | None):
+    # snapshot: implicit-bool-conversion
+    if data:
+        pass
+```
+
+```snapshot
+warning[implicit-bool-conversion]: Boolean test on `bytes | None` does not distinguish `None` from other falsy values
+  --> src/mdtest_snippet.py:15:8
+   |
+15 |     if data:
+   |        ^^^^ `None` and an empty bytestring are both falsy
+help: Use `is None` or `is not None` to check for presence of the value
+help: Use `bool(...)` if testing truthiness is intentional
+```
+
+```py
+def check(number: float | None):
+    # snapshot: implicit-bool-conversion
+    if number:
+        pass
+```
+
+```snapshot
+warning[implicit-bool-conversion]: Boolean test on `float | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:19:8
    |
-19 |     if flag:
-   |        ^^^^ Both `None` and `False` are falsy
-help: Use `is None` or `is not None` to check whether the value is present
+19 |     if number:
+   |        ^^^^^^ `None` and `0` are both falsy
+help: Use `is None` or `is not None` to check for presence of the value
 help: Use `bool(...)` if testing truthiness is intentional
 ```
 
@@ -134,12 +251,12 @@ def check(items: list[int] | None):
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test of `list[int] | None` conflates `None` with other falsy values
+warning[implicit-bool-conversion]: Boolean test on `list[int] | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:23:8
    |
 23 |     if items:
-   |        ^^^^^ Both `None` and an empty list are falsy
-help: Use `is None` or `is not None` to check whether the value is present
+   |        ^^^^^ `None` and an empty list are both falsy
+help: Use `is None` or `is not None` to check for presence of the value
 help: Use `bool(...)` if testing truthiness is intentional
 ```
 
@@ -151,12 +268,12 @@ def check(mapping: dict[str, int] | None):
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test of `dict[str, int] | None` conflates `None` with other falsy values
+warning[implicit-bool-conversion]: Boolean test on `dict[str, int] | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:27:8
    |
 27 |     if mapping:
-   |        ^^^^^^^ Both `None` and an empty dictionary are falsy
-help: Use `is None` or `is not None` to check whether the value is present
+   |        ^^^^^^^ `None` and an empty dictionary are both falsy
+help: Use `is None` or `is not None` to check for presence of the value
 help: Use `bool(...)` if testing truthiness is intentional
 ```
 
@@ -171,12 +288,12 @@ def check(value: str | int | None):
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test of `str | int | None` conflates `None` with other falsy values
+warning[implicit-bool-conversion]: Boolean test on `str | int | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:31:8
    |
 31 |     if value:
    |        ^^^^^ Both `None` and non-`None` values can be false
-help: Use `is None` or `is not None` to check whether the value is present
+help: Use `is None` or `is not None` to check for presence of the value
 help: Use `bool(...)` if testing truthiness is intentional
 ```
 
@@ -192,12 +309,12 @@ def check(value: Custom | None):
 ```
 
 ```snapshot
-warning[implicit-bool-conversion]: Boolean test of `Custom | None` conflates `None` with other falsy values
+warning[implicit-bool-conversion]: Boolean test on `Custom | None` does not distinguish `None` from other falsy values
   --> src/mdtest_snippet.py:39:8
    |
 39 |     if value:
    |        ^^^^^ Both `None` and non-`None` values can be false
-help: Use `is None` or `is not None` to check whether the value is present
+help: Use `is None` or `is not None` to check for presence of the value
 help: Use `bool(...)` if testing truthiness is intentional
 ```
 
@@ -244,200 +361,5 @@ def check(items: list[int] | None, flag: bool, other: bool):
     if result := items and flag:  # error: [implicit-bool-conversion]
         pass
     if result := flag and items:  # error: [implicit-bool-conversion]
-        pass
-```
-
-The exemption applies to assignments, return values, and call arguments. Explicit boolean contexts
-inside these expressions, such as `not` and conditional-expression tests, are still checked.
-
-```py
-def consume(value: object): ...
-def display_name(name: str | None) -> str:
-    consume(name and name.upper())
-    value = (name and name.upper()) or "Anonymous"
-    return name or "Anonymous"
-
-def check(name: str | None, flag: bool):
-    value = flag and not name  # error: [implicit-bool-conversion]
-    value = flag and (1 if name else 0)  # error: [implicit-bool-conversion]
-    value = not (name or flag)  # error: [implicit-bool-conversion]
-    if (name and flag) or flag:  # error: [implicit-bool-conversion]
-        pass
-    assert name or flag  # error: [implicit-bool-conversion]
-```
-
-## Allowed types
-
-Boolean literals, gradual types, and values narrowed to booleans are accepted.
-
-```py
-from typing_extensions import Any, Never, TypeVar
-
-def check(flag: bool, dynamic: Any, unknown, missing: Never, optional: bool | None):
-    if flag:
-        pass
-    if dynamic:
-        pass
-    if unknown:
-        pass
-    if missing:
-        pass
-    if optional is not None:
-        if optional:
-            pass
-
-T = TypeVar("T", bound=bool)
-
-def generic(flag: T):
-    if flag:
-        pass
-```
-
-## Custom truthiness
-
-Optional objects with custom truthiness are checked.
-
-```py
-class Custom:
-    def __bool__(self) -> bool:
-        return True
-
-def check(value: Custom | None):
-    if value:  # error: [implicit-bool-conversion]
-        pass
-    if bool(value):
-        pass
-```
-
-## Comparisons
-
-Comparisons usually return booleans, but a custom comparison can return another type.
-
-```py
-class Custom:
-    def __lt__(self, other: "Custom") -> int | None:
-        return 1
-
-def check(left: Custom, right: Custom):
-    if left < right:  # error: [implicit-bool-conversion]
-        pass
-    result = left < right
-    if bool(left < right):
-        pass
-```
-
-## Constants
-
-Non-optional literal values are allowed.
-
-```py
-if 0:
-    pass
-if "text":  # error: [redundant-condition]
-    pass
-if []:
-    pass
-```
-
-## Unions and type parameters
-
-Dynamic union members are excluded, even when a known member can be false.
-
-```py
-from typing import Any, TypeVar
-
-def check(optional: bool | None, gradual: int | Any | None):
-    if optional:  # error: [implicit-bool-conversion]
-        pass
-    if gradual:
-        pass
-
-T = TypeVar("T")
-
-def generic(value: T):
-    if value:
-        pass
-```
-
-## Optional values with distinct falsy cases
-
-Empty containers, zero, and `False` can all be confused with `None`. Dynamic element types do not
-make a container itself dynamic.
-
-```py
-from typing import Any, Literal
-
-def check(number: float | None, text: str | None, items: list[Any] | None):
-    if number:  # error: [implicit-bool-conversion]
-        pass
-    if text:  # error: [implicit-bool-conversion]
-        pass
-    if items:  # error: [implicit-bool-conversion]
-        pass
-```
-
-## Unambiguous presence checks
-
-Always-truthy alternatives make a truthiness test an unambiguous presence check.
-
-```py
-import re
-from typing import Literal, final
-
-@final
-class Present:
-    pass
-
-class AlwaysTrue:
-    def __bool__(self) -> Literal[True]:
-        return True
-
-def check(
-    match: re.Match[str] | None,
-    present: Present | None,
-    custom: AlwaysTrue | None,
-    positive: Literal[1] | None,
-    flag: Literal[True] | None,
-):
-    if match:
-        pass
-    if present:
-        pass
-    if custom:
-        pass
-    if positive:
-        pass
-    if flag:
-        pass
-```
-
-## Non-optional and dynamic values
-
-Ordinary truthiness checks remain valid. A union containing a dynamic alternative is excluded.
-
-```py
-from typing import Any
-
-def check(items: list[str], number: int, text: str, dynamic: Any | None, unknown):
-    if items:
-        pass
-    if number:
-        pass
-    if text:
-        pass
-    if dynamic:
-        pass
-    value = unknown if number else None
-    if value:
-        pass
-```
-
-## Nested scopes
-
-```py
-def check(items: list[int | None], count: int | None):
-    predicate = lambda: not count  # error: [implicit-bool-conversion]
-    filtered = (x for x in items if x)  # error: [implicit-bool-conversion]
-    if value := count:  # error: [implicit-bool-conversion]
         pass
 ```

@@ -1271,8 +1271,7 @@ def take(items: list[str], limit: int | None = None) -> list[str]:
 
 
 This rule can trigger on conditions that intentionally treat missing and empty values alike. For
-example, a function might select the first available preset, falling back to an automatic mode when
-no presets are available:
+example, the following function intentionally treats both `None` and empty lists as equivalent:
 
 ```py
 def default_preset(presets: list[str] | None) -> str:
@@ -1281,8 +1280,8 @@ def default_preset(presets: list[str] | None) -> str:
     return "auto"
 ```
 
-There is no mistake here: both `None` and an empty list should select the fallback. Replacing the
-condition with `presets is not None` would introduce an `IndexError` for an empty list.
+Replacing the condition with `presets is not None` would introduce an `IndexError` for an empty
+list.
 
 An explicit `bool()` call preserves the intended truthiness check without triggering the rule:
 
