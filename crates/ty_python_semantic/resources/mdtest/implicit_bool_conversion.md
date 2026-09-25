@@ -91,8 +91,8 @@ def check(value: str | Literal[True] | None):
         pass
 ```
 
-The rule does *not* trigger on unions with `None` where the other types are always truthy, such
-as `Match[str]`:
+The rule does *not* trigger on unions with `None` where the other types are always truthy, such as
+`Match[str]`:
 
 ```py
 import re
@@ -105,8 +105,8 @@ def check(match: re.Match[str] | None):
         pass
 ```
 
-The rule does *not* trigger on unions with `None` that only include dynamic types. These could
-be problematic in theory, but are much less likely to be a mistake:
+The rule does *not* trigger on unions with `None` that only include dynamic types. These could be
+problematic in theory, but are much less likely to be a mistake:
 
 ```py
 def check(value: Any | None):
@@ -114,7 +114,8 @@ def check(value: Any | None):
         pass
 ```
 
-The rule does trigger, however, if the union includes dynamic types in addition to two types that can be falsy:
+The rule does trigger, however, if the union includes dynamic types in addition to two types that
+can be falsy:
 
 ```py
 def check(value: int | Any | None):
@@ -151,12 +152,12 @@ def check(value: AlwaysTruthyFinal | None):
 
 ## Type-specific explanations
 
-For common builtin types, the annotation identifies the falsy value that can be confused with `None` to
-help users identify the problem.
+For common builtin types, the annotation identifies the falsy value that can be confused with `None`
+to help users identify the problem.
 
-Note: for a type like `int | None`, the falsy values that could be confused are not just `None` and `0`.
-`False` and instances of custom subclasses of `int` could also be falsy, but it would be too verbose to
-mention that in the diagnostic hint, so we just list `None` and `0` here:
+Note: for a type like `int | None`, the falsy values that could be confused are not just `None` and
+`0`. `False` and instances of custom subclasses of `int` could also be falsy, but it would be too
+verbose to mention that in the diagnostic hint, so we just list `None` and `0` here:
 
 ```py
 def check(integer: int | None):
