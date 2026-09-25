@@ -946,6 +946,7 @@ linter.flake8_gettext.function_names = [
 linter.flake8_implicit_str_concat.allow_multiline = true
 linter.flake8_import_conventions.aliases = {
 	altair = alt,
+	datetime = dt,
 	holoviews = hv,
 	matplotlib = mpl,
 	matplotlib.pyplot = plt,
