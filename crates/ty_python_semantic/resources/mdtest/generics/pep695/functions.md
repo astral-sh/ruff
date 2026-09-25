@@ -2771,6 +2771,25 @@ reveal_type(set(values))
 reveal_type(set(choose("x")))
 ```
 
+### Prefer a constraint that is more specific than incomparable alternatives
+
+Encountering two incomparable constraints does not make the result ambiguous when a later constraint
+is more specific than both. The preferred result should not depend on which incomparable constraint
+was declared first.
+
+```py
+def choose_str_first[T: (int | str, int | bytes, int)](value: T) -> T:
+    return value
+
+def choose_bytes_first[T: (int | bytes, int | str, int)](value: T) -> T:
+    return value
+
+# revealed: int
+reveal_type(choose_str_first(1))
+# revealed: int
+reveal_type(choose_bytes_first(1))
+```
+
 ## Ambiguous constrained TypeVar inference from a partial constraint family
 
 Non-concrete evidence can rule out some declared constraints while remaining ambiguous among others.

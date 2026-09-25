@@ -1721,6 +1721,30 @@ def check(value: str) -> None:
     reveal_type(narrow_first(value))  # revealed: str
 ```
 
+## Prefer a constraint that is more specific than incomparable alternatives
+
+Encountering two incomparable constraints does not make the result ambiguous when a later constraint
+is more specific than both. The preferred result should not depend on which incomparable constraint
+was declared first.
+
+```py
+from typing import TypeVar
+
+StrFirst = TypeVar("StrFirst", int | str, int | bytes, int)
+BytesFirst = TypeVar("BytesFirst", int | bytes, int | str, int)
+
+def choose_str_first(value: StrFirst) -> StrFirst:
+    return value
+
+def choose_bytes_first(value: BytesFirst) -> BytesFirst:
+    return value
+
+# revealed: int
+reveal_type(choose_str_first(1))
+# revealed: int
+reveal_type(choose_bytes_first(1))
+```
+
 ## Prefer general constraints for upper-bound-only inference
 
 When inference provides only an upper bound, we prefer the most general compatible declared

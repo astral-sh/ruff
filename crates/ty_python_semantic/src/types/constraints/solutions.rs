@@ -695,64 +695,58 @@ impl<'db> SolutionWalker<'db> {
         }
 
         // At this point, we know that more than one constraint was satisfied. Check to see if any
-        // one of them is "tighter" than all of the others. If so, we prefer that single solution.
-        let mut current_best: Option<usize> = None;
+        // one of them is preferred over all of the others. If so, we prefer that single solution.
         let has_lower_bound_evidence = path.positive_constraints().any(|(constraint, _)| {
             let constraint = storage.constraint_data(constraint);
             constraint.provides_lower_bound_for(db, bound_typevar)
         });
-        for (idx, declared_constraint) in
+        let mut preferred = None;
+        'candidate: for (candidate_idx, declared_constraint) in
             constrained_typevar.declared_constraints.iter().enumerate()
         {
-            if !constraint_satisfied[idx] {
+            if !constraint_satisfied[candidate_idx] {
                 continue;
             }
 
-            let Some(best) = current_best else {
-                current_best = Some(idx);
-                continue;
-            };
-
-            let best = constrained_typevar.declared_constraints[best].constrained_ty;
             let candidate = declared_constraint.constrained_ty;
-            let candidate_assignable_to_best = candidate.is_assignable_to(db, env, best);
-            let best_assignable_to_candidate = best.is_assignable_to(db, env, candidate);
+            for (other_idx, other_constraint) in
+                constrained_typevar.declared_constraints.iter().enumerate()
+            {
+                if candidate_idx == other_idx || !constraint_satisfied[other_idx] {
+                    continue;
+                }
 
-            // If these two declared constraints cannot be compared, then there cannot possibly
-            // be a single "tightest" solution.
-            if !candidate_assignable_to_best && !best_assignable_to_candidate {
-                current_best = None;
-                break;
+                let other = other_constraint.constrained_ty;
+                let candidate_assignable_to_other = candidate.is_assignable_to(db, env, other);
+                let other_assignable_to_candidate = other.is_assignable_to(db, env, candidate);
+
+                // Lower-bound evidence asks for the narrowest compatible declared constraint
+                // above the lower bound. With only upper-bound evidence, ask for the widest
+                // compatible declared constraint below the upper bound. If the candidates are
+                // assignable in both directions, prefer a fully static constraint over a gradual
+                // one. Equivalent constraints preserve declaration order.
+                let candidate_is_at_least_as_good =
+                    match (candidate_assignable_to_other, other_assignable_to_candidate) {
+                        (false, false) => false,
+                        (true, false) => has_lower_bound_evidence,
+                        (false, true) => !has_lower_bound_evidence,
+                        (true, true) => {
+                            candidate.is_fully_static(db, env) || !other.is_fully_static(db, env)
+                        }
+                    };
+                if !candidate_is_at_least_as_good {
+                    continue 'candidate;
+                }
             }
 
-            // Lower-bound evidence asks for the narrowest compatible declared constraint
-            // above the lower bound. With only upper-bound evidence, ask for the widest
-            // compatible declared constraint below the upper bound. If the candidates are
-            // assignable in both directions, prefer a fully static constraint over a
-            // gradual one. Otherwise, keep the current best to preserve the TypeVar's
-            // declared constraint order.
-            let this_solution_is_better =
-                if candidate_assignable_to_best != best_assignable_to_candidate {
-                    if has_lower_bound_evidence {
-                        candidate_assignable_to_best
-                    } else {
-                        best_assignable_to_candidate
-                    }
-                } else {
-                    let candidate_is_static = candidate.is_fully_static(db, env);
-                    let best_is_static = best.is_fully_static(db, env);
-                    candidate_is_static && !best_is_static
-                };
-
-            if this_solution_is_better {
-                current_best = Some(idx);
-            }
+            preferred = Some(candidate_idx);
+            break;
         }
 
-        // If there was a single "best" constraint, remove the solutions from the other
+        // If there was a single preferred constraint, remove the solutions from the other
         // constraints. Otherwise keep them all, and let the caller decide how to handle the
         // ambiguity.
-        if let Some(best) = current_best {
+        if let Some(best) = preferred {
             let solutions = &constraint_solutions[best];
             self.pending.truncate(solutions.end);
             self.pending.drain(previously_pending..solutions.start);
