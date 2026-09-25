@@ -850,7 +850,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if !self.context.is_lint_enabled(&IMPLICIT_BOOL_CONVERSION)
             || matches!(expression, ast::Expr::BoolOp(_) | ast::Expr::If(_))
         {
-            // Compound conditions are checked through their operands.
+            // For an expression like `c1 or c2` or `a if c1 else b` we check the
+            // condition operands individually, so don't check the whole expression
+            // as well.
             return None;
         }
 
