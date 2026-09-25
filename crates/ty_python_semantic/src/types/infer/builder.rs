@@ -11587,10 +11587,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// their final operand during inference; only that final operand remains when
     /// the whole expression is used as a condition.
     fn check_implicit_bool_conversion(&self, expression: &ast::Expr, ty: Type<'db>) {
-        if !self.context.is_lint_enabled(&IMPLICIT_BOOL_CONVERSION)
-            || self.in_string_annotation()
-            || self.file().is_stub(self.db())
-        {
+        if !self.context.is_lint_enabled(&IMPLICIT_BOOL_CONVERSION) || self.in_string_annotation() {
             return;
         }
         if let ast::Expr::BoolOp(boolean) = expression
@@ -11632,8 +11629,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "Boolean test of `{}` conflates `None` with other falsy values",
                 ty.display(db, env)
             ));
-            diagnostic
-                .set_primary_annotation_message("Both `None` and non-`None` values can be false");
+            let non_none = UnionType::from_elements(
+                db,
+                env,
+                elements
+                    .iter()
+                    .copied()
+                    .filter(|element| !element.is_none(db)),
+            );
+            let known_class = match non_none {
+                Type::NominalInstance(instance) => instance.known_class(db),
+                Type::Union(union) => union.known(db).map(KnownUnion::annotation_class),
+                _ => None,
+            };
+            diagnostic.set_primary_annotation_message(match known_class {
+                Some(KnownClass::Int) => "Both `None` and `0` are falsy",
+                Some(KnownClass::Str) => "Both `None` and the empty string are falsy",
+                Some(KnownClass::Bytes) => "Both `None` and an empty bytestring are falsy",
+                Some(KnownClass::Float) => "Both `None` and `0.0` are falsy",
+                Some(KnownClass::Bool) => "Both `None` and `False` are falsy",
+                Some(KnownClass::List) => "Both `None` and an empty list are falsy",
+                Some(KnownClass::Dict) => "Both `None` and an empty dictionary are falsy",
+                _ => "Both `None` and non-`None` values can be false",
+            });
             diagnostic.help("Use `is None` or `is not None` to check whether the value is present");
             diagnostic.help("Use `bool(...)` if testing truthiness is intentional");
         }
