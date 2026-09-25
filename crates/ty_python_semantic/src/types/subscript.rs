@@ -23,8 +23,8 @@ use super::infer::TypeContext;
 use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::{
-    ClassLiteral, IntersectionBuilder, IntersectionType, KnownInstanceType, MemberLookupPolicy,
-    Type, TypeAliasType, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder, todo_type,
+    ClassLiteral, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
+    TypeVarBoundOrConstraints, TypedDictType, UnionBuilder, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -564,23 +564,12 @@ impl<'db> Type<'db> {
         slice_ty: Type<'db>,
         expr_context: ast::ExprContext,
     ) -> Result<Type<'db>, SubscriptError<'db>> {
-        self.subscript_with_receiver(db, env, slice_ty, expr_context, None)
-    }
-
-    fn subscript_with_receiver(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        slice_ty: Type<'db>,
-        expr_context: ast::ExprContext,
-        receiver: Option<Type<'db>>,
-    ) -> Result<Type<'db>, SubscriptError<'db>> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.subscript_with_receiver(db, env, slice_ty, expr_context, receiver);
+            return fallback.subscript(db, env, slice_ty, expr_context);
         }
 
         if let Some(fallback) = slice_ty.materialized_divergent_fallback() {
-            return self.subscript_with_receiver(db, env, fallback, expr_context, receiver);
+            return self.subscript(db, env, fallback, expr_context);
         }
 
         let value_ty = self;
@@ -594,56 +583,37 @@ impl<'db> Type<'db> {
             (Type::Recursive(recursive), _) => Some(
                 recursive
                     .unfold(db, env)
-                    .map(|unfolded| {
-                        unfolded.subscript_with_receiver(db, env, slice_ty, expr_context, receiver)
-                    })
+                    .map(|unfolded| unfolded.subscript(db, env, slice_ty, expr_context))
                     .unwrap_or(Ok(value_ty)),
             ),
 
             (_, Type::Recursive(recursive)) => Some(
                 recursive
                     .unfold(db, env)
-                    .map(|unfolded| {
-                        value_ty.subscript_with_receiver(db, env, unfolded, expr_context, receiver)
-                    })
+                    .map(|unfolded| value_ty.subscript(db, env, unfolded, expr_context))
                     .unwrap_or(Ok(value_ty)),
             ),
 
-            (Type::TypeAlias(alias), _) => Some(alias.value_type(db).subscript_with_receiver(
+            (Type::TypeAlias(alias), _) => Some(alias.value_type(db).subscript(
                 db,
                 env,
                 slice_ty,
                 expr_context,
-                receiver,
             )),
 
-            (_, Type::TypeAlias(alias)) => Some(value_ty.subscript_with_receiver(
-                db,
-                env,
-                alias.value_type(db),
-                expr_context,
-                receiver,
-            )),
-
-            // Expand overlapping alternatives before collecting their subscript errors.
-            (Type::Union(union), _) if union.has_aliases(db) => {
-                Some(union.expand_aliases(db, env).subscript_with_receiver(
-                    db,
-                    env,
-                    slice_ty,
-                    expr_context,
-                    receiver,
-                ))
+            (_, Type::TypeAlias(alias)) => {
+                Some(value_ty.subscript(db, env, alias.value_type(db), expr_context))
             }
 
+            // Expand overlapping alternatives before collecting their subscript errors.
+            (Type::Union(union), _) if union.has_aliases(db) => Some(
+                union
+                    .expand_aliases(db, env)
+                    .subscript(db, env, slice_ty, expr_context),
+            ),
+
             (_, Type::Union(union)) if union.has_aliases(db) => {
-                Some(value_ty.subscript_with_receiver(
-                    db,
-                    env,
-                    union.expand_aliases(db, env),
-                    expr_context,
-                    receiver,
-                ))
+                Some(value_ty.subscript(db, env, union.expand_aliases(db, env), expr_context))
             }
 
             (Type::Union(union), _) => Some(map_subscript_alternatives(
@@ -651,9 +621,7 @@ impl<'db> Type<'db> {
                 env,
                 value_ty,
                 union.elements(db).iter().copied(),
-                |element| {
-                    element.subscript_with_receiver(db, env, slice_ty, expr_context, receiver)
-                },
+                |element| element.subscript(db, env, slice_ty, expr_context),
             )),
 
             (_, Type::Union(union)) => Some(map_subscript_alternatives(
@@ -661,47 +629,37 @@ impl<'db> Type<'db> {
                 env,
                 slice_ty,
                 union.elements(db).iter().copied(),
-                |element| {
-                    value_ty.subscript_with_receiver(db, env, element, expr_context, receiver)
-                },
+                |element| value_ty.subscript(db, env, element, expr_context),
             )),
 
-            (Type::EnumComplement(complement), _) => Some(
-                complement
-                    .remaining_literal_union(db, env)
-                    .subscript_with_receiver(db, env, slice_ty, expr_context, receiver),
-            ),
+            (Type::EnumComplement(complement), _) => {
+                Some(complement.remaining_literal_union(db, env).subscript(
+                    db,
+                    env,
+                    slice_ty,
+                    expr_context,
+                ))
+            }
 
-            (_, Type::EnumComplement(complement)) => Some(value_ty.subscript_with_receiver(
+            (_, Type::EnumComplement(complement)) => Some(value_ty.subscript(
                 db,
                 env,
                 complement.remaining_literal_union(db, env),
                 expr_context,
-                receiver,
             )),
 
             (Type::Intersection(intersection), _) => Some(map_intersection_subscript(
                 db,
                 env,
                 intersection,
-                |element| {
-                    element.subscript_with_receiver(
-                        db,
-                        env,
-                        slice_ty,
-                        expr_context,
-                        Some(receiver.unwrap_or(self)),
-                    )
-                },
+                |element| element.subscript(db, env, slice_ty, expr_context),
             )),
 
             (_, Type::Intersection(intersection)) => Some(map_intersection_subscript(
                 db,
                 env,
                 intersection,
-                |element| {
-                    value_ty.subscript_with_receiver(db, env, element, expr_context, receiver)
-                },
+                |element| value_ty.subscript(db, env, element, expr_context),
             )),
 
             (Type::TypeVar(typevar), _)
@@ -713,15 +671,7 @@ impl<'db> Type<'db> {
                     env,
                     value_ty,
                     constraints.elements(db).iter().copied(),
-                    |constraint| {
-                        constraint.subscript_with_receiver(
-                            db,
-                            env,
-                            slice_ty,
-                            expr_context,
-                            receiver,
-                        )
-                    },
+                    |constraint| constraint.subscript(db, env, slice_ty, expr_context),
                 ))
             }
 
@@ -903,26 +853,14 @@ impl<'db> Type<'db> {
                 if (lhs_literal.is_string() || lhs_literal.is_bytes())
                     && let Some(bool) = rhs_literal.as_bool() =>
             {
-                Some(value_ty.subscript_with_receiver(
-                    db,
-                    env,
-                    Type::int_literal(i64::from(bool)),
-                    expr_context,
-                    receiver,
-                ))
+                Some(value_ty.subscript(db, env, Type::int_literal(i64::from(bool)), expr_context))
             }
 
             (Type::NominalInstance(nominal), Type::LiteralValue(literal))
                 if let Some(bool) = literal.as_bool()
                     && nominal.tuple_spec(db, env).is_some() =>
             {
-                Some(value_ty.subscript_with_receiver(
-                    db,
-                    env,
-                    Type::int_literal(i64::from(bool)),
-                    expr_context,
-                    receiver,
-                ))
+                Some(value_ty.subscript(db, env, Type::int_literal(i64::from(bool)), expr_context))
             }
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _) => {
@@ -1009,17 +947,11 @@ impl<'db> Type<'db> {
         // If the class defines `__getitem__`, return its return type.
         //
         // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
-        match Type::try_call_dunder_member_impl(
+        match value_ty.try_call_dunder(
             db,
             env,
-            value_ty.member_lookup_with_policy_and_receiver(
-                db,
-                env,
-                "__getitem__",
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                receiver,
-            ),
-            &mut CallArguments::positional([slice_ty]),
+            "__getitem__",
+            CallArguments::positional([slice_ty]),
             TypeContext::default(),
         ) {
             Ok(outcome) => {

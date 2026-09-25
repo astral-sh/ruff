@@ -315,13 +315,20 @@ def _(flag: bool):
     reveal_type(c[0])  # revealed: str
 ```
 
-## Implicit calls preserve intersection receivers
+## Intersection receivers
 
-Implicit calls bind `Self` to the full receiver, just like explicit calls to the same method.
+```toml
+[environment]
+python-version = "3.14"
+```
+
+### Calls and unary operators
+
+Calls through `__call__` and unary operators bind `Self` to the full receiver, just like explicit
+calls to the same method.
 
 ```py
-from typing_extensions import Self
-from ty_extensions import Intersection
+from typing import Self
 
 class C:
     def __call__(self) -> Self:
@@ -336,27 +343,21 @@ class C:
     def __invert__(self) -> Self:
         return self
 
-    def __getitem__(self, key: int | None) -> Self:
-        return self
-
 class Other: ...
 
-def narrowed(c: C, key: int | None):
+def narrowed(c: C):
     if isinstance(c, Other):
         reveal_type(c.__call__())  # revealed: C & Other
         reveal_type(c())  # revealed: C & Other
-        reveal_type(-c)  # revealed: C & Other
-        reveal_type(+c)  # revealed: C & Other
-        reveal_type(~c)  # revealed: C & Other
-        reveal_type(c[0])  # revealed: C & Other
-        reveal_type(c[key])  # revealed: C & Other
-    else:
-        reveal_type(c())  # revealed: C & ~Other
-        reveal_type(-c)  # revealed: C & ~Other
 
-def reversed_order(c: Intersection[Other, C]):
-    reveal_type(c())  # revealed: Other & C
-    reveal_type(-c)  # revealed: Other & C
+        reveal_type(c.__neg__())  # revealed: C & Other
+        reveal_type(-c)  # revealed: C & Other
+
+        reveal_type(c.__pos__())  # revealed: C & Other
+        reveal_type(+c)  # revealed: C & Other
+
+        reveal_type(c.__invert__())  # revealed: C & Other
+        reveal_type(~c)  # revealed: C & Other
 ```
 
 Each member of a union retains its own intersection receiver, and multiple methods on an
@@ -370,23 +371,21 @@ class D:
     def __neg__(self) -> Self:
         return self
 
-def union(c: Intersection[C, Other] | Intersection[D, Other]):
+def union(c: C & Other | D & Other):
+    reveal_type(c.__call__())  # revealed: (C & Other) | (D & Other)
     reveal_type(c())  # revealed: (C & Other) | (D & Other)
-    reveal_type(-c)  # revealed: (C & Other) | (D & Other)
 
-def multiple_providers(c: Intersection[C, D]):
-    reveal_type(c())  # revealed: C & D
-    reveal_type(-c)  # revealed: C & D
+    reveal_type(c.__neg__())  # revealed: (C & Other) | (D & Other)
+    reveal_type(-c)  # revealed: (C & Other) | (D & Other)
 ```
 
-## Arithmetic preserves intersection receivers
+### Arithmetic
 
 Both normal and reflected operators bind `Self` to the full receiver. Augmented assignment retains
 that receiver as well.
 
 ```py
-from typing_extensions import Self
-from ty_extensions import Intersection
+from typing import Self
 
 class C:
     def __add__(self, other: int) -> Self:
@@ -400,19 +399,39 @@ class C:
 
 class Other: ...
 
-def _(c: Intersection[C, Other]):
+def _(c: C & Other):
+    reveal_type(c.__add__(1))  # revealed: C & Other
     reveal_type(c + 1)  # revealed: C & Other
+
+    reveal_type(c.__radd__(1))  # revealed: C & Other
     reveal_type(1 + c)  # revealed: C & Other
+
+    reveal_type(c.__iadd__(1))  # revealed: C & Other
     c += 1
     reveal_type(c)  # revealed: C & Other
 ```
 
-## Context managers preserve intersection receivers
+### Subscripting
 
 ```py
-from typing import Any
-from typing_extensions import Self
-from ty_extensions import Intersection
+from typing import Self
+
+class C:
+    def __getitem__(self, key: int) -> Self:
+        return self
+
+class Other: ...
+
+def _(c: C & Other):
+    reveal_type(c.__getitem__(0))  # revealed: C & Other
+    # TODO: This should retain `C & Other`, just like the explicit call.
+    reveal_type(c[0])  # revealed: C
+```
+
+### Context managers
+
+```py
+from typing import Any, Self
 
 class C:
     def __enter__(self) -> Self:
@@ -426,21 +445,22 @@ class C:
 
 class Other: ...
 
-async def _(c: Intersection[C, Other]):
+async def _(c: C & Other):
+    reveal_type(c.__enter__())  # revealed: C & Other
     with c as entered:
         reveal_type(entered)  # revealed: C & Other
+
+    reveal_type(await c.__aenter__())  # revealed: C & Other
     async with c as entered_async:
         reveal_type(entered_async)  # revealed: C & Other
 ```
 
-## Await preserves intersection receivers
+### Await
 
 `Self` can also occur inside the return type of a dunder method.
 
 ```py
-from typing import Any, Generator
-from typing_extensions import Self
-from ty_extensions import Intersection
+from typing import Any, Generator, Self
 
 class C:
     def __await__(self) -> Generator[Any, None, Self]:
@@ -449,15 +469,17 @@ class C:
 
 class Other: ...
 
-async def _(c: Intersection[C, Other]):
+async def _(c: C & Other):
+    reveal_type(c.__await__())  # revealed: Generator[Any, None, C & Other]
     reveal_type(await c)  # revealed: C & Other
 ```
 
-## Iteration over intersection receivers
+### Iteration
+
+#### Synchronous
 
 ```py
-from typing_extensions import Self
-from ty_extensions import Intersection
+from typing import Self
 
 class C:
     def __iter__(self) -> Self:
@@ -468,26 +490,25 @@ class C:
 
 class Other: ...
 
-def _(c: Intersection[C, Other]):
+def _(c: C & Other):
     reveal_type(c.__iter__())  # revealed: C & Other
-    reveal_type(c.__next__())  # revealed: C & Other
-    # TODO: These should all retain `C & Other`, just like the explicit calls.
+    # TODO: This should retain `C & Other`, just like the explicit call.
     reveal_type(iter(c))  # revealed: C
+
+    reveal_type(c.__next__())  # revealed: C & Other
+    # TODO: This should retain `C & Other`, just like the explicit call.
     reveal_type(next(c))  # revealed: C
+
+    reveal_type(c.__iter__().__next__())  # revealed: C & Other
     for item in c:
+        # TODO: This should retain `C & Other`, just like the explicit calls.
         reveal_type(item)  # revealed: C
 ```
 
-## Async iteration over intersection receivers
-
-```toml
-[environment]
-python-version = "3.12"
-```
+#### Asynchronous
 
 ```py
 from typing import Self
-from ty_extensions import Intersection
 
 class C:
     def __aiter__(self) -> Self:
@@ -498,12 +519,16 @@ class C:
 
 class Other: ...
 
-async def _(c: Intersection[C, Other]):
+async def _(c: C & Other):
     reveal_type(c.__aiter__())  # revealed: C & Other
-    reveal_type(await c.__anext__())  # revealed: C & Other
-    # TODO: These built-ins should retain `C & Other`, just like the explicit calls.
+    # TODO: This should retain `C & Other`, just like the explicit call.
     reveal_type(aiter(c))  # revealed: C
+
+    reveal_type(await c.__anext__())  # revealed: C & Other
+    # TODO: This should retain `C & Other`, just like the explicit call.
     reveal_type(await anext(c))  # revealed: C
+
+    reveal_type(await c.__aiter__().__anext__())  # revealed: C & Other
     async for item in c:
         reveal_type(item)  # revealed: C & Other
 ```
