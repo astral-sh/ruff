@@ -2728,17 +2728,11 @@ def probe(value: Tree[int, str]):
 
 Specializing a generic class also specializes the upper bound of `Self` inside type alias arguments.
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 ```py
-from typing import Generic, Self, TypeVar
-
-type Identity[T] = T
+from typing_extensions import Generic, Self, TypeAlias, TypeVar
 
 T = TypeVar("T")
+Identity: TypeAlias = T
 
 class Box(Generic[T]):
     def mutate(self: Identity[Self], value: T) -> None: ...
