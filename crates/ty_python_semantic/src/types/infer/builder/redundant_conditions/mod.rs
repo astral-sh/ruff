@@ -757,10 +757,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let env = self.program_environment();
 
-        let kind =
+        let kind = if truthiness.is_ambiguous() {
             if let Some(union) = self.implicit_bool_conversion_candidate(expression, value_type) {
                 ConditionKind::NoneUnion(union)
-            } else if truthiness.is_ambiguous() {
+            } else {
                 let expanded = match value_type.resolve_type_alias(db) {
                     Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
                     ty => ty,
@@ -821,16 +821,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         return None;
                     }
                 }
-            } else if value_type.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
-                ConditionKind::Boolean
-            } else if value_type.bool(db, env).is_ambiguous() {
-                ConditionKind::ShortCircuit
-            } else if any_over_expr(expression, ast::Expr::is_named_expr) {
-                // Include deferred bodies: a surrounding call may execute a lambda or generator.
-                ConditionKind::ContainsWalrus
-            } else {
-                ConditionKind::Value
-            };
+            }
+        } else if value_type.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
+            ConditionKind::Boolean
+        } else if value_type.bool(db, env).is_ambiguous() {
+            ConditionKind::ShortCircuit
+        } else if any_over_expr(expression, ast::Expr::is_named_expr) {
+            // Include deferred bodies: a surrounding call may execute a lambda or generator.
+            ConditionKind::ContainsWalrus
+        } else {
+            ConditionKind::Value
+        };
 
         Some(RedundantCondition {
             expression,
