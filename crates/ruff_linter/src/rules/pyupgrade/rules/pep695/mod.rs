@@ -242,6 +242,7 @@ struct TypeVarReferenceVisitor<'a> {
     /// Tracks whether any non-TypeVars have been seen to avoid replacing generic parameters when an
     /// unknown `TypeVar` is encountered.
     any_skipped: bool,
+    has_unpacked_kwargs: bool,
 }
 
 /// Recursively collects the names of type variable references present in an expression.
@@ -275,10 +276,10 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
 
         match expr {
             Expr::Name(name) if name.ctx.is_load() => {
-                if let Some(var) = expr_name_to_type_var(self.semantic, name) {
-                    self.vars.push(var);
-                } else {
-                    self.any_skipped = true;
+                match expr_name_to_type_var(self.semantic, name) {
+                    TypeVarLookup::Resolved(var) => self.vars.push(var),
+                    TypeVarLookup::UnpackedKwargs => self.has_unpacked_kwargs = true,
+                    TypeVarLookup::Unresolved => self.any_skipped = true,
                 }
             }
             _ => visitor::walk_expr(self, expr),
@@ -286,23 +287,33 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
     }
 }
 
+pub(crate) enum TypeVarLookup<'a> {
+    Unresolved,
+    Resolved(TypeVar<'a>),
+    UnpackedKwargs,
+}
+
 pub(crate) fn expr_name_to_type_var<'a>(
     semantic: &'a SemanticModel,
     name: &'a ExprName,
-) -> Option<TypeVar<'a>> {
-    let StmtAssign { value, .. } = semantic
+) -> TypeVarLookup<'a> {
+    let Some(stmt) = semantic
         .lookup_symbol(name.id.as_str())
         .binding_id()
         .and_then(|binding_id| semantic.binding(binding_id).source)
-        .map(|node_id| semantic.statement(node_id))?
-        .as_assign_stmt()?;
+        .map(|node_id| semantic.statement(node_id))
+        .and_then(|stmt| stmt.as_assign_stmt())
+    else {
+        return TypeVarLookup::Unresolved;
+    };
+    let StmtAssign { value, .. } = stmt;
 
     match value.as_ref() {
         Expr::Subscript(ExprSubscript {
             value: subscript_value,
             ..
         }) if semantic.match_typing_expr(subscript_value, "TypeVar") => {
-            return Some(TypeVar {
+            return TypeVarLookup::Resolved(TypeVar {
                 name: &name.id,
                 restriction: None,
                 kind: TypeParamKind::TypeVar,
@@ -319,7 +330,7 @@ pub(crate) fn expr_name_to_type_var<'a>(
             } else if semantic.match_typing_expr(func, "ParamSpec") {
                 TypeParamKind::ParamSpec
             } else {
-                return None;
+                return TypeVarLookup::Unresolved;
             };
 
             if arguments
@@ -353,7 +364,13 @@ pub(crate) fn expr_name_to_type_var<'a>(
                     None
                 };
 
-                return Some(TypeVar {
+                // Check for unpacked keyword arguments that cannot be represented
+                // in PEP 695 syntax.
+                if arguments.keywords.iter().any(|kw| kw.arg.is_none()) {
+                    return TypeVarLookup::UnpackedKwargs;
+                }
+
+                return TypeVarLookup::Resolved(TypeVar {
                     name: &name.id,
                     restriction,
                     kind,
@@ -363,7 +380,7 @@ pub(crate) fn expr_name_to_type_var<'a>(
         }
         _ => {}
     }
-    None
+    TypeVarLookup::Unresolved
 }
 
 /// Check if the current statement is nested within another [`StmtClassDef`] or [`StmtFunctionDef`].

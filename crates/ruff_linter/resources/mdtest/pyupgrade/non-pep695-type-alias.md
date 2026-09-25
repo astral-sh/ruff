@@ -32,3 +32,39 @@ from typing_extensions import TypeAliasType, TypeVar
 T = TypeVar("T", default=int)
 Alias = TypeAliasType("Alias", list[T], type_params=(T,))
 ```
+
+## `TypeVar` with unpacked keyword arguments
+
+When a `TypeVar` uses unpacked keyword arguments (e.g. `**{"default": Any}`), the fix cannot
+safely inline it into PEP 695 syntax. A diagnostic is still emitted, but no fix is offered.
+
+```toml
+target-version = "py314"
+
+[lint]
+preview = true
+select = ["UP040", "UP046", "UP047"]
+```
+
+```py
+from typing import Any, Generic, TypeAlias, TypeAliasType, TypeVar
+
+T = TypeVar("T", **{"default": Any})
+U = TypeVar("U")
+
+# error: [non-pep695-type-alias]
+AnyList = TypeAliasType("AnyList", list[T], type_params=(T,))
+
+# error: [non-pep695-type-alias]
+Alias: TypeAlias = list[T]
+
+# error: [non-pep695-type-alias]
+MixedAlias: TypeAlias = tuple[T, U]
+
+# error: [non-pep695-generic-class]
+class MyClass(Generic[T, U]):
+    pass
+
+def f(first: T, second: U) -> tuple[T, U]:
+    return first, second
+```

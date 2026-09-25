@@ -154,8 +154,12 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
                     vars: vec![],
                     semantic: checker.semantic(),
                     any_skipped: false,
+                    has_unpacked_kwargs: false,
                 };
                 visitor.visit_expr(annotation);
+                if visitor.has_unpacked_kwargs {
+                    return;
+                }
                 visitor.vars
             };
             type_vars.extend(vars);
