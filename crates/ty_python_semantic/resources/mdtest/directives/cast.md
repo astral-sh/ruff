@@ -888,7 +888,7 @@ from typing import cast
 for x in cast(list[object], reveal_type([42])):  # no redundant-cast or disjoint-cast diagnostic
     reveal_type(x)  # revealed: object
 
-for x in [42]:  # no diagnostic
+for x in [42]:
     reveal_type(x)  # revealed: Literal[42]
 ```
 
@@ -909,6 +909,23 @@ for x in cast(set[object], reveal_type({"foo", "bar"})):  # no redundant-cast or
 for x, y in cast(dict[object, object], reveal_type({"foo": 42})).items():  # no redundant-cast or disjoint-cast diagnostic
     reveal_type(x)  # revealed: object
     reveal_type(y)  # revealed: object
+```
+
+In situations where reinferring the type with type context would still lead to a disjoint type for
+the collection literal, we continue to report `disjoint-cast`:
+
+```py
+# revealed: set[int]
+for x in cast(set[str], reveal_type({1, 2, 3})):  # error: [disjoint-cast]
+    reveal_type(x)  # revealed: str
+
+# revealed: list[int]
+for x in cast(list[str], reveal_type([1, 2, 3])):  # error: [disjoint-cast]
+    reveal_type(x)  # revealed: str
+
+# revealed: dict[int, int]
+for x in cast(dict[str, str], reveal_type({1: 2, 3: 4})):  # error: [disjoint-cast]
+    reveal_type(x)  # revealed: str
 ```
 
 ## Diagnostic snapshots
