@@ -24,7 +24,10 @@ use ty_python_core::definition::Definition;
 impl<'db> Type<'db> {
     pub(super) fn function_like_kind(self, db: &'db dyn Db) -> Option<CallableTypeKind> {
         match self {
-            Type::FunctionLiteral(function) => Some(function.callable_type_kind(db)),
+            Type::FunctionLiteral(function) => {
+                let kind = function.callable_type_kind(db);
+                (kind != CallableTypeKind::BuiltinFunctionLike).then_some(kind)
+            }
             Type::Callable(callable) if callable.is_method_like(db) => Some(callable.kind(db)),
             Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
                 Some(match wrapper.kind(db) {
@@ -601,6 +604,11 @@ pub enum CallableTypeKind {
     /// [descriptor-protocol]: https://docs.python.org/3/howto/descriptor.html#descriptor-protocol
     FunctionLike,
 
+    /// A builtin function, such as `object.__new__`, with runtime class
+    /// `types.BuiltinFunctionType`. Unlike Python functions, these are not descriptors:
+    /// attribute access neither binds a receiver nor unwraps a `staticmethod`.
+    BuiltinFunctionLike,
+
     /// A `Callable[P, R]`-typed dunder attribute whose parameters come from a `ParamSpec`.
     ///
     /// This has the runtime assumptions of [`Self::Regular`]: truthiness is ambiguous,
@@ -832,6 +840,7 @@ impl<'db> CallableType<'db> {
     pub(super) fn runtime_class(self, db: &'db dyn Db) -> Option<KnownClass> {
         match self.kind(db) {
             CallableTypeKind::FunctionLike => Some(KnownClass::FunctionType),
+            CallableTypeKind::BuiltinFunctionLike => Some(KnownClass::BuiltinFunctionType),
             CallableTypeKind::StaticMethodLike => Some(KnownClass::Staticmethod),
             CallableTypeKind::ClassMethodLike => Some(KnownClass::Classmethod),
             _ => None,

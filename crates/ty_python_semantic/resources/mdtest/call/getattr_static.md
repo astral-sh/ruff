@@ -136,6 +136,59 @@ def _(flag: bool):
     reveal_type(inspect.getattr_static(C, "x", "default"))  # revealed: int | Literal["default"]
 ```
 
+## Metaclass fallback for possibly unbound attributes
+
+When a class attribute is absent, static lookup falls back to the metaclass before using the default
+argument. A conditionally defined class attribute therefore does not make the result possibly
+missing when the metaclass always provides it.
+
+```py
+from inspect import getattr_static
+
+class Meta(type):
+    attr: int = 1
+
+def check(flag: bool):
+    class C(metaclass=Meta):
+        if flag:
+            attr: str = "class attribute"
+
+    reveal_type(getattr_static(C, "attr", None))  # revealed: str | int
+```
+
+## Static lookup on unions
+
+Each alternative uses its own class and metaclass lookup before the results are combined. In
+particular, a class attribute on one alternative does not hide the metaclass attribute of another
+alternative.
+
+```py
+from inspect import getattr_static
+
+class Meta(type):
+    attr: int = 1
+
+class A(metaclass=Meta):
+    attr: str = "class attribute"
+
+class B(metaclass=Meta): ...
+
+def check(flag: bool):
+    cls = A if flag else B
+    reveal_type(getattr_static(cls, "attr", None))  # revealed: str | int
+```
+
+An instance alternative also participates in lookup:
+
+```py
+class C:
+    attr: bytes = b"instance attribute"
+
+def check_mixed(flag: bool):
+    value = A if flag else C()
+    reveal_type(getattr_static(value, "attr", None))  # revealed: str | bytes
+```
+
 ## Gradual types
 
 ```py
@@ -186,6 +239,160 @@ the raw `classmethod` or `staticmethod` descriptors (this is a regression test f
 ```py
 some_classmethod.__kwdefaults__  # error: [unresolved-attribute]
 some_staticmethod.__kwdefaults__  # error: [unresolved-attribute]
+```
+
+## Builtin `__new__` identity
+
+Unlike Python-defined `__new__` methods, builtin `__new__` methods are not wrapped in a
+`staticmethod` descriptor. Static lookup can therefore return the same object as ordinary attribute
+access. This comparison guards against custom object allocation and is not redundant.
+
+```toml
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+import inspect
+
+def check_allocation(cls: object):
+    reveal_type(inspect.getattr_static(cls, "__new__"))  # revealed: Any
+    reveal_type(inspect.getattr_static(cls, "__new__") is object.__new__)  # revealed: bool
+    if inspect.getattr_static(cls, "__new__") is not object.__new__:
+        raise TypeError
+
+check_allocation(object)
+```
+
+Static and ordinary lookup also agree when the class is known, including when `__new__` is
+inherited:
+
+```py
+class C: ...
+
+reveal_type(inspect.getattr_static(object, "__new__") is object.__new__)  # revealed: Literal[True]
+reveal_type(inspect.getattr_static(C, "__new__") is object.__new__)  # revealed: Literal[True]
+reveal_type(inspect.getattr_static(int, "__new__") is int.__new__)  # revealed: Literal[True]
+reveal_type(inspect.getattr_static(list, "__new__") is list.__new__)  # revealed: Literal[True]
+```
+
+The descriptor can change in a subclass, so a `type` or instance annotation does not establish its
+identity:
+
+```py
+def check_class(cls: type):
+    reveal_type(inspect.getattr_static(cls, "__new__") is object.__new__)  # revealed: bool
+
+def check_subclass(cls: type[C]):
+    reveal_type(inspect.getattr_static(cls, "__new__") is object.__new__)  # revealed: bool
+
+def check_instance(instance: C):
+    reveal_type(inspect.getattr_static(instance, "__new__") is object.__new__)  # revealed: bool
+```
+
+## Builtin `__new__` descriptor behavior
+
+Builtin `__new__` functions have no descriptor wrapper or `__get__` method. Assigning one to a class
+attribute does not bind an instance to its first parameter.
+
+```py
+from inspect import getattr_static
+
+new = getattr_static(object, "__new__")
+reveal_type(type(new))  # revealed: <class 'BuiltinFunctionType'>
+new.__func__  # error: [unresolved-attribute]
+new.__get__  # error: [unresolved-attribute]
+
+class C:
+    create = object.__new__
+
+reveal_type(C.create(C))  # revealed: C
+reveal_type(C().create(C))  # revealed: C
+```
+
+Generalizing a builtin function to a callable preserves its runtime class and binding behavior:
+
+```py
+constructors = [object.__new__]
+reveal_type(type(constructors[0]))  # revealed: <class 'BuiltinFunctionType'>
+
+class D:
+    create = constructors[0]
+
+class Child(D): ...
+
+reveal_type(D().create(D))  # revealed: D
+reveal_type(D().create(Child))  # revealed: Child
+```
+
+Explicitly wrapping a builtin function in `staticmethod` creates a separate descriptor that exposes
+the original builtin function:
+
+```py
+wrapped = staticmethod(object.__new__)
+reveal_type(type(wrapped))  # revealed: <class 'staticmethod'>
+reveal_type(type(wrapped.__func__))  # revealed: <class 'BuiltinFunctionType'>
+reveal_type(wrapped.__func__ is object.__new__)  # revealed: Literal[True]
+```
+
+## Final-class `__new__` descriptors
+
+An instance of a final class cannot inherit a different constructor from a subclass, so static
+lookup preserves its `__new__` signature and checks the arguments when it is called.
+
+```py
+from inspect import getattr_static
+from typing import final
+
+@final
+class C:
+    def __new__(cls, value: int):
+        return object.__new__(cls)
+
+def check(instance: C):
+    new = getattr_static(instance, "__new__")
+    reveal_type(type(new))  # revealed: <class 'staticmethod'>
+    new(C, 1)
+    new(C, "wrong")  # error: [invalid-argument-type]
+```
+
+## Static `__new__` lookup on unions
+
+Unions of known classes retain the signature of their shared constructor:
+
+```py
+from inspect import getattr_static
+
+class Base:
+    def __new__(cls, value: int):
+        return object.__new__(cls)
+
+class C(Base): ...
+class D(Base): ...
+
+def check(flag: bool):
+    cls = C if flag else D
+    new = getattr_static(cls, "__new__")
+    new(cls, 1)
+    new(cls, "wrong")  # error: [invalid-argument-type]
+```
+
+## Python-defined `__new__` descriptors
+
+Python-defined `__new__` methods are implicitly wrapped in `staticmethod`, so static and ordinary
+lookup return distinct objects.
+
+```py
+from inspect import getattr_static
+
+class C:
+    def __new__(cls):
+        return object.__new__(cls)
+
+new = getattr_static(C, "__new__")
+reveal_type(type(new))  # revealed: <class 'staticmethod'>
+reveal_type(new is C.__new__)  # revealed: Literal[False]
+reveal_type(new.__func__ is C.__new__)  # revealed: Literal[True]
 ```
 
 [official documentation]: https://docs.python.org/3/library/inspect.html#inspect.getattr_static

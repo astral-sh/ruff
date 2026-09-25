@@ -1172,7 +1172,12 @@ impl<'db> FunctionType<'db> {
 
     pub(super) fn underlying_function(self, db: &'db dyn Db) -> Self {
         if self.is_classmethod(db) || self.is_staticmethod(db) {
-            self.with_descriptor_kind(db, CallableTypeKind::FunctionLike)
+            let kind = if self.is_builtin_new(db) {
+                CallableTypeKind::BuiltinFunctionLike
+            } else {
+                CallableTypeKind::FunctionLike
+            };
+            self.with_descriptor_kind(db, kind)
         } else {
             self
         }
@@ -1441,12 +1446,22 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Returns true if every definition of this method uses `@staticmethod`, or is implicitly a
-    /// static method. An inconsistently applied decorator does not affect method binding.
+    /// static method. Builtin `__new__` methods do not have a staticmethod wrapper.
+    /// An inconsistently applied decorator does not affect method binding.
     pub(crate) fn is_staticmethod(self, db: &'db dyn Db) -> bool {
         self.descriptor_kind(db).map_or_else(
-            || self.has_staticmethod_declaration(db),
+            || self.has_staticmethod_declaration(db) && !self.is_builtin_new(db),
             |kind| kind == CallableTypeKind::StaticMethodLike,
         )
+    }
+
+    /// Builtin `__new__` methods are builtin functions, without the `staticmethod` wrapper
+    /// that Python creates for Python-defined `__new__` methods.
+    fn is_builtin_new(self, db: &'db dyn Db) -> bool {
+        self.name(db) == "__new__"
+            && file_to_module(db, self.program_file(db).resolver_file(db))
+                .and_then(|module| module.known(db))
+                .is_some_and(KnownModule::is_builtins)
     }
 
     /// Whether this function was declared as a staticmethod, even if descriptor access has
@@ -1699,22 +1714,25 @@ impl<'db> FunctionType<'db> {
 
     /// Return the kind for this function when it is converted into a [`CallableType`].
     pub(crate) fn callable_type_kind(self, db: &'db dyn Db) -> CallableTypeKind {
-        if self.is_classmethod(db) {
+        if let Some(kind) = self.descriptor_kind(db) {
+            kind
+        } else if self.is_classmethod(db) {
             CallableTypeKind::ClassMethodLike
         } else if self.is_staticmethod(db) {
             CallableTypeKind::StaticMethodLike
+        } else if self.is_builtin_new(db) {
+            CallableTypeKind::BuiltinFunctionLike
         } else {
             CallableTypeKind::FunctionLike
         }
     }
 
     pub(super) fn runtime_class(self, db: &'db dyn Db) -> KnownClass {
-        if self.is_classmethod(db) {
-            KnownClass::Classmethod
-        } else if self.is_staticmethod(db) {
-            KnownClass::Staticmethod
-        } else {
-            KnownClass::FunctionType
+        match self.callable_type_kind(db) {
+            CallableTypeKind::ClassMethodLike => KnownClass::Classmethod,
+            CallableTypeKind::StaticMethodLike => KnownClass::Staticmethod,
+            CallableTypeKind::BuiltinFunctionLike => KnownClass::BuiltinFunctionType,
+            _ => KnownClass::FunctionType,
         }
     }
 

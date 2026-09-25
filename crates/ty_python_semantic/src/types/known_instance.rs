@@ -119,6 +119,7 @@ impl<'db> MethodWrapper<'db> {
                     CallableTypeKind::ClassMethodLike => kind == MethodWrapperKind::Classmethod,
                     CallableTypeKind::StaticMethodLike => kind == MethodWrapperKind::Staticmethod,
                     CallableTypeKind::Regular
+                    | CallableTypeKind::BuiltinFunctionLike
                     | CallableTypeKind::DunderParamSpec
                     | CallableTypeKind::ParamSpecValue => false,
                 } =>

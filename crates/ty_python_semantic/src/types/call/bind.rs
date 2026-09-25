@@ -2511,6 +2511,15 @@ impl<'db> Bindings<'db> {
                                 continue;
                             };
 
+                            // A subclass can replace a builtin `__new__` with a Python-defined
+                            // staticmethod, or vice versa. Keep the stub's `Any` when the receiver
+                            // could inherit a different constructor.
+                            if attr_name.value(db) == "__new__"
+                                && instance_ty.has_overridable_new(db, env)
+                            {
+                                continue;
+                            }
+
                             let default = if let Some(default) = default {
                                 *default
                             } else {

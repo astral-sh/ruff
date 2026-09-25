@@ -73,6 +73,7 @@ use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
 use crate::types::call::bind::ConstructorCallableKind;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
+use crate::types::callable::CallableTypeKind;
 pub(crate) use crate::types::callable::{CallableType, CallableTypes};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSetBuilder;
@@ -2387,12 +2388,19 @@ impl<'db> Type<'db> {
 
     /// Returns `true` if this type supports eager `Self` binding via `bind_self_typevars`.
     ///
-    /// `FunctionLiteral`, `BoundMethod`, and function-like `Callable` types return `false`
+    /// `FunctionLiteral`, `BoundMethod`, and Python or builtin function-like `Callable` types return `false`
     /// because their `Self` binding is deferred to call time via the signature binding path.
     fn supports_self_binding(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         match self {
             Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => false,
-            Type::Callable(callable) if callable.is_function_like(db) => false,
+            Type::Callable(callable)
+                if matches!(
+                    callable.kind(db),
+                    CallableTypeKind::FunctionLike | CallableTypeKind::BuiltinFunctionLike
+                ) =>
+            {
+                false
+            }
             _ => self.contains_self(db, env),
         }
     }
@@ -4777,19 +4785,49 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> Place<'db> {
-        if let Type::ModuleLiteral(module) = self {
-            module
+        match self {
+            Type::Union(union) => {
+                union.map_with_boundness(db, env, |ty| ty.static_member(db, env, name))
+            }
+            Type::Intersection(intersection) => {
+                intersection.map_with_boundness(db, env, |ty| ty.static_member(db, env, name))
+            }
+            Type::TypeAlias(alias) => alias.value_type(db).static_member(db, env, name),
+            Type::ModuleLiteral(module) => module
                 .static_member(db, env, name)
-                .map_or(Place::Undefined, |member| member.member(db).place)
-        } else if let place @ Place::Defined(_) = self.class_member(db, env, name).place {
-            place
-        } else if let Some(place @ Place::Defined(_)) = self
-            .find_name_in_mro(db, env, name)
-            .map(|inner| inner.place)
-        {
-            place
-        } else {
-            self.instance_member(db, env, name).place
+                .map_or(Place::Undefined, |member| member.member(db).place),
+            _ => {
+                self.find_name_in_mro(db, env, name)
+                    .unwrap_or_default()
+                    .or_fall_back_to(db, env, || self.class_member(db, env, name))
+                    .or_fall_back_to(db, env, || self.instance_member(db, env, name))
+                    .place
+            }
+        }
+    }
+
+    /// Whether subclasses can change the raw descriptor returned by static `__new__` lookup.
+    /// Unlike most methods, constructor overrides need not preserve the base signature, and
+    /// can switch between a builtin function and a Python-defined staticmethod.
+    fn has_overridable_new(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        match self {
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|ty| ty.has_overridable_new(db, env)),
+            Type::Intersection(intersection) => intersection
+                .positive_elements_or_object(db)
+                .any(|ty| ty.has_overridable_new(db, env)),
+            Type::TypeAlias(alias) => alias.value_type(db).has_overridable_new(db, env),
+            Type::NominalInstance(_)
+            | Type::ProtocolInstance(_)
+            | Type::NewTypeInstance(_)
+            | Type::TypeVar(_) => self
+                .nominal_class(db, env)
+                .is_none_or(|class| !class.is_final(db)),
+            // Subclass-of types for final classes are normalized to class literals.
+            Type::SubclassOf(_) | Type::Recursive(_) => true,
+            _ => false,
         }
     }
 
