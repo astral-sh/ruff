@@ -1,32 +1,30 @@
 # Implicit boolean conversions
 
-This opt-in rule detects truthiness checks that conflate `None` with other falsy values.
+This opt-in rule detects truthiness checks that may accidentally conflate `None` with other falsy values.
 
 ```toml
 [rules]
 implicit-bool-conversion = "warn"
 ```
 
-## Missing values and zero
+## Basic
 
-A valid zero must not be mistaken for a missing value. An explicit conversion is allowed when
-truthiness is intentional.
+Consider the following problematic `take` function where a limit of `0` would be treated as if it were `None`,
+which is probably not the intended behavior:
 
 ```py
-def process(limit: int | None):
-    if not limit:  # snapshot: implicit-bool-conversion
-        pass
-    if limit is None:
-        pass
-    if not bool(limit):
-        pass
+def take(items: list[str], limit: int | None = None) -> list[str]:
+    # snapshot: implicit-bool-conversion
+    if not limit:
+        return items
+    return items[:limit]
 ```
 
 ```snapshot
 warning[implicit-bool-conversion]: Boolean test of `int | None` conflates `None` with other falsy values
- --> src/mdtest_snippet.py:2:12
+ --> src/mdtest_snippet.py:3:12
   |
-2 |     if not limit:  # snapshot: implicit-bool-conversion
+3 |     if not limit:
   |            ^^^^^ Both `None` and non-`None` values can be false
 help: Use `is None` or `is not None` to check whether the value is present
 help: Use `bool(...)` if testing truthiness is intentional
@@ -34,21 +32,23 @@ help: Use `bool(...)` if testing truthiness is intentional
 
 ## Boolean contexts
 
+The rule triggers in all of these Boolean contexts:
+
 ```py
-def check(items: list[int | None], count: int | None):
-    if count:  # error: [implicit-bool-conversion]
+def check(limit: int | None, items: list[int | None]):
+    if limit:  # error: [implicit-bool-conversion]
         pass
-    elif count:  # error: [implicit-bool-conversion]
+    elif limit:  # error: [implicit-bool-conversion]
         pass
-    while count:  # error: [implicit-bool-conversion]
+    while limit:  # error: [implicit-bool-conversion]
         break
-    result = 1 if count else 0  # error: [implicit-bool-conversion]
-    result = not count  # error: [implicit-bool-conversion]
+    result = 1 if limit else 0  # error: [implicit-bool-conversion]
+    result = not limit  # error: [implicit-bool-conversion]
     filtered = [x for x in items if x]  # error: [implicit-bool-conversion]
-    match count:
-        case _ if count:  # error: [implicit-bool-conversion]
+    match limit:
+        case _ if limit:  # error: [implicit-bool-conversion]
             pass
-    assert count  # error: [implicit-bool-conversion]
+    assert limit  # error: [implicit-bool-conversion]
 ```
 
 ## Short-circuit expressions
