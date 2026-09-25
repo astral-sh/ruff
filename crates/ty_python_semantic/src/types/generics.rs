@@ -3388,13 +3388,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .map(|accumulator| accumulator.get_or_build(db, self.env));
                 let chosen = match mapped_ty {
                     Some(mapped_ty) => {
-                        let candidate = CandidateTypeVarSolution::exact(
-                            *variable,
-                            mapped_ty,
-                            // The legacy map has already merged its solutions and discarded their
-                            // directional bounds. Treat the resulting mapping as an exact equality.
-                            TypeVarVariance::Invariant,
-                        );
+                        // The legacy map has already merged its solutions and discarded their
+                        // directional bounds. Treat the resulting mapping as an exact equality.
+                        let candidate =
+                            CandidateTypeVarSolution::from_equivalence(*variable, mapped_ty);
                         choose(*variable, Some(&candidate)).unwrap_or(mapped_ty)
                     }
                     None => choose(*variable, None)?,

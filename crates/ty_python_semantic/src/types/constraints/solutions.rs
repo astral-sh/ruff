@@ -9,10 +9,9 @@ use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{Constraint, ConstraintProvenance, UnsatisfiableBound};
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions,
-    CandidateTypeVarRangeSolution, CandidateTypeVarRangeSolver, CandidateTypeVarSolution,
-    ConstraintAssignment, ConstraintId, ConstraintSetStorage, NodeId, SolutionLimits,
-    SolutionValidity, SolutionViolation, SolutionViolationKind,
+    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, CandidateTypeVarSolution,
+    CandidateTypeVarSolver, ConstraintAssignment, ConstraintId, ConstraintSetStorage, NodeId,
+    SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type};
@@ -279,8 +278,8 @@ impl<'db> SolutionWalker<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         path: &PathAssignments,
         bound_typevar: BoundTypeVarInstance<'db>,
-    ) -> Option<CandidateTypeVarRangeSolution<'db>> {
-        let mut evidence = CandidateTypeVarRangeSolver::default();
+    ) -> Option<CandidateTypeVarSolution<'db>> {
+        let mut evidence = CandidateTypeVarSolver::default();
         for (constraint, _) in path.positive_constraints() {
             let constraint = storage.constraint_data(constraint);
             if constraint.provides_bound_for(db, bound_typevar)
@@ -297,7 +296,7 @@ impl<'db> SolutionWalker<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        evidence: &CandidateTypeVarRangeSolution<'db>,
+        evidence: &CandidateTypeVarSolution<'db>,
         constrained_ty: Type<'db>,
     ) -> bool {
         let constraint_lower = constrained_ty.bottom_materialization(db, env);
@@ -802,7 +801,7 @@ impl<'db> SolutionWalker<'db> {
             .collect();
 
         // Then collect the combined lower and upper bounds for each typevar.
-        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, CandidateTypeVarRangeSolver<'db>> =
+        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, CandidateTypeVarSolver<'db>> =
             FxIndexMap::default();
 
         for (constraint, _) in typevars {
@@ -840,21 +839,16 @@ impl<'db> SolutionWalker<'db> {
         let typevars: Option<Box<[_]>> = mappings
             .into_iter()
             .map(|(bound_typevar, solver)| {
-                let range = solver.finish(db, env, storage, bound_typevar)?;
-                let (solution, argument) = match self
+                let mut solution = solver.finish(db, env, storage, bound_typevar)?;
+                let argument = match self
                     .declared_constraint_solutions
                     .get(&bound_typevar.identity(db))
                 {
                     Some(&ty) => {
-                        let solution =
-                            CandidateTypeVarSolution::exact(bound_typevar, ty, range.variance());
-                        (solution, Some(ty))
+                        solution.selected_declared_constraint = Some(ty);
+                        Some(ty)
                     }
-                    None => {
-                        let argument = range.inference_lower(db, env);
-                        let solution = CandidateTypeVarSolution::range(bound_typevar, range);
-                        (solution, argument)
-                    }
+                    None => solution.inference_lower(db, env),
                 };
 
                 if let Some(typevar_violations) = typevar_violations

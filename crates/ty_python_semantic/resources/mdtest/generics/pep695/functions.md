@@ -2735,6 +2735,23 @@ def pair(first: A, second: C) -> tuple[A, C]:
 starpipe((1, 2), pair)
 ```
 
+### Receiver evidence does not determine constrained TypeVar solutions
+
+Binding the method adds the lower bound `ConstrainedReceiver ≤ T`. Selecting `str` while binding its
+receiver only validates that bound; it does not turn the evidence into an equality. The argument can
+therefore make `object` the final solution.
+
+```py
+class ConstrainedReceiver(str):
+    def method[T: (str, object)](self: T, value: T) -> T:
+        return value
+
+# revealed: str
+reveal_type(ConstrainedReceiver().method("foo"))
+# revealed: object
+reveal_type(ConstrainedReceiver().method(1))
+```
+
 ### Nested generic calls preserve constrained TypeVar solutions
 
 Solving a constrained TypeVar as part of a nested generic call should produce the same

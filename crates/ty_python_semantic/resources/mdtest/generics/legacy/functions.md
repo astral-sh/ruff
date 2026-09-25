@@ -1655,6 +1655,27 @@ y: list[Sub] = f2(Sub())
 reveal_type(y)  # revealed: list[Sub]
 ```
 
+## Receiver evidence does not determine constrained TypeVar solutions
+
+Binding the method adds the lower bound `ConstrainedReceiver ≤ ReceiverT`. Selecting `str` while
+binding the receiver only validates that bound; it does not turn the evidence into an equality. The
+argument can therefore make `object` the final solution.
+
+```py
+from typing import TypeVar
+
+ReceiverT = TypeVar("ReceiverT", str, object)
+
+class ConstrainedReceiver(str):
+    def method(self: ReceiverT, value: ReceiverT) -> ReceiverT:
+        return value
+
+# revealed: str
+reveal_type(ConstrainedReceiver().method("foo"))
+# revealed: object
+reveal_type(ConstrainedReceiver().method(1))
+```
+
 ## Nested generic calls preserve constrained TypeVar solutions
 
 Solving a constrained TypeVar as part of a nested generic call should produce the same
