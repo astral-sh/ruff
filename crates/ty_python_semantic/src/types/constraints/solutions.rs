@@ -14,7 +14,7 @@ use crate::types::constraints::{
     SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
-use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type};
+use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, any_over_type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
 type ProcessSatisfied<'a, 'db, L, B> = dyn FnMut(
@@ -484,16 +484,25 @@ impl<'db> SolutionWalker<'db> {
                         })
                     })
         };
-        let has_preservable_typevar_evidence =
+        let contains_preservable_typevar =
+            |ty| any_over_type(db, env, ty, false, is_preservable_typevar);
+        let has_bare_preservable_typevar_evidence =
             evidence.evidence_lower.is_some_and(is_preservable_typevar)
                 || evidence
                     .as_single_upper_bound(db, env)
                     .is_some_and(is_preservable_typevar);
         let has_non_concrete_evidence = has_no_evidence
             || evidence.has_only_non_concrete_evidence == Some(true)
-            || has_preservable_typevar_evidence;
+            || has_bare_preservable_typevar_evidence;
 
         if has_non_concrete_evidence {
+            let has_preservable_typevar_evidence = evidence
+                .evidence_lower
+                .is_some_and(contains_preservable_typevar)
+                || evidence
+                    .as_single_upper_bound(db, env)
+                    .is_some_and(contains_preservable_typevar);
+
             let mut potentially_satisfied_constraint_count = 0;
             for declared_constraint in &constrained_typevar.declared_constraints {
                 let Some(constraints) = declared_constraint.constraints.as_deref() else {

@@ -2072,25 +2072,22 @@ reveal_type(narrow(1))  # revealed: int
 reveal_type(narrow("hello"))  # revealed: str
 ```
 
-A fixed constrained TypeVar can occur alongside gradual evidence when another context validates the
-inferred type. Checking its declared constraints must not add the individual constraints to that
-type: `result` remains `list[Any | Fixed]`.
+A fixed constrained typevar and a gradual argument can provide separate bounds for another
+constrained typevar. Both bounds are non-concrete, so we preserve their combined family solution
+rather than adding the individual constraints `A` and `B` to it.
 
 ```py
-from typing import Any, TypeVar
-from ty_extensions import static_assert
-from ty_extensions._internal import TypeOf, is_equivalent_to
+from typing import Any
 
-class A: ...
-class B: ...
+# It is important that this function takes in multiple parameters of type `Result`, so that we
+# exercise a constraint set with multiple constraints in it.
+def merge(left: T, right: T) -> T:
+    return left
 
-Fixed = TypeVar("Fixed", A, B)
-
-def check(marker: Fixed, value: Any) -> None:
-    result = [marker]
-    result.append(value)
-    expected: list[Fixed] = result
-    static_assert(is_equivalent_to(TypeOf[result], list[Any | Fixed]))
+def check(marker: S, value: Any) -> None:
+    result = merge(marker, value)
+    # revealed: S@check | Any
+    reveal_type(result)
 ```
 
 ## Inferring a constrained typevar from a bounded typevar
