@@ -368,6 +368,9 @@ bitflags! {
 
         /// A suspicious `Iterable` operand suppresses only an enclosing iterable diagnostic.
         const SUPPRESS_ITERABLE = 1 << 2;
+
+        /// A suspicious `None` union operand suppresses only an enclosing `None` union diagnostic.
+        const SUPPRESS_NONE_UNION = 1 << 3;
     }
 }
 
@@ -758,7 +761,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let env = self.program_environment();
 
         let kind = if truthiness.is_ambiguous() {
-            if let Some(union) = self.implicit_bool_conversion_candidate(expression, value_type) {
+            if let Some(union) = self.implicit_bool_conversion_candidate(value_type) {
                 ConditionKind::NoneUnion(union)
             } else {
                 let expanded = match value_type.resolve_type_alias(db) {
@@ -842,20 +845,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     /// Return the expanded union corresponding to `ty` if this test is eligible for `implicit-bool-conversion`.
-    fn implicit_bool_conversion_candidate(
-        &self,
-        expression: &ast::Expr,
-        ty: Type<'db>,
-    ) -> Option<UnionType<'db>> {
-        if !self.context.is_lint_enabled(&IMPLICIT_BOOL_CONVERSION)
-            || matches!(expression, ast::Expr::BoolOp(_) | ast::Expr::If(_))
-        {
-            // For an expression like `c1 or c2` or `a if c1 else b` we check the
-            // condition operands individually, so don't check the whole expression
-            // as well.
-            return None;
-        }
-
+    fn implicit_bool_conversion_candidate(&self, ty: Type<'db>) -> Option<UnionType<'db>> {
         let db = self.db();
         let env = self.program_environment();
         let expanded = match ty.resolve_type_alias(db) {
@@ -1092,7 +1082,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let result = match &condition.kind {
             ConditionKind::Callable(_) => ConditionCheckResult::SUPPRESS_CALLABLE,
             ConditionKind::Iterable => ConditionCheckResult::SUPPRESS_ITERABLE,
-            ConditionKind::NoneUnion(_) => ConditionCheckResult::empty(),
+            ConditionKind::NoneUnion(_) => ConditionCheckResult::SUPPRESS_NONE_UNION,
             ConditionKind::Boolean
             | ConditionKind::ContainsWalrus
             | ConditionKind::ShortCircuit
