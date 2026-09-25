@@ -170,7 +170,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // For ordinary decorators that still apply to the original class, precompute the call so
         // the second pass can reuse it if no inner decorator has changed the binding.
         for &(decorator_ty, decorator) in decorator_types_and_nodes.iter().rev() {
-            if !metadata_applies_to_original_class {
+            if !metadata_applies_to_original_class
+                || decorator_ty
+                    .as_function_literal()
+                    .is_some_and(|function| function.is_known(db, KnownFunction::RuntimeCheckable))
+            {
                 decorators_to_apply.push((decorator_ty, decorator, None));
                 continue;
             }
@@ -225,11 +229,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if decorator_ty.as_function_literal().is_some_and(|function| {
                 matches!(
                     function.known(db),
-                    Some(
-                        KnownFunction::Final
-                            | KnownFunction::DisjointBase
-                            | KnownFunction::RuntimeCheckable
-                    )
+                    Some(KnownFunction::Final | KnownFunction::DisjointBase)
                 )
             }) {
                 continue;
@@ -304,6 +304,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // to update the public binding. `original_class_ty` remains the class object whose body and
         // metadata were inferred above.
         for (decorator_ty, decorator_node, precomputed_result) in decorators_to_apply {
+            if decorator_ty
+                .as_function_literal()
+                .is_some_and(|function| function.is_known(db, KnownFunction::RuntimeCheckable))
+            {
+                // Protocol bases can be deferred, so validate this identity decorator after
+                // inference. Retain its actual input in case an inner decorator replaced the class.
+                self.defer_decorator_call(decorator_node, inferred_ty);
+                continue;
+            }
+
             let decorator_result = match precomputed_result {
                 // The metadata pass already called this decorator with the same input. If an inner
                 // decorator changed the binding, apply this decorator to the new public binding.
