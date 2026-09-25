@@ -65,7 +65,9 @@ impl TypeChecker for HttpxClientChecker {
         // match base annotation directly
         if semantic
             .resolve_qualified_name(annotation)
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["httpx", "Client"]))
+            .is_some_and(|qualified_name| {
+                matches!(qualified_name.segments(), ["httpx" | "httpx2", "Client"])
+            })
         {
             return true;
         }
@@ -77,7 +79,7 @@ impl TypeChecker for HttpxClientChecker {
                 if semantic
                     .resolve_qualified_name(inner_expr)
                     .is_some_and(|qualified_name| {
-                        matches!(qualified_name.segments(), ["httpx", "Client"])
+                        matches!(qualified_name.segments(), ["httpx" | "httpx2", "Client"])
                     })
                 {
                     found = true;
@@ -99,7 +101,9 @@ impl TypeChecker for HttpxClientChecker {
 
         semantic
             .resolve_qualified_name(func)
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["httpx", "Client"]))
+            .is_some_and(|qualified_name| {
+                matches!(qualified_name.segments(), ["httpx" | "httpx2", "Client"])
+            })
     }
 }
 
