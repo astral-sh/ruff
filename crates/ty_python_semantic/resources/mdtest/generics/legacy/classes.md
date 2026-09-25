@@ -1504,6 +1504,182 @@ reveal_type(generic_context(into_regular_callable(D)))
 reveal_type(D())  # revealed: D[Unknown, Unknown]
 ```
 
+### Class identity does not specialize a generic constructor
+
+Instances with different type arguments share the same runtime class. Comparing an instance's class
+with `C` therefore leaves `C` available to infer fresh type arguments on later constructor calls.
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def __init__(self, x: T) -> None: ...
+
+def class_identity() -> None:
+    assert type(C(0)) is C
+    reveal_type(C)  # revealed: <class 'C'>
+    assert type(C(None)) is C
+    reveal_type(C(None))  # revealed: C[None]
+```
+
+The same behavior applies when the comparison is reversed, when the class is obtained through
+`__class__`, and when an alias names the unspecialized constructor.
+
+```py
+def reversed_identity() -> None:
+    assert C is type(C(0))
+    reveal_type(C(None))  # revealed: C[None]
+
+def class_attribute_identity() -> None:
+    assert C(0).__class__ is C
+    reveal_type(C(None))  # revealed: C[None]
+
+def alias_identity() -> None:
+    alias = C
+    assert type(C(0)) is alias
+    reveal_type(alias(None))  # revealed: C[None]
+```
+
+Already-specialized class types can also describe the same runtime class. Each variable retains its
+own constructor signature after the comparison.
+
+```py
+def specialized_identity(left: type[C[int]], right: type[C[str]]) -> None:
+    reveal_type(left is right)  # revealed: bool
+    if left is right:
+        reveal_type(left(1))  # revealed: C[int]
+        left("wrong")  # error: [invalid-argument-type]
+        reveal_type(right("ok"))  # revealed: C[str]
+        right(1)  # error: [invalid-argument-type]
+```
+
+When an `object` is identical to a specialized class variable, it acquires that variable's
+constructor signature.
+
+```py
+def object_identity(value: object, cls: type[C[int]]) -> None:
+    if value is cls:
+        reveal_type(value(1))  # revealed: C[int]
+        value("wrong")  # error: [invalid-argument-type]
+```
+
+Comparing compatible specialized class references preserves their relationship with a type variable,
+even when one reference may be `None`. Returning the identical class satisfies the generic return
+type.
+
+```py
+U = TypeVar("U", bound=C[int])
+
+def same_class(cls: type[U] | None, other: type[C[int]]) -> type[U]:
+    if other is cls:
+        return other
+    raise AssertionError
+```
+
+### Class identity with final generic classes
+
+A final generic class has no subclasses, but its instances still share a runtime class across
+specializations. An identity check leaves the unspecialized constructor available for later calls.
+
+```py
+from typing_extensions import Generic, TypeVar, final
+
+T = TypeVar("T")
+
+@final
+class C(Generic[T]):
+    def __init__(self, x: T) -> None: ...
+
+def class_identity() -> None:
+    assert type(C(0)) is C
+    reveal_type(C)  # revealed: <class 'C'>
+    assert type(C(None)) is C
+    reveal_type(C(None))  # revealed: C[None]
+```
+
+An explicitly specialized alias is not guaranteed to be identical to its origin class. Comparing it
+with the origin also preserves its existing constructor signature.
+
+```py
+def specialized_alias_identity() -> None:
+    alias = C[int]
+    reveal_type(alias is C)  # revealed: bool
+    if alias is C:
+        alias(1)
+        alias(None)  # error: [invalid-argument-type]
+        reveal_type(C(None))  # revealed: C[None]
+```
+
+An `object` narrowed to a final class variable also preserves its specialized constructor signature.
+
+```py
+def object_identity(value: object, cls: type[C[int]]) -> None:
+    if value is cls:
+        reveal_type(value(1))  # revealed: C[int]
+        value("wrong")  # error: [invalid-argument-type]
+```
+
+### Class identity with default type arguments
+
+A type variable can be bounded by a specialization that differs from the class's default type
+arguments. The runtime class can still be `C`, and comparing it with `C` leaves the constructor free
+to infer type arguments from a later call.
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T", default=str)
+
+class C(Generic[T]):
+    def __init__(self, x: T) -> None:
+        self.x = x
+
+U = TypeVar("U", bound=C[int])
+
+def type_variable_identity(cls: type[U]) -> None:
+    reveal_type(cls is C)  # revealed: bool
+    assert cls is C
+    reveal_type(C(None))  # revealed: C[None]
+```
+
+The comparison also removes an unrelated class from a union of constructors without specializing the
+remaining constructor.
+
+```py
+class Other: ...
+
+def union_class_identity(cls: type[U], flag: bool) -> None:
+    constructor = C if flag else Other
+    assert constructor is cls
+    reveal_type(constructor(None))  # revealed: C[None]
+```
+
+A nongeneric subclass fixes its inherited type argument. Comparing an optional class variable
+against that subclass preserves the relationship with the type variable, so constructing it
+satisfies the generic return type.
+
+```py
+class Child(C[int]): ...
+
+def optional_construct(cls: type[U] | None) -> U:
+    if cls is Child:
+        return Child(1)
+    raise AssertionError
+```
+
+The relationship is also preserved when comparing two variables holding nongeneric classes.
+
+```py
+V = TypeVar("V", bound=Child)
+
+def same_class(cls: type[V], other: type[Child]) -> type[V]:
+    if other is cls:
+        return other
+    return cls
+```
+
 ## Generic subclass
 
 When a generic subclass fills its superclass's type parameter with one of its own, the actual types
