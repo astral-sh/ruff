@@ -1745,6 +1745,49 @@ reveal_type(choose_str_first(1))
 reveal_type(choose_bytes_first(1))
 ```
 
+## Prune preferred constraints before combining independent TypeVars
+
+When each constrained TypeVar has one preferred solution, inference should select those solutions
+without exhausting the path budget on combinations that will eventually be discarded.
+
+```py
+from typing import TypeVar
+
+T1 = TypeVar("T1", int, object)
+T2 = TypeVar("T2", int, object)
+T3 = TypeVar("T3", int, object)
+T4 = TypeVar("T4", int, object)
+T5 = TypeVar("T5", int, object)
+T6 = TypeVar("T6", int, object)
+T7 = TypeVar("T7", int, object)
+T8 = TypeVar("T8", int, object)
+T9 = TypeVar("T9", int, object)
+T10 = TypeVar("T10", int, object)
+T11 = TypeVar("T11", int, object)
+T12 = TypeVar("T12", int, object)
+T13 = TypeVar("T13", int, object)
+
+def choose_independent(
+    x1: T1,
+    x2: T2,
+    x3: T3,
+    x4: T4,
+    x5: T5,
+    x6: T6,
+    x7: T7,
+    x8: T8,
+    x9: T9,
+    x10: T10,
+    x11: T11,
+    x12: T12,
+    x13: T13,
+) -> tuple[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13]:
+    raise NotImplementedError
+
+# revealed: tuple[int, int, int, int, int, int, int, int, int, int, int, int, int]
+reveal_type(choose_independent(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1))
+```
+
 ## Prefer general constraints for upper-bound-only inference
 
 When inference provides only an upper bound, we prefer the most general compatible declared

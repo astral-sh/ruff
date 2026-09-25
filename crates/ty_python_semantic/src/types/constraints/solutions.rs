@@ -628,56 +628,64 @@ impl<'db> SolutionWalker<'db> {
         // We cannot return only family solutions, so also check which individual declared
         // constraints can be used in the solution.
         let previously_pending = self.pending.len();
-        let mut constraint_satisfied = SmallVec::<[bool; 4]>::default();
-        let mut constraint_solutions = SmallVec::<[Range<usize>; 4]>::default();
-        for declared_constraint in &constrained_typevar.declared_constraints {
-            let mut satisfied = false;
-            let start = self.pending.len();
-            if let Some(constraints) = declared_constraint.constraints.as_deref() {
-                self.with_declared_constraint_solution(
-                    db,
-                    bound_typevar,
-                    declared_constraint.constrained_ty,
-                    |this| {
-                        this.visit_constraints_and_then(
-                            db,
-                            env,
-                            storage,
-                            limits,
-                            path,
-                            constraints,
-                            &mut |this, storage, limits, path| {
-                                // Selecting a concrete constraint must not specialize a caller's fixed
-                                // typevar: `S & str <= int` may hold for some `S`, but not for every `S`.
-                                if !this.evidence_satisfies_declared_constraint(
-                                    db,
-                                    env,
-                                    storage,
-                                    &evidence,
-                                    declared_constraint.constrained_ty,
-                                ) {
-                                    return ControlFlow::Continue(());
-                                }
+        let has_lower_bound_evidence = path.positive_constraints().any(|(constraint, _)| {
+            let constraint = storage.constraint_data(constraint);
+            constraint.provides_lower_bound_for(db, bound_typevar)
+        });
 
-                                // The candidate solution satisfies this declared constraint, but we still
-                                // need to check any remaining constrained typevars.
-                                this.validate_constrained(
-                                    db,
-                                    env,
-                                    storage,
-                                    limits,
-                                    path,
-                                    constrained,
-                                    &mut |this, storage, limits, path| {
-                                        satisfied = true;
-                                        process_satisfied(this, storage, limits, path)
-                                    },
-                                )
-                            },
-                        )
-                    },
-                )?;
+        // A constraint preferred over every potentially valid alternative will also be preferred
+        // over any subset of those alternatives. Try it first so that a successful branch can
+        // discard the dominated alternatives before they multiply with later typevars.
+        let preferred =
+            constrained_typevar.preferred_constraint(db, env, has_lower_bound_evidence, |idx| {
+                constrained_typevar.declared_constraints[idx]
+                    .constraints
+                    .is_some()
+            });
+        if let Some(preferred) = preferred
+            && self.validate_single_declared_constraint(
+                db,
+                env,
+                storage,
+                limits,
+                path,
+                bound_typevar,
+                &evidence,
+                &constrained_typevar.declared_constraints[preferred],
+                constrained,
+                process_satisfied,
+            )?
+        {
+            return ControlFlow::Continue(());
+        }
+
+        let constraint_count = constrained_typevar.declared_constraints.len();
+        let mut constraint_satisfied = SmallVec::<[bool; 4]>::with_capacity(constraint_count);
+        let mut constraint_solutions =
+            SmallVec::<[Range<usize>; 4]>::with_capacity(constraint_count);
+        for (idx, declared_constraint) in
+            constrained_typevar.declared_constraints.iter().enumerate()
+        {
+            let start = self.pending.len();
+            if preferred == Some(idx) {
+                // We already checked this one above.
+                constraint_satisfied.push(false);
+                constraint_solutions.push(start..start);
+                continue;
             }
+
+            let satisfied = self.validate_single_declared_constraint(
+                db,
+                env,
+                storage,
+                limits,
+                path,
+                bound_typevar,
+                &evidence,
+                declared_constraint,
+                constrained,
+                process_satisfied,
+            )?;
             let end = self.pending.len();
             constraint_satisfied.push(satisfied);
             constraint_solutions.push(start..end);
@@ -696,52 +704,10 @@ impl<'db> SolutionWalker<'db> {
 
         // At this point, we know that more than one constraint was satisfied. Check to see if any
         // one of them is preferred over all of the others. If so, we prefer that single solution.
-        let has_lower_bound_evidence = path.positive_constraints().any(|(constraint, _)| {
-            let constraint = storage.constraint_data(constraint);
-            constraint.provides_lower_bound_for(db, bound_typevar)
-        });
-        let mut preferred = None;
-        'candidate: for (candidate_idx, declared_constraint) in
-            constrained_typevar.declared_constraints.iter().enumerate()
-        {
-            if !constraint_satisfied[candidate_idx] {
-                continue;
-            }
-
-            let candidate = declared_constraint.constrained_ty;
-            for (other_idx, other_constraint) in
-                constrained_typevar.declared_constraints.iter().enumerate()
-            {
-                if candidate_idx == other_idx || !constraint_satisfied[other_idx] {
-                    continue;
-                }
-
-                let other = other_constraint.constrained_ty;
-                let candidate_assignable_to_other = candidate.is_assignable_to(db, env, other);
-                let other_assignable_to_candidate = other.is_assignable_to(db, env, candidate);
-
-                // Lower-bound evidence asks for the narrowest compatible declared constraint
-                // above the lower bound. With only upper-bound evidence, ask for the widest
-                // compatible declared constraint below the upper bound. If the candidates are
-                // assignable in both directions, prefer a fully static constraint over a gradual
-                // one. Equivalent constraints preserve declaration order.
-                let candidate_is_at_least_as_good =
-                    match (candidate_assignable_to_other, other_assignable_to_candidate) {
-                        (false, false) => false,
-                        (true, false) => has_lower_bound_evidence,
-                        (false, true) => !has_lower_bound_evidence,
-                        (true, true) => {
-                            candidate.is_fully_static(db, env) || !other.is_fully_static(db, env)
-                        }
-                    };
-                if !candidate_is_at_least_as_good {
-                    continue 'candidate;
-                }
-            }
-
-            preferred = Some(candidate_idx);
-            break;
-        }
+        let preferred =
+            constrained_typevar.preferred_constraint(db, env, has_lower_bound_evidence, |idx| {
+                constraint_satisfied[idx]
+            });
 
         // If there was a single preferred constraint, remove the solutions from the other
         // constraints. Otherwise keep them all, and let the caller decide how to handle the
@@ -753,6 +719,69 @@ impl<'db> SolutionWalker<'db> {
         }
 
         ControlFlow::Continue(())
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn validate_single_declared_constraint<L: SolutionLimits>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        path: &mut PathAssignments,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        evidence: &CandidateTypeVarSolution<'db>,
+        declared_constraint: &DeclaredConstraint<'db>,
+        constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
+        process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
+    ) -> ControlFlow<L::Break, bool> {
+        let mut satisfied = false;
+        if let Some(constraints) = declared_constraint.constraints.as_deref() {
+            self.with_declared_constraint_solution(
+                db,
+                bound_typevar,
+                declared_constraint.constrained_ty,
+                |this| {
+                    this.visit_constraints_and_then(
+                        db,
+                        env,
+                        storage,
+                        limits,
+                        path,
+                        constraints,
+                        &mut |this, storage, limits, path| {
+                            // Selecting a concrete constraint must not specialize a caller's fixed
+                            // typevar: `S & str <= int` may hold for some `S`, but not for every `S`.
+                            if !this.evidence_satisfies_declared_constraint(
+                                db,
+                                env,
+                                storage,
+                                evidence,
+                                declared_constraint.constrained_ty,
+                            ) {
+                                return ControlFlow::Continue(());
+                            }
+
+                            // The candidate solution satisfies this declared constraint, but we still
+                            // need to check any remaining constrained typevars.
+                            this.validate_constrained(
+                                db,
+                                env,
+                                storage,
+                                limits,
+                                path,
+                                constrained,
+                                &mut |this, storage, limits, path| {
+                                    satisfied = true;
+                                    process_satisfied(this, storage, limits, path)
+                                },
+                            )
+                        },
+                    )
+                },
+            )?;
+        }
+        ControlFlow::Continue(satisfied)
     }
 
     /// Create a pending candidate solution for the current path.
@@ -1193,5 +1222,55 @@ impl<'db> Validations<'db> {
                 declared_constraints,
             }
         });
+    }
+}
+
+impl<'db> Constrained<'db> {
+    fn preferred_constraint(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        has_lower_bound_evidence: bool,
+        is_eligible: impl Fn(usize) -> bool,
+    ) -> Option<usize> {
+        'candidate: for (candidate_idx, declared_constraint) in
+            self.declared_constraints.iter().enumerate()
+        {
+            if !is_eligible(candidate_idx) {
+                continue;
+            }
+
+            let candidate = declared_constraint.constrained_ty;
+            for (other_idx, other_constraint) in self.declared_constraints.iter().enumerate() {
+                if candidate_idx == other_idx || !is_eligible(other_idx) {
+                    continue;
+                }
+
+                let other = other_constraint.constrained_ty;
+                let candidate_assignable_to_other = candidate.is_assignable_to(db, env, other);
+                let other_assignable_to_candidate = other.is_assignable_to(db, env, candidate);
+
+                // Lower-bound evidence asks for the narrowest compatible declared constraint
+                // above the lower bound. With only upper-bound evidence, ask for the widest
+                // compatible declared constraint below the upper bound. If the candidates are
+                // assignable in both directions, prefer a fully static constraint over a gradual
+                // one. Equivalent constraints preserve declaration order.
+                let candidate_is_at_least_as_good =
+                    match (candidate_assignable_to_other, other_assignable_to_candidate) {
+                        (false, false) => false,
+                        (true, false) => has_lower_bound_evidence,
+                        (false, true) => !has_lower_bound_evidence,
+                        (true, true) => {
+                            candidate.is_fully_static(db, env) || !other.is_fully_static(db, env)
+                        }
+                    };
+                if !candidate_is_at_least_as_good {
+                    continue 'candidate;
+                }
+            }
+
+            return Some(candidate_idx);
+        }
+        None
     }
 }

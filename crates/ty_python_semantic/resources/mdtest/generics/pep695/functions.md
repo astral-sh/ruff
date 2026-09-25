@@ -2790,6 +2790,47 @@ reveal_type(choose_str_first(1))
 reveal_type(choose_bytes_first(1))
 ```
 
+### Prune preferred constraints before combining independent TypeVars
+
+When each constrained TypeVar has one preferred solution, inference should select those solutions
+without exhausting the path budget on combinations that will eventually be discarded.
+
+```py
+def choose_independent[
+    T1: (int, object),
+    T2: (int, object),
+    T3: (int, object),
+    T4: (int, object),
+    T5: (int, object),
+    T6: (int, object),
+    T7: (int, object),
+    T8: (int, object),
+    T9: (int, object),
+    T10: (int, object),
+    T11: (int, object),
+    T12: (int, object),
+    T13: (int, object),
+](
+    x1: T1,
+    x2: T2,
+    x3: T3,
+    x4: T4,
+    x5: T5,
+    x6: T6,
+    x7: T7,
+    x8: T8,
+    x9: T9,
+    x10: T10,
+    x11: T11,
+    x12: T12,
+    x13: T13,
+) -> tuple[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13]:
+    raise NotImplementedError
+
+# revealed: tuple[int, int, int, int, int, int, int, int, int, int, int, int, int]
+reveal_type(choose_independent(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1))
+```
+
 ## Ambiguous constrained TypeVar inference from a partial constraint family
 
 Non-concrete evidence can rule out some declared constraints while remaining ambiguous among others.
