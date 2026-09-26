@@ -427,19 +427,21 @@ struct PatternSuccessAnalyzer<'db, 'pattern> {
     scope: ScopeId<'db>,
     // Different union arms can pass the same type to the same nested pattern. Reuse its complete
     // result within this analysis so repeated work does not multiply at each pattern level.
-    successful_patterns:
-        FxHashMap<(PatternIdentity<'pattern, 'db>, Type<'db>), PatternSuccessResult<'db>>,
-    matched_subjects: FxHashMap<(PatternIdentity<'pattern, 'db>, Type<'db>), Type<'db>>,
+    successful_patterns: FxHashMap<PatternCacheKey<'pattern, 'db>, PatternSuccessResult<'db>>,
+    matched_subjects: FxHashMap<PatternCacheKey<'pattern, 'db>, Type<'db>>,
 }
 
-/// Identifies a node in the pattern being analyzed without hashing its entire subtree.
+/// Identifies a pattern by its address and subject type without hashing the pattern subtree.
 #[derive(Clone, Copy)]
-struct PatternIdentity<'pattern, 'db>(&'pattern PatternPredicateKind<'db>);
+struct PatternCacheKey<'pattern, 'db> {
+    pattern: &'pattern PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+}
 
-impl PatternIdentity<'_, '_> {
+impl PatternCacheKey<'_, '_> {
     fn is_structural(self) -> bool {
         matches!(
-            self.0,
+            self.pattern,
             PatternPredicateKind::Class(_)
                 | PatternPredicateKind::Mapping(_)
                 | PatternPredicateKind::Sequence(_)
@@ -448,17 +450,18 @@ impl PatternIdentity<'_, '_> {
     }
 }
 
-impl PartialEq for PatternIdentity<'_, '_> {
+impl PartialEq for PatternCacheKey<'_, '_> {
     fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self.0, other.0)
+        std::ptr::eq(self.pattern, other.pattern) && self.subject_ty == other.subject_ty
     }
 }
 
-impl Eq for PatternIdentity<'_, '_> {}
+impl Eq for PatternCacheKey<'_, '_> {}
 
-impl Hash for PatternIdentity<'_, '_> {
+impl Hash for PatternCacheKey<'_, '_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        std::ptr::hash(self.0, state);
+        std::ptr::hash(self.pattern, state);
+        self.subject_ty.hash(state);
     }
 }
 
@@ -2223,8 +2226,11 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
         pattern: &'pattern PatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
-        let key = (PatternIdentity(pattern), subject_ty);
-        let cacheable = key.0.is_structural();
+        let key = PatternCacheKey {
+            pattern,
+            subject_ty,
+        };
+        let cacheable = key.is_structural();
         if cacheable && let Some(result) = self.successful_patterns.get(&key) {
             return result.clone();
         }
@@ -2315,8 +2321,11 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
         pattern: &'pattern PatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> Type<'db> {
-        let key = (PatternIdentity(pattern), subject_ty);
-        let cacheable = key.0.is_structural();
+        let key = PatternCacheKey {
+            pattern,
+            subject_ty,
+        };
+        let cacheable = key.is_structural();
         if cacheable && let Some(result) = self.matched_subjects.get(&key) {
             return *result;
         }
