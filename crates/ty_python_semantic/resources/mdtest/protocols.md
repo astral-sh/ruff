@@ -4283,6 +4283,203 @@ class Box[T](Protocol):
 reveal_type(Box.first())  # revealed: Box[Unknown]
 ```
 
+## Restricted method receivers
+
+`Processor.process` can only be called on a receiver that also satisfies `Ready`.
+`DeferredProcessor` has the same restriction, so it satisfies `Processor` even though its instances
+are not necessarily ready. Calling the method still requires a `Ready` receiver.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Protocol, Self
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Ready: ...
+class Authorized: ...
+
+class Processor(Protocol):
+    def process(self: Intersection[Self, Ready], value: int) -> int: ...
+
+class DeferredProcessor:
+    def process(self: Intersection[Self, Ready], value: int) -> int:
+        return value
+
+processor: Processor = DeferredProcessor()
+
+def call(processor: Processor, ready_processor: Intersection[Processor, Ready]):
+    processor.process(1)  # error: [invalid-argument-type]
+    reveal_type(ready_processor.process(1))  # revealed: int
+```
+
+An unrestricted implementation also satisfies the protocol. Requiring an additional receiver
+restriction is incompatible: a caller may satisfy the protocol's restriction without satisfying the
+implementation's additional requirement.
+
+```py
+class AlwaysAvailableProcessor:
+    def process(self, value: int) -> int:
+        return value
+
+class AuthorizedProcessor:
+    def process(self: Intersection[Self, Ready, Authorized], value: int) -> int:
+        return value
+
+static_assert(is_assignable_to(AlwaysAvailableProcessor, Processor))
+static_assert(not is_assignable_to(AuthorizedProcessor, Processor))
+```
+
+A stored bound method keeps its captured receiver. Narrowing the object that stores it cannot make
+the captured receiver satisfy `Ready`.
+
+```py
+class StoredUnreadyMethod:
+    process = DeferredProcessor().process
+
+class ReadyProcessor(DeferredProcessor, Ready): ...
+
+class StoredReadyMethod:
+    process = ReadyProcessor().process
+
+static_assert(not is_assignable_to(StoredUnreadyMethod, Processor))
+static_assert(is_assignable_to(StoredReadyMethod, Processor))
+```
+
+The same receiver restrictions are compared when both types are protocols.
+
+```py
+class AuthorizedProcessorProtocol(Protocol):
+    def process(self: Intersection[Self, Ready, Authorized], value: int) -> int: ...
+
+static_assert(not is_assignable_to(AuthorizedProcessorProtocol, Processor))
+static_assert(is_assignable_to(Processor, AuthorizedProcessorProtocol))
+```
+
+## Restricted callback receivers
+
+Callback protocols compare the receiver restriction on `__call__` in the same way as other methods.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Protocol, Self
+from ty_extensions import Intersection
+
+class Ready: ...
+
+class ProcessingCallback(Protocol):
+    def __call__(self: Intersection[Self, Ready], value: int) -> int: ...
+
+class DeferredCallback:
+    def __call__(self: Intersection[Self, Ready], value: int) -> int:
+        return value
+
+callback: ProcessingCallback = DeferredCallback()
+```
+
+## Restricted classmethod receivers
+
+A classmethod can likewise restrict `cls` to classes whose instances satisfy another type. Matching
+restrictions are compatible, while an additional receiver restriction is rejected.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Protocol, Self
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Ready: ...
+class Authorized: ...
+
+class Processor(Protocol):
+    @classmethod
+    def process(cls: type[Intersection[Self, Ready]], value: int) -> int: ...
+
+class DeferredProcessor:
+    @classmethod
+    def process(cls: type[Intersection[Self, Ready]], value: int) -> int:
+        return value
+
+class AuthorizedProcessor:
+    @classmethod
+    def process(cls: type[Intersection[Self, Ready, Authorized]], value: int) -> int:
+        return value
+
+processor: Processor = DeferredProcessor()
+static_assert(not is_assignable_to(AuthorizedProcessor, Processor))
+
+def call(ready_processor_class: type[Intersection[Processor, Ready]]):
+    reveal_type(ready_processor_class.process(1))  # revealed: int
+```
+
+A compatible staticmethod can satisfy the classmethod contract without imposing a receiver
+restriction of its own.
+
+```py
+class StaticProcessor:
+    @staticmethod
+    def process(value: int) -> int:
+        return value
+
+static_assert(is_assignable_to(StaticProcessor, Processor))
+```
+
+## Overloaded methods with restricted receivers
+
+Each overload can impose a different receiver restriction. The implementation must provide the
+corresponding parameter and return types for each receiver domain; swapping the restrictions is
+incompatible.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Protocol, Self, overload
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import is_assignable_to
+
+class AcceptsIntegers: ...
+class AcceptsText: ...
+
+class OverloadedProcessor(Protocol):
+    @overload
+    def process(self: Intersection[Self, AcceptsIntegers], value: int) -> int: ...
+    @overload
+    def process(self: Intersection[Self, AcceptsText], value: str) -> str: ...
+
+class MatchingOverloads:
+    @overload
+    def process(self: Intersection[Self, AcceptsIntegers], value: int) -> int: ...
+    @overload
+    def process(self: Intersection[Self, AcceptsText], value: str) -> str: ...
+    def process(self, value: int | str) -> int | str:
+        return value
+
+class SwappedReceiverRestrictions:
+    @overload
+    def process(self: Intersection[Self, AcceptsText], value: int) -> int: ...
+    @overload
+    def process(self: Intersection[Self, AcceptsIntegers], value: str) -> str: ...
+    def process(self, value: int | str) -> int | str:
+        return value
+
+static_assert(is_assignable_to(MatchingOverloads, OverloadedProcessor))
+static_assert(not is_assignable_to(SwappedReceiverRestrictions, OverloadedProcessor))
+```
+
 ## Subtyping of protocols with generic method members
 
 Protocol method members can be generic. They can have generic contexts scoped to the class:

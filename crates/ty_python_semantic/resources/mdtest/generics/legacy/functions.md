@@ -2503,3 +2503,49 @@ def grandchild_value(value: Levels[object, object, U]) -> U:
 def probe(value: Levels[int, str, bytes]):
     reveal_type(grandchild_value(value))  # revealed: bytes
 ```
+
+## Generic receivers in restricted protocol methods
+
+A generic implementation's receiver must accept every receiver allowed by the protocol. Its type
+variable can be bounded by the protocol's additional receiver restriction, even when the
+implementing class does not inherit that bound.
+
+```py
+from typing import Protocol, TypeVar
+from typing_extensions import Self
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Ready: ...
+class Authorized: ...
+
+T = TypeVar("T", bound=Ready)
+U = TypeVar("U", bound=Authorized)
+
+class Processor(Protocol):
+    def process(self: Intersection[Self, Ready], value: int) -> int: ...
+
+class ReadyBoundProcessor:
+    def process(self: T, value: int) -> int:
+        return value
+
+class AuthorizationBoundProcessor:
+    def process(self: U, value: int) -> int:
+        return value
+
+static_assert(is_assignable_to(ReadyBoundProcessor, Processor))
+static_assert(not is_assignable_to(AuthorizationBoundProcessor, Processor))
+```
+
+Receiver constraints also apply to occurrences of the same type variable in ordinary parameters and
+the return type. The receiver here cannot specialize to `int` to satisfy the protocol's return type.
+
+```py
+V = TypeVar("V")
+
+class ReceiverAsResult:
+    def process(self: V, value: V) -> V:
+        return self
+
+static_assert(not is_assignable_to(ReceiverAsResult, Processor))
+```
