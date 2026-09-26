@@ -1497,7 +1497,8 @@ mod tests {
                 remaining_paths,
                 remaining_visits,
             };
-            let mut walker = SolutionWalker::new(source_orders.clone(), inferable);
+            let mut walker =
+                SolutionWalker::new(db, &mut storage, source_orders.clone(), inferable);
             assert_eq!(
                 walker.visit_node(
                     db,
@@ -1513,7 +1514,8 @@ mod tests {
             drop(walker);
 
             let mut limits = UnboundedSolutionLimits;
-            let mut walker = SolutionWalker::new(source_orders.clone(), inferable);
+            let mut walker =
+                SolutionWalker::new(db, &mut storage, source_orders.clone(), inferable);
             let ControlFlow::Continue(()) = walker.visit_node(
                 db,
                 &env,
