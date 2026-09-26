@@ -18,14 +18,15 @@ use crate::module_name::ModuleName;
 use crate::resolve::{PyTyped, ResolverContext};
 use crate::typeshed::TypeshedVersionsQueryResult;
 
-/// A path that points to a Python module.
+/// A path to a possible Python module or a directory searched for modules.
 ///
 /// A `ModulePath` is made up of two elements:
-/// - The [`SearchPath`] that was used to find this module.
+/// - The [`SearchPath`] containing the location.
 ///   This could point to a directory on disk or a directory
 ///   in the vendored zip archive.
-/// - A relative path from the search path to the file
-///   that contains the source code of the Python module in question.
+/// - A relative path from the search path to a file or directory.
+///
+/// The path does not establish that a module exists or that resolution selects it.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) struct ModulePath {
     search_path: SearchPath,
@@ -83,58 +84,21 @@ impl ModulePath {
                 system_path_is_directory(resolver.db, &search_path.join(relative_path))
             }
             SearchPathInner::StandardLibraryCustom(stdlib_root) => {
-                match query_stdlib_version(relative_path, resolver) {
-                    TypeshedVersionsQueryResult::DoesNotExist => false,
-                    TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => {
-                        system_path_is_directory(resolver.db, &stdlib_root.join(relative_path))
-                    }
-                }
+                system_path_is_directory(resolver.db, &stdlib_root.join(relative_path))
+                    && !matches!(
+                        query_stdlib_version(relative_path, resolver),
+                        TypeshedVersionsQueryResult::DoesNotExist
+                    )
             }
             SearchPathInner::StandardLibraryVendored(stdlib_root) => {
-                match query_stdlib_version(relative_path, resolver) {
-                    TypeshedVersionsQueryResult::DoesNotExist => false,
-                    TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => resolver
-                        .vendored()
-                        .is_directory(stdlib_root.join(relative_path)),
-                }
+                resolver
+                    .vendored()
+                    .is_directory(stdlib_root.join(relative_path))
+                    && !matches!(
+                        query_stdlib_version(relative_path, resolver),
+                        TypeshedVersionsQueryResult::DoesNotExist
+                    )
             }
-        }
-    }
-
-    /// Get the `py.typed` info for this package (not considering parent packages)
-    pub(super) fn py_typed(&self, resolver: &ResolverContext) -> PyTyped {
-        let Some(py_typed_file) = self.to_system_path().and_then(|path| {
-            if !directory_contains_file(resolver.db, &path, &["py.typed"]) {
-                return None;
-            }
-            let py_typed_path = path.join("py.typed");
-            system_path_to_file(resolver.db, py_typed_path).ok()
-        }) else {
-            return PyTyped::Untyped;
-        };
-
-        // Different module names revisit the same package. Share the tracked contents instead of
-        // reading its marker from disk again for every module resolution.
-        let py_typed_contents = source_text(resolver.db, py_typed_file);
-        // If we fail to read it let's say that's like it doesn't exist
-        // (right now the difference between Untyped and Full is academic)
-        if py_typed_contents.read_error().is_some() {
-            return PyTyped::Untyped;
-        }
-
-        // The python typing spec says to look for "partial\n" but in the wild we've seen:
-        //
-        // * PARTIAL\n
-        // * partial\\n (as in they typed "\n")
-        // * partial/n
-        //
-        // since the py.typed file never really grew any other contents, let's be permissive
-        if py_typed_contents.to_ascii_lowercase().contains("partial") {
-            PyTyped::Partial
-        } else {
-            PyTyped::Full
         }
     }
 
@@ -301,19 +265,28 @@ impl<'db> ModuleDirectory<'db> {
         context: &ResolverContext<'db>,
         name: &str,
     ) -> Option<Self> {
+        let child_type = self.listing.and_then(|listing| listing.file_type(name));
+        let needs_directory_check = self.path.search_path.is_standard_library()
+            || match child_type {
+                Some(FileType::Directory) => false,
+                Some(FileType::Symlink) => true,
+                _ => return None,
+            };
         let mut path = self.path.clone();
         path.push(name);
-        path.is_directory(context).then(|| {
-            let enumeration_allowed = self.enumeration_allowed.map(|parent_allowed| {
-                let child_type = if self.path.search_path.as_vendored_path().is_some() {
-                    Some(FileType::Directory)
-                } else {
-                    self.listing.and_then(|listing| listing.file_type(name))
-                };
-                Self::enumeration_allowed_after_step(parent_allowed, child_type)
-            });
-            Self::new(context, path, enumeration_allowed)
-        })
+        if needs_directory_check && !path.is_directory(context) {
+            return None;
+        }
+
+        let enumeration_allowed = self.enumeration_allowed.map(|parent_allowed| {
+            let child_type = if self.path.search_path.as_vendored_path().is_some() {
+                Some(FileType::Directory)
+            } else {
+                child_type
+            };
+            Self::enumeration_allowed_after_step(parent_allowed, child_type)
+        });
+        Some(Self::new(context, path, enumeration_allowed))
     }
 
     /// Iterates over entries in a system or vendored directory.
@@ -451,6 +424,46 @@ impl<'db> ModuleDirectory<'db> {
             }
         }
     }
+
+    /// Reads this package's `py.typed` marker without considering parent packages.
+    pub(super) fn py_typed(&self, resolver: &ResolverContext) -> PyTyped {
+        if !matches!(
+            self.listing
+                .and_then(|listing| listing.file_type("py.typed")),
+            Some(FileType::File | FileType::Symlink)
+        ) {
+            return PyTyped::Untyped;
+        }
+        let Some(py_typed_file) = self
+            .path
+            .to_system_path()
+            .and_then(|path| system_path_to_file(resolver.db, path.join("py.typed")).ok())
+        else {
+            return PyTyped::Untyped;
+        };
+
+        // Different module names revisit the same package. Share the tracked contents instead of
+        // reading its marker from disk again for every module resolution.
+        let py_typed_contents = source_text(resolver.db, py_typed_file);
+        // If we fail to read it let's say that's like it doesn't exist
+        // (right now the difference between Untyped and Full is academic)
+        if py_typed_contents.read_error().is_some() {
+            return PyTyped::Untyped;
+        }
+
+        // The python typing spec says to look for "partial\n" but in the wild we've seen:
+        //
+        // * PARTIAL\n
+        // * partial\\n (as in they typed "\n")
+        // * partial/n
+        //
+        // since the py.typed file never really grew any other contents, let's be permissive
+        if py_typed_contents.to_ascii_lowercase().contains("partial") {
+            PyTyped::Partial
+        } else {
+            PyTyped::Full
+        }
+    }
 }
 
 /// A directory entry that borrows a system listing or owns a vendored entry's path.
@@ -480,16 +493,6 @@ impl ModuleDirectoryEntry<'_> {
             },
         }
     }
-}
-
-fn directory_contains_file(db: &dyn Db, directory: &SystemPath, names: &[&str]) -> bool {
-    let Ok(listing) = directory_listing(db, directory) else {
-        return false;
-    };
-
-    names
-        .iter()
-        .any(|name| listing.entry_is_file(db, directory, name))
 }
 
 fn system_path_is_directory(db: &dyn Db, path: &SystemPath) -> bool {
