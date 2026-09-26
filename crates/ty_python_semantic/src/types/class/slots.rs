@@ -167,6 +167,8 @@ impl InstanceDictionary {
             | KnownClass::TypedDictFallback
             | KnownClass::Template
             | KnownClass::Path
+            | KnownClass::RePattern
+            | KnownClass::ReMatch
             | KnownClass::FunctoolsPartial
             | KnownClass::ConstraintSet
             | KnownClass::ConstraintSetSolution

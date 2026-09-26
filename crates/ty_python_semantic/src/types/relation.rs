@@ -3734,6 +3734,19 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 !left_sentinel.is_same_sentinel(db, right_sentinel),
             ),
 
+            // Capture information describes sets of patterns and matches, not individual
+            // runtime objects. Distinct capture information does not imply disjoint values.
+            (
+                Type::KnownInstance(KnownInstanceType::Regex(left_regex)),
+                Type::KnownInstance(KnownInstanceType::Regex(right_regex)),
+            ) => nontrivial_check(self, || {
+                self.check_type_pair(
+                    db,
+                    left_regex.instance_fallback(db, env),
+                    right_regex.instance_fallback(db, env),
+                )
+            }),
+
             // Distinct wrapper types can describe the same descriptor when their wrapped types
             // overlap; they do not necessarily represent distinct objects.
             (
@@ -4046,6 +4059,18 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         self.constraints,
                         !special_form.is_instance_of(db, env, instance.class(db, env)),
                     )
+                })
+            }
+
+            (Type::KnownInstance(KnownInstanceType::Regex(regex)), Type::NominalInstance(_))
+            | (Type::NominalInstance(_), Type::KnownInstance(KnownInstanceType::Regex(regex))) => {
+                nontrivial_check(self, || {
+                    let nominal = if matches!(left, Type::NominalInstance(_)) {
+                        left
+                    } else {
+                        right
+                    };
+                    self.check_type_pair(db, regex.instance_fallback(db, env), nominal)
                 })
             }
 
