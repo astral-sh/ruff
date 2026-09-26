@@ -6000,10 +6000,27 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         };
 
-        let return_with_tcx = Some(self.return_ty).zip(self.call_expression_tcx.annotation);
+        // TODO: Variadic inference still uses legacy type mappings, which cannot distinguish
+        // validity from evidence. Keep its contextual preference until it uses the solver.
+        let prefer_context = self.call_expression_tcx.is_declared()
+            || generic_context
+                .variables(db)
+                .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db));
+        let return_with_tcx = Some(self.return_ty).zip(
+            self.call_expression_tcx
+                .annotation
+                .filter(|_| prefer_context),
+        );
 
         self.inferable_typevars = generic_context.inferable_typevars(db);
         let mut builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
+
+        if !prefer_context && let Some(tcx) = self.call_expression_tcx.annotation {
+            let validity =
+                self.return_ty
+                    .when_constraint_set_assignable_to(db, self.env, tcx, constraints);
+            builder.intersect_validity_constraints(validity);
+        }
 
         // Type variables for which we inferred a declared type based on a partially specialized
         // type from an outer generic context. For these type variables, we may infer types that
@@ -7271,9 +7288,8 @@ pub(crate) enum ArgumentTypeContext<'db> {
     Standard {
         /// The raw parameter type from the overload signature.
         raw_parameter_type: Type<'db>,
-        /// The parameter type to use as context, possibly specialized from the call expression's
-        /// declared type.
-        parameter_type: Type<'db>,
+        /// The expected parameter type, possibly specialized from the call expression's context.
+        context: TypeContext<'db>,
     },
 
     ParamSpec {
@@ -7287,12 +7303,12 @@ pub(crate) enum ArgumentTypeContext<'db> {
 impl<'db> ArgumentTypeContext<'db> {
     /// Creates a context for ordinary parameter annotations.
     ///
-    /// `raw_parameter_type` is the lookup key used by later type checking. `parameter_type` is the
+    /// `raw_parameter_type` is the lookup key used by later type checking. `context` is the
     /// possibly-specialized context used to infer the argument expression.
-    fn standard(raw_parameter_type: Type<'db>, parameter_type: Type<'db>) -> Self {
+    fn standard(raw_parameter_type: Type<'db>, context: TypeContext<'db>) -> Self {
         Self::Standard {
             raw_parameter_type,
-            parameter_type,
+            context,
         }
     }
 
@@ -7311,11 +7327,8 @@ impl<'db> ArgumentTypeContext<'db> {
     /// Returns the type context used for inferring the argument expression.
     pub(crate) fn type_context(self) -> TypeContext<'db> {
         match self {
-            Self::Standard { parameter_type, .. }
-            | Self::ParamSpec {
-                declared_type: parameter_type,
-                ..
-            } => TypeContext::new(Some(parameter_type)),
+            Self::Standard { context, .. } => context,
+            Self::ParamSpec { declared_type, .. } => TypeContext::new(Some(declared_type)),
         }
     }
 
@@ -7325,12 +7338,16 @@ impl<'db> ArgumentTypeContext<'db> {
     /// for that type. `ParamSpec` arguments are cached by the concrete forwarded parameter type,
     /// but still inserted through their full context so the original `P.args` or `P.kwargs` lookup
     /// key is populated too.
-    pub(crate) fn inference_cache_key(self) -> Type<'db> {
+    ///
+    /// The key retains the context kind: a declared type can select a different specialization
+    /// than the same type used only as a validity constraint.
+    pub(crate) fn inference_cache_key(self) -> TypeContext<'db> {
         match self {
             Self::Standard {
-                raw_parameter_type, ..
-            } => raw_parameter_type,
-            Self::ParamSpec { declared_type, .. } => declared_type,
+                raw_parameter_type,
+                context,
+            } => context.with_annotation(Some(raw_parameter_type)),
+            Self::ParamSpec { declared_type, .. } => TypeContext::new(Some(declared_type)),
         }
     }
 
@@ -7852,10 +7869,9 @@ impl<'db> Binding<'db> {
             (callable.kind(db) == CallableTypeKind::ParamSpecValue).then_some(callable)
         };
 
-        // If the parameter is a single non-ParamSpec type variable with an upper bound,
-        // e.g., `typing.Self`, use the upper bound as type context. ParamSpec components
-        // need to reach generic call specialization below, where earlier arguments can
-        // specialize the full `ParamSpec`.
+        // A type variable's upper bound, including the bound of `Self`, restricts valid arguments
+        // without supplying a preferred type. ParamSpec components need specialization below,
+        // where earlier arguments can determine the full parameter list.
         if let Type::TypeVar(typevar) = parameter_type
             && !typevar.is_paramspec(db)
             && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
@@ -7863,7 +7879,7 @@ impl<'db> Binding<'db> {
         {
             return Some(ArgumentTypeContext::standard(
                 original_parameter_type,
-                bound,
+                TypeContext::validity(bound),
             ));
         }
 
@@ -7916,9 +7932,18 @@ impl<'db> Binding<'db> {
             }
         }
 
+        // Specializing a parameter from validity-only context must not turn that context into a
+        // declared preference for a nested call. Unchanged parameter annotations still supply
+        // declared context.
+        let context =
+            if !call_expression_tcx.is_declared() && parameter_type != original_parameter_type {
+                call_expression_tcx.with_annotation(Some(parameter_type))
+            } else {
+                TypeContext::new(Some(parameter_type))
+            };
         Some(ArgumentTypeContext::standard(
             original_parameter_type,
-            parameter_type,
+            context,
         ))
     }
 

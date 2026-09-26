@@ -244,6 +244,62 @@ reveal_type(c_instance.y)  # revealed: int
 reveal_type(c_instance.z)  # revealed: int
 ```
 
+#### Inferred attributes do not provide declared type preference
+
+An inferred attribute type restricts assignments without supplying a preferred type for generic
+calls. Its validity bounds are combined with argument evidence, rather than replacing that evidence
+with the attribute's inferred type:
+
+```py
+from typing import Any, TypeVar
+
+T = TypeVar("T")
+
+def singleton(value: T) -> list[T]:
+    return [value]
+
+def identity(value: T) -> T:
+    return value
+
+class C:
+    def __init__(self):
+        self.inferred = [1]
+        self.declared: list[int] = [1]
+
+def _(c: C, value: Any, unknown):
+    c.inferred = singleton(value)
+    reveal_type(c.inferred)  # revealed: list[Any | int]
+    c.inferred = identity(singleton(unknown))
+    reveal_type(c.inferred)  # revealed: list[Unknown | int]
+
+    c.declared = singleton(value)
+    reveal_type(c.declared)  # revealed: list[int]
+    c.declared = identity(singleton(unknown))
+    reveal_type(c.declared)  # revealed: list[int]
+```
+
+Both inferred and declared attribute types still reject incompatible assignments:
+
+```py
+def _(c: C):
+    c.inferred = singleton("invalid")  # error: [invalid-assignment]
+    c.declared = singleton("invalid")  # error: [invalid-assignment]
+```
+
+The same distinction applies to class attributes:
+
+```py
+class ClassAttributes:
+    inferred = [1]
+    declared: list[int] = [1]
+
+def _(value: Any):
+    ClassAttributes.inferred = singleton(value)
+    reveal_type(ClassAttributes.inferred)  # revealed: list[Any | int]
+    ClassAttributes.declared = singleton(value)
+    reveal_type(ClassAttributes.declared)  # revealed: list[int]
+```
+
 #### Singleton promotion happens after unioning implicit assignments
 
 ```py
