@@ -12,6 +12,7 @@ use ty_module_resolver::system_module_search_paths;
 use crate::Project;
 use crate::db::{Db, ProjectDatabase};
 use crate::script::Script;
+use crate::uv::UvMetadata;
 use crate::watch::Watcher;
 
 /// Wrapper around a [`Watcher`] that watches the relevant paths of a project.
@@ -178,11 +179,17 @@ impl WatchPaths {
     }
 }
 
-/// Watches are registered in project, Python environment, module, then configuration order.
-/// On Linux, the last registered watch determines the path reported for overlapping symlinks.
+/// Workspace and project watches come first, followed by Python environment, module, and
+/// configuration watches. On Linux, the last registered watch determines the path reported for
+/// overlapping symlinks.
 ///
-/// Project roots and explicitly included paths come first because project files are discovered
-/// by walking them. A virtual environment outside the project needs its own watch because
+/// uv discovers the workspace root from `pyproject.toml`, so a successful metadata request tells
+/// us where to watch even if `uv.lock` is created later. A member's ty project root may be inside
+/// that workspace; changes to the lockfile at the workspace root can then change `members` and
+/// `resolution` in `uv workspace metadata`.
+///
+/// The workspace root, project root, and explicitly included paths share recursive watches where
+/// possible. A virtual environment outside the project needs its own watch because
 /// `pyvenv.cfg` can change the inferred Python version and import search paths. Watching its
 /// `site-packages` alone does not cover that file. System environment roots are excluded to
 /// avoid recursively watching a system prefix such as `/usr`.
@@ -192,6 +199,8 @@ impl WatchPaths {
 /// so their events use the explicit paths checked for configuration changes.
 ///
 /// # Known limitations
+///
+/// ## Virtual environments
 ///
 /// These limitations apply to virtual environments outside the project directory unless another
 /// watch already covers the relevant paths. Environments inside the project are covered by the project watch.
@@ -207,20 +216,48 @@ impl WatchPaths {
 ///   directory, or even be the user's home directory. We accept this limitation to avoid watching
 ///   those unrelated directories. A nonrecursive parent watch would need additional logic to
 ///   register the environment watch again after recreation.
+///
+/// ## uv workspace metadata
+///
+/// Metadata refreshes use the existing workspace, project, environment, and module search-path
+/// watches. We do not register additional watches for every local dependency's source directory.
+///
+/// - Non-editable local dependencies: For a dependency installed from `../helper`, the search
+///   path points to its installed copy in `site-packages`. Moving or deleting `../helper` can
+///   affect uv's resolution without producing an event on a watched path.
+/// - Initial metadata failure: uv may fail before reporting the workspace root or dependencies.
+///   Creating or repairing an external dependency then goes unnoticed unless an existing watch
+///   covers it. Directory changes under ty's project root can still request a retry.
+/// - Excluded workspace members: We use `src.include` and `src.exclude` to avoid refreshing uv
+///   metadata for unrelated directory changes, such as creating a package directory inside `.venv`.
+///   We intentionally make an exception for directories containing a module search path:
+///   excluding a dependency from checking does not stop the application from importing it.
+///   For example, an app can import an editable dependency at `packages/lib/src` while
+///   `src.include` selects only `packages/app`. Deleting `packages/lib` removes dependency
+///   sources and can change uv's resolution, so it should trigger a refresh.
+///   For excluded members with no module search path, a directory event alone does not trigger
+///   a refresh, so the cached uv member list can become stale. A separate event for the member's
+///   `pyproject.toml` or the workspace's `uv.lock` still triggers a refresh.
+///
+/// We accept these gaps to avoid retaining additional dependency paths, repeating uv's discovery
+/// after errors, or refreshing metadata for every directory change under the workspace root.
 #[salsa::tracked(returns(ref))]
 pub fn watch_paths(db: &dyn Db, project: Project) -> WatchPaths {
     let project_path = project.root(db);
+    let workspace_root = project
+        .metadata(db)
+        .uv_workspace()
+        .map(UvMetadata::workspace_root);
     let virtual_environment = project
         .program_settings(db)
         .virtual_environment
         .as_deref()
         .filter(|environment| !environment.starts_with(project_path));
 
-    // Watch both the project root and any paths provided by the user on the CLI (removing any redundant nested paths).
-    // This is necessary to observe changes to files that are outside the project root.
-    // We always need to watch the project root to observe changes to its configuration.
+    // Watch the workspace and project roots and any paths provided by the user on the CLI.
+    // A recursive parent watch also covers nested paths, including member projects.
     let included_paths = ruff_db::system::deduplicate_nested_paths(
-        std::iter::once(project_path).chain(
+        std::iter::once(project_path).chain(workspace_root).chain(
             project
                 .included_paths_list(db)
                 .iter()

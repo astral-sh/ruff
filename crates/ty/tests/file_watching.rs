@@ -308,7 +308,7 @@ trait Setup {
 }
 
 struct SetupContext<'a> {
-    system: &'a OsSystem,
+    system: &'a TestSystem,
     root_path: &'a SystemPath,
     options: Option<Options>,
     config_file_override: Option<SystemPathBuf>,
@@ -319,8 +319,16 @@ struct SetupContext<'a> {
 }
 
 impl<'a> SetupContext<'a> {
-    fn system(&self) -> &'a OsSystem {
+    fn system(&self) -> &'a TestSystem {
         self.system
+    }
+
+    fn os_system(&self) -> &'a OsSystem {
+        self.system()
+            .system()
+            .as_any()
+            .downcast_ref::<OsSystem>()
+            .expect("Expected an OS system for file-watching tests")
     }
 
     fn join_project_path(&self, relative: impl AsRef<SystemPath>) -> SystemPathBuf {
@@ -452,12 +460,12 @@ where
     // Keep file-watching tests independent from the shell and user config that run the test binary.
     let os_system = OsSystem::new(&project_path);
     let user_config_directory_override = os_system.with_user_config_directory(None);
-    let system = TestSystem::new(os_system.clone());
+    let system = TestSystem::new(os_system);
     system.clear_env_vars();
     configure_system(&system);
 
     let mut setup_context = SetupContext {
-        system: &os_system,
+        system: &system,
         root_path: &root_path,
         options: None,
         config_file_override: None,
@@ -2870,7 +2878,7 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
 
         _config_dir_override = Some(
             context
-                .system()
+                .os_system()
                 .with_user_config_directory(Some(config_directory)),
         );
 
@@ -3222,21 +3230,24 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
 
 #[cfg(feature = "test-uv")]
 mod uv_metadata {
-    use std::process::Command;
+    use std::fs::File as StdFile;
+    use std::io::Write as _;
     use std::time::Duration;
 
     use anyhow::Context;
     use insta::assert_snapshot;
+    use ruff_db::Db as _;
     use ruff_db::diagnostic::DiagnosticId;
     use ruff_db::files::File;
-    use ruff_db::system::{OsSystem, System as _};
+    use ruff_db::system::{Command, System, SystemPath};
     use ty_module_resolver::system_module_search_paths;
     use ty_project::{Db, ScriptEnvironmentAvailability, UseUv, UvSyncChanges, uv_test_env_vars};
     use ty_python_semantic::Db as _;
     use ty_static::EnvVars;
+    use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
     use super::{
-        ChangeEvent, SetupContext, TestCase, event_for_file, setup_with_system, update_file,
+        ChangeEvent, Setup, SetupContext, TestCase, event_for_file, setup_with_system, update_file,
     };
 
     const MANIFEST: &str = r#"
@@ -3304,20 +3315,33 @@ mod uv_metadata {
     }
 
     #[test]
+    fn creating_a_uv_project_clears_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv_with_system(UseUv::On, |context: &mut SetupContext| {
+            context.write_project_file("main.py", "value = 1\n")?;
+            run_uv_with_system(
+                context.system(),
+                context.project_path(),
+                &["venv", "--offline"],
+            )
+        })?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+
+        std::fs::write(case.project_path("pyproject.toml").as_std_path(), MANIFEST)?;
+        let events = case.take_watch_changes(event_for_file("pyproject.toml"));
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
     fn project_refresh_uses_the_returned_workspace_root() -> anyhow::Result<()> {
         let mut case = setup_uv(
             UseUv::On,
-            &[
-                (
-                    "../pyproject.toml",
-                    r#"
-                    [tool.uv.workspace]
-                    members = ["project"]
-                    "#,
-                ),
-                (
-                    "pyproject.toml",
-                    r#"
+            &[(
+                "pyproject.toml",
+                r#"
                     [project]
                     name = "example"
                     version = "0.1.0"
@@ -3325,20 +3349,563 @@ mod uv_metadata {
 
                     [tool.ty]
                     "#,
-                ),
-            ],
+            )],
         )?;
-        let project = case.db().project();
         assert_eq!(
-            project.root(case.db()),
+            case.db().project().root(case.db()),
             case.root_path().join("project").as_path()
         );
 
-        // Without its own ty configuration, the member belongs to the enclosing workspace.
+        // Joining a new enclosing workspace changes the root returned by uv. Removing the
+        // member's ty configuration lets ty use that root.
+        std::fs::write(
+            case.root_path().join("pyproject.toml"),
+            "[tool.uv.workspace]\nmembers = ['project']\n",
+        )?;
         update_and_synchronize_project(&mut case, MANIFEST)?;
-        assert_eq!(case.db().project(), project);
-        assert_eq!(project.root(case.db()), case.root_path());
+        assert_eq!(case.db().project().root(case.db()), case.root_path());
         Ok(())
+    }
+
+    #[test]
+    fn deleting_an_invalid_workspace_lockfile_clears_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv_workspace_member()?;
+        update_file(case.root_path().join("uv.lock"), "version = -1\n")?;
+        let changed = case.take_watch_changes(event_for_file("uv.lock"));
+        apply_changes_and_synchronize_project(&mut case, &changed)?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+
+        // The lockfile belongs to the workspace, outside the member project's root.
+        std::fs::remove_file(case.root_path().join("uv.lock").as_std_path())?;
+        let deleted = case.take_watch_changes(|event: &ChangeEvent| {
+            event.is_deleted() && event.file_name() == Some("uv.lock")
+        });
+        apply_changes_and_synchronize_project(&mut case, &deleted)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
+    fn creating_an_invalid_workspace_lockfile_reports_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv_workspace_member()?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        // Discard the removal events so only creating the lockfile can request this refresh.
+        std::fs::remove_file(case.root_path().join("uv.lock").as_std_path())?;
+        case.take_watch_changes(|event: &ChangeEvent| {
+            event.is_deleted() && event.file_name() == Some("uv.lock")
+        });
+
+        std::fs::write(case.root_path().join("uv.lock"), "version = -1\n")?;
+        let events = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Created { .. }) && event.file_name() == Some("uv.lock")
+        });
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        Ok(())
+    }
+
+    #[test]
+    fn renaming_a_workspace_member_updates_distribution_metadata() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "pyproject.toml",
+                    r#"
+                    [tool.uv.workspace]
+                    members = ["member"]
+                    "#,
+                ),
+                ("member/pyproject.toml", MANIFEST),
+                ("main.py", ""),
+            ],
+        )?;
+        assert_eq!(
+            case.db().project().root(case.db()),
+            case.root_path().join("project").as_path()
+        );
+        let manifest = case.project_path("member/pyproject.toml");
+
+        // This manifest is below the ty project root, so ty does not read its configuration.
+        update_file(
+            &manifest,
+            &MANIFEST.replace("name = \"example\"", "name = \"renamed\""),
+        )?;
+        let changed = case.take_watch_changes(event_for_file("pyproject.toml"));
+        apply_changes_and_synchronize_project(&mut case, &changed)?;
+        let main = case.system_file(case.project_path("main.py"))?;
+        let metadata = case.db().dependency_metadata(main).context("uv metadata")?;
+        assert_eq!(
+            metadata
+                .distributions
+                .values()
+                .map(|distribution| distribution.name.as_str())
+                .collect::<Vec<_>>(),
+            ["renamed"]
+        );
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
+    fn editing_then_moving_a_file_out_does_not_request_uv_metadata() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                ("pyproject.toml", MANIFEST),
+                ("module.py", "x: int = 'invalid'"),
+            ],
+        )?;
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @r#"module.py:1:10: error[invalid-assignment] Object of type `Literal["invalid"]` is not assignable to `int`"#
+        );
+
+        // Editing immediately before moving can produce multiple events for the same path.
+        // Moving to an unwatched directory can leave the deletion's file kind unknown.
+        update_file(case.project_path("module.py"), "x: int = 1\n")?;
+        std::fs::rename(
+            case.project_path("module.py"),
+            case.root_path().join("module.py"),
+        )?;
+        let changes = case.stop_watch(event_for_file("module.py"));
+        assert!(
+            case.apply_changes(&changes).project_sync_path().is_none(),
+            "{changes:?}"
+        );
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
+    fn creating_a_package_in_a_search_path_does_not_request_uv_metadata() -> anyhow::Result<()> {
+        let mut case = setup_uv_with_external_search_path()?;
+
+        // Changes within a search path outside `src.include` do not affect dependency projects.
+        std::fs::create_dir(case.root_path().join("dependency/src/package"))?;
+        let created = case.take_watch_changes(event_for_file("package"));
+        assert!(case.apply_changes(&created).project_sync_path().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn deleting_a_search_path_directory_updates_uv_members() -> anyhow::Result<()> {
+        let mut case = setup_uv_with_external_search_path()?;
+        let project_root = case.project_path("");
+        let dependency = case.root_path().join("dependency");
+        assert!(!dependency.starts_with(&project_root));
+        let main = case.system_file(case.project_path("src/main.py"))?;
+        assert!(dependency_project_paths(&case, main)?.contains(&dependency.as_path()));
+
+        std::fs::remove_dir_all(&dependency)?;
+        let deleted = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Deleted { path, .. } if path.starts_with(&dependency))
+        });
+        apply_changes_and_synchronize_project(&mut case, &deleted)?;
+        assert!(!dependency_project_paths(&case, main)?.contains(&dependency.as_path()));
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
+    fn moving_in_a_member_outside_checked_paths_updates_uv_members() -> anyhow::Result<()> {
+        let mut case = setup_uv_for_member_move("../incoming/pyproject.toml")?;
+        let incoming = case.root_path().join("incoming");
+        let member = case.project_path("packages/member");
+        let main = case.system_file(case.project_path("src/main.py"))?;
+        assert_eq!(
+            dependency_project_paths(&case, main)?,
+            [case.project_path("").as_path()]
+        );
+
+        std::fs::rename(&incoming, &member)?;
+        let created = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Created { path, .. } if path.starts_with(&member))
+        });
+        apply_changes_and_synchronize_project(&mut case, &created)?;
+        assert_eq!(
+            dependency_project_paths(&case, main)?,
+            [case.project_path("").as_path(), member.as_path()]
+        );
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
+    fn moving_out_a_member_outside_checked_paths_updates_uv_members() -> anyhow::Result<()> {
+        let mut case = setup_uv_for_member_move("packages/member/pyproject.toml")?;
+        let member = case.project_path("packages/member");
+        let main = case.system_file(case.project_path("src/main.py"))?;
+        assert_eq!(
+            dependency_project_paths(&case, main)?,
+            [case.project_path("").as_path(), member.as_path()]
+        );
+
+        std::fs::rename(&member, case.root_path().join("outgoing"))?;
+        let deleted = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Deleted { path, .. } if path.starts_with(&member))
+        });
+        apply_changes_and_synchronize_project(&mut case, &deleted)?;
+        assert_eq!(
+            dependency_project_paths(&case, main)?,
+            [case.project_path("").as_path()]
+        );
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
+    fn deleting_a_broken_member_clears_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv_with_system(UseUv::On, |context: &mut SetupContext| {
+            run_uv_with_system(
+                context.system(),
+                context.project_path(),
+                &["venv", "--offline"],
+            )?;
+            context.write_project_file(
+                "pyproject.toml",
+                "[tool.uv.workspace]\nmembers = ['packages/*']\n",
+            )?;
+            context.write_project_file("packages/broken/pyproject.toml", "[project")
+        })?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+
+        let broken = case.project_path("packages/broken");
+        std::fs::remove_dir_all(&broken)?;
+        let deleted = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Deleted { path, .. } if path.starts_with(&broken))
+        });
+        apply_changes_and_synchronize_project(&mut case, &deleted)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
+    fn creating_an_invalid_python_version_file_reports_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv(UseUv::On, &[("pyproject.toml", MANIFEST)])?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        // Invalid UTF-8 makes uv reject the pin even when an environment already exists.
+        std::fs::write(case.project_path(".python-version"), [0xff])?;
+        let events = case.take_watch_changes(event_for_file(".python-version"));
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        Ok(())
+    }
+
+    #[test]
+    fn deleting_an_invalid_python_version_file_clears_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv_with_system(UseUv::On, |context: &mut SetupContext| {
+            context.write_project_file("pyproject.toml", MANIFEST)?;
+            run_uv_with_system(
+                context.system(),
+                context.project_path(),
+                &["venv", "--offline"],
+            )?;
+            std::fs::write(context.join_project_path(".python-version"), [0xff])?;
+            Ok(())
+        })?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+
+        std::fs::remove_file(case.project_path(".python-version").as_std_path())?;
+        let events = case.take_watch_changes(|event: &ChangeEvent| {
+            event.is_deleted() && event.file_name() == Some(".python-version")
+        });
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
+    fn creating_an_invalid_uv_toml_reports_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv(UseUv::On, &[("pyproject.toml", MANIFEST)])?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        std::fs::write(
+            case.project_path("uv.toml").as_std_path(),
+            "no-cache = 'invalid'\n",
+        )?;
+        let events = case.take_watch_changes(event_for_file("uv.toml"));
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        Ok(())
+    }
+
+    #[test]
+    fn deleting_an_invalid_uv_toml_clears_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv_with_system(UseUv::On, |context: &mut SetupContext| {
+            context.write_project_file("pyproject.toml", MANIFEST)?;
+            run_uv_with_system(
+                context.system(),
+                context.project_path(),
+                &["venv", "--offline"],
+            )?;
+            context.write_project_file("uv.toml", "no-cache = 'invalid'\n")?;
+            Ok(())
+        })?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+
+        std::fs::remove_file(case.project_path("uv.toml").as_std_path())?;
+        let events = case.take_watch_changes(|event: &ChangeEvent| {
+            event.is_deleted() && event.file_name() == Some("uv.toml")
+        });
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
+    fn uv_files_do_not_refresh_metadata_when_uv_is_disabled() -> anyhow::Result<()> {
+        let mut case = setup_uv(UseUv::Off, &[("pyproject.toml", MANIFEST)])?;
+        run_uv(&case, &["lock", "--offline"])?;
+
+        let events = case.take_watch_changes(event_for_file("uv.lock"));
+        assert!(case.apply_changes(&events).project_sync_path().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn recreating_selected_environment_clears_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv(UseUv::On, &[("pyproject.toml", MANIFEST)])?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        std::fs::remove_dir_all(case.project_path(".venv").as_std_path())?;
+
+        let deleted = case.take_watch_changes(|event: &ChangeEvent| {
+            event.is_deleted() && event.file_name() == Some(".venv")
+        });
+        apply_changes_and_synchronize_project(&mut case, &deleted)?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+
+        run_uv(&case, &["venv", "--offline"])?;
+        let created = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Created { .. }) && event.file_name() == Some(".venv")
+        });
+        apply_changes_and_synchronize_project(&mut case, &created)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    #[test]
+    fn creating_an_unrelated_distribution_does_not_request_project_metadata() -> anyhow::Result<()>
+    {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                ("pyproject.toml", MANIFEST),
+                ("other/.venv/site-packages/.keep", ""),
+            ],
+        )?;
+        let distribution = case.project_path("other/.venv/site-packages/example-0.1.0.dist-info");
+
+        std::fs::create_dir(&distribution)?;
+        let created = case.take_watch_changes(event_for_file("example-0.1.0.dist-info"));
+        assert!(case.apply_changes(&created).project_sync_path().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn deleting_an_unrelated_distribution_does_not_request_project_metadata() -> anyhow::Result<()>
+    {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                ("pyproject.toml", MANIFEST),
+                (
+                    "other/.venv/site-packages/example-0.1.0.dist-info/.keep",
+                    "",
+                ),
+            ],
+        )?;
+        let distribution = case.project_path("other/.venv/site-packages/example-0.1.0.dist-info");
+
+        std::fs::remove_dir_all(&distribution)?;
+        let deleted = case.take_watch_changes(event_for_file("example-0.1.0.dist-info"));
+        assert!(case.apply_changes(&deleted).project_sync_path().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn creating_unrelated_site_packages_does_not_request_project_metadata() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                ("pyproject.toml", MANIFEST),
+                ("other/.venv/lib/python3.12/.keep", ""),
+            ],
+        )?;
+        let site_packages = case.project_path("other/.venv/lib/python3.12/site-packages");
+
+        std::fs::create_dir(&site_packages)?;
+        let created = case.take_watch_changes(event_for_file("site-packages"));
+        assert!(case.apply_changes(&created).project_sync_path().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn deleting_unrelated_site_packages_does_not_request_project_metadata() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                ("pyproject.toml", MANIFEST),
+                ("other/.venv/lib/python3.12/site-packages/.keep", ""),
+            ],
+        )?;
+        let site_packages = case.project_path("other/.venv/lib/python3.12/site-packages");
+
+        std::fs::remove_dir_all(&site_packages)?;
+        let deleted = case.take_watch_changes(event_for_file("site-packages"));
+        assert!(case.apply_changes(&deleted).project_sync_path().is_none());
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn symlinked_environment_uninstall_reports_module_ownership_error() -> anyhow::Result<()> {
+        let mut case = setup_uv_with_dependency(|context| {
+            let environment = context.join_root_path("environment");
+            run_uv_with_system(
+                context.system(),
+                context.project_path(),
+                &["venv", "--offline", environment.as_str()],
+            )?;
+            std::os::unix::fs::symlink(&environment, context.join_project_path(".venv"))?;
+            Ok(())
+        })?;
+        let project = case.db().project();
+        let environment = project.program(case.db()).resolver_environment(case.db());
+        let site_packages = system_module_search_paths(case.db(), environment)
+            .find(|path| path.file_name() == Some("site-packages"))
+            .context("environment has no site-packages")?
+            .to_path_buf();
+        assert!(site_packages.starts_with(case.root_path().join("environment")));
+        assert_eq!(project.check_settings(case.db()).as_slice(), &[]);
+
+        run_uv(
+            &case,
+            &[
+                "pip",
+                "uninstall",
+                "--python",
+                ".venv",
+                "example-dependency",
+            ],
+        )?;
+        let deleted = case.take_watch_changes(|event: &ChangeEvent| {
+            event.is_deleted() && event.file_name() == Some("example_dependency-0.1.0.dist-info")
+        });
+        apply_changes_and_synchronize_project(&mut case, &deleted)?;
+        assert_snapshot!(
+            case.render_diagnostics(&project.check_settings(case.db())),
+            @"pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: uv metadata has no module ownership or editable source paths"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn reinstalling_a_package_clears_module_ownership_error() -> anyhow::Result<()> {
+        let mut case = setup_uv_with_dependency(|_| Ok(()))?;
+        let project = case.db().project();
+        assert_eq!(project.check_settings(case.db()).as_slice(), &[]);
+        run_uv(
+            &case,
+            &[
+                "pip",
+                "uninstall",
+                "--python",
+                ".venv",
+                "example-dependency",
+            ],
+        )?;
+
+        let events = case.take_watch_changes(|event: &ChangeEvent| {
+            event.is_deleted() && event.file_name() == Some("example_dependency-0.1.0.dist-info")
+        });
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+
+        assert_snapshot!(
+            case.render_diagnostics(&project.check_settings(case.db())),
+            @"pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: uv metadata has no module ownership or editable source paths"
+        );
+
+        run_uv(&case, &["sync", "--frozen", "--offline"])?;
+        let events = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Created { .. })
+                && event.file_name() == Some("example_dependency-0.1.0.dist-info")
+        });
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        assert_eq!(project.check_settings(case.db()).as_slice(), &[]);
+        Ok(())
+    }
+
+    /// Installs a local wheel so package changes affect uv's module ownership metadata.
+    fn setup_uv_with_dependency(
+        prepare: impl FnOnce(&mut SetupContext) -> anyhow::Result<()>,
+    ) -> anyhow::Result<TestCase> {
+        setup_uv_with(
+            UseUv::On,
+            &[
+                (
+                    "pyproject.toml",
+                    r#"
+                    [project]
+                    name = "example"
+                    version = "0.1.0"
+                    requires-python = ">=3.8"
+                    dependencies = ["example-dependency"]
+
+                    [tool.uv]
+                    no-index = true
+                    find-links = ["wheels"]
+                    "#,
+                ),
+                ("main.py", "import example_module\n"),
+            ],
+            |context| {
+                let wheel =
+                    context.join_project_path("wheels/example_dependency-0.1.0-py3-none-any.whl");
+                std::fs::create_dir_all(wheel.parent().context("wheel has no parent")?)?;
+                let mut wheel = ZipWriter::new(StdFile::create(wheel.as_std_path())?);
+                let options =
+                    SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
+                for (path, contents) in [
+                    ("example_module.py", "value = 1\n"),
+                    (
+                        "example_dependency-0.1.0.dist-info/METADATA",
+                        "Metadata-Version: 2.1\nName: example-dependency\nVersion: 0.1.0\n",
+                    ),
+                    (
+                        "example_dependency-0.1.0.dist-info/WHEEL",
+                        "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+                    ),
+                    (
+                        "example_dependency-0.1.0.dist-info/RECORD",
+                        "example_module.py,,\nexample_dependency-0.1.0.dist-info/RECORD,,\n",
+                    ),
+                ] {
+                    wheel.start_file(path, options)?;
+                    wheel.write_all(contents.as_bytes())?;
+                }
+                wheel.finish()?;
+                prepare(context)
+            },
+        )
     }
 
     #[test]
@@ -3397,7 +3964,7 @@ mod uv_metadata {
             @"script.py:6:6: error[unresolved-import] Cannot resolve imported module `attrs`"
         );
 
-        let synchronized = update_and_synchronize_script(
+        update_and_synchronize_script(
             &mut case,
             r#"
             # /// script
@@ -3407,7 +3974,6 @@ mod uv_metadata {
             from attrs import define
             "#,
         )?;
-        assert!(synchronized);
 
         // Apply the package creation reported by the watcher after uv finishes writing it.
         let changes = case.stop_watch(|event: &ChangeEvent| {
@@ -3472,7 +4038,7 @@ mod uv_metadata {
                 .any(|diagnostic| diagnostic.id() == DiagnosticId::UvMetadata)
         );
 
-        let synchronized = update_and_synchronize_script(
+        update_and_synchronize_script(
             &mut case,
             r#"
             # /// script
@@ -3482,7 +4048,6 @@ mod uv_metadata {
             from attrs import define
             "#,
         )?;
-        assert!(synchronized);
 
         assert_eq!(case.db().check().as_slice(), &[]);
 
@@ -3529,61 +4094,196 @@ mod uv_metadata {
         assert_eq!(case.db().check().as_slice(), &[]);
 
         let dependency = dependencies.join("dependency.py");
-        update_file(&dependency, "value = 2")?;
+        update_file(&dependency, "value = 'wrong'")?;
         let changes = case.stop_watch(event_for_file("dependency.py"));
-        assert!(
-            changes.iter().any(
-                |event| matches!(event, ChangeEvent::Changed { path, .. } if path == &dependency)
-            ),
-            "expected an edit at the new search path: {changes:?}"
+        case.apply_changes(&changes);
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @r#"script.py:7:15: error[invalid-assignment] Object of type `Literal["wrong"]` is not assignable to `int`"#
         );
         Ok(())
     }
 
+    /// Returns the project paths used by dependency checks for `file`.
+    fn dependency_project_paths(case: &TestCase, file: File) -> anyhow::Result<Vec<&SystemPath>> {
+        let metadata = case.db().dependency_metadata(file).context("uv metadata")?;
+        Ok(metadata
+            .projects
+            .iter()
+            .map(|project| project.path.as_path())
+            .collect())
+    }
+
+    /// Runs uv in the test's project directory with its configured executable and environment.
+    fn run_uv(case: &TestCase, args: &[&str]) -> anyhow::Result<()> {
+        run_uv_with_system(case.db().system(), &case.project_path(""), args)
+    }
+
+    /// Runs uv in `directory` with the system's configured executable and environment.
+    /// Returns an error if uv fails.
+    fn run_uv_with_system(
+        system: &dyn System,
+        directory: &SystemPath,
+        args: &[&str],
+    ) -> anyhow::Result<()> {
+        let mut command = Command::new(system.env_var(EnvVars::UV)?);
+        command.current_dir(directory).args(args.iter().copied());
+        let output = system.run_command(command)?;
+        anyhow::ensure!(
+            output.status.success(),
+            "uv {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        Ok(())
+    }
+
+    /// Writes the fixture files and creates a watched project with the selected uv mode.
+    /// Installs project dependencies for `UseUv::On` and synchronizes discovered scripts.
     fn setup_uv(use_uv: UseUv, files: &[(&str, &str)]) -> anyhow::Result<TestCase> {
-        let uv = OsSystem::default().which("uv")?;
-        let mut case = setup_with_system(
-            |context: &mut SetupContext| {
-                for (path, content) in files {
-                    context.write_project_file(path, content)?;
-                }
-                if use_uv == UseUv::On {
-                    let output = Command::new(uv.as_std_path())
-                        .env_clear()
-                        .envs(uv_test_env_vars())
-                        .current_dir(context.project_path())
-                        .args(["sync", "--offline"])
-                        .output()?;
-                    anyhow::ensure!(
-                        output.status.success(),
-                        "uv sync failed: {}",
-                        String::from_utf8_lossy(&output.stderr)
-                    );
-                }
+        setup_uv_with(use_uv, files, |_| Ok(()))
+    }
+
+    /// Sets up a ty project that is a member of its parent directory's uv workspace.
+    fn setup_uv_workspace_member() -> anyhow::Result<TestCase> {
+        let case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "../pyproject.toml",
+                    r#"
+                    [tool.uv.workspace]
+                    members = ["project"]
+                    "#,
+                ),
+                ("pyproject.toml", MANIFEST),
+                ("ty.toml", ""),
+            ],
+        )?;
+        assert_eq!(
+            case.db().project().root(case.db()),
+            case.root_path().join("project").as_path()
+        );
+        Ok(case)
+    }
+
+    /// Sets up member-move tests with only `src` selected for checking.
+    fn setup_uv_for_member_move(manifest_path: &str) -> anyhow::Result<TestCase> {
+        setup_uv_with(
+            UseUv::On,
+            &[
+                (
+                    "pyproject.toml",
+                    r#"
+                    [tool.uv.workspace]
+                    members = ["packages/*"]
+                    "#,
+                ),
+                ("packages/.keep", ""),
+                ("src/main.py", "value = 1\n"),
+                (manifest_path, MANIFEST),
+            ],
+            |context| {
+                context.set_included_paths(vec![context.join_project_path("src")]);
                 Ok(())
             },
-            |system| {
-                system.set_env_vars(uv_test_env_vars());
-                system.set_env_var(
-                    EnvVars::TY_UV,
-                    match use_uv {
-                        UseUv::Off => "0",
-                        UseUv::Scripts => "scripts",
-                        UseUv::On => "1",
-                    },
-                );
-                system.set_env_var(EnvVars::UV, uv.as_str());
-            },
-        )?;
+        )
+    }
+
+    /// Adds another workspace member's source directory to the project's search paths.
+    fn setup_uv_with_external_search_path() -> anyhow::Result<TestCase> {
+        setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "../pyproject.toml",
+                    r#"
+                    [tool.uv.workspace]
+                    members = ["project", "dependency"]
+                    "#,
+                ),
+                ("pyproject.toml", MANIFEST),
+                (
+                    "ty.toml",
+                    r#"
+                    [environment]
+                    extra-paths = ["../dependency/src"]
+
+                    [src]
+                    include = ["src"]
+                    "#,
+                ),
+                ("src/main.py", "value = 1\n"),
+                ("../dependency/src/.keep", ""),
+                (
+                    "../dependency/pyproject.toml",
+                    "[project]\nname = 'dependency'\nversion = '0.1.0'\n",
+                ),
+            ],
+        )
+    }
+
+    /// Like [`setup_uv`], but calls `prepare` after writing the files and before running uv.
+    fn setup_uv_with(
+        use_uv: UseUv,
+        files: &[(&str, &str)],
+        prepare: impl FnOnce(&mut SetupContext) -> anyhow::Result<()>,
+    ) -> anyhow::Result<TestCase> {
+        let mut case = setup_uv_with_system(use_uv, |context: &mut SetupContext| {
+            for (path, content) in files {
+                context.write_project_file(path, content)?;
+            }
+            prepare(context)?;
+            if use_uv == UseUv::On {
+                run_uv_with_system(
+                    context.system(),
+                    context.project_path(),
+                    &["sync", "--offline"],
+                )?;
+            }
+            Ok(())
+        })?;
         let scripts: Vec<_> = case.db().project().script_files(case.db()).iter().collect();
         synchronize_scripts(&mut case, &scripts)?;
         Ok(case)
     }
 
+    /// Creates a watched project with the selected uv mode and test command environment.
+    /// Lets the test control Python environment creation and synchronization.
+    fn setup_uv_with_system(use_uv: UseUv, setup_files: impl Setup) -> anyhow::Result<TestCase> {
+        setup_with_system(setup_files, |system| {
+            // TestSystem disables executable lookup so tests don't discover the host's Python.
+            // These tests require uv, so resolve it using the wrapped OS system.
+            let uv = system
+                .system()
+                .which("uv")
+                .expect("uv must be installed for uv file-watching tests");
+            system.set_env_vars(uv_test_env_vars());
+            system.set_env_var(
+                EnvVars::TY_UV,
+                match use_uv {
+                    UseUv::Off => "0",
+                    UseUv::Scripts => "scripts",
+                    UseUv::On => "1",
+                },
+            );
+            system.set_env_var(EnvVars::UV, uv.as_str());
+        })
+    }
+
+    /// Updates `pyproject.toml` and processes its watcher events through project synchronization.
     fn update_and_synchronize_project(case: &mut TestCase, source: &str) -> anyhow::Result<()> {
         update_file(case.project_path("pyproject.toml"), source)?;
         let changes = case.take_watch_changes(event_for_file("pyproject.toml"));
-        let changes = case.apply_changes(&changes);
+        apply_changes_and_synchronize_project(case, &changes)
+    }
+
+    /// Applies watcher events, requests any resulting uv project refresh, and waits for
+    /// pending uv synchronizations to finish.
+    fn apply_changes_and_synchronize_project(
+        case: &mut TestCase,
+        changes: &[ChangeEvent],
+    ) -> anyhow::Result<()> {
+        let changes = case.apply_changes(changes);
 
         if let Some(project_path) = changes.project_sync_path() {
             case.db()
