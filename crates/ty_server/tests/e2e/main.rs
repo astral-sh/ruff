@@ -45,9 +45,11 @@ mod notebook;
 mod publish_diagnostics;
 mod pull_diagnostics;
 mod rename;
+mod resolve_test_run_params;
 mod script_preparation;
 mod semantic_tokens;
 mod signature_help;
+mod test_discovery;
 mod type_hierarchy;
 mod workspace_folders;
 
@@ -1695,6 +1697,11 @@ impl TestContext {
         settings.add_filter(&tempdir_filter(project_dir.as_str()), "<temp_dir>/");
         settings.add_filter(&tempdir_filter(project_dir_uri.path()), "<temp_dir>/");
         settings.add_filter(r#"\\\\"#, "/");
+        // For windows
+        settings.add_filter(
+            &tempdir_filter(project_dir.as_str().replace('\\', "/")),
+            "<temp_dir>/",
+        );
         settings.add_filter(
             r#"The system cannot find the file specified."#,
             "No such file or directory",

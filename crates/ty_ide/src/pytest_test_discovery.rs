@@ -17,7 +17,7 @@ use crate::{Db, FxIndexMap};
 ///
 /// Multiple possible definitions of the same target produce one item, using the first definition's
 /// source location. Methods from alternative class definitions are combined under that class item.
-fn discover_pytest_tests<'db>(
+pub fn discover_pytest_tests<'db>(
     db: &'db dyn Db,
     file: ProgramFile<'db>,
 ) -> Vec<DiscoveredPytestTest> {
@@ -71,26 +71,26 @@ fn discover_pytest_tests<'db>(
 
 /// A collected pytest test function or a class containing collected pytest tests.
 #[derive(Debug, PartialEq, Eq)]
-struct DiscoveredPytestTest {
+pub struct DiscoveredPytestTest {
     /// File-relative pytest target, such as `TestUsers::test_lookup`.
     ///
     /// This identifier is unchanged by edits that only move the item's source location.
-    id: String,
+    pub id: String,
     /// Whether this item is a class or a function/method.
-    kind: DiscoveredPytestTestKind,
+    pub kind: DiscoveredPytestTestKind,
     /// The source range of the test binding or class name.
-    range: TextRange,
+    pub range: TextRange,
     /// The collected test name or class name shown in the editor.
     /// For `TestUsers::test_lookup`, this is `test_lookup`.
-    label: String,
+    pub label: String,
     /// The containing class's identifier, or `None` for a module-level item.
     /// For `TestUsers::test_lookup`, this is `Some("TestUsers")`.
-    parent: Option<String>,
+    pub parent: Option<String>,
 }
 
 /// Whether an editor item represents a test class or a test function/method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum DiscoveredPytestTestKind {
+pub enum DiscoveredPytestTestKind {
     /// A class containing collected tests.
     Class,
     /// A collected function or method, including `unittest.TestCase` methods.
