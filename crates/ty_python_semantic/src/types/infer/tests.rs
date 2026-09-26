@@ -1341,6 +1341,40 @@ fn parameter_default_presence_invalidates_caller() -> anyhow::Result<()> {
 }
 
 #[test]
+fn dynamic_class_metaclass_updates_after_base_change() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let base = "\
+class Meta1(type): ...
+class Meta2(type): ...
+class Base(metaclass=Meta1): ...
+";
+    db.write_files([
+        ("/src/base.py", base),
+        (
+            "/src/main.py",
+            "\
+from typing_extensions import reveal_type
+from base import Base
+
+C = type('C', (Base,), {})
+reveal_type(type(C))
+",
+        ),
+    ])?;
+    assert_revealed_type(&db, "/src/main.py", "<class 'Meta1'>");
+
+    db.write_file(
+        "/src/base.py",
+        base.replace("metaclass=Meta1", "metaclass=Meta2"),
+    )?;
+    assert_revealed_type(&db, "/src/main.py", "<class 'Meta2'>");
+
+    db.write_file("/src/base.py", base)?;
+    assert_revealed_type(&db, "/src/main.py", "<class 'Meta1'>");
+    Ok(())
+}
+
+#[test]
 fn field_specifier_default_value_invalidates_caller() -> anyhow::Result<()> {
     let mut db = setup_db();
     let field_source = r#"from typing import Any

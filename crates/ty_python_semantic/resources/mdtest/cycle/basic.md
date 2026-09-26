@@ -594,3 +594,26 @@ Sequence = object
 ```py
 reveal_type("a".encode())  # revealed: bytes
 ```
+
+## Dynamic class metaclasses in loop conditions
+
+Determining whether a loop body is reachable can depend on the metaclass of a dynamic class created
+in the loop, whose base in turn depends on that reachability.
+
+### `type`
+
+```py
+value = 0
+while value:
+    value = type("C", (value,), {})
+```
+
+### `types.new_class`
+
+```py
+from types import new_class
+
+value = 0
+while value:
+    value = new_class("C", (value,))
+```
