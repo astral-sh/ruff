@@ -1,12 +1,15 @@
+use camino::{Utf8Component, Utf8Path};
+
 use ruff_db::Db as _;
-use ruff_db::files::FileRootKind;
+use ruff_db::files::{FilePath, FileRootKind};
 use ruff_db::system::{
     DbWithTestSystem as _, DbWithWritableSystem as _, SystemPath, SystemPathBuf,
 };
 use ruff_db::vendored::VendoredPathBuf;
 use ruff_python_ast::PythonVersion;
 
-use crate::db::tests::TestDb;
+use crate::db::{Db, tests::TestDb};
+use crate::module::Module;
 use crate::settings::SearchPathSettings;
 use crate::strategy::FallibleStrategy;
 
@@ -315,6 +318,55 @@ impl TestCaseBuilder<VendoredTypeshed> {
             stdlib: VendoredPathBuf::from("stdlib"),
             site_packages,
             python_version,
+        }
+    }
+}
+
+/// Formats a resolved module with normalized path separators for test snapshots.
+pub(crate) struct ModuleDebugSnapshot<'db> {
+    pub(crate) db: &'db dyn Db,
+    pub(crate) module: Module<'db>,
+}
+
+impl std::fmt::Debug for ModuleDebugSnapshot<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self.module {
+            Module::Namespace(pkg) => {
+                write!(f, "Module::Namespace({name:?})", name = pkg.name(self.db))
+            }
+            Module::File(module) => {
+                // For snapshots, just normalize all paths to using
+                // Unix slashes for simplicity.
+                let path_components = match module.file(self.db).path(self.db) {
+                    FilePath::System(path) => path.components(),
+                    FilePath::Vendored(path) => path.components(),
+                    FilePath::SystemVirtual(path) => Utf8Path::new(path.as_str()).components(),
+                };
+                let nice_path = path_components
+                    // Avoid including a root component, since that
+                    // results in a platform dependent separator.
+                    // Convert to an empty string so that we get a
+                    // path beginning with `/` regardless of platform.
+                    .map(|component| {
+                        if let Utf8Component::RootDir = component {
+                            Utf8Component::Normal("")
+                        } else {
+                            component
+                        }
+                    })
+                    .map(|component| component.as_str())
+                    .collect::<Vec<&str>>()
+                    .join("/");
+                write!(
+                    f,
+                    "Module::File({name:?}, {search_path:?}, {path:?}, {kind:?}, {known:?})",
+                    name = module.name(self.db).as_str(),
+                    search_path = module.search_path(self.db).debug_kind(),
+                    path = nice_path,
+                    kind = module.kind(self.db),
+                    known = module.known(self.db),
+                )
+            }
         }
     }
 }
