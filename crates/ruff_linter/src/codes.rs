@@ -1370,6 +1370,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         // Rules that belong only to categories, without linter groups or codes.
         () => rules::ruff::rules::PytestFixtureAutouse,
+        () => rules::ruff::rules::TarfileIgnoreZerosTrue,
 
         _ => return None,
     })
