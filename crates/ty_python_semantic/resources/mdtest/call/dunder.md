@@ -413,6 +413,8 @@ def _(c: C & Other):
 
 ### Subscripting
 
+Subscripting binds `Self` to the full receiver, including when narrowing excludes a type.
+
 ```py
 from typing import Self
 
@@ -422,10 +424,30 @@ class C:
 
 class Other: ...
 
-def _(c: C & Other):
+def intersection(c: C & Other):
     reveal_type(c.__getitem__(0))  # revealed: C & Other
-    # TODO: This should retain `C & Other`, just like the explicit call.
-    reveal_type(c[0])  # revealed: C
+    reveal_type(c[0])  # revealed: C & Other
+
+def negative(c: C):
+    if not isinstance(c, Other):
+        reveal_type(c.__getitem__(0))  # revealed: C & ~Other
+        reveal_type(c[0])  # revealed: C & ~Other
+
+def reversed_order(c: Other & C):
+    reveal_type(c.__getitem__(0))  # revealed: Other & C
+    reveal_type(c[0])  # revealed: Other & C
+```
+
+Each member of a union retains its own intersection receiver.
+
+```py
+class D:
+    def __getitem__(self, key: int) -> Self:
+        return self
+
+def union(c: C & Other | D & Other):
+    reveal_type(c.__getitem__(0))  # revealed: (C & Other) | (D & Other)
+    reveal_type(c[0])  # revealed: (C & Other) | (D & Other)
 ```
 
 ### Context managers
