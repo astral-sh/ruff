@@ -185,40 +185,36 @@ impl RedundantConditionContext {
         builder: &TypeInferenceBuilder<'_, '_>,
         condition: &RedundantCondition<'_, '_>,
     ) -> bool {
-        if matches!(
-            condition.kind,
-            ConditionKind::NoneUnion(_) | ConditionKind::Iterable | ConditionKind::Callable(_)
-        ) {
+        match condition.kind {
             // These checks should always be considered suspicious.
-            return false;
-        }
-
-        let defensive = match self {
-            Self::Assertion => matches!(
-                &condition.kind,
-                ConditionKind::Boolean | ConditionKind::ShortCircuit
-            ),
-            Self::DefensiveExit {
-                truthy_branch,
-                falsy_branch,
-            } => {
-                let is_boolean_or_short_circuit = matches!(
-                    &condition.kind,
-                    ConditionKind::Boolean | ConditionKind::ShortCircuit
-                );
-
-                is_boolean_or_short_circuit
-                    && if condition.truthiness.is_always_true() {
-                        falsy_branch
-                    } else {
-                        truthy_branch
-                    }
+            ConditionKind::NoneUnion(_) | ConditionKind::Iterable | ConditionKind::Callable(_) => {
+                return false;
             }
-            Self::Standalone => false,
-        };
 
-        if defensive {
-            return true;
+            // These checks are exempted if they are clearly part of a "defensive exit"
+            // that asserts that a branch is unreachable
+            ConditionKind::Boolean | ConditionKind::ShortCircuit => {
+                let defensive = match self {
+                    Self::Assertion => true,
+                    Self::DefensiveExit {
+                        truthy_branch,
+                        falsy_branch,
+                    } => {
+                        if condition.truthiness.is_always_true() {
+                            falsy_branch
+                        } else {
+                            truthy_branch
+                        }
+                    }
+                    Self::Standalone => false,
+                };
+                if defensive {
+                    return true;
+                }
+            }
+
+            // For these checks, fall through to the exemptions below
+            ConditionKind::ContainsWalrus | ConditionKind::Value => {}
         }
 
         match condition.expression {
@@ -328,11 +324,13 @@ impl RedundantConditionContext {
     }
 }
 
-/// Return `true` if any subexpression in `expression` is recognized as "tainted" by being defined
+/// Return `true` if `expression` is recognized as "tainted" by being defined
 /// (directly or indirectly) with respect to `sys.version_info`, `sys.platform`, `os.name`, or
 /// `typing.TYPE_CHECKING`.
 ///
 /// Follow assignments and imports so aliases inherit the same exemption as the original guard.
+///
+/// As elsewhere in ty, `TYPE_CHECKING` is recognized syntactically, without resolving its origin.
 fn is_special_cased_condition_expression<'db>(
     db: &'db dyn Db,
     file: ProgramFile<'db>,

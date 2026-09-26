@@ -64,7 +64,7 @@ use ruff_text_size::Ranged;
 use ty_python_core::{Truthiness, expression::ExpressionContext, predicate::StatementCall};
 
 use crate::{
-    Db,
+    Db, ProgramEnvironment,
     lint::LintMetadata,
     reachability::{analyze_condition_expression, is_non_terminal_call},
     types::{
@@ -128,7 +128,7 @@ enum ConditionKind<'db> {
 
     /// A value with fixed truthiness that does not require the strict rule.
     ///
-    /// Unlike the other three categories, these tests are reported by the enabled-by-default
+    /// Unlike the above three categories, these tests are reported by the enabled-by-default
     /// `redundant-condition` rule.
     ///
     /// ```python
@@ -340,18 +340,20 @@ struct RedundantCondition<'ast, 'db> {
     kind: ConditionKind<'db>,
 }
 
-/// Determination of whether `redundant-condition-strict` diagnostics should be reported
-/// on subexpressions of a compound condition, or should instead be only reported on the
-/// outer expression.
+/// Determination of whether diagnostics for [`ConditionKind::Boolean`] and
+/// [`ConditionKind::ShortCircuit`] should be reported on subexpressions of a compound
+/// condition, or should instead be only reported on the outer expression.
 ///
-/// `redundant-condition` diagnostics are always reported, regardless of this preference.
+/// Other condition kinds are unaffected by this preference, including
+/// [`ConditionKind::ContainsWalrus`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum BooleanDiagnosticPreference {
     /// No enclosing condition has fixed truthiness, so this test can be reported individually.
     CurrentCondition,
 
-    /// A condition containing this test has fixed truthiness. `redundant-condition-strict`
-    /// diagnostics should be suppressed for this subexpression.
+    /// A condition containing this test has fixed truthiness. Diagnostics for
+    /// [`ConditionKind::Boolean`] and [`ConditionKind::ShortCircuit`] should be suppressed
+    /// for this subexpression.
     EnclosingCondition,
 }
 
@@ -671,11 +673,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Classify a condition using its inferred type and truthiness.
     ///
     /// We return `Some` if the condition is always truthy, always falsy, or otherwise suspicious
-    /// in a boolean context due to it being a `Callable` or `Iterable` type. Exemptions are made
-    /// for literal boolean and integer expressions: although these can always be determined to be
-    /// either always truthy or always falsy, a condition written as `True`, `False`, `1`, or `0`
-    /// is almost certainly deliberate. A variable with an inferred literal type is still classified,
-    /// however, because its truthiness may be less obvious to the author:
+    /// in a boolean context due to it being a `Callable` or `Iterable` type, or a union containing
+    /// both `None` and other potentially falsy values. Exemptions are made for literal boolean,
+    /// integer, and `None` expressions: although these can always be determined to be either always
+    /// truthy or always falsy, a condition written as `True`, `False`, `1`, `0`, or `None` is almost
+    /// certainly deliberate. A variable with an inferred literal type is still classified, however,
+    /// because its truthiness may be less obvious to the author:
     ///
     /// ```python
     /// from typing import Literal, Callable, Iterable
@@ -684,7 +687,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///     flag: bool,
     ///     known: Literal[True],
     ///     callback: Callable[[], bool],
-    ///     items: Iterable[int]
+    ///     items: Iterable[int],
+    ///     limit: int | None,
     /// ):
     ///     if flag:      # No classification: ambiguous truthiness without a suspicious type.
     ///         pass
@@ -703,39 +707,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     ///     if items:     # `ConditionKind::Iterable`: ambiguous truthiness.
     ///         pass
+    ///
+    ///     if limit:     # `ConditionKind::NoneUnion`: `None` and `0` are both falsy.
+    ///         pass
     /// ```
     fn classify_redundant_condition<'expr>(
         &self,
         test: BooleanTest<'expr, 'db>,
     ) -> Option<RedundantCondition<'expr, 'db>> {
-        /// The bottom specialization for `GeneratorType`
-        static BOTTOM_SPEC: &[Type] = &[Type::Never, Type::object(), Type::Never];
-
-        /// The top specialization for `Iterable`
-        static TOP_SPEC: &[Type] = &[Type::object()];
-
-        /// Fast path for conditions with ambiguous truthiness,
-        /// so that we do not have to materialize `GeneratorType` specializations
-        /// for common cases such as `bool`, `TypeIs` and `TypeGuard` conditions, etc.
-        fn cannot_satisfy_iterable_check<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-            match ty {
-                Type::NominalInstance(_)
-                | Type::TypeGuard(_)
-                | Type::TypeIs(_)
-                | Type::Dynamic(_)
-                | Type::LiteralValue(_) => true,
-                Type::Intersection(intersection) => intersection
-                    .positive(db)
-                    .iter()
-                    .any(|&item| cannot_satisfy_iterable_check(db, item)),
-                Type::Union(union) => union
-                    .elements(db)
-                    .iter()
-                    .all(|&item| cannot_satisfy_iterable_check(db, item)),
-                _ => false,
-            }
-        }
-
         let BooleanTest {
             expression,
             value_type,
@@ -761,71 +740,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let env = self.program_environment();
 
         let kind = if truthiness.is_ambiguous() {
+            let expanded_type = ExpandedType::new(db, env, value_type);
+
             if let Some(union) =
-                self.truthiness_test_of_none_union_candidate(expression, value_type)
+                self.truthiness_test_of_none_union_candidate(expression, expanded_type)
             {
                 ConditionKind::NoneUnion(union)
+            } else if let Some(callables) =
+                self.truthiness_test_of_callable_candidate(expanded_type)
+            {
+                ConditionKind::Callable(callables)
+            } else if self.is_truthiness_test_of_iterable_candidate(value_type) {
+                ConditionKind::Iterable
             } else {
-                let expanded = match value_type.resolve_type_alias(db) {
-                    Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
-                    ty => ty,
-                };
-                let callables = match expanded {
-                    Type::Callable(callable) => Some(CallableTypes::one(callable)),
-                    Type::Union(union) => {
-                        let mut emit_diagnostic = true;
-                        let union_elements = union.elements(db);
-                        let mut callable_elements = Vec::with_capacity(union_elements.len());
-                        for element in union_elements {
-                            if let Type::Callable(callable) = element {
-                                callable_elements.push(*callable);
-                            } else if element.bool(db, env).is_always_true()
-                                && let Some(callables) = element.try_upcast_to_callable(db, env)
-                            {
-                                callable_elements.extend(&callables);
-                            } else {
-                                emit_diagnostic = false;
-                                break;
-                            }
-                        }
-                        if emit_diagnostic {
-                            Some(CallableTypes::from_elements(callable_elements))
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
-                };
-
-                if let Some(callables) = callables {
-                    ConditionKind::Callable(callables)
-                } else {
-                    if cannot_satisfy_iterable_check(db, value_type) {
-                        return None;
-                    }
-
-                    let builder = ConstraintSetBuilder::new();
-
-                    let generator =
-                        KnownClass::GeneratorType.to_specialized_instance(db, env, BOTTOM_SPEC);
-
-                    let check = |source: Type<'db>, target: Type<'db>| {
-                        source.when_subtype_of(db, env, target, &builder, TypeVarSet::None)
-                    };
-
-                    if check(generator, value_type)
-                        .and(db, &builder, || {
-                            let iterable =
-                                KnownClass::Iterable.to_specialized_instance(db, env, TOP_SPEC);
-                            check(value_type, iterable)
-                        })
-                        .is_always_satisfied(db, env)
-                    {
-                        ConditionKind::Iterable
-                    } else {
-                        return None;
-                    }
-                }
+                return None;
             }
         } else if value_type.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
             ConditionKind::Boolean
@@ -846,23 +774,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         })
     }
 
-    /// Return the expanded union corresponding to `ty` if this test is eligible for `truthiness-test-of-none-union`.
+    /// Return the union corresponding to `expanded_type` if this test is eligible
+    /// for `truthiness-test-of-none-union`.
     fn truthiness_test_of_none_union_candidate(
         &self,
         expression: &ast::Expr,
-        ty: Type<'db>,
+        expanded_type: ExpandedType<'db>,
     ) -> Option<UnionType<'db>> {
+        // Only check types that are unions with `None`:
+        let union = expanded_type.as_union()?;
+
         let db = self.db();
         let env = self.program_environment();
-        let expanded = match ty.resolve_type_alias(db) {
-            Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
-            ty => ty,
-        };
 
-        // Only check types that are unions with `None`:
-        let Type::Union(union) = expanded else {
-            return None;
-        };
         let elements = union.elements(db);
         if !elements.iter().any(|element| element.is_none(db)) {
             return None;
@@ -910,9 +834,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // value-producing operand to qualify independently, including through assignments.
         // The shared condition traversal prefers operand diagnostics where possible.
         let is_candidate = |operand: &ast::Expr| {
-            self.truthiness_test_of_none_union_candidate(operand, self.expression_type(operand))
-                .is_some()
+            self.truthiness_test_of_none_union_candidate(
+                operand,
+                ExpandedType::new(db, env, self.expression_type(operand)),
+            )
+            .is_some()
         };
+
         let has_suspicious_operand = match expression {
             ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => values.iter().any(is_candidate),
             ast::Expr::If(ast::ExprIf { body, orelse, .. }) => {
@@ -922,6 +850,93 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             _ => true,
         };
         has_suspicious_operand.then_some(union)
+    }
+
+    fn truthiness_test_of_callable_candidate(
+        &self,
+        expanded_type: ExpandedType<'db>,
+    ) -> Option<CallableTypes<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+
+        match *expanded_type {
+            Type::Callable(callable) => Some(CallableTypes::one(callable)),
+            Type::Union(union) => {
+                let mut emit_diagnostic = true;
+                let union_elements = union.elements(db);
+                let mut callable_elements = Vec::with_capacity(union_elements.len());
+                for element in union_elements {
+                    if let Type::Callable(callable) = element {
+                        callable_elements.push(*callable);
+                    } else if element.bool(db, env).is_always_true()
+                        && let Some(callables) = element.try_upcast_to_callable(db, env)
+                    {
+                        callable_elements.extend(&callables);
+                    } else {
+                        emit_diagnostic = false;
+                        break;
+                    }
+                }
+                if emit_diagnostic {
+                    Some(CallableTypes::from_elements(callable_elements))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn is_truthiness_test_of_iterable_candidate(&self, value_type: Type<'db>) -> bool {
+        /// The bottom specialization for `GeneratorType`
+        static BOTTOM_SPEC: &[Type] = &[Type::Never, Type::object(), Type::Never];
+
+        /// The top specialization for `Iterable`
+        static TOP_SPEC: &[Type] = &[Type::object()];
+
+        /// Fast path for conditions with ambiguous truthiness,
+        /// so that we do not have to materialize `GeneratorType` specializations
+        /// for common cases such as `bool`, `TypeIs` and `TypeGuard` conditions, etc.
+        fn cannot_satisfy_iterable_check<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+            match ty {
+                Type::NominalInstance(_)
+                | Type::TypeGuard(_)
+                | Type::TypeIs(_)
+                | Type::Dynamic(_)
+                | Type::LiteralValue(_) => true,
+                Type::Intersection(intersection) => intersection
+                    .positive(db)
+                    .iter()
+                    .any(|&item| cannot_satisfy_iterable_check(db, item)),
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .all(|&item| cannot_satisfy_iterable_check(db, item)),
+                _ => false,
+            }
+        }
+
+        let db = self.db();
+        let env = self.program_environment();
+
+        if cannot_satisfy_iterable_check(db, value_type) {
+            return false;
+        }
+
+        let builder = ConstraintSetBuilder::new();
+
+        let generator = KnownClass::GeneratorType.to_specialized_instance(db, env, BOTTOM_SPEC);
+
+        let check = |source: Type<'db>, target: Type<'db>| {
+            source.when_subtype_of(db, env, target, &builder, TypeVarSet::None)
+        };
+
+        check(generator, value_type)
+            .and(db, &builder, || {
+                let iterable = KnownClass::Iterable.to_specialized_instance(db, env, TOP_SPEC);
+                check(value_type, iterable)
+            })
+            .is_always_satisfied(db, env)
     }
 
     /// Read an already-inferred expression's type and truthiness using the requested
@@ -1348,5 +1363,25 @@ fn is_trivial_statement(stmt: &ast::Stmt) -> bool {
             ast::Expr::StringLiteral(_) | ast::Expr::EllipsisLiteral(_)
         ),
         _ => false,
+    }
+}
+
+/// A type with outermost aliases resolved and aliases exposing top-level union elements expanded.
+///
+/// Aliases nested inside non-union types remain unexpanded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ExpandedType<'db>(Type<'db>);
+
+impl<'db> ExpandedType<'db> {
+    fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Self {
+        Self(ty.expand_top_level_aliases(db, env))
+    }
+}
+
+impl<'db> std::ops::Deref for ExpandedType<'db> {
+    type Target = Type<'db>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
