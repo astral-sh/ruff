@@ -362,6 +362,11 @@ pub(crate) const fn is_pragma_excluded_from_import_width_enabled(preview: Previe
     preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/issues/28857
+pub(crate) const fn is_pragma_kept_on_import_statement_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/27666
 pub(crate) const fn is_rule_categories_enabled(preview: PreviewMode) -> bool {
     preview.is_enabled()
