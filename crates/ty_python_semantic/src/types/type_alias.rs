@@ -26,8 +26,8 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 
 impl<'db> Type<'db> {
-    /// Returns whether expanding aliases and unions can return to the same alias without entering
-    /// another type. For example, `type A = int | A` is invalid, but
+    /// Returns whether expanding aliases, unions, and intersections can return to the same alias
+    /// without entering another type. For example, `type A = int | A` is invalid, but
     /// `type A = int | list[A]` is a valid recursive alias.
     pub(super) fn has_unguarded_alias_cycle(self, db: &'db dyn Db) -> bool {
         AliasCycleSummary::from_type(db, self).cycle.is_some()
@@ -91,6 +91,11 @@ impl<'db> AliasCycleSummary<'db> {
             Type::Union(union) => union
                 .elements(db)
                 .iter()
+                .find_map(|&element| Self::collect(db, element, typevars)),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .chain(intersection.negative(db))
                 .find_map(|&element| Self::collect(db, element, typevars)),
             Type::Divergent(divergent)
                 if divergent.flags.contains(DivergentFlags::FROM_TYPE_ALIAS) =>
