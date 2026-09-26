@@ -1948,17 +1948,27 @@ impl<'db> DataclassParams<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let field_specifiers = self
-            .field_specifiers(db)
-            .iter()
-            .map(|ty| {
-                let ty = ty.recursive_type_normalized_impl(db, env, div, true);
-                if nested { ty } else { Some(ty.unwrap_or(div)) }
-            })
-            .collect::<Option<Box<_>>>()?;
+        let field_specifiers =
+            normalize_field_specifiers(db, env, self.field_specifiers(db), div, nested)?;
 
         Some(Self::new(db, self.flags(db), field_specifiers))
     }
+}
+
+fn normalize_field_specifiers<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    field_specifiers: &[Type<'db>],
+    div: Type<'db>,
+    nested: bool,
+) -> Option<Box<[Type<'db>]>> {
+    field_specifiers
+        .iter()
+        .map(|ty| {
+            let ty = ty.recursive_type_normalized_impl(db, env, div, true);
+            if nested { ty } else { Some(ty.unwrap_or(div)) }
+        })
+        .collect()
 }
 
 /// Representation of a type: a set of possible values at runtime.
@@ -3821,12 +3831,16 @@ impl<'db> Type<'db> {
             Type::NewTypeInstance(newtype) => newtype
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::NewTypeInstance),
+            Type::DataclassDecorator(params) => params
+                .recursive_type_normalized_impl(db, env, div, nested)
+                .map(Type::DataclassDecorator),
+            Type::DataclassTransformer(params) => params
+                .recursive_type_normalized_impl(db, env, div, nested)
+                .map(Type::DataclassTransformer),
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::Never
             | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::SpecialForm(_)
             | Type::LiteralValue(_) => Some(self),
