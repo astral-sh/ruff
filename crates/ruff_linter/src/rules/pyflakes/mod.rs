@@ -173,6 +173,7 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_33.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_34.pyi"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_34.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_35/__init__.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
@@ -268,6 +269,218 @@ mod tests {
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
+    }
+
+    #[test]
+    fn implicit_relative_submodule_preview() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes/F821_35/__init__.py"),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(Rule::UndefinedName)
+            },
+        )?;
+        assert!(diagnostics.is_empty());
+        Ok(())
+    }
+
+    #[test_case(
+        r"
+        if False:
+            from . import foo
+            assert foo.Bar
+        from . import foo as alias
+        foo = None
+        del foo
+        from .foo import Bar
+        assert foo.Bar is Bar is alias.Bar
+        ",
+        "unexecuted_explicit_binding_before_cached_alias_deletion",
+        &[("F821", 9, 8)],
+        &[("F821", 9, 8)]
+    )]
+    #[test_case(
+        r"
+        from typing import TYPE_CHECKING
+        if TYPE_CHECKING:
+            from .foo import Bar
+        from . import foo as alias
+        foo = None
+        del foo
+        from .foo import Bar
+        assert foo.Bar is Bar is alias.Bar
+        ",
+        "typing_only_binding_before_cached_alias_deletion",
+        &[("F821", 9, 8)],
+        &[("F821", 9, 8)]
+    )]
+    #[test_case(
+        r"
+        foo = None
+        del foo
+        from . import foo as alias
+        assert foo is alias
+        from .foo import Bar
+        assert foo.Bar is Bar is alias.Bar
+        ",
+        "first_alias_load_after_deletion",
+        &[("F821", 5, 8), ("F821", 7, 8)],
+        &[]
+    )]
+    #[test_case(
+        r"
+        foo = None
+        del foo
+        class C:
+            foo = 42
+            from .foo import Bar
+            assert foo == 42
+        assert foo.Bar is C.Bar
+        from .foo import Bar
+        assert foo.Bar is Bar is C.Bar
+        ",
+        "first_class_load_after_deletion",
+        &[("F821", 8, 8), ("F821", 10, 8)],
+        &[]
+    )]
+    #[test_case(
+        r"
+        from typing import TYPE_CHECKING
+        if TYPE_CHECKING:
+            from .foo import Bar
+        foo = None
+        del foo
+        from .foo import Bar
+        assert foo.Bar is Bar
+        ",
+        "typing_only_import_before_first_load",
+        &[("F821", 8, 8)],
+        &[]
+    )]
+    #[test_case(
+        r"
+        if False:
+            from .foo import Bar
+        foo = None
+        del foo
+        from .foo import Bar
+        assert foo.Bar is Bar
+        ",
+        "unexecuted_import_before_first_load",
+        &[("F821", 7, 8)],
+        &[]
+    )]
+    #[test_case(
+        r"
+        if True:
+            pass
+        else:
+            from .foo import Bar
+        foo = None
+        del foo
+        from .foo import Bar
+        assert foo.Bar is Bar
+        ",
+        "unexecuted_else_before_first_load",
+        &[("F821", 9, 8)],
+        &[]
+    )]
+    #[test_case(
+        r"
+        from . import foo
+        def f():
+            print(foo)
+            from .foo import Bar
+            return Bar
+        f()
+        ",
+        "function_scope",
+        &[],
+        &[]
+    )]
+    #[test_case(
+        r"
+        from . import foo
+        del foo
+        from .foo import Bar
+        print(foo, Bar)
+        ",
+        "deleted_explicit_import",
+        &[("F821", 5, 7)],
+        &[("F821", 5, 7)]
+    )]
+    #[test_case(
+        r"
+        from . import foo as alias
+        from builtins import eval as foo
+        from .foo import Bar
+        print(foo('1 + 1'), Bar, alias)
+        ",
+        "cached_eval",
+        &[("S307", 5, 7)],
+        &[("S307", 5, 7)]
+    )]
+    #[test_case(
+        r"
+        lazy from .foo import Bar
+        print(foo, Bar)
+        ",
+        "lazy_import",
+        &[("F821", 3, 7)],
+        &[("F821", 3, 7)]
+    )]
+    #[test_case(
+        r"
+        from .foo import Bar
+        print(foo)
+        import math as foo
+        print(Bar)
+        ",
+        "implicit_reference_not_transferred",
+        &[("F821", 3, 7), ("F401", 4, 16)],
+        &[("F401", 4, 16)]
+    )]
+    fn implicit_relative_submodule_import(
+        contents: &str,
+        name: &str,
+        stable_expected: &[(&str, usize, usize)],
+        preview_expected: &[(&str, usize, usize)],
+    ) {
+        for (preview, expected) in [
+            (PreviewMode::Disabled, stable_expected),
+            (PreviewMode::Enabled, preview_expected),
+        ] {
+            let diagnostics = test_contents(
+                &SourceKind::Python {
+                    code: dedent(contents).to_string(),
+                    is_stub: false,
+                },
+                Path::new("package/__init__.py"),
+                &LinterSettings {
+                    preview,
+                    unresolved_target_version: ruff_python_ast::PythonVersion::PY315.into(),
+                    ..LinterSettings::for_rules([
+                        Rule::UnusedImport,
+                        Rule::UndefinedName,
+                        Rule::UndefinedLocal,
+                        Rule::SuspiciousEvalUsage,
+                    ])
+                },
+            )
+            .0;
+            let actual: Vec<_> = diagnostics
+                .iter()
+                .map(|diagnostic| {
+                    let location = diagnostic.ruff_start_location().unwrap();
+                    (
+                        diagnostic.secondary_code_or_id(),
+                        location.line.get(),
+                        location.column.get(),
+                    )
+                })
+                .collect();
+            assert_eq!(actual, expected, "{name} ({preview:?})");
+        }
     }
 
     #[test_case(
