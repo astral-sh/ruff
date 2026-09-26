@@ -96,6 +96,19 @@ fn bounded_intersection_preserves_late_union_elements() {
             Some(expected)
         );
     }
+
+    // A narrowing factor applies before union distribution even when it appears last.
+    let literal = Type::int_literal(5);
+    for elements in [
+        [wide, narrow, literal],
+        [narrow, wide, literal],
+        [literal, wide, narrow],
+    ] {
+        assert_eq!(
+            IntersectionType::bounded_from_elements(db, &env, elements),
+            Some(literal)
+        );
+    }
 }
 
 #[test]
@@ -115,6 +128,87 @@ fn bounded_intersection_returns_none_when_budget_exhausted() {
         IntersectionType::bounded_from_elements(db, &env, [wide, wide]),
         None
     );
+}
+
+#[test]
+fn bounded_intersection_limits_negated_alias_expansion() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/aliases.py",
+        r#"
+        from typing import Literal
+        from ty_extensions import Intersection, Not
+
+        class A: ...
+        class B: ...
+        class C: ...
+        class D: ...
+        class E: ...
+        class F: ...
+
+        type First = Intersection[A, B]
+        type Second = Intersection[C, D]
+        type Third = Intersection[E, F]
+        type Excluded = Not[int]
+        type ExcludedLiteral = Not[Literal[5]]
+        "#,
+    )?;
+    let db = &db;
+    let env = db.program_environment();
+    let file = system_path_to_file(db, "/src/aliases.py")?;
+    let file = ProgramFile::new(db, file, env.program(db));
+    let mut exclusions = Vec::new();
+    for name in ["First", "Second", "Third"] {
+        let ty = global_symbol(db, file, name).place.expect_type();
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) = ty else {
+            anyhow::bail!("expected `{name}` to be a type alias");
+        };
+        exclusions.push(Type::TypeAlias(alias).negate(db, &env));
+    }
+
+    // De Morgan's law expands these negated intersections into a product of unions.
+    assert!(IntersectionType::bounded_from_elements(db, &env, &exclusions[..2]).is_some());
+    assert!(IntersectionType::bounded_from_elements(db, &env, &exclusions).is_none());
+
+    // A narrowing factor prunes these alternatives before they can exhaust the budget,
+    // regardless of where it appears among the negated aliases.
+    let literal = Type::int_literal(5);
+    for position in 0..=exclusions.len() {
+        let mut elements = exclusions.clone();
+        elements.insert(position, literal);
+        assert_eq!(
+            IntersectionType::bounded_from_elements(db, &env, elements),
+            Some(literal)
+        );
+    }
+
+    // Double negation of a literal is also a narrowing factor, not a disjunction.
+    let excluded_literal = global_symbol(db, file, "ExcludedLiteral")
+        .place
+        .expect_type();
+    let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) = excluded_literal else {
+        anyhow::bail!("expected `ExcludedLiteral` to be a type alias");
+    };
+    exclusions.push(Type::TypeAlias(alias).negate(db, &env));
+    assert_eq!(
+        IntersectionType::bounded_from_elements(db, &env, exclusions),
+        Some(Type::LiteralValue(LiteralValueType::unpromotable(5)))
+    );
+
+    // A double negation introduces no alternatives and must not consume the first-union exemption.
+    let excluded = global_symbol(db, file, "Excluded").place.expect_type();
+    let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) = excluded else {
+        anyhow::bail!("expected `Excluded` to be a type alias");
+    };
+    let integer = Type::TypeAlias(alias).negate(db, &env);
+    let wide = UnionType::from_elements(db, &env, (1..=6).map(Type::int_literal));
+    for elements in [[integer, wide], [wide, integer]] {
+        assert_eq!(
+            IntersectionType::bounded_from_elements(db, &env, elements),
+            Some(wide)
+        );
+    }
+    Ok(())
 }
 
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
@@ -549,6 +643,122 @@ fn divergent_type() {
             .to_string(),
         "Never"
     );
+}
+
+#[test]
+fn pending_narrowing_intersections_are_order_independent() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let pending = Type::pending_narrowing();
+    let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
+
+    for elements in [[pending, recursive], [recursive, pending]] {
+        assert_eq!(
+            IntersectionType::from_elements(&db, &env, elements),
+            pending
+        );
+    }
+    assert_eq!(
+        IntersectionBuilder::new(&db, &env)
+            .add_positive(recursive)
+            .add_negative(pending)
+            .build(),
+        pending
+    );
+    assert_eq!(
+        IntersectionBuilder::new(&db, &env)
+            .add_negative(pending)
+            .add_positive(recursive)
+            .build(),
+        pending
+    );
+}
+
+#[test]
+fn pending_narrowing_cycle_recovery_preserves_guarded_contributions() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let pending = Type::pending_narrowing();
+    let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let int = KnownClass::Int.to_instance(&db, &env);
+    let foreign = Type::divergent(salsa::plumbing::Id::from_bits(2));
+    let is_cycle_marker = |ty: Type<'_>| ty.same_divergent_marker(recursive);
+    let normalize =
+        |ty| Type::pending_narrowing_normalized(ty, &db, &env, recursive, &is_cycle_marker);
+    let list_of = |element| KnownClass::List.to_specialized_instance(&db, &env, &[element]);
+    let callable_returning =
+        |return_ty| Type::single_callable(&db, Signature::new(Parameters::empty(), return_ty));
+
+    // A constructor must retain a recursive reference even when a union also contains a
+    // resolved initializer. Otherwise, subsequent iterations can grow without a depth bound.
+    let approximation = UnionType::from_elements(
+        &db,
+        &env,
+        [
+            pending,
+            int,
+            recursive,
+            callable_returning(pending),
+            foreign,
+        ],
+    );
+    let normalized = normalize(approximation);
+    assert_eq!(
+        normalized,
+        UnionType::from_elements(&db, &env, [int, callable_returning(recursive), foreign])
+    );
+    assert!(
+        normalized
+            .as_union()
+            .is_some_and(|union| union.recursively_defined(&db) == RecursivelyDefined::No)
+    );
+
+    let unresolved = UnionType::from_elements(&db, &env, [pending, recursive]);
+    assert_eq!(normalize(unresolved), pending);
+
+    // Pending narrowing in an opaque bound invalidates the enclosing type argument.
+    let pending_typevar = BoundTypeVarInstance::synthetic_self(
+        &db,
+        pending,
+        BindingContext::Synthetic(env.program(&db)),
+    );
+    assert_eq!(
+        normalize(list_of(Type::TypeVar(pending_typevar))),
+        list_of(recursive)
+    );
+
+    // Metadata not rewritten by recursive normalization must not retain pending narrowing.
+    let typevar_object =
+        Type::KnownInstance(KnownInstanceType::TypeVar(pending_typevar.typevar(&db)));
+    assert_eq!(normalize(list_of(typevar_object)), recursive);
+}
+
+#[test]
+fn pending_narrowing_cycle_recovery_checks_alias_arguments() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented("/src/aliases.py", "type Constant[T] = int")?;
+    let env = db.program_environment();
+    let file = system_path_to_file(&db, "/src/aliases.py")?;
+    let file = ProgramFile::new(&db, file, env.program(&db));
+    let pending = Type::pending_narrowing();
+    let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let is_cycle_marker = |ty: Type<'_>| ty.same_divergent_marker(recursive);
+    let normalize =
+        |ty| Type::pending_narrowing_normalized(ty, &db, &env, recursive, &is_cycle_marker);
+    let list_of = |element| KnownClass::List.to_specialized_instance(&db, &env, &[element]);
+
+    // Stored arguments remain provisional even when the alias body does not use them.
+    // An alias does not itself establish recursive structure, but an enclosing constructor does.
+    let ty = global_symbol(&db, file, "Constant").place.expect_type();
+    let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) = ty else {
+        anyhow::bail!("expected `Constant` to be a type alias");
+    };
+    let alias = Type::TypeAlias(
+        alias.apply_specialization(&db, |context| context.repeat_specialization(&db, pending)),
+    );
+    assert_eq!(normalize(alias), pending);
+    assert_eq!(normalize(list_of(alias)), list_of(recursive));
+    Ok(())
 }
 
 #[test]

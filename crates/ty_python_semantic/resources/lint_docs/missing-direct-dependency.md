@@ -36,9 +36,6 @@ and environments from the enclosing workspace or other scripts do not apply.
 
 ## Known limitations
 
-The current workspace integration applies to directory checks. Explicit file arguments and
-`--config-file` bypass uv workspace discovery.
-
 Imports guarded by `TYPE_CHECKING` are not reported because they are not executed at runtime. They
 can use development-only dependencies, such as type stub packages, without requiring those packages
 as runtime dependencies.

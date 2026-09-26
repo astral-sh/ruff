@@ -563,21 +563,95 @@ def foo():
         ): ...
 ```
 
-## Class scopes do not cover inner scopes
+## Legacy class typevars do not cover inner class scopes
 
-Just like regular symbols, the typevars of a generic class are only available in that class's scope,
-and are not available in nested scopes.
+Legacy typevars bound by a generic class are not available in nested class scopes. A method of the
+nested class can introduce its own independent binding for the same typevar.
 
 ```py
-class C[T]:
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class C(Generic[T]):
     ok1: list[T] = []
 
     class Bad:
         # error: [unbound-type-variable]
         bad: list[T] = []
 
-    class Inner[S]: ...
+        def method(self, value: T) -> T:
+            return value
+
+    class Inner(Generic[S]): ...
     ok2: Inner[T]
+
+reveal_type(C.Bad.method)  # revealed: def method[T](self, value: T) -> T
+```
+
+## PEP 695 class type parameters remain bound in inner scopes
+
+PEP 695 type parameters belong to the class that declares them and remain visible in nested classes.
+References in a nested class body or method retain that binding.
+
+```py
+class Outer[T]:
+    class Inner:
+        values: list[T] = []
+
+        def method(self, value: T) -> T:
+            reveal_type(value)  # revealed: T@Outer
+            return value
+
+reveal_type(Outer.Inner.method)  # revealed: def method(self, value: T@Outer) -> T@Outer
+```
+
+## PEP 695 type parameters in generic nested classes
+
+A generic nested class can use both its own type parameters and those of the outer class. Nested
+functions inside its methods also retain the outer class's binding.
+
+```py
+class Outer[T]:
+    class Inner[U]:
+        def method(self, value: T, other: U) -> tuple[T, U]:
+            reveal_type(value)  # revealed: T@Outer
+            reveal_type(other)  # revealed: U@Inner
+
+            def nested(value: T) -> T:
+                return value
+
+            reveal_type(nested)  # revealed: def nested(value: T@Outer) -> T@Outer
+            return nested(value), other
+```
+
+## PEP 695 `TypeVarTuple` bindings in nested classes
+
+The same rule applies to a `TypeVarTuple` declared by the outer class.
+
+```py
+class Outer[*Ts]:
+    class Inner:
+        def method(self, value: tuple[*Ts]) -> tuple[*Ts]:
+            return value
+
+# revealed: def method(self, value: tuple[*Ts@Outer]) -> tuple[*Ts@Outer]
+reveal_type(Outer.Inner.method)
+```
+
+## PEP 695 type parameters across intervening methods
+
+An intervening method does not hide the outer class's type parameter from a nested class.
+
+```py
+class Outer[T]:
+    def method(self, value: T) -> None:
+        class Inner:
+            def nested(self, value: T) -> T:
+                return value
+
+        reveal_type(Inner.nested)  # revealed: def nested(self, value: T@Outer) -> T@Outer
 ```
 
 ## Type parameter defaults cannot reference outer-scope type parameters

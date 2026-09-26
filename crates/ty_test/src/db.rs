@@ -205,9 +205,8 @@ impl TestProgramDb for Db {
 impl salsa::Database for Db {}
 
 impl DbWithWritableSystem for Db {
-    type System = MdtestSystem;
-    fn writable_system(&self) -> &Self::System {
-        &self.system
+    fn writable_system(&self) -> ruff_db::system::Result<&dyn WritableSystem> {
+        Ok(&self.system)
     }
 }
 

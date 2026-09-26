@@ -187,6 +187,76 @@ def _(top: Top[C3], bottom: Bottom[C3]) -> None:
     reveal_type(bottom)
 ```
 
+## `TypeIs`
+
+`TypeIs` is invariant in its type argument, and so the top and bottom materializations of
+`TypeIs[Any]` cannot simplify to `TypeIs[object]` and `TypeIs[Never]`, and are instead represented
+with the `Top` and `Bottom` special forms:
+
+```py
+from typing import Any
+from typing_extensions import Never, TypeIs
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
+
+def _(top: Top[TypeIs[Any]], bottom: Bottom[TypeIs[Any]]):
+    reveal_type(top)  # revealed: Top[TypeIs[Any]]
+    reveal_type(bottom)  # revealed: Bottom[TypeIs[Any]]
+
+static_assert(not is_equivalent_to(Top[TypeIs[Any]], TypeIs[object]))
+static_assert(not is_equivalent_to(Bottom[TypeIs[Any]], TypeIs[Never]))
+```
+
+`TypeIs[int]` is a subtype of `Top[TypeIs[Any]]`, but not `TypeIs[object]`:
+
+```py
+static_assert(not is_subtype_of(TypeIs[int], TypeIs[object]))
+static_assert(not is_subtype_of(TypeIs[object], TypeIs[int]))
+
+static_assert(is_subtype_of(TypeIs[int], Top[TypeIs[Any]]))
+static_assert(is_subtype_of(Bottom[TypeIs[Any]], TypeIs[int]))
+
+static_assert(not is_subtype_of(Top[TypeIs[Any]], TypeIs[int]))
+static_assert(not is_subtype_of(TypeIs[int], Bottom[TypeIs[Any]]))
+```
+
+A static `TypeIs` type is equivalent to its top and bottom materializations:
+
+```py
+static_assert(is_equivalent_to(Top[TypeIs[int]], TypeIs[int]))
+static_assert(is_equivalent_to(Bottom[TypeIs[int]], TypeIs[int]))
+```
+
+Materializations are fully static, so they are subtypes of themselves and cannot be materialized
+further:
+
+```py
+static_assert(is_subtype_of(Top[TypeIs[Any]], Top[TypeIs[Any]]))
+static_assert(is_subtype_of(Bottom[TypeIs[Any]], Bottom[TypeIs[Any]]))
+
+static_assert(is_equivalent_to(Top[Bottom[TypeIs[Any]]], Bottom[TypeIs[Any]]))
+static_assert(is_equivalent_to(Bottom[Top[TypeIs[Any]]], Top[TypeIs[Any]]))
+```
+
+The static component of a gradual `TypeIs` type constrains the possible materializations of its
+argument:
+
+```py
+static_assert(is_subtype_of(TypeIs[int], Top[TypeIs[int | Any]]))
+static_assert(is_subtype_of(TypeIs[int | str], Top[TypeIs[int | Any]]))
+static_assert(not is_subtype_of(TypeIs[str], Top[TypeIs[int | Any]]))
+```
+
+In contrast, `TypeGuard` is covariant, so the top and bottom materializations of `TypeGuard[Any]`
+simplify to `TypeGuard[object]` and `TypeGuard[Never]`:
+
+```py
+from typing_extensions import TypeGuard
+
+static_assert(is_equivalent_to(Top[TypeGuard[Any]], TypeGuard[object]))
+static_assert(is_equivalent_to(Bottom[TypeGuard[Any]], TypeGuard[Never]))
+```
+
 ## Callable with gradual parameters
 
 For callables with gradual parameters (the `...` form), the top materialization preserves the
@@ -1167,7 +1237,7 @@ An intersection of `int` and `Any` likewise retains only the compatible `int` co
 variances.
 
 ```py
-type GradualInt = Intersection[int, Any]
+type GradualInt = int & Any
 
 static_assert(is_subtype_of(ConstrainedCovariant[int], Top[ConstrainedCovariant[GradualInt]]))
 static_assert(not is_subtype_of(ConstrainedCovariant[str], Top[ConstrainedCovariant[GradualInt]]))
@@ -1255,10 +1325,10 @@ python-version = "3.12"
 
 ```py
 from typing import Any
-from ty_extensions import Bottom, Intersection, Top, static_assert
+from ty_extensions import Bottom, Top, static_assert
 from ty_extensions._internal import is_assignable_to, is_subtype_of
 
-type GradualInt = Intersection[int, Any]
+type GradualInt = int & Any
 
 class MixedConstrained[T: (int, str), U]:
     value: T
@@ -1284,6 +1354,46 @@ static_assert(is_assignable_to(MixedConstrained[int, str], Top[MixedConstrained[
 static_assert(not is_assignable_to(MixedConstrained[str, str], Top[MixedConstrained[GradualInt, Any]]))
 static_assert(is_assignable_to(Bottom[MixedConstrained[GradualInt, Any]], MixedConstrained[int, int]))
 static_assert(not is_assignable_to(Bottom[MixedConstrained[GradualInt, Any]], MixedConstrained[str, int]))
+```
+
+## Growing recursive aliases
+
+A recursive alias can keep nesting its type argument as it unfolds. This does not change the
+materialization bounds: its values fit the top materialization, and its bottom materialization fits
+any compatible top materialization. In particular, choosing `int` for `Any` gives the two aliases a
+common materialization.
+
+```py
+from typing import Any, TypeVar
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of, is_disjoint_from
+
+T = TypeVar("T")
+Growing = T | list["Growing[list[T]]"]
+
+def into_top(value: Growing[int]) -> Top[Growing[int]]:
+    return value
+
+def overlapping_bounds(value: Bottom[Growing[Any]]) -> Top[Growing[int]]:
+    return value
+
+static_assert(is_subtype_of(Growing[int], Top[Growing[int]]))
+static_assert(is_subtype_of(Bottom[Growing[int]], Growing[int]))
+static_assert(is_subtype_of(Bottom[Growing[Any]], Top[Growing[str]]))
+static_assert(not is_disjoint_from(list[Growing[int]], list[Growing[Any]]))
+static_assert(not is_subtype_of(Bottom[Growing[int]], Top[Growing[str]]))
+```
+
+A fixed `Any` in the body still distinguishes the two materializations, even when the type argument
+is fully static. Conversely, an argument that does not affect the alias's value does not distinguish
+the materializations of two specializations.
+
+```py
+WithAny = tuple[T, Any] | list["WithAny[list[T]]"]
+Phantom = int | list["Phantom[T]"]
+
+static_assert(not is_subtype_of(Top[WithAny[int]], Bottom[WithAny[int]]))
+static_assert(is_subtype_of(Top[Phantom[int]], Top[Phantom[str]]))
 ```
 
 ## Materialization does not force invalid recursive specializations
@@ -2629,6 +2739,21 @@ class RecursiveValue[T](Protocol):
 static_assert(not is_assignable_to(Top[RecursiveValue[str]], Bottom[RecursiveValue[object]]))
 static_assert(is_assignable_to(Bottom[RecursiveValue[str]], Top[RecursiveValue[object]]))
 static_assert(is_assignable_to(Top[RecursiveValue[str]], RecursiveValue[object]))
+```
+
+Subtyping also rejects a top-materialized source against an unmaterialized target, and an
+unmaterialized source against a bottom-materialized target.
+
+```py
+from ty_extensions._internal import is_subtype_of
+
+static_assert(not is_subtype_of(Top[RecursiveValue[str]], Bottom[RecursiveValue[object]]))
+static_assert(not is_subtype_of(Top[RecursiveValue[str]], RecursiveValue[object]))
+static_assert(not is_subtype_of(RecursiveValue[str], Bottom[RecursiveValue[object]]))
+
+static_assert(is_subtype_of(Bottom[RecursiveValue[str]], Top[RecursiveValue[object]]))
+static_assert(is_subtype_of(Bottom[RecursiveValue[str]], RecursiveValue[object]))
+static_assert(is_subtype_of(RecursiveValue[str], Top[RecursiveValue[object]]))
 ```
 
 ### Generator delegation

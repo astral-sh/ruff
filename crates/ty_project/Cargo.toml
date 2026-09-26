@@ -35,6 +35,7 @@ ty_vendored = { workspace = true }
 anyhow = { workspace = true }
 bitvec = { workspace = true }
 camino = { workspace = true }
+char_str = { workspace = true, features = ["get-size", "serde"] }
 colored = { workspace = true }
 compact_str = { workspace = true, features = ["serde"] }
 crossbeam = { workspace = true }

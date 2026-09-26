@@ -59,7 +59,8 @@ use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
+    ClassLiteral, KnownClass, RecursiveType, StaticClassLiteral, Type, TypeAndQualifiers,
+    TypeQualifiers,
 };
 use crate::{Db, FxIndexSet};
 
@@ -73,9 +74,93 @@ use ty_python_core::unpack::Unpack;
 use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, semantic_index};
 
 mod builder;
+mod implicit_alias;
+pub(super) use implicit_alias::implicit_alias_parameters;
 mod comparisons;
 #[cfg(test)]
 mod tests;
+
+/// The inferred alias type, or a cycle error retaining a type for recovery.
+pub(super) type ImplicitAliasResult<'db> = Result<Type<'db>, CyclicTypeAliasError<'db>>;
+
+/// An alias that reaches itself through aliases and unions without a containing type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct CyclicTypeAliasError<'db> {
+    /// The type available for recovery. Normalizing this type does not make the alias valid.
+    fallback_type: Type<'db>,
+}
+
+/// Infer the type denoted by an implicit or PEP 613 alias independently of its runtime value.
+///
+/// `_parameters` supplies the formal type parameters collected by [`implicit_alias_parameters`].
+/// Although the function body does not read it, Salsa's `cycle_initial` uses it to construct
+/// `μa. a` with an identity specialization (for example, `T -> T`) on both the recursive type and
+/// its self-reference. This lets recursive uses such as `Alias[int]` or `Alias[list[T]]` specialize
+/// the provisional type before inference of the alias's body is complete. `cycle_fn` then binds
+/// self-references in the inferred result through [`RecursiveType::recover`].
+///
+/// For generic aliases, the caller applies explicit type arguments or the default specialization.
+/// If inference does not encounter a cycle, the result need not contain a structural recursive type.
+/// Validation examines the inferred constructor before recovery, so diagnostics do not depend on
+/// which recursive references remain in the recovered type.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
+        ImplicitAliasInference {
+            ty: Ok(Type::Recursive(RecursiveType::initial(db, definition, id, parameters))),
+            diagnostics: TypeCheckDiagnostics::default(),
+            implicit_aliases: Box::default(),
+        }
+    },
+    cycle_fn=|db, cycle: &salsa::Cycle, _: &ImplicitAliasInference<'db>, mut result: ImplicitAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
+        let recover = |ty| RecursiveType::recover(db, definition, cycle.id(), parameters, ty);
+        result.ty = result.ty.map(recover).map_err(|error| CyclicTypeAliasError {
+            fallback_type: recover(error.fallback_type),
+        });
+        result
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(super) fn infer_implicit_alias_type<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    _parameters: Option<crate::types::GenericContext<'db>>,
+) -> ImplicitAliasInference<'db> {
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let Some(value) = definition.kind(db).value(&module) else {
+        return ImplicitAliasInference {
+            ty: Ok(Type::unknown()),
+            diagnostics: TypeCheckDiagnostics::default(),
+            implicit_aliases: Box::default(),
+        };
+    };
+    let index = semantic_index(db, program_file);
+    let env = ProgramEnvironment::from_file(program_file);
+    TypeInferenceBuilder::new(
+        db,
+        &env,
+        InferenceRegion::Definition(definition),
+        python_file.file(db),
+        program_file,
+        index,
+        &module,
+    )
+    .finish_implicit_alias_type(definition, value)
+}
+
+/// The type and diagnostics inferred from an alias's right-hand side.
+///
+/// An alias's own diagnostics are kept separate from those of aliases it references. File
+/// checking collects each referenced alias once, so recursive aliases cannot accumulate each
+/// other's diagnostics during fixed-point iteration.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct ImplicitAliasInference<'db> {
+    pub(super) ty: ImplicitAliasResult<'db>,
+    pub(super) diagnostics: TypeCheckDiagnostics,
+    pub(super) implicit_aliases: Box<[Definition<'db>]>,
+}
 
 bitflags::bitflags! {
     /// Metadata for expressions inferred as type expressions.
@@ -215,7 +300,10 @@ pub(crate) fn is_discarded_dict_key_assignment<'db>(
 /// `@staticmethod`).
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, _, _| FunctionDecoratorInference::default(),
+    cycle_initial=|_, _, _| FunctionDecoratorInference {
+        has_unknown_decorators: true,
+        ..FunctionDecoratorInference::default()
+    },
     heap_size=ruff_memory_usage::heap_size
 )]
 pub(crate) fn function_known_decorators<'db>(
@@ -258,7 +346,10 @@ pub(crate) struct FunctionDecoratorInference<'db> {
     expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
+    implicit_aliases: Box<[Definition<'db>]>,
     known_decorators: FunctionDecorators,
+    /// Whether any decorator is unrecognized, or decorator inference is incomplete.
+    has_unknown_decorators: bool,
     diagnostics: TypeCheckDiagnostics,
 }
 
@@ -284,8 +375,16 @@ impl<'db> FunctionDecoratorInference<'db> {
         &self.called_functions
     }
 
-    fn known_decorators(&self) -> FunctionDecorators {
+    fn implicit_aliases(&self) -> &[Definition<'db>] {
+        &self.implicit_aliases
+    }
+
+    pub(super) fn known_decorators(&self) -> FunctionDecorators {
         self.known_decorators
+    }
+
+    pub(super) fn has_unknown_decorators(&self) -> bool {
+        self.has_unknown_decorators
     }
 
     fn diagnostics(&self) -> &TypeCheckDiagnostics {
@@ -929,6 +1028,9 @@ pub(crate) struct ScopeInference<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ScopeInferenceExtra<'db> {
+    /// Aliases whose type-expression diagnostics are needed by this region.
+    implicit_aliases: Box<[Definition<'db>]>,
+
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -998,6 +1100,12 @@ impl<'db> ScopeInference<'db> {
 
     pub(crate) fn diagnostics(&self) -> Option<&TypeCheckDiagnostics> {
         self.extra.as_deref().map(|extra| &extra.diagnostics)
+    }
+
+    pub(crate) fn implicit_aliases(&self) -> &[Definition<'db>] {
+        self.extra
+            .as_deref()
+            .map_or(&[], |extra| &extra.implicit_aliases)
     }
 
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
@@ -1295,18 +1403,6 @@ impl<'db> DefinitionTypes<'db> {
             Self::Empty | Self::Binding(..) => Either::Right([].iter().copied()),
         }
     }
-
-    fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> + '_ {
-        match self {
-            Self::Declaration(declaration) | Self::BindingAndDeclaration(declaration) => {
-                Either::Left(Either::Left(std::iter::once(*declaration)))
-            }
-            Self::Other(other) => {
-                Either::Left(Either::Right(other.declarations.iter().map(|(_, ty)| *ty)))
-            }
-            Self::Empty | Self::Binding(..) => Either::Right(std::iter::empty()),
-        }
-    }
 }
 
 /// Compact representations for common combinations of extra definition inference data.
@@ -1345,6 +1441,9 @@ struct DeferredAndUndecorated<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct OtherDefinitionInferenceExtra<'db> {
+    /// Aliases whose type-expression diagnostics are needed by this region.
+    implicit_aliases: Box<[Definition<'db>]>,
+
     /// Condition truthiness retained for checks of enclosing conditions containing walrus expressions.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.
     comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
@@ -1735,10 +1834,6 @@ impl<'db> DefinitionInference<'db> {
         self.types.declarations(owner)
     }
 
-    fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> {
-        self.types.declaration_types()
-    }
-
     fn fallback_type(&self) -> Option<Type<'db>> {
         match self.extra.as_deref() {
             Some(DefinitionInferenceExtra::Other(extra)) => extra.cycle_recovery,
@@ -1746,7 +1841,7 @@ impl<'db> DefinitionInference<'db> {
         }
     }
 
-    fn discards_dict_key_assignments(&self) -> bool {
+    pub(crate) fn discards_dict_key_assignments(&self) -> bool {
         match self.extra.as_deref() {
             Some(DefinitionInferenceExtra::DiscardsDictKeyAssignments) => true,
             Some(DefinitionInferenceExtra::Other(extra)) => extra.discards_dict_key_assignments,
@@ -1846,6 +1941,9 @@ pub(crate) struct ExpressionInference<'db> {
 /// Extra data that only exists for few inferred expression regions.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ExpressionInferenceExtra<'db> {
+    /// Aliases whose type-expression diagnostics are needed by this region.
+    implicit_aliases: Box<[Definition<'db>]>,
+
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -2023,6 +2121,11 @@ impl<'db> ExpressionInference<'db> {
             .get(&collection_def)
     }
 
+    /// Whether this result depends on provisional types from cycle recovery.
+    pub(super) fn is_provisional(&self) -> bool {
+        self.fallback_type().is_some()
+    }
+
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
@@ -2088,6 +2191,9 @@ pub(crate) struct StatementInferenceInner<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct StatementInferenceInnerExtra<'db> {
+    /// Aliases whose type-expression diagnostics are needed by this region.
+    implicit_aliases: Box<[Definition<'db>]>,
+
     /// Condition truthiness retained for checks performed by the enclosing suite.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.
     comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
@@ -2296,34 +2402,31 @@ bitflags::bitflags! {
         /// Whether we are currently in a context where `Concatenate` can be legal
         const IN_VALID_CONCATENATE_CONTEXT = 1 << 6;
 
-        /// Whether we're in the first pass of inferring a PEP-613 type alias.
-        ///
-        /// During this pass, `invalid-type-form` diagnostics are suppressed;
-        /// these are emitted during the second, post-inference, pass.
-        const IN_PEP_613_ALIAS_FIRST_PASS = 1 << 7;
-
-        const IN_NO_TYPE_CHECK = 1 << 8;
+        const IN_NO_TYPE_CHECK = 1 << 7;
 
         /// Whether the visitor is currently visiting a `**kwargs` annotation.
-        const IN_KWARG_ANNOTATION = 1 << 9;
+        const IN_KWARG_ANNOTATION = 1 << 8;
 
         /// Whether we're in a context where `Unpack` can be legal.
-        const IN_VALID_UNPACK_CONTEXT = 1 << 10;
+        const IN_VALID_UNPACK_CONTEXT = 1 << 9;
 
         /// Whether to disable the `int`/`float` special case in a type expression.
-        const DISABLE_INT_FLOAT_SPECIAL_CASE = 1 << 11;
+        const DISABLE_INT_FLOAT_SPECIAL_CASE = 1 << 10;
 
         /// Whether the visitor is currently visiting a type expression.
-        const IN_TYPE_EXPRESSION = 1 << 12;
+        const IN_TYPE_EXPRESSION = 1 << 11;
 
         /// Whether the visitor is currently visiting a nested position in a type expression.
-        const IN_NESTED_TYPE_EXPRESSION = 1 << 13;
+        const IN_NESTED_TYPE_EXPRESSION = 1 << 12;
 
         /// Whether the visitor is currently visiting the argument to `Unpack[...]` or `*`.
-        const IN_UNPACK_TYPE_ARGUMENT = 1 << 14;
+        const IN_UNPACK_TYPE_ARGUMENT = 1 << 13;
 
         /// Whether the current method's explicit receiver annotation is incompatible with `Self`.
-        const HAS_INCOMPATIBLE_SELF_RECEIVER = 1 << 15;
+        const HAS_INCOMPATIBLE_SELF_RECEIVER = 1 << 14;
+
+        /// Whether the visitor is currently visiting an explicit `__init__` receiver annotation.
+        const IN_INIT_RECEIVER_ANNOTATION = 1 << 15;
     }
 }
 

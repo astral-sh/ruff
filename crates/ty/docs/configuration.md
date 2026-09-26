@@ -721,6 +721,9 @@ any module where the first component contains the substring `test`, use `*test*.
 === "pyproject.toml"
 
     ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
     [tool.ty.overrides.analysis]
     # Suppress errors for all `test` modules except `test.foo`
     allowed-unresolved-imports = ["test.**", "!test.foo"]
@@ -729,6 +732,9 @@ any module where the first component contains the substring `test`, use `*test*.
 === "ty.toml"
 
     ```toml
+    [[overrides]]
+    include = ["src"]
+
     [overrides.analysis]
     # Suppress errors for all `test` modules except `test.foo`
     allowed-unresolved-imports = ["test.**", "!test.foo"]
@@ -762,6 +768,9 @@ When multiple patterns match, later entries take precedence.
 === "pyproject.toml"
 
     ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
     [tool.ty.overrides.analysis]
     # Replace all pandas and numpy imports with Any
     replace-imports-with-any = ["pandas.**", "numpy.**"]
@@ -770,6 +779,9 @@ When multiple patterns match, later entries take precedence.
 === "ty.toml"
 
     ```toml
+    [[overrides]]
+    include = ["src"]
+
     [overrides.analysis]
     # Replace all pandas and numpy imports with Any
     replace-imports-with-any = ["pandas.**", "numpy.**"]
@@ -798,6 +810,9 @@ Defaults to `true`.
 === "pyproject.toml"
 
     ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
     [tool.ty.overrides.analysis]
     # Disable support for `type: ignore` comments
     respect-type-ignore-comments = false
@@ -806,6 +821,9 @@ Defaults to `true`.
 === "ty.toml"
 
     ```toml
+    [[overrides]]
+    include = ["src"]
+
     [overrides.analysis]
     # Disable support for `type: ignore` comments
     respect-type-ignore-comments = false
@@ -904,6 +922,9 @@ def narrow_match(x: str) -> None:
 === "pyproject.toml"
 
     ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
     [tool.ty.overrides.analysis]
     # Preserve broad builtin types instead of narrowing them to literals
     strict-equality-semantics = true
@@ -912,6 +933,9 @@ def narrow_match(x: str) -> None:
 === "ty.toml"
 
     ```toml
+    [[overrides]]
+    include = ["src"]
+
     [overrides.analysis]
     # Preserve broad builtin types instead of narrowing them to literals
     strict-equality-semantics = true
@@ -947,6 +971,9 @@ Defaults to `false`.
 === "pyproject.toml"
 
     ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
     [tool.ty.overrides.analysis]
     # Use the top materialization when narrowing to an unspecialized generic class
     strict-generic-narrowing = true
@@ -955,6 +982,9 @@ Defaults to `false`.
 === "ty.toml"
 
     ```toml
+    [[overrides]]
+    include = ["src"]
+
     [overrides.analysis]
     # Use the top materialization when narrowing to an unspecialized generic class
     strict-generic-narrowing = true

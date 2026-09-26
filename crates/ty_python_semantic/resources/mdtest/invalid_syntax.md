@@ -216,7 +216,7 @@ not panic.
 ```py
 match 0:
     # error: [invalid-syntax] "alternative patterns bind different names"
-    # error: [invalid-syntax] "Expected `:`, found name"
+    # error: [invalid-syntax] "Expected `:`, found identifier"
     # error: [invalid-syntax] "Expected an expression"
     case first | second first:
 ```

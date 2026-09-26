@@ -35,7 +35,7 @@ imara-diff = { workspace = true }
 indicatif = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
-markdown = { version = "1.0.0" }
+markdown = { version = "1.0.0", default-features = false }
 rayon = { workspace = true }
 regex = { workspace = true }
 schemars = { workspace = true }

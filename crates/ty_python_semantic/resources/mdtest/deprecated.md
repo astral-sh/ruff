@@ -438,6 +438,32 @@ DeprType.__str__  # error: [deprecated] "Use OtherType instead"
 depr_func.__str__  # error: [deprecated] "Use other_func instead"
 ```
 
+### Conflicting local annotation
+
+Importing a deprecated item still produces a warning when the imported value is incompatible with an
+existing local annotation.
+
+`module.py`:
+
+```py
+from typing_extensions import deprecated
+
+@deprecated("Use current instead")
+def old() -> None: ...
+```
+
+`main.py`:
+
+```py
+old: str
+
+# error: [invalid-assignment]
+# error: [deprecated] "Use current instead"
+from module import old
+
+reveal_type(old)  # revealed: str
+```
+
 ### Non-Import Deprecated
 
 If the items aren't imported and instead referenced using `module.item` then each use should produce
@@ -526,6 +552,37 @@ AliasClass = DeprType  # error: [deprecated] "Use OtherType instead"
 # TODO: these diagnostics ideally shouldn't fire
 alias_func()  # error: [deprecated] "Use other_func instead"
 AliasClass()  # error: [deprecated] "Use OtherType instead"
+```
+
+## Names in annotations
+
+Each reference to a deprecated class produces one warning, including references through aliases and
+generic specialization.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing_extensions import deprecated
+
+@deprecated("Use Replacement")
+class Old[T = int]: ...
+
+Alias = Old  # error: [deprecated] "Use Replacement"
+
+def direct(value: Old) -> None:  # error: [deprecated] "Use Replacement"
+    pass
+
+def alias(value: Alias) -> None:  # error: [deprecated] "Use Replacement"
+    pass
+
+def specialized(value: Old[int]) -> None:  # error: [deprecated] "Use Replacement"
+    pass
+
+def specialized_alias(value: Alias[int]) -> None:  # error: [deprecated] "Use Replacement"
+    pass
 ```
 
 ## Dunders

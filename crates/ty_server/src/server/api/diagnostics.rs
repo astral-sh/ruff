@@ -24,7 +24,7 @@ use ty_project::{Db as _, ProjectDatabase};
 use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::session::client::Client;
-use crate::session::{DocumentHandle, GlobalSettings};
+use crate::session::{GlobalSettings, OpenDocumentHandle};
 use crate::system::{AnySystemPath, file_to_uri};
 use crate::{DIAGNOSTIC_NAME, Db, DiagnosticMode};
 use crate::{PositionEncoding, Session};
@@ -38,23 +38,27 @@ pub(super) struct Diagnostics {
 }
 
 impl Diagnostics {
-    /// Computes the result ID for `diagnostics`.
+    /// Computes the result ID for the filtered `diagnostics`.
     ///
     /// The result ID is `None` if there are no diagnostics or hints.
-    pub(super) fn result_id_from_hash(
+    pub(super) fn result_id_from_hash<'a>(
         db: &dyn Db,
-        diagnostics: &[ruff_db::diagnostic::Diagnostic],
+        diagnostics: impl Iterator<Item = &'a ruff_db::diagnostic::Diagnostic> + Clone,
         unnecessary_hints: &[Hint],
         client_capabilities: ResolvedClientCapabilities,
     ) -> Option<String> {
-        if diagnostics.is_empty() && unnecessary_hints.is_empty() {
+        let diagnostic_count = diagnostics.clone().count();
+        if diagnostic_count == 0 && unnecessary_hints.is_empty() {
             return None;
         }
 
-        // Generate the base result ID from raw diagnostic content.
+        // Generate the base result ID from filtered diagnostic content.
         let mut hasher = DefaultHasher::new();
 
-        diagnostics.hash(&mut hasher);
+        diagnostic_count.hash(&mut hasher);
+        for diagnostic in diagnostics.clone() {
+            diagnostic.hash(&mut hasher);
+        }
         unnecessary_hints.hash(&mut hasher);
 
         if client_capabilities.supports_full_diagnostic_output() {
@@ -95,7 +99,7 @@ impl Diagnostics {
     ) -> Option<String> {
         Self::result_id_from_hash(
             db,
-            &self.items,
+            self.items.iter(),
             &self.unnecessary_hints,
             client_capabilities,
         )
@@ -105,7 +109,6 @@ impl Diagnostics {
         &self,
         db: &ProjectDatabase,
         client_capabilities: ResolvedClientCapabilities,
-        global_settings: &GlobalSettings,
     ) -> LspDiagnostics {
         if let Some(notebook_document) = db.notebook_document(self.file_or_notebook) {
             let mut cell_diagnostics: FxHashMap<Uri, Vec<Diagnostic>> = FxHashMap::default();
@@ -117,15 +120,8 @@ impl Diagnostics {
             }
 
             for diagnostic in &self.items {
-                let Some((uri, lsp_diagnostic)) = to_lsp_diagnostic(
-                    db,
-                    diagnostic,
-                    self.encoding,
-                    client_capabilities,
-                    global_settings,
-                ) else {
-                    continue;
-                };
+                let (uri, lsp_diagnostic) =
+                    to_lsp_diagnostic(db, diagnostic, self.encoding, client_capabilities);
 
                 let Some(uri) = uri else {
                     tracing::warn!("Unable to find notebook cell");
@@ -164,17 +160,8 @@ impl Diagnostics {
             let mut diagnostics = self
                 .items
                 .iter()
-                .filter_map(|diagnostic| {
-                    Some(
-                        to_lsp_diagnostic(
-                            db,
-                            diagnostic,
-                            self.encoding,
-                            client_capabilities,
-                            global_settings,
-                        )?
-                        .1,
-                    )
+                .map(|diagnostic| {
+                    to_lsp_diagnostic(db, diagnostic, self.encoding, client_capabilities).1
                 })
                 .collect::<Vec<_>>();
             diagnostics.extend(unnecessary_hints_to_lsp_diagnostics(
@@ -224,7 +211,7 @@ pub(crate) fn publish_all_document_diagnostics(session: &Session, client: &Clien
 ///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
 pub(crate) fn publish_diagnostics_if_needed(
-    document: &DocumentHandle,
+    document: &OpenDocumentHandle,
     session: &Session,
     client: &Client,
 ) {
@@ -238,14 +225,30 @@ pub(crate) fn publish_diagnostics_if_needed(
 
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
 /// notification].
-pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, client: &Client) {
+pub(super) fn publish_diagnostics(
+    document: &OpenDocumentHandle,
+    session: &Session,
+    client: &Client,
+) {
     if session.global_settings().diagnostic_mode().is_off() {
         return;
     }
 
     let db = session.project_db(document.notebook_or_file_path());
 
-    let Some(diagnostics) = compute_diagnostics(db, document, session.position_encoding()) else {
+    let Some(file) = document.notebook_or_file(db) else {
+        tracing::info!(
+            "No file found for snapshot for `{}`",
+            document.notebook_or_file_path()
+        );
+        return;
+    };
+    let Some(diagnostics) = compute_diagnostics(
+        db,
+        file,
+        session.position_encoding(),
+        session.global_settings(),
+    ) else {
         return;
     };
 
@@ -259,11 +262,7 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
             });
         };
 
-    match diagnostics.to_lsp_diagnostics(
-        db,
-        session.client_capabilities(),
-        session.global_settings(),
-    ) {
+    match diagnostics.to_lsp_diagnostics(db, session.client_capabilities()) {
         LspDiagnostics::TextDocument(diagnostics) => {
             publish_diagnostics_notification(
                 document.uri().clone(),
@@ -278,7 +277,7 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
             )]
             for (cell_uri, diagnostics) in cell_diagnostics {
                 let version = session
-                    .document_handle(&cell_uri)
+                    .open_document_handle(&cell_uri)
                     .map(|document| document.version())
                     .ok();
                 publish_diagnostics_notification(cell_uri, version, diagnostics);
@@ -368,17 +367,9 @@ pub(crate) fn publish_settings_diagnostics(
         // Convert diagnostics to LSP format
         let lsp_diagnostics = file_diagnostics
             .into_iter()
-            .filter_map(|diagnostic| {
-                Some(
-                    to_lsp_diagnostic(
-                        db,
-                        &diagnostic,
-                        session_encoding,
-                        client_capabilities,
-                        global_settings,
-                    )?
-                    .1,
-                )
+            .filter(|diagnostic| global_settings.should_show_diagnostic(diagnostic))
+            .map(|diagnostic| {
+                to_lsp_diagnostic(db, &diagnostic, session_encoding, client_capabilities).1
             })
             .collect::<Vec<_>>();
 
@@ -392,17 +383,10 @@ pub(crate) fn publish_settings_diagnostics(
 
 pub(super) fn compute_diagnostics(
     db: &ProjectDatabase,
-    document: &DocumentHandle,
+    file: File,
     encoding: PositionEncoding,
+    global_settings: &GlobalSettings,
 ) -> Option<Diagnostics> {
-    let Some(file) = document.notebook_or_file(db) else {
-        tracing::info!(
-            "No file found for snapshot for `{}`",
-            document.notebook_or_file_path()
-        );
-        return None;
-    };
-
     // The first uv result supplies the module paths needed for correct diagnostics. Do not analyze
     // the script until that result is available. Waiting would not help: publishing the environment
     // advances the database revision and cancels this snapshot, so the request must retry anyway.
@@ -410,7 +394,8 @@ pub(super) fn compute_diagnostics(
         return None;
     }
 
-    let diagnostics = db.check_file(file);
+    let mut diagnostics = db.check_file(file);
+    diagnostics.retain(|diagnostic| global_settings.should_show_diagnostic(diagnostic));
     let unnecessary_hints = hints(db, file);
 
     Some(Diagnostics {
@@ -466,12 +451,7 @@ pub(super) fn to_lsp_diagnostic(
     diagnostic: &ruff_db::diagnostic::Diagnostic,
     encoding: PositionEncoding,
     client_capabilities: ResolvedClientCapabilities,
-    global_settings: &GlobalSettings,
-) -> Option<(Option<lsp_types::Uri>, Diagnostic)> {
-    if diagnostic.is_invalid_syntax() && !global_settings.show_syntax_errors() {
-        return None;
-    }
-
+) -> (Option<lsp_types::Uri>, Diagnostic) {
     let supports_related_information =
         client_capabilities.supports_diagnostic_related_information();
 
@@ -577,7 +557,7 @@ pub(super) fn to_lsp_diagnostic(
         }
     }
 
-    Some((
+    (
         uri,
         Diagnostic {
             range,
@@ -590,7 +570,7 @@ pub(super) fn to_lsp_diagnostic(
             related_information,
             data: serde_json::to_value(data).ok(),
         },
-    ))
+    )
 }
 
 /// Converts an [`Annotation`] to a [`DiagnosticRelatedInformation`].

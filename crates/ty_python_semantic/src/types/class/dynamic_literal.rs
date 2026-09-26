@@ -327,6 +327,9 @@ impl<'db> DynamicClassLiteral<'db> {
 
         // Reconcile with other bases' metaclasses.
         for (base, base_metaclass) in bases {
+            if base_metaclass == SubclassOfType::subclass_of_unknown() {
+                return Ok(ClassMetaclass::Selected(base_metaclass));
+            }
             // Get the ClassType for comparison.
             let Some(candidate_class) = candidate.to_class_type(db) else {
                 // If candidate isn't a class type, keep it as is.
@@ -336,15 +339,13 @@ impl<'db> DynamicClassLiteral<'db> {
                 continue;
             };
 
-            // Keep the incumbent when both metaclasses are equal.
-            if candidate_class.is_subclass_of(db, &env, base_metaclass_class) {
-                continue;
-            }
-
-            // If base's metaclass is more derived, use it.
-            if base_metaclass_class.is_subclass_of(db, &env, candidate_class) {
-                candidate = base_metaclass;
-                candidate_base = base;
+            if let Some(selected) =
+                candidate_class.most_derived_metaclass(db, &env, base_metaclass_class)
+            {
+                if selected != candidate {
+                    candidate = selected;
+                    candidate_base = base;
+                }
                 continue;
             }
 

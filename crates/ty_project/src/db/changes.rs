@@ -344,9 +344,7 @@ impl ProjectDatabase {
                 .find(|path| self.system().is_directory(path))
                 .unwrap_or(&project_root);
             let metadata = project.metadata(self);
-            if metadata.use_uv().workspace_discovery_enabled()
-                && metadata.config_file_override().is_none()
-            {
+            if metadata.use_uv().workspace_discovery_enabled() {
                 result.project_sync_path = Some(path.to_path_buf());
             } else {
                 // We're not refreshing uv metadata, so use the existing environment.

@@ -91,18 +91,11 @@ enum Reason {
 /// UP036
 pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
     for branch in if_elif_branches(stmt_if) {
-        let Expr::Compare(ast::ExprCompare {
-            left,
-            ops,
-            comparators,
-            range: _,
-            node_index: _,
-        }) = &branch.test
-        else {
+        let Expr::Compare(compare) = &branch.test else {
             continue;
         };
 
-        let ([op], [comparison]) = (&**ops, &**comparators) else {
+        let Some((left, op, comparison)) = compare.as_single() else {
             continue;
         };
 

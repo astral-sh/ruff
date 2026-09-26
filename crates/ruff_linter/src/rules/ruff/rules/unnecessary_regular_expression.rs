@@ -332,9 +332,8 @@ impl<'a> ReFunc<'a> {
     /// Return a new compare expr of the form `left op right`
     fn compare_expr(left: &Expr, op: CmpOp, right: &Expr) -> Expr {
         Expr::Compare(ExprCompare {
-            left: Box::new(left.clone()),
-            ops: Box::new([op]),
-            comparators: Box::new([right.clone()]),
+            ops: [op].into(),
+            operands: Box::new([left.clone(), right.clone()]),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })
@@ -353,7 +352,7 @@ impl<'a> ReFunc<'a> {
         Expr::Call(ExprCall {
             func: Box::new(method),
             arguments: Arguments {
-                args: args.into_boxed_slice(),
+                args: args.into(),
                 keywords: std::iter::empty().collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -439,25 +438,14 @@ enum ComparisonToNone {
 /// If the regex call is compared to `None`, return the comparison and its range.
 ///    Example: `re.search("abc", s) is None`
 fn get_comparison_to_none(semantic: &SemanticModel) -> Option<(ComparisonToNone, TextRange)> {
-    let parent_expr = semantic.current_expression_parent()?;
-
-    let Expr::Compare(ExprCompare {
-        ops,
-        comparators,
-        range,
-        ..
-    }) = parent_expr
-    else {
+    let compare = semantic.current_expression_parent()?.as_compare_expr()?;
+    let (_, op, Expr::NoneLiteral(_)) = compare.as_single()? else {
         return None;
     };
 
-    let Some(Expr::NoneLiteral(_)) = comparators.first() else {
-        return None;
-    };
-
-    match ops.as_ref() {
-        [CmpOp::Is] => Some((ComparisonToNone::Is, *range)),
-        [CmpOp::IsNot] => Some((ComparisonToNone::IsNot, *range)),
+    match op {
+        CmpOp::Is => Some((ComparisonToNone::Is, compare.range())),
+        CmpOp::IsNot => Some((ComparisonToNone::IsNot, compare.range())),
         _ => None,
     }
 }

@@ -147,6 +147,22 @@ reveal_type(x12[0][2]["a"])  # revealed: int
 reveal_type(x12[0][3]["b"])  # revealed: int
 ```
 
+## Key narrowing through dictionary unpacking
+
+Unpacking a dictionary literal preserves its key bindings. Later entries replace earlier entries,
+including any narrowing for their nested keys.
+
+```py
+d = {"outer": {"stale": 1}, **{"outer": {"current": 2}}}
+reveal_type(d["outer"]["current"])  # revealed: Literal[2]
+reveal_type(d["outer"]["stale"])  # revealed: int
+
+d = {"keep": 1, **{**{"outer": {"current": 2}}}, "outer": {"last": "value"}}
+reveal_type(d["keep"])  # revealed: Literal[1]
+reveal_type(d["outer"]["last"])  # revealed: Literal["value"]
+reveal_type(d["outer"]["current"])  # revealed: str
+```
+
 ## Dict unpacking in function calls
 
 Narrowing is also performed for dictionary unpacking expressions:

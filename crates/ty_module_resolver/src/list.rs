@@ -1,13 +1,11 @@
 use std::borrow::Cow;
 use std::collections::btree_map::{BTreeMap, Entry};
 
-use ruff_db::files::directory_listing;
-
 use crate::ResolverEnvironment;
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
-use crate::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
+use crate::path::{ModuleDirectory, ModulePath, SearchPath, SystemOrVendoredPathRef};
 use crate::resolve::{ModuleResolveMode, ResolverContext, resolve_file_module, search_paths};
 
 /// List all available modules, including all sub-modules, sorted in lexicographic order.
@@ -98,7 +96,7 @@ fn list_modules_in<'db>(
     let mut lister = Lister::new(db, search_path.resolver_environment(db), path);
     match path.as_path() {
         SystemOrVendoredPathRef::System(system_search_path) => {
-            let Ok(listing) = directory_listing(db, system_search_path) else {
+            let Some(listing) = lister.directory.system_listing() else {
                 return vec![];
             };
             for (name, file_type) in listing.iter() {
@@ -135,7 +133,7 @@ impl get_size2::GetSize for ListedModule<'_> {}
 /// in the same directory).
 struct Lister<'db> {
     db: &'db dyn Db,
-    search_path: &'db SearchPath,
+    directory: ModuleDirectory<'db>,
     resolver_environment: ResolverEnvironment<'db>,
     modules: BTreeMap<&'db ModuleName, ListedModule<'db>>,
 }
@@ -150,7 +148,10 @@ impl<'db> Lister<'db> {
     ) -> Lister<'db> {
         Lister {
             db,
-            search_path,
+            directory: ModuleDirectory::new(
+                &ResolverContext::new(db, resolver_environment, ModuleResolveMode::Typing),
+                search_path.to_module_path(),
+            ),
             resolver_environment,
             modules: BTreeMap::new(),
         }
@@ -183,7 +184,7 @@ impl<'db> Lister<'db> {
         }
 
         let Some(name) = path.file_name() else { return };
-        let mut module_path = self.search_path.to_module_path();
+        let mut module_path = self.directory.path().search_path().to_module_path();
         module_path.push(name);
         let Some(module_name) = module_path.to_module_name() else {
             return;
@@ -191,7 +192,9 @@ impl<'db> Lister<'db> {
 
         // Some modules cannot shadow a subset of special
         // modules from the standard library.
-        if !self.search_path.is_standard_library() && self.is_non_shadowable(&module_name) {
+        if !self.directory.path().search_path().is_standard_library()
+            && self.is_non_shadowable(&module_name)
+        {
             return;
         }
 
@@ -207,7 +210,7 @@ impl<'db> Lister<'db> {
                             self.resolver_environment,
                             Cow::Owned(module_name),
                             ModuleKind::Package,
-                            self.search_path.clone(),
+                            self.directory.path().search_path().clone(),
                         ),
                     );
                     return;
@@ -245,7 +248,7 @@ impl<'db> Lister<'db> {
             let is_dir =
                 file_type.is_definitely_directory() || module_path.is_directory(&self.context());
             if is_dir {
-                if !self.search_path.is_standard_library() {
+                if !self.directory.path().search_path().is_standard_library() {
                     self.add_module(
                         &module_path,
                         Module::namespace_package(
@@ -273,7 +276,7 @@ impl<'db> Lister<'db> {
             return;
         }
 
-        let Some(file) = module_path.to_file(&self.context()) else {
+        let Some(file) = self.directory.resolve_file(&self.context(), name) else {
             return;
         };
         self.add_module(
@@ -284,7 +287,7 @@ impl<'db> Lister<'db> {
                 self.resolver_environment,
                 Cow::Owned(module_name),
                 ModuleKind::Module,
-                self.search_path.clone(),
+                self.directory.path().search_path().clone(),
             ),
         );
     }

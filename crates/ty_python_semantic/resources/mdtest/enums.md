@@ -2227,6 +2227,109 @@ def _(answer: type[Answer]) -> None:
     reveal_type(answer.NO)  # revealed: Literal[Answer.NO]
 ```
 
+## Reassigning enum members
+
+### Class attributes
+
+Enum members cannot be reassigned on the class, even to their original value or to the member
+itself. This also applies to aliases, including aliases declared with the same value.
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+    ALIAS = NO
+    SAME_VALUE = 0
+
+Answer.NO = 5  # error: [invalid-assignment] "Cannot assign to attribute `NO` on type `<class 'Answer'>`"
+Answer.NO = 0  # error: [invalid-assignment]
+Answer.NO = Answer.NO  # error: [invalid-assignment]
+Answer.ALIAS = 0  # error: [invalid-assignment]
+Answer.SAME_VALUE = 0  # error: [invalid-assignment]
+```
+
+The assigned expression is still checked when the target is read-only:
+
+```py
+# error: [invalid-assignment]
+# error: [unresolved-reference]
+Answer.YES = missing
+```
+
+The same restriction applies through a `type[Answer]` receiver and to enums created with the
+functional syntax:
+
+```py
+def reassign(cls: type[Answer]):
+    cls.NO = 0  # error: [invalid-assignment]
+
+Dynamic = Enum("Dynamic", {"NO": 0, "ALIAS": 0})
+Dynamic.NO = 0  # error: [invalid-assignment]
+Dynamic.ALIAS = 0  # error: [invalid-assignment]
+```
+
+### Augmented assignments
+
+An augmented assignment also replaces the class attribute, so it cannot target an enum member.
+
+```py
+from enum import IntEnum
+
+class Answer(IntEnum):
+    NO = 0
+    YES = 1
+
+Answer.NO += 1  # error: [invalid-assignment]
+```
+
+### Non-member and instance attributes
+
+Non-member attributes remain assignable, even when they hold an enum member. Assignment through an
+enum instance is also allowed: it shadows the class attribute without replacing the member on the
+enum class.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, nonmember
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+    description: str
+    default = nonmember(NO)
+    _ignore_ = "temporary"
+    temporary = 0
+
+Answer.description = "An answer"
+Answer.default = 1
+Answer.temporary = 1
+Answer.NO.NO = 0
+
+def shadow(answer: Answer):
+    answer.NO = 0
+
+class Settings:
+    default = Answer.NO
+
+Settings.default = Answer.YES
+```
+
+An enum's non-member attribute can also hold a member of another enum:
+
+```py
+class Other(Enum):
+    MEMBER = 1
+    default = nonmember(Answer.NO)
+
+Other.default = Answer.YES
+```
+
 ## Calling enum variants
 
 ```py
@@ -3281,6 +3384,21 @@ class StaticHttp(int, Enum):
     NOT_FOUND = 2
 
 reveal_mro(StaticHttp)  # revealed: (<class 'StaticHttp'>, <class 'int'>, <class 'Enum'>, <class 'object'>)
+```
+
+### Fallback MROs
+
+Putting `object` before `Enum` creates an inconsistent MRO. The fallback still includes `Enum` and
+places `object` last.
+
+```py
+from enum import Enum
+from ty_extensions._internal import reveal_mro
+
+# error: [inconsistent-mro]
+Broken = Enum("Broken", "MEMBER", type=object)
+
+reveal_mro(Broken)  # revealed: (<class 'Broken'>, <class 'Enum'>, <class 'object'>)
 ```
 
 ### IntEnum function syntax

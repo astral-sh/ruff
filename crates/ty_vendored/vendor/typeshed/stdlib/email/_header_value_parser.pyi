@@ -68,11 +68,12 @@ XXX: provide complete list of token types.
 """
 
 import sys
+from _typeshed import Incomplete
 from collections.abc import Iterable, Iterator
 from email.errors import HeaderParseError, MessageDefect
 from email.policy import Policy
 from re import Pattern
-from typing import Any, Final
+from typing import Final
 from typing_extensions import Self
 
 WSP: Final[set[str]]
@@ -92,13 +93,13 @@ NLSET: Final[set[str]]
 SPECIALSNL: Final[set[str]]
 
 # Added in Python 3.10.17, 3.11.12, 3.12.9, 3.13.2
-def make_quoted_pairs(value: Any) -> str:
+def make_quoted_pairs(value) -> str:
     """Escape dquote and backslash for use within a quoted-string."""
 
-def quote_string(value: Any) -> str: ...
+def quote_string(value) -> str: ...
 
 # Added in Python 3.10.20, 3.11.15, 3.12.13, 3.13.12, 3.14.3
-def make_parenthesis_pairs(value: Any) -> str:
+def make_parenthesis_pairs(value) -> str:
     """Escape parenthesis and backslash for use within a comment."""
 
 rfc2047_matcher: Final[Pattern[str]]
@@ -108,7 +109,7 @@ class TokenList(list[TokenList | Terminal]):
     syntactic_break: bool
     ew_combine_allowed: bool
     defects: list[MessageDefect]
-    def __init__(self, *args: Any, **kw: Any) -> None: ...
+    def __init__(self, *args, **kw) -> None: ...
     @property
     def value(self) -> str: ...
     @property
@@ -165,7 +166,7 @@ class BareQuotedString(QuotedString):
 
 class Comment(WhiteSpaceTokenList):
     token_type: str
-    def quote(self, value: Any) -> str: ...
+    def quote(self, value) -> str: ...
     @property
     def content(self) -> str: ...
 
@@ -367,7 +368,7 @@ class ContentType(ParameterizedHeaderValue):
 class ContentDisposition(ParameterizedHeaderValue):
     token_type: str
     as_ew_allowed: bool
-    content_disposition: Any
+    content_disposition: Incomplete
 
 class ContentTransferEncoding(TokenList):
     token_type: str
@@ -538,7 +539,7 @@ def get_dot_atom(value: str) -> tuple[DotAtom, str]:
     word.
     """
 
-def get_word(value: str) -> tuple[Any, str]:
+def get_word(value: str) -> tuple[Incomplete, str]:
     """word = atom / quoted-string
 
     Either atom or quoted-string may start with CFWS.  We have to peel off this

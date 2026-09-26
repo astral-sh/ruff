@@ -6,12 +6,12 @@ expression: lex_jupyter_source(source)
 ```
 [
     Match 0..5,
-    Name 6..9,
+    Identifier 6..9,
     Colon 9..10,
     Newline 10..11,
     Indent 11..15,
     Case 15..19,
-    Name 20..23,
+    Identifier 20..23,
     Colon 23..24,
     Newline 24..25,
     Indent 25..33,

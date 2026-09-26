@@ -1,17 +1,21 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use insta::assert_snapshot;
 use lsp_types::{
-    DiagnosticSeverity, DocumentDiagnosticReport, FullDocumentDiagnosticReport, Message, Position,
-    WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport,
+    Contents, DocumentDiagnosticReport, Position, RegistrationRequest,
+    TextDocumentContentChangeEvent, UnregistrationRequest, WorkspaceDiagnosticReport,
 };
 use ruff_db::system::SystemPath;
+use ruff_python_trivia::textwrap::dedent;
 use ty_server::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
 
+use crate::diagnostic_snapshots::{
+    condensed_document_diagnostic_snapshot, condensed_workspace_diagnostic_snapshot,
+};
 use crate::{
     TestServer, TestServerBuilder,
     pull_diagnostics::{
         assert_workspace_diagnostics_suspends_for_long_polling, send_workspace_diagnostic_request,
-        shutdown_and_await_workspace_diagnostic, sort_workspace_diagnostic_response,
+        shutdown_and_await_workspace_diagnostic,
     },
 };
 
@@ -103,6 +107,41 @@ fn add_workspace_folder_after_init() -> Result<()> {
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     "
     );
+
+    Ok(())
+}
+
+/// Adding a workspace refreshes diagnostics even when diagnostic support is re-registered.
+#[test]
+fn add_workspace_refreshes_diagnostics_with_dynamic_registration() -> Result<()> {
+    let root1 = SystemPath::new("root1");
+    let root2 = SystemPath::new("root2");
+    let main = root1.join("main.py");
+    let mut server = TestServerBuilder::new()?
+        .enable_workspace_diagnostic_refresh(true)
+        .enable_diagnostic_dynamic_registration(true)
+        .with_file(&main, "missing")?
+        .with_file(root2.join("main.py"), "")?
+        .with_workspace(root1, None)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let (id, _) = server.await_request::<RegistrationRequest>();
+    server.acknowledge_request(id);
+
+    server.open_text_document(&main, "missing", 1);
+    server.document_diagnostic_request(&main, None);
+    server.assert_no_pending_messages();
+
+    server.add_workspace_folder(root2, None)?;
+    server.change_workspace_folders([root2], []);
+    server = server.wait_until_workspaces_are_initialized();
+
+    let (id, _) = server.await_request::<UnregistrationRequest>();
+    server.acknowledge_request(id);
+    let (id, _) = server.await_request::<RegistrationRequest>();
+    server.acknowledge_request(id);
+    server.await_diagnostic_refresh();
 
     Ok(())
 }
@@ -354,6 +393,52 @@ fn add_and_remove_workspace_folders() -> Result<()> {
     Ok(())
 }
 
+/// Replacing the only workspace still refreshes diagnostics for documents that remain open.
+#[test]
+fn replace_only_workspace_refreshes_diagnostics() -> Result<()> {
+    let root = SystemPath::new("project");
+    let nested = root.join("app");
+    let main = nested.join("main.py");
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .enable_workspace_diagnostic_refresh(true)
+        .with_file(&main, "missing")?
+        .with_file(
+            nested.join("ty.toml"),
+            dedent(
+                r#"
+                [rules]
+                unresolved-reference = "warn"
+                "#,
+            ),
+        )?
+        .with_workspace(root, None)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(&main, "missing", 1);
+    assert_eq!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(&main, None)),
+        "0:0..0:7[ERROR]: Name `missing` used when not defined",
+    );
+    server.assert_no_pending_messages();
+
+    // Removing the parent temporarily leaves no projects, but this is not initial configuration.
+    server.add_workspace_folder(&nested, None)?;
+    server.change_workspace_folders([nested.as_path()], [root]);
+    server = server.wait_until_workspaces_are_initialized();
+    server.await_diagnostic_refresh();
+
+    assert_eq!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(&main, None)),
+        "0:0..0:7[WARNING]: Name `missing` used when not defined",
+    );
+
+    Ok(())
+}
+
 /// Tests that if we add a workspace folder that has already been
 /// added, then it's a no-op and things still work.
 #[test]
@@ -561,6 +646,190 @@ include = ["only_external.py"]
     Ok(())
 }
 
+#[test]
+fn external_file_uses_project_with_matching_search_paths_for_requests_and_changes() -> Result<()> {
+    let path = SystemPath::new("shared/library.py");
+    let importer = SystemPath::new("web/src/main.py");
+    let importer_source = "from library import value";
+    let source = "\
+from project_value import value
+value
+";
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("api"), None)?
+        .with_workspace(SystemPath::new("web/src"), None)?
+        .with_files([
+            ("api/ty.toml", ""),
+            (
+                "web/ty.toml",
+                r#"[environment]
+extra-paths = ["../shared"]
+"#,
+            ),
+            ("api/project_value.py", "value = 'api'"),
+            ("web/src/project_value.py", "value = 'web'"),
+            (path.as_str(), source),
+            (importer.as_str(), importer_source),
+        ])?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(path, source, 1);
+    assert_hover(&mut server, path, Position::new(1, 0), "Literal[\"web\"]");
+
+    // Adding api's search path moves the shared file from web's database to api's.
+    let config = SystemPath::new("api/ty.toml");
+    server.write_file(config, r#"environment.extra-paths = ["../shared"]"#)?;
+    server.did_change_watched_files(vec![lsp_types::FileEvent {
+        uri: server.file_uri(config),
+        kind: lsp_types::FileChangeType::Changed,
+    }]);
+    assert_hover(&mut server, path, Position::new(1, 0), "Literal[\"api\"]");
+
+    server.change_text_document(
+        path,
+        vec![
+            TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                lsp_types::TextDocumentContentChangeWholeDocument {
+                    text: "\
+value = 'edited'
+value
+"
+                    .into(),
+                },
+            ),
+        ],
+        2,
+    );
+    assert_hover(
+        &mut server,
+        path,
+        Position::new(1, 0),
+        "Literal[\"edited\"]",
+    );
+
+    // The old database must also see the edit when importing the shared file.
+    server.open_text_document(importer, importer_source, 1);
+    assert_hover(
+        &mut server,
+        importer,
+        Position::new(0, 20),
+        "Literal[\"edited\"]",
+    );
+
+    Ok(())
+}
+
+#[test]
+fn external_file_respects_matching_project_editor_settings() -> Result<()> {
+    let path = SystemPath::new("shared/library.py");
+    let source = "value = 42";
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("api"), None)?
+        .with_workspace(
+            SystemPath::new("web/src"),
+            Some(ClientOptions::default().with_disable_language_services(true)),
+        )?
+        .with_files([
+            (
+                "web/ty.toml",
+                r#"[environment]
+extra-paths = ["../shared"]
+"#,
+            ),
+            (path.as_str(), source),
+        ])?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(path, source, 1);
+    assert!(server.hover_request(path, Position::new(0, 0)).is_none());
+
+    Ok(())
+}
+
+#[test]
+fn containing_project_takes_precedence_over_import_search_paths() -> Result<()> {
+    let path = SystemPath::new("library/module.py");
+    let source = "\
+from project_value import value
+value
+";
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("app"), None)?
+        .with_workspace(SystemPath::new("library"), None)?
+        .with_files([
+            (
+                "app/ty.toml",
+                r#"[environment]
+extra-paths = ["../library", "imports"]
+"#,
+            ),
+            (
+                "library/ty.toml",
+                r#"[environment]
+extra-paths = ["imports"]
+"#,
+            ),
+            ("app/imports/project_value.py", "value = 'app'"),
+            ("library/imports/project_value.py", "value = 'library'"),
+            (path.as_str(), source),
+        ])?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    // The file is in library's workspace folder and on app's import search path.
+    server.open_text_document(path, source, 1);
+    assert_hover(
+        &mut server,
+        path,
+        Position::new(1, 0),
+        "Literal[\"library\"]",
+    );
+
+    Ok(())
+}
+
+#[test]
+fn shared_search_paths_select_project_by_root_order() -> Result<()> {
+    let path = SystemPath::new("shared/library.py");
+    let source = "\
+from project_value import value
+value
+";
+    // api sorts first but cannot import the file. Of the matching projects, web is registered
+    // first, but tools sorts first and should be selected.
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("web"), None)?
+        .with_workspace(SystemPath::new("tools"), None)?
+        .with_workspace(SystemPath::new("api"), None)?
+        .with_files([
+            (
+                "web/ty.toml",
+                r#"[environment]
+extra-paths = ["../shared"]
+"#,
+            ),
+            (
+                "tools/ty.toml",
+                r#"[environment]
+extra-paths = ["../shared"]
+"#,
+            ),
+            ("api/project_value.py", "value = 'api'"),
+            ("tools/project_value.py", "value = 'tools'"),
+            ("web/project_value.py", "value = 'web'"),
+            (path.as_str(), source),
+        ])?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(path, source, 1);
+    assert_hover(&mut server, path, Position::new(1, 0), "Literal[\"tools\"]");
+
+    Ok(())
+}
+
 /// Test that workspace folders cannot realistically have different
 /// global settings.
 ///
@@ -679,6 +948,16 @@ fn global_settings_change() -> Result<()> {
 
     server.open_text_document(&main1, main_content, 1);
     let document_diagnostics = server.document_diagnostic_request(&main1, None);
+    let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) =
+        &document_diagnostics
+    else {
+        anyhow::bail!("Expected a full report for the initial diagnostics");
+    };
+    let result_id = report
+        .full_document_diagnostic_report
+        .result_id
+        .clone()
+        .context("Expected a result ID for the syntax error")?;
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(document_diagnostics),
         @"0:1..0:1[ERROR]: unexpected EOF while parsing",
@@ -700,7 +979,7 @@ fn global_settings_change() -> Result<()> {
     server.change_workspace_folders([root2], []);
     server = server.wait_until_workspaces_are_initialized();
 
-    let document_diagnostics = server.document_diagnostic_request(&main1, None);
+    let document_diagnostics = server.document_diagnostic_request(&main1, Some(result_id));
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(document_diagnostics),
         @"",
@@ -714,85 +993,6 @@ fn global_settings_change() -> Result<()> {
     );
 
     Ok(())
-}
-
-/// A helper routine for creating a snapshot for a collection of
-/// workspace diagnostics.
-///
-/// We mostly use this in our workspace folder tests to check that the
-/// LSP is correctly recognizing and reporting diagnostics for each
-/// workspace folder. This isn't really meant to test the diagnostics
-/// themselves, hence the condensed output.
-pub(crate) fn condensed_workspace_diagnostic_snapshot(
-    mut report: WorkspaceDiagnosticReport,
-) -> String {
-    sort_workspace_diagnostic_response(&mut report);
-    let items = report.items;
-    items
-        .into_iter()
-        .map(|item| match item {
-            WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(
-                doc_report,
-            ) => {
-                let diagnostics = condensed_full_document_diagnostic_report(
-                    doc_report.full_document_diagnostic_report,
-                )
-                .join("\n\t");
-                format!("{}\n\t{diagnostics}", doc_report.uri)
-            }
-            WorkspaceDocumentDiagnosticReport::WorkspaceUnchangedDocumentDiagnosticReport(
-                doc_report,
-            ) => {
-                format!("{}\n\tUNCHANGED", doc_report.uri)
-            }
-        })
-        .collect::<Vec<String>>()
-        .join("\n")
-}
-
-pub(crate) fn condensed_document_diagnostic_snapshot(report: DocumentDiagnosticReport) -> String {
-    match report {
-        DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(full) => {
-            condensed_full_document_diagnostic_report(full.full_document_diagnostic_report)
-                .join("\n")
-        }
-        // NOTE: It might be worth providing more details for these
-        // cases, but I don't think there's currently a use case for
-        // it.
-        DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
-            "UNCHANGED".to_string()
-        }
-    }
-}
-
-fn condensed_full_document_diagnostic_report(report: FullDocumentDiagnosticReport) -> Vec<String> {
-    report
-        .items
-        .into_iter()
-        .map(|d| {
-            let range = format!(
-                "{start_line}:{start_char}..{end_line}:{end_char}",
-                start_line = d.range.start.line,
-                start_char = d.range.start.character,
-                end_line = d.range.end.line,
-                end_char = d.range.end.character,
-            );
-            let severity = match d.severity {
-                Some(DiagnosticSeverity::Error) => "ERROR",
-                Some(DiagnosticSeverity::Warning) => "WARNING",
-                Some(DiagnosticSeverity::Information) => "INFORMATION",
-                Some(DiagnosticSeverity::Hint) => "HINT",
-                Some(DiagnosticSeverity::Custom(_)) | None => "unknown",
-            };
-            let Message::String(message) = d.message else {
-                panic!(
-                    "Only string-type diagnostic messages supported, got: {:?}",
-                    d.message
-                );
-            };
-            format!("{range}[{severity}]: {message}")
-        })
-        .collect()
 }
 
 /// Asks for workspace diagnostics in a way that anticipates "long polling."
@@ -814,4 +1014,15 @@ fn get_expected_empty_workspace_diagnostics_and_shutdown(
     let request_id = send_workspace_diagnostic_request(&mut server);
     assert_workspace_diagnostics_suspends_for_long_polling(&mut server, &request_id);
     shutdown_and_await_workspace_diagnostic(server, &request_id)
+}
+
+#[track_caller]
+fn assert_hover(server: &mut TestServer, path: &SystemPath, position: Position, expected: &str) {
+    let hover = server
+        .hover_request(path, position)
+        .expect("hover response");
+    let Contents::MarkupContent(markup) = hover.contents else {
+        panic!("expected markup");
+    };
+    assert_eq!(markup.value, expected);
 }

@@ -50,7 +50,7 @@ impl Tokens {
     /// | Token               | Range     |
     /// |---------------------|-----------|
     /// | `Def`               | `0..3`    |
-    /// | `Name`              | `4..7`    |
+    /// | `Identifier`        | `4..7`    |
     /// | `Lpar`              | `7..8`    |
     /// | `Rpar`              | `8..9`    |
     /// | `Colon`             | `9..10`   |
@@ -65,7 +65,7 @@ impl Tokens {
     /// token which are 12, 13, and 14.
     ///
     /// Examples:
-    /// 1) `4..10` would give `Name`, `Lpar`, `Rpar`, `Colon`
+    /// 1) `4..10` would give `Identifier`, `Lpar`, `Rpar`, `Colon`
     /// 2) `11..25` would give `Comment`, `NonLogicalNewline`
     /// 3) `12..25` would give same as (2) and offset 12 is in the "gap"
     /// 4) `9..12` would give `Colon`, `Newline` and offset 12 is in the "gap"
@@ -421,7 +421,7 @@ mod tests {
     /// Code: <https://play.ruff.rs/a3658340-6df8-42c5-be80-178744bf1193>
     const TEST_CASE_WITH_GAP: [(TokenKind, Range<u32>); 10] = [
         (TokenKind::Def, 0..3),
-        (TokenKind::Name, 4..7),
+        (TokenKind::Identifier, 4..7),
         (TokenKind::Lpar, 7..8),
         (TokenKind::Rpar, 8..9),
         (TokenKind::Colon, 9..10),
@@ -481,7 +481,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Offset 5 is inside token `Name 4..7`")]
+    #[should_panic(expected = "Offset 5 is inside token `Identifier 4..7`")]
     fn tokens_after_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.after(TextSize::new(5));
@@ -543,7 +543,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Offset 5 is inside token `Name 4..7`")]
+    #[should_panic(expected = "Offset 5 is inside token `Identifier 4..7`")]
     fn tokens_before_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.before(TextSize::new(5));
@@ -554,7 +554,7 @@ mod tests {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         let in_range = tokens.in_range(TextRange::new(4.into(), 10.into()));
         assert_eq!(in_range.len(), 4);
-        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Name);
+        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Identifier);
         assert_eq!(in_range.last().unwrap().kind(), TokenKind::Colon);
     }
 
@@ -595,14 +595,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Offset 5 is inside token `Name 4..7`")]
+    #[should_panic(expected = "Offset 5 is inside token `Identifier 4..7`")]
     fn tokens_in_range_start_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.in_range(TextRange::new(5.into(), 10.into()));
     }
 
     #[test]
-    #[should_panic(expected = "Offset 6 is inside token `Name 4..7`")]
+    #[should_panic(expected = "Offset 6 is inside token `Identifier 4..7`")]
     fn tokens_in_range_end_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.in_range(TextRange::new(0.into(), 6.into()));
@@ -655,7 +655,7 @@ mod tests {
         let tokens = new_tokens(
             [
                 (TokenKind::If, 0..2),
-                (TokenKind::Name, 3..4),
+                (TokenKind::Identifier, 3..4),
                 (TokenKind::Colon, 4..5),
                 (TokenKind::Newline, 5..6),
                 (TokenKind::Indent, 6..7),
@@ -663,7 +663,7 @@ mod tests {
                 (TokenKind::Newline, 11..12),
                 (TokenKind::NonLogicalNewline, 12..13),
                 (TokenKind::Dedent, 13..13),
-                (TokenKind::Name, 13..14),
+                (TokenKind::Identifier, 13..14),
                 (TokenKind::Newline, 14..14),
             ]
             .into_iter(),

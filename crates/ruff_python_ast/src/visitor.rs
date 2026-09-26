@@ -5,7 +5,7 @@ pub mod transformer;
 
 use crate::{
     self as ast, Alias, AnyParameterRef, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension,
-    Decorator, ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringPart,
+    Decorator, ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringPartRef,
     InterpolatedStringElement, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
     PatternArguments, PatternKeyword, Stmt, StringLiteral, TString, TypeParam, TypeParamParamSpec,
     TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams, UnaryOp, WithItem,
@@ -512,18 +512,12 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             range: _,
             node_index: _,
         }) => visitor.visit_expr(value),
-        Expr::Compare(ast::ExprCompare {
-            left,
-            ops,
-            comparators,
-            range: _,
-            node_index: _,
-        }) => {
-            visitor.visit_expr(left);
-            for cmp_op in ops {
+        Expr::Compare(compare) => {
+            visitor.visit_expr(compare.first_operand());
+            for cmp_op in &compare.ops {
                 visitor.visit_cmp_op(cmp_op);
             }
-            for expr in comparators {
+            for expr in compare.comparators() {
                 visitor.visit_expr(expr);
             }
         }
@@ -539,10 +533,10 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         Expr::FString(ast::ExprFString { value, .. }) => {
             for part in value {
                 match part {
-                    FStringPart::Literal(string_literal) => {
+                    FStringPartRef::Literal(string_literal) => {
                         visitor.visit_string_literal(string_literal);
                     }
-                    FStringPart::FString(f_string) => visitor.visit_f_string(f_string),
+                    FStringPartRef::FString(f_string) => visitor.visit_f_string(f_string),
                 }
             }
         }

@@ -489,6 +489,13 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
 Commit each step of this process separately for easier review.
 
+Optionally, run the [Prepare release workflow](https://github.com/astral-sh/ruff/actions/workflows/release-prepare.yml)
+to generate the version updates and changelog and open a pull request. Leave `version` blank to detect
+the next version from pull request labels, or provide an explicit version. The generated changelog
+still needs manual review and editing. Check out the generated branch and continue with the changelog
+review and remaining preparation steps below. To prepare the release locally, start with
+`./scripts/release.sh`.
+
 1. Run `./scripts/release.sh`; this command will:
 
     - Generate a temporary virtual environment with `rooster`

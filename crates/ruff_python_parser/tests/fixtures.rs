@@ -507,6 +507,18 @@ Root: {root:#?}",
 
 impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
+        if let AnyNodeRef::ExprCompare(compare) = node {
+            assert!(
+                !compare.ops.is_empty(),
+                "Comparison without an operator: {compare:#?}"
+            );
+            assert_eq!(
+                compare.operands.len(),
+                compare.ops.len() + 1,
+                "Comparison operands and operators are unbalanced: {compare:#?}",
+            );
+        }
+
         assert!(
             node.end() <= self.source_length,
             "The range of the node exceeds the length of the source code. Node: {node:#?}",

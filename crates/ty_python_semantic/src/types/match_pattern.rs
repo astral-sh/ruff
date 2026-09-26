@@ -46,13 +46,6 @@ pub(crate) fn mapping_pattern_type<'db>(
         .top_materialization(db, env)
 }
 
-pub(crate) fn callable_pattern_type<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-) -> Type<'db> {
-    Type::Callable(CallableType::unknown(db)).top_materialization(db, env)
-}
-
 /// Return whether every runtime value represented by a `TypedDict` satisfies `class`.
 ///
 /// `TypedDict` is not a nominal subtype of `dict` in the static type system, but every runtime
@@ -691,7 +684,7 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
                     if kind.is_empty()
-                        && let callable_pattern_ty = callable_pattern_type(db, env)
+                        && let callable_pattern_ty = Type::Callable(CallableType::top(db))
                         && subject_ty.is_subtype_of(db, env, callable_pattern_ty) =>
                 {
                     return callable_pattern_ty;
@@ -1100,7 +1093,7 @@ fn subject_independent_definite_match_pattern_type<'db>(
                 }
                 Type::ClassLiteral(_) => None,
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
-                    Some(callable_pattern_type(db, env))
+                    Some(Type::Callable(CallableType::top(db)))
                 }
                 _ => Some(Type::Never),
             }
@@ -1160,7 +1153,7 @@ pub(crate) fn definite_match_pattern_type<'db>(
                         .top_materialization(db, env)
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
-                    callable_pattern_type(db, env)
+                    Type::Callable(CallableType::top(db))
                 }
                 _ => Type::Never,
             }

@@ -1,6 +1,11 @@
 name: Run memory report
 
-permissions: {}
+permissions:
+  contents: read
+
+# Third-party builds must not write caches consumed by other jobs.
+# GitHub-hosted runners use GitHub's cache service, which enforces this mode.
+cache-mode: read
 
 on:
   pull_request:
@@ -43,7 +48,7 @@ env:
 jobs:
   memory_report:
     name: Compute memory usage diff
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,20 +58,28 @@ jobs:
 
       # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
       - name: Fetch full history without tags
-        run: git -C ruff fetch --no-tags --filter=blob:none --unshallow origin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          git -C ruff fetch --no-tags --filter=blob:none --unshallow origin
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: "ruff"
+          save-if: false
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.18"
+          checksum: "89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16"
           enable-cache: true
+          save-cache: false
 
       - name: Install Rust toolchain
         run: rustup show

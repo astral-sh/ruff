@@ -173,7 +173,7 @@ impl<'db> LiteralValueType<'db> {
         self.flags().is_promotable()
     }
 
-    pub(crate) fn kind(self) -> LiteralValueTypeKind<'db> {
+    pub(crate) const fn kind(self) -> LiteralValueTypeKind<'db> {
         match self.0 {
             LiteralValueTypeInner::Int(v, _) => LiteralValueTypeKind::Int(v),
             LiteralValueTypeInner::Bool(v, _) => LiteralValueTypeKind::Bool(v),
@@ -208,7 +208,7 @@ impl<'db> LiteralValueType<'db> {
         }
     }
 
-    pub(crate) fn as_bool(self) -> Option<bool> {
+    pub(crate) const fn as_bool(self) -> Option<bool> {
         if let LiteralValueTypeKind::Bool(v) = self.kind() {
             Some(v)
         } else {
