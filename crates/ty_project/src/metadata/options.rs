@@ -864,7 +864,7 @@ pub struct EnvironmentOptions {
     /// to reflect the differing contents of the standard library across Python versions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[option(
-        default = r#""3.14""#,
+        default = r#""3.15""#,
         value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | "3.15""#,
         example = r#"
             python-version = "3.12"

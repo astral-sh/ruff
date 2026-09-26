@@ -1048,54 +1048,6 @@ Whether to enable the Ruff extension. Modifying this setting requires restarting
 }
 ```
 
-### `format.args`
-
-!!! warning "Deprecated"
-
-    This setting is only used by [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) which is
-    deprecated in favor of the native language server. Refer to the [migration
-    guide](migration.md) for more information.
-
-_**This setting is not used by the native language server.**_
-
-Additional arguments to pass to the Ruff formatter.
-
-**Default value**: `[]`
-
-**Type**: `string[]`
-
-**Example usage**:
-
-```json
-{
-    "ruff.format.args": ["--line-length", "100"]
-}
-```
-
-### `ignoreStandardLibrary`
-
-!!! warning "Deprecated"
-
-    This setting is only used by [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) which is
-    deprecated in favor of the native language server. Refer to the [migration
-    guide](migration.md) for more information.
-
-_**This setting is not used by the native language server.**_
-
-Whether to ignore files that are inferred to be part of the Python standard library.
-
-**Default value**: `true`
-
-**Type**: `bool`
-
-**Example usage**:
-
-```json
-{
-    "ruff.ignoreStandardLibrary": false
-}
-```
-
 ### `importStrategy`
 
 Strategy for loading the `ruff` executable.
@@ -1120,11 +1072,8 @@ Strategy for loading the `ruff` executable.
 A list of paths to Python interpreters. Even though this is a list, only the first interpreter is
 used.
 
-This setting depends on the [`ruff.nativeServer`](#nativeserver) setting:
-
-- If using the native server, the interpreter is used to find the `ruff` executable when
-    [`ruff.importStrategy`](#importstrategy) is set to `fromEnvironment`.
-- Otherwise, the interpreter is used to run the `ruff-lsp` server.
+The interpreter is used to find the `ruff` executable when
+[`ruff.importStrategy`](#importstrategy) is set to `fromEnvironment`.
 
 **Default value**: `[]`
 
@@ -1138,72 +1087,14 @@ This setting depends on the [`ruff.nativeServer`](#nativeserver) setting:
 }
 ```
 
-### `lint.args`
-
-!!! warning "Deprecated"
-
-    This setting is only used by [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) which is
-    deprecated in favor of the native language server. Refer to the [migration
-    guide](migration.md) for more information.
-
-_**This setting is not used by the native language server.**_
-
-Additional arguments to pass to the Ruff linter.
-
-**Default value**: `[]`
-
-**Type**: `string[]`
-
-**Example usage**:
-
-```json
-{
-    "ruff.lint.args": ["--config", "/path/to/pyproject.toml"]
-}
-```
-
-### `lint.run`
-
-!!! warning "Deprecated"
-
-    This setting is only used by [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) which is
-    deprecated in favor of the native language server. Refer to the [migration
-    guide](migration.md) for more information.
-
-_**This setting is not used by the native language server.**_
-
-Run Ruff on every keystroke (`onType`) or on save (`onSave`).
-
-**Default value**: `"onType"`
-
-**Type**: `"onType" | "onSave"`
-
-**Example usage**:
-
-```json
-{
-    "ruff.lint.run": "onSave"
-}
-```
-
 ### `nativeServer`
+
+!!! warning "Deprecated"
+
+    This setting is deprecated as of Ruff 0.17. The Ruff extension will always use the native language server.
 
 Whether to use the native language server, [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) or
 automatically decide between the two based on the Ruff version and extension settings.
-
-- `"on"`: Use the native language server. A warning will be displayed if deprecated settings are
-    detected.
-- `"off"`: Use [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp). A warning will be displayed if
-    settings specific to the native server are detected.
-- `"auto"`: Automatically select between the native language server and
-    [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) based on the following conditions:
-    1. If the Ruff version is >= `0.5.3`, use the native language server unless any deprecated
-        settings are detected. In that case, show a warning and use
-        [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) instead.
-    1. If the Ruff version is < `0.5.3`, use [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp). A
-        warning will be displayed if settings specific to the native server are detected.
-- `true`: Same as `on`
-- `false`: Same as `off`
 
 **Default value**: `"auto"`
 
@@ -1233,28 +1124,6 @@ The first executable in the list which is exists is used. This setting takes pre
 ```json
 {
     "ruff.path": ["/home/user/.local/bin/ruff"]
-}
-```
-
-### `showNotifications`
-
-!!! warning "Deprecated"
-
-    This setting is only used by [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) which is
-    deprecated in favor of the native language server. Refer to the [migration
-    guide](migration.md) for more information.
-
-Setting to control when a notification is shown.
-
-**Default value**: `"off"`
-
-**Type**: `"off" | "onError" | "onWarning" | "always"`
-
-**Example usage**:
-
-```json
-{
-    "ruff.showNotifications": "onWarning"
 }
 ```
 

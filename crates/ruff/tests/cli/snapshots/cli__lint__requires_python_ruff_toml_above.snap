@@ -87,7 +87,7 @@ linter.explicit_preview_rules = false
 linter.extension = ExtensionMapping({})
 linter.allowed_confusables = []
 linter.builtins = []
-linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
+linter.dummy_variable_rgx = ^(_+|(_+[\p{XID_Continue}]*[\p{XID_Continue}--_]+?))$
 linter.external = []
 linter.ignore_init_module_imports = true
 linter.logger_objects = []
@@ -137,6 +137,7 @@ linter.flake8_gettext.function_names = [
 linter.flake8_implicit_str_concat.allow_multiline = true
 linter.flake8_import_conventions.aliases = {
 	altair = alt,
+	datetime = dt,
 	holoviews = hv,
 	matplotlib = mpl,
 	matplotlib.pyplot = plt,
@@ -273,7 +274,7 @@ linter.ruff.strictly_empty_init_modules = false
 
 # Formatter Settings
 formatter.exclude = []
-formatter.unresolved_target_version = 3.10
+formatter.unresolved_target_version = 3.11
 formatter.per_file_target_version = {}
 formatter.preview = disabled
 formatter.line_width = 88
@@ -289,7 +290,7 @@ formatter.docstring_code_line_width = dynamic
 # Analyze Settings
 analyze.exclude = []
 analyze.preview = disabled
-analyze.target_version = 3.10
+analyze.target_version = 3.11
 analyze.string_imports = disabled
 analyze.extension = ExtensionMapping({})
 analyze.include_dependencies = {}

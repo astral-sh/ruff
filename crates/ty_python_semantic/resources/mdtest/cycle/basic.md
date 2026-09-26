@@ -548,6 +548,11 @@ class Bar: ...
 
 ## Known class instances with a shadowed typing module
 
+```toml
+[environment]
+python-version = "3.10"
+```
+
 String members retain their types when a local `typing.py` introduces an inference cycle. Resolving
 `str`'s bases looks up `Sequence` in that module. Determining whether the assignment is reachable
 requires inferring `trigger`'s return annotation. Resolving `C.attribute` requires determining `C`'s
@@ -574,6 +579,11 @@ Sequence = object
 ```
 
 ## Known class instances after checking the shadowing module
+
+```toml
+[environment]
+python-version = "3.10"
+```
 
 String members retain their types when the shadowing module is checked first, as they do when the
 consumer is checked first.

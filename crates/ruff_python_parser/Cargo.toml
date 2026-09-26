@@ -16,6 +16,7 @@ license = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["get-size"] }
 ruff_python_trivia = { workspace = true }
 ruff_text_size = { workspace = true, features = ["get-size"] }
+ruff_unicode_names2 = { workspace = true }
 
 bitflags = { workspace = true }
 bstr = { workspace = true }
@@ -29,7 +30,6 @@ stacker = { workspace = true }
 thin-vec = { workspace = true }
 unicode-ident = { workspace = true }
 unicode-normalization = { workspace = true }
-unicode_names2 = { workspace = true }
 
 [dev-dependencies]
 ruff_annotate_snippets = { workspace = true }

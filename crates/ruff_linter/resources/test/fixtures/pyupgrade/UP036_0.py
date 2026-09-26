@@ -210,10 +210,10 @@ if sys.version_info[:2] >= (3,0):
 if sys.version_info[:3] >= (3,0):
     print("py3")
 
-if sys.version_info[:2] > (3,14):
+if sys.version_info[:2] > (3,15):
     print("py3")
 
-if sys.version_info[:3] > (3,14):
+if sys.version_info[:3] > (3,15):
     print("py3")
 
 if sys.version_info > (3,0):

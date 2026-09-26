@@ -139,16 +139,9 @@ linter.rules.enabled = [
 	unnecessary-map (C417),
 	unnecessary-literal-within-dict-call (C418),
 	unnecessary-comprehension-in-call (C419),
-	call-datetime-without-tzinfo (DTZ001),
 	call-datetime-today (DTZ002),
 	call-datetime-utcnow (DTZ003),
 	call-datetime-utcfromtimestamp (DTZ004),
-	call-datetime-now-without-tzinfo (DTZ005),
-	call-datetime-fromtimestamp (DTZ006),
-	call-datetime-strptime-without-zone (DTZ007),
-	call-date-today (DTZ011),
-	call-date-fromtimestamp (DTZ012),
-	datetime-min-max (DTZ901),
 	debugger (T100),
 	shebang-not-executable (EXE001),
 	shebang-missing-executable-file (EXE002),
@@ -271,6 +264,7 @@ linter.rules.enabled = [
 	unused-import (F401),
 	import-shadowed-by-loop-var (F402),
 	late-future-import (F404),
+	undefined-local-with-nested-import-star-usage (F406),
 	future-feature-not-defined (F407),
 	percent-format-invalid-format (F501),
 	percent-format-expected-mapping (F502),
@@ -554,16 +548,9 @@ linter.rules.should_fix = [
 	unnecessary-map (C417),
 	unnecessary-literal-within-dict-call (C418),
 	unnecessary-comprehension-in-call (C419),
-	call-datetime-without-tzinfo (DTZ001),
 	call-datetime-today (DTZ002),
 	call-datetime-utcnow (DTZ003),
 	call-datetime-utcfromtimestamp (DTZ004),
-	call-datetime-now-without-tzinfo (DTZ005),
-	call-datetime-fromtimestamp (DTZ006),
-	call-datetime-strptime-without-zone (DTZ007),
-	call-date-today (DTZ011),
-	call-date-fromtimestamp (DTZ012),
-	datetime-min-max (DTZ901),
 	debugger (T100),
 	shebang-not-executable (EXE001),
 	shebang-missing-executable-file (EXE002),
@@ -686,6 +673,7 @@ linter.rules.should_fix = [
 	unused-import (F401),
 	import-shadowed-by-loop-var (F402),
 	late-future-import (F404),
+	undefined-local-with-nested-import-star-usage (F406),
 	future-feature-not-defined (F407),
 	percent-format-invalid-format (F501),
 	percent-format-expected-mapping (F502),
@@ -908,7 +896,7 @@ linter.explicit_preview_rules = false
 linter.extension = ExtensionMapping({})
 linter.allowed_confusables = []
 linter.builtins = []
-linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
+linter.dummy_variable_rgx = ^(_+|(_+[\p{XID_Continue}]*[\p{XID_Continue}--_]+?))$
 linter.external = []
 linter.ignore_init_module_imports = true
 linter.logger_objects = []
@@ -958,6 +946,7 @@ linter.flake8_gettext.function_names = [
 linter.flake8_implicit_str_concat.allow_multiline = true
 linter.flake8_import_conventions.aliases = {
 	altair = alt,
+	datetime = dt,
 	holoviews = hv,
 	matplotlib = mpl,
 	matplotlib.pyplot = plt,
