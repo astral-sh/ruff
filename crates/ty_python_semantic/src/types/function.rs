@@ -1773,8 +1773,7 @@ impl<'db> FunctionType<'db> {
             || None,
             || {
                 let mut literal = self.literal(db);
-                // A field specifier can refer to a decorator produced by this function, so the
-                // transform metadata can contain the same recursive types as its signature.
+                // A field specifier may refer back to this function or its result.
                 if let Some(params) = literal.last_definition.dataclass_transformer_params(db) {
                     let params = params.recursive_type_normalized_impl(db, env, div, nested)?;
                     literal.last_definition = literal
