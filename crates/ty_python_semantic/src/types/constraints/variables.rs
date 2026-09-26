@@ -11,7 +11,7 @@ use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, ConstraintSetBuilder, ConstraintSetStorage, Node, NodeId,
     SourceOrderId, max_constructor_and_typevar_depth, wobble_index,
 };
-use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain, TypeVarSet};
+use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain};
 use crate::types::{ApplyTypeMappingVisitor, Type, TypeContext, TypeMapping};
 use crate::{Db, ProgramEnvironment};
 
@@ -479,24 +479,6 @@ impl<'db> Constraint<'db> {
                 max_constructor_and_typevar_depth(db, env, this.bound)
             }
             Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => (0, 0),
-        }
-    }
-
-    pub(super) fn directly_constrains_inferable_typevar(
-        self,
-        db: &'db dyn Db,
-        inferable: TypeVarSet<'db>,
-    ) -> bool {
-        match self {
-            Constraint::ConcreteLower(this) => this.typevar.is_inferable(db, inferable),
-            Constraint::ConcreteUpper(this) => this.typevar.is_inferable(db, inferable),
-            Constraint::ConcreteEquivalence(this) => this.typevar.is_inferable(db, inferable),
-            Constraint::TypeVarRange(this) => {
-                this.left.is_inferable(db, inferable) || this.right.is_inferable(db, inferable)
-            }
-            Constraint::TypeVarEquivalence(this) => {
-                this.left.is_inferable(db, inferable) || this.right.is_inferable(db, inferable)
-            }
         }
     }
 
