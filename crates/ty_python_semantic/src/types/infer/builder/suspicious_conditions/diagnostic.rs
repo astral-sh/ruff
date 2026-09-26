@@ -36,9 +36,10 @@ use crate::{
     reachability::is_range_reachable,
     types::{
         KnownClass, KnownUnion, LintDiagnosticGuard, LintDiagnosticGuardBuilder,
-        MemberLookupPolicy, Type, TypeContext, UnionType,
+        MemberLookupPolicy, Type, UnionType,
         call::bind::CallableDescription,
         context::InferContext,
+        definition_expression_type_in_scope,
         diagnostic::typing_module_for_fix,
         enum_metadata,
         function::KnownFunction,
@@ -48,7 +49,6 @@ use crate::{
                 SuiteExitKind, is_trivial_statement, suite_ends_with_exit,
             },
         },
-        infer_definition_types, infer_scope_types,
         narrow::{NarrowingConstraint, infer_narrowing_constraints},
         signatures::CallableSignature,
         tuple::{Tuple, TupleLength},
@@ -943,18 +943,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         expression: &ast::Expr,
     ) -> Option<Type<'db>> {
         let db = self.db();
-        match definition.kind(db) {
-            DefinitionKind::AnnotatedAssignment(_) => {
-                infer_definition_types(db, definition).try_expression_type(expression)
-            }
-            DefinitionKind::Parameter(_) => {
-                let scope = definition.scope(db).scope(db).parent()?;
-                let scope_id = scope.to_scope_id(db, definition.program_file(db));
-                infer_scope_types(db, scope_id, TypeContext::default())
-                    .try_expression_type(expression)
-            }
-            _ => None,
-        }
+        let file = definition.program_file(db);
+        let index = semantic_index(db, file);
+        let scope = index.try_expression_scope_id(expression).or_else(|| {
+            let module = parsed_module(db, definition.python_file(db)).load(db);
+            index.annotation_parent_scope_id(&module, expression)
+        })?;
+        Some(definition_expression_type_in_scope(
+            db,
+            definition,
+            expression,
+            scope.to_scope_id(db, file),
+        ))
     }
 
     /// Locate the iterable name and its element annotation so a fix can change only the name.
@@ -1105,8 +1105,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         })
     }
 
-    /// Return a [`TextRange`] spanning from `branch_start` up to and including
-    /// the offset of the first newline character after the start of `first_statement`.
+    /// Return a [`TextRange`] spanning from `branch_start` up to
+    /// the offset of the first newline character after the start of
+    /// `first_statement`. The newline itself is excluded from this range.
     ///
     /// For example, given this code:
     ///
@@ -1515,7 +1516,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         candidates.into_iter().flatten().find_map(|candidate| {
             let name = candidate.as_name_expr()?;
             let ty = self.expression_type(candidate);
-            if ty.is_never() || !self.type_before_if_chain(name)?.is_union() {
+            if ty.is_never()
+                || !self
+                    .type_before_if_chain(name)?
+                    .expand_top_level_aliases(db, env)
+                    .is_union()
+            {
                 return None;
             }
             let place = places.symbol_id(&name.id)?;

@@ -396,7 +396,7 @@ pub(crate) fn inferred_declaration<'db>(
 /// Supports expressions that are evaluated within a type-params sub-scope.
 ///
 /// ## Panics
-/// If the given expression is not a sub-expression of the given [`Definition`].
+/// If the expression is absent from the semantic index for the definition's file.
 fn definition_expression_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -406,6 +406,20 @@ fn definition_expression_type<'db>(
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
+    definition_expression_type_in_scope(db, definition, expression, scope)
+}
+
+/// Infer a definition's expression using an explicitly supplied evaluation scope.
+///
+/// [`definition_expression_type`] can look up the scope of a string literal used as an annotation,
+/// but not the scope of nodes parsed from its contents: those nodes are absent from the semantic
+/// index. This helper lets the caller supply the enclosing annotation's scope for such nodes.
+fn definition_expression_type_in_scope<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    expression: &ast::Expr,
+    scope: ScopeId<'db>,
+) -> Type<'db> {
     if scope == definition.scope(db) {
         // expression is in the definition scope
         let inference = infer_definition_types(db, definition);
@@ -421,7 +435,8 @@ fn definition_expression_type<'db>(
             Type::unknown()
         }
     } else {
-        // expression is in a type-params sub-scope
+        // The expression is evaluated in another scope, such as a type-parameter scope
+        // or the scope containing a function's parameter annotations.
         infer_complete_scope_types(db, scope).expression_type(expression)
     }
 }
@@ -2887,6 +2902,16 @@ impl<'db> Type<'db> {
                 }
                 _ => return ty,
             }
+        }
+    }
+
+    /// Resolve outermost aliases and expand aliases that expose top-level union elements.
+    ///
+    /// Aliases nested inside non-union types remain unexpanded.
+    fn expand_top_level_aliases(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+        match self.resolve_type_alias(db) {
+            Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
+            ty => ty,
         }
     }
 
@@ -5667,10 +5692,7 @@ impl<'db> Type<'db> {
         if member.is_class_var() {
             return false;
         }
-        let ty = match ty.resolve_type_alias(db) {
-            Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
-            ty => ty,
-        };
+        let ty = ty.expand_top_level_aliases(db, env);
         let alternatives = match &ty {
             Type::Union(union) => union.elements(db),
             _ => std::slice::from_ref(&ty),
