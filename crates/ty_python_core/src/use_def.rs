@@ -2257,9 +2257,26 @@ impl<'db> UseDefMapBuilder<'db> {
             declarations: Some(place_state.declarations().clone()),
         };
 
+        // An implicit binding fills only paths with no prior binding. In particular, loop
+        // headers can coexist with UNBOUND and must remain visible on subsequent iterations.
+        let reachability = if matches!(
+            previous_definitions,
+            PreviousDefinitions::OnlyUnboundAreShadowed
+        ) {
+            place_state
+                .bindings()
+                .iter()
+                .find(|binding| binding.binding().is_unbound())
+                .map_or(ScopedReachabilityConstraintId::ALWAYS_FALSE, |binding| {
+                    binding.reachability_constraint()
+                })
+        } else {
+            self.reachability
+        };
+
         place_state.record_binding(
             def_id,
-            self.reachability,
+            reachability,
             self.is_class_scope,
             place.is_symbol(),
             previous_definitions,
@@ -2267,7 +2284,7 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         match imported_qualifier_action {
             ImportedQualifierAction::Record => {
-                place_state.record_imported_qualifier(def_id, self.reachability);
+                place_state.record_imported_qualifier(def_id, reachability);
             }
             ImportedQualifierAction::Clear => place_state.clear_imported_qualifiers(),
             ImportedQualifierAction::Preserve => {}
@@ -2282,7 +2299,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
         definitions.bindings.record_binding(
             def_id,
-            self.reachability,
+            reachability,
             self.is_class_scope,
             place.is_symbol(),
             PreviousDefinitions::AreKept,
@@ -2292,7 +2309,7 @@ impl<'db> UseDefMapBuilder<'db> {
         if let ImportedQualifierAction::Record = imported_qualifier_action {
             definitions.declarations.record_imported_qualifier(
                 def_id,
-                self.reachability,
+                reachability,
                 PreviousDefinitions::AreKept,
             );
         }
@@ -2758,6 +2775,49 @@ impl<'db> UseDefMapBuilder<'db> {
             place.is_symbol(),
             PreviousDefinitions::AreShadowed,
             FutureDefinitions::ShadowThisOne,
+        );
+    }
+
+    /// Invalidate a member only on paths where an implicit binding changes its receiver.
+    pub(super) fn delete_binding_conditionally(
+        &mut self,
+        place: ScopedPlaceId,
+        condition: ScopedReachabilityConstraintId,
+    ) {
+        if condition == ScopedReachabilityConstraintId::ALWAYS_FALSE {
+            return;
+        }
+        if condition == ScopedReachabilityConstraintId::ALWAYS_TRUE {
+            self.delete_binding(place);
+            return;
+        }
+
+        let def_id = self.push_definition(DefinitionEntry::Deleted);
+        let pending = self.pending_reachability.current;
+        let place_state =
+            pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
+        let place_state = self.pending_reachability.materialize(
+            place_state,
+            pending,
+            &mut self.narrowing_constraints,
+            &mut self.reachability_constraints,
+        );
+        let mut previous = place_state.clone();
+        place_state.record_binding(
+            def_id,
+            self.reachability,
+            self.is_class_scope,
+            place.is_symbol(),
+            PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
+        );
+        place_state.record_reachability_constraint(&mut self.reachability_constraints, condition);
+        let preserved = self.reachability_constraints.add_not_constraint(condition);
+        previous.record_reachability_constraint(&mut self.reachability_constraints, preserved);
+        place_state.merge(
+            previous,
+            &mut self.narrowing_constraints,
+            &mut self.reachability_constraints,
         );
     }
 
