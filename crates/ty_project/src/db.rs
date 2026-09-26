@@ -740,7 +740,6 @@ pub(crate) mod testing {
     use ruff_python_ast::PythonVersion;
     use ty_module_resolver::SearchPathSettings;
     use ty_python_core::ProgramFile;
-    use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, ProgramSettings};
     #[cfg(feature = "testing")]
     use ty_python_semantic::ProgramEnvironment;
@@ -803,11 +802,8 @@ pub(crate) mod testing {
 
             db.files().try_add_root(&db, &root, FileRootKind::Project);
 
-            let program_settings = ProgramSettings {
-                python_version: PythonVersionWithSource::default(),
-                python_platform: PythonPlatform::default(),
-                search_paths,
-            };
+            let mut program_settings = ProgramSettings::empty(db.vendored());
+            program_settings.search_paths = search_paths;
             let project = Project::from_metadata(
                 &db,
                 project,
@@ -821,16 +817,13 @@ pub(crate) mod testing {
 
         #[cfg(feature = "testing")]
         pub fn set_python_version(&mut self, python_version: PythonVersion) {
-            let program = self.project().program(self);
-            let settings = ProgramSettings {
-                python_version: PythonVersionWithSource {
-                    source: ty_python_semantic::PythonVersionSource::Default,
-                    version: python_version,
-                },
-                python_platform: program.python_platform(self).clone(),
-                search_paths: program.search_paths(self).clone(),
+            let project = self.project();
+            let mut settings = project.program_settings(self).clone();
+            settings.python_version = PythonVersionWithSource {
+                source: ty_python_semantic::PythonVersionSource::Default,
+                version: python_version,
             };
-            self.project().update_program(self, settings);
+            project.update_program(self, settings);
         }
     }
 

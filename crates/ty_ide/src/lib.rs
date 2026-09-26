@@ -419,9 +419,7 @@ mod tests {
     use ty_module_resolver::SearchPathSettings;
     use ty_project::{Db as _, ProjectMetadata, SemanticDb as _};
     use ty_python_core::ProgramFile;
-    use ty_python_core::platform::PythonPlatform;
-    use ty_python_core::program::{FallibleStrategy, ProgramSettings};
-    use ty_python_semantic::PythonVersionWithSource;
+    use ty_python_core::program::FallibleStrategy;
 
     /// A way to create a simple single-file (named `main.py`) cursor test.
     ///
@@ -674,14 +672,10 @@ mod tests {
             .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
             .expect("valid search paths");
 
-            db.project().update_program(
-                &mut db,
-                ProgramSettings {
-                    python_version: PythonVersionWithSource::default(),
-                    python_platform: PythonPlatform::default(),
-                    search_paths,
-                },
-            );
+            let project = db.project();
+            let mut settings = project.program_settings(&db).clone();
+            settings.search_paths = search_paths;
+            project.update_program(&mut db, settings);
 
             db.files()
                 .try_add_root(&db, &project_root, FileRootKind::Project);
