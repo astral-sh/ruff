@@ -639,23 +639,21 @@ fn full_module_name(prefix: Option<&ModuleName>, component_name: &str) -> Option
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::Db as _;
-    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_db::system::SystemPath;
 
     use crate::db::tests::TestDb;
     use crate::resolve::ModuleResolveMode;
-    use crate::settings::SearchPathSettings;
-    use crate::strategy::FallibleStrategy;
     use crate::testing::TestCaseBuilder;
 
     use super::{ModuleSearchCursor, ResolverContext};
 
     #[test]
     fn module_search_can_be_reused_across_sibling_module_resolutions() {
-        let db = search_db(
-            &["/src/acme/reports.py", "/site-packages/acme/tools.py"],
-            &[],
-        );
+        let db = TestCaseBuilder::new()
+            .with_src_files(&[("acme/reports.py", "")])
+            .with_site_packages_files(&[("acme/tools.py", "")])
+            .build()
+            .db;
         for mode in [ModuleResolveMode::Typing, ModuleResolveMode::Runtime] {
             let context = ResolverContext::new(&db, db.resolver_environment(), mode);
             let root = ModuleSearchCursor::with_configured_search_paths(&context);
@@ -672,15 +670,15 @@ mod tests {
 
     #[test]
     fn sibling_modules_can_be_resolved_correctly_in_any_order() {
-        let db = search_db(
-            &[
-                "/extra/acme/patched.pyi",
-                "/src/acme/__init__.py",
-                "/src/acme/patched.py",
-                "/src/acme/runtime.py",
-            ],
-            &["/extra"],
-        );
+        let db = TestCaseBuilder::new()
+            .with_src_files(&[
+                ("acme/__init__.py", ""),
+                ("acme/patched.py", ""),
+                ("acme/runtime.py", ""),
+            ])
+            .with_extra_path("/extra", &[("acme/patched.pyi", "")])
+            .build()
+            .db;
         for children in [["patched", "runtime"], ["runtime", "patched"]] {
             let context =
                 ResolverContext::new(&db, db.resolver_environment(), ModuleResolveMode::Typing);
@@ -699,17 +697,17 @@ mod tests {
 
     #[test]
     fn module_resolution_does_not_affect_nested_package_searches() {
-        let db = search_db(
-            &[
-                "/extra/acme/tools/patched.pyi",
-                "/src/acme/__init__.py",
-                "/src/acme/runtime.py",
-                "/src/acme/tools/__init__.py",
-                "/src/acme/tools/patched.py",
-                "/src/acme/tools/runtime.py",
-            ],
-            &["/extra"],
-        );
+        let db = TestCaseBuilder::new()
+            .with_src_files(&[
+                ("acme/__init__.py", ""),
+                ("acme/runtime.py", ""),
+                ("acme/tools/__init__.py", ""),
+                ("acme/tools/patched.py", ""),
+                ("acme/tools/runtime.py", ""),
+            ])
+            .with_extra_path("/extra", &[("acme/tools/patched.pyi", "")])
+            .build()
+            .db;
         let context =
             ResolverContext::new(&db, db.resolver_environment(), ModuleResolveMode::Typing);
         let acme = ModuleSearchCursor::with_configured_search_paths(&context)
@@ -726,29 +724,6 @@ mod tests {
             assert_resolves_to(&db, tools, "patched", "/extra/acme/tools/patched.pyi");
             assert_resolves_to(&db, tools, "runtime", "/src/acme/tools/runtime.py");
         }
-    }
-
-    fn search_db(paths: &[&str], extra_paths: &[&str]) -> TestDb {
-        let mut db = TestCaseBuilder::new().build().db;
-        db.write_files(paths.iter().map(|path| (*path, "")))
-            .expect("write search fixtures");
-        let settings = SearchPathSettings {
-            src_roots: vec![SystemPathBuf::from("/src")],
-            site_packages_paths: vec![SystemPathBuf::from("/site-packages")],
-            custom_typeshed: Some(SystemPathBuf::from("/typeshed")),
-            extra_paths: extra_paths
-                .iter()
-                .copied()
-                .map(SystemPathBuf::from)
-                .collect(),
-            ..SearchPathSettings::empty()
-        };
-        db.set_search_paths(
-            settings
-                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                .expect("configure search fixtures"),
-        );
-        db
     }
 
     fn assert_resolves_to(

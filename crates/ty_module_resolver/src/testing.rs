@@ -110,6 +110,7 @@ pub(crate) struct TestCaseBuilder<T> {
     python_version: PythonVersion,
     first_party_files: Vec<FileSpec>,
     site_packages_files: Vec<FileSpec>,
+    extra_paths: Vec<(SystemPathBuf, Vec<FileSpec>)>,
     // Additional file roots (beyond site_packages, src and stdlib)
     // that should be registered with the `Db` abstraction.
     roots: Vec<SystemPathBuf>,
@@ -122,6 +123,7 @@ impl<T> TestCaseBuilder<T> {
             python_version: self.python_version,
             first_party_files: self.first_party_files,
             site_packages_files: self.site_packages_files,
+            extra_paths: self.extra_paths,
             roots: self.roots,
         }
     }
@@ -135,6 +137,17 @@ impl<T> TestCaseBuilder<T> {
     /// Specify files to be created in the `site-packages` mock directory
     pub(crate) fn with_site_packages_files(mut self, files: &[FileSpec]) -> Self {
         self.site_packages_files.extend(files.iter().copied());
+        self
+    }
+
+    /// Configure an extra module-search path and create files relative to that directory.
+    pub(crate) fn with_extra_path(
+        mut self,
+        path: impl AsRef<SystemPath>,
+        files: &[FileSpec],
+    ) -> Self {
+        self.extra_paths
+            .push((path.as_ref().to_path_buf(), files.to_vec()));
         self
     }
 
@@ -175,6 +188,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
             python_version: PythonVersion::default(),
             first_party_files: vec![],
             site_packages_files: vec![],
+            extra_paths: vec![],
             roots: vec![],
         }
     }
@@ -218,6 +232,7 @@ impl TestCaseBuilder<MockedTypeshed> {
             python_version,
             first_party_files,
             site_packages_files,
+            extra_paths,
             roots,
         } = self;
 
@@ -228,11 +243,16 @@ impl TestCaseBuilder<MockedTypeshed> {
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
         let typeshed = Self::build_typeshed_mock(&mut db, &typeshed_option);
         let stdlib = typeshed.join("stdlib");
+        let extra_paths = extra_paths
+            .into_iter()
+            .map(|(path, files)| Self::write_mock_directory(&mut db, path, files))
+            .collect();
 
         let search_paths = SearchPathSettings {
             src_roots: vec![src.clone()],
             custom_typeshed: Some(typeshed),
             site_packages_paths: vec![site_packages.clone()],
+            extra_paths,
             ..SearchPathSettings::empty()
         }
         .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
@@ -287,6 +307,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
             python_version,
             first_party_files,
             site_packages_files,
+            extra_paths,
             roots,
         } = self;
 
@@ -296,9 +317,14 @@ impl TestCaseBuilder<VendoredTypeshed> {
             Self::write_mock_directory(&mut db, "/site-packages", site_packages_files);
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
 
+        let extra_paths = extra_paths
+            .into_iter()
+            .map(|(path, files)| Self::write_mock_directory(&mut db, path, files))
+            .collect();
         let search_paths = SearchPathSettings {
             src_roots: vec![src.clone()],
             site_packages_paths: vec![site_packages.clone()],
+            extra_paths,
             ..SearchPathSettings::empty()
         }
         .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
