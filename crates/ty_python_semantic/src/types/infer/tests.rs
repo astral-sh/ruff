@@ -529,6 +529,70 @@ fn simple_assignment_does_not_enter_salsa_cycle() {
     assert_eq!(cycles, Vec::<String>::new());
 }
 
+/// Mutually dependent loop conditions must not select different fixed points depending on which
+/// imported variable is inferred first. Both inputs are `Never`, so neither conditional assignment
+/// can execute. Regression test for <https://github.com/astral-sh/ty/issues/4577>.
+#[test]
+fn loop_variable_types_are_independent_of_file_order() -> anyhow::Result<()> {
+    for (x_condition, y_condition) in [
+        ("x", "y"),
+        ("bool(x)", "bool(y)"),
+        ("bool(x or False)", "bool(y or False)"),
+        ("bool(bool(x) or False)", "bool(bool(y) or False)"),
+        ("x not in (False,)", "y not in (False,)"),
+    ] {
+        for order in [["x", "y"], ["y", "x"]] {
+            let mut db = TestDbBuilder::new()
+                .with_python_version(PythonVersion::PY313)
+                .build()?;
+            db.write_dedented(
+                "src/initial.pyi",
+                r#"
+                from typing import Never
+
+                a: Never
+                b: Never
+                stop: bool
+                "#,
+            )?;
+            db.write_dedented(
+                "src/loop.py",
+                &format!(
+                    r#"
+                    from initial import a, b, stop
+
+                    while True:
+                        x = a
+                        y = b
+                        if {y_condition}:
+                            pass
+                        else:
+                            a = "large"
+                        if {x_condition}:
+                            pass
+                        else:
+                            b = True
+                        if stop:
+                            break
+                    "#
+                ),
+            )?;
+            for name in ["x", "y"] {
+                db.write_file(
+                    format!("src/check_{name}.py"),
+                    format!(
+                        "from typing import reveal_type\nfrom loop import {name}\nreveal_type({name})\n"
+                    ),
+                )?;
+            }
+            for name in order {
+                assert_revealed_type(&db, &format!("src/check_{name}.py"), "Never");
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Comparison truthiness widens consistently in expression, statement, and definition inference
 /// when an override is present in only one iteration.
 ///

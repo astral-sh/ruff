@@ -47,9 +47,7 @@ use crate::place_load::{
     ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoadFailure, PlaceLoadMode,
     PlaceLoadResolutionStep, PlaceLoadSource, PlaceLoadSourceKind, resolve_place_load,
 };
-use crate::reachability::{
-    ReachabilityEvaluationCache, analyze_condition_expression, evaluate_reachability_with_cache,
-};
+use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
 use crate::types::abstract_methods::AbstractMethods;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
@@ -103,8 +101,8 @@ use crate::types::infer::builder::binary_expressions::BinaryInferenceState;
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{
-    StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeAndRange,
-    TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
+    StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TruthinessAnalyzer,
+    TypeAndRange, TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
     nearest_enclosing_function, original_class_type,
 };
 use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
@@ -146,7 +144,7 @@ use ty_python_core::definition::{
     LoopHeaderDefinitionKind, NestedBindingExecution, NestedBindingsDefinitionKind,
     ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
 };
-use ty_python_core::expression::{Expression, ExpressionKind};
+use ty_python_core::expression::{Expression, ExpressionContext, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::node_key::NodeKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
@@ -8622,6 +8620,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         add.insert(self, ty)
     }
 
+    /// Evaluate an already-inferred expression, preserving the absence of a result.
+    fn expression_truthiness(
+        &self,
+        expression: &ast::Expr,
+        context: ExpressionContext,
+    ) -> Option<Truthiness> {
+        TruthinessAnalyzer::new(
+            self.db(),
+            self.program_environment(),
+            |node| self.expression_type(node),
+            |node| self.comparison_truthiness.get(&node.into()).copied(),
+        )
+        .truthiness(expression, context)
+    }
+
     fn infer_if_expression(
         &mut self,
         if_expression: &ast::ExprIf,
@@ -8660,13 +8673,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let test_truthiness = match test_ty.try_bool(db, env) {
-            Ok(_) => analyze_condition_expression(test, &|node| {
-                self.comparison_truthiness
-                    .get(&node.into())
-                    .copied()
-                    .or_else(|| self.expression_type(node).bool_if_inhabited(db, env))
-            })
-            .unwrap_or(Truthiness::Ambiguous),
+            Ok(_) => self
+                .expression_truthiness(test, ExpressionContext::Condition)
+                .unwrap_or(Truthiness::Ambiguous),
             Err(err) => {
                 err.report_diagnostic(&self.context, &**test);
                 err.fallback_truthiness()
@@ -11405,7 +11414,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     err.fallback_truthiness()
                 });
 
-                self.check_negation_redundancy(unary, ty, original_truthiness);
+                self.check_negation_redundancy(unary);
 
                 Type::from_truthiness(db, env, original_truthiness.negate())
             }

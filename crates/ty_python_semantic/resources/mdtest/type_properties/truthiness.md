@@ -280,3 +280,14 @@ def _(a: AllKeysNotRequired) -> None:
     # This should be `bool`. `Literal[True]` would be wrong as `{}` is a valid value.
     reveal_type(bool(a))  # revealed: bool
 ```
+
+## Uninhabited values
+
+Calling `bool` with an argument of type `Never` retains the constructor's return type.
+
+```py
+from typing_extensions import Never
+
+def uninhabited(value: Never):
+    reveal_type(bool(value))  # revealed: bool
+```
