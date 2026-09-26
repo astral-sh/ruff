@@ -425,9 +425,29 @@ struct PatternSuccessAnalyzer<'db, 'pattern> {
     db: &'db dyn Db,
     env: ProgramEnvironment<'db>,
     scope: ScopeId<'db>,
-    // Different union arms can pass the same type to the same nested pattern. Reuse its complete
-    // result within this analysis so repeated work does not multiply at each pattern level.
+    /// Caches structural-pattern analysis results, including subject and binding types.
+    ///
+    /// ```python
+    /// def f(value: tuple[tuple[int | str], int] | tuple[tuple[int | str], str]) -> None:
+    ///     match value:
+    ///         case [[item], _]:
+    ///             reveal_type(item)  # int | str
+    /// ```
+    ///
+    /// Both union arms reach `[item]` with the same `tuple[int | str]` type, so its result,
+    /// including the type of `item`, can be reused instead of analyzing it twice.
     successful_patterns: FxHashMap<PatternCacheKey<'pattern, 'db>, PatternSuccessResult<'db>>,
+
+    /// Caches the subject type established by a structural pattern, without storing bindings.
+    ///
+    /// ```python
+    /// def f(value: int | str) -> None:
+    ///     match value:
+    ///         case int():
+    ///             reveal_type(value)  # int
+    /// ```
+    ///
+    /// For `int()` and an incoming subject type of `int | str`, the matched subject type is `int`.
     matched_subjects: FxHashMap<PatternCacheKey<'pattern, 'db>, Type<'db>>,
 }
 
