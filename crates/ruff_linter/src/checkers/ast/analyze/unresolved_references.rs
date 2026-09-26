@@ -23,7 +23,7 @@ pub(crate) fn unresolved_references(checker: &Checker) {
         } else {
             // F821
             if checker.is_rule_enabled(Rule::UndefinedName) {
-                if checker.semantic.in_no_type_check() {
+                if reference.in_no_type_check() {
                     continue;
                 }
 
