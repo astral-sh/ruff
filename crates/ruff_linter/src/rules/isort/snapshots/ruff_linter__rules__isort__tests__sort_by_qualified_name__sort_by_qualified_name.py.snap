@@ -1,0 +1,51 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+assertion_line: 1465
+---
+I001 [*] Import block is un-sorted or un-formatted
+  --> sort_by_qualified_name.py:1:1
+   |
+ 1 | / from collections import OrderedDict
+ 2 | | from collections.abc import Mapping
+ 3 | | from collections import Counter
+ 4 | | from collections.abc import Sequence
+ 5 | |
+ 6 | | import collections.abc
+ 7 | | import collections
+ 8 | |
+ 9 | | # Relative imports
+10 | | from . import foo
+11 | | from .bar import baz
+12 | | from .. import parent
+13 | |
+14 | | # Star imports
+15 | | from xml import *
+16 | | from xml.etree import ElementTree
+   | |_________________________________^
+   |
+help: Organize imports
+   - from collections import OrderedDict
+   - from collections.abc import Mapping
+   - from collections import Counter
+   - from collections.abc import Sequence
+1  + import collections
+2  + import collections.abc
+3  + from collections.abc import Mapping, Sequence
+4  + from collections import Counter, OrderedDict
+5  + 
+6  + # Star imports
+7  + from xml import *
+8  + from xml.etree import ElementTree
+9  | 
+   - import collections.abc
+   - import collections
+10 + from .. import parent
+11 | 
+12 | # Relative imports
+13 | from . import foo
+14 | from .bar import baz
+   - from .. import parent
+   - 
+   - # Star imports
+   - from xml import *
+   - from xml.etree import ElementTree
