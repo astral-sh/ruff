@@ -3736,8 +3736,8 @@ impl<'db> Type<'db> {
         if nested && (self.same_divergent_marker(div) || self.is_pending_narrowing()) {
             return None;
         }
-        // These types stay opaque, but pending values in their stored arguments, bounds, or
-        // fields still invalidate the enclosing constructor's approximation.
+        // Opaque types and definition-backed TypedDicts can contain pending values that still
+        // invalidate the enclosing constructor's approximation.
         if nested
             && matches!(
                 self,
@@ -3814,10 +3814,9 @@ impl<'db> Type<'db> {
                 .map(|ty| TypeFormType::from_type_expression(db, ty)),
             Type::Divergent(_) => Some(self),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
-            Type::TypedDict(_) => {
-                // TODO: Normalize TypedDicts
-                Some(self)
-            }
+            Type::TypedDict(typed_dict) => typed_dict
+                .recursive_type_normalized_impl(db, env, div, nested)
+                .map(Type::TypedDict),
             Type::TypeAlias(_) => Some(self),
             Type::NewTypeInstance(newtype) => newtype
                 .recursive_type_normalized_impl(db, env, div, nested)

@@ -230,6 +230,32 @@ impl<'db> TypedDictType<'db> {
         Self::Class(defining_class)
     }
 
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::Class(class) => Some(Self::Class(
+                class.recursive_type_normalized_impl(db, env, div, nested)?,
+            )),
+            Self::Synthesized(typed_dict) => {
+                Some(Self::Synthesized(SynthesizedTypedDictType::new(
+                    db,
+                    typed_dict
+                        .items(db)
+                        .recursive_type_normalized_impl(db, env, div, nested)?,
+                    typed_dict.kind(db),
+                    typed_dict
+                        .openness(db)
+                        .recursive_type_normalized_impl(db, env, div, nested)?,
+                )))
+            }
+        }
+    }
+
     pub(crate) fn defining_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(defining_class) => Some(defining_class),
