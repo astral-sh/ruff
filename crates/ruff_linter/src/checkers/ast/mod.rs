@@ -35,6 +35,7 @@ use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::stmt_if::if_elif_branches;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
@@ -69,6 +70,7 @@ use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::preview::{
+    is_implicit_relative_submodule_import_enabled,
     is_incorrect_dict_iterator_comprehension_enabled, is_undefined_export_in_dunder_init_enabled,
 };
 use crate::registry::Rule;
@@ -203,6 +205,9 @@ pub(crate) struct Checker<'a> {
     path: &'a Path,
     /// Whether `path` points to an `__init__.py` file.
     in_init_module: OnceCell<bool>,
+    /// Eager relative submodules seen while visiting module and class bodies in `__init__.py`.
+    /// Importing a cached submodule does not restore a deleted package attribute.
+    relative_submodule_imports: FxHashSet<&'a str>,
     /// The [`Path`] to the package containing the current file.
     package: Option<PackageRoot<'a>>,
     /// The module representation of the current file (e.g., `foo.bar`).
@@ -287,6 +292,7 @@ impl<'a> Checker<'a> {
             noqa,
             path,
             in_init_module: OnceCell::new(),
+            relative_submodule_imports: FxHashSet::default(),
             package,
             module,
             source_type,
@@ -1139,36 +1145,50 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
 
-                if self.in_init_module() && level == 1 {
+                if is_implicit_relative_submodule_import_enabled(self.settings())
+                    && self.in_init_module()
+                    && level == 1
+                    && !is_lazy
+                    && !self
+                        .semantic
+                        .scopes
+                        .ancestors(self.semantic.scope_id)
+                        .any(|scope| scope.kind.is_function())
+                {
                     if let Some(module_identifier) = module_identifier {
                         let submodule = module_identifier.as_str().split('.').next().unwrap();
-                        let qualified_name = collect_import_from_member(level, None, submodule);
-                        let already_bound =
-                            self.semantic.current_scope().get(submodule).is_some_and(
-                                |binding_id| {
-                                    matches!(
-                                        &self.semantic.binding(binding_id).kind,
-                                        BindingKind::FromImport(FromImport {
-                                            qualified_name: existing,
-                                        }) if existing.as_ref() == &qualified_name
-                                    )
-                                },
-                            );
-
-                        if !already_bound {
-                            let binding_id = self.add_binding(
-                                submodule,
-                                TextRange::at(
-                                    module_identifier.start(),
-                                    TextSize::try_from(submodule.len()).unwrap(),
-                                ),
-                                BindingKind::FromImport(FromImport {
-                                    qualified_name: Box::new(qualified_name),
-                                }),
-                                BindingFlags::EXTERNAL,
-                            );
-                            // This binding is implicit, so don't report it as an unused import.
-                            self.semantic.bindings[binding_id].source = None;
+                        self.bind_relative_submodule(
+                            submodule,
+                            TextRange::at(
+                                module_identifier.start(),
+                                TextSize::try_from(submodule.len()).unwrap(),
+                            ),
+                        );
+                    } else {
+                        // `from . import foo as alias` can also load `foo` into the package.
+                        // Importing an existing runtime package attribute does not load a module.
+                        for alias in names {
+                            if alias.name.as_str() != "*"
+                                && self.semantic.global_scope().get(&alias.name).is_none_or(
+                                    |binding_id| {
+                                        let binding = self.semantic.binding(binding_id);
+                                        binding.kind.is_builtin()
+                                            || binding.kind.is_annotation()
+                                            || binding.is_unbound()
+                                            || binding.context.is_typing()
+                                            || (binding.kind.is_from_import()
+                                                && binding.source.is_none())
+                                            || binding.source.is_some_and(|source| {
+                                                self.in_statically_unreachable_branch(
+                                                    binding.range,
+                                                    self.semantic.statements(source),
+                                                )
+                                            })
+                                    },
+                                )
+                            {
+                                self.bind_relative_submodule(&alias.name, alias.name.range());
+                            }
                         }
                     }
                 }
@@ -2708,6 +2728,67 @@ impl<'a> Checker<'a> {
         self.visit_body(&clause.body);
     }
 
+    /// Check constant conditions without treating unknown branches as unreachable.
+    fn in_statically_unreachable_branch(
+        &self,
+        range: TextRange,
+        statements: impl Iterator<Item = &'a Stmt>,
+    ) -> bool {
+        statements
+            .filter_map(Stmt::as_if_stmt)
+            .flat_map(if_elif_branches)
+            .any(|branch| {
+                match helpers::Truthiness::from_expr(branch.test, |name| {
+                    self.semantic.has_builtin_binding(name)
+                }) {
+                    helpers::Truthiness::False
+                    | helpers::Truthiness::Falsey
+                    | helpers::Truthiness::None => branch.range().contains(range.start()),
+                    helpers::Truthiness::True | helpers::Truthiness::Truthy => {
+                        branch.end() <= range.start()
+                    }
+                    helpers::Truthiness::Unknown => false,
+                }
+            })
+    }
+
+    /// Record an eager relative submodule load and its implicit package attribute.
+    fn bind_relative_submodule(&mut self, name: &'a str, range: TextRange) {
+        // Keep typing-only and statically unreachable imports out of the runtime cache.
+        let not_runtime_load = self.semantic.in_type_checking_block()
+            || self.in_statically_unreachable_branch(range, self.semantic.current_statements());
+        let first_import = if not_runtime_load {
+            !self.relative_submodule_imports.contains(name)
+        } else {
+            self.relative_submodule_imports.insert(name)
+        };
+
+        // Preserve explicit values and their diagnostics. Only a first load restores deletion.
+        let should_bind = self.semantic.global_scope().get(name).is_none_or(|id| {
+            let binding = self.semantic.binding(id);
+            binding.kind.is_builtin()
+                || binding.kind.is_annotation()
+                || (first_import && binding.is_unbound())
+        });
+        if !should_bind {
+            return;
+        }
+
+        // Class imports load into the package namespace, not the class namespace.
+        let scope_id = std::mem::replace(&mut self.semantic.scope_id, ScopeId::global());
+        let binding_id = self.add_binding(
+            name,
+            range,
+            BindingKind::FromImport(FromImport {
+                qualified_name: Box::new(collect_import_from_member(1, None, name)),
+            }),
+            BindingFlags::EXTERNAL,
+        );
+        self.semantic.scope_id = scope_id;
+        // This binding is implicit, so don't report it as an unused import.
+        self.semantic.bindings[binding_id].source = None;
+    }
+
     /// Add a [`Binding`] to the current scope, bound to the given name.
     fn add_binding(
         &mut self,
@@ -2755,12 +2836,15 @@ impl<'a> Checker<'a> {
                 return binding_id;
             }
 
-            // Avoid shadowing builtins.
+            // References to builtins, unbound names, and implicit submodules must not
+            // make a later explicit binding appear used.
             let shadowed = &self.semantic.bindings[shadowed_id];
-            if !matches!(
+            if !(matches!(
                 shadowed.kind,
                 BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException(_)
-            ) {
+            ) || matches!(shadowed.kind, BindingKind::FromImport(_))
+                && shadowed.source.is_none())
+            {
                 let references = shadowed.references.clone();
                 let is_global = shadowed.is_global();
                 let is_nonlocal = shadowed.is_nonlocal();
