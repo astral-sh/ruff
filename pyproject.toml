@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.16.7"
+version = "0.16.9"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -58,12 +58,13 @@ exclude = [
 [dependency-groups]
 dev = [
     "astral-dev-toolchain-cargo-codspeed>=5.0.1",
+    "astral-dev-toolchain-cargo-deny>=0.20.2",
     "astral-dev-toolchain-cargo-fuzz>=0.13.2",
     "astral-dev-toolchain-cargo-insta>=1.48.0",
     "astral-dev-toolchain-cargo-nextest>=0.9.143",
     "astral-dev-toolchain-cargo-shear>=1.13.4",
     "astral-dev-toolchain-hyperfine>=1.20.0",
-    "prek==0.4.12",
+    "prek==0.4.14",
 ]
 release = [
     "rooster==0.1.1",
@@ -130,6 +131,7 @@ build-constraint-dependencies = [
 exclude-newer = "P7D"
 
 [tool.uv.exclude-newer-package]
+astral-dev-toolchain-cargo-deny = "2026-09-15T19:10:00Z"
 astral-dev-toolchain-hyperfine = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-shear = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-codspeed = "2026-08-27T00:00:00Z"
@@ -312,6 +314,8 @@ version_files = [
     { target = "crates/ruff_linter/src/rules/**/*.rs", replace = "NEXT_RUFF_VERSION" },
     "crates/ruff_wasm/Cargo.toml",
     "scripts/benchmarks/pyproject.toml",
+    { target = ".github/ISSUE_TEMPLATE/1_bug_report.yaml" },
+    { target = ".github/ISSUE_TEMPLATE/3_question.yaml" },
 ]
 
 [tool.rooster.section-labels]

@@ -1,6 +1,11 @@
 name: ty ecosystem-analyzer
 
-permissions: {}
+permissions:
+  contents: read
+
+# Third-party builds must not write caches consumed by other jobs.
+# GitHub-hosted runners use GitHub's cache service, which enforces this mode.
+cache-mode: read
 
 on:
   pull_request:
@@ -18,6 +23,7 @@ on:
       - "crates/ruff_python_stdlib/**"
       - ".github/workflows/ty-ecosystem-analyzer.yaml"
       - ".github/ty-ecosystem.toml"
+      - ".github/ty-ecosystem-constraints.txt"
       - "crates/ty_python_semantic/resources/primer/**"
       - "Cargo.lock"
       - "pyproject.toml"
@@ -53,7 +59,7 @@ jobs:
     strategy:
       matrix:
         revision: [base, pr]
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-32' || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -61,9 +67,19 @@ jobs:
           persist-credentials: false
           ref: ${{ github.sha }}
 
+      # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
+      - name: Fetch full history without tags
+        if: matrix.revision == 'base'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          git fetch --no-tags --filter=blob:none --unshallow origin
+
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           lookup-only: false
+          save-if: false
 
       - name: Install Rust toolchain
         run: rustup show
@@ -76,9 +92,6 @@ jobs:
           REVISION: ${{ matrix.revision }}
         run: |
           if [[ "${REVISION}" == "base" ]]; then
-            # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
-            git fetch --no-tags --filter=blob:none --unshallow origin
-
             # The first parent contains any preceding layers in a stacked pull request.
             MERGE_BASE="$(git rev-parse "${GITHUB_SHA}^1")"
             echo "${MERGE_BASE}" > merge-base.txt
@@ -95,6 +108,7 @@ jobs:
           if [[ "${REVISION}" == "pr" ]]; then
             cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
             cp .github/ty-ecosystem.toml ty-ecosystem.toml
+            cp .github/ty-ecosystem-constraints.txt ty-ecosystem-constraints.txt
           fi
 
       - name: Upload base ty binary
@@ -107,7 +121,7 @@ jobs:
             ty-base
             merge-base.txt
 
-      - name: Upload PR ty binary, flaky project list, and config
+      - name: Upload PR ty binary, flaky project list, config, and constraints
         if: matrix.revision == 'pr'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -117,6 +131,7 @@ jobs:
             ty-pr
             projects_flaky.txt
             ty-ecosystem.toml
+            ty-ecosystem-constraints.txt
 
       - name: Upload ecosystem-analyzer dependency metadata
         if: matrix.revision == 'pr'
@@ -132,7 +147,7 @@ jobs:
     strategy:
       matrix:
         shard: [0, 1, 2, 3]
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-32' || 'ubuntu-latest' }}
     timeout-minutes: 10
     env:
       EXCLUDE_NEWER: ${{ github.event.pull_request.updated_at }}
@@ -140,9 +155,11 @@ jobs:
       TY_UV: scripts
     steps:
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.18"
+          checksum: "89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16"
           ignore-empty-workdir: true
           # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
           # since its cache-invalidation keys aren't available until the build artifacts
@@ -152,7 +169,7 @@ jobs:
           # small, pure-Python projects.
           enable-cache: false
 
-      - name: Download ty binaries, flaky project list, config, and dependency metadata
+      - name: Download ty binaries, flaky project list, config, constraints, and dependency metadata
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: ty-build-*
@@ -161,6 +178,7 @@ jobs:
       - name: Analyze shard ${{ matrix.shard }}
         env:
           SHARD: ${{ matrix.shard }}
+          UV_CONSTRAINT: ${{ github.workspace }}/ty-ecosystem-constraints.txt
         run: |
           mkdir -p ~/.config/ty
           cp ty-ecosystem.toml ~/.config/ty/ty.toml
@@ -201,9 +219,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.18"
+          checksum: "89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16"
           ignore-empty-workdir: true
           # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
           # since its cache-invalidation keys aren't available until the build artifacts

@@ -347,6 +347,9 @@ def func3(t: tuple[*Ts]):
 
 ## Ellipses in the wrong place in a `tuple` specialization
 
+An ellipsis is only valid after a single, non-unpacked element type. Each misplaced ellipsis is
+reported at its own location.
+
 ```toml
 [environment]
 python-version = "3.11"
@@ -377,6 +380,31 @@ def invalid_typevartuple_ellipsis(
     # error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
     unpacked: tuple[Unpack[Ts], ...],
 ) -> None: ...
+```
+
+Multiple misplaced ellipses in an alias produce separate diagnostics, each highlighting only the
+offending ellipsis:
+
+```py
+# snapshot: invalid-type-form
+# snapshot: invalid-type-form
+X = tuple[int, ..., ...]
+y: X
+```
+
+```snapshot
+error[invalid-type-form]: Invalid `tuple` specialization
+  --> src/mdtest_snippet.py:27:16
+   |
+27 | X = tuple[int, ..., ...]
+   |                ^^^ `...` can only be used as the second element in a two-element `tuple` specialization
+
+
+error[invalid-type-form]: Invalid `tuple` specialization
+  --> src/mdtest_snippet.py:27:21
+   |
+27 | X = tuple[int, ..., ...]
+   |                     ^^^ `...` can only be used as the second element in a two-element `tuple` specialization
 ```
 
 ## Invalid AST nodes in string annotations
@@ -1349,6 +1377,59 @@ error[invalid-type-form]: Set literals are not allowed in type expressions
   |
 4 | quoted_set: "{int}"  # snapshot: invalid-type-form
   |              ^^^^^ Did you mean `set[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+#### Recursive type aliases in collection hints
+
+Collection suggestions preserve the name of a recursive alias, including when it appears in a union.
+Quoted annotations receive the same suggestions.
+
+```py
+Tree = tuple[int, "Tree | None"]
+
+def consume(
+    trees: "[Tree]",  # snapshot: invalid-type-form
+    pair: "(Tree, int)",  # snapshot: invalid-type-form
+    mapping: "{str: Tree}",  # snapshot: invalid-type-form
+    roots: "{Tree | None}",  # snapshot: invalid-type-form
+): ...
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:4:13
+  |
+4 |     trees: "[Tree]",  # snapshot: invalid-type-form
+  |             ^^^^^^ Did you mean `list[Tree]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Tuple literals are not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:5:12
+  |
+5 |     pair: "(Tree, int)",  # snapshot: invalid-type-form
+  |            ^^^^^^^^^^^ Did you mean `tuple[Tree, int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Dict literals are not allowed in parameter annotations
+ --> src/mdtest_snippet.py:6:15
+  |
+6 |     mapping: "{str: Tree}",  # snapshot: invalid-type-form
+  |               ^^^^^^^^^^^ Did you mean `dict[str, Tree]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Set literals are not allowed in parameter annotations
+ --> src/mdtest_snippet.py:7:13
+  |
+7 |     roots: "{Tree | None}",  # snapshot: invalid-type-form
+  |             ^^^^^^^^^^^^^ Did you mean `set[Tree | None]`?
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```

@@ -1,6 +1,8 @@
 #![allow(clippy::disallowed_names)]
 use ruff_benchmark::criterion;
-use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject, TY_ECOSYSTEM_PIN};
+use ruff_benchmark::real_world_projects::{
+    InstalledProject, RealWorldProject, TY_ECOSYSTEM_PIN, check_project,
+};
 
 use std::fmt::Write;
 use std::ops::Range;
@@ -85,7 +87,7 @@ fn setup_tomllib_case() -> FileCase {
 
     let src_root = SystemPath::new("/src");
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_override_options(Options {
+    metadata.set_override_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             ..EnvironmentOptions::default()
@@ -905,14 +907,15 @@ from collections.abc import Callable, Iterable
 from typing import Protocol
 
 class Chain[T](Protocol):
-    def value(self) -> T: ...
+    def value(self) -> T:
+        raise RuntimeError
 "
     .to_string();
 
     for i in 0..NUM_METHODS {
         writeln!(
             &mut code,
-            "    def method_{i}[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]: ..."
+            "    def method_{i}[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]:\n        raise RuntimeError"
         )
         .ok();
     }
@@ -1007,6 +1010,42 @@ def check(value: Chain[tuple[int, str]]) -> None:
 "#;
 
     criterion.bench_function("ty_micro[materialized_recursive_protocol_overload]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for subtyping between materialized recursive protocols.
+///
+/// Subtyping checks between materialized specializations of a recursive protocol should terminate even
+/// though the recursive methods repeatedly introduce type variables and nested specializations.
+fn benchmark_materialized_recursive_protocol_subtyping(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from __future__ import annotations
+
+from typing import Any, Protocol
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_subtype_of
+
+class Chain[T](Protocol):
+    marker: Any
+    def value(self) -> T: ...
+    def child[U](self, other: U) -> Chain[tuple[T, U]]: ...
+    def pair(self) -> Chain[tuple[T, T]]: ...
+    def window(self) -> Chain[Chain[T]]: ...
+    def concat[U](self, other: Chain[U]) -> Chain[T | U]: ...
+
+def _[T]():
+    constraints = is_constraint_set_subtype_of(Top[Chain[T]], Top[Chain[object]])
+    static_assert(constraints == ConstraintSet.upper_bound(T, object))
+"#;
+
+    criterion.bench_function("ty_micro[materialized_recursive_protocol_subtyping]", |b| {
         b.iter_batched_ref(
             || setup_micro_case(code),
             |case| assert_eq!(case.db.check().len(), 0),
@@ -1445,6 +1484,122 @@ fn benchmark_literal_equality_fallthrough_guarded_any(criterion: &mut Criterion)
     );
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4514>.
+///
+/// Each failed comparison against a union of enum members introduces two disjoint exclusions.
+/// Without simplifying their union, successive comparisons double the number of alternatives.
+fn benchmark_enum_union_equality(criterion: &mut Criterion) {
+    let code = r#"
+from enum import Enum
+
+class First(Enum):
+    m0 = 0
+    m1 = 1
+    m2 = 2
+    m3 = 3
+    m4 = 4
+    m5 = 5
+    m6 = 6
+    m7 = 7
+    m8 = 8
+    m9 = 9
+
+class Second(Enum):
+    m0 = 0
+    m1 = 1
+    m2 = 2
+    m3 = 3
+    m4 = 4
+    m5 = 5
+    m6 = 6
+    m7 = 7
+    m8 = 8
+    m9 = 9
+
+def check(value, choice: bool) -> None:
+    enum = First if choice else Second
+    if isinstance(value, str):
+        return
+    if value == enum.m0:
+        pass
+    elif value == enum.m1:
+        pass
+    elif value == enum.m2:
+        pass
+    elif value == enum.m3:
+        pass
+    elif value == enum.m4:
+        pass
+    elif value == enum.m5:
+        pass
+    elif value == enum.m6:
+        pass
+    elif value == enum.m7:
+        pass
+    elif value == enum.m8:
+        pass
+    elif value == enum.m9:
+        pass
+    else:
+        repr(value)
+"#;
+
+    benchmark_literal_fallthrough(criterion, "ty_micro[enum_union_equality]", code);
+}
+
+/// Each condition introduces alternatives with several disjoint exclusions, which must be
+/// simplified before the next condition to avoid multiplying the number of alternatives.
+fn benchmark_disjoint_membership_exclusions(criterion: &mut Criterion) {
+    let code = r#"
+def check(value) -> None:
+    if isinstance(value, bytes):
+        return
+    if value not in (10, 11) or value not in (12, 13):
+        pass
+    else:
+        return
+    if value not in (14, 15) or value not in (16, 17):
+        pass
+    else:
+        return
+    if value not in (18, 19) or value not in (20, 21):
+        pass
+    else:
+        return
+    if value not in (22, 23) or value not in (24, 25):
+        pass
+    else:
+        return
+    if value not in (26, 27) or value not in (28, 29):
+        pass
+    else:
+        return
+    if value not in (30, 31) or value not in (32, 33):
+        pass
+    else:
+        return
+    if value not in (34, 35) or value not in (36, 37):
+        pass
+    else:
+        return
+    if value not in (38, 39) or value not in (40, 41):
+        pass
+    else:
+        return
+    if value not in (42, 43) or value not in (44, 45):
+        pass
+    else:
+        return
+    if value not in (46, 47) or value not in (48, 49):
+        pass
+    else:
+        return
+    repr(value)
+"#;
+
+    benchmark_literal_fallthrough(criterion, "ty_micro[disjoint_membership_exclusions]", code);
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/4256>.
 ///
 /// Excluding rejected gradual string literals must not expand the complement of each intersection
@@ -1473,6 +1628,38 @@ fn benchmark_gradual_literal_union_equality(criterion: &mut Criterion) {
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4541>.
+///
+/// Negating a compound gradual intersection can repeatedly introduce equivalent alternatives.
+/// Keeping the expression inline forces immediate evaluation of the negation.
+fn benchmark_gradual_intersection_negation(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from typing import Any, Callable
+from ty_extensions import Intersection, Not
+
+class A: ...
+
+x: Not[
+    Intersection[
+        Any | type[A] | str,
+        Callable[..., object],
+        Not[Callable[..., object]],
+        Not[Intersection[A, type[str], Any, Not[type[Any]]]],
+    ]
+]
+"#;
+
+    criterion.bench_function("ty_micro[gradual_intersection_negation]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
             BatchSize::SmallInput,
         );
     });
@@ -1703,13 +1890,12 @@ fn benchmark_repeated_narrowed_assignments(criterion: &mut Criterion) {
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
-    max_diagnostics: usize,
     freeze_inputs: bool,
     rules: Option<Rules>,
 }
 
 impl<'a> ProjectBenchmark<'a> {
-    fn new(project: RealWorldProject<'a>, max_diagnostics: usize) -> Self {
+    fn new(project: RealWorldProject<'a>) -> Self {
         let setup_project = project.setup().expect("Failed to setup project");
         let fs = setup_project
             .copy_to_memory_fs()
@@ -1718,7 +1904,6 @@ impl<'a> ProjectBenchmark<'a> {
         Self {
             project: setup_project,
             fs,
-            max_diagnostics,
             freeze_inputs: false,
             rules: None,
         }
@@ -1735,7 +1920,7 @@ impl<'a> ProjectBenchmark<'a> {
         let src_root = SystemPath::new("/");
         let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
 
-        metadata.apply_override_options(Options {
+        metadata.set_override_options(Options {
             environment: Some(EnvironmentOptions {
                 python_version: Some(RangedValue::cli(self.project.config.python_version)),
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
@@ -1775,24 +1960,6 @@ fn bench_project_named(
     criterion: &mut Criterion,
     benchmark_name: &str,
 ) {
-    fn check_project(db: &mut ProjectDatabase, project_name: &str, max_diagnostics: usize) {
-        let result = db.check();
-        let diagnostics = result.len();
-
-        if diagnostics > max_diagnostics {
-            let details = result
-                .into_iter()
-                .map(|diagnostic| diagnostic.concise_message().to_string())
-                .collect::<Vec<_>>()
-                .join("\n  ");
-            assert!(
-                diagnostics <= max_diagnostics,
-                "{project_name}: Expected <={max_diagnostics} diagnostics \
-                but got {diagnostics}:\n  {details}",
-            );
-        }
-    }
-
     setup_rayon();
 
     let mut group = criterion.benchmark_group("project");
@@ -1800,42 +1967,36 @@ fn bench_project_named(
     group.bench_function(benchmark_name, |b| {
         b.iter_batched_ref(
             || benchmark.setup_iteration(),
-            |db| check_project(db, benchmark_name, benchmark.max_diagnostics),
+            |db| check_project(db, benchmark_name),
             BatchSize::SmallInput,
         );
     });
 }
 
 fn hydra(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(
-        RealWorldProject {
-            name: "hydra-zen",
-            repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
-            commit: "03a01096ea6a7c574fdf0b9990056506e566df2d",
-            paths: &["src", "tests/annotations"],
-            dependencies: &["pydantic", "beartype", "hydra-core"],
-            max_dep_date: TY_ECOSYSTEM_PIN,
-            python_version: SupportedPythonVersion::Py311,
-        },
-        520,
-    );
+    let benchmark = ProjectBenchmark::new(RealWorldProject {
+        name: "hydra-zen",
+        repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
+        commit: "03a01096ea6a7c574fdf0b9990056506e566df2d",
+        paths: &["src", "tests/annotations"],
+        dependencies: &["pydantic", "beartype", "hydra-core"],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    });
 
     bench_project(&benchmark, criterion);
 }
 
 fn attrs(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(
-        RealWorldProject {
-            name: "attrs",
-            repository: "https://github.com/python-attrs/attrs",
-            commit: "89fae8300f484544c1b7678cea5efe58c551fbb9",
-            paths: &["src/attrs", "src/attr", "typing-examples"],
-            dependencies: &[],
-            max_dep_date: TY_ECOSYSTEM_PIN,
-            python_version: SupportedPythonVersion::Py311,
-        },
-        104,
-    );
+    let benchmark = ProjectBenchmark::new(RealWorldProject {
+        name: "attrs",
+        repository: "https://github.com/python-attrs/attrs",
+        commit: "89fae8300f484544c1b7678cea5efe58c551fbb9",
+        paths: &["src/attrs", "src/attr", "typing-examples"],
+        dependencies: &[],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    });
 
     bench_project(&benchmark, criterion);
 
@@ -1849,7 +2010,6 @@ fn attrs(criterion: &mut Criterion) {
             RangedValue::cli("all".to_owned()),
             RangedValue::cli(Level::Error),
         )])),
-        max_diagnostics: 100,
         ..frozen_benchmark
     };
 
@@ -1857,35 +2017,29 @@ fn attrs(criterion: &mut Criterion) {
 }
 
 fn anyio(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(
-        RealWorldProject {
-            name: "anyio",
-            repository: "https://github.com/agronholm/anyio",
-            commit: "ffe91331adb912c5d150f5d373f7cd28a0e96a62",
-            paths: &["src"],
-            dependencies: &["exceptiongroup", "idna", "pytest"],
-            max_dep_date: TY_ECOSYSTEM_PIN,
-            python_version: SupportedPythonVersion::Py311,
-        },
-        110,
-    );
+    let benchmark = ProjectBenchmark::new(RealWorldProject {
+        name: "anyio",
+        repository: "https://github.com/agronholm/anyio",
+        commit: "ffe91331adb912c5d150f5d373f7cd28a0e96a62",
+        paths: &["src"],
+        dependencies: &["exceptiongroup", "idna", "pytest"],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    });
 
     bench_project(&benchmark, criterion);
 }
 
 fn datetype(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(
-        RealWorldProject {
-            name: "DateType",
-            repository: "https://github.com/glyph/DateType",
-            commit: "a6ebb954cd18302a031a29b2f65e077b8e7776d4",
-            paths: &["src"],
-            dependencies: &[],
-            max_dep_date: TY_ECOSYSTEM_PIN,
-            python_version: SupportedPythonVersion::Py311,
-        },
-        17,
-    );
+    let benchmark = ProjectBenchmark::new(RealWorldProject {
+        name: "DateType",
+        repository: "https://github.com/glyph/DateType",
+        commit: "a6ebb954cd18302a031a29b2f65e077b8e7776d4",
+        paths: &["src"],
+        dependencies: &[],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    });
 
     bench_project(&benchmark, criterion);
 }
@@ -1914,6 +2068,7 @@ criterion_group!(
     benchmark_inherited_recursive_protocol,
     benchmark_nested_recursive_protocol_receiver,
     benchmark_materialized_recursive_protocol_overload,
+    benchmark_materialized_recursive_protocol_subtyping,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
@@ -1922,7 +2077,10 @@ criterion_group!(
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
+    benchmark_enum_union_equality,
+    benchmark_disjoint_membership_exclusions,
     benchmark_gradual_literal_union_equality,
+    benchmark_gradual_intersection_negation,
     benchmark_literal_or_pattern_reachability,
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,

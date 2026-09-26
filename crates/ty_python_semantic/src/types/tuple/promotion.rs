@@ -6,7 +6,7 @@ use ruff_python_ast::{self as ast};
 
 use crate::types::tuple::TupleSpec;
 use crate::types::typevar::BoundTypeVarIdentity;
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::{any_over_type, contains_growing_type};
 use crate::types::{Type, UnionBuilder};
 
 /// Tracks the typevars of a collection to which tuple size promotion should **not** apply.
@@ -73,9 +73,12 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     ) -> bool {
         expression
             .is_some_and(|expression| Self::is_promotable_tuple_literal(db, env, expression, ty))
-            || !any_over_type(db, env, ty, true, |ty| {
-                ty.tuple_instance_spec(db, env).is_some()
-            })
+            // An unbounded unfolding cannot establish the absence of annotated tuples.
+            // Preserve their lengths unless the complete finite scan permits promotion.
+            || (!contains_growing_type(db, env, ty)
+                && !any_over_type(db, env, ty, true, |ty| {
+                    ty.tuple_instance_spec(db, env).is_some()
+                }))
     }
 
     /// Returns true if the given expression is either a non-starred homogeneous tuple literal or the

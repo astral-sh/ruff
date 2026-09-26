@@ -1869,6 +1869,56 @@ fn check_input_from_argfile() -> Result<()> {
 }
 
 #[test]
+fn check_existing_at_paths_are_literal() -> Result<()> {
+    // Preserve existing @-prefixed paths so filenames from integrations cannot inject options.
+    let tempdir = TempDir::new()?;
+    fs::write(tempdir.path().join("@list.py"), "import os\n")?;
+    fs::create_dir(tempdir.path().join("@package"))?;
+    fs::write(tempdir.path().join("@package/main.py"), "import sys\n")?;
+    fs::write(
+        tempdir.path().join("list.py"),
+        "--output-file\nsentinel.txt\nunrelated.py\n",
+    )?;
+    fs::write(tempdir.path().join("package"), "unrelated.py\n")?;
+    fs::write(tempdir.path().join("unrelated.py"), "")?;
+    fs::write(tempdir.path().join("sentinel.txt"), "unchanged\n")?;
+
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter(r"\\", "/");
+    let _scope = settings.bind_to_scope();
+
+    assert_cmd_snapshot!(ruff_cmd()
+        .current_dir(tempdir.path())
+        .args([
+            "check",
+            "--isolated",
+            "--no-cache",
+            "--select",
+            "F401",
+            "--output-format",
+            "concise",
+            "@list.py",
+            "--",
+            "@package",
+        ]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    @list.py:1:8: F401 [*] `os` imported but unused
+    @package/main.py:1:8: F401 [*] `sys` imported but unused
+    Found 2 errors.
+    [*] 2 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ");
+    assert_eq!(
+        fs::read_to_string(tempdir.path().join("sentinel.txt"))?,
+        "unchanged\n"
+    );
+    Ok(())
+}
+
+#[test]
 // Regression test for https://github.com/astral-sh/ruff/issues/20655
 fn missing_argfile_reports_error() {
     let mut cmd = RuffCheck::default().filename("@!.txt").build();

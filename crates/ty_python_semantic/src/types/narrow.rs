@@ -9,19 +9,20 @@ use crate::reachability::{
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
+use crate::types::iteration::extract_literal_container_element_types;
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::{TupleElement, TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema, TypedDictType};
 use crate::types::unpacker::collected_list_type;
 use crate::types::{
-    CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
+    CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType, CycleDetector,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
-    callable_pattern_type, class_pattern_positional_sources,
-    definite_match_pattern_type_for_subject, exact_sequence_pattern_type, infer_expression_types,
-    mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
-    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    Type, TypeContext, TypeVarBoundOrConstraints, UnfoldResult, UnionBuilder, binding_type,
+    class_pattern_positional_sources, definite_match_pattern_type_for_subject,
+    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
+    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
+    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -88,10 +89,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
         | PredicateNode::Condition(expression)
         | PredicateNode::ChainedComparisonCondition(expression) => {
             let constraints = all_narrowing_constraints_for_expression(db, expression);
-            (
-                constraints.get(place, true).cloned(),
-                constraints.get(place, false).cloned(),
-            )
+            (constraints.get(place, true), constraints.get(place, false))
         }
         PredicateNode::Pattern(pattern) => {
             let positive = all_narrowing_constraints_for_pattern(db, pattern)
@@ -143,7 +141,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, _, _| ExpressionNarrowingConstraints::default(),
+    cycle_initial=|_, _, _| ExpressionNarrowingConstraints::Inferred { positive: None, negative: None },
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn all_narrowing_constraints_for_expression<'db>(
@@ -155,9 +153,18 @@ fn all_narrowing_constraints_for_expression<'db>(
     let env = ProgramEnvironment::from_file(program_file);
     let module = parsed_module(db, python_file).load(db);
     let predicate = PredicateNode::Expression(expression);
-    ExpressionNarrowingConstraints {
-        positive: NarrowingConstraintsBuilder::new(db, &env, &module, predicate, true).finish(),
-        negative: NarrowingConstraintsBuilder::new(db, &env, &module, predicate, false).finish(),
+    let mut positive = NarrowingConstraintsBuilder::new(db, &env, &module, predicate, true);
+    let positive_constraints = positive.finish();
+    let mut negative = NarrowingConstraintsBuilder::new(db, &env, &module, predicate, false);
+    let negative_constraints = negative.finish();
+
+    if positive.is_provisional || negative.is_provisional {
+        ExpressionNarrowingConstraints::Provisional
+    } else {
+        ExpressionNarrowingConstraints::Inferred {
+            positive: positive_constraints,
+            negative: negative_constraints,
+        }
     }
 }
 
@@ -483,13 +490,51 @@ impl ClassInfoConstraintFunction {
         is_positive: bool,
         use_generic_filtering: bool,
     ) -> Option<Type<'db>> {
+        ClassInfoConstraint {
+            function: self,
+            env,
+            is_positive,
+            use_generic_filtering,
+            visitor: CycleDetector::new(is_positive.then_some(Type::Never)),
+        }
+        .generate(db, classinfo)
+    }
+}
+
+/// Collect the classes reachable through one class-info argument.
+struct ClassInfoConstraint<'a, 'db> {
+    function: ClassInfoConstraintFunction,
+    env: &'a ProgramEnvironment<'db>,
+    is_positive: bool,
+    use_generic_filtering: bool,
+    visitor: CycleDetector<'db, ClassInfoConstraintFunction, Type<'db>, Option<Type<'db>>, 1>,
+}
+
+impl<'db> ClassInfoConstraint<'_, 'db> {
+    fn generate(&self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
+        // Revisiting a finite tuple tree adds no classes. Growing arguments can add
+        // new classes at each depth, so no finite narrowing constraint covers them.
+        self.visitor
+            .try_visit(
+                db,
+                classinfo,
+                |_| true,
+                || self.generate_impl(db, classinfo),
+            )
+            .unwrap_or(None)
+    }
+
+    fn generate_impl(&self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
+        let env = self.env;
+        let is_positive = self.is_positive;
+        let use_generic_filtering = self.use_generic_filtering;
         let constraint_from_class_literal = |class: ClassLiteral<'db>| {
             let specialization = if use_generic_filtering {
                 class.unknown_specialization(db)
             } else {
                 class.top_materialization(db)
             };
-            let constraint = match self {
+            let constraint = match self.function {
                 ClassInfoConstraintFunction::IsInstance => Type::instance(db, env, specialization),
                 ClassInfoConstraintFunction::IsSubclass => {
                     SubclassOfType::from(db, env, specialization)
@@ -506,13 +551,13 @@ impl ClassInfoConstraintFunction {
         };
 
         match classinfo {
-            Type::TypeAlias(alias) => self.generate_constraint(
-                db,
-                env,
-                alias.value_type(db),
-                is_positive,
-                use_generic_filtering,
-            ),
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
+            Type::TypeAlias(alias) => self.generate(db, alias.value_type(db)),
+            Type::Recursive(recursive) => {
+                self.generate(db, recursive.unfold(db, env).into_unfolded()?)
+            }
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
                 // We can't narrow negatively from a `SubclassOf` type. `if !isinstance(x, y)`
@@ -535,7 +580,7 @@ impl ClassInfoConstraintFunction {
                     //   not valid runtime class-info arguments.
                     // - A class can inhabit `type[protocol]` because its metaclass constructs
                     //   protocol-conforming objects even if its nominal instances do not conform.
-                    SubclassOfInner::Protocol(protocol) => match self {
+                    SubclassOfInner::Protocol(protocol) => match self.function {
                         ClassInfoConstraintFunction::IsInstance => {
                             let constraint = Type::ProtocolInstance(protocol);
                             Some(if use_generic_filtering {
@@ -546,7 +591,7 @@ impl ClassInfoConstraintFunction {
                         }
                         ClassInfoConstraintFunction::IsSubclass => Some(classinfo),
                     },
-                    SubclassOfInner::TypeVar(bound_typevar) => match self {
+                    SubclassOfInner::TypeVar(bound_typevar) => match self.function {
                         ClassInfoConstraintFunction::IsSubclass => Some(classinfo),
                         ClassInfoConstraintFunction::IsInstance => {
                             Some(Type::TypeVar(bound_typevar))
@@ -565,13 +610,7 @@ impl ClassInfoConstraintFunction {
                         // target) should be SKIPPED, not abort narrowing on the
                         // whole intersection. Narrowing on the remaining members
                         // is still sound.
-                        if let Some(c) = self.generate_constraint(
-                            db,
-                            env,
-                            *element,
-                            is_positive,
-                            use_generic_filtering,
-                        ) {
+                        if let Some(c) = self.generate(db, *element) {
                             builder.add_positive_in_place(c);
                             any_member = true;
                         }
@@ -586,22 +625,13 @@ impl ClassInfoConstraintFunction {
                     None
                 }
             }
-            Type::Union(union) => union.try_map(db, env, |element| {
-                self.generate_constraint(db, env, *element, is_positive, use_generic_filtering)
-            }),
+            Type::Union(union) => union.try_map(db, env, |element| self.generate(db, *element)),
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db, env)? {
-                    TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        self.generate_constraint(db, env, bound, is_positive, use_generic_filtering)
+                    TypeVarBoundOrConstraints::UpperBound(bound) => self.generate(db, bound),
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        self.generate(db, constraints.as_type(db, env))
                     }
-                    TypeVarBoundOrConstraints::Constraints(constraints) => self
-                        .generate_constraint(
-                            db,
-                            env,
-                            constraints.as_type(db, env),
-                            is_positive,
-                            use_generic_filtering,
-                        ),
                 }
             }
 
@@ -613,15 +643,9 @@ impl ClassInfoConstraintFunction {
                 UnionType::try_from_elements(
                     db,
                     env,
-                    tuple.iter_element_types(db).map(|element| {
-                        self.generate_constraint(
-                            db,
-                            env,
-                            element,
-                            is_positive,
-                            use_generic_filtering,
-                        )
-                    }),
+                    tuple
+                        .iter_element_types(db)
+                        .map(|element| self.generate(db, element)),
                 )
             }
 
@@ -638,56 +662,32 @@ impl ClassInfoConstraintFunction {
                             // which means that `isinstance(x, int | None)` works even though
                             // `None` is not a class literal.
                             if element.is_none(db) {
-                                self.generate_constraint(
-                                    db,
-                                    env,
-                                    KnownClass::NoneType.to_class_literal(db, env),
-                                    is_positive,
-                                    use_generic_filtering,
-                                )
+                                self.generate(db, KnownClass::NoneType.to_class_literal(db, env))
                             } else {
-                                self.generate_constraint(
-                                    db,
-                                    env,
-                                    element,
-                                    is_positive,
-                                    use_generic_filtering,
-                                )
+                                self.generate(db, element)
                             }
                         }),
                 )
             }
 
             Type::SpecialForm(form) => match form {
-                SpecialFormType::LegacyStdlibAlias(alias) => self.generate_constraint(
-                    db,
-                    env,
-                    alias.aliased_class().to_class_literal(db, env),
-                    is_positive,
-                    use_generic_filtering,
-                ),
-                SpecialFormType::Tuple => self.generate_constraint(
-                    db,
-                    env,
-                    KnownClass::Tuple.to_class_literal(db, env),
-                    is_positive,
-                    use_generic_filtering,
-                ),
-                SpecialFormType::Type => self.generate_constraint(
-                    db,
-                    env,
-                    KnownClass::Type.to_class_literal(db, env),
-                    is_positive,
-                    use_generic_filtering,
-                ),
+                SpecialFormType::LegacyStdlibAlias(alias) => {
+                    self.generate(db, alias.aliased_class().to_class_literal(db, env))
+                }
+                SpecialFormType::Tuple => {
+                    self.generate(db, KnownClass::Tuple.to_class_literal(db, env))
+                }
+                SpecialFormType::Type => {
+                    self.generate(db, KnownClass::Type.to_class_literal(db, env))
+                }
                 // We don't have a good meta-type for `Callable`s right now,
                 // so only apply `isinstance()` narrowing, not `issubclass()`
                 SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
-                    (self == ClassInfoConstraintFunction::IsInstance).then(|| {
+                    (self.function == ClassInfoConstraintFunction::IsInstance).then(|| {
                         if use_generic_filtering {
                             Type::Callable(CallableType::unknown(db))
                         } else {
-                            callable_pattern_type(db, env)
+                            Type::Callable(CallableType::top(db))
                         }
                     })
                 }
@@ -1023,13 +1023,9 @@ fn specialize_generic_class_for_subject<'db>(
     };
 
     let constraints = ConstraintSetBuilder::new();
+    let inferable = generic_context.inferable_typevars(db);
     let solutions = Type::instance(db, env, source)
-        .assignable_solutions_with_inferable(
-            db,
-            env,
-            Type::instance(db, env, target),
-            generic_context.inferable_typevars(db),
-        )
+        .assignable_solutions_with_inferable(db, env, Type::instance(db, env, target), inferable)
         .solve(db, env, &constraints);
 
     specialize_generic_class_from_solutions(db, env, target_class, solutions)
@@ -1055,6 +1051,7 @@ fn specialize_generic_class_from_solutions<'db>(
         .clone()
         .map(|typevar| {
             solution
+                .solved_typevars
                 .iter()
                 .find(|binding| binding.bound_typevar == typevar)
                 .map(|binding| binding.solution)
@@ -1369,18 +1366,26 @@ impl<'db> PatternNarrowingResult<'db> {
     }
 }
 
-#[derive(Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-struct ExpressionNarrowingConstraints<'db> {
-    positive: Option<FrozenNarrowingConstraints<'db>>,
-    negative: Option<FrozenNarrowingConstraints<'db>>,
+#[derive(PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+enum ExpressionNarrowingConstraints<'db> {
+    Inferred {
+        positive: Option<FrozenNarrowingConstraints<'db>>,
+        negative: Option<FrozenNarrowingConstraints<'db>>,
+    },
+    /// A predicate's type is not yet available during cycle recovery. The semantic index already
+    /// restricts narrowing to places this predicate could affect, so the fallback applies to any
+    /// requested place until inference resolves the predicate.
+    Provisional,
 }
 
 impl<'db> ExpressionNarrowingConstraints<'db> {
-    fn get(&self, place: ScopedPlaceId, is_positive: bool) -> Option<&NarrowingConstraint<'db>> {
-        if is_positive {
-            self.positive.as_ref()?.get(&place)
-        } else {
-            self.negative.as_ref()?.get(&place)
+    fn get(&self, place: ScopedPlaceId, is_positive: bool) -> Option<NarrowingConstraint<'db>> {
+        match self {
+            Self::Provisional => Some(NarrowingConstraint::intersection(Type::pending_narrowing())),
+            Self::Inferred { positive, negative } => if is_positive { positive } else { negative }
+                .as_ref()?
+                .get(&place)
+                .cloned(),
         }
     }
 }
@@ -1476,7 +1481,7 @@ fn positive_class_pattern_type<'db>(
             Some(if use_generic_filtering {
                 Type::Callable(CallableType::unknown(db))
             } else {
-                callable_pattern_type(db, env)
+                Type::Callable(CallableType::top(db))
             })
         }
         _ if class_expression_ty.is_assignable_to(
@@ -1667,6 +1672,7 @@ struct NarrowingConstraintsBuilder<'db, 'ast> {
     module: &'ast ParsedModuleRef,
     predicate: PredicateNode<'db>,
     is_positive: bool,
+    is_provisional: bool,
 }
 
 impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
@@ -1683,10 +1689,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             module,
             predicate,
             is_positive,
+            is_provisional: false,
         }
     }
 
-    fn finish(mut self) -> Option<FrozenNarrowingConstraints<'db>> {
+    fn finish(&mut self) -> Option<FrozenNarrowingConstraints<'db>> {
         let constraints: Option<NarrowingConstraints<'db>> = match self.predicate {
             PredicateNode::Expression(expression)
             | PredicateNode::Condition(expression)
@@ -3792,30 +3799,21 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
     /// Preserve the precise element types of an immediately consumed list or set literal.
     ///
-    /// These expressions cannot be mutated before membership is evaluated. Representing them as
-    /// fixed-length tuples also lets negative narrowing exclude values that are guaranteed present.
+    /// A tuple carries the element types into equality-based narrowing, including negative
+    /// constraints for singleton elements. This view does not describe a set's length or order.
     fn inline_membership_rhs_type(
         &self,
         rhs: &ast::Expr,
         inference: &ExpressionInference<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db;
-        let elements = match rhs.expression_value() {
-            ast::Expr::List(list) => &list.elts,
-            ast::Expr::Set(set) => &set.elts,
-            _ => return None,
-        };
-
-        if elements.iter().any(ast::Expr::is_starred_expr) {
-            return None;
-        }
-
+        let elements = extract_literal_container_element_types(db, &self.env, rhs, |element| {
+            inference.expression_type(element)
+        })?;
         Some(Type::heterogeneous_tuple(
             db,
             &self.env,
-            elements
-                .iter()
-                .map(|element| inference.expression_type(element)),
+            elements.iter().copied(),
         ))
     }
 
@@ -4475,6 +4473,15 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let db = self.db;
         let inference = infer_expression_types(db, expression, TypeContext::default());
 
+        // During loop inference, even the callee can temporarily be `Divergent`. Treating that
+        // as a call with no narrowing would expose unguarded alternatives to the loop body. For
+        // example, `while isinstance(x, list): x = x[0]` could subscript an `int` alternative and
+        // feed the resulting recovery `Unknown` back into every subsequent cycle iteration.
+        if inference.is_provisional() {
+            self.is_provisional = true;
+            return None;
+        }
+
         if let Some(type_guard_call_constraints) =
             self.evaluate_type_guard_call(inference, expr_call, is_positive)
         {
@@ -4608,7 +4615,13 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let place_and_constraint = match return_ty {
             Type::TypeIs(type_is) => {
                 let (_, place) = type_is.place_info(db)?;
-                let target = type_is.return_type(db);
+                let mut target = type_is.return_type(db);
+
+                if let Some(kind) = type_is.materialization_kind(db) {
+                    let kind = if is_positive { kind } else { kind.flip() };
+                    target = target.materialization(db, &self.env, kind);
+                }
+
                 let use_generic_filtering = is_positive
                     && !db
                         .analysis_settings(self.scope().file(db))
@@ -5010,6 +5023,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let mut excluded_tags = UnionBuilder::new(db, &self.env);
         visit_matching_typeddict_field_types(
             db,
+            &self.env,
             subscript_value_type,
             key_literal.value(db),
             &mut |tag_type| {
@@ -5271,6 +5285,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 // one `TypedDict` (even if other types are also present), or a type alias to such a type.
 fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
+        Type::RecursiveVar(_) => {
+            unreachable!("semantic operation on an unbound recursive variable")
+        }
         Type::TypedDict(_) => true,
         Type::Intersection(intersection) => intersection
             .positive(db)
@@ -5281,6 +5298,9 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
             .iter()
             .any(|union_member_ty| is_or_contains_typeddict(db, *union_member_ty)),
         Type::TypeAlias(alias) => is_or_contains_typeddict(db, alias.value_type(db)),
+        Type::Recursive(recursive) => recursive
+            .unfold(db, &recursive.environment(db))
+            .is_unfolded_and(|unfolded| is_or_contains_typeddict(db, unfolded)),
 
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -5400,11 +5420,15 @@ fn key_membership_contains_protocol<'db>(
 /// Visit matching `TypedDict` field types, ignoring other alternatives and missing fields.
 fn visit_matching_typeddict_field_types<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     field_name: &str,
     visit: &mut impl FnMut(Type<'db>),
 ) {
     let elements = match ty {
+        Type::RecursiveVar(_) => {
+            unreachable!("semantic operation on an unbound recursive variable")
+        }
         Type::TypedDict(td) => {
             if let Some(field) = td.items(db).get(field_name) {
                 visit(field.declared_ty);
@@ -5414,10 +5438,17 @@ fn visit_matching_typeddict_field_types<'db>(
         Type::TypeAlias(alias) => {
             return visit_matching_typeddict_field_types(
                 db,
+                env,
                 alias.value_type(db),
                 field_name,
                 visit,
             );
+        }
+        Type::Recursive(recursive) => {
+            if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db, env) {
+                visit_matching_typeddict_field_types(db, env, unfolded, field_name, visit);
+            }
+            return;
         }
         Type::Union(union) => Either::Left(union.elements(db).iter()),
         Type::Intersection(intersection) => Either::Right(intersection.positive(db).iter()),
@@ -5425,7 +5456,7 @@ fn visit_matching_typeddict_field_types<'db>(
     };
 
     for element in elements {
-        visit_matching_typeddict_field_types(db, *element, field_name, visit);
+        visit_matching_typeddict_field_types(db, env, *element, field_name, visit);
     }
 }
 

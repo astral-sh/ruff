@@ -106,6 +106,50 @@ darwin
 other
 ```
 
+### `sys.platform` membership in inline containers
+
+Membership in an inline list or set of platform names is statically known when the target platform
+is configured. Assignments in matching branches replace the initial value.
+
+```toml
+[environment]
+python-platform = "linux"
+```
+
+```py
+import sys
+
+x = 0
+if sys.platform in {"linux", "windows"}:
+    x = 1
+reveal_type(x)  # revealed: Literal[1]
+
+y = 0
+if sys.platform in ["linux", "windows"]:
+    y = 1
+reveal_type(y)  # revealed: Literal[1]
+```
+
+An absent platform leaves the initial value unchanged. Negating a membership test reverses which
+branch is reachable.
+
+```py
+absent = 0
+if sys.platform in ["darwin", "win32"]:
+    absent = 1
+reveal_type(absent)  # revealed: Literal[0]
+
+excluded = 0
+if sys.platform not in {"darwin", "win32"}:
+    excluded = 1
+reveal_type(excluded)  # revealed: Literal[1]
+
+present = 0
+if sys.platform not in ["linux", "win32"]:
+    present = 1
+reveal_type(present)  # revealed: Literal[0]
+```
+
 ### `typing.TYPE_CHECKING`
 
 ```py

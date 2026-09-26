@@ -1,5 +1,5 @@
-//! Logic for reporting boolean tests that are unintentionally always truthy or always falsy.
-//! These may be reported under either `redundant-condition` or `redundant-condition-strict`.
+//! Logic for reporting boolean tests with fixed truthiness, or suspicious tests of values typed as
+//! `Callable`, `Iterable`, or unions containing `None`.
 //!
 //! This module classifies tests and selects which expressions to report. [`exemptions`] handles
 //! assertions, defensive branches, and environment checks; [`diagnostic`] builds messages and fixes.
@@ -25,11 +25,11 @@
 //!
 //! The whole condition is also always truthy, but reporting the fixed truthiness of the outer
 //! condition as well the fixed truthiness of its subexpressions would flag the same mistake
-//! twice. To choose which expression to report, the redundant-condition checker therefore needs
-//! to see the context of the complete condition. We therefore wait until the
-//! [`TypeInferenceBuilder`] has inferred the whole condition before checking any subexpression
-//! boolean tests within it. See [`TypeInferenceBuilder::check_condition_redundancy`] for how a
-//! check of a smaller expression is postponed until that point.
+//! twice. To choose which expression to report, we therefore need to see the context of the
+//! complete condition when checking subexpressions. To do this, we wait until the
+//! [`TypeInferenceBuilder`] has inferred types for the whole condition before checking any
+//! subexpression boolean tests within it. See [`TypeInferenceBuilder::check_condition_redundancy`]
+//! for how a check of a smaller expression is postponed until that point.
 //!
 //! A boolean test can also occur inside an expression that is being passed to a function or
 //! stored in a variable. For example, `not ready` below tests the truthiness of `ready` while
@@ -45,10 +45,16 @@
 //!
 //! consume(not ready)  # `redundant-condition` on `ready`.
 //! ```
+//!
+//! Note that while `redundant-condition` on a subexpression can suppress a
+//! `redundant-condition-strict` warning on an outer expression, `truthiness-test-of-iterable`
+//! can only suppress `truthiness-test-of-iterable` warnings on an outer expression. The same is
+//! true for `truthiness-test-of-callable`.
 
 mod diagnostic;
 mod exemptions;
 
+use bitflags::bitflags;
 use ruff_python_ast::{
     self as ast,
     helpers::any_over_expr,
@@ -58,22 +64,28 @@ use ruff_text_size::Ranged;
 use ty_python_core::{Truthiness, expression::ExpressionContext, predicate::StatementCall};
 
 use crate::{
+    Db,
     lint::LintMetadata,
     reachability::{analyze_condition_expression, is_non_terminal_call},
     types::{
-        KnownClass, KnownInstanceType, Type,
-        diagnostic::{REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT},
+        CallableTypes, KnownClass, KnownInstanceType, MemberLookupPolicy, Type, UnionType,
+        constraints::ConstraintSetBuilder,
+        diagnostic::{
+            REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT, TRUTHINESS_TEST_OF_CALLABLE,
+            TRUTHINESS_TEST_OF_ITERABLE, TRUTHINESS_TEST_OF_NONE_UNION,
+        },
         infer::TypeInferenceBuilder,
+        typevar::TypeVarSet,
     },
 };
 
 use self::exemptions::RedundantConditionContext;
 
-/// Classification of a redundant condition.
+/// Classification of a boolean test.
 ///
 /// This is used to determine which diagnostic rule would apply to the condition.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ConditionKind {
+#[derive(Debug, PartialEq, Eq)]
+enum ConditionKind<'db> {
     /// A condition whose value type is assignable to `int`, including `bool`.
     ///
     /// These tests commonly enforce runtime invariants, so they are only flagged by the
@@ -127,17 +139,37 @@ enum ConditionKind {
     ///     print("ready")
     /// ```
     Value,
+
+    /// A value that does not have a known truthiness,
+    /// but is nonetheless suspicious in a boolean context because it is a subtype
+    /// of `Iterable[object]` and a supertype of `GeneratorType[Never]`.
+    Iterable,
+
+    /// A value with ambiguous truthiness whose type is `Callable`, or a union in which
+    /// every member is either a `Callable` type or another callable type known to be
+    /// always truthy, such as a function or bound method.
+    Callable(CallableTypes<'db>),
+
+    /// A union whose `None` and non-`None` members can both be falsy.
+    NoneUnion(UnionType<'db>),
 }
 
-impl ConditionKind {
+impl ConditionKind<'_> {
     /// Return the rule responsible for reporting this category of redundant condition.
-    const fn rule(self) -> &'static LintMetadata {
+    const fn rule(&self) -> &'static LintMetadata {
         match self {
             Self::Value => &REDUNDANT_CONDITION,
+            Self::NoneUnion(_) => &TRUTHINESS_TEST_OF_NONE_UNION,
+            Self::Iterable => &TRUTHINESS_TEST_OF_ITERABLE,
+            Self::Callable(_) => &TRUTHINESS_TEST_OF_CALLABLE,
             Self::Boolean | Self::ShortCircuit | Self::ContainsWalrus => {
                 &REDUNDANT_CONDITION_STRICT
             }
         }
+    }
+
+    const fn is_boolean(&self) -> bool {
+        matches!(self, Self::Boolean)
     }
 }
 
@@ -184,21 +216,128 @@ struct BooleanTest<'ast, 'db> {
     evaluation: ExpressionContext,
 }
 
-/// A condition with known truthiness, and the rule category needed to report it.
+impl BooleanTest<'_, '_> {
+    /// Determine whether a redundant-condition diagnostic can also explain why some code is
+    /// unreachable.
+    ///
+    /// The expression we warn about can be just one subexpression of an `if` condition, loop
+    /// condition, `assert` test, or `match` guard. Before adding a secondary annotation to a
+    /// diagnostic that warns that the always-truthy or always-falsy condition makes some other
+    /// code unreachable, we check whether the truthiness of the particular (sub)expression
+    /// the diagnostic is being emitted on is enough to determine the outcome of the entire
+    /// enclosing condition.
+    ///
+    /// For example, we warn that `nonempty` is always truthy here:
+    ///
+    /// ```python
+    /// nonempty = (1, 2)
+    /// assert not nonempty
+    /// print("unreachable")
+    /// ```
+    ///
+    /// `nonempty` is only a subexpression of the overall `assert` test (`not nonempty`), but
+    /// the overall test must also be false as a result of the subexpression being always truthy.
+    /// This method therefore returns `AlwaysFalse`, allowing the diagnostic on `nonempty` to also
+    /// point out that the `print` call below the assertion is unreachable.
+    ///
+    /// Similarly, in this example, knowing that `nonempty` is truthy tells us that the
+    /// `if` body is always entered, whatever the value of `flag`:
+    ///
+    /// ```py
+    /// nonempty = (1, 2)
+    ///
+    /// def _(flag: bool):
+    ///     if nonempty or flag:
+    ///         print("reachable")
+    ///     else:
+    ///         print("unreachable")
+    /// ```
+    ///
+    /// In this situation, if the diagnostic is emitted on the `nonempty` subexpression, this method
+    /// returns `AlwaysTrue` to indicate that the truthiness of this subexpression is sufficient to
+    /// make the overall condition always-truthy, thus allowing us to note in the diagnostic that the
+    /// `else` branch is unreachable.
+    ///
+    /// In this last example, however, whether we enter the body also depends on `flag`:
+    ///
+    /// ```py
+    /// nonempty = (1, 2)
+    ///
+    /// def _(flag: bool):
+    ///     if nonempty and flag:
+    ///         print("reachable")
+    ///     else:
+    ///         print("unreachable")
+    /// ```
+    ///
+    /// If a diagnostic is emitted on the `nonempty` subexpression, this method will return `Ambiguous`
+    /// because the truthiness of `nonempty` does not settle the question of whether the overall
+    /// condition will be always-truthy or always-falsy. This is true even if type inference has
+    /// separately established that `flag` is always truthy: explaining why the `else` branch is
+    /// unreachable would then require facts about both operands, so we should not attach that
+    /// explanation to a diagnostic that only points to `nonempty`.
+    ///
+    /// To make this distinction, `truthiness_from_condition` evaluates `and`, `or`, and `not` using the
+    /// known truthiness of `condition.expression`, but treats every other operand as potentially truthy
+    /// or falsy.
+    fn truthiness_implied_by(self, condition: &RedundantCondition<'_, '_>) -> Truthiness {
+        fn truthiness_from_condition(
+            expression: &ast::Expr,
+            condition: &RedundantCondition<'_, '_>,
+        ) -> Truthiness {
+            if expression.range() == condition.expression.range() {
+                return condition.truthiness;
+            }
+
+            match expression {
+                ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
+                    values
+                        .iter()
+                        .fold(Truthiness::from(op.is_and()), |result, value| match op {
+                            ast::BoolOp::Or => {
+                                result.or_else(|| truthiness_from_condition(value, condition))
+                            }
+                            ast::BoolOp::And => {
+                                result.and_then(|| truthiness_from_condition(value, condition))
+                            }
+                        })
+                }
+                ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    operand,
+                    ..
+                }) => truthiness_from_condition(operand, condition).negate(),
+                _ => Truthiness::Ambiguous,
+            }
+        }
+
+        if self.truthiness.is_ambiguous() {
+            return Truthiness::Ambiguous;
+        }
+
+        if truthiness_from_condition(self.expression, condition) == self.truthiness {
+            self.truthiness
+        } else {
+            Truthiness::Ambiguous
+        }
+    }
+}
+
+/// A classified boolean test and the rule category needed to report it.
 ///
-/// We may or may not eventually report a diagnostic for this condition! A condition is classified
-/// before we examine the context the condition occurs in, so an instance of this struct represents
-/// a "diagnostic candidate" rather than a guarantee that a diagnostic will be emitted.
+/// A test is classified before its context is considered, so this struct represents a diagnostic
+/// candidate rather than a guarantee that a diagnostic will be emitted.
 ///
-/// The value type is retained for diagnostic messages. The `is_truthy` field describes the condition's
-/// outcome, which can depend on short-circuit evaluation as well as the value type (see the doc-comment
-/// for [`ExpressionContext`] for more details).
+/// The value type is retained for diagnostic messages. The `truthiness` field records what can be
+/// inferred about the test's outcome, which can depend on short-circuit evaluation as well as the
+/// value type (see the doc-comment for [`ExpressionContext`] for more details). It remains
+/// ambiguous for suspicious `Callable` and `Iterable` tests.
 #[derive(Debug)]
 struct RedundantCondition<'ast, 'db> {
     expression: &'ast ast::Expr,
     value_type: Type<'db>,
-    is_truthy: bool,
-    kind: ConditionKind,
+    truthiness: Truthiness,
+    kind: ConditionKind<'db>,
 }
 
 /// Determination of whether `redundant-condition-strict` diagnostics should be reported
@@ -216,40 +355,29 @@ enum BooleanDiagnosticPreference {
     EnclosingCondition,
 }
 
-/// The result of checking a boolean test, indicating whether an expression containing that test
-/// should also be checked for redundancy.
-///
-/// This is returned by [`TypeInferenceBuilder::check_boolean_test`] to prevent duplicate diagnostics
-/// on an expression and its subexpressions. A condition can suppress an enclosing diagnostic even
-/// when its own diagnostic is disabled, exempt, or ignored.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ConditionCheckResult {
-    /// The containing boolean or conditional expression can still be reported.
-    ///
-    /// For example, the boolean result of `isinstance()` is not reported as a subexpression when
-    /// the complete `not` expression has fixed truthiness:
-    ///
-    /// ```python
-    /// def check(value: str):
-    ///     if not isinstance(value, str):  # `redundant-condition-strict` on the whole condition.
-    ///         print("unreachable")
-    /// ```
-    CheckEnclosingCondition,
+bitflags! {
+    /// Biset representing the rules on an outer expression that can be suppressed by a diagnostic
+    /// on an inner subexpression.
+    #[derive(Clone, Copy, Debug)]
+    struct ConditionCheckResult: u8 {
+        /// A fixed-truthiness operand takes precedence over the entire enclosing test.
+        const SUPPRESS_ALL = 1 << 0;
 
-    /// The containing boolean or conditional expression should not be reported.
-    ///
-    /// For example, reporting that `ready` is always truthy suppresses a second diagnostic saying
-    /// that `not ready` is always false. This also applies if the diagnostic on `ready` is ignored
-    /// or its rule is disabled:
-    ///
-    /// ```python
-    /// def ready() -> bool:
-    ///     return True
-    ///
-    /// if not ready:  # Only `ready` is reported, under `redundant-condition`.
-    ///     print("unreachable")
-    /// ```
-    SuppressEnclosingCondition,
+        /// A suspicious `Callable` operand suppresses only an enclosing callable diagnostic.
+        const SUPPRESS_CALLABLE = 1 << 1;
+
+        /// A suspicious `Iterable` operand suppresses only an enclosing iterable diagnostic.
+        const SUPPRESS_ITERABLE = 1 << 2;
+
+        /// A suspicious `None` union operand suppresses only an enclosing `None` union diagnostic.
+        const SUPPRESS_NONE_UNION = 1 << 3;
+    }
+}
+
+impl ConditionCheckResult {
+    const fn suppresses(self, enclosing: Self) -> bool {
+        self.contains(Self::SUPPRESS_ALL) || self.intersects(enclosing)
+    }
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -261,14 +389,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// - It's a stub file
     /// - We're inside a string annotation. Its expressions are absent from the semantic index,
     ///   so we cannot group nested tests to avoid duplicate diagnostics.
-    /// - Neither `redundant-condition` nor `redundant-condition-strict` is enabled
-    ///   in the user's configuration.
+    /// - None of the relevant rules are enabled in the user's configuration
     fn should_check_redundant_conditions(&self) -> bool {
+        static RELEVANT_RULES: &[&LintMetadata] = &[
+            &REDUNDANT_CONDITION,
+            &REDUNDANT_CONDITION_STRICT,
+            &TRUTHINESS_TEST_OF_CALLABLE,
+            &TRUTHINESS_TEST_OF_ITERABLE,
+            &TRUTHINESS_TEST_OF_NONE_UNION,
+        ];
+
         !self.in_string_annotation()
             && self.db().should_check_file(self.file())
             && !self.file().is_stub(self.db())
-            && (self.context.is_lint_enabled(&REDUNDANT_CONDITION)
-                || self.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT))
+            && RELEVANT_RULES
+                .iter()
+                .any(|rule| self.context.is_lint_enabled(rule))
     }
 
     /// Check a condition, for which types have already been inferred, to see if it is redundant.
@@ -382,8 +518,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    /// Sweep over an entire suite of statements to examine if any direct `if`-statement conditions,
-    /// `elif`-statement conditions or `assert`-statement conditionsin that suite are redundant.
+    /// Sweep over an entire suite of statements to examine if any direct `if`, `elif`, `assert`,
+    /// or `while` conditions or `match` guards in that suite are redundant.
     ///
     /// We suppress conditions in [`ConditionKind::Boolean`] and [`ConditionKind::ShortCircuit`] when
     /// the code they make unreachable is a "defensive exit". See the doc-comment for
@@ -391,7 +527,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// All types in the suite must already be inferred before this method is called. This is so we
     /// can recognize terminal statements from their types, including calls returning `Never` and
-    /// `return NotImplemented` statements.
+    /// `return NotImplemented` statements. Reachability annotations can also require types from
+    /// patterns and guards in later `match` cases.
     ///
     /// ## Assertions
     ///
@@ -452,51 +589,78 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             &suite[i + 1..],
                         );
 
-                        for condition in self.redundant_conditions(
-                            self.boolean_test(test, ExpressionContext::Condition),
-                            context,
-                        ) {
+                        let boolean_test = self.boolean_test(test, ExpressionContext::Condition);
+                        for condition in self.redundant_conditions(boolean_test, context) {
                             if let Some(mut diagnostic) =
                                 self.report_redundant_condition(&condition)
-                                && condition.expression.range() == test.range()
                             {
-                                self.annotate_redundant_if_or_elif(
+                                // An operand's truthiness can differ from the full condition's,
+                                // so use the latter to determine which branch is unreachable.
+                                self.add_secondary_annotations_for_redundant_if_or_elif(
                                     &condition,
                                     &mut diagnostic,
+                                    boolean_test.truthiness_implied_by(&condition),
                                     if_stmt,
+                                    branch_index,
+                                    &suite[i + 1..],
                                 );
                             }
                         }
                     }
                 }
                 ast::Stmt::Assert(assert_statement) => {
-                    let test_type = self.expression_type(&assert_statement.test);
-                    let truthiness = self.condition_truthiness(&assert_statement.test);
-                    for condition in self.redundant_conditions(
-                        BooleanTest {
-                            expression: &assert_statement.test,
-                            value_type: test_type,
-                            truthiness,
-                            evaluation: ExpressionContext::Condition,
-                        },
-                        RedundantConditionContext::Assertion,
-                    ) {
-                        self.report_redundant_condition(&condition);
+                    let boolean_test =
+                        self.boolean_test(&assert_statement.test, ExpressionContext::Condition);
+                    for condition in self
+                        .redundant_conditions(boolean_test, RedundantConditionContext::Assertion)
+                    {
+                        if let Some(mut diagnostic) = self.report_redundant_condition(&condition) {
+                            self.add_secondary_annotations_for_redundant_assert(
+                                &mut diagnostic,
+                                boolean_test.truthiness_implied_by(&condition),
+                                &suite[i + 1..],
+                            );
+                        }
                     }
                 }
                 ast::Stmt::While(while_statement) => {
-                    let test_type = self.expression_type(&while_statement.test);
-                    let truthiness = self.condition_truthiness(&while_statement.test);
-                    for condition in self.redundant_conditions(
-                        BooleanTest {
-                            expression: &while_statement.test,
-                            value_type: test_type,
-                            truthiness,
-                            evaluation: ExpressionContext::Condition,
-                        },
-                        RedundantConditionContext::Standalone,
-                    ) {
-                        self.report_redundant_condition(&condition);
+                    let boolean_test =
+                        self.boolean_test(&while_statement.test, ExpressionContext::Condition);
+                    for condition in self
+                        .redundant_conditions(boolean_test, RedundantConditionContext::Standalone)
+                    {
+                        if let Some(mut diagnostic) = self.report_redundant_condition(&condition) {
+                            self.add_secondary_annotations_for_redundant_while(
+                                &mut diagnostic,
+                                boolean_test.truthiness_implied_by(&condition),
+                                while_statement,
+                                &suite[i + 1..],
+                            );
+                        }
+                    }
+                }
+                ast::Stmt::Match(match_statement) => {
+                    for (case_index, case) in match_statement.cases.iter().enumerate() {
+                        let Some(guard) = case.guard.as_deref() else {
+                            continue;
+                        };
+
+                        let boolean_test = self.boolean_test(guard, ExpressionContext::Condition);
+                        for condition in self.redundant_conditions(
+                            boolean_test,
+                            RedundantConditionContext::Standalone,
+                        ) {
+                            if let Some(mut diagnostic) =
+                                self.report_redundant_condition(&condition)
+                            {
+                                self.add_secondary_annotations_for_redundant_match(
+                                    &mut diagnostic,
+                                    boolean_test.truthiness_implied_by(&condition),
+                                    case,
+                                    &match_statement.cases[case_index + 1..],
+                                );
+                            }
+                        }
                     }
                 }
                 _ => continue,
@@ -506,38 +670,78 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Classify a condition using its inferred type and truthiness.
     ///
-    /// We return `None` if we cannot determine whether the test is always truthy or always falsy.
-    /// We also return `None` for literal boolean and integer expressions: a condition written as
-    /// `True`, `False`, `1`, or `0` is almost certainly deliberate. A variable with an inferred
-    /// literal type is still classified, however, because its truthiness may be less obvious to
-    /// the author:
+    /// We return `Some` if the condition is always truthy, always falsy, or otherwise suspicious
+    /// in a boolean context due to it being a `Callable` or `Iterable` type. Exemptions are made
+    /// for literal boolean and integer expressions: although these can always be determined to be
+    /// either always truthy or always falsy, a condition written as `True`, `False`, `1`, or `0`
+    /// is almost certainly deliberate. A variable with an inferred literal type is still classified,
+    /// however, because its truthiness may be less obvious to the author:
     ///
     /// ```python
-    /// from typing import Literal
+    /// from typing import Literal, Callable, Iterable
     ///
-    /// def check(flag: bool, known: Literal[True]):
-    ///     if flag:   # No classification: the outcome is unknown.
+    /// def check(
+    ///     flag: bool,
+    ///     known: Literal[True],
+    ///     callback: Callable[[], bool],
+    ///     items: Iterable[int]
+    /// ):
+    ///     if flag:      # No classification: ambiguous truthiness without a suspicious type.
     ///         pass
-    ///     if True:   # No classification: a literal boolean expression.
+    ///
+    ///     if True:      # No classification: a literal boolean expression.
     ///         pass
-    ///     if 1:      # No classification: a literal integer expression.
+    ///
+    ///     if 1:         # No classification: a literal integer expression.
     ///         pass
-    ///     if known:  # `ConditionKind::Boolean`: the value type is boolean.
+    ///
+    ///     if known:     # `ConditionKind::Boolean`: the value type is boolean.
+    ///         pass
+    ///
+    ///     if callback:  # `ConditionKind::Callable`: ambiguous truthiness.
+    ///         pass
+    ///
+    ///     if items:     # `ConditionKind::Iterable`: ambiguous truthiness.
     ///         pass
     /// ```
     fn classify_redundant_condition<'expr>(
         &self,
         test: BooleanTest<'expr, 'db>,
     ) -> Option<RedundantCondition<'expr, 'db>> {
+        /// The bottom specialization for `GeneratorType`
+        static BOTTOM_SPEC: &[Type] = &[Type::Never, Type::object(), Type::Never];
+
+        /// The top specialization for `Iterable`
+        static TOP_SPEC: &[Type] = &[Type::object()];
+
+        /// Fast path for conditions with ambiguous truthiness,
+        /// so that we do not have to materialize `GeneratorType` specializations
+        /// for common cases such as `bool`, `TypeIs` and `TypeGuard` conditions, etc.
+        fn cannot_satisfy_iterable_check<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+            match ty {
+                Type::NominalInstance(_)
+                | Type::TypeGuard(_)
+                | Type::TypeIs(_)
+                | Type::Dynamic(_)
+                | Type::LiteralValue(_) => true,
+                Type::Intersection(intersection) => intersection
+                    .positive(db)
+                    .iter()
+                    .any(|&item| cannot_satisfy_iterable_check(db, item)),
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .all(|&item| cannot_satisfy_iterable_check(db, item)),
+                _ => false,
+            }
+        }
+
         let BooleanTest {
             expression,
             value_type,
             truthiness,
             ..
         } = test;
-        if truthiness.is_ambiguous() {
-            return None;
-        }
 
         if matches!(
             expression,
@@ -556,7 +760,74 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let env = self.program_environment();
 
-        let kind = if value_type.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
+        let kind = if truthiness.is_ambiguous() {
+            if let Some(union) =
+                self.truthiness_test_of_none_union_candidate(expression, value_type)
+            {
+                ConditionKind::NoneUnion(union)
+            } else {
+                let expanded = match value_type.resolve_type_alias(db) {
+                    Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
+                    ty => ty,
+                };
+                let callables = match expanded {
+                    Type::Callable(callable) => Some(CallableTypes::one(callable)),
+                    Type::Union(union) => {
+                        let mut emit_diagnostic = true;
+                        let union_elements = union.elements(db);
+                        let mut callable_elements = Vec::with_capacity(union_elements.len());
+                        for element in union_elements {
+                            if let Type::Callable(callable) = element {
+                                callable_elements.push(*callable);
+                            } else if element.bool(db, env).is_always_true()
+                                && let Some(callables) = element.try_upcast_to_callable(db, env)
+                            {
+                                callable_elements.extend(&callables);
+                            } else {
+                                emit_diagnostic = false;
+                                break;
+                            }
+                        }
+                        if emit_diagnostic {
+                            Some(CallableTypes::from_elements(callable_elements))
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                };
+
+                if let Some(callables) = callables {
+                    ConditionKind::Callable(callables)
+                } else {
+                    if cannot_satisfy_iterable_check(db, value_type) {
+                        return None;
+                    }
+
+                    let builder = ConstraintSetBuilder::new();
+
+                    let generator =
+                        KnownClass::GeneratorType.to_specialized_instance(db, env, BOTTOM_SPEC);
+
+                    let check = |source: Type<'db>, target: Type<'db>| {
+                        source.when_subtype_of(db, env, target, &builder, TypeVarSet::None)
+                    };
+
+                    if check(generator, value_type)
+                        .and(db, &builder, || {
+                            let iterable =
+                                KnownClass::Iterable.to_specialized_instance(db, env, TOP_SPEC);
+                            check(value_type, iterable)
+                        })
+                        .is_always_satisfied(db, env)
+                    {
+                        ConditionKind::Iterable
+                    } else {
+                        return None;
+                    }
+                }
+            }
+        } else if value_type.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
             ConditionKind::Boolean
         } else if value_type.bool(db, env).is_ambiguous() {
             ConditionKind::ShortCircuit
@@ -570,9 +841,87 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         Some(RedundantCondition {
             expression,
             value_type,
-            is_truthy: truthiness.is_always_true(),
+            truthiness,
             kind,
         })
+    }
+
+    /// Return the expanded union corresponding to `ty` if this test is eligible for `truthiness-test-of-none-union`.
+    fn truthiness_test_of_none_union_candidate(
+        &self,
+        expression: &ast::Expr,
+        ty: Type<'db>,
+    ) -> Option<UnionType<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+        let expanded = match ty.resolve_type_alias(db) {
+            Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
+            ty => ty,
+        };
+
+        // Only check types that are unions with `None`:
+        let Type::Union(union) = expanded else {
+            return None;
+        };
+        let elements = union.elements(db);
+        if !elements.iter().any(|element| element.is_none(db)) {
+            return None;
+        }
+
+        // Check if one of the non-`None` elements of the union may be falsy.
+        // Dynamic types can materialize to always-truthy types. Excluding them respects
+        // the gradual guarantee: replacing an always-truthy union element with `Any`
+        // or `Unknown` should not introduce a diagnostic.
+        if !elements.iter().any(|element| {
+            if element.is_none(db)
+                || element.is_dynamic()
+                || !element
+                    .try_bool(db, env)
+                    .is_ok_and(Truthiness::may_be_false)
+            {
+                return false;
+            }
+
+            // Non-final classes without a `__bool__` or `__len__` method have ambiguous
+            // truthiness in the `try_bool` check above, since their truthiness *could* be
+            // affected by a subclass defining one of these methods.
+            // However, for this particular diagnostic, we want to assume that classes
+            // without these methods are always truthy. If we don't do that, we would flag
+            // all Boolean checks on types like `MyClass | None`, based on the assumption
+            // that there *might* be a subclass affecting truthiness. This would lead to
+            // too many false positives, so we make a conservative choice here.
+            ["__bool__", "__len__"].iter().any(|name| {
+                !element
+                    .member_lookup_with_policy(
+                        db,
+                        env,
+                        name,
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .place
+                    .is_undefined()
+            })
+        }) {
+            return None;
+        }
+
+        // A compound expression can combine `None` and other falsy values from unrelated
+        // operands, as in `enabled and match` with `match: Match[str] | None`. Require a
+        // value-producing operand to qualify independently, including through assignments.
+        // The shared condition traversal prefers operand diagnostics where possible.
+        let is_candidate = |operand: &ast::Expr| {
+            self.truthiness_test_of_none_union_candidate(operand, self.expression_type(operand))
+                .is_some()
+        };
+        let has_suspicious_operand = match expression {
+            ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => values.iter().any(is_candidate),
+            ast::Expr::If(ast::ExprIf { body, orelse, .. }) => {
+                is_candidate(body) || is_candidate(orelse)
+            }
+            ast::Expr::Named(ast::ExprNamed { value, .. }) => is_candidate(value),
+            _ => true,
+        };
+        has_suspicious_operand.then_some(union)
     }
 
     /// Read an already-inferred expression's type and truthiness using the requested
@@ -607,13 +956,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// This ensures that the same mistake is not reported twice.
     ///
     /// Callers construct diagnostics for the selected conditions using the [`diagnostic`] module,
-    /// and can add annotations using the surrounding statement context.
+    /// and can add secondary annotations using the surrounding statement context.
     ///
     /// Independent tests within subexpressions are included in the same result.
     ///
-    /// If the truthiness of the complete condition is fixed, we only report a single diagnostic
-    /// for the entire condition. If its truthiness is ambiguous, however, subexpressions with
-    /// fixed truthiness can be reported individually:
+    /// When an operand and the complete condition both have fixed truthiness, we select one
+    /// diagnostic for the mistake. Suspicious `Callable` and `Iterable` operands can instead be
+    /// reported alongside a complete condition with fixed truthiness. If the complete condition
+    /// has ambiguous truthiness, subexpressions with fixed truthiness can be reported individually:
     ///
     /// ```python
     /// def check(value: int, flag: bool):
@@ -640,22 +990,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Check `test` and the boolean tests contributing to its outcome.
     ///
-    /// Diagnostic selection follows two rules:
+    /// Diagnostic selection follows these rules:
     ///
     /// - Within a condition with fixed truthiness, boolean and short-circuit operands are not
     ///   reported. The enclosing condition represents their redundancy, even if its diagnostic
     ///   is exempt or ignored.
-    /// - Other operands, such as uncalled functions, take precedence over their enclosing
-    ///   conditions because they identify the likely mistake more directly.
+    /// - Other operands with fixed truthiness, such as uncalled functions, take precedence over
+    ///   their enclosing conditions because they identify the likely mistake more directly.
+    /// - Suspicious `Callable` and `Iterable` operands suppress only their own rule on enclosing
+    ///   expressions, leaving the other suspicious rule and fixed-truthiness rules eligible.
     ///
     /// The first rule is decided before visiting operands, since the whole condition's truthiness
-    /// is already known. The second is decided after visiting them, using [`ConditionCheckResult`].
+    /// is already known. The others are decided after visiting them, using [`ConditionCheckResult`].
     ///
-    /// Return [`ConditionCheckResult::SuppressEnclosingCondition`] if a caller checking a boolean
-    /// or conditional expression containing `test` should suppress the diagnostic on that larger
-    /// expression. For example, the code below receives a diagnostic on `ready` because the
-    /// function object is always truthy. It does not also receive a diagnostic saying that
-    /// `not ready` is always false:
+    /// A fixed-truthiness operand can suppress a diagnostic on the enclosing expression. For
+    /// example, the code below receives a diagnostic on `ready` because the function object is
+    /// always truthy. It does not also receive a diagnostic saying that `not ready` is always false:
     ///
     /// ```python
     /// def ready() -> bool:
@@ -665,11 +1015,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///     print("unreachable")
     /// ```
     ///
-    /// Checking `ready` returns [`ConditionCheckResult::SuppressEnclosingCondition`], so the call
-    /// checking `not ready` knows not to report a diagnostic regarding the larger expression.
+    /// Checking `ready` returns [`ConditionCheckResult::SUPPRESS_ALL`], so the call checking
+    /// `not ready` does not report a diagnostic on the larger expression. A suspicious `Callable`
+    /// or `Iterable` test instead suppresses only the same rule on enclosing expressions.
     ///
-    /// Return the same result if the selected diagnostic is disabled or ignored. Disabling the
-    /// diagnostic on `ready` should not cause a different diagnostic on `not ready` to appear.
     /// Conditions selected for reporting are appended to `conditions` in traversal order.
     fn check_boolean_test<'ast>(
         &self,
@@ -684,18 +1033,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             BooleanDiagnosticPreference::EnclosingCondition
         };
 
-        let mut operand_result = ConditionCheckResult::CheckEnclosingCondition;
+        let mut operand_result = ConditionCheckResult::empty();
 
         let mut check_operand = |expression: &'ast ast::Expr, context, conditions: &mut Vec<_>| {
-            if self.check_boolean_test(
+            let result = self.check_boolean_test(
                 self.boolean_test(expression, test.evaluation),
                 context,
                 operand_preference,
                 conditions,
-            ) == ConditionCheckResult::SuppressEnclosingCondition
-            {
-                operand_result = ConditionCheckResult::SuppressEnclosingCondition;
-            }
+            );
+            operand_result |= result;
         };
 
         match test.expression {
@@ -738,7 +1085,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ),
         }
 
-        if operand_result == ConditionCheckResult::SuppressEnclosingCondition {
+        if operand_result.contains(ConditionCheckResult::SUPPRESS_ALL) {
             return operand_result;
         }
 
@@ -749,11 +1096,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // Boolean tests against `ty_extensions._internal.ConstraintSet` are (hopefully)
             // only going to occur in the context of our test suite, and it's very annoying
             // if we report them as redundant.
-            return ConditionCheckResult::SuppressEnclosingCondition;
+            return ConditionCheckResult::SUPPRESS_ALL;
         }
 
         let Some(condition) = self.classify_redundant_condition(test) else {
-            return ConditionCheckResult::CheckEnclosingCondition;
+            return operand_result;
         };
 
         if preference == BooleanDiagnosticPreference::EnclosingCondition
@@ -762,7 +1109,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ConditionKind::Boolean | ConditionKind::ShortCircuit
             )
         {
-            return ConditionCheckResult::CheckEnclosingCondition;
+            return operand_result;
         }
 
         // An unreachable operand can retain a literal type, as in `False and "yes"`.
@@ -774,16 +1121,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .context
                 .is_range_reachable(condition.expression.range())
         {
-            return ConditionCheckResult::CheckEnclosingCondition;
+            return operand_result;
+        }
+
+        let result = match &condition.kind {
+            ConditionKind::Callable(_) => ConditionCheckResult::SUPPRESS_CALLABLE,
+            ConditionKind::Iterable => ConditionCheckResult::SUPPRESS_ITERABLE,
+            ConditionKind::NoneUnion(_) => ConditionCheckResult::SUPPRESS_NONE_UNION,
+            ConditionKind::Boolean
+            | ConditionKind::ContainsWalrus
+            | ConditionKind::ShortCircuit
+            | ConditionKind::Value => ConditionCheckResult::SUPPRESS_ALL,
+        };
+
+        if operand_result.suppresses(result) {
+            return operand_result;
         }
 
         let rule = condition.kind.rule();
-
         if self.context.is_lint_enabled(rule) && !condition_context.exempts(self, &condition) {
             conditions.push(condition);
         }
 
-        ConditionCheckResult::SuppressEnclosingCondition
+        operand_result | result
     }
 
     /// Find and check boolean tests within subexpressions of `test`. This includes tests inside
@@ -893,7 +1253,7 @@ impl<'ast> Visitor<'ast> for SubexpressionChecker<'_, 'ast, '_> {
 /// Which exits are accepted when checking the final statement of a suite.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SuiteExitKind {
-    /// Accept any return statement, as well as defensive exits.
+    /// Accept any return, break, or continue statement, as well as defensive exits.
     Any,
     /// Only accept exits that can indicate a defensive runtime check.
     Defensive,
@@ -908,7 +1268,7 @@ enum SuiteExitKind {
 /// - or a nested `if` statement with an explicit `else` where every branch of the
 ///   `if`/`elif`/`else` ends in a recognized exit of the requested kind.
 ///
-/// [`SuiteExitKind::Any`] also accepts every `return` statement, while
+/// [`SuiteExitKind::Any`] also accepts every `return`, `break`, and `continue` statement, while
 /// [`SuiteExitKind::Defensive`] only accepts `return NotImplemented`.
 ///
 /// Potentially failing assertions count as exits even when they might succeed. This heuristic
@@ -927,6 +1287,7 @@ fn suite_ends_with_exit(
         .find(|stmt| !is_trivial_statement(stmt))
         .is_some_and(|stmt| match stmt {
             ast::Stmt::Raise(_) => true,
+            ast::Stmt::Break(_) | ast::Stmt::Continue(_) => kind == SuiteExitKind::Any,
             ast::Stmt::Assert(ast::StmtAssert { test, .. }) => {
                 builder.condition_truthiness(test).may_be_false()
             }
@@ -977,6 +1338,8 @@ fn suite_ends_with_exit(
 
 /// Return `true` if `stmt` is a "trivial statement"
 /// that has no effect nor side effect at runtime.
+///
+/// Statements considered trivial are `pass`, `...`, and string-literal statements.
 fn is_trivial_statement(stmt: &ast::Stmt) -> bool {
     match stmt {
         ast::Stmt::Pass(_) => true,

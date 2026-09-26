@@ -60,7 +60,7 @@ If a dict literal is inferred against a union containing both a `TypedDict` and 
 extra keys accepted by the non-`TypedDict` arm should not trigger eager `TypedDict` diagnostics:
 
 ```py
-from typing import Any, TypedDict
+from typing_extensions import Any, TypedDict
 
 class FormatterConfig(TypedDict, total=False):
     format: str
@@ -77,7 +77,7 @@ Methods that are available on `dict`s are also available on `TypedDict`s:
 bob.update(age=26)
 bob.update({"age": 27})
 
-class NamePatch(TypedDict, total=False):
+class NamePatch(TypedDict, total=False, closed=True):
     name: str
 
 name_update: NamePatch = {"name": "Bobby"}
@@ -147,7 +147,7 @@ class Movie(TypedDict, total=False):
     year: int
     director: NotRequired[str]
 
-class MissingRequiredTitle(TypedDict, total=False):
+class MissingRequiredTitle(TypedDict, total=False, closed=True):
     year: int
 
 movie: Movie = {"title": "Alien"}
@@ -2529,6 +2529,8 @@ def _(
     # No error here:
     reveal_type(person[unknown_key])  # revealed: Unknown
 
+    # error: [invalid-key] "got key of type `list[RecursiveKey | None]`"
+    # error: [invalid-key] "got key of type `None`"
     reveal_type(movie[recursive_key[0]])  # revealed: Unknown
 
     # error: [invalid-key] "Unknown key "anything" for TypedDict `Animal`"
@@ -2667,13 +2669,13 @@ class ReadOnlyPerson(TypedDict):
     id: ReadOnly[int]
     age: int
 
-class AgePatch(TypedDict, total=False):
+class AgePatch(TypedDict, total=False, closed=True):
     age: int
 
 class IdPatch(TypedDict, total=False):
     id: int
 
-class ImpossibleIdPatch(TypedDict, total=False):
+class ImpossibleIdPatch(TypedDict, total=False, closed=True):
     id: NotRequired[Never]
 
 person: ReadOnlyPerson = {"id": 1, "age": 30}
@@ -2694,6 +2696,134 @@ person.update({"id": 2})
 person.update(id=2)
 
 person.update(impossible_id_patch)
+```
+
+## Updates with undeclared source items
+
+An open `TypedDict` can contain items that are not declared in its type. A `NamePatch` may contain a
+`count` item with an incompatible type, so neither `update()` nor `|=` can safely apply it to a
+`Counter`. A source declaring every destination field is accepted when those declared types are
+compatible.
+
+```py
+from typing_extensions import TypedDict
+
+class NamePatch(TypedDict):
+    name: str
+
+class Counter(TypedDict):
+    name: str
+    count: int
+
+def _(counter: Counter, patch: NamePatch, other: Counter):
+    counter.update(patch)  # error: [invalid-argument-type]
+    counter |= patch  # error: [unsupported-operator]
+    counter.update(other)
+    counter |= other
+    counter |= {"name": "updated", "count": 1}
+```
+
+## Updates with undeclared read-only items
+
+An open source may contain a destination's read-only item even when it does not declare that item.
+Although `id` accepts any object, the update is rejected because it could overwrite a read-only
+item.
+
+```py
+from typing_extensions import Never, NotRequired, ReadOnly, TypedDict
+
+class Person(TypedDict):
+    id: ReadOnly[object]
+    name: str
+
+class NamePatch(TypedDict):
+    name: str
+
+def _(person: Person, patch: NamePatch):
+    person.update(patch)  # error: [invalid-argument-type]
+    person |= patch  # error: [unsupported-operator]
+```
+
+A source with an `id: NotRequired[Never]` item cannot contain `id`, so it can update the mutable
+`name` item even when the source is open.
+
+```py
+class ImpossibleIdPatch(TypedDict):
+    id: NotRequired[Never]
+    name: str
+
+def _(person: Person, patch: ImpossibleIdPatch):
+    person.update(patch)
+    person |= patch
+```
+
+## Updates with undeclared destination items
+
+By default, an open `TypedDict`'s undeclared items behave as read-only items of type `object`. This
+allows subtypes to give those items narrower types: `destination` may contain a `count` item of type
+`str`. Even a closed source cannot update an undeclared destination key, because it could overwrite
+such an item with an incompatible value. A non-mutating merge can include these keys because it
+leaves the destination unchanged.
+
+```py
+from typing_extensions import TypedDict
+
+class Named(TypedDict):
+    name: str
+
+class CountPatch(TypedDict, closed=True):
+    count: int
+
+def _(destination: Named, patch: CountPatch):
+    destination.update(patch)  # error: [invalid-argument-type]
+    destination |= patch  # error: [unsupported-operator]
+    reveal_type(destination | patch)  # revealed: Named
+```
+
+Explicit mutable extra items permit these updates when the source's value types are compatible. An
+`object` extra-item type accepts both integer and string values, while `int` only accepts the
+integer patch. Explicit read-only extra items reject writes even when their value type is
+compatible.
+
+```py
+from typing_extensions import ReadOnly
+
+class ObjectExtras(Named, extra_items=object): ...
+class IntExtras(Named, extra_items=int): ...
+class ReadOnlyExtras(Named, extra_items=ReadOnly[object]): ...
+
+class StringPatch(TypedDict, closed=True):
+    count: str
+
+def _(
+    objects: ObjectExtras,
+    ints: IntExtras,
+    read_only: ReadOnlyExtras,
+    count: CountPatch,
+    text: StringPatch,
+):
+    objects.update(count)
+    objects |= count
+    objects.update(text)
+    objects |= text
+    ints.update(count)
+    ints |= count
+    ints.update(text)  # error: [invalid-argument-type]
+    ints |= text  # error: [unsupported-operator]
+    read_only.update(count)  # error: [invalid-argument-type]
+    read_only |= count  # error: [unsupported-operator]
+```
+
+An optional bottom-typed item cannot be present, so it does not write an undeclared destination key:
+
+```py
+from typing_extensions import Never, NotRequired
+
+class AbsentCountPatch(TypedDict, closed=True):
+    count: NotRequired[Never]
+
+def _(destination: Named, patch: AbsentCountPatch):
+    destination.update(patch)
 ```
 
 ## Methods on `TypedDict`
@@ -2840,7 +2970,7 @@ def _(v: OptionalX | RequiredX) -> None:
     # but this is a terrible error message:
     #
     # error: [call-non-callable] "Object of type `Overload[]` is not callable"
-    reveal_type(v.pop("x"))  # revealed: Unknown
+    reveal_type(v.pop("x"))  # revealed: int | Unknown
 
 def union_pop_with_default(u: OptionalX | OptStrX) -> None:
     # `Literal[0]` is assignable to `int`, so `OptionalX` arm returns `int`; `OptStrX` arm
@@ -3361,7 +3491,22 @@ def set_and_get(value: SetAndGet[Key, Value], key: Key, item: Value) -> Value:
 
 def takes_int(value: int) -> None: ...
 def _(value: CorrelatedA | CorrelatedB) -> None:
+    # TODO: This should not error.
+    # snapshot: invalid-argument-type
     takes_int(set_and_get(value, "a", 1))
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `takes_int` is incorrect
+   --> src/mdtest_snippet.py:347:15
+    |
+347 |     takes_int(set_and_get(value, "a", 1))
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^ Expected `int`, found `object`
+info: Function defined here
+   --> src/mdtest_snippet.py:343:5
+    |
+343 | def takes_int(value: int) -> None: ...
+    |     ^^^^^^^^^ ---------- Parameter declared here
 ```
 
 Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a
@@ -4296,6 +4441,58 @@ type AliasNodeChild[T] = AliasNode[T] | None
 
 # TODO: Infer `AliasNode[int]`.
 reveal_type(AliasNode(child=AliasNode(value=1)))  # revealed: AliasNode[Unknown]
+```
+
+### Constructor inference through recursive aliases
+
+A generic `TypedDict` inside a recursive alias does not acquire an incompatible type argument from
+another constructor field. Both alias syntaxes preserve the unresolved outer type argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict, TypeVar
+
+T = TypeVar("T")
+
+class Item[T](TypedDict):
+    value: T
+
+Tree = Item[T] | list["Tree[T]"]
+type ExplicitTree[T] = Item[T] | list[ExplicitTree[T]]
+
+class Box[T](TypedDict):
+    data: Tree[T]
+    marker: T
+
+class ExplicitBox[T](TypedDict):
+    data: ExplicitTree[T]
+    marker: T
+
+reveal_type(Box(data={"value": 1}, marker="x"))  # revealed: Box[Unknown]
+reveal_type(ExplicitBox(data={"value": 1}, marker="x"))  # revealed: ExplicitBox[Unknown]
+reveal_type(Box(data=Item(value=1), marker="x"))  # revealed: Box[Unknown]
+reveal_type(ExplicitBox(data=Item(value=1), marker="x"))  # revealed: ExplicitBox[Unknown]
+```
+
+Aliases whose type arguments change at every recursive step also keep constructor inference
+conservative.
+
+```py
+Growing = tuple[T, "Growing[list[T]] | None"]
+type ExplicitGrowing[T] = tuple[T, ExplicitGrowing[list[T]] | None]
+
+class GrowingBox[T](TypedDict):
+    data: Growing[T]
+
+class ExplicitGrowingBox[T](TypedDict):
+    data: ExplicitGrowing[T]
+
+reveal_type(GrowingBox(data=(1, None)))  # revealed: GrowingBox[Unknown]
+reveal_type(ExplicitGrowingBox(data=(1, None)))  # revealed: ExplicitGrowingBox[Unknown]
 ```
 
 ### Constructor inference from nested values

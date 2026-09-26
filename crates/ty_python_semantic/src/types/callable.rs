@@ -11,8 +11,9 @@ use crate::{
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
+        cyclic::ActiveRecursionDetector,
         function::OverloadLiteral,
-        known_instance::FunctoolsPartialInstance,
+        known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
         visitor, walk_signature,
@@ -21,6 +22,85 @@ use crate::{
 use ty_python_core::definition::Definition;
 
 impl<'db> Type<'db> {
+    pub(super) fn function_like_kind(self, db: &'db dyn Db) -> Option<CallableTypeKind> {
+        match self {
+            Type::FunctionLiteral(function) => Some(function.callable_type_kind(db)),
+            Type::Callable(callable) if callable.is_method_like(db) => Some(callable.kind(db)),
+            Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
+                Some(match wrapper.kind(db) {
+                    MethodWrapperKind::Staticmethod => CallableTypeKind::StaticMethodLike,
+                    MethodWrapperKind::Classmethod => CallableTypeKind::ClassMethodLike,
+                })
+            }
+            _ => None,
+        }
+    }
+
+    pub(super) fn is_classmethod(self, db: &'db dyn Db) -> bool {
+        self.function_like_kind(db) == Some(CallableTypeKind::ClassMethodLike)
+    }
+
+    /// Returns the function exposed by descriptor access or a bound method's `__func__`.
+    pub(super) fn underlying_function(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::FunctionLiteral(function) => {
+                Type::FunctionLiteral(function.underlying_function(db))
+            }
+            Type::Callable(callable) if callable.is_method_like(db) => {
+                Type::Callable(callable.into_function_like(db))
+            }
+            Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => wrapper.wrapped(db),
+            _ => self,
+        }
+    }
+
+    /// Model the effect of `__get__` on functions, staticmethods, and
+    /// classmethods.
+    ///
+    /// See [`Self::try_call_dunder_get`] for general descriptor access, including user-defined
+    /// `__get__` methods.
+    pub(super) fn function_like_dunder_get(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        instance: Option<Type<'db>>,
+        owner: Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        // ParamSpec specialization can produce a union of function descriptors.
+        match self {
+            Type::Union(union) => {
+                return union.try_map(db, env, |alternative| {
+                    alternative.function_like_dunder_get(db, env, instance, owner)
+                });
+            }
+            Type::TypeAlias(alias) => {
+                return alias
+                    .value_type(db)
+                    .function_like_dunder_get(db, env, instance, owner);
+            }
+            _ => {}
+        }
+        let kind = self.function_like_kind(db)?;
+        let receiver = match kind {
+            CallableTypeKind::StaticMethodLike => return Some(self.underlying_function(db)),
+            CallableTypeKind::ClassMethodLike => owner
+                .filter(|owner| !owner.is_none(db))
+                .or_else(|| instance.map(|instance| instance.to_meta_type(db, env))),
+            _ => instance,
+        };
+        Some(receiver.map_or_else(
+            || self.underlying_function(db),
+            |receiver| {
+                Type::BoundMethod(super::BoundMethodType::from_callable(
+                    db,
+                    self,
+                    env.program(db),
+                    receiver,
+                ))
+            },
+        ))
+    }
+
     /// Create a callable type with a single non-overloaded signature.
     pub(crate) fn single_callable(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
         Type::Callable(CallableType::single(db, signature))
@@ -60,9 +140,11 @@ impl<'db> Type<'db> {
             db,
             env,
             UpcastPolicy::default(),
-            CallableUpcastContext {
+            &CallableUpcastContext {
                 recursive_definition,
+                ..CallableUpcastContext::default()
             },
+            None,
         )
     }
 
@@ -76,7 +158,8 @@ impl<'db> Type<'db> {
             db,
             env,
             policy,
-            CallableUpcastContext::default(),
+            &CallableUpcastContext::default(),
+            None,
         )
     }
 
@@ -85,14 +168,34 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         policy: UpcastPolicy,
-        context: CallableUpcastContext<'db>,
+        context: &CallableUpcastContext<'db>,
+        receiver: Option<Type<'db>>,
+    ) -> Option<CallableTypes<'db>> {
+        context.active.visit(
+            &self,
+            || None,
+            || self.try_upcast_to_callable_impl(db, env, policy, context, receiver),
+        )
+    }
+
+    fn try_upcast_to_callable_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        policy: UpcastPolicy,
+        context: &CallableUpcastContext<'db>,
+        receiver: Option<Type<'db>>,
     ) -> Option<CallableTypes<'db>> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback
-                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context);
+            return fallback.try_upcast_to_callable_with_policy_and_context(
+                db, env, policy, context, receiver,
+            );
         }
 
         match self {
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             Type::Callable(callable) => Some(CallableTypes::one(callable)),
 
             Type::Dynamic(_) => Some(CallableTypes::one(CallableType::function_like(
@@ -103,6 +206,11 @@ impl<'db> Type<'db> {
                 db,
                 Signature::dynamic(self),
             ))),
+
+            Type::Recursive(recursive) => recursive
+                .unfold(db, env)
+                .into_unfolded()?
+                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, receiver),
 
             Type::FunctionLiteral(function_literal)
                 if context.is_recursive_reference(db, function_literal) =>
@@ -119,16 +227,32 @@ impl<'db> Type<'db> {
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
-            Type::BoundMethod(bound_method) => bound_method.callables(db, env),
+            Type::BoundMethod(bound_method) => bound_method.callables(db).cloned(),
+
+            Type::TypeVar(typevar) => match typevar.require_bound_or_constraints(db, env) {
+                TypeVarBoundOrConstraints::UpperBound(bound) => bound
+                    .try_upcast_to_callable_with_policy_and_context(
+                        db,
+                        env,
+                        policy,
+                        context,
+                        Some(receiver.unwrap_or(self)),
+                    ),
+                // TODO: Preserve `Self` while validating the receiver against each constraint.
+                TypeVarBoundOrConstraints::Constraints(_) => None,
+            },
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
-                    .member_lookup_with_policy(
+                    .member_lookup_with_policy_and_receiver(
                         db,
                         env,
                         "__call__",
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        receiver,
                     )
+                    .unwrap_or_else(|error| error.fallback_member(db))
+                    .member(db)
                     .place;
 
                 if let Place::Defined(place) = call_symbol
@@ -136,7 +260,9 @@ impl<'db> Type<'db> {
                 {
                     place
                         .ty
-                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)
+                        .try_upcast_to_callable_with_policy_and_context(
+                            db, env, policy, context, None,
+                        )
                         // The callable instance itself doesn't inherit the descriptor behavior of
                         // its `__call__` method.
                         .map(|callables| callables.map(|callable| callable.into_regular(db)))
@@ -152,7 +278,7 @@ impl<'db> Type<'db> {
 
             Type::NewTypeInstance(newtype) => newtype
                 .concrete_base_type(db)
-                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context),
+                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, receiver),
 
             Type::SubclassOf(subclass_of_ty) if policy == UpcastPolicy::Sound => {
                 Some(CallableTypes::one(CallableType::function_like(
@@ -180,7 +306,7 @@ impl<'db> Type<'db> {
                             let upcast_callables = bound
                                 .constructor_for_typevar_bound(db, env)
                                 .try_upcast_to_callable_with_policy_and_context(
-                                    db, env, policy, context,
+                                    db, env, policy, context, None,
                                 )?;
                             Some(upcast_callables.map(|callable| {
                                 let signatures = callable
@@ -199,7 +325,7 @@ impl<'db> Type<'db> {
                                 let element_upcast = constraint
                                     .to_meta_type(db, env)
                                     .try_upcast_to_callable_with_policy_and_context(
-                                        db, env, policy, context,
+                                        db, env, policy, context, None,
                                     )?;
                                 for callable in element_upcast.into_inner() {
                                     let signatures =
@@ -225,8 +351,9 @@ impl<'db> Type<'db> {
             Type::Union(union) => {
                 let mut callables = SmallVec::new();
                 for element in union.elements(db) {
-                    let element_callable = element
-                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)?;
+                    let element_callable = element.try_upcast_to_callable_with_policy_and_context(
+                        db, env, policy, context, receiver,
+                    )?;
                     callables.extend(element_callable.into_inner());
                 }
                 Some(CallableTypes::new(callables))
@@ -235,25 +362,22 @@ impl<'db> Type<'db> {
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => enum_literal
                     .enum_class_instance(db, env)
-                    .try_upcast_to_callable_with_policy_and_context(db, env, policy, context),
+                    .try_upcast_to_callable_with_policy_and_context(
+                        db, env, policy, context, receiver,
+                    ),
                 _ => None,
             },
 
             Type::TypeAlias(alias) => alias
                 .value_type(db)
-                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context),
+                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, receiver),
 
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function))
-                if context.is_recursive_reference(db, function) =>
-            {
-                Some(CallableTypes::one(CallableType::bottom(db)))
-            }
+            Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(callable)) => callable
+                .inner(db)
+                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, None)
+                .map(|callables| callables.map(|callable| callable.into_regular(db))),
 
-            Type::KnownBoundMethod(method) => Some(CallableTypes::one(CallableType::new(
-                db,
-                CallableSignature::from_overloads(method.signatures(db, env)),
-                CallableTypeKind::Regular,
-            ))),
+            Type::KnownBoundMethod(method) => method.callables(db, env),
 
             Type::WrapperDescriptor(wrapper_descriptor) => {
                 Some(CallableTypes::one(CallableType::new(
@@ -295,12 +419,14 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => intersection
                 .finite_alternative_union(db, env)
                 .and_then(|alternatives| {
-                    alternatives.try_upcast_to_callable_with_policy(db, env, policy)
+                    alternatives.try_upcast_to_callable_with_policy_and_context(
+                        db, env, policy, context, receiver,
+                    )
                 }),
 
             Type::EnumComplement(complement) => complement
                 .remaining_literal_union(db, env)
-                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context),
+                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, receiver),
 
             // TODO
             Type::DataclassDecorator(_)
@@ -309,19 +435,19 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::PropertyInstance(_)
             | Type::SlotDescriptor(_)
-            | Type::TypeVar(_)
             | Type::BoundSuper(_) => None,
         }
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Debug, Default)]
 struct CallableUpcastContext<'db> {
     recursive_definition: Option<Definition<'db>>,
+    active: ActiveRecursionDetector<Type<'db>>,
 }
 
 impl<'db> CallableUpcastContext<'db> {
-    fn is_recursive_reference(self, db: &'db dyn Db, function: FunctionType<'db>) -> bool {
+    fn is_recursive_reference(&self, db: &'db dyn Db, function: FunctionType<'db>) -> bool {
         self.recursive_definition
             .is_some_and(|definition| function.contains_definition(db, definition))
     }
@@ -430,9 +556,7 @@ pub enum CallableTypeKind {
     /// - They use `types.FunctionType` as their owner type when constructing `super()`.
     /// - They act as [non-data descriptors][descriptor-protocol]: access through a class leaves
     ///   the signature unchanged, while access through an instance binds the first parameter
-    ///   to that instance. The resulting callable remains function-like.
-    ///   TODO: Model the result as a bound method. Its runtime type is `types.MethodType`,
-    ///   so retaining the `types.FunctionType` behavior listed above is inaccurate.
+    ///   to that instance, producing a [`super::BoundMethodType`] that does not bind again.
     /// - Like function literals, they defer binding `typing.Self` until the receiver is known
     ///   from the call's arguments, as illustrated below.
     ///
@@ -484,7 +608,6 @@ pub enum CallableTypeKind {
     /// descriptors. The separate kind prevents the dunder descriptor heuristic from turning
     /// it into [`Self::FunctionLike`] after `P` is specialized: the specialized parameters
     /// already describe the callable's arguments.
-    /// Calling [`CallableType::bind_self`] removes this marker without removing a parameter.
     ///
     /// In the example below, specializing `P` to `[str]` gives `callback.__call__` the signature
     /// `(str, /) -> int`. Binding a receiver would incorrectly remove its `str` parameter:
@@ -510,78 +633,9 @@ pub enum CallableTypeKind {
     DunderParamSpec,
 
     /// A callable with the descriptor behavior of `staticmethod`.
-    ///
-    /// These are [non-data descriptors][descriptor-protocol] that return the callable unchanged
-    /// on both class and instance access, without binding a receiver.
-    ///
-    /// TODO: Distinguish the `staticmethod` descriptor from the wrapped function returned by
-    /// descriptor access. Currently, this kind is retained after access, and member lookup
-    /// and type relations lack both nominal types: truthiness is ambiguous, the metatype is
-    /// `type`, and only `object` attributes plus `__call__` are exposed.
-    ///
-    /// In the example below, `Example.method` is an always-truthy `types.FunctionType` instance
-    /// at runtime. After the `Callable`-returning decorator is applied, ty incorrectly rejects
-    /// its `__name__` attribute and the assignment, and loses precision for `type` and `bool`:
-    ///
-    /// ```python
-    /// from collections.abc import Callable
-    /// from types import FunctionType
-    /// from typing import reveal_type
-    ///
-    /// def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
-    ///     return function
-    ///
-    /// class Example:
-    ///     @preserve
-    ///     @staticmethod
-    ///     def method(value: int) -> str:
-    ///         return str(value)
-    ///
-    /// Example.method.__name__  # ty reports unresolved-attribute; Python returns "method".
-    /// function: FunctionType = Example.method  # ty reports invalid-assignment.
-    /// reveal_type(type(Example.method))  # ty reveals type; Python returns FunctionType.
-    /// reveal_type(bool(Example.method))  # ty reveals bool; the result is always True.
-    /// ```
-    ///
-    /// [descriptor-protocol]: https://docs.python.org/3/howto/descriptor.html#descriptor-protocol
     StaticMethodLike,
 
     /// A callable with the descriptor behavior of `classmethod`.
-    ///
-    /// These are [non-data descriptors][descriptor-protocol] that bind the first parameter on
-    /// both class and instance access, using the owner when no instance is supplied.
-    ///
-    /// TODO: Distinguish the `classmethod` descriptor from the bound method returned by
-    /// descriptor access. Currently, this kind is retained after binding. Neither the
-    /// descriptor's `classmethod` type nor the bound method's `types.MethodType` is reflected
-    /// in member lookup or type relations: truthiness is ambiguous, the metatype is `type`,
-    /// and only `object` attributes plus `__call__` are exposed.
-    ///
-    /// In the example below, `Example.method` is an always-truthy `types.MethodType` instance
-    /// at runtime. After the `Callable`-returning decorator is applied, ty incorrectly rejects
-    /// its `__name__` attribute and the assignment, and loses precision for `type` and `bool`:
-    ///
-    /// ```python
-    /// from collections.abc import Callable
-    /// from types import MethodType
-    /// from typing import reveal_type
-    ///
-    /// def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
-    ///     return function
-    ///
-    /// class Example:
-    ///     @preserve
-    ///     @classmethod
-    ///     def method(cls, value: int) -> str:
-    ///         return str(value)
-    ///
-    /// Example.method.__name__  # ty reports unresolved-attribute; Python returns "method".
-    /// method: MethodType = Example.method  # ty reports invalid-assignment.
-    /// reveal_type(type(Example.method))  # ty reveals type; Python returns MethodType.
-    /// reveal_type(bool(Example.method))  # ty reveals bool; the result is always True.
-    /// ```
-    ///
-    /// [descriptor-protocol]: https://docs.python.org/3/howto/descriptor.html#descriptor-protocol
     ClassMethodLike,
 
     /// An internal representation of the value bound to a `typing.ParamSpec` type variable.
@@ -599,14 +653,6 @@ pub enum CallableTypeKind {
     /// materializations from ordinary callable types in type-relation checks. It does not
     /// carry the runtime `typing.ParamSpec` instance behavior of a `ParamSpec` declaration.
     ParamSpecValue,
-
-    /// Callable objects modeled as instances of Python's `types.MethodWrapperType`.
-    ///
-    /// Accessing `__call__` on a bound method or method descriptor produces a method wrapper.
-    /// It retains the original callable's precise signatures, is always truthy, and exposes
-    /// method-wrapper attributes such as `__name__`, `__qualname__`, and `__self__`. Unlike a
-    /// function-like callable, it does not bind another receiver when stored on a class.
-    MethodWrapper,
 }
 
 /// A "policy" enum that describes how `type[]` types should be upcast
@@ -749,20 +795,50 @@ impl<'db> CallableType<'db> {
         )
     }
 
+    pub(crate) fn is_bottom_paramspec_value(self, db: &'db dyn Db) -> bool {
+        if self.kind(db) != CallableTypeKind::ParamSpecValue {
+            return false;
+        }
+        let [signature] = self.signatures(db).overloads.as_slice() else {
+            return false;
+        };
+        signature.parameters().is_bottom()
+    }
+
+    pub(crate) fn is_top_paramspec_value(self, db: &'db dyn Db) -> bool {
+        if self.kind(db) != CallableTypeKind::ParamSpecValue {
+            return false;
+        }
+        let [signature] = self.signatures(db).overloads.as_slice() else {
+            return false;
+        };
+        signature.parameters().is_top()
+    }
+
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
     pub(crate) fn unknown(db: &'db dyn Db) -> CallableType<'db> {
         Self::single(db, Signature::unknown())
+    }
+
+    /// Create the fully static `Top[Callable[..., object]]` type.
+    pub(crate) fn top(db: &'db dyn Db) -> CallableType<'db> {
+        Self::single(db, Signature::new(Parameters::top(), Type::object()))
     }
 
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::FunctionLike)
     }
 
-    pub(crate) fn is_method_wrapper(self, db: &'db dyn Db) -> bool {
-        matches!(self.kind(db), CallableTypeKind::MethodWrapper)
+    pub(super) fn runtime_class(self, db: &'db dyn Db) -> Option<KnownClass> {
+        match self.kind(db) {
+            CallableTypeKind::FunctionLike => Some(KnownClass::FunctionType),
+            CallableTypeKind::StaticMethodLike => Some(KnownClass::Staticmethod),
+            CallableTypeKind::ClassMethodLike => Some(KnownClass::Classmethod),
+            _ => None,
+        }
     }
 
-    fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
+    pub(super) fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::DunderParamSpec)
     }
 
@@ -792,10 +868,6 @@ impl<'db> CallableType<'db> {
         self.with_kind(db, CallableTypeKind::Regular)
     }
 
-    pub(crate) fn into_method_wrapper(self, db: &'db dyn Db) -> CallableType<'db> {
-        self.with_kind(db, CallableTypeKind::MethodWrapper)
-    }
-
     /// Retain every parameter signature and its generic context, but erase return types
     /// that do not participate in a `ParamSpec` specialization.
     pub(crate) fn into_paramspec_value(self, db: &'db dyn Db) -> CallableType<'db> {
@@ -805,12 +877,11 @@ impl<'db> CallableType<'db> {
     /// Returns the reduced callable produced by partially applying selected overloads.
     pub(crate) fn partially_apply(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
         overloads: impl IntoIterator<Item = PartialSignatureApplication<'db>>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
-            CallableSignature::partially_apply(db, env, overloads)?,
+            CallableSignature::partially_apply(db, overloads)?,
             CallableTypeKind::Regular,
         ))
     }
@@ -836,17 +907,24 @@ impl<'db> CallableType<'db> {
         ))
     }
 
-    pub(crate) fn bind_self(
+    /// Binds a method receiver, specializing its signatures and removing incompatible overloads.
+    ///
+    /// `typing_self_type` is used to replace `typing.Self`, which differs from `receiver_type`
+    /// for class methods.
+    pub(super) fn bind_self(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        self_type: Option<Type<'db>>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
     ) -> CallableType<'db> {
-        if self.is_dunder_paramspec(db) {
-            return self.into_regular(db);
-        }
-
-        self.with_signatures(db, self.signatures(db).bind_self(db, env, self_type))
+        Self::new_internal(
+            db,
+            self.signatures(db)
+                .bind_method_receiver(db, env, receiver_type, typing_self_type),
+            CallableTypeKind::Regular,
+            self.deprecated(db),
+        )
     }
 
     pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
@@ -855,15 +933,6 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
         self.with_kind(db, CallableTypeKind::DunderParamSpec)
-    }
-
-    pub(crate) fn apply_self(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        self_type: Type<'db>,
-    ) -> CallableType<'db> {
-        self.apply_self_with_receiver(db, env, self_type, self_type)
     }
 
     pub(crate) fn apply_self_with_receiver(
@@ -946,8 +1015,15 @@ impl<'db> CallableType<'db> {
 pub(crate) struct CallableTypes<'db>(SmallVec<[CallableType<'db>; 1]>);
 
 impl<'db> CallableTypes<'db> {
-    fn new(callables: SmallVec<[CallableType<'db>; 1]>) -> Self {
+    fn new(mut callables: SmallVec<[CallableType<'db>; 1]>) -> Self {
         assert!(!callables.is_empty(), "CallableTypes should not be empty");
+        // Repeated alternatives do not change a union. Removing them also lets recursive
+        // constructor queries converge when each iteration adds the same `__init__` callable.
+        if callables.len() > 1 {
+            let mut seen = FxHashSet::default();
+            callables.retain(|callable| seen.insert(*callable));
+            callables.shrink_to_fit();
+        }
         CallableTypes(callables)
     }
 
@@ -956,20 +1032,14 @@ impl<'db> CallableTypes<'db> {
     }
 
     pub(crate) fn from_elements(callables: impl IntoIterator<Item = CallableType<'db>>) -> Self {
-        let callables: SmallVec<_> = callables.into_iter().collect();
-        assert!(!callables.is_empty(), "CallableTypes should not be empty");
-        CallableTypes(callables)
+        Self::new(callables.into_iter().collect())
     }
 
-    pub(crate) fn exactly_one(self) -> Option<CallableType<'db>> {
+    pub(crate) fn exactly_one(&self) -> Option<CallableType<'db>> {
         match self.0.as_slice() {
             [single] => Some(*single),
             _ => None,
         }
-    }
-
-    pub(super) fn as_slice(&self) -> &[CallableType<'db>] {
-        &self.0
     }
 
     fn into_inner(self) -> SmallVec<[CallableType<'db>; 1]> {
@@ -980,9 +1050,17 @@ impl<'db> CallableTypes<'db> {
         self.0.iter()
     }
 
-    pub(crate) fn into_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    /// Iterates over every signature of every callable alternative without merging the
+    /// alternatives into an overloaded callable.
+    pub(crate) fn signatures(&self, db: &'db dyn Db) -> impl Iterator<Item = &'db Signature<'db>> {
+        self.0
+            .iter()
+            .flat_map(move |callable| callable.signatures(db))
+    }
+
+    pub(crate) fn to_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         assert!(!self.0.is_empty(), "CallableTypes should not be empty");
-        UnionType::from_elements(db, env, self.0.into_iter().map(Type::Callable))
+        UnionType::from_elements(db, env, self.0.iter().copied().map(Type::Callable))
     }
 
     pub(crate) fn map(self, mut f: impl FnMut(CallableType<'db>) -> CallableType<'db>) -> Self {
@@ -1041,13 +1119,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: CallableType<'db>,
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if target.is_function_like(db) && !source.is_function_like(db) {
+        if target.runtime_class(db).is_some()
+            && target.runtime_class(db) != source.runtime_class(db)
+        {
             return self.never();
         }
-        if target.is_method_wrapper(db) && !source.is_method_wrapper(db) {
-            return self.never();
-        }
-
         self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
     }
 

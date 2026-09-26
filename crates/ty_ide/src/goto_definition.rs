@@ -2401,6 +2401,73 @@ while True:
     }
 
     #[test]
+    fn goto_definition_keyword_argument_union() {
+        let test = cursor_test(
+            "
+def first(value: int) -> int:
+    return value
+
+def second(value: int) -> str:
+    return str(value)
+
+def run(flag: bool):
+    callback = first if flag else second
+    callback(value<CURSOR>=1)
+",
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:10:14
+           |
+        10 |     callback(value=1)
+           |              ^^^^^ Clicking here
+        info: Found 2 definitions
+         --> main.py:2:11
+          |
+        2 | def first(value: int) -> int:
+          |           -----
+        3 |     return value
+        4 |
+        5 | def second(value: int) -> str:
+          |            -----
+        ");
+    }
+
+    #[test]
+    fn goto_definition_keyword_argument_constructor_new_and_init() {
+        let test = cursor_test(
+            "
+class Product:
+    def __new__(cls, value: int):
+        return object.__new__(cls)
+
+    def __init__(self, value: int):
+        self.value = value
+
+Product(value<CURSOR>=1)
+",
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:9:9
+          |
+        9 | Product(value=1)
+          |         ^^^^^ Clicking here
+        info: Found 2 definitions
+         --> main.py:3:22
+          |
+        3 |     def __new__(cls, value: int):
+          |                      -----
+        4 |         return object.__new__(cls)
+        5 |
+        6 |     def __init__(self, value: int):
+          |                        -----
+        ");
+    }
+
+    #[test]
     fn goto_definition_keyword_argument_typeddict() {
         let test = CursorTest::builder()
             .source(

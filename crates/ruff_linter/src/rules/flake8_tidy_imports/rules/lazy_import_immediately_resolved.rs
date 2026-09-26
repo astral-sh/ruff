@@ -45,6 +45,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// class Bar(foo.Foo): ...
 /// ```
 ///
+/// ## Known problems
+/// Ruff does not detect all cases where decorators evaluate annotations. For
+/// example, `@dataclasses.dataclass` can immediately resolve lazy imports used in
+/// field annotations without triggering this rule.
+///
 /// ## Fix availability
 /// The fix is only available when the lazy import statement imports a single
 /// member, since removing `lazy` from a multi-member import would make every
@@ -174,6 +179,27 @@ fn is_immediate_resolution_context(semantic: &SemanticModel, source_type: PySour
         || semantic.in_deferred_type_definition()
         || semantic.in_deferred_type_alias_value()
     {
+        return false;
+    }
+
+    // Imports can only be lazy on Python 3.15+, where ordinary annotations are deferred, even if an
+    // older target version makes the model treat them as runtime-evaluated. For example, this
+    // import is runtime-evaluated on 3.9 in our semantic model but would be deferred on 3.15, where
+    // `__lazy_modules__` actually has an effect:
+    //
+    // ```toml
+    // target-version = "py39"
+    // ```
+    //
+    // ```
+    // __lazy_modules__ = ["pathlib"]
+    //
+    // from pathlib import Path
+    //
+    // class C:
+    //     path: Path
+    // ```
+    if semantic.in_runtime_evaluated_annotation() && !semantic.in_runtime_required_annotation() {
         return false;
     }
 

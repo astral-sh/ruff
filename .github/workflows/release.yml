@@ -132,6 +132,8 @@ jobs:
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit # zizmor: ignore[secrets-inherit]
+    permissions:
+      "contents": "read"
 
   custom-build-docker:
     needs:
@@ -156,6 +158,8 @@ jobs:
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit # zizmor: ignore[secrets-inherit]
+    permissions:
+      "contents": "read"
 
   # The custom binary jobs produce checksum sidecars outside cargo-dist.
   # Include them in a local manifest before generating the installers.
@@ -173,9 +177,11 @@ jobs:
           persist-credentials: false
           submodules: recursive
       - name: "Install uv"
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.18"
+          checksum: "89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16"
           enable-cache: false
       - name: Install cached dist
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
@@ -449,6 +455,8 @@ jobs:
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit # zizmor: ignore[secrets-inherit]
+    permissions:
+      "id-token": "write"
 
   custom-publish-docs:
     needs:
@@ -460,6 +468,7 @@ jobs:
     secrets: inherit # zizmor: ignore[secrets-inherit]
     permissions:
       "contents": "read"
+      "id-token": "write"
 
   custom-publish-playground:
     needs:
@@ -469,6 +478,8 @@ jobs:
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit # zizmor: ignore[secrets-inherit]
+    permissions:
+      "contents": "read"
 
   custom-publish-versions:
     needs:
@@ -478,6 +489,9 @@ jobs:
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit # zizmor: ignore[secrets-inherit]
+    permissions:
+      "contents": "read"
+      "id-token": "write"
 
   custom-publish-mirror:
     needs:

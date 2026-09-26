@@ -8,18 +8,17 @@ use std::sync::Arc;
 use anyhow::{Context, anyhow};
 use lsp_server::{Message, RequestId};
 use lsp_types::{
-    ClientInfo, DiagnosticProvider, DiagnosticRegistrationOptions,
-    DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Registration, RegistrationParams,
-    TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Uri,
+    ClientInfo, DiagnosticProvider, DiagnosticRegistrationOptions, Registration,
+    RegistrationParams, TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Uri,
     WorkDoneProgressBegin,
 };
-use lsp_types::{DidChangeWatchedFilesNotification, ExitNotification, Notification};
 use lsp_types::{
     DocumentDiagnosticRequest, RegistrationRequest, Request, ShutdownRequest,
     UnregistrationRequest, WorkspaceDiagnosticRequest,
 };
+use lsp_types::{ExitNotification, Notification};
 use ruff_db::Db;
-use ruff_db::files::{File, system_path_to_file};
+use ruff_db::files::{File, system_path_to_file, vendored_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
@@ -44,6 +43,7 @@ use crate::server::{
     publish_diagnostics_if_needed, publish_settings_diagnostics,
 };
 use crate::session::client::Client;
+use crate::session::file_watcher::LspFileWatcher;
 use crate::session::index::Document;
 use crate::session::request_queue::RequestQueue;
 use crate::system::{AnySystemPath, LSPSystem};
@@ -51,6 +51,7 @@ use crate::{PositionEncoding, TextDocument};
 use index::Index;
 
 pub(crate) mod client;
+mod file_watcher;
 pub(crate) mod index;
 mod options;
 mod request_queue;
@@ -73,7 +74,19 @@ pub(crate) struct Session {
     /// Maps workspace folders to their respective workspace.
     workspaces: Workspaces,
 
-    /// The projects across all workspaces.
+    /// Whether the initial workspace configuration has been applied.
+    workspace_configuration_initialized: bool,
+
+    /// All projects across all workspaces.
+    ///
+    /// Each initialized workspace currently has one project database; this map
+    /// contains the root of that workspace as a key and the state for the
+    /// associated project as a value.
+    ///
+    /// Note that the workspace root used as a key can differ from the project
+    /// root of the associated project (because the project root is determined
+    /// by a configuration discovery process that might settle on an ancestor
+    /// of the workspace).
     projects: BTreeMap<SystemPathBuf, ProjectState>,
 
     /// Initialization options that were provided by the client during server initialization.
@@ -119,6 +132,8 @@ pub(crate) struct Session {
     /// Registrations is a set of LSP methods that have been dynamically registered with the
     /// client.
     registrations: HashSet<String>,
+
+    file_watcher: Option<LspFileWatcher>,
 
     /// The name of the client (editor) that connected to this server.
     client_name: ClientName,
@@ -175,6 +190,7 @@ impl Session {
             native_system,
             position_encoding,
             workspaces,
+            workspace_configuration_initialized: false,
             deferred_messages: VecDeque::new(),
             index: Some(index),
             initialization_options,
@@ -189,6 +205,7 @@ impl Session {
             suspended_workspace_diagnostics_request: None,
             revision: 0,
             registrations: HashSet::new(),
+            file_watcher: LspFileWatcher::new(resolved_client_capabilities),
             client_name,
         })
     }
@@ -323,7 +340,7 @@ impl Session {
         } else if let Some(project) = self.projects.get(project_root) {
             for file in changes.scripts {
                 if let Some(document) = project.db.document(file) {
-                    let document = DocumentHandle::from_document(document);
+                    let document = OpenDocumentHandle::from_document(document);
                     publish_diagnostics_if_needed(&document, self, client);
                 }
             }
@@ -336,6 +353,8 @@ impl Session {
         if capabilities.supports_inlay_hint_refresh() {
             client.send_request::<lsp_types::InlayHintRefreshRequest>(self, (), |_, ()| {});
         }
+
+        self.update_file_watcher(client);
     }
 
     /// Requests synchronization using the scripts' saved metadata.
@@ -452,19 +471,12 @@ impl Session {
     /// Returns a reference to the project's [`ProjectDatabase`] in which the given `path` belongs.
     ///
     /// If the path is a system path, it will return the project database that is closest to the
-    /// given path, or the first project if no project is found for the path.
+    /// given path, then one whose search paths contain it, then the first project when sorted by
+    /// workspace folder path.
     ///
     /// If the path is a virtual path, it will return the first project database in the session.
     pub(crate) fn project_db(&self, path: &AnySystemPath) -> &ProjectDatabase {
         &self.project_state(path).db
-    }
-
-    /// Returns an iterator, in arbitrary order, over all project databases
-    /// in this session.
-    pub(crate) fn project_dbs(&self) -> impl Iterator<Item = &ProjectDatabase> {
-        self.projects
-            .values()
-            .map(|project_state| &project_state.db)
     }
 
     /// Returns a mutable reference to the project's [`ProjectDatabase`] in which the given `path`
@@ -480,16 +492,14 @@ impl Session {
     /// Returns a reference to the project's [`ProjectState`] in which the given `path` belongs.
     ///
     /// If the path is a system path, it will return the project database that is closest to the
-    /// given path, or the first project if no project is found for the path.
+    /// given path, then one whose search paths contain it, then the first project when sorted by
+    /// workspace folder path.
     ///
     /// If the path is a virtual path, it will return the first project database in the session.
     fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
-        match path {
-            AnySystemPath::System(system_path) => self
-                .project_state_for_path(system_path)
-                .unwrap_or_else(|| self.project_state_virtual_fallback()),
-            AnySystemPath::SystemVirtual(_virtual_path) => self.project_state_virtual_fallback(),
-        }
+        self.project_state_for_document(path)
+            .map(|(_, project)| project)
+            .expect("To always have at least one project")
     }
 
     /// Returns a mutable reference to the project's [`ProjectState`] in which the given `path`
@@ -499,58 +509,41 @@ impl Session {
     ///
     /// [`project_db`]: Session::project_db
     pub(crate) fn project_state_mut(&mut self, path: &AnySystemPath) -> &mut ProjectState {
-        match path {
-            AnySystemPath::System(system_path) => {
-                let range = ..=system_path.to_path_buf();
-
-                // Using `range` here to work around a borrow checker limitation
-                // where it can't prove that the `range_mut` call and the `self.projects.values_mut`
-                // never borrow `self.projects` mutably at the same time.
-                // https://rust-lang.github.io/rfcs/2094-nll.html#problem-case-3-conditional-control-flow-across-functions
-                if self
-                    .projects
-                    .range(range.clone())
-                    .any(|(workspace_root, _)| system_path.starts_with(workspace_root))
-                {
-                    return self
-                        .projects
-                        .range_mut(range)
-                        .rfind(|(workspace_root, _)| system_path.starts_with(workspace_root))
-                        .unwrap()
-                        .1;
-                }
-
-                self.project_state_virtual_fallback_mut()
-            }
-            AnySystemPath::SystemVirtual(_virtual_path) => {
-                self.project_state_virtual_fallback_mut()
-            }
-        }
-    }
-
-    /// Returns a reference to the project's [`ProjectState`] corresponding to the given path, if
-    /// any.
-    fn project_state_for_path(&self, path: impl AsRef<SystemPath>) -> Option<&ProjectState> {
-        let path = path.as_ref();
-        self.projects
-            .range(..=path.to_path_buf())
-            .rfind(|(workspace_root, _)| path.starts_with(workspace_root))
-            .map(|(_, project)| project)
-    }
-
-    // TODO: While ty supports multiple workspace folders, we still
-    // need to figure out which project should this virtual path
-    // belong to: https://github.com/astral-sh/ty/issues/794 (e.g.
-    // look for the first project with an overlapping search path?)
-    fn project_state_virtual_fallback(&self) -> &ProjectState {
-        self.projects
-            .values()
-            .next()
+        self.project_state_for_document(path)
+            .map(|(root, _)| root.to_path_buf())
+            .and_then(|root| self.projects.get_mut(&root))
             .expect("To always have at least one project")
     }
 
-    fn project_state_virtual_fallback_mut(&mut self) -> &mut ProjectState {
-        self.projects.values_mut().next().unwrap()
+    /// Selects a project to use for analysis of the given document (identified
+    /// by path).
+    ///
+    /// When the given document path is a system path, we select the project registered under the
+    /// closest containing workspace folder. Otherwise, we select the first project by workspace-root
+    /// path whose import search paths contain the file. If no project matches, or the path is virtual,
+    /// we select the project associated with the workspace root path that sorts first lexicographically.
+    ///
+    /// Returns a tuple where the first element is the workspace root of the
+    /// selected project and the second element is the state object for the selected project.
+    ///
+    /// Returns None when no projects exist.
+    fn project_state_for_document(
+        &self,
+        path: &AnySystemPath,
+    ) -> Option<(&SystemPath, &ProjectState)> {
+        path.as_system()
+            .and_then(|path| {
+                self.projects
+                    .range(..=path.to_path_buf())
+                    .rfind(|(root, _)| path.starts_with(root))
+                    .or_else(|| {
+                        self.projects
+                            .iter()
+                            .find(|(_, project)| project.db.program_for_dependency(path).is_some())
+                    })
+            })
+            .or_else(|| self.projects.first_key_value())
+            .map(|(workspace_root, project)| (workspace_root.as_path(), project))
     }
 
     pub(crate) fn apply_changes(
@@ -582,6 +575,7 @@ impl Session {
         }
         let scripts = result.scripts_to_synchronize(db);
         Self::synchronize_closed_scripts(db, &scripts, client, capabilities, &script_progress);
+        self.update_file_watcher(client);
         result
     }
 
@@ -688,6 +682,18 @@ impl Session {
         }
 
         self.register_capabilities(client);
+
+        // New workspace settings can affect diagnostics in existing workspaces. Re-registering
+        // diagnostic support does not invalidate the client's cached results. There are no
+        // cached results to refresh during the initial workspace configuration.
+        if self.workspace_configuration_initialized
+            && self
+                .client_capabilities()
+                .supports_workspace_diagnostic_refresh()
+        {
+            client.send_request::<lsp_types::DiagnosticRefreshRequest>(self, (), |_, ()| {});
+        }
+        self.workspace_configuration_initialized = true;
     }
 
     /// Initializes a single workspace folder with the given URI
@@ -755,9 +761,8 @@ impl Session {
         }
         workspace.initialize(settings);
 
-        // For now, create one project database per workspace.
-        // In the future, index the workspace directories to find all projects
-        // and create a project database for each.
+        // For now, create one project database per workspace. Future support for nested projects
+        // may instead manage the project collection inside ProjectDatabase.
         let system = LSPSystem::new(
             self.index.as_ref().unwrap().clone(),
             self.native_system.clone(),
@@ -767,7 +772,7 @@ impl Session {
         let configuration_file = workspace.settings.configuration_file();
 
         let metadata = if let Some(configuration_file) = configuration_file {
-            ProjectMetadata::from_config_file_with_uv(
+            ProjectMetadata::from_config_file(
                 configuration_file.clone(),
                 workspace_directory,
                 &system,
@@ -777,47 +782,48 @@ impl Session {
             ProjectMetadata::discover_with_uv(workspace_directory, &system, self.use_uv)
         };
 
-        let project = metadata
-            .context("Failed to discover project configuration")
-            .and_then(|mut metadata| {
-                if let Some(fallback_options) = workspace.settings.fallback_options() {
-                    metadata.apply_fallback_options(fallback_options.clone());
+        let (mut metadata, discovery_result) =
+            match metadata.context("Failed to discover project configuration") {
+                Ok(metadata) => (metadata, Ok(())),
+                Err(err) => {
+                    let Ok(metadata) = ProjectMetadata::from_options(
+                        Options::default(),
+                        workspace_directory.to_path_buf(),
+                        None,
+                        &UseDefaultStrategy,
+                    );
+                    (metadata.with_use_uv(self.use_uv), Err(err))
                 }
+            };
 
+        if let Some(fallback_options) = workspace.settings.fallback_options() {
+            metadata.set_fallback_options(fallback_options.clone());
+        }
+
+        if let Some(override_options) = workspace.settings.override_options() {
+            metadata.set_override_options(override_options.clone());
+        }
+
+        // Load user configuration even if project discovery failed.
+        let project = discovery_result
+            .and(
                 metadata
                     .apply_configuration_files(&system)
-                    .context("Failed to apply configuration files")?;
+                    .context("Failed to apply configuration files"),
+            )
+            .and_then(|()| ProjectDatabase::fallible(metadata.clone(), system.clone()));
 
-                if let Some(override_options) = workspace.settings.override_options() {
-                    metadata.apply_override_options(override_options.clone());
-                }
-
-                ProjectDatabase::fallible(metadata, system.clone())
-            });
-
-        let mut db = match project {
-            Ok(db) => db,
-            Err(err) => {
-                tracing::error!(
-                    "Failed to create project for workspace `{uri}`: {err:#}. \
-                        Falling back to default settings"
-                );
-
-                client.show_error_message(format!(
-                    "Failed to load project for workspace {uri}. {}",
-                    self.client_name.log_guidance(),
-                ));
-
-                let Ok(metadata) = ProjectMetadata::from_options(
-                    Options::default(),
-                    workspace_directory.to_path_buf(),
-                    None,
-                    &UseDefaultStrategy,
-                )
-                .map(|metadata| metadata.with_use_uv(self.use_uv));
-                ProjectDatabase::use_defaults(metadata, system)
-            }
-        };
+        let mut db = project.unwrap_or_else(|err| {
+            tracing::error!(
+                "Failed to load project for workspace `{uri}`: {err:#}. \
+                 Continuing with valid settings"
+            );
+            client.show_error_message(format!(
+                "Failed to load project for workspace {uri}. {}",
+                self.client_name.log_guidance(),
+            ));
+            ProjectDatabase::use_defaults(metadata, system)
+        });
 
         // Carry forward diagnostic state if any exists
         let previous = self.projects.remove(&root);
@@ -1016,7 +1022,7 @@ impl Session {
 
         // Collect all of the documents to clear upfront to
         // work around borrowck.
-        let documents_to_clear: Vec<DocumentHandle> = self
+        let documents_to_clear: Vec<OpenDocumentHandle> = self
             .text_document_handles()
             .filter_map(|doc| {
                 if let AnySystemPath::System(ref path) = *doc.notebook_or_file_path()
@@ -1034,10 +1040,16 @@ impl Session {
 
         self.bump_revision();
 
+        self.update_file_watcher(client);
+
         Ok(())
     }
 
-    pub(crate) fn clear_diagnostics_if_needed(&self, document: &DocumentHandle, client: &Client) {
+    pub(crate) fn clear_diagnostics_if_needed(
+        &self,
+        document: &OpenDocumentHandle,
+        client: &Client,
+    ) {
         if self.client_capabilities().supports_pull_diagnostics() && !document.is_cell_or_notebook()
         {
             return;
@@ -1084,7 +1096,6 @@ impl Session {
     /// `ty.experimental.rename` global setting.
     fn register_capabilities(&mut self, client: &Client) {
         static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
-        static FILE_WATCHER_REGISTRATION_ID: &str = "ty/workspace/didChangeWatchedFiles";
 
         let mut registrations = vec![];
         let mut unregistrations = vec![];
@@ -1138,26 +1149,19 @@ impl Session {
             }
         }
 
-        if let Some(register_options) = self.file_watcher_registration_options() {
-            if self
-                .registrations
-                .contains(DidChangeWatchedFilesNotification::METHOD.as_str())
-            {
-                unregistrations.push(Unregistration {
-                    id: FILE_WATCHER_REGISTRATION_ID.into(),
-                    method: DidChangeWatchedFilesNotification::METHOD.into(),
-                });
-            }
-            registrations.push(Registration {
-                id: FILE_WATCHER_REGISTRATION_ID.into(),
-                method: DidChangeWatchedFilesNotification::METHOD.into(),
-                register_options: Some(serde_json::to_value(register_options).unwrap()),
-            });
-        }
-
         // First, unregister any existing capabilities and then register or re-register them.
         self.unregister_dynamic_capability(client, unregistrations);
         self.register_dynamic_capability(client, registrations);
+        self.update_file_watcher(client);
+    }
+
+    fn update_file_watcher(&mut self, client: &Client) {
+        let Some(file_watcher) = &mut self.file_watcher else {
+            return;
+        };
+        if let Some(update) = file_watcher.update(self.projects.values().map(|state| &state.db)) {
+            update.apply(self, client);
+        }
     }
 
     /// Registers a list of dynamic capabilities with the client.
@@ -1209,123 +1213,50 @@ impl Session {
         );
     }
 
-    /// Try to register the file watcher provided by the client if the client supports it.
-    ///
-    /// Note that this should be called *after* workspaces/projects have been initialized.
-    /// This is required because the globs we use for registering file watching take
-    /// project search paths into account.
-    fn file_watcher_registration_options(
-        &self,
-    ) -> Option<DidChangeWatchedFilesRegistrationOptions> {
-        fn make_watcher(glob: &str) -> FileSystemWatcher {
-            FileSystemWatcher {
-                glob_pattern: lsp_types::GlobPattern::Pattern(glob.into()),
-                // When `kind` is omitted, it defaults to `WatchKind.Create | WatchKind.Change | WatchKind.Delete`.
-                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#fileSystemWatcher
-                kind: None,
-            }
-        }
-
-        fn make_relative_watcher(relative_to: &SystemPath, glob: &str) -> FileSystemWatcher {
-            let base_uri = Uri::from_file_path(relative_to.as_std_path())
-                .expect("system path must be a valid URI");
-            let glob_pattern =
-                lsp_types::GlobPattern::RelativePattern(lsp_types::RelativePattern {
-                    base_uri: base_uri.into(),
-                    pattern: glob.to_string(),
-                });
-            FileSystemWatcher {
-                glob_pattern,
-                kind: Some(
-                    lsp_types::WatchKind::Change
-                        | lsp_types::WatchKind::Delete
-                        | lsp_types::WatchKind::Create,
-                ),
-            }
-        }
-
-        if !self.client_capabilities().supports_file_watcher() {
-            tracing::warn!(
-                "Your LSP client doesn't support file watching: \
-                 You may see stale results when files change outside the editor"
-            );
-            return None;
-        }
-
-        // We also want to watch everything in the search paths as
-        // well. But this seems to require "relative" watcher support.
-        // I had trouble getting this working without using a base uri.
-        //
-        // Specifically, I tried this for each search path:
-        //
-        //     make_watcher(&format!("{path}/**"))
-        //
-        // But while this seemed to work for the project root, it
-        // simply wouldn't result in any file notifications for changes
-        // to files outside of the project root.
-        let watchers = if !self.client_capabilities().supports_relative_file_watcher() {
-            tracing::warn!(
-                "Your LSP client doesn't support file watching outside of project: \
-                 You may see stale results when dependencies change"
-            );
-            // Initialize our list of watchers with the standard globs relative
-            // to the project root if we can't use relative globs.
-            vec![make_watcher("**")]
-        } else {
-            // Gather up all of our project roots and all of the corresponding
-            // project root system paths, then deduplicate them relative to
-            // one another. Then listen to everything.
-            let roots = self.project_dbs().map(|db| db.project().root(db));
-            let paths = self
-                .project_dbs()
-                .flat_map(|db| {
-                    ty_module_resolver::system_module_search_paths(
-                        db,
-                        db.project().program(db).resolver_environment(db),
-                    )
-                    .map(move |path| (db, path))
-                })
-                .filter(|(db, path)| !path.starts_with(db.project().root(*db)))
-                .map(|(_, path)| path)
-                .chain(roots);
-            ruff_db::system::deduplicate_nested_paths(paths)
-                .map(|path| make_relative_watcher(path, "**"))
-                .collect()
-        };
-        Some(DidChangeWatchedFilesRegistrationOptions { watchers })
-    }
-
-    /// Creates a document snapshot with the URI referencing the document to snapshot.
+    /// Captures client settings and a target for a document request.
     pub(crate) fn snapshot_document(&self, uri: &Uri) -> Result<DocumentSnapshot, DocumentError> {
-        let index = self.index();
-        let document_handle = index.document_handle(uri)?;
+        let document = self.document_target(uri)?;
 
         Ok(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
             global_settings: self.global_settings.clone(),
             workspace_settings: self
-                .workspace_settings_for_document(document_handle.notebook_or_file_path())
+                .project_state_for_document(document.notebook_or_file_path())
+                .and_then(|(workspace_root, _)| self.workspaces.settings_for_path(workspace_root))
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
-            document: document_handle,
+            document,
             client_name: self.client_name,
         })
     }
 
-    fn workspace_settings_for_document(
-        &self,
-        path: &AnySystemPath,
-    ) -> Option<Arc<WorkspaceSettings>> {
-        // Virtual documents use the same "owner" heuristic as `project_state`.
-        match path {
-            AnySystemPath::System(system_path) => self.workspaces.settings_for_path(system_path),
-            AnySystemPath::SystemVirtual(_) => {
-                let project = self.project_state(path);
-                self.workspaces
-                    .settings_for_path(project.db.project().root(&project.db))
-                    .or_else(|| self.workspaces.settings_virtual_fallback())
+    /// Selects an open document or a supported closed document for a request.
+    fn document_target(&self, uri: &Uri) -> Result<DocumentRequestTarget, DocumentError> {
+        match self.index().open_document_handle(uri) {
+            Ok(handle) => Ok(DocumentRequestTarget::Open(handle)),
+            Err(DocumentError::NotFound(key))
+                if let DocumentKey::File(path) = &key
+                    && self.is_supported_closed_file(path) =>
+            {
+                Ok(DocumentRequestTarget::Closed {
+                    uri: uri.clone(),
+                    path: key.into_file_path(),
+                })
             }
+            Err(error) => Err(error),
         }
+    }
+
+    /// Returns whether requests may target this file while it is closed.
+    fn is_supported_closed_file(&self, path: &SystemPath) -> bool {
+        // Closed notebooks lack the client's cell URI and position mappings.
+        if PySourceType::try_from_path(path) == Some(PySourceType::Ipynb) {
+            return false;
+        }
+
+        // A request needs a project, but the file need not belong to it:
+        // unrelated files use the same fallback project as open files.
+        !self.projects.is_empty()
     }
 
     /// Creates a snapshot of the current state of the [`Session`].
@@ -1347,33 +1278,33 @@ impl Session {
         }
     }
 
-    /// Iterates over the document keys for all open text documents.
-    pub(super) fn text_document_handles(&self) -> impl Iterator<Item = DocumentHandle> + '_ {
+    /// Iterates over handles to all open text documents.
+    pub(super) fn text_document_handles(&self) -> impl Iterator<Item = OpenDocumentHandle> + '_ {
         self.index()
             .text_documents()
-            .map(|(_, document)| DocumentHandle::from_text_document(document))
+            .map(|(_, document)| OpenDocumentHandle::from_text_document(document))
     }
 
     /// Iterates over all open file-level documents.
     ///
     /// Notebook cells are excluded because their file-level representation is the containing
     /// notebook.
-    pub(super) fn file_document_handles(&self) -> impl Iterator<Item = DocumentHandle> + '_ {
+    pub(super) fn file_document_handles(&self) -> impl Iterator<Item = OpenDocumentHandle> + '_ {
         self.index()
             .file_documents()
-            .map(DocumentHandle::from_document)
+            .map(OpenDocumentHandle::from_document)
     }
 
-    /// Returns a handle to the document specified by its URI.
+    /// Returns a handle to the open document specified by its URI.
     ///
     /// # Errors
     ///
-    /// If the document is not found.
-    pub(crate) fn document_handle(
+    /// Returns an error if the document is not open in the session.
+    pub(crate) fn open_document_handle(
         &self,
         uri: &lsp_types::Uri,
-    ) -> Result<DocumentHandle, DocumentError> {
-        self.index().document_handle(uri)
+    ) -> Result<OpenDocumentHandle, DocumentError> {
+        self.index().open_document_handle(uri)
     }
 
     /// Registers a notebook document at the provided `path`.
@@ -1384,7 +1315,7 @@ impl Session {
         &mut self,
         client: &Client,
         document: NotebookDocument,
-    ) -> DocumentHandle {
+    ) -> OpenDocumentHandle {
         let handle = self.index_mut().open_notebook_document(document);
         self.open_document_in_db(client, &handle, None);
         handle
@@ -1400,7 +1331,7 @@ impl Session {
         &mut self,
         client: &Client,
         document: TextDocument,
-    ) -> DocumentHandle {
+    ) -> OpenDocumentHandle {
         let language_id = document.language_id();
 
         // Request synchronization before installing the editor contents because uv reads the
@@ -1438,7 +1369,7 @@ impl Session {
     fn open_document_in_db(
         &mut self,
         client: &Client,
-        document: &DocumentHandle,
+        document: &OpenDocumentHandle,
         language_id: Option<LanguageId>,
     ) {
         let path = document.notebook_or_file_path();
@@ -1482,6 +1413,7 @@ impl Session {
         }
 
         self.bump_revision();
+        self.update_file_watcher(client);
     }
 
     /// Returns a reference to the index.
@@ -1578,13 +1510,15 @@ impl Drop for MutIndexGuard<'_> {
 }
 
 /// An immutable snapshot of [`Session`] that references a specific document.
+///
+/// The document may be open or closed. Creating the snapshot does not open it.
 #[derive(Debug)]
 pub(crate) struct DocumentSnapshot {
     resolved_client_capabilities: ResolvedClientCapabilities,
     global_settings: Arc<GlobalSettings>,
     workspace_settings: Arc<WorkspaceSettings>,
     position_encoding: PositionEncoding,
-    document: DocumentHandle,
+    document: DocumentRequestTarget,
     client_name: ClientName,
 }
 
@@ -1609,32 +1543,81 @@ impl DocumentSnapshot {
         &self.workspace_settings
     }
 
-    /// Returns the result of the document query for this snapshot.
-    pub(crate) fn document(&self) -> &DocumentHandle {
+    /// Returns the document targeted by this snapshot.
+    pub(crate) fn document(&self) -> &DocumentRequestTarget {
         &self.document
     }
 
-    pub(crate) fn uri(&self) -> &lsp_types::Uri {
-        self.document.uri()
+    pub(crate) fn client_name(&self) -> ClientName {
+        self.client_name
     }
+}
 
-    pub(crate) fn to_notebook_or_file(&self, db: &dyn Db) -> Option<File> {
-        let file = self.document.notebook_or_file(db);
+/// A document targeted by a request, whether open or closed.
+///
+/// Request handlers use this type to resolve a database file without requiring the client to
+/// open the document. Updating or closing a client document requires an [`OpenDocumentHandle`].
+#[derive(Debug)]
+pub(crate) enum DocumentRequestTarget {
+    /// A document opened by the client.
+    Open(OpenDocumentHandle),
+    /// A closed document identified by its URI and path.
+    Closed {
+        /// The URI supplied by the client.
+        uri: Uri,
+        /// The path used to resolve the document in the database.
+        path: AnySystemPath,
+    },
+}
+
+impl DocumentRequestTarget {
+    /// Returns the database file for this document, or its containing notebook for a cell.
+    ///
+    /// Returns [`None`] if the file cannot be resolved.
+    pub(crate) fn to_notebook_or_file(&self, db: &ProjectDatabase) -> Option<File> {
+        let file = match self {
+            Self::Open(handle) => handle.notebook_or_file(db),
+            Self::Closed { path, .. } => {
+                let path = path.as_system()?;
+                if let Some(root) = ty_ide::cached_vendored_root(db)
+                    && let Some(vendored) = ty_ide::map_system_to_vendored(&root, path)
+                {
+                    // Reuse the bundled file's database identity instead of creating
+                    // a separate file for its cached copy.
+                    vendored_path_to_file(db, vendored).ok()
+                } else {
+                    system_path_to_file(db, path).ok()
+                }
+            }
+        };
         if file.is_none() {
             tracing::debug!(
                 "Failed to resolve file: file not found for `{}`",
-                self.document.uri()
+                self.uri()
             );
         }
         file
     }
 
-    pub(crate) fn notebook_or_file_path(&self) -> &AnySystemPath {
-        self.document.notebook_or_file_path()
+    /// Returns whether the document is a cell in a notebook opened by the client.
+    pub(crate) fn is_cell(&self) -> bool {
+        matches!(self, Self::Open(handle) if handle.is_cell())
     }
 
-    pub(crate) fn client_name(&self) -> ClientName {
-        self.client_name
+    /// Returns the document URI supplied by the client.
+    pub(crate) fn uri(&self) -> &Uri {
+        match self {
+            Self::Open(handle) => handle.uri(),
+            Self::Closed { uri, .. } => uri,
+        }
+    }
+
+    /// Returns the document's path, or its containing notebook's path for a cell.
+    pub(crate) fn notebook_or_file_path(&self) -> &AnySystemPath {
+        match self {
+            Self::Open(handle) => handle.notebook_or_file_path(),
+            Self::Closed { path, .. } => path,
+        }
     }
 }
 
@@ -1791,10 +1774,6 @@ impl Workspaces {
         self.for_path(path).map(Workspace::settings_arc)
     }
 
-    fn settings_virtual_fallback(&self) -> Option<Arc<WorkspaceSettings>> {
-        self.workspaces.values().next().map(Workspace::settings_arc)
-    }
-
     /// Returns `true` if all workspaces have been [initialized].
     ///
     /// [initialized]: Workspaces::initialize
@@ -1894,14 +1873,13 @@ impl SuspendedWorkspaceDiagnosticRequest {
     }
 }
 
-/// A handle to a document stored within [`Index`].
+/// A handle to a document opened by the client and stored in [`Index`].
 ///
-/// Allows identifying the document within the index but it also carries the URI used by the
-/// client to reference the document as well as the version of the document.
+/// Carries the client's URI and document version and supports updating or closing the document.
 ///
-/// It also exposes methods to get the file-path of the corresponding ty-file.
+/// Requests that also accept closed files use [`DocumentRequestTarget`].
 #[derive(Clone, Debug)]
-pub(crate) enum DocumentHandle {
+pub(crate) enum OpenDocumentHandle {
     Text {
         uri: lsp_types::Uri,
         path: AnySystemPath,
@@ -1919,7 +1897,7 @@ pub(crate) enum DocumentHandle {
     },
 }
 
-impl DocumentHandle {
+impl OpenDocumentHandle {
     fn from_text_document(document: &TextDocument) -> Self {
         match document.notebook() {
             None => Self::Text {
@@ -1991,9 +1969,9 @@ impl DocumentHandle {
     #[expect(unused)]
     fn notebook_path(&self) -> Option<&AnySystemPath> {
         match self {
-            DocumentHandle::Notebook { path, .. } => Some(path),
-            DocumentHandle::Cell { notebook_path, .. } => Some(notebook_path),
-            DocumentHandle::Text { .. } => None,
+            OpenDocumentHandle::Notebook { path, .. } => Some(path),
+            OpenDocumentHandle::Cell { notebook_path, .. } => Some(notebook_path),
+            OpenDocumentHandle::Text { .. } => None,
         }
     }
 
@@ -2012,7 +1990,7 @@ impl DocumentHandle {
         }
     }
 
-    pub(crate) fn is_cell(&self) -> bool {
+    fn is_cell(&self) -> bool {
         matches!(self, Self::Cell { .. })
     }
 
@@ -2073,7 +2051,7 @@ impl DocumentHandle {
             self.set_version(document.version());
         }
 
-        self.update_in_db(session, client);
+        self.update_in_databases(session, client);
 
         Ok(())
     }
@@ -2101,29 +2079,47 @@ impl DocumentHandle {
             self.set_version(new_version);
         }
 
-        self.update_in_db(session, client);
+        self.update_in_databases(session, client);
         Ok(())
     }
 
-    fn update_in_db(&self, session: &mut Session, client: &Client) {
+    fn update_in_databases(&self, session: &mut Session, client: &Client) {
         let path = self.notebook_or_file_path();
-        let changes = match path {
-            AnySystemPath::System(system_path) => {
-                [ChangeEvent::file_content_changed(system_path.clone())]
-            }
-            AnySystemPath::SystemVirtual(virtual_path) => {
-                [ChangeEvent::ChangedVirtual(virtual_path.clone())]
-            }
+        let (containing_workspace, is_virtual, changes) = match path {
+            AnySystemPath::System(system_path) => (
+                session.workspaces().for_path(system_path),
+                false,
+                [ChangeEvent::file_content_changed(system_path.clone())],
+            ),
+            AnySystemPath::SystemVirtual(virtual_path) => (
+                None,
+                true,
+                [ChangeEvent::ChangedVirtual(virtual_path.clone())],
+            ),
         };
 
-        session.apply_changes(client, path, &changes);
+        if containing_workspace.is_some() || is_virtual {
+            // A containing workspace determines the project for a system file, while virtual
+            // documents select a single, arbitrary project. Neither selection depends on import
+            // search paths, so update only the selected database.
+            session.apply_changes(client, path, &changes);
+        } else {
+            // This is both a system file and an external file (it has no containing workspace
+            // that defines how to select a single project for it). For external files, a change in
+            // import search paths can change the selected project, so here we update all databases
+            // to keep previously selected projects' cached contents fresh.
+            let roots: Vec<_> = session.projects.keys().cloned().collect();
+            for root in roots {
+                session.apply_changes(client, &AnySystemPath::System(root), &changes);
+            }
+        }
     }
 
     fn set_version(&mut self, version: DocumentVersion) {
         let self_version = match self {
-            DocumentHandle::Text { version, .. }
-            | DocumentHandle::Notebook { version, .. }
-            | DocumentHandle::Cell { version, .. } => version,
+            OpenDocumentHandle::Text { version, .. }
+            | OpenDocumentHandle::Notebook { version, .. }
+            | OpenDocumentHandle::Cell { version, .. } => version,
         };
 
         *self_version = version;
@@ -2173,7 +2169,7 @@ impl DocumentHandle {
                         // unsaved script metadata can bring a file back into the project when
                         // `exclude-scripts` is enabled. Also request synchronization for saved
                         // metadata changes that were skipped while the editor overlay was present.
-                        self.update_in_db(session, client);
+                        self.update_in_databases(session, client);
                     } else {
                         // This can only fail when the path is a directory or it doesn't exists but the
                         // file should exists for this handler in this branch. This is because every
@@ -2248,10 +2244,45 @@ mod tests {
     use std::sync::Arc;
 
     use anyhow::Context;
-    use ruff_db::system::{Command, CommandExecutor, OsSystem, System as _};
+    use lsp_types::Uri;
+    use ruff_db::files::vendored_path_to_file;
+    use ruff_db::system::{Command, CommandExecutor, OsSystem, System as _, SystemPath};
+    use ruff_db::vendored::VendoredPath;
+    use ty_project::metadata::Options;
+    use ty_project::{ProjectDatabase, ProjectMetadata};
+    use ty_python_core::program::UseDefaultStrategy;
 
-    use super::Index;
-    use crate::system::{LSPSystem, WorkspaceTrust};
+    use super::{DocumentRequestTarget, Index};
+    use crate::system::{AnySystemPath, LSPSystem, WorkspaceTrust};
+
+    #[test]
+    fn closed_cached_stub_resolves_to_vendored_file() -> anyhow::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let root = SystemPath::from_std_path(directory.path()).context("UTF-8 project path")?;
+        let Ok(metadata) = ProjectMetadata::from_options(
+            Options::default(),
+            root.to_path_buf(),
+            None,
+            &UseDefaultStrategy,
+        );
+        let db = ProjectDatabase::use_defaults(metadata, OsSystem::new(root));
+        let vendored_path = VendoredPath::new("stdlib/builtins.pyi");
+        let cached_path = ty_ide::cached_vendored_root(&db)
+            .context("typeshed cache root")?
+            .join(vendored_path.as_str());
+        let target = DocumentRequestTarget::Closed {
+            uri: Uri::from_file_path(cached_path.as_std_path())
+                .ok()
+                .context("cached stub URI")?,
+            path: AnySystemPath::System(cached_path),
+        };
+
+        assert_eq!(
+            target.to_notebook_or_file(&db),
+            Some(vendored_path_to_file(&db, vendored_path)?),
+        );
+        Ok(())
+    }
 
     /// Mutating the document index requires exclusive ownership after Salsa cancels the current
     /// database snapshots. A background command executor must not retain an `LSPSystem`, because

@@ -37,7 +37,7 @@ impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_notebook_or_file(db) else {
+        let Some(file) = snapshot.document().to_notebook_or_file(db) else {
             return Ok(None);
         };
         let python_file = db.program_file(file).python_file(db);
@@ -45,7 +45,8 @@ impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
         let mut results = Vec::new();
 
         for position in params.positions {
-            let Some(offset) = position.to_text_size(db, file, snapshot.uri(), snapshot.encoding())
+            let Some(offset) =
+                position.to_text_size(db, file, snapshot.document().uri(), snapshot.encoding())
             else {
                 continue;
             };

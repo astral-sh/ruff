@@ -265,6 +265,72 @@ class Calculator:
 reveal_type(Calculator().square_then_round(3.14))  # revealed: int
 ```
 
+## Generic decorators with protocol-bound receivers
+
+A signature-preserving decorator whose type variable is bounded by a protocol preserves method
+binding. A class with the decorated method can satisfy that protocol, and subclasses can override
+the method with the same signature.
+
+```py
+from typing import Callable, Protocol
+
+class P(Protocol):
+    def method(self) -> None: ...
+
+def identity[T: P](func: Callable[[T], None]) -> Callable[[T], None]:
+    return func
+
+class Base:
+    @identity
+    def method(self) -> None:
+        pass
+
+class Derived(Base):
+    def method(self) -> None:
+        pass
+
+base: P = Base()
+reveal_type(Base().method)  # revealed: () -> None
+Base().method()
+```
+
+## Decorators with explicit protocol receivers
+
+The same applies when a nongeneric decorator names the protocol as the receiver type directly.
+Checking whether the class satisfies the protocol requires binding the same decorated method.
+
+```py
+from typing import Callable, Protocol
+
+class P(Protocol):
+    def method(self) -> int: ...
+
+def identity(func: Callable[[P], int]) -> Callable[[P], int]:
+    return func
+
+class Base:
+    @identity
+    def method(self: P) -> int:
+        return 1
+
+base: P = Base()
+reveal_type(Base().method)  # revealed: () -> int
+```
+
+Binding the receiver does not make incompatible overrides or protocol implementations valid.
+
+```py
+class ExtraArgument(Base):
+    def method(self, value: int) -> int:  # error: [invalid-method-override]
+        return value
+
+class WrongReturn(Base):
+    def method(self) -> str:  # error: [invalid-method-override]
+        return "wrong result"
+
+wrong_return: P = WrongReturn()  # error: [invalid-assignment]
+```
+
 ## Use case: Wrappers with explicit receivers
 
 `trio` defines multiple functions that takes in a callable with `Concatenate`-prepended receiver
@@ -460,6 +526,23 @@ reveal_type(D.class_method)  # revealed: ((int, /) -> int) | ((int, str, /) -> s
 reveal_type(D().class_method)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
 ```
 
+In the following example, both decorators return a union of callables with instance-method behavior.
+Stacking them preserves that behavior, so calling the method supplies the receiver to either
+alternative.
+
+```py
+def instance_decorator(function: object) -> Callable[[object, int], int] | Callable[[object, int], str]:
+    raise NotImplementedError
+
+class E:
+    @instance_decorator
+    @instance_decorator
+    def method(self, value: int) -> int:
+        return value
+
+reveal_type(E().method(1))  # revealed: int | str
+```
+
 ## Decorators returning a possibly non-callable value
 
 A decorator might return a non-callable value. We report an error when `staticmethod` is applied to
@@ -607,6 +690,30 @@ reveal_type(Child.method(1))  # revealed: int
 reveal_type(Other.method("x"))  # revealed: str
 Base.method("x")  # error: [no-matching-overload]
 Other.method(1)  # error: [no-matching-overload]
+```
+
+The same overload selection applies when we pass these bound methods as callbacks. Here,
+`Executor.submit` forwards arguments to the supplied method and returns a future for its result, so
+the selected overload determines both the accepted arguments and the future's result type. The
+simplified definitions below are based on typeshed's `concurrent.futures` stubs.
+
+```py
+from typing import Callable, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+class Future(Generic[R]): ...
+
+class Executor:
+    def submit(self, fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> Future[R]:
+        raise NotImplementedError
+
+def check(executor: Executor):
+    reveal_type(executor.submit(Base.method, 1))  # revealed: Future[int]
+    reveal_type(executor.submit(Other.method, "x"))  # revealed: Future[str]
+    executor.submit(Base.method, "x")  # error: [invalid-argument-type] "Expected `int`"
+    executor.submit(Other.method, 1)  # error: [invalid-argument-type] "Expected `str`"
 ```
 
 ## Extracted `__call__` methods do not bind again

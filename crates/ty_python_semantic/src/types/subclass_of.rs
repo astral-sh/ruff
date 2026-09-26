@@ -8,9 +8,10 @@ use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral, ClassType,
-    DynamicType, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
-    ProtocolInstanceType, SpecialFormType, Type, TypeContext, TypeMapping, TypeQualifiers,
-    TypeRecursionContext, TypeVarBoundOrConstraints, TypedDictType, UnionType, todo_type,
+    DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownClass, MaterializationKind,
+    MemberLookupPolicy, ProtocolInstanceType, SpecialFormType, Type, TypeContext, TypeMapping,
+    TypeQualifiers, TypeRecursionContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
+    todo_type,
 };
 use ty_python_core::definition::Definition;
 
@@ -93,25 +94,36 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Given an instance of the class or type variable `T`, returns a [`Type`] instance representing `type[T]`.
+    /// Returns the unsupported component if conversion fails, including inside unions and intersections.
     pub(crate) fn try_from_instance(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
-    ) -> Option<Type<'db>> {
-        // Handle unions by distributing `type[]` over each element:
+    ) -> Result<Type<'db>, Type<'db>> {
+        // Handle unions and intersections by distributing `type[]` over each element:
         // `type[A | B]` -> `type[A] | type[B]`
+        // `type[A & B]` -> `type[A] & type[B]`
         match ty {
-            Type::Union(union) => UnionType::try_from_elements(
-                db,
-                env,
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|element| Self::try_from_instance(db, env, *element)),
-            ),
-            Type::ProtocolInstance(protocol) => Some(protocol.to_meta_type(db, env)),
+            Type::Never => Ok(Type::Never),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .try_fold(UnionBuilder::new(db, env), |builder, element| {
+                    Ok(builder.add(Self::try_from_instance(db, env, *element)?))
+                })
+                .map(UnionBuilder::build),
+            Type::Intersection(intersection) if intersection.negative(db).is_empty() => {
+                intersection
+                    .iter_positive(db)
+                    .try_fold(IntersectionBuilder::new(db, env), |builder, element| {
+                        Ok(builder.add_positive(Self::try_from_instance(db, env, element)?))
+                    })
+                    .map(IntersectionBuilder::build)
+            }
+            Type::ProtocolInstance(protocol) => Ok(protocol.to_meta_type(db, env)),
             _ => SubclassOfInner::try_from_instance(db, env, ty)
-                .map(|subclass_of| Self::from(db, env, subclass_of)),
+                .map(|subclass_of| Self::from(db, env, subclass_of))
+                .ok_or(ty),
         }
     }
 
@@ -187,7 +199,7 @@ impl<'db> SubclassOfType<'db> {
         self.into_type_var()
             .and_then(|typevar| typevar.typevar(db).upper_bound(db, env))
             .and_then(|bound| {
-                let bound = Self::try_from_instance(db, env, bound.resolve_type_alias(db))?;
+                let bound = Self::try_from_instance(db, env, bound.resolve_type_alias(db)).ok()?;
                 matches!(bound, Type::ClassLiteral(_) | Type::GenericAlias(_)).then_some(bound)
             })
     }
@@ -221,7 +233,7 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::TypeVar(typevar) => {
                 let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
                 Self::try_from_instance(db, visitor.env, mapped)
-                    .unwrap_or_else(|| visitor.project_meta_type(db, mapped))
+                    .unwrap_or_else(|_| visitor.project_meta_type(db, mapped))
             }
         }
     }

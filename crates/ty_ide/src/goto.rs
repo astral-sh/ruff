@@ -439,10 +439,20 @@ impl<'db> Definitions<'db> {
     /// so this will check both the goto-declarations and goto-definitions (in that order)
     /// and return the first one found.
     pub(crate) fn docstring(self, db: &'db dyn SemanticDb) -> Option<Docstring> {
+        self.docstring_with_source(db)
+            .map(|(_, docstring)| docstring)
+    }
+
+    /// Also return the definition that supplied the documentation, which may be
+    /// an implementation definition shared by several names in a stub.
+    pub(crate) fn docstring_with_source(
+        self,
+        db: &'db dyn SemanticDb,
+    ) -> Option<(ResolvedDefinition<'db>, Docstring)> {
         for definition in &self {
             // If we got a docstring from the original definition, use it
             if let Some(docstring) = definition.docstring(db) {
-                return Some(Docstring::new(docstring));
+                return Some((definition.clone(), Docstring::new(docstring)));
             }
         }
 
@@ -454,7 +464,7 @@ impl<'db> Definitions<'db> {
         // Try to find the corresponding implementation definition
         for definition in stub_mapper.map_definitions(self.0) {
             if let Some(docstring) = definition.docstring(db) {
-                return Some(Docstring::new(docstring));
+                return Some((definition, Docstring::new(docstring)));
             }
         }
 
@@ -1433,7 +1443,7 @@ fn find_goto_target_impl<'a>(
         tokens
             .at_offset(offset)
             .max_by_key(|token| match token.kind() {
-                TokenKind::Name
+                TokenKind::Identifier
                 | TokenKind::String
                 | TokenKind::Complex
                 | TokenKind::Float

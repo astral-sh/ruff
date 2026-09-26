@@ -67,9 +67,9 @@ use crate::statement::StatementInner;
 use crate::symbol::{ScopedSymbolId, Symbol};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
-    EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, LiveBinding, LiveBindingStatus,
-    PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId, UseDefMapBuilder,
-    UseDefMapInterner,
+    EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, ImportedQualifierAction, LiveBinding,
+    LiveBindingStatus, PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId,
+    UseDefMapBuilder, UseDefMapInterner,
 };
 use crate::{Db, Statement, StatementNodeKey};
 use crate::{
@@ -1644,6 +1644,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 });
             }
             DefinitionCategory::Binding => {
+                let imported_qualifier_action = match kind {
+                    DefinitionKind::ImportFrom(_) | DefinitionKind::StarImport(_) => {
+                        ImportedQualifierAction::Record
+                    }
+                    DefinitionKind::Import(_) | DefinitionKind::ImportFromSubmodule(_) => {
+                        ImportedQualifierAction::Clear
+                    }
+                    _ => ImportedQualifierAction::Preserve,
+                };
                 let previous = previous_definitions.unwrap_or(if kind.is_loop_header() {
                     PreviousDefinitions::AreKept
                 } else {
@@ -1655,6 +1664,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         definition,
                         previous,
                         FutureDefinitions::ShadowThisOne,
+                        imported_qualifier_action,
                     );
                 });
             }
@@ -1791,6 +1801,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         for item in &dict.items {
             let Some(key) = item.key.as_ref() else {
+                if let ast::Expr::Dict(unpacked) = &item.value {
+                    // The unpacked keys belong to the same target. Recording them in order
+                    // lets later items replace earlier bindings, including nested keys.
+                    self.add_dict_key_assignment_definitions_impl(
+                        target,
+                        unpacked.into(),
+                        assignment,
+                    );
+                }
                 continue;
             };
 
@@ -1969,6 +1988,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // definitions.
                 PreviousDefinitions::AreKept,
                 FutureDefinitions::DontShadowThisOne,
+                ImportedQualifierAction::Preserve,
             );
         }
     }
@@ -4028,7 +4048,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // * And we're in the global scope
                 //
                 // We introduce a local definition `x = <module 'thispackage.x'>` that occurs
-                // before the `z = ...` declaration the import introduces. This models the fact
+                // before the `z = ...` binding the import introduces. This models the fact
                 // that the *first* time that you import 'thispackage.x' the python runtime creates
                 // `x` as a variable in the global scope of `thispackage`.
                 //

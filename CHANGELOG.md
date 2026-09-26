@@ -1,5 +1,89 @@
 # Changelog
 
+## 0.16.9
+
+Released on 2026-09-24.
+
+### Preview features
+
+- \[`ruff`\] Avoid false positives for overloaded division (`RUF069`) ([#28309](https://github.com/astral-sh/ruff/pull/28309))
+
+### Bug fixes
+
+- \[`flake8-bugbear`\] Avoid false positives for calls with keyword arguments (`B009`, `B010`, `B043`) ([#28776](https://github.com/astral-sh/ruff/pull/28776))
+- \[`flake8-tidy-imports`\] Allow lazy imports to be used in deferred annotations (`TID255`) ([#28767](https://github.com/astral-sh/ruff/pull/28767))
+
+### Rule changes
+
+- Update LibCST-based fixes for Python 3.15 ([#28616](https://github.com/astral-sh/ruff/pull/28616))
+- \[`flake8-pyi`\] Mention stubs in the diagnostic message (`PYI002`) ([#28542](https://github.com/astral-sh/ruff/pull/28542))
+
+### Documentation
+
+- Fix horizontal overflow on the rules documentation page ([#28699](https://github.com/astral-sh/ruff/pull/28699))
+- Update rules table with category information ([#28651](https://github.com/astral-sh/ruff/pull/28651))
+- \[`flake8-annotations`\] Clarify that `ANN401` checks return types in addition to arguments ([#28334](https://github.com/astral-sh/ruff/pull/28334))
+- \[`flake8-bugbear`\] Document type-checker interaction (`B010`) ([#28509](https://github.com/astral-sh/ruff/pull/28509))
+- \[`flake8-comprehensions`\] Document `map`/generator exception behavior (`C417`) ([#27794](https://github.com/astral-sh/ruff/pull/27794))
+- \[`ruff`\] Mention related isort settings (`RUF022`) ([#28719](https://github.com/astral-sh/ruff/pull/28719))
+
+### Contributors
+
+- [@qinpei-dev](https://github.com/qinpei-dev)
+- [@sanjayrohith](https://github.com/sanjayrohith)
+- [@ntBre](https://github.com/ntBre)
+- [@webdevsamran](https://github.com/webdevsamran)
+- [@zaniebot](https://github.com/zaniebot)
+- [@ewdurbin](https://github.com/ewdurbin)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@spaceone](https://github.com/spaceone)
+- [@IbrahimKhan12](https://github.com/IbrahimKhan12)
+- [@devtechedge](https://github.com/devtechedge)
+- [@GruffElixir](https://github.com/GruffElixir)
+
+## 0.16.8
+
+Released on 2026-09-16.
+
+### Bug fixes
+
+- Visit functional `TypedDict` keyword arguments correctly ([#28584](https://github.com/astral-sh/ruff/pull/28584))
+- \[`flake8-simplify`\] Detect nested `async with` under sync parent (`SIM117`) ([#27821](https://github.com/astral-sh/ruff/pull/27821))
+- \[`flake8-simplify`\] Preserve operand order in `SIM109` fix ([#27824](https://github.com/astral-sh/ruff/pull/27824))
+- \[`pyupgrade`\] Preserve required parentheses in multiline `UP040` fixes ([#28164](https://github.com/astral-sh/ruff/pull/28164))
+- \[`pyupgrade`\] Skip `TypeVarTuple` and `ParamSpec` conversions with bounds or constraints (`UP040`, `UP046`, `UP047`) ([#28505](https://github.com/astral-sh/ruff/pull/28505))
+
+### Rule changes
+
+- Add support for `__lazy_modules__` ([#28459](https://github.com/astral-sh/ruff/pull/28459))
+- Recognize PEP-728 `TypedDict` class keywords ([#28533](https://github.com/astral-sh/ruff/pull/28533))
+- Recognize quoted types in `typing.TypeForm` ([#28507](https://github.com/astral-sh/ruff/pull/28507))
+- Support conditional assignment to `__lazy_modules__` ([#28491](https://github.com/astral-sh/ruff/pull/28491))
+- \[`flake8-type-checking`\] Prefer lazy imports over `TYPE_CHECKING` on Python 3.15 and later (`TC001`, `TC002`, `TC003`) ([#28541](https://github.com/astral-sh/ruff/pull/28541))
+- \[`pyupgrade`\] Make the fix for `UP040` always unsafe ([#28526](https://github.com/astral-sh/ruff/pull/28526))
+- \[`pyupgrade`\] Stop recommending deprecated `ByteString` aliases (`UP035`) ([#28498](https://github.com/astral-sh/ruff/pull/28498))
+- \[`ruff`, `flake8-use-pathlib`\] Recognize the `parent_mode` argument (`RUF064`, `PTH103`) ([#28528](https://github.com/astral-sh/ruff/pull/28528))
+- \[`ruff`\] Detect `\Z` in `pytest.raises()` match patterns (`RUF043`) ([#28598](https://github.com/astral-sh/ruff/pull/28598))
+
+### CLI
+
+- Use rule name and code in formatter incompatibility warnings ([#28571](https://github.com/astral-sh/ruff/pull/28571))
+
+### Configuration
+
+- \[`flake8-tidy-imports`\] Add `extend-banned-api` ([#28644](https://github.com/astral-sh/ruff/pull/28644))
+
+### Contributors
+
+- [@VedantMadane](https://github.com/VedantMadane)
+- [@alzeph](https://github.com/alzeph)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@fredrikblau](https://github.com/fredrikblau)
+- [@ntBre](https://github.com/ntBre)
+- [@zsol](https://github.com/zsol)
+- [@Aniket-a14](https://github.com/Aniket-a14)
+- [@r-b-1](https://github.com/r-b-1)
+
 ## 0.16.7
 
 Released on 2026-09-10.

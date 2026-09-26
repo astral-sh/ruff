@@ -15,6 +15,7 @@ use crate::importer::{ImportAction, ImportRequest, MembersInScope};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, imported_symbol, place_from_bindings};
 use crate::suppression::FileSuppressionId;
+use crate::types::abstract_methods::AbstractMethods;
 use crate::types::call::bind::CallableDescription;
 use crate::types::call::{Bindings, CallDiagnosticOverride, CallError};
 use crate::types::class::{
@@ -107,6 +108,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_ENUM_MEMBER_ANNOTATION);
     registry.register_lint(&INVALID_GENERIC_ENUM);
     registry.register_lint(&INVALID_GENERIC_CLASS);
+    registry.register_lint(&INVALID_INIT_TYPE_VARIABLE);
     registry.register_lint(&INVALID_MODULE_GETATTR_CALL);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_PARAMSPEC);
@@ -191,8 +193,11 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
     registry.register_lint(&INVALID_TOTAL_ORDERING);
     registry.register_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER);
+    registry.register_lint(&TRUTHINESS_TEST_OF_NONE_UNION);
     registry.register_lint(&REDUNDANT_CONDITION);
     registry.register_lint(&REDUNDANT_CONDITION_STRICT);
+    registry.register_lint(&TRUTHINESS_TEST_OF_CALLABLE);
+    registry.register_lint(&TRUTHINESS_TEST_OF_ITERABLE);
 
     // String annotations
     registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
@@ -721,6 +726,15 @@ declare_lint! {
     pub(crate) static INVALID_TYPE_CHECKING_CONSTANT = {
         summary: "detects invalid `TYPE_CHECKING` constant assignments",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/invalid-init-type-variable.md")]
+    pub(crate) static INVALID_INIT_TYPE_VARIABLE = {
+        summary: "detects type variables from outer scopes in `__init__` receiver annotations",
+        status: LintStatus::stable("0.0.83"),
         default_level: Level::Error,
     }
 }
@@ -1372,7 +1386,16 @@ declare_lint! {
     pub(crate) static INVALID_LEGACY_POSITIONAL_PARAMETER = {
         summary: "detects incorrect usage of the legacy convention for specifying positional-only parameters",
         status: LintStatus::stable("0.0.15"),
-        default_level: Level::Warn,
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/truthiness-test-of-none-union.md")]
+    pub(crate) static TRUTHINESS_TEST_OF_NONE_UNION = {
+        summary: "detects truthiness checks that conflate `None` with other falsy values",
+        status: LintStatus::stable("0.0.84"),
+        default_level: Level::Ignore,
     }
 }
 
@@ -1391,6 +1414,24 @@ declare_lint! {
         summary: "detects conditions that are always truthy or always falsey (strict)",
         status: LintStatus::stable("0.0.79"),
         default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/truthiness-test-of-callable.md")]
+    pub(crate) static TRUTHINESS_TEST_OF_CALLABLE = {
+        summary: "detects truthiness tests of `Callable`-typed objects",
+        status: LintStatus::stable("0.0.83"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/truthiness-test-of-iterable.md")]
+    pub(crate) static TRUTHINESS_TEST_OF_ITERABLE = {
+        summary: "detects truthiness tests of `Iterable`-typed objects",
+        status: LintStatus::stable("0.0.83"),
+        default_level: Level::Warn,
     }
 }
 
@@ -1435,6 +1476,21 @@ impl TypeCheckDiagnostics {
 
     pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
         self.diagnostics.extend_from_slice(&other.diagnostics);
+        self.used_suppressions.extend(&other.used_suppressions);
+    }
+
+    /// Extend with selected diagnostics while retaining all used suppressions.
+    pub(super) fn extend_filtered(
+        &mut self,
+        other: &TypeCheckDiagnostics,
+        mut include: impl FnMut(&Diagnostic) -> bool,
+    ) {
+        self.diagnostics.extend(
+            other
+                .iter()
+                .filter(|diagnostic| include(diagnostic))
+                .cloned(),
+        );
         self.used_suppressions.extend(&other.used_suppressions);
     }
 
@@ -3883,6 +3939,46 @@ pub(crate) fn report_call_to_abstract_method(
     diag.annotate(
         Annotation::secondary(span).message(format_args!("Method `{name}` defined here")),
     );
+}
+
+pub(crate) fn report_attempted_instantiation_of_abstract_class<'db>(
+    context: &InferContext<'db, '_>,
+    call: &ast::ExprCall,
+    class: ClassType<'db>,
+    abstract_methods: &AbstractMethods<'db>,
+) {
+    let db = context.db();
+    let Some(first_name) = abstract_methods.first_name() else {
+        return;
+    };
+    let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, call) else {
+        return;
+    };
+    let class_name = class.name(db);
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Cannot instantiate abstract class `{class_name}`"
+    ));
+    abstract_methods.annotate_diagnostic(db, context.program_environment(), &mut diagnostic);
+
+    let num_abstract_methods = abstract_methods.len();
+    if num_abstract_methods == 1 {
+        diagnostic.set_concise_message(format_args!(
+            "Cannot instantiate `{class_name}` with unimplemented abstract method `{first_name}`",
+        ));
+    } else {
+        let formatted_methods = abstract_methods.formatted_names(db);
+        if formatted_methods.truncation_occurred {
+            diagnostic.set_concise_message(format_args!(
+                "Cannot instantiate `{class_name}` with {num_abstract_methods} unimplemented \
+                    abstract methods, including {formatted_methods}",
+            ));
+        } else {
+            diagnostic.set_concise_message(format_args!(
+                "Cannot instantiate `{class_name}` with unimplemented \
+                    abstract methods {formatted_methods}",
+            ));
+        }
+    }
 }
 
 pub(super) fn abstract_method_span<'db>(

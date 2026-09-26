@@ -1,6 +1,7 @@
 name: Run typing conformance
 
-permissions: {}
+permissions:
+  contents: read
 
 on:
   pull_request:
@@ -40,7 +41,7 @@ env:
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
   CARGO_PROFILE_DEV_LTO: "false"
   CARGO_PROFILE_DEV_OPT_LEVEL: 0
-  CONFORMANCE_SUITE_COMMIT: cf943ccbea5596ef969eec6e2260097ff697b7ba
+  CONFORMANCE_SUITE_COMMIT: d44387d4426429de9e0becda96fc639b8d846515
   PYTHON_VERSION: 3.12
 
 jobs:
@@ -56,7 +57,11 @@ jobs:
 
       # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
       - name: Fetch full history without tags
-        run: git -C ruff fetch --no-tags --filter=blob:none --unshallow origin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          git -C ruff fetch --no-tags --filter=blob:none --unshallow origin
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

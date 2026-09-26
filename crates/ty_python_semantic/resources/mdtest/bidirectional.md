@@ -506,6 +506,9 @@ x5: dict[str, int] = {**42}
 
 ### Collection unions
 
+When a collection literal is inferred against a union type context, the union is narrowed to the
+first compatible element, with inference attempts performed in source-order.
+
 ```py
 from collections.abc import Mapping, Sequence
 from typing import Literal
@@ -543,6 +546,17 @@ type NestedOp[T] = T | Ops[T]
 
 x9: NestedOp[str] = {"$in": ["a", "b"]}
 reveal_type(x9)  # revealed: dict[Literal["$in", "$nin"], list[str]]
+```
+
+Tuple literals perform narrowing similarly.
+
+```py
+def _(key: str):
+    x10: tuple[int, list[str]] | tuple[str, list[int]] = (key, [True])
+    reveal_type(x10)  # revealed: tuple[str, list[int]]
+
+    x11: tuple[int, list[int]] | tuple[str, list[str]] = (key, [])
+    reveal_type(x11)  # revealed: tuple[str, list[str]]
 ```
 
 ### Binary operations
@@ -1335,6 +1349,29 @@ x10: Callable[[list[int]], MultiPath[int] | MultiPath[list[int]]] = reveal_type(
 # fmt: on
 ```
 
+## Generic class specialization through recursive callable aliases
+
+A recursive callable context specializes a generic class used as a factory. The returned container
+keeps the recursive element type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+
+Factory = Callable[[], list["Factory"]]
+type ExplicitFactory = Callable[[], list[ExplicitFactory]]
+
+factory: Factory = list
+explicit_factory: ExplicitFactory = list
+
+reveal_type(factory())  # revealed: list[Factory]
+reveal_type(explicit_factory())  # revealed: list[ExplicitFactory]
+```
+
 ## Narrow union declared type for generic calls
 
 When a generic call is checked against a union declared type, the union is narrowed to the first
@@ -1888,7 +1925,7 @@ class SortParams[F]:
 def build_sort_spec[T](
     sort_params: SortParams[T] | None,
 ) -> dict[T, Literal[1, -1]] | None:
-    if not sort_params:
+    if sort_params is None:
         return None
     return {sort_params.field: 1}
 
@@ -1899,6 +1936,51 @@ def use_sort(value: Mapping[Path, Literal[1, -1]]) -> None: ...
 params: SortParams[Path] | None = None
 sort = build_sort_spec(params) or {"name": -1}
 use_sort(sort)
+```
+
+An unspecialized collection parameter is not useful type context for a collection literal. The other
+operand of a conditional or boolean expression can supply it instead:
+
+```py
+def f[T](values: list[T]) -> list[T]:
+    return values
+
+def _(values: list[object], flag: bool):
+    reveal_type(f(values if flag else [1]))  # revealed: list[object]
+    reveal_type(f([1] if flag else values))  # revealed: list[object]
+    reveal_type(f(values or [1]))  # revealed: list[object]
+    reveal_type(f(values and [1]))  # revealed: list[object]
+```
+
+The same applies to set literals:
+
+```py
+def g[T](values: set[T]) -> set[T]:
+    return values
+
+def _(values: set[object], flag: bool):
+    reveal_type(g(values if flag else {1}))  # revealed: set[object]
+    reveal_type(g({1} if flag else values))  # revealed: set[object]
+    reveal_type(g(values or {1}))  # revealed: set[object]
+```
+
+As well as generic constructors:
+
+```py
+def _(values: dict[str | None, object], flag: bool):
+    reveal_type(dict(values if flag else {None: None}))  # revealed: dict[str | None, object]
+    reveal_type(dict({None: None} if flag else values))  # revealed: dict[str | None, object]
+    reveal_type(dict(values or {None: None}))  # revealed: dict[str | None, object]
+```
+
+Explicit gradual element types remain preferred over the other operand's specialization:
+
+```py
+from typing import Any
+
+def _(values: list[int], flag: bool):
+    x: list[Any] = values if flag else reveal_type([])  # revealed: list[Any]
+    reveal_type(x)  # revealed: list[Any]
 ```
 
 ## Lambda expressions
@@ -2750,6 +2832,15 @@ def _() -> int:
     return invalid_x6  # error: [invalid-return-type]
 ```
 
+A return annotation can provide a union of fixed-length tuple element types. Inferring an empty list
+from this context doesn't wrongly widen the type of `result` to a list of variable-length tuples:
+
+```py
+def tuples() -> list[tuple[()] | tuple[int]]:
+    result = []
+    return result
+```
+
 ```py
 x7 = []
 x7[:] = [1, "2", 3.0]
@@ -2897,6 +2988,88 @@ reveal_type(x23)  # revealed: list[float | str | None]
 x24 = {"a": 1}
 x24[1] = "b"
 reveal_type(x24)  # revealed: dict[int | str, str | int]
+```
+
+## Unconstrained collection use-sites
+
+Calling a method that does not constrain a collection's element type does not affect its inferred
+type.
+
+```py
+def _():
+    x1 = [1]
+    x1.reverse()
+    reveal_type(x1)  # revealed: list[int]
+
+    x2 = {1}
+    x2.clear()
+    reveal_type(x2)  # revealed: set[int]
+
+    x3 = {"a": 1}
+    x3.clear()
+    reveal_type(x3)  # revealed: dict[str, int]
+```
+
+Calls that partially constrain the collection do not affect the type inferred for unrelated type
+variables.
+
+```py
+def _():
+    values = {"a": 1}
+    values.pop("a")
+    reveal_type(values)  # revealed: dict[str, int]
+```
+
+An empty collection remains unknown until another use supplies an element type:
+
+```py
+def _():
+    x1 = []
+    x1.reverse()
+    reveal_type(x1)  # revealed: list[Unknown]
+
+    x2 = []
+    x2.reverse()
+    x2.append(1)
+    reveal_type(x2)  # revealed: list[int]
+```
+
+Gradual types that explicitly constrain a collection are preserved in the inferred type.
+
+```py
+def _(unknown):
+    x1 = [1]
+    x1.reverse()
+    x1.append(unknown)
+    reveal_type(x1)  # revealed: list[Unknown | int]
+```
+
+An upper bound on the element type introduced by a callback does not influence the type of the
+collection literal:
+
+```py
+from typing import Any
+
+def key(value) -> int:
+    return 0
+
+def any_key(value: Any) -> int:
+    return 0
+
+def _():
+    x1 = [(0, "a")]
+    x1.sort(key=lambda x: x[0])
+    reveal_type(x1)  # revealed: list[tuple[int, str]]
+
+    x2 = [(0, "a")]
+    x2.sort(key=key)
+    # TODO: This should reveal `list[tuple[int, str]]`.
+    reveal_type(x2)  # revealed: list[Unknown | tuple[int, str]]
+
+    x3 = [(0, "a")]
+    x3.sort(key=any_key)
+    # TODO: This should reveal `list[tuple[int, str]]`.
+    reveal_type(x3)  # revealed: list[Any | tuple[int, str]]
 ```
 
 ## Multi-inference diagnostics

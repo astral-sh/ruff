@@ -883,8 +883,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ) {
             (None, None) => false,
             (Some(MaterializationKind::Top), Some(MaterializationKind::Bottom)) => return None,
+            (None, Some(MaterializationKind::Bottom)) | (Some(MaterializationKind::Top), None)
+                if self.relation.is_subtyping() =>
+            {
+                return None;
+            }
             _ if self.typevar_evaluation == TypeVarEvaluation::Lazy
-                && self.relation.is_assignability() =>
+                && (self.relation.is_assignability() || self.relation.is_subtyping()) =>
             {
                 true
             }

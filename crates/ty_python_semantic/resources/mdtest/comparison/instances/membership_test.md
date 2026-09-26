@@ -10,6 +10,172 @@ For references, see:
 - <https://docs.python.org/3/reference/datamodel.html#object.__contains__>
 - <https://snarky.ca/unravelling-membership-testing/>
 
+## Inline list and set literals
+
+An immediately consumed list or set literal preserves its elements' values for membership tests.
+This lets us determine whether a literal value is present or absent.
+
+```py
+reveal_type("a" in ["a", "b"])  # revealed: Literal[True]
+reveal_type("c" in ["a", "b"])  # revealed: Literal[False]
+reveal_type("a" not in ["a", "b"])  # revealed: Literal[False]
+reveal_type("c" not in ["a", "b"])  # revealed: Literal[True]
+
+reveal_type("a" in {"a", "b"})  # revealed: Literal[True]
+reveal_type("c" in {"a", "b"})  # revealed: Literal[False]
+reveal_type("a" not in {"a", "b"})  # revealed: Literal[False]
+reveal_type("c" not in {"a", "b"})  # revealed: Literal[True]
+```
+
+Membership uses runtime equality, including equality between integer and boolean values. Duplicate
+set elements do not change membership, and an empty list cannot contain any value.
+
+```py
+reveal_type(1 in [True])  # revealed: Literal[True]
+reveal_type(True in {1, 1})  # revealed: Literal[True]
+reveal_type(b"a" in {b"a", b"b"})  # revealed: Literal[True]
+reveal_type("a" in [])  # revealed: Literal[False]
+reveal_type("a" not in [])  # revealed: Literal[True]
+```
+
+## Inline elements with inferred literal types
+
+Elements can have known literal values without using literal syntax. A function returning a literal
+type provides the same membership information as the corresponding literal expression.
+
+```py
+from typing import Literal
+
+def first() -> Literal["a"]:
+    return "a"
+
+second = "b"
+reveal_type("a" in [first(), second])  # revealed: Literal[True]
+reveal_type("c" in [first(), second])  # revealed: Literal[False]
+reveal_type("b" in {first(), second})  # revealed: Literal[True]
+reveal_type("c" in {first(), second})  # revealed: Literal[False]
+```
+
+An element with a union type contributes only one of its possible values. Neither alternative is
+guaranteed to be present, but a value outside the union is definitely absent.
+
+```py
+def uncertain_element(value: Literal["a", "b"]):
+    reveal_type("a" in [value])  # revealed: bool
+    reveal_type("c" in [value])  # revealed: Literal[False]
+    reveal_type("a" in {value})  # revealed: bool
+    reveal_type("c" in {value})  # revealed: Literal[False]
+
+def unknown_element(value: str):
+    reveal_type("a" in [value])  # revealed: bool
+    reveal_type("a" in {value})  # revealed: bool
+```
+
+An unknown element does not prevent a later known element from establishing membership.
+
+```py
+def known_element(value: str):
+    reveal_type("a" in [value, "a"])  # revealed: Literal[True]
+    reveal_type("a" not in [value, "a"])  # revealed: Literal[False]
+    reveal_type("a" in {value, "a"})  # revealed: Literal[True]
+    reveal_type("a" not in {value, "a"})  # revealed: Literal[False]
+```
+
+## Inline enum members
+
+An inline set of enum members also has known membership.
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+reveal_type(Color.RED in {Color.RED})  # revealed: Literal[True]
+reveal_type(Color.BLUE in {Color.RED})  # revealed: Literal[False]
+```
+
+## Unpacked inline list elements
+
+Unpacking a fixed-length tuple or another inline list preserves the known elements. Unpacking a list
+of unknown length does not guarantee that any value is present.
+
+```py
+reveal_type("a" in [*("a", "b")])  # revealed: Literal[True]
+reveal_type("c" not in [*["a", "b"]])  # revealed: Literal[True]
+
+def unpack_unknown(values: list[str]):
+    reveal_type("a" in [*values])  # revealed: bool
+```
+
+## Stored mutable containers
+
+A stored list or set can be empty or contain only some of the values permitted by its element type.
+A literal element type alone therefore does not establish membership.
+
+```py
+from typing import Literal
+
+def stored(values: list[Literal["a", "b"]], keys: set[Literal["a", "b"]]):
+    reveal_type("a" in values)  # revealed: bool
+    reveal_type("a" not in values)  # revealed: bool
+    reveal_type("a" in keys)  # revealed: bool
+    reveal_type("a" not in keys)  # revealed: bool
+```
+
+## Inline containers with custom equality
+
+Lists and sets test their elements using identity or equality. A custom equality method with a known
+result can therefore establish membership. We assume that equal objects have equal hashes.
+
+```py
+from typing import Literal, overload
+
+class EqualValue:
+    @overload
+    def __eq__(self, other: "EqualValue") -> Literal[True]: ...
+    @overload
+    def __eq__(self, other: object) -> bool: ...
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, EqualValue)
+
+    def __hash__(self) -> int:
+        return 0
+
+reveal_type(EqualValue() in [EqualValue()])  # revealed: Literal[True]
+reveal_type(EqualValue() not in [EqualValue()])  # revealed: Literal[False]
+reveal_type(EqualValue() in {EqualValue()})  # revealed: Literal[True]
+reveal_type(EqualValue() not in {EqualValue()})  # revealed: Literal[False]
+```
+
+Identity also counts as a match, even when equality always returns false. The equality result alone
+therefore cannot establish that a custom object is absent.
+
+```py
+class NeverEqual:
+    def __eq__(self, other: object) -> Literal[False]:
+        return False
+
+value = NeverEqual()
+reveal_type(value in [value])  # revealed: bool
+```
+
+## Inline membership in comparison chains
+
+The following comparison receives the actual list type of the shared operand, so its reflected
+method can accept the list even when the preceding membership test has a known result.
+
+```py
+from typing import Literal
+
+class LargerThanList:
+    def __gt__(self, other: list[str]) -> Literal[True]:
+        return True
+
+reveal_type("a" in ["a"] < LargerThanList())  # revealed: Literal[True]
+```
+
 ## Implements `__contains__`
 
 Classes can support membership tests by implementing the `__contains__` method:
