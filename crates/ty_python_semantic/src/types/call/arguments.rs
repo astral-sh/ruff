@@ -2,14 +2,17 @@ use crate::Db;
 use std::borrow::Cow;
 use std::cell::OnceCell;
 use std::fmt::Display;
+use std::hash::BuildHasherDefault;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
-use crate::ProgramEnvironment;
+use crate::types::signatures::Parameters;
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::{Type, TypeContext, expand_type};
+use crate::{FxIndexMap, ProgramEnvironment};
 
 /// Maximum total number of expanded argument type combinations across all arguments
 /// in [`CallArgumentExpansions::iter`].
@@ -43,6 +46,63 @@ pub(crate) struct CallArguments<'a, 'db> {
 struct CallArgument<'a, 'db> {
     argument: Argument<'a>,
     types: CallArgumentTypes<'db>,
+    literal_unpacking: Option<LiteralUnpacking<'db>>,
+}
+
+/// The exact contents of a collection constructed directly in an unpacked argument.
+///
+/// These values supplement the container type: `list[int | str]` alone cannot retain the
+/// argument count or associate each element with its parameter. Names and other expressions
+/// keep their ordinary type-based unpacking, since their contents may have changed.
+#[derive(Clone, Debug)]
+pub(super) enum LiteralUnpacking<'db> {
+    Positional(Box<[Type<'db>]>),
+    Keywords(Box<[(Name, Type<'db>)]>),
+}
+
+impl<'db> LiteralUnpacking<'db> {
+    fn positional(
+        expression: &ast::Expr,
+        expression_type: &mut impl FnMut(&ast::Expr) -> Option<Type<'db>>,
+    ) -> Option<Self> {
+        let (ast::Expr::List(ast::ExprList { elts: elements, .. })
+        | ast::Expr::Tuple(ast::ExprTuple { elts: elements, .. })) = expression
+        else {
+            return None;
+        };
+        let types = elements
+            .iter()
+            .map(|element| {
+                if element.is_starred_expr() {
+                    None
+                } else {
+                    expression_type(element)
+                }
+            })
+            .collect::<Option<Box<[_]>>>()?;
+        Some(Self::Positional(types))
+    }
+
+    fn keywords(
+        expression: &ast::Expr,
+        expression_type: &mut impl FnMut(&ast::Expr) -> Option<Type<'db>>,
+    ) -> Option<Self> {
+        let ast::Expr::Dict(ast::ExprDict { items, .. }) = expression else {
+            return None;
+        };
+        let mut keywords =
+            FxIndexMap::with_capacity_and_hasher(items.len(), BuildHasherDefault::default());
+        for ast::DictItem { key, value } in items {
+            let Some(ast::Expr::StringLiteral(key)) = key else {
+                return None;
+            };
+            let name = Name::new(key.value.to_str());
+            let ty = expression_type(value)?;
+            // A repeated key in a dictionary replaces its value without changing order.
+            keywords.insert(name, ty);
+        }
+        Some(Self::Keywords(keywords.into_iter().collect()))
+    }
 }
 
 /// Inferred types for a given argument.
@@ -147,6 +207,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             call_arguments.items.push(CallArgument {
                 argument,
                 types: CallArgumentTypes::new(ty),
+                literal_unpacking: None,
             });
         }
 
@@ -159,23 +220,23 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// typechecking.
     pub(crate) fn from_arguments_typed(
         arguments: &'a ast::Arguments,
-        mut infer_argument_type: impl FnMut(&ast::Expr) -> Type<'db>,
+        mut infer_argument_type: impl FnMut(&ast::Expr) -> Option<Type<'db>>,
     ) -> Self {
-        arguments
+        let call_arguments = arguments
             .iter_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        let ty = infer_argument_type(value);
+                        let ty = infer_argument_type(value).unwrap_or(Type::unknown());
                         (Argument::Variadic, Some(ty))
                     }
                     _ => {
-                        let ty = infer_argument_type(arg);
+                        let ty = infer_argument_type(arg).unwrap_or(Type::unknown());
                         (Argument::Positional, Some(ty))
                     }
                 },
                 ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
-                    let ty = infer_argument_type(value);
+                    let ty = infer_argument_type(value).unwrap_or(Type::unknown());
                     if let Some(arg) = arg {
                         (Argument::Keyword(&arg.id), Some(ty))
                     } else {
@@ -183,7 +244,35 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     }
                 }
             })
-            .collect()
+            .collect::<Self>();
+        call_arguments.with_literal_unpacking(arguments, infer_argument_type)
+    }
+
+    /// Retain immediate literal contents after the argument expressions have been inferred.
+    ///
+    /// The callback reads existing child expression types; it must not infer expressions again.
+    #[must_use]
+    pub(crate) fn with_literal_unpacking(
+        mut self,
+        arguments: &ast::Arguments,
+        mut expression_type: impl FnMut(&ast::Expr) -> Option<Type<'db>>,
+    ) -> Self {
+        for (item, argument) in self.items.iter_mut().zip(arguments.iter_source_order()) {
+            item.literal_unpacking = match argument {
+                ast::ArgOrKeyword::Arg(ast::Expr::Starred(ast::ExprStarred { value, .. })) => {
+                    LiteralUnpacking::positional(value, &mut expression_type)
+                }
+                ast::ArgOrKeyword::Keyword(ast::Keyword {
+                    arg: None, value, ..
+                }) => LiteralUnpacking::keywords(value, &mut expression_type),
+                _ => None,
+            };
+        }
+        self
+    }
+
+    pub(super) fn literal_unpacking(&self, index: usize) -> Option<&LiteralUnpacking<'db>> {
+        self.items.get(index)?.literal_unpacking.as_ref()
     }
 
     /// Create a [`CallArguments`] with no arguments.
@@ -254,6 +343,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             items.push(CallArgument {
                 argument: Argument::Synthetic,
                 types: CallArgumentTypes::new(bound_self),
+                literal_unpacking: None,
             });
             items.extend(self.items.iter().cloned());
             Cow::Owned(CallArguments { items })
@@ -275,21 +365,42 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         }
     }
 
-    /// Create a new [`CallArguments`] containing only the arguments at the specified indices.
+    /// Select the arguments forwarded to a `ParamSpec` sub-call.
     ///
     /// The resulting argument list preserves the order of `indices`. Unlike [`Self::start_from`],
-    /// this can project a non-contiguous subset of the original call arguments. This is used to
-    /// turn the forwarded outer arguments into the argument list for a synthetic sub-call:
+    /// this can project a non-contiguous subset of the original call arguments. Literal
+    /// dictionaries retain only keys that were not consumed by the wrapper's prefix:
     ///
     /// ```py
     /// def wrapper[**P, R](func: Callable[P, R], **kwargs: P.kwargs) -> R: ...
     /// wrapper(TagSet=[...], func=f)  # select `TagSet=[...]`, but not the later `func=f`
     /// ```
-    pub(crate) fn select(&self, indices: &[usize]) -> Self {
+    pub(crate) fn select_for_paramspec(
+        &self,
+        indices: &[usize],
+        parameters: &Parameters<'db>,
+        prefix_len: usize,
+    ) -> Self {
         Self {
             items: indices
                 .iter()
-                .map(|index| self.items[*index].clone())
+                .map(|index| {
+                    let mut argument = self.items[*index].clone();
+                    if let Some(LiteralUnpacking::Keywords(keywords)) =
+                        &mut argument.literal_unpacking
+                    {
+                        *keywords = keywords
+                            .iter()
+                            .filter(|(name, _)| {
+                                parameters
+                                    .keyword_by_name(name.as_str())
+                                    .is_none_or(|(index, _)| index >= prefix_len)
+                            })
+                            .cloned()
+                            .collect();
+                    }
+                    argument
+                })
                 .collect(),
         }
     }
@@ -515,6 +626,14 @@ impl<'a, 'db> CallArgumentExpansions<'_, 'a, 'db> {
                         let mut expanded_argument = pre_expanded_types.clone();
                         expanded_argument.items[index].types =
                             CallArgumentTypes::new(Some(*subtype));
+                        // Tuple expansion narrows the element types. Dictionary keys are not
+                        // represented in their container type and must remain available.
+                        if matches!(
+                            expanded_argument.items[index].literal_unpacking,
+                            Some(LiteralUnpacking::Positional(_))
+                        ) {
+                            expanded_argument.items[index].literal_unpacking = None;
+                        }
                         expanded_arguments.push(expanded_argument);
                     }
                 }
@@ -565,6 +684,7 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
             items.push(CallArgument {
                 argument,
                 types: CallArgumentTypes::new(ty),
+                literal_unpacking: None,
             });
         }
 

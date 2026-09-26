@@ -31,7 +31,9 @@ use crate::lint::LintMetadata;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::PyIndex;
 use crate::types::ProgramEnvironment;
-use crate::types::call::arguments::{CallArgumentExpansions, CallArgumentTypes, Expansion};
+use crate::types::call::arguments::{
+    CallArgumentExpansions, CallArgumentTypes, Expansion, LiteralUnpacking,
+};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintSet, ConstraintSetBuilder,
@@ -4914,7 +4916,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         parameters: &'a Parameters<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
-        let explicit_keyword_parameters: FxHashSet<usize> = arguments
+        let mut explicit_keyword_parameters: FxHashSet<usize> = arguments
             .iter()
             .filter_map(|(argument, _)| {
                 if let Argument::Keyword(name) = argument {
@@ -4924,6 +4926,13 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 }
             })
             .collect();
+        for (index, _) in arguments.iter().enumerate() {
+            if let Some(LiteralUnpacking::Keywords(keywords)) = arguments.literal_unpacking(index) {
+                explicit_keyword_parameters.extend(keywords.iter().filter_map(|(name, _)| {
+                    parameters.keyword_by_name(name).map(|(index, _)| index)
+                }));
+            }
+        }
 
         Self {
             arguments,
@@ -5114,6 +5123,20 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 variable_element: Option<Type<'db>>,
             },
             None,
+        }
+
+        if let Some(LiteralUnpacking::Positional(types)) =
+            self.arguments.literal_unpacking(argument_index)
+        {
+            let mut matched = true;
+            // Count every element, including those after the first excess positional argument.
+            for ty in types {
+                matched &= self
+                    .match_positional(argument_index, argument, Some(*ty), false)
+                    .is_ok();
+            }
+            self.argument_matches[argument_index].matched = matched;
+            return matched.then_some(()).ok_or(());
         }
 
         let variadic_type = match argument_type {
@@ -5339,7 +5362,18 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_index: usize,
         argument_type: Option<Type<'db>>,
     ) {
-        if let Some(unpacked) =
+        if let Some(LiteralUnpacking::Keywords(keywords)) =
+            self.arguments.literal_unpacking(argument_index)
+        {
+            let mut matched = true;
+            // An unknown key must not prevent later keys from binding to their parameters.
+            for (name, ty) in keywords {
+                matched &= self
+                    .match_keyword(argument_index, Argument::Keywords, Some(*ty), name.as_str())
+                    .is_ok();
+            }
+            self.argument_matches[argument_index].matched = matched;
+        } else if let Some(unpacked) =
             argument_type.and_then(|ty| extract_unpacked_typed_dict_from_value_type(db, env, ty))
         {
             let openness = unpacked.openness;
@@ -6506,7 +6540,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     Some((argument_indices.map_or(index, |(first, _)| first), index));
             }
 
-            if matches!(argument, Argument::Variadic) {
+            if matches!(argument, Argument::Variadic)
+                && !matches!(
+                    self.arguments.literal_unpacking(argument_index),
+                    Some(LiteralUnpacking::Positional(_))
+                )
+            {
                 let argument_type = argument_types.get_default()?;
                 let mut argument_tuple = argument_type.iterate(db, self.env);
                 let consumed_prefix = matches
@@ -6859,13 +6898,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
-        let db = self.db;
         let paramspec = self.signature.parameters().as_paramspec_with_prefix();
         let paramspec_component_start = paramspec.and_then(|(prefix, paramspec)| {
             let prefix_len = prefix.len();
             let paramspec_argument_indices = self.paramspec_argument_indices(prefix_len);
             if paramspec_argument_indices.is_empty() {
-                self.evaluate_paramspec_sub_call(constraints, None, paramspec);
+                self.evaluate_paramspec_sub_call(constraints, None, prefix_len, paramspec);
                 return None;
             }
 
@@ -6873,31 +6911,28 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 paramspec_argument_indices
                     .iter()
                     .any(|(argument_index, _)| {
-                        let [parameter_index] =
-                            self.argument_matches[*argument_index].parameters.as_slice()
-                        else {
-                            return false;
-                        };
-
-                        let Type::TypeVar(typevar) =
-                            self.signature.parameters()[parameter_index.index].annotated_type()
-                        else {
-                            return false;
-                        };
-
-                        typevar.is_paramspec(db)
+                        let matches = &self.argument_matches[*argument_index].parameters;
+                        // Literal dictionaries are projected onto the ParamSpec in the sub-call.
+                        // Other arguments must belong entirely to the ParamSpec.
+                        matches!(
+                            self.arguments.literal_unpacking(*argument_index),
+                            Some(LiteralUnpacking::Keywords(_))
+                        ) || matches
+                            .iter()
+                            .all(|parameter| parameter.index >= prefix_len)
                     });
 
             if has_paramspec_component_argument
                 && self.evaluate_paramspec_sub_call(
                     constraints,
                     Some(&paramspec_argument_indices),
+                    prefix_len,
                     paramspec,
                 )
             {
                 Some(prefix_len)
             } else {
-                self.evaluate_paramspec_sub_call(constraints, None, paramspec);
+                self.evaluate_paramspec_sub_call(constraints, None, prefix_len, paramspec);
                 None
             }
         });
@@ -6980,6 +7015,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         &mut self,
         constraints: &ConstraintSetBuilder<'db>,
         paramspec_arguments: Option<&[(usize, Option<usize>)]>,
+        prefix_len: usize,
         paramspec: BoundTypeVarInstance<'db>,
     ) -> bool {
         let db = self.db;
@@ -7005,7 +7041,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     paramspec_arguments.iter().copied().unzip();
 
                 (
-                    self.arguments.select(&paramspec_argument_indices),
+                    self.arguments.select_for_paramspec(
+                        &paramspec_argument_indices,
+                        self.signature.parameters(),
+                        prefix_len,
+                    ),
                     Some(error_argument_indices),
                 )
             } else {
@@ -7062,7 +7102,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             *error_parameter_source = Some(parameter_source);
                         } else if let Some(parameter_index) = argument_index
                             .and_then(|index| paramspec_arguments?.get(index))
-                            .and_then(|(index, _)| argument_matches[*index].parameters.first())
+                            .and_then(|(index, _)| {
+                                argument_matches[*index]
+                                    .parameters
+                                    .iter()
+                                    .find(|parameter| parameter.index >= prefix_len)
+                            })
                             .map(|parameter| parameter.index)
                         {
                             parameter.signature_parameter_index = parameter_index;
@@ -7179,6 +7224,19 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             None
         };
+
+        if let Some(LiteralUnpacking::Keywords(_)) =
+            self.arguments.literal_unpacking(argument_index)
+        {
+            self.check_variadic_argument_type(
+                constraints,
+                argument_index,
+                adjusted_argument_index,
+                Argument::Keywords,
+                paramspec_component_start,
+            );
+            return;
+        }
 
         for matched_parameter in self.argument_matches[argument_index].iter() {
             let parameter_index = matched_parameter.index;
@@ -7693,7 +7751,11 @@ impl<'db> Binding<'db> {
             callable.signatures(db).iter().cloned(),
         );
 
-        let mut sub_arguments = arguments_types.select(&paramspec_argument_indices);
+        let mut sub_arguments = arguments_types.select_for_paramspec(
+            &paramspec_argument_indices,
+            self.signature.parameters(),
+            prefix.len(),
+        );
         // Clear the previously inferred type for this argument, if it was inferred in the previous
         // fixpoint iteration.
         sub_arguments.clear_types(sub_argument_index);
