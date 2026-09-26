@@ -2689,6 +2689,21 @@ impl<'db> Bindings<'db> {
                                 .parameter_type_by_name(db, "frozen_default", false)
                                 .ok()
                                 .flatten();
+                            let slots_default = overload
+                                .parameter_type_by_name(db, "slots_default", false)
+                                .ok()
+                                .flatten()
+                                .or_else(|| {
+                                    // Older `__dataclass_transform__` signatures can accept
+                                    // extensions through `**kwargs`.
+                                    call_arguments.iter().find_map(|(arg, types)| {
+                                        if matches!(arg, Argument::Keyword(name) if name == "slots_default") {
+                                            types.get_default()
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                });
 
                             if to_bool(&eq_default, true).unwrap_or(true) {
                                 flags |= DataclassTransformerFlags::EQ_DEFAULT;
@@ -2701,6 +2716,9 @@ impl<'db> Bindings<'db> {
                             }
                             if to_bool(&frozen_default, false).unwrap_or(false) {
                                 flags |= DataclassTransformerFlags::FROZEN_DEFAULT;
+                            }
+                            if to_bool(&slots_default, false).unwrap_or(false) {
+                                flags |= DataclassTransformerFlags::SLOTS_DEFAULT;
                             }
 
                             // Accept both `field_specifiers` (current name) and
