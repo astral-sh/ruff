@@ -3736,8 +3736,8 @@ impl<'db> Type<'db> {
         if nested && (self.same_divergent_marker(div) || self.is_pending_narrowing()) {
             return None;
         }
-        // Opaque types and definition-backed TypedDicts can contain pending values that still
-        // invalidate the enclosing constructor's approximation.
+        // Some of these types stay opaque, but pending values in their stored arguments, bounds, or
+        // fields still invalidate the enclosing constructor's approximation.
         if nested
             && matches!(
                 self,
