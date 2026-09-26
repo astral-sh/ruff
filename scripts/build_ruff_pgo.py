@@ -5,6 +5,7 @@
 # dependencies = []
 #
 # [tool.ty.rules]
+# truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"
 # missing-type-argument = "warn"
 # possibly-unresolved-reference = "warn"
@@ -548,7 +549,9 @@ def cargo_command(target: str, *, debug: bool = False) -> list[str]:
 
 
 def append_flags(existing: str | None, additional: str) -> str:
-    return " ".join(flag for flag in (existing, additional) if flag)
+    return " ".join(
+        flag for flag in (existing, additional) if flag is not None and flag
+    )
 
 
 def run(

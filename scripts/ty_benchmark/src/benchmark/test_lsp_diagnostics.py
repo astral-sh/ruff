@@ -416,7 +416,7 @@ def print_diagnostics(
 ):
     file = file.relative_to(cwd)
 
-    if label:
+    if label is not None and label:
         print(f"\n{file}: {len(diagnostics)} {label}")
     else:
         print(f"\n{file}: {len(diagnostics)} diagnostics")

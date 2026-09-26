@@ -68,7 +68,7 @@ class SnapshotRunner(NamedTuple):
             snapshot_file = self.snapshot_dir / f"{self.name}_{command.name}.txt"
 
             # Run the prepare command if provided.
-            if command.prepare:
+            if command.prepare is not None and command.prepare:
                 logger.info(f"Running prepare: {command.prepare}")
                 subprocess.run(
                     command.prepare,

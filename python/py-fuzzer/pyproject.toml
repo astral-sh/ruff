@@ -34,6 +34,7 @@ local_partial_types = true
 enable_error_code = "ignore-without-code,redundant-expr,truthy-bool"
 
 [tool.ty.rules]
+truthiness-test-of-none-union = "error"
 possibly-unresolved-reference = "error"
 unused-ignore-comment = "error"
 
