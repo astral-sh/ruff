@@ -496,7 +496,7 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+    pub fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.definition(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.definition(db),
