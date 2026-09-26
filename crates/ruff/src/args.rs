@@ -627,6 +627,10 @@ pub struct FormatCommand {
 
 #[derive(Copy, Clone, Debug, clap::Parser)]
 pub struct ServerCommand {
+    /// Treat all workspaces as untrusted, disabling the uv formatter backend.
+    #[arg(long)]
+    untrusted_workspace: bool,
+
     /// Enable preview mode. Use `--no-preview` to disable.
     ///
     /// This enables unstable server features and turns on the preview mode for the linter
@@ -638,6 +642,14 @@ pub struct ServerCommand {
 }
 
 impl ServerCommand {
+    pub(crate) fn resolve_workspace_trust(self) -> ruff_server::WorkspaceTrust {
+        if self.untrusted_workspace {
+            ruff_server::WorkspaceTrust::Untrusted
+        } else {
+            ruff_server::WorkspaceTrust::Trusted
+        }
+    }
+
     pub(crate) fn resolve_preview(self) -> Option<bool> {
         resolve_bool_arg(self.preview, self.no_preview)
     }

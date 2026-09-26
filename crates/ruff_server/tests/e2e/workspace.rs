@@ -1,7 +1,18 @@
-use anyhow::{Context, Result};
-use insta::{assert_json_snapshot, assert_snapshot};
+use std::assert_matches;
+use std::process::Command;
 
-use crate::{TestServer, TestServerBuilder};
+use anyhow::{Context, Result, ensure};
+use insta::{assert_json_snapshot, assert_snapshot};
+use lsp_types::{
+    DocumentFormattingParams, DocumentFormattingRequest, DocumentRangeFormattingParams,
+    DocumentRangeFormattingRequest, Position, Range, ShowMessageNotification,
+    TextDocumentIdentifier, TextEdit,
+};
+use ruff_server::WorkspaceTrust;
+use serde_json::json;
+use test_case::test_case;
+
+use crate::{AwaitResponseError, TestServer, TestServerBuilder};
 
 const SOURCE: &str = "value= \"hello\"\n";
 
@@ -298,5 +309,91 @@ fn unavailable_document_diagnostic_returns_empty_response() -> Result<()> {
     "#
     );
 
+    Ok(())
+}
+
+#[test_case(WorkspaceTrust::Trusted; "trusted")]
+#[test_case(WorkspaceTrust::Untrusted; "untrusted")]
+fn uv_formatting(workspace_trust: WorkspaceTrust) -> Result<()> {
+    without_uv(|| {
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(".")?
+            .with_workspace_trust(workspace_trust)
+            .with_initialization_options(json!({"settings": {"format": {"backend": "uv"}}}))
+            .build();
+        server.open_text_document("test.py", "x=1\n", 1);
+
+        let document = server.send_request::<DocumentFormattingRequest>(DocumentFormattingParams {
+            text_document: TextDocumentIdentifier {
+                uri: server.file_uri("test.py"),
+            },
+            options: Default::default(),
+            work_done_progress_params: Default::default(),
+        });
+        let document = server.try_await_response::<DocumentFormattingRequest>(&document, None);
+
+        let range =
+            server.send_request::<DocumentRangeFormattingRequest>(DocumentRangeFormattingParams {
+                text_document: TextDocumentIdentifier {
+                    uri: server.file_uri("test.py"),
+                },
+                range: Range::new(Position::new(0, 0), Position::new(1, 0)),
+                options: Default::default(),
+                work_done_progress_params: Default::default(),
+            });
+        let range = server.try_await_response::<DocumentRangeFormattingRequest>(&range, None);
+
+        match workspace_trust {
+            WorkspaceTrust::Trusted => {
+                assert_matches!(
+                    document,
+                    Err(AwaitResponseError::RequestFailed(error))
+                        if error.message.contains("uv was not found"),
+                );
+                assert_matches!(
+                    range,
+                    Err(AwaitResponseError::RequestFailed(error))
+                        if error.message.contains("uv was not found"),
+                );
+                server.await_notification::<ShowMessageNotification>();
+                server.await_notification::<ShowMessageNotification>();
+            }
+            WorkspaceTrust::Untrusted => {
+                let expected = Some(vec![TextEdit {
+                    range: Range::new(Position::new(0, 0), Position::new(1, 0)),
+                    new_text: "x = 1\n".to_string(),
+                }]);
+                assert_eq!(document?, expected);
+                assert_eq!(range?, expected);
+            }
+        }
+        Ok(())
+    })
+}
+
+/// Isolate PATH from other tests, which run their servers in the same process.
+/// Without uv, formatting only succeeds if the internal backend is used.
+fn without_uv(body: impl FnOnce() -> Result<()>) -> Result<()> {
+    const CHILD: &str = "RUFF_TEST_ISOLATED_CHILD";
+    let thread = std::thread::current();
+    let name = thread.name().context("missing test name")?;
+    if std::env::var(CHILD).as_deref() == Ok(name) {
+        return body();
+    }
+
+    let empty_path = tempfile::tempdir()?;
+    let output = Command::new(std::env::current_exe()?)
+        .args(["--exact", name, "--nocapture"])
+        .env(CHILD, name)
+        .env("PATH", empty_path.path())
+        .current_dir(empty_path.path())
+        .output()?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // An unmatched `--exact` filter exits successfully without running any tests.
+    ensure!(
+        output.status.success() && stdout.contains("test result: ok. 1 passed;"),
+        "{stdout}\n{}",
+        String::from_utf8_lossy(&output.stderr),
+    );
     Ok(())
 }

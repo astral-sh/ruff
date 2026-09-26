@@ -66,7 +66,7 @@ use lsp_types::{
     DidChangeWorkspaceFoldersNotification, DidCloseTextDocumentNotification,
     DidOpenTextDocumentNotification, ExitNotification, InitializedNotification, Notification,
 };
-use ruff_server::{ConnectionInitializer, LogLevel, Server, init_logging};
+use ruff_server::{ConnectionInitializer, LogLevel, Server, WorkspaceTrust, init_logging};
 use rustc_hash::FxHashMap;
 use tempfile::TempDir;
 
@@ -196,6 +196,7 @@ impl TestServer {
         test_context: TestContext,
         capabilities: ClientCapabilities,
         initialization_options: Option<serde_json::Value>,
+        workspace_trust: WorkspaceTrust,
     ) -> Self {
         setup_tracing();
 
@@ -207,7 +208,13 @@ impl TestServer {
             // TODO: This should probably be configurable to test concurrency issues
             let worker_threads = NonZeroUsize::new(1).unwrap();
 
-            match Server::new(worker_threads, server_connection, None, true) {
+            match Server::new(
+                worker_threads,
+                server_connection,
+                None,
+                workspace_trust,
+                true,
+            ) {
                 Ok(server) => {
                     if let Err(err) = server.run() {
                         panic!("Server stopped with error: {err:?}");
@@ -968,6 +975,7 @@ pub(crate) struct TestServerBuilder {
     workspaces: Vec<WorkspaceFolder>,
     initialization_options: Option<serde_json::Value>,
     client_capabilities: ClientCapabilities,
+    workspace_trust: WorkspaceTrust,
 }
 
 impl TestServerBuilder {
@@ -1002,11 +1010,16 @@ impl TestServerBuilder {
             test_context: TestContext::new()?,
             initialization_options: None,
             client_capabilities,
+            workspace_trust: WorkspaceTrust::Trusted,
         })
     }
 
+    pub(crate) fn with_workspace_trust(mut self, workspace_trust: WorkspaceTrust) -> Self {
+        self.workspace_trust = workspace_trust;
+        self
+    }
+
     /// Set the initial client options for the test server
-    #[expect(dead_code)]
     pub(crate) fn with_initialization_options(mut self, options: serde_json::Value) -> Self {
         self.initialization_options = Some(options);
         self
@@ -1149,6 +1162,7 @@ impl TestServerBuilder {
             self.test_context,
             self.client_capabilities,
             self.initialization_options,
+            self.workspace_trust,
         )
     }
 }
