@@ -5,6 +5,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use camino::{Utf8Path, Utf8PathBuf};
+use itertools::Either;
 use ruff_db::files::{
     DirectoryListing, File, FilePath, directory_listing, system_path_to_file, vendored_path_to_file,
 };
@@ -25,9 +26,10 @@ use crate::typeshed::TypeshedVersionsQueryResult;
 ///   in the vendored zip archive.
 /// - A relative path from the search path to the file
 ///   that contains the source code of the Python module in question.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) struct ModulePath {
     search_path: SearchPath,
+    #[get_size(size_fn = utf8_path_buf_size)]
     relative_path: Utf8PathBuf,
 }
 
@@ -234,6 +236,15 @@ impl ModulePath {
         }
     }
 
+    /// Returns the path within the vendored filesystem, if this is a vendored module.
+    fn to_vendored_path(&self) -> Option<VendoredPathBuf> {
+        Some(
+            self.search_path
+                .as_vendored_path()?
+                .join(&self.relative_path),
+        )
+    }
+
     #[must_use]
     pub(crate) fn to_module_name(&self) -> Option<ModuleName> {
         fn strip_stubs(component: &str) -> &str {
@@ -286,6 +297,10 @@ impl ModulePath {
     }
 }
 
+fn utf8_path_buf_size(path: &Utf8PathBuf) -> usize {
+    path.capacity()
+}
+
 impl PartialEq<SystemPathBuf> for ModulePath {
     fn eq(&self, other: &SystemPathBuf) -> bool {
         let ModulePath {
@@ -331,14 +346,30 @@ pub(crate) struct ModuleDirectory<'db> {
     path: ModulePath,
     // The contents of the directory.
     listing: Option<&'db DirectoryListing>,
+    // Known after descent or snapshot restoration; arbitrary paths are checked on demand.
+    enumeration_allowed: Option<bool>,
 }
 
 impl<'db> ModuleDirectory<'db> {
-    pub(crate) fn new(context: &ResolverContext<'db>, path: ModulePath) -> Self {
+    /// Opens a directory, optionally reusing enumeration eligibility established for this path.
+    pub(crate) fn new(
+        context: &ResolverContext<'db>,
+        path: ModulePath,
+        enumeration_allowed: Option<bool>,
+    ) -> Self {
         let listing = path
             .to_system_path()
             .and_then(|path| directory_listing(context.db, &path).ok());
-        Self { path, listing }
+        let enumeration_allowed = enumeration_allowed.or_else(|| {
+            (path.relative_path.as_str().is_empty()
+                || path.search_path.as_vendored_path().is_some())
+            .then_some(true)
+        });
+        Self {
+            path,
+            listing,
+            enumeration_allowed,
+        }
     }
 
     /// Returns an existing child directory and retrieves its listing without
@@ -352,7 +383,70 @@ impl<'db> ModuleDirectory<'db> {
     ) -> Option<Self> {
         let mut path = self.path.clone();
         path.push(name);
-        path.is_directory(context).then(|| Self::new(context, path))
+        path.is_directory(context).then(|| {
+            let enumeration_allowed = self.enumeration_allowed.map(|parent_allowed| {
+                let child_type = if self.path.search_path.as_vendored_path().is_some() {
+                    Some(FileType::Directory)
+                } else {
+                    self.listing.and_then(|listing| listing.file_type(name))
+                };
+                Self::enumeration_allowed_after_step(parent_allowed, child_type)
+            });
+            Self::new(context, path, enumeration_allowed)
+        })
+    }
+
+    /// Iterates over entries in a system or vendored directory.
+    pub(crate) fn entries(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = ModuleDirectoryEntry<'db>> + use<'db> {
+        if let Some(listing) = self.system_listing() {
+            Either::Left(
+                listing
+                    .iter()
+                    .map(|(name, kind)| ModuleDirectoryEntry::System(name, kind)),
+            )
+        } else {
+            Either::Right(
+                self.path
+                    .to_vendored_path()
+                    .into_iter()
+                    .flat_map(move |path| db.vendored().read_directory(path))
+                    .map(ModuleDirectoryEntry::Vendored),
+            )
+        }
+    }
+
+    /// Whether this directory's contents may supply names during module enumeration.
+    ///
+    /// Search roots may be symlinks, but no directory component below the root may be a
+    /// symlink. Descent and restored search snapshots carry this result when it is known.
+    /// For arbitrary paths, check the ancestors only when enumeration requests eligibility.
+    /// Ordinary resolution does not use this restriction.
+    pub(crate) fn enumeration_allowed(&self, db: &dyn Db) -> bool {
+        if let Some(allowed) = self.enumeration_allowed {
+            return allowed;
+        }
+        let Some(search_root) = self.path.search_path().as_system_path() else {
+            return true;
+        };
+        let mut parent = search_root.to_path_buf();
+        for component in self.path.relative_path.components() {
+            let child_type = directory_listing(db, &parent)
+                .ok()
+                .and_then(|listing| listing.file_type(component.as_str()));
+            if !Self::enumeration_allowed_after_step(true, child_type) {
+                return false;
+            }
+            parent.push(component.as_str());
+        }
+        true
+    }
+
+    /// Every step below a search root must use an ordinary directory.
+    fn enumeration_allowed_after_step(parent_allowed: bool, child_type: Option<FileType>) -> bool {
+        parent_allowed && child_type == Some(FileType::Directory)
     }
 
     /// Returns the directory's path without permitting it to change.
@@ -435,6 +529,35 @@ impl<'db> ModuleDirectory<'db> {
                     }
                 }
             }
+        }
+    }
+}
+
+/// A directory entry that borrows a system listing or owns a vendored entry's path.
+pub(crate) enum ModuleDirectoryEntry<'db> {
+    /// An entry from a cached system directory listing, with a borrowed name.
+    System(&'db str, FileType),
+    /// An owned entry from the vendored filesystem.
+    Vendored(ruff_db::vendored::DirectoryEntry),
+}
+
+impl ModuleDirectoryEntry<'_> {
+    /// Returns the entry's name without its parent directory.
+    pub(crate) fn file_name(&self) -> Option<&str> {
+        match self {
+            Self::System(name, _) => Some(name),
+            Self::Vendored(entry) => entry.path().file_name(),
+        }
+    }
+
+    /// Returns the entry's file type without following symlinks.
+    pub(crate) fn file_type(&self) -> FileType {
+        match self {
+            Self::System(_, kind) => *kind,
+            Self::Vendored(entry) => match entry.file_type() {
+                ruff_db::vendored::FileType::Directory => FileType::Directory,
+                ruff_db::vendored::FileType::File => FileType::File,
+            },
         }
     }
 }
@@ -991,7 +1114,7 @@ value = 1
             ResolverEnvironment::new(&db, PythonVersion::PY312, db.search_paths()),
             ModuleResolveMode::Typing,
         );
-        let directory = ModuleDirectory::new(&resolver, stdlib_path.to_module_path());
+        let directory = ModuleDirectory::new(&resolver, stdlib_path.to_module_path(), None);
 
         assert_eq!(directory.resolve_file(&resolver, "foo.py"), None);
     }
@@ -1023,7 +1146,7 @@ value = 1
         );
         let search_path =
             SearchPath::first_party(db.system(), root.clone()).expect("Existing source directory");
-        let directory = ModuleDirectory::new(&resolver, search_path.to_module_path());
+        let directory = ModuleDirectory::new(&resolver, search_path.to_module_path(), None);
 
         // Require exact filename casing even when the filesystem is case-insensitive.
         assert_eq!(directory.resolve_file(&resolver, "tools.py"), None);
@@ -1536,6 +1659,7 @@ value = 1
                     search_path: self.search_path.clone(),
                     relative_path: parent.to_path_buf(),
                 },
+                None,
             );
 
             directory.resolve_file(context, filename)

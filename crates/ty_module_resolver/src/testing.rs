@@ -1,12 +1,15 @@
+use camino::{Utf8Component, Utf8Path};
+
 use ruff_db::Db as _;
-use ruff_db::files::FileRootKind;
+use ruff_db::files::{FilePath, FileRootKind};
 use ruff_db::system::{
     DbWithTestSystem as _, DbWithWritableSystem as _, SystemPath, SystemPathBuf,
 };
 use ruff_db::vendored::VendoredPathBuf;
 use ruff_python_ast::PythonVersion;
 
-use crate::db::tests::TestDb;
+use crate::db::{Db, tests::TestDb};
+use crate::module::Module;
 use crate::settings::SearchPathSettings;
 use crate::strategy::FallibleStrategy;
 
@@ -107,6 +110,7 @@ pub(crate) struct TestCaseBuilder<T> {
     python_version: PythonVersion,
     first_party_files: Vec<FileSpec>,
     site_packages_files: Vec<FileSpec>,
+    extra_paths: Vec<(SystemPathBuf, Vec<FileSpec>)>,
     // Additional file roots (beyond site_packages, src and stdlib)
     // that should be registered with the `Db` abstraction.
     roots: Vec<SystemPathBuf>,
@@ -119,6 +123,7 @@ impl<T> TestCaseBuilder<T> {
             python_version: self.python_version,
             first_party_files: self.first_party_files,
             site_packages_files: self.site_packages_files,
+            extra_paths: self.extra_paths,
             roots: self.roots,
         }
     }
@@ -132,6 +137,17 @@ impl<T> TestCaseBuilder<T> {
     /// Specify files to be created in the `site-packages` mock directory
     pub(crate) fn with_site_packages_files(mut self, files: &[FileSpec]) -> Self {
         self.site_packages_files.extend(files.iter().copied());
+        self
+    }
+
+    /// Configure an extra module-search path and create files relative to that directory.
+    pub(crate) fn with_extra_path(
+        mut self,
+        path: impl AsRef<SystemPath>,
+        files: &[FileSpec],
+    ) -> Self {
+        self.extra_paths
+            .push((path.as_ref().to_path_buf(), files.to_vec()));
         self
     }
 
@@ -172,6 +188,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
             python_version: PythonVersion::default(),
             first_party_files: vec![],
             site_packages_files: vec![],
+            extra_paths: vec![],
             roots: vec![],
         }
     }
@@ -215,6 +232,7 @@ impl TestCaseBuilder<MockedTypeshed> {
             python_version,
             first_party_files,
             site_packages_files,
+            extra_paths,
             roots,
         } = self;
 
@@ -225,11 +243,16 @@ impl TestCaseBuilder<MockedTypeshed> {
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
         let typeshed = Self::build_typeshed_mock(&mut db, &typeshed_option);
         let stdlib = typeshed.join("stdlib");
+        let extra_paths = extra_paths
+            .into_iter()
+            .map(|(path, files)| Self::write_mock_directory(&mut db, path, files))
+            .collect();
 
         let search_paths = SearchPathSettings {
             src_roots: vec![src.clone()],
             custom_typeshed: Some(typeshed),
             site_packages_paths: vec![site_packages.clone()],
+            extra_paths,
             ..SearchPathSettings::empty()
         }
         .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
@@ -284,6 +307,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
             python_version,
             first_party_files,
             site_packages_files,
+            extra_paths,
             roots,
         } = self;
 
@@ -293,9 +317,14 @@ impl TestCaseBuilder<VendoredTypeshed> {
             Self::write_mock_directory(&mut db, "/site-packages", site_packages_files);
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
 
+        let extra_paths = extra_paths
+            .into_iter()
+            .map(|(path, files)| Self::write_mock_directory(&mut db, path, files))
+            .collect();
         let search_paths = SearchPathSettings {
             src_roots: vec![src.clone()],
             site_packages_paths: vec![site_packages.clone()],
+            extra_paths,
             ..SearchPathSettings::empty()
         }
         .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
@@ -315,6 +344,101 @@ impl TestCaseBuilder<VendoredTypeshed> {
             stdlib: VendoredPathBuf::from("stdlib"),
             site_packages,
             python_version,
+        }
+    }
+}
+
+/// Creates an enumeration fixture on disk, with extra paths relative to its temporary root.
+#[cfg(target_family = "unix")]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "Test fixture needs real filesystem symlinks"
+)]
+pub(crate) fn os_enumeration_db(
+    extra_paths: &[&str],
+) -> anyhow::Result<(tempfile::TempDir, TestDb, SystemPathBuf)> {
+    let temp = tempfile::TempDir::new().expect("create enumeration workspace");
+    let canonical = temp
+        .path()
+        .canonicalize()
+        .expect("canonical workspace path");
+    let root = SystemPathBuf::from_path_buf(canonical).expect("UTF-8 workspace path");
+    for path in ["src", "site-packages", "typeshed/stdlib"]
+        .into_iter()
+        .chain(extra_paths.iter().copied())
+    {
+        std::fs::create_dir_all(root.join(path).as_std_path()).expect("create search root");
+    }
+    let mut db = TestDb::new();
+    db.use_system(ruff_db::system::OsSystem::new(&root));
+    db.write_file(root.join("typeshed/stdlib/VERSIONS"), "")?;
+    let settings = SearchPathSettings {
+        src_roots: vec![root.join("src")],
+        site_packages_paths: vec![root.join("site-packages")],
+        custom_typeshed: Some(root.join("typeshed")),
+        extra_paths: extra_paths.iter().map(|path| root.join(path)).collect(),
+        ..SearchPathSettings::empty()
+    };
+    db.set_search_paths(
+        settings
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+            .expect("configure real filesystem search paths"),
+    );
+    Ok((temp, db, root))
+}
+
+/// Formats a resolved module with stable paths for test snapshots.
+pub(crate) struct ModuleDebugSnapshot<'db> {
+    db: &'db dyn Db,
+    module: Module<'db>,
+}
+
+impl<'db> ModuleDebugSnapshot<'db> {
+    /// Wraps a module for snapshot formatting.
+    pub(crate) fn new(db: &'db dyn Db, module: Module<'db>) -> Self {
+        Self { db, module }
+    }
+}
+
+impl std::fmt::Debug for ModuleDebugSnapshot<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self.module {
+            Module::Namespace(pkg) => {
+                write!(f, "Module::Namespace({name:?})", name = pkg.name(self.db))
+            }
+            Module::File(module) => {
+                // For snapshots, just normalize all paths to using
+                // Unix slashes for simplicity.
+                let path_components = match module.file(self.db).path(self.db) {
+                    FilePath::System(path) => path.components(),
+                    FilePath::Vendored(path) => path.components(),
+                    FilePath::SystemVirtual(path) => Utf8Path::new(path.as_str()).components(),
+                };
+                let nice_path = path_components
+                    // Avoid including a root component, since that
+                    // results in a platform dependent separator.
+                    // Convert to an empty string so that we get a
+                    // path beginning with `/` regardless of platform.
+                    .map(|component| {
+                        if let Utf8Component::RootDir = component {
+                            Utf8Component::Normal("")
+                        } else {
+                            component
+                        }
+                    })
+                    .map(|component| component.as_str())
+                    .collect::<Vec<&str>>()
+                    .join("/");
+                write!(
+                    f,
+                    "Module::File({name:?}, {search_path:?}, {path:?}, {kind:?}, {known:?})",
+                    name = module.name(self.db).as_str(),
+                    search_path = module.search_path(self.db).debug_kind(),
+                    path = nice_path,
+                    kind = module.kind(self.db),
+                    known = module.known(self.db),
+                )
+            }
         }
     }
 }
