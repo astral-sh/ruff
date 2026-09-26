@@ -41,7 +41,7 @@ use crate::{
         diagnostic::REDUNDANT_CONDITION_STRICT,
         infer::{
             TypeInferenceBuilder,
-            builder::redundant_conditions::{SuiteExitKind, suite_ends_with_exit},
+            builder::suspicious_conditions::{SuiteExitKind, suite_ends_with_exit},
         },
         infer_definition_types, infer_expression_types,
     },

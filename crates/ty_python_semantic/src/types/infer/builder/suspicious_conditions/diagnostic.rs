@@ -44,7 +44,7 @@ use crate::{
         function::KnownFunction,
         infer::{
             TypeInferenceBuilder,
-            builder::redundant_conditions::{
+            builder::suspicious_conditions::{
                 SuiteExitKind, is_trivial_statement, suite_ends_with_exit,
             },
         },
