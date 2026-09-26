@@ -9926,7 +9926,10 @@ from .<CURSOR>
 ",
             )
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @"import");
+        assert_snapshot!(builder.build().snapshot(), @"
+        import
+        bar
+        ");
     }
 
     #[test]
@@ -9966,6 +9969,7 @@ from .imp<CURSOR>
         assert_snapshot!(builder.build().snapshot(), @"
         import
         foo
+        sub1
         ");
     }
 
@@ -9991,7 +9995,10 @@ from .imp<CURSOR>
             .source("package/foo.py", "")
             .source("package/sub1/sub2/bar.py", "from.<CURSOR>")
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @"import");
+        assert_snapshot!(builder.build().snapshot(), @"
+        import
+        bar
+        ");
     }
 
     #[test]
@@ -10004,6 +10011,7 @@ from .imp<CURSOR>
         assert_snapshot!(builder.build().snapshot(), @"
         import
         foo
+        sub1
         ");
     }
 
@@ -10642,6 +10650,79 @@ collabc<CURSOR>
             .build()
             .snapshot();
         assert_snapshot!(snapshot, @"collections.abc");
+    }
+
+    #[test]
+    fn auto_import_namespace_descendants() {
+        let builder = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "NamespaceSymbol<CURSOR>")
+            .source("acme/reports.py", "class NamespaceSymbolLocal: ...")
+            .source("acme/regular/__init__.py", "")
+            .source(
+                "acme/regular/nested/tools.py",
+                "class NamespaceSymbolNested: ...",
+            )
+            .site_packages("acme/widgets.py", "class NamespaceSymbolDependency: ...")
+            .completion_test_builder()
+            .skip_builtins()
+            .imports()
+            .module_names();
+
+        assert_snapshot!(builder.build().snapshot(), @"
+        NamespaceSymbolLocal :: acme.reports :: from acme.reports import NamespaceSymbolLocal
+
+        NamespaceSymbolNested :: acme.regular.nested.tools :: from acme.regular.nested.tools import NamespaceSymbolNested
+
+        NamespaceSymbolDependency :: acme.widgets :: from acme.widgets import NamespaceSymbolDependency
+        ");
+    }
+
+    #[test]
+    fn auto_import_namespace_descendant_but_not_namespace_package() {
+        // TODO: We should in fact suggest the namespace package itself (not just its descendants);
+        // this was merely a scope cut in the original delivery of namespace package support.
+
+        let builder = CursorTest::builder()
+            .source("main.py", "acme<CURSOR>")
+            .source("acme/reports.py", "")
+            .completion_test_builder();
+
+        let completions = builder.build();
+        completions.not_contains("acme").contains("acme.reports");
+    }
+
+    #[test]
+    fn import_statement_completes_split_namespace_children() {
+        let builder = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "from acme import <CURSOR>")
+            .source("acme/reports.py", "")
+            .source("acme/regular/__init__.py", "")
+            .site_packages("acme/widgets.py", "")
+            .completion_test_builder()
+            .skip_builtins()
+            .imports()
+            .module_names()
+            .skip_auto_import()
+            .skip_dunders();
+
+        assert_snapshot!(builder.build().snapshot(), @"
+        regular :: <no import required> :: <no import edit>
+        reports :: <no import required> :: <no import edit>
+        widgets :: <no import required> :: <no import edit>
+        ");
+    }
+
+    #[test]
+    fn import_completion_triggers_desperate_module_resolution() {
+        let builder = CursorTest::builder()
+            .source("scripts/main.py", "from package import <CURSOR>")
+            .source("scripts/package/__init__.py", "")
+            .source("scripts/package/child.py", "")
+            .completion_test_builder()
+            .skip_auto_import();
+        builder.build().contains("child");
     }
 
     #[test]
