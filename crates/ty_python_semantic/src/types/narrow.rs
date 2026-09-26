@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry};
-use std::hash::{Hash, Hasher};
 
 use crate::place::loop_header_reachability;
 use crate::reachability::{
@@ -11,6 +10,7 @@ use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::iteration::extract_literal_container_element_types;
+use crate::types::match_pattern::PatternCacheKey;
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::{TupleElement, TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema, TypedDictType};
@@ -449,40 +449,6 @@ struct PatternSuccessAnalyzer<'db, 'pattern> {
     ///
     /// For `int()` and an incoming subject type of `int | str`, the matched subject type is `int`.
     matched_subjects: FxHashMap<PatternCacheKey<'pattern, 'db>, Type<'db>>,
-}
-
-/// Identifies a pattern by its address and subject type without hashing the pattern subtree.
-#[derive(Clone, Copy)]
-struct PatternCacheKey<'pattern, 'db> {
-    pattern: &'pattern PatternPredicateKind<'db>,
-    subject_ty: Type<'db>,
-}
-
-impl PatternCacheKey<'_, '_> {
-    fn is_structural(self) -> bool {
-        matches!(
-            self.pattern,
-            PatternPredicateKind::Class(_)
-                | PatternPredicateKind::Mapping(_)
-                | PatternPredicateKind::Sequence(_)
-                | PatternPredicateKind::Or(_)
-        )
-    }
-}
-
-impl PartialEq for PatternCacheKey<'_, '_> {
-    fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self.pattern, other.pattern) && self.subject_ty == other.subject_ty
-    }
-}
-
-impl Eq for PatternCacheKey<'_, '_> {}
-
-impl Hash for PatternCacheKey<'_, '_> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        std::ptr::hash(self.pattern, state);
-        self.subject_ty.hash(state);
-    }
 }
 
 /// Infer the types of all names bound when `pattern` succeeds.

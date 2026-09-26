@@ -1173,6 +1173,43 @@ def match_pair(value: Pair) -> None:
             reveal_type(right)  # revealed: str
 ```
 
+## Nested sequence captures over recursive unions
+
+```py
+from __future__ import annotations
+from typing import Literal, TypeAlias
+
+Node: TypeAlias = tuple["Node", Literal[0]] | tuple["Node", Literal[1]] | None
+
+def visit(value: Node) -> None:
+    match value:
+        case [[captured, _], _]:
+            reveal_type(captured)  # revealed: Node
+```
+
+## Nested alternative captures over recursive unions
+
+```py
+from __future__ import annotations
+from typing import TypeAlias
+
+class A:
+    child: Node
+
+class B:
+    child: Node
+
+class Leaf: ...
+
+Node: TypeAlias = A | B | Leaf
+
+def visit(value: Node) -> None:
+    match value:
+        case (A(child=(A(child=captured) | B(child=captured))) | B(child=(A(child=captured) | B(child=captured)))) as whole:
+            reveal_type(captured)  # revealed: A | B | Leaf
+            reveal_type(whole)  # revealed: A | B
+```
+
 ## Generic subclass captures
 
 ### Gradual mode
@@ -2501,6 +2538,77 @@ def non_string_key_is_not_exhaustive(
     match value:
         case {1: _}:
             return 1
+```
+
+## Recursive `TypedDict` mapping patterns
+
+Nested mapping patterns can reach the same recursive union through multiple `TypedDict` fields.
+Captures retain the field type, and later cases still see values the earlier pattern did not
+consume.
+
+```py
+from __future__ import annotations
+from typing import Literal, TypeAlias, TypedDict
+
+class A(TypedDict):
+    child: Node
+    tag: Literal[0]
+
+class B(TypedDict):
+    child: Node
+    tag: Literal[1]
+
+Node: TypeAlias = A | B | None
+
+def visit(value: Node) -> None:
+    match value:
+        case {"child": {"child": {"child": captured}}}:
+            reveal_type(captured)  # revealed: A | B | None
+        case {"child": None}:
+            reveal_type(value)  # revealed: A | B
+        case None:
+            reveal_type(value)  # revealed: None
+```
+
+The same nested pattern can exhaust one union member without exhausting another, and an optional key
+can still be absent:
+
+```py
+class IntValue(TypedDict):
+    inner: int
+
+class StrValue(TypedDict):
+    inner: str
+
+class IntWrapper(TypedDict):
+    child: IntValue
+
+class StrWrapper(TypedDict):
+    child: StrValue
+
+class MaybeWrapper(TypedDict, total=False):
+    child: IntValue
+
+def distinguish_subjects(value: IntWrapper | StrWrapper) -> None:
+    match value:
+        case {"child": {"inner": int()}}:
+            reveal_type(value)  # revealed: IntWrapper
+        case _:
+            reveal_type(value)  # revealed: StrWrapper
+
+def distinguish_patterns(value: IntWrapper) -> int:
+    match value:
+        case {"child": {"inner": str()}}:
+            return 1
+        case {"child": {"inner": int()}}:
+            return 2
+
+def optional_key(value: MaybeWrapper) -> None:
+    match value:
+        case {"child": {"inner": int()}}:
+            pass
+        case _:
+            reveal_type(value)  # revealed: MaybeWrapper
 ```
 
 ## `NamedTuple` positional patterns
