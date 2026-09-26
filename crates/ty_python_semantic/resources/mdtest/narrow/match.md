@@ -1112,6 +1112,67 @@ def test_incompatible_declared_class_capture(value: PatternBox[int]) -> None:
             reveal_type(item)  # revealed: str
 ```
 
+## Nested captures over recursive unions
+
+A capture nested inside class patterns retains its recursive union type, including when other union
+members can overlap with the pattern class.
+
+```py
+from __future__ import annotations
+from typing import TypeAlias
+
+class Branch:
+    child: Node
+    sibling: Node
+
+class LeafA: ...
+class LeafB: ...
+class LeafC: ...
+
+Node: TypeAlias = Branch | LeafA | LeafB | LeafC
+
+def visit(node: Node) -> None:
+    match node:
+        case Branch(child=Branch(child=Branch(child=Branch(child=captured)))):
+            reveal_type(captured)  # revealed: Branch | LeafA | LeafB | LeafC
+            reveal_type(node)  # revealed: Branch
+
+def visit_siblings(node: Node) -> None:
+    match node:
+        case Branch(child=Branch(child=first), sibling=Branch(child=second)):
+            reveal_type(first)  # revealed: Branch | LeafA | LeafB | LeafC
+            reveal_type(second)  # revealed: Branch | LeafA | LeafB | LeafC
+```
+
+Different union members and sibling subpatterns retain their own input types:
+
+```py
+class Holder:
+    value: object
+
+class IntHolder(Holder):
+    value: int
+
+class StrHolder(Holder):
+    value: str
+
+def filter_holders(value: IntHolder | StrHolder) -> None:
+    match value:
+        case Holder(value=int() as item) as whole:
+            reveal_type(item)  # revealed: int
+            reveal_type(whole)  # revealed: IntHolder
+
+class Pair:
+    left: int | str
+    right: int | str
+
+def match_pair(value: Pair) -> None:
+    match value:
+        case Pair(left=int() as left, right=str() as right):
+            reveal_type(left)  # revealed: int
+            reveal_type(right)  # revealed: str
+```
+
 ## Generic subclass captures
 
 ### Gradual mode

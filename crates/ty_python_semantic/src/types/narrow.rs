@@ -1,6 +1,8 @@
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry};
+use std::hash::{Hash, Hasher};
 
 use crate::place::loop_header_reachability;
 use crate::reachability::{
@@ -272,6 +274,7 @@ impl<'db> PatternSuccessTypes<'db> {
 ///
 /// The pattern produces `Never` for the matched subject and commits no `item` binding, because the
 /// second element prevents the complete sequence pattern from matching.
+#[derive(Clone)]
 struct PatternSuccessResult<'db> {
     /// The type established while this pattern is being evaluated.
     matched_subject_ty: Type<'db>,
@@ -303,7 +306,7 @@ struct PatternBindingTypes<'db> {
 }
 
 /// One successful pattern arm's contribution to a binding type.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 struct PatternBindingType<'db> {
     /// The type inferred for the binding in this arm.
     ty: Type<'db>,
@@ -355,9 +358,15 @@ impl<'db> PatternBindingTypes<'db> {
         }
     }
 
-    /// Add the contributions from another successful pattern arm.
+    /// Add the distinct contributions from another successful pattern arm.
     fn merge(&mut self, other: Self) {
-        self.contributions.extend(other.contributions);
+        // Repeated contributions do not affect the union, but subject aliases and extracted
+        // values must remain separate because only subject aliases are restored after filtering.
+        for contribution in other.contributions {
+            if !self.contributions.contains(&contribution) {
+                self.contributions.push(contribution);
+            }
+        }
     }
 
     /// Return the union of the contributions that alias the current subject.
@@ -413,10 +422,45 @@ enum PatternValueSource {
 /// Subject narrowing and binding inference use separate recursive entry points. Structural
 /// patterns share the lower-level operations that filter subject arms, extract child values, and
 /// preserve type variables.
-struct PatternSuccessAnalyzer<'db> {
+struct PatternSuccessAnalyzer<'db, 'pattern> {
     db: &'db dyn Db,
     env: ProgramEnvironment<'db>,
     scope: ScopeId<'db>,
+    // Different union arms can pass the same type to the same nested pattern. Reuse its complete
+    // result within this analysis so repeated work does not multiply at each pattern level.
+    successful_patterns:
+        RefCell<FxHashMap<(PatternIdentity<'pattern, 'db>, Type<'db>), PatternSuccessResult<'db>>>,
+    matched_subjects: RefCell<FxHashMap<(PatternIdentity<'pattern, 'db>, Type<'db>), Type<'db>>>,
+}
+
+/// Identifies a node in the pattern being analyzed without hashing its entire subtree.
+#[derive(Clone, Copy)]
+struct PatternIdentity<'pattern, 'db>(&'pattern PatternPredicateKind<'db>);
+
+impl PatternIdentity<'_, '_> {
+    fn is_structural(self) -> bool {
+        matches!(
+            self.0,
+            PatternPredicateKind::Class(_)
+                | PatternPredicateKind::Mapping(_)
+                | PatternPredicateKind::Sequence(_)
+                | PatternPredicateKind::Or(_)
+        )
+    }
+}
+
+impl PartialEq for PatternIdentity<'_, '_> {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self.0, other.0)
+    }
+}
+
+impl Eq for PatternIdentity<'_, '_> {}
+
+impl Hash for PatternIdentity<'_, '_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::ptr::hash(self.0, state);
+    }
 }
 
 /// Infer the types of all names bound when `pattern` succeeds.
@@ -2108,12 +2152,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 }
 
-impl<'db> PatternSuccessAnalyzer<'db> {
+impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
     fn new(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
         Self {
             db,
             env: ProgramEnvironment::from_scope(scope),
             scope,
+            successful_patterns: RefCell::new(FxHashMap::default()),
+            matched_subjects: RefCell::new(FxHashMap::default()),
         }
     }
 
@@ -2175,11 +2221,17 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     /// values not definitely matched by an earlier alternative.
     fn analyze_successful_pattern(
         &self,
-        pattern: &PatternPredicateKind<'db>,
+        pattern: &'pattern PatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
+        let key = (PatternIdentity(pattern), subject_ty);
+        let cacheable = key.0.is_structural();
+        if cacheable && let Some(result) = self.successful_patterns.borrow().get(&key) {
+            return result.clone();
+        }
+
         let db = self.db;
-        match pattern {
+        let result = match pattern {
             PatternPredicateKind::Class(kind) => {
                 self.analyze_successful_class_pattern(kind, subject_ty)
             }
@@ -2247,7 +2299,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     bindings: BTreeMap::new(),
                 }
             }
+        };
+        if cacheable {
+            self.successful_patterns
+                .borrow_mut()
+                .insert(key, result.clone());
         }
+        result
     }
 
     /// Return the type established when `pattern` matches `subject_ty`.
@@ -2257,11 +2315,17 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     /// structural facts established by their child patterns.
     fn matched_subject_type(
         &self,
-        pattern: &PatternPredicateKind<'db>,
+        pattern: &'pattern PatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> Type<'db> {
+        let key = (PatternIdentity(pattern), subject_ty);
+        let cacheable = key.0.is_structural();
+        if cacheable && let Some(result) = self.matched_subjects.borrow().get(&key) {
+            return *result;
+        }
+
         let db = self.db;
-        match pattern {
+        let result = match pattern {
             PatternPredicateKind::Class(kind) => {
                 self.matched_class_pattern_subject_type(kind, subject_ty)
             }
@@ -2285,12 +2349,16 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 subject_ty,
                 necessary_match_pattern_type(db, &self.env, pattern),
             ),
+        };
+        if cacheable {
+            self.matched_subjects.borrow_mut().insert(key, result);
         }
+        result
     }
 
     fn matched_or_pattern_subject_type(
         &self,
-        patterns: &[PatternPredicateKind<'db>],
+        patterns: &'pattern [PatternPredicateKind<'db>],
         subject_ty: Type<'db>,
     ) -> Type<'db> {
         let db = self.db;
@@ -2343,7 +2411,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
     fn analyze_successful_or_pattern(
         &self,
-        patterns: &[PatternPredicateKind<'db>],
+        patterns: &'pattern [PatternPredicateKind<'db>],
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
         self.analyze_pattern_subject_arms(
@@ -2357,7 +2425,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
     fn analyze_successful_or_pattern_arm(
         &self,
-        patterns: &[PatternPredicateKind<'db>],
+        patterns: &'pattern [PatternPredicateKind<'db>],
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
         let db = self.db;
@@ -2676,7 +2744,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
     fn matched_class_pattern_subject_type(
         &self,
-        kind: &ClassPatternPredicateKind<'db>,
+        kind: &'pattern ClassPatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> Type<'db> {
         let db = self.db;
@@ -2691,7 +2759,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
     fn matched_class_pattern_subject_type_for_context(
         &self,
-        kind: &ClassPatternPredicateKind<'db>,
+        kind: &'pattern ClassPatternPredicateKind<'db>,
         context: &ClassPatternContext<'db>,
         subject_ty: Type<'db>,
     ) -> Type<'db> {
@@ -2723,7 +2791,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
     fn analyze_successful_class_pattern(
         &self,
-        kind: &ClassPatternPredicateKind<'db>,
+        kind: &'pattern ClassPatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
         let db = self.db;
@@ -2746,7 +2814,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
     fn analyze_successful_class_pattern_for_context(
         &self,
-        kind: &ClassPatternPredicateKind<'db>,
+        kind: &'pattern ClassPatternPredicateKind<'db>,
         context: &ClassPatternContext<'db>,
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
@@ -2908,7 +2976,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
     fn matched_mapping_pattern_subject_type(
         &self,
-        kind: &MappingPatternPredicateKind<'db>,
+        kind: &'pattern MappingPatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> Type<'db> {
         let key_types = self.mapping_pattern_key_types(kind);
@@ -2933,7 +3001,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
     fn analyze_successful_mapping_pattern(
         &self,
-        kind: &MappingPatternPredicateKind<'db>,
+        kind: &'pattern MappingPatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
         let key_types = self.mapping_pattern_key_types(kind);
@@ -2989,7 +3057,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
     fn matched_sequence_pattern_subject_type(
         &self,
-        kind: &SequencePatternPredicateKind<'db>,
+        kind: &'pattern SequencePatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> Type<'db> {
         let db = self.db;
@@ -3036,7 +3104,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     /// ```
     fn analyze_successful_sequence_pattern(
         &self,
-        kind: &SequencePatternPredicateKind<'db>,
+        kind: &'pattern SequencePatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
         let db = self.db;
