@@ -93,6 +93,7 @@ use crate::types::generics::{ApplySpecialization, Specialization, bind_typevar};
 use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{
     InternedConstraintSet, InternedType, SentinelInstance, UnionTypeInstance,
+    widen_recursive_method_wrappers,
 };
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
@@ -2506,7 +2507,8 @@ impl<'db> Type<'db> {
         // An inferred attribute updated with `self.items += (item,)` can settle on the
         // initializer plus a single update during the first few iterations. Widen new tuple
         // lengths during those iterations too, so repeated updates are represented.
-        UnionType::widen_growing_tuples(db, env, previous, result)
+        let result = UnionType::widen_growing_tuples(db, env, previous, result).unwrap_or(result);
+        widen_recursive_method_wrappers(db, env, previous, result, cycle)
             .unwrap_or(result)
             .recursive_type_normalized_impl_with_cycle(db, env, cycle)
     }

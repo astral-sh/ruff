@@ -7,8 +7,8 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
         ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
-        PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
-        TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
+        PromotionKind, PromotionMode, RecursivelyDefined, StringLiteralType, Type, TypeAliasType,
+        TypeContext, TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
         callable::{CallableTypeKind, CallableTypes},
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
@@ -182,12 +182,8 @@ impl<'db> MethodWrapper<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.wrapped(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-            self.kind(db),
-        ))
+        let wrapped = normalize_wrapped_type(db, env, self.wrapped(db), div, nested)?;
+        Some(Self::new(db, wrapped, self.kind(db)))
     }
 
     fn apply_type_mapping_impl(
@@ -964,33 +960,7 @@ impl<'db> FunctoolsPartialInstance<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        // Repeated `f = partial(f)` assignments add a new layer to the wrapped callable.
-        // Treat it as nested so that cycle recovery can collapse these layers while
-        // preserving the reduced signature of the outer partial.
-        let wrapped = match self.wrapped(db).inner(db) {
-            Type::Union(union) if !nested => {
-                // Keep known callable alternatives in `func`, even if another alternative
-                // diverges. For example, `p = partial(p.func)` does not add wrapped layers.
-                let mut builder = UnionBuilder::new(db, env)
-                    .cycle_recovery(true)
-                    .or_recursively_defined(union.recursively_defined(db));
-                for ty in union.elements(db) {
-                    builder.add_in_place(
-                        ty.recursive_type_normalized_impl(db, env, div, true)
-                            .unwrap_or(div),
-                    );
-                }
-                builder.build()
-            }
-            wrapped => {
-                let wrapped = wrapped.recursive_type_normalized_impl(db, env, div, true);
-                if nested {
-                    wrapped?
-                } else {
-                    wrapped.unwrap_or(div)
-                }
-            }
-        };
+        let wrapped = normalize_wrapped_type(db, env, self.wrapped(db).inner(db), div, nested)?;
         Some(Self::new(
             db,
             InternedType::new(db, wrapped),
@@ -1019,6 +989,122 @@ impl<'db> FunctoolsPartialInstance<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         )
     }
+}
+
+fn normalize_wrapped_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    wrapped: Type<'db>,
+    div: Type<'db>,
+    nested: bool,
+) -> Option<Type<'db>> {
+    // Repeated wrapping adds a new layer to the wrapped type on each cycle iteration.
+    // Normalize it as nested so that those layers collapse while retaining the outer wrapper.
+    match wrapped {
+        Type::Union(union) if !nested => {
+            // Preserve non-recursive alternatives, such as the original callable in
+            // `p = partial(p.func)`.
+            let mut builder = UnionBuilder::new(db, env)
+                .cycle_recovery(true)
+                .or_recursively_defined(union.recursively_defined(db));
+            for ty in union.elements(db) {
+                builder.add_in_place(
+                    ty.recursive_type_normalized_impl(db, env, div, true)
+                        .unwrap_or(div),
+                );
+            }
+            Some(builder.build())
+        }
+        wrapped => {
+            let wrapped = wrapped.recursive_type_normalized_impl(db, env, div, true);
+            if nested {
+                wrapped
+            } else {
+                Some(wrapped.unwrap_or(div))
+            }
+        }
+    }
+}
+
+/// Collapse growing descriptor layers during cycle recovery.
+///
+/// Wrapping a union can add a new `staticmethod[staticmethod[f]]` alternative on each
+/// iteration. Once the previous iteration includes a wrapper around the cycle marker,
+/// replace new layers around existing wrappers with that recursive alternative.
+pub(super) fn widen_recursive_method_wrappers<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    previous: Type<'db>,
+    current: Type<'db>,
+    cycle: &salsa::Cycle,
+) -> Option<Type<'db>> {
+    if previous == current {
+        return None;
+    }
+    let previous_types = match &previous {
+        Type::Union(union) => union.elements(db),
+        ty => std::slice::from_ref(ty),
+    };
+    let recursive_marker = |kind| {
+        previous_types.iter().find_map(|previous| {
+            let Type::KnownInstance(KnownInstanceType::MethodWrapper(existing)) = previous else {
+                return None;
+            };
+            let wrapped = existing.wrapped(db);
+            (existing.kind(db) == kind
+                && cycle
+                    .head_ids()
+                    .any(|id| wrapped.same_divergent_marker(Type::divergent(id))))
+            .then_some(wrapped)
+        })
+    };
+    if recursive_marker(MethodWrapperKind::Staticmethod).is_none()
+        && recursive_marker(MethodWrapperKind::Classmethod).is_none()
+    {
+        return None;
+    }
+    let current_types = match &current {
+        Type::Union(union) => union.elements(db),
+        ty => std::slice::from_ref(ty),
+    };
+    let wraps_previous = |mut wrapped| {
+        while let Type::KnownInstance(KnownInstanceType::MethodWrapper(inner)) = wrapped {
+            if previous_types.contains(&wrapped) {
+                return true;
+            }
+            wrapped = inner.wrapped(db);
+        }
+        false
+    };
+    let widen = |ty| {
+        if let Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) = ty
+            && !previous_types.contains(&ty)
+            && wraps_previous(wrapper.wrapped(db))
+            && let Some(div) = recursive_marker(wrapper.kind(db))
+        {
+            Some((wrapper.kind(db), div))
+        } else {
+            None
+        }
+    };
+    if !current_types.iter().any(|&ty| widen(ty).is_some()) {
+        return None;
+    }
+    let mut builder = UnionBuilder::new(db, env)
+        .cycle_recovery(true)
+        .or_recursively_defined(current.as_union().map_or(RecursivelyDefined::No, |union| {
+            union.recursively_defined(db)
+        }));
+    for &ty in current_types {
+        if let Some((kind, div)) = widen(ty) {
+            builder.add_in_place(Type::KnownInstance(KnownInstanceType::MethodWrapper(
+                MethodWrapper::new(db, div, kind),
+            )));
+        } else {
+            builder.add_in_place(ty);
+        }
+    }
+    Some(builder.build())
 }
 
 /// A salsa-interned `Type`

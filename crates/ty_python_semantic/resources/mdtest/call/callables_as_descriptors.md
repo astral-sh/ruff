@@ -840,6 +840,113 @@ second_method = classmethod(second)
 static_assert(is_disjoint_from(TypeOf[first_method], TypeOf[second_method]))
 ```
 
+## Recursive method wrappers
+
+### Repeatedly wrapping a callable
+
+Repeatedly wrapping a function converges while retaining the original function's signature.
+
+```py
+def repeat(flag: bool):
+    def f(x: int) -> int:
+        return x
+
+    current = f
+    while flag:
+        current = staticmethod(current)
+    reveal_type(current)  # revealed: (def f(x: int) -> int) | staticmethod[def f(x: int) -> int] | staticmethod[Divergent]
+    reveal_type(current(1))  # revealed: int | Divergent
+```
+
+The same holds for a lambda:
+
+```py
+def repeat_lambda(flag: bool):
+    current = lambda: None
+    while flag:
+        current = staticmethod(current)
+    reveal_type(current)  # revealed: (() -> None) | staticmethod[Divergent]
+```
+
+Multiple wrapper layers can be added in each iteration.
+
+```py
+def repeat_twice(flag: bool):
+    def f(x: int) -> int:
+        return x
+
+    current = f
+    while flag:
+        current = staticmethod(staticmethod(current))
+    # revealed: (def f(x: int) -> int) | staticmethod[staticmethod[def f(x: int) -> int]] | staticmethod[Divergent]
+    reveal_type(current)
+```
+
+### Rewrapping the wrapped callable
+
+Wrapping the `__func__` attribute retains the original callable alongside the recursive alternative.
+
+```py
+def repeat_static(flag: bool):
+    def f(x: int) -> int:
+        return x
+
+    current = staticmethod(f)
+    while flag:
+        current = staticmethod(current.__func__)
+    reveal_type(current.__func__)  # revealed: (def f(x: int) -> int) | Divergent
+    reveal_type(current.__func__(1))  # revealed: int | Divergent
+    current.__func__("bad")  # error: [invalid-argument-type]
+
+def repeat_class(flag: bool):
+    def f(cls: type, x: int) -> int:
+        return x
+
+    current = classmethod(f)
+    while flag:
+        current = classmethod(current.__func__)
+    reveal_type(current.__func__)  # revealed: (def f(cls: type, x: int) -> int) | Divergent
+    reveal_type(current.__func__(object, 1))  # revealed: int | Divergent
+    current.__func__(object, "bad")  # error: [invalid-argument-type]
+```
+
+### A finite set of nested wrappers
+
+Distinct, non-recursive wrappers remain separate alternatives.
+
+```py
+def choose(flag: bool, condition: bool):
+    def f(x: int) -> int:
+        return x
+
+    single = staticmethod(f)
+    double = staticmethod(single)
+    current = single
+    while flag:
+        if condition:
+            current = double
+        else:
+            current = current
+    reveal_type(current)  # revealed: staticmethod[def f(x: int) -> int] | staticmethod[staticmethod[def f(x: int) -> int]]
+    reveal_type(current.__func__)  # revealed: (def f(x: int) -> int) | staticmethod[def f(x: int) -> int]
+```
+
+A recursive branch also preserves a finite nested wrapper supplied by another branch.
+
+```py
+def choose_recursive(flag: bool, condition: bool):
+    def f(x: int) -> int:
+        return x
+
+    single = staticmethod(f)
+    double = staticmethod(single)
+    current = single
+    while flag:
+        current = staticmethod(current.__func__) if condition else double
+    # revealed: staticmethod[def f(x: int) -> int] | staticmethod[Divergent] | staticmethod[staticmethod[def f(x: int) -> int]]
+    reveal_type(current)
+```
+
 ## Assigning wrappers to annotated descriptor types
 
 A `staticmethod` annotation constrains both the parameters and the return type of the wrapped
