@@ -28,6 +28,27 @@ enum BinaryExpressionOperandTypes<'db> {
 type BinaryExpressionVisitor<'db> =
     CycleDetector<'db, ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
 
+fn is_union_type_operand(ty: Type<'_>) -> bool {
+    matches!(
+        ty,
+        Type::ClassLiteral(_)
+            | Type::SubclassOf(_)
+            | Type::GenericAlias(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(
+                KnownInstanceType::UnionType(_)
+                    | KnownInstanceType::Literal(_)
+                    | KnownInstanceType::Annotated(_)
+                    | KnownInstanceType::TypeGenericAlias(_)
+                    | KnownInstanceType::Callable(_)
+                    | KnownInstanceType::TypeVar(_)
+                    | KnownInstanceType::TypeAliasType(_)
+                    | KnownInstanceType::NewType(_)
+                    | KnownInstanceType::Sentinel(_)
+            )
+    )
+}
+
 /// Repeated conditional concatenation can double the number of tuple alternatives at each step.
 const MAX_TUPLE_ADDITION_ALTERNATIVES: usize = 32;
 /// Repeated doubling (`x = x + x`) can grow a single tuple without introducing any union.
@@ -1064,37 +1085,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             // PEP 604-style union types using the `|` operator.
-            (
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(
-                    KnownInstanceType::UnionType(_)
-                    | KnownInstanceType::Literal(_)
-                    | KnownInstanceType::Annotated(_)
-                    | KnownInstanceType::TypeGenericAlias(_)
-                    | KnownInstanceType::Callable(_)
-                    | KnownInstanceType::TypeVar(_)
-                    | KnownInstanceType::TypeAliasType(_)
-                    | KnownInstanceType::NewType(_),
-                ),
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(
-                    KnownInstanceType::UnionType(_)
-                    | KnownInstanceType::Literal(_)
-                    | KnownInstanceType::Annotated(_)
-                    | KnownInstanceType::TypeGenericAlias(_)
-                    | KnownInstanceType::Callable(_)
-                    | KnownInstanceType::TypeVar(_)
-                    | KnownInstanceType::TypeAliasType(_)
-                    | KnownInstanceType::NewType(_),
-                ),
-                ast::Operator::BitOr,
-            ) => {
+            (left, right, ast::Operator::BitOr)
+                if is_union_type_operand(left) && is_union_type_operand(right) =>
+            {
                 if left_ty.is_equivalent_to(db, env, right_ty) {
                     Some(left_ty)
                 } else {
@@ -1107,24 +1100,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ))
                 }
             }
-            (
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::KnownInstance(..)
-                | Type::SpecialForm(..),
-                Type::NominalInstance(instance),
-                ast::Operator::BitOr,
-            )
-            | (
-                Type::NominalInstance(instance),
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::KnownInstance(..)
-                | Type::SpecialForm(..),
-                ast::Operator::BitOr,
-            ) if instance.has_known_class(db, KnownClass::NoneType) => {
+            (left, right, ast::Operator::BitOr)
+                if (is_union_type_operand(left) && right.is_none(db))
+                    || (left.is_none(db) && is_union_type_operand(right)) =>
+            {
                 Some(UnionTypeInstance::from_value_expression_types(
                     db,
                     [left_ty, right_ty],
