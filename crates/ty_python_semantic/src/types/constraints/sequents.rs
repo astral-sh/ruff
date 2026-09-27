@@ -53,6 +53,11 @@ pub(super) struct SequentMap<'db> {
     pending: Vec<Sequent<Constraint<'db>>>,
 }
 
+static EMPTY_SEQUENT_MAP: SequentMap<'static> = SequentMap {
+    sequents: Vec::new(),
+    pending: Vec::new(),
+};
+
 /// A batch of sequents, along with information about the order they need to be imported into a
 /// [`ConstraintSetBuilder`].
 ///
@@ -309,6 +314,26 @@ impl<'db> SequentMap<'db> {
         env: &ProgramEnvironment<'db>,
         constraint: Constraint<'db>,
     ) -> &'db Self {
+        // Most individual constraints produce no sequents. Avoid interning the query arguments
+        // and retaining an empty Salsa result for those cases. Keep the checks in sync with the
+        // single-constraint `add_sequents` methods below.
+        let may_produce_sequents = match constraint {
+            Constraint::ConcreteLower(bound) => {
+                bound.bound == bound.typevar.domain(db).bottom(db)
+                    || bound.bound == bound.typevar.domain(db).top(db)
+            }
+            Constraint::ConcreteUpper(bound) => {
+                bound.bound == bound.typevar.domain(db).top(db)
+                    || bound.bound == bound.typevar.domain(db).bottom(db)
+            }
+            Constraint::ConcreteEquivalence(_) => false,
+            Constraint::TypeVarRange(bound) => bound.left.is_same_typevar_as(db, bound.right),
+            Constraint::TypeVarEquivalence(bound) => bound.left.is_same_typevar_as(db, bound.right),
+        };
+        if !may_produce_sequents {
+            return &EMPTY_SEQUENT_MAP;
+        }
+
         #[salsa::tracked(
             returns(ref),
             cycle_initial=|_, _, _, _| SequentMap::default(),
