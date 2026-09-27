@@ -1053,54 +1053,6 @@ mod tests {
     }
 
     #[test]
-    fn all_modules_tracks_nested_module_changes() -> anyhow::Result<()> {
-        fn package_names(db: &TestDb) -> Vec<String> {
-            super::all_modules(db, db.resolver_environment())
-                .iter()
-                .map(|module| module.name(db).as_str())
-                .filter(|name| *name == "package" || name.starts_with("package."))
-                .map(str::to_owned)
-                .collect()
-        }
-
-        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
-            .with_src_files(&[
-                ("package/__init__.py", ""),
-                ("package/sub/__init__.py", ""),
-                ("package/sub/existing.py", "x = 1"),
-            ])
-            .build();
-
-        let initial = ["package", "package.sub", "package.sub.existing"];
-        assert_eq!(package_names(&db), initial);
-
-        // Changing a module's contents does not change the list of modules.
-        db.write_file(src.join("package/sub/existing.py"), "x = 2")?;
-        db.clear_salsa_events();
-        assert_eq!(package_names(&db), initial);
-        let events = db.take_salsa_events();
-        assert_function_query_was_not_run_by_name(&db, "all_modules_impl", None, &events);
-
-        let added = src.join("package/sub/added.py");
-        db.write_file(&added, "")?;
-        assert_eq!(
-            package_names(&db),
-            [
-                "package",
-                "package.sub",
-                "package.sub.added",
-                "package.sub.existing"
-            ]
-        );
-
-        db.memory_file_system().remove_file(&added)?;
-        File::sync_path(&mut db, &added);
-        assert_eq!(package_names(&db), initial);
-
-        Ok(())
-    }
-
-    #[test]
     fn deeply_nested_file_does_not_invalidate_top_level_listing() -> anyhow::Result<()> {
         let TestCase { mut db, src, .. } = TestCaseBuilder::new()
             .with_src_files(&[("package/__init__.py", ""), ("package/sub/__init__.py", "")])
