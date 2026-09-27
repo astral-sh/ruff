@@ -1,13 +1,14 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::whitespace::trailing_comment_start_offset;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix;
-use crate::{AlwaysFixableViolation, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for functions that end with an unnecessary `return` or
@@ -107,7 +108,11 @@ pub(crate) fn useless_return(
     }
 
     let mut diagnostic = checker.report_diagnostic(UselessReturn, last_stmt.range());
-    let edit = fix::edits::delete_stmt(last_stmt, Some(stmt), checker.locator(), checker.indexer());
+    let edit = if let Some(index) = trailing_comment_start_offset(last_stmt, checker.source()) {
+        Edit::range_deletion(last_stmt.range().add_end(index))
+    } else {
+        fix::edits::delete_stmt(last_stmt, Some(stmt), checker.locator(), checker.indexer())
+    };
     diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().current_statement_id(),
     )));

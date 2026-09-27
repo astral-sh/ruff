@@ -58,3 +58,8 @@ class BaseCache:
     def get(self, key: str) -> None:
         print(f"{key} not found")
         return None
+
+
+def preserve_trailing_comment():
+    print("comment")
+    return  # [useless-return] This comment should be preserved.
