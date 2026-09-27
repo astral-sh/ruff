@@ -581,6 +581,12 @@ impl<'db> Type<'db> {
             })
         }
 
+        self.assert_not_recursive_var();
+        target.assert_not_recursive_var();
+        if self.is_trivially_constraint_set_assignable_to(db, target) {
+            return Cow::Owned(OwnedConstraintSet::always());
+        }
+
         let program = env.program(db);
         Cow::Borrowed(when_assignable_to_owned_impl(
             db,
