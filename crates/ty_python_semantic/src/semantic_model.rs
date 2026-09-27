@@ -4,7 +4,7 @@ use ruff_db::files::{File, FilePath};
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::find_node::CoveringNode;
-use ruff_python_ast::{self as ast, ExprStringLiteral, HasNodeIndex, ModExpression};
+use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
 use ruff_python_ast::{Expr, ExprRef, name::Name};
 use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
@@ -31,12 +31,12 @@ use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
     CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
     infer_complete_scope_types, infer_definition_types, inferred_declaration,
-    is_discarded_dict_key_assignment, string_literal_type,
+    is_discarded_dict_key_assignment,
 };
-use ty_python_core::definition::{Definition, DefinitionKind, docstring_from_body};
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::PlaceExpr;
 use ty_python_core::place_table;
-use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, Scope, ScopeId};
+use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
 use ty_python_core::symbol::Symbol;
 use ty_python_core::{BindingWithConstraintsIterator, Program, ProgramFile};
@@ -1040,34 +1040,8 @@ impl HasType for ast::ExprRef<'_> {
         let file_scope = index.try_expression_scope_id(&model.expr_ref_in_ast(*self))?;
         let scope = file_scope.to_scope_id(model.db, file);
 
-        infer_complete_scope_types(model.db, scope)
-            .try_expression_type(*self)
-            .or_else(|| infer_docstring_type(model, scope, *self))
+        infer_complete_scope_types(model.db, scope).try_expression_type(*self)
     }
-}
-
-/// Scope inference skips docstrings because they have no type-checking effects. Infer their
-/// literal types on demand when the semantic model is asked for them.
-fn infer_docstring_type<'db>(
-    model: &SemanticModel<'db>,
-    scope: ScopeId<'db>,
-    expression: ExprRef<'_>,
-) -> Option<Type<'db>> {
-    let ExprRef::StringLiteral(literal) = expression else {
-        return None;
-    };
-    let module = parsed_module(model.db, model.python_file()).load(model.db);
-    let body = match scope.node(model.db) {
-        NodeWithScopeKind::Module => module.suite(),
-        NodeWithScopeKind::Function(function) => &function.node(&module).body,
-        NodeWithScopeKind::Class(class) => &class.node(&module).body,
-        _ => return None,
-    };
-
-    // Only the leading string expression is skipped; other strings are inferred normally.
-    let docstring = docstring_from_body(body)?;
-    (docstring.node_index().load() == literal.node_index().load())
-        .then(|| string_literal_type(model.db, literal))
 }
 
 macro_rules! impl_expression_has_type {
@@ -1280,6 +1254,67 @@ mod tests {
         let ty = alias.inferred_type(&model).unwrap();
 
         assert!(ty.is_class_literal());
+
+        Ok(())
+    }
+
+    #[test]
+    fn docstring_types() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+"Module docstring"
+"Another module string"
+
+class Example:
+    "Class docstring"
+    "Another class string"
+
+    def method(self):
+        "Method docstring"
+        "Another method string"
+
+def function():
+    "Function docstring"
+    "Another function string"
+
+def no_docstring():
+    f"Not a docstring"
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let ast = parsed_module(&db, file.python_file(&db)).load(&db);
+        let model = SemanticModel::new(&db, file);
+        let suite = ast.suite();
+        let class = suite[2].as_class_def_stmt().unwrap();
+        let method = class.body[2].as_function_def_stmt().unwrap();
+        let function = suite[3].as_function_def_stmt().unwrap();
+        let no_docstring = suite[4].as_function_def_stmt().unwrap();
+
+        for (statement, expected) in [
+            (&suite[0], "LiteralString"),
+            (&suite[1], "Literal[\"Another module string\"]"),
+            (&class.body[0], "LiteralString"),
+            (&class.body[1], "Literal[\"Another class string\"]"),
+            (&method.body[0], "LiteralString"),
+            (&method.body[1], "Literal[\"Another method string\"]"),
+            (&function.body[0], "LiteralString"),
+            (&function.body[1], "Literal[\"Another function string\"]"),
+        ] {
+            let expression = &statement.as_expr_stmt().unwrap().value;
+            let ty = expression.inferred_type(&model).unwrap();
+            assert_eq!(
+                ty.display(&db, &model.program_environment()).to_string(),
+                expected
+            );
+        }
+
+        let fstring = &no_docstring.body[0].as_expr_stmt().unwrap().value;
+        assert!(fstring.inferred_type(&model).is_some());
 
         Ok(())
     }

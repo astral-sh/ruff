@@ -2163,10 +2163,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
     }
 
-    /// A scope's docstring has no type-checking effects. Infer its literal type only when the
-    /// semantic model is asked for it, rather than retaining its contents for every checked file.
+    /// Record a type for the docstring without retaining its contents in the type database.
     fn infer_scope_body(&mut self, suite: &[ast::Stmt]) {
-        self.infer_body(ast::helpers::body_without_leading_docstring(suite));
+        if let Some((ast::Stmt::Expr(statement), body)) = suite.split_first()
+            && statement.value.is_string_literal_expr()
+        {
+            self.store_expression_type(&statement.value, Type::literal_string());
+            self.infer_body(body);
+        } else {
+            self.infer_body(suite);
+        }
     }
 
     fn infer_body(&mut self, suite: &[ast::Stmt]) {
@@ -7026,7 +7032,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 aliased_type,
             )));
         }
-        super::string_literal_type(self.db(), literal)
+        if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
+            Type::string_literal(self.db(), literal.value.to_str())
+        } else {
+            Type::literal_string()
+        }
     }
 
     fn infer_bytes_literal_expression(&mut self, literal: &ast::ExprBytesLiteral) -> Type<'db> {

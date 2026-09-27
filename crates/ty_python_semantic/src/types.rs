@@ -41,7 +41,6 @@ pub(crate) use self::infer::{
     InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
     infer_definition_types, infer_expression_type, infer_expression_types,
     infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
-    string_literal_type,
 };
 use self::infer::{
     implicit_alias_parameters, infer_function_default_types, infer_implicit_alias_type,
@@ -3222,7 +3221,6 @@ impl<'db> Type<'db> {
 
     /// Create a `LiteralString`.
     fn literal_string() -> Self {
-        // Note that `LiteralString`s are never implicitly inferred, and so are always unpromotable.
         Self::LiteralValue(LiteralValueType::unpromotable(
             LiteralValueTypeKind::LiteralString,
         ))
