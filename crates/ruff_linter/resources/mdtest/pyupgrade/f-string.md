@@ -167,8 +167,8 @@ help: Convert to f-string
 Some `str.format` calls parse fine but have no f-string that behaves the same, so UP032 leaves them
 alone.
 
-A signed index raises `KeyError` (Python reads `+0` as a name), but an f-string would read it as
-index `0`:
+A signed name such as `+0` is a keyword, not a positional index, so the call raises `KeyError`.
+There is no keyword argument to interpolate, so the call is skipped:
 
 ```py
 "{+0}".format(0)
@@ -187,10 +187,48 @@ A string key that contains the quote the f-string would wrap it in:
 "{[']}".format(x)
 ```
 
+A string key containing a backslash. `str.format` takes the key literally, but quoted inside a
+replacement field it becomes a regular string literal, where a backslash starts an escape sequence in
+a raw string or escapes the closing quote at the end of the key:
+
+```py
+r"{[\n]}".format(x)
+"{[\]}".format(x)
+```
+
 A conversion other than `s`, `r`, or `a` raises `ValueError`:
 
 ```py
 "{!?}".format(0)
+```
+
+Mixing automatic and manual field numbering also raises `ValueError`:
+
+```py
+"{} {1}".format(x, y)
+"{0} {}".format(x, y)
+```
+
+## A signed element index is a string key
+
+Inside brackets, `str.format` only reads an all-digit index as an integer. A signed one is a string
+key, so it converts to a quoted subscript rather than an integer one:
+
+```py
+"{0[+1]}".format(d)  # snapshot: f-string
+```
+
+```snapshot
+error[UP032]: Use f-string instead of `format` call
+ --> src/mdtest_snippet.py:1:1
+  |
+1 | "{0[+1]}".format(d)  # snapshot: f-string
+  | ^^^^^^^^^^^^^^^^^^^
+help: Convert to f-string
+  |
+  - "{0[+1]}".format(d)  # snapshot: f-string
+1 + f"{d['+1']}"  # snapshot: f-string
+  |
 ```
 
 ## Valid conversions are unaffected
@@ -205,8 +243,9 @@ error[UP032]: Use f-string instead of `format` call
   |
 1 | "{!r}".format(x)  # snapshot: f-string
   | ^^^^^^^^^^^^^^^^
-  |
 help: Convert to f-string
+  |
   - "{!r}".format(x)  # snapshot: f-string
 1 + f"{x!r}"  # snapshot: f-string
+  |
 ```

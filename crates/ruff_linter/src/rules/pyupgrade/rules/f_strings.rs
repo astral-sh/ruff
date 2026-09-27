@@ -305,14 +305,6 @@ impl FStringConversion {
 
                     let field = FieldName::parse(&field_name)?;
 
-                    // `usize::parse` accepts a leading `+`, so `"{+0}"` parses as index 0 here,
-                    // but Python reads `+0` as a name and raises `KeyError`.
-                    if matches!(field.field_type, FieldType::Index(_))
-                        && field_name.starts_with('+')
-                    {
-                        return Err(anyhow::anyhow!("signed index in field name"));
-                    }
-
                     for part in &field.parts {
                         if let FieldNamePart::Attribute(name) = part
                             && !is_identifier(name)
@@ -384,6 +376,13 @@ impl FStringConversion {
                                         "string index contains the f-string quote"
                                     ));
                                 }
+                                // `str.format` takes the backslash literally, but inside the
+                                // quoted key it would start an escape sequence.
+                                if index.contains('\\') {
+                                    return Err(anyhow::anyhow!(
+                                        "string index contains a backslash"
+                                    ));
+                                }
                                 converted.push('[');
                                 converted.push(quote);
                                 converted.push_str(&index);
@@ -430,6 +429,11 @@ impl FStringConversion {
 /// UP032
 pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &FormatSummary) {
     if summary.has_nested_parts {
+        return;
+    }
+
+    // `"{} {1}".format(a, b)` raises `ValueError`, but the equivalent f-string would succeed.
+    if !(summary.autos.is_empty() || summary.indices.is_empty()) {
         return;
     }
 
