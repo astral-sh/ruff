@@ -21,6 +21,8 @@ use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions};
 use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
+#[cfg(unix)]
+use ty_project::watch::watch_paths;
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata, UseUv};
 use ty_python_core::platform::PythonPlatform;
@@ -2650,6 +2652,52 @@ mod unix {
         } else {
             case.assert_indexed_project_files([patched_bar_baz_file]);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn symlinked_site_packages_outside_environment() -> anyhow::Result<()> {
+        let mut case = setup(|context: &mut SetupContext| {
+            context.write_virtual_environment("environment", PythonVersion::PY312)?;
+            let environment_site_packages =
+                context.join_root_path("environment/lib/python3.12/site-packages");
+            let shared_site_packages = context.join_root_path("shared-site-packages");
+            std::fs::rename(&environment_site_packages, &shared_site_packages)?;
+            std::os::unix::fs::symlink(&shared_site_packages, &environment_site_packages)?;
+            context.write_file("shared-site-packages/dependency.py", "value: int = 1")?;
+            context.write_project_file(
+                "ty.toml",
+                r#"
+                [environment]
+                python = "../environment"
+                "#,
+            )?;
+            context.write_project_file(
+                "main.py",
+                r"
+                from dependency import value
+
+                result: int = value
+                ",
+            )
+        })?;
+        assert_eq!(case.db().check(), []);
+
+        let environment = case.root_path().join("environment");
+        let site_packages = case.root_path().join("shared-site-packages");
+        // The target is outside the environment and needs its own watch.
+        assert_eq!(
+            watch_paths(case.db(), case.db().project()).paths(),
+            [case.project_path(""), environment, site_packages.clone()]
+        );
+
+        update_file(site_packages.join("dependency.py"), "value: str = ''")?;
+        let changes = case.stop_watch(event_for_file("dependency.py"));
+        case.apply_changes(&changes);
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"main.py:4:15: error[invalid-assignment] Object of type `str` is not assignable to `int`"
+        );
         Ok(())
     }
 

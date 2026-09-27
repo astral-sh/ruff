@@ -462,7 +462,7 @@ import colorama
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
     error[unresolved-import]: Cannot resolve imported module `colorama`
@@ -473,7 +473,7 @@ import colorama
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
     Found 2 diagnostics
@@ -495,7 +495,7 @@ import colorama
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
     error[unresolved-import]: Cannot resolve imported module `colorama`
@@ -506,7 +506,7 @@ import colorama
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
     Found 2 diagnostics

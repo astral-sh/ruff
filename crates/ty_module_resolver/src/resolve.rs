@@ -834,10 +834,12 @@ impl SearchPaths {
         let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
 
         for path in site_packages_paths {
+            // Resolve symlinks so site-packages outside the environment keeps its own file watch,
+            // and imports use the same path as the reported changes.
+            let path = canonicalize(path, system);
             tracing::debug!("Adding site-packages search path `{path}`");
             let path = strategy.fallback_opt(
-                SearchPath::site_packages(system, path.clone())
-                    .map_err(SearchPathSettingsError::from),
+                SearchPath::site_packages(system, path).map_err(SearchPathSettingsError::from),
                 |err| {
                     tracing::debug!("Skipping invalid site-packages search-path: {err}");
                 },
