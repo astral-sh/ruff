@@ -1688,6 +1688,137 @@ fn benchmark_literal_or_pattern_reachability(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4596>.
+fn benchmark_nested_class_pattern_capture(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from __future__ import annotations
+from typing import TypeAlias, assert_type
+
+class Wrap:
+    inner: Node
+
+class Leaf0: ...
+class Leaf1: ...
+class Leaf2: ...
+class Leaf3: ...
+class Leaf4: ...
+class Leaf5: ...
+class Leaf6: ...
+class Leaf7: ...
+class Leaf8: ...
+class Leaf9: ...
+class Leaf10: ...
+class Leaf11: ...
+class Leaf12: ...
+class Leaf13: ...
+class Leaf14: ...
+class Leaf15: ...
+
+Node: TypeAlias = (
+    Wrap | Leaf0 | Leaf1 | Leaf2 | Leaf3 | Leaf4 | Leaf5 | Leaf6 | Leaf7
+    | Leaf8 | Leaf9 | Leaf10 | Leaf11 | Leaf12 | Leaf13 | Leaf14 | Leaf15
+)
+
+def visit(node: Node) -> None:
+    match node:
+        case Wrap(inner=Wrap(inner=Wrap(inner=Wrap(inner=Wrap(inner=captured))))):
+            pass
+
+def narrow(node: Node) -> None:
+    match node:
+        case Wrap(inner=Wrap(inner=Wrap(inner=Wrap(inner=Wrap(inner=_))))):
+            assert_type(node, Wrap)
+"#;
+
+    criterion.bench_function("ty_micro[nested_class_pattern_capture]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for exhaustiveness checks on recursive class patterns.
+fn benchmark_nested_class_pattern_exhaustiveness(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from __future__ import annotations
+from typing import TypeAlias, assert_type
+
+class Base:
+    child: Node
+
+class A(Base): ...
+class B(Base): ...
+class C(Base): ...
+class D(Base): ...
+
+Node: TypeAlias = A | B | C | D | None
+
+def visit(node: Node) -> None:
+    match node:
+        case Base(child=Base(child=Base(child=Base(child=Base(child=Base(child=Base(
+            child=Base(child=Base(child=_))
+        ))))))):
+            return
+    assert_type(node, Node)
+"#;
+
+    criterion.bench_function("ty_micro[nested_class_pattern_exhaustiveness]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for exhaustiveness checks on recursive mapping patterns.
+fn benchmark_nested_mapping_pattern_exhaustiveness(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from __future__ import annotations
+from typing import Literal, TypeAlias, TypedDict, assert_type
+
+class A(TypedDict):
+    child: Node
+    tag: Literal[0]
+
+class B(TypedDict):
+    child: Node
+    tag: Literal[1]
+
+class C(TypedDict):
+    child: Node
+    tag: Literal[2]
+
+class D(TypedDict):
+    child: Node
+    tag: Literal[3]
+
+Node: TypeAlias = A | B | C | D | None
+
+def visit(node: Node) -> None:
+    match node:
+        case {"child": {"child": {"child": {"child":
+             {"child": {"child": {"child": {"child": {"child": captured}}}}}}}}}:
+            assert_type(captured, Node)
+"#;
+
+    criterion.bench_function("ty_micro[nested_mapping_pattern_exhaustiveness]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_literal_fallthrough(criterion: &mut Criterion, name: &str, code: &str) {
     setup_rayon();
 
@@ -2082,6 +2213,9 @@ criterion_group!(
     benchmark_gradual_literal_union_equality,
     benchmark_gradual_intersection_negation,
     benchmark_literal_or_pattern_reachability,
+    benchmark_nested_class_pattern_capture,
+    benchmark_nested_class_pattern_exhaustiveness,
+    benchmark_nested_mapping_pattern_exhaustiveness,
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,
     benchmark_repeated_suppressing_context_managers,
