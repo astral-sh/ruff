@@ -12,7 +12,8 @@ help: Remove useless `return` statement
   |
 5 |     print(sys.version)
   -     return None  # [useless-return]
-6 |
+6 +     # [useless-return]
+7 |
   |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -26,7 +27,8 @@ help: Remove useless `return` statement
    |
 10 |     print(sys.version)
    -     return None  # [useless-return]
-11 |
+11 +     # [useless-return]
+12 |
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -40,7 +42,8 @@ help: Remove useless `return` statement
    |
 15 |     print(sys.version)
    -     return None  # [useless-return]
-16 |
+16 +     # [useless-return]
+17 |
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -54,7 +57,8 @@ help: Remove useless `return` statement
    |
 21 |         print(sys.version)
    -         return None  # [useless-return]
-22 |
+22 +         # [useless-return]
+23 |
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -68,7 +72,8 @@ help: Remove useless `return` statement
    |
 49 |     print(sys.version)
    -     return None  # [useless-return]
-50 |
+50 +     # [useless-return]
+51 |
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -82,4 +87,19 @@ help: Remove useless `return` statement
    |
 59 |         print(f"{key} not found")
    -         return None
+60 |
+   |
+
+PLR1711 [*] Useless `return` statement at end of function
+  --> useless_return.py:65:5
+   |
+63 | def preserve_trailing_comment():
+64 |     print("comment")
+65 |     return  # [useless-return] This comment should be preserved.
+   |     ^^^^^^
+help: Remove useless `return` statement
+   |
+64 |     print("comment")
+   -     return  # [useless-return] This comment should be preserved.
+65 +     # [useless-return] This comment should be preserved.
    |
