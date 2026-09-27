@@ -4,7 +4,7 @@ use ruff_db::files::{File, FilePath};
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::find_node::CoveringNode;
-use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
+use ruff_python_ast::{self as ast, ExprStringLiteral, HasNodeIndex, ModExpression};
 use ruff_python_ast::{Expr, ExprRef, name::Name};
 use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
@@ -31,12 +31,12 @@ use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
     CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
     infer_complete_scope_types, infer_definition_types, inferred_declaration,
-    is_discarded_dict_key_assignment,
+    is_discarded_dict_key_assignment, string_literal_type,
 };
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::definition::{Definition, DefinitionKind, docstring_from_body};
 use ty_python_core::place::PlaceExpr;
 use ty_python_core::place_table;
-use ty_python_core::scope::{FileScopeId, Scope};
+use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, Scope};
 use ty_python_core::semantic_index;
 use ty_python_core::symbol::Symbol;
 use ty_python_core::{BindingWithConstraintsIterator, Program, ProgramFile};
@@ -1040,7 +1040,23 @@ impl HasType for ast::ExprRef<'_> {
         let file_scope = index.try_expression_scope_id(&model.expr_ref_in_ast(*self))?;
         let scope = file_scope.to_scope_id(model.db, file);
 
-        infer_complete_scope_types(model.db, scope).try_expression_type(*self)
+        infer_complete_scope_types(model.db, scope)
+            .try_expression_type(*self)
+            .or_else(|| {
+                let ExprRef::StringLiteral(literal) = *self else {
+                    return None;
+                };
+                let module = parsed_module(model.db, file.python_file(model.db)).load(model.db);
+                let body = match scope.node(model.db) {
+                    NodeWithScopeKind::Module => module.suite(),
+                    NodeWithScopeKind::Function(function) => &function.node(&module).body,
+                    NodeWithScopeKind::Class(class) => &class.node(&module).body,
+                    _ => return None,
+                };
+                let docstring = docstring_from_body(body)?;
+                (docstring.node_index().load() == literal.node_index().load())
+                    .then(|| string_literal_type(model.db, literal))
+            })
     }
 }
 
@@ -1194,6 +1210,7 @@ mod tests {
     use crate::{HasType, SemanticModel};
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+    use ruff_db::system::DbWithWritableSystem as _;
     use ty_python_core::ProgramFile;
 
     #[test]
@@ -1254,6 +1271,50 @@ mod tests {
         let ty = alias.inferred_type(&model).unwrap();
 
         assert!(ty.is_class_literal());
+
+        Ok(())
+    }
+
+    #[test]
+    fn docstring_expression_types() -> anyhow::Result<()> {
+        let mut db = TestDbBuilder::new()
+            .with_file(
+                "/src/docs.py",
+                "\"module doc\"\nclass C:\n    ('class ' 'doc')\n    def f(self):\n        \"function doc\"\n        \"other string\"\n        if True:\n            \"nested string\"\n",
+            )
+            .build()?;
+
+        let check = |db: &crate::db::tests::TestDb, expected_module: &str| {
+            let file = system_path_to_file(db, "/src/docs.py").unwrap();
+            let file = ProgramFile::new(db, file, db.program_environment().program(db));
+            let ast = parsed_module(db, file.python_file(db)).load(db);
+            let model = SemanticModel::new(db, file);
+            let check_expr = |stmt: &ruff_python_ast::Stmt, expected: &str| {
+                let expr = &stmt.as_expr_stmt().unwrap().value;
+                let ty = expr.inferred_type(&model).expect("expression type");
+                assert_eq!(
+                    ty.display(db, &db.program_environment()).to_string(),
+                    expected
+                );
+            };
+
+            check_expr(&ast.suite()[0], expected_module);
+            let class = ast.suite()[1].as_class_def_stmt().unwrap();
+            check_expr(&class.body[0], r#"Literal["class doc"]"#);
+            let function = class.body[1].as_function_def_stmt().unwrap();
+            check_expr(&function.body[0], r#"Literal["function doc"]"#);
+            check_expr(&function.body[1], r#"Literal["other string"]"#);
+            let if_stmt = function.body[2].as_if_stmt().unwrap();
+            check_expr(&if_stmt.body[0], r#"Literal["nested string"]"#);
+        };
+
+        check(&db, r#"Literal["module doc"]"#);
+        let long_doc = "a".repeat(4097);
+        db.write_dedented(
+            "/src/docs.py",
+            &format!("\"{long_doc}\"\nclass C:\n    ('class ' 'doc')\n    def f(self):\n        \"function doc\"\n        \"other string\"\n        if True:\n            \"nested string\"\n"),
+        )?;
+        check(&db, "LiteralString");
 
         Ok(())
     }

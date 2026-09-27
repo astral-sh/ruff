@@ -80,6 +80,18 @@ mod comparisons;
 #[cfg(test)]
 mod tests;
 
+/// Infer a string literal in the absence of contextual typing.
+pub(crate) fn string_literal_type<'db>(
+    db: &'db dyn Db,
+    literal: &ast::ExprStringLiteral,
+) -> Type<'db> {
+    if literal.value.len() <= TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE {
+        Type::string_literal(db, literal.value.to_str())
+    } else {
+        Type::literal_string()
+    }
+}
+
 /// The inferred alias type, or a cycle error retaining a type for recovery.
 pub(super) type ImplicitAliasResult<'db> = Result<Type<'db>, CyclicTypeAliasError<'db>>;
 
