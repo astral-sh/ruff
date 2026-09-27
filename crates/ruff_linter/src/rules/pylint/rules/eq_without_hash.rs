@@ -22,6 +22,11 @@ use crate::codes::Category;
 /// cause issues when using instances of the class as keys in a dictionary or
 /// members of a set.
 ///
+/// Conversely, when a type is mutable, implementing `__hash__` is generally
+/// unsound: a value's hash must remain stable for its lifetime in a set or as a
+/// dict key. Prefer treating hashability as implying immutability of the hashed
+/// fields (see the glossary link under References).
+///
 /// ## Example
 ///
 /// ```python
