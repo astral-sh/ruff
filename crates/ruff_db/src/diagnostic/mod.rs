@@ -145,13 +145,7 @@ impl Diagnostic {
     /// should be constructed via [`Annotation::primary`]. A diagnostic with no
     /// primary annotations is allowed, but its rendering may be sub-optimal.
     pub fn annotate(&mut self, ann: Annotation) {
-        let annotations = &mut Arc::make_mut(&mut self.inner).annotations;
-        // Most diagnostics have exactly one annotation. Avoid the default allocation of four
-        // annotations on the first push, while retaining normal amortized growth thereafter.
-        if annotations.is_empty() {
-            annotations.reserve_exact(1);
-        }
-        annotations.push(ann);
+        Arc::make_mut(&mut self.inner).annotations.push(ann);
     }
 
     /// Adds an "info" sub-diagnostic with the given message.
@@ -178,11 +172,9 @@ impl Diagnostic {
 
     /// Adds an "info" sub-diagnostic before any existing sub-diagnostics.
     pub fn prepend_info<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
-        let subs = &mut Arc::make_mut(&mut self.inner).subs;
-        if subs.is_empty() {
-            subs.reserve_exact(1);
-        }
-        subs.insert(0, SubDiagnostic::new(SubDiagnosticSeverity::Info, message));
+        Arc::make_mut(&mut self.inner)
+            .subs
+            .insert(0, SubDiagnostic::new(SubDiagnosticSeverity::Info, message));
     }
 
     /// Adds a "help" sub-diagnostic with the given message.
@@ -198,11 +190,7 @@ impl Diagnostic {
     /// to it. For the simpler case of a sub-diagnostic with only a message,
     /// using a method like [`Diagnostic::info`] may be more convenient.
     pub fn sub(&mut self, sub: SubDiagnostic) {
-        let subs = &mut Arc::make_mut(&mut self.inner).subs;
-        if subs.is_empty() {
-            subs.reserve_exact(1);
-        }
-        subs.push(sub);
+        Arc::make_mut(&mut self.inner).subs.push(sub);
     }
 
     /// Return a `std::fmt::Display` implementation that renders this
@@ -697,9 +685,6 @@ impl SubDiagnostic {
     /// to have no annotations (e.g., a simple note) than for a diagnostic to
     /// have no annotations.
     pub fn annotate(&mut self, ann: Annotation) {
-        if self.inner.annotations.is_empty() {
-            self.inner.annotations.reserve_exact(1);
-        }
         self.inner.annotations.push(ann);
     }
 

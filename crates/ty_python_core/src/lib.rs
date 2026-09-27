@@ -1178,7 +1178,6 @@ mod tests {
     use ruff_db::{
         files::{File, system_path_to_file},
         parsed::ParsedModuleRef,
-        system::DbWithWritableSystem as _,
     };
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
@@ -1242,39 +1241,6 @@ mod tests {
             .symbols()
             .map(|expr| expr.name().to_string())
             .collect()
-    }
-
-    #[test]
-    fn standalone_expression_nodes_update_together() -> anyhow::Result<()> {
-        let TestCase { mut db, file } = test_case("a = b = []\n");
-        let expression_id = |db: &TestDb, assigned: bool| {
-            let file = program_file(db, file);
-            let module = ruff_db::parsed::parsed_module(db, file.python_file(db)).load(db);
-            let statement = &module.suite()[0];
-            let node = match statement {
-                ast::Stmt::Assign(assign) => assign.value.as_ref(),
-                ast::Stmt::If(if_statement) => if_statement.test.as_ref(),
-                _ => panic!("expected an assignment or if statement"),
-            };
-            let expression = semantic_index(db, file).expression(node);
-            assert_eq!(expression.node_ref(db).index(), node.node_index().load());
-            let assignment = expression.assigned_to(db);
-            assert_eq!(assignment.is_some(), assigned);
-            if let Some(assignment) = assignment {
-                assert_eq!(
-                    assignment.node(&module).node_index().load(),
-                    statement.node_index().load()
-                );
-            }
-            expression.as_id()
-        };
-
-        let original = expression_id(&db, true);
-        db.write_file("test.py", "if []:\n    pass\n")?;
-        assert_eq!(expression_id(&db, false), original);
-        db.write_file("test.py", "a = b = [1]\n")?;
-        assert_eq!(expression_id(&db, true), original);
-        Ok(())
     }
 
     #[test]

@@ -123,7 +123,7 @@ pub enum ExpressionKind {
 /// * a return type of a cross-module query
 /// * a field of a type that is a return type of a cross-module query
 /// * an argument of a cross-module query
-#[salsa::tracked(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct Expression<'db> {
     /// The scope in which the expression occurs.
     ///
@@ -132,61 +132,33 @@ pub struct Expression<'db> {
     #[returns(copy)]
     pub scope_id: ScopeId<'db>,
 
-    /// AST references, which are refreshed together whenever the file is re-indexed.
+    /// The expression node.
     #[no_eq]
     #[tracked]
     #[returns(ref)]
-    nodes: ExpressionAstNodes,
+    pub node_ref: AstNodeRef<ast::Expr>,
+
+    /// An assignment statement, if this expression is immediately used as the rhs of that
+    /// assignment.
+    ///
+    /// (Note that this is the _immediately_ containing assignment — if a complex expression is
+    /// assigned to some target, only the outermost expression node has this set. The inner
+    /// expressions are used to build up the assignment result, and are not "immediately assigned"
+    /// to the target, and so have `None` for this field.)
+    #[no_eq]
+    #[tracked]
+    #[returns(clone)]
+    pub assigned_to: Option<AstNodeRef<ast::StmtAssign>>,
 
     /// The inference context for this expression.
     #[returns(copy)]
     pub kind: ExpressionKind,
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
-#[doc(hidden)]
-pub struct ExpressionAstNodes {
-    node_ref: AstNodeRef<ast::Expr>,
-    assigned_to: Option<AstNodeRef<ast::StmtAssign>>,
-}
-
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for Expression<'_> {}
 
 impl<'db> Expression<'db> {
-    pub fn new<D: salsa::Database + ?Sized>(
-        db: &'db D,
-        scope_id: ScopeId<'db>,
-        node_ref: AstNodeRef<ast::Expr>,
-        assigned_to: Option<AstNodeRef<ast::StmtAssign>>,
-        kind: ExpressionKind,
-    ) -> Self {
-        Self::new_internal(
-            db,
-            scope_id,
-            ExpressionAstNodes {
-                node_ref,
-                assigned_to,
-            },
-            kind,
-        )
-    }
-
-    /// The expression node.
-    pub fn node_ref<D: salsa::Database + ?Sized>(self, db: &'db D) -> &'db AstNodeRef<ast::Expr> {
-        &self.nodes(db).node_ref
-    }
-
-    /// The immediately containing assignment, if this expression is its RHS.
-    ///
-    /// Inner subexpressions of an assigned expression do not have this set.
-    pub fn assigned_to<D: salsa::Database + ?Sized>(
-        self,
-        db: &'db D,
-    ) -> Option<AstNodeRef<ast::StmtAssign>> {
-        self.nodes(db).assigned_to.clone()
-    }
-
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.scope_id(db)
     }
