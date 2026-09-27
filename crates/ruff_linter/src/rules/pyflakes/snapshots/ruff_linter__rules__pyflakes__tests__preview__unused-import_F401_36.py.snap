@@ -1,0 +1,37 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F401 [*] `package.removed` imported but unused
+  --> F401_36.py:10:5
+   |
+ 8 | from package import (
+ 9 |     kept,  # noqa: F401
+10 |     removed,
+   |     ^^^^^^^
+11 | )
+   |
+help: Remove unused import: `package.removed`
+   |
+9  |     kept,  # noqa: F401
+   -     removed,
+   - )
+10 +     )
+11 |
+   |
+
+F401 [*] `package2.removed2` imported but unused
+  --> F401_36.py:15:5
+   |
+13 | from package2 import (
+14 |     kept2,  # ruff: ignore[F401]
+15 |     removed2,
+   |     ^^^^^^^^
+16 | )
+   |
+help: Remove unused import: `package2.removed2`
+   |
+14 |     kept2,  # ruff: ignore[F401]
+   -     removed2,
+   - )
+15 +     )
+   |

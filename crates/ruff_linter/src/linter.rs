@@ -207,6 +207,7 @@ pub fn check_path(
             &directives.noqa_line_for,
             settings,
             noqa,
+            suppressions,
             path,
             package,
             source_type,

@@ -258,6 +258,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_27__all_mistyped/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_36.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("__init__.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_36.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {

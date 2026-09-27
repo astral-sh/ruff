@@ -84,6 +84,7 @@ use crate::rules::pylint::rules::{
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::rule_table::RuleTable;
 use crate::settings::{LinterSettings, TargetVersion, flags};
+use crate::suppression::Suppressions;
 use crate::{Edit, Violation};
 use crate::{Locator, docstrings, noqa};
 
@@ -219,6 +220,10 @@ pub(crate) struct Checker<'a> {
     /// The [`NoqaMapping`] for the current analysis (i.e., the mapping from line number to
     /// suppression commented line number).
     noqa_line_for: &'a NoqaMapping,
+    /// The [`Suppressions`] for the current analysis (i.e., `# ruff: ignore` and related
+    /// suppression comments). These are consulted alongside `noqa` directives when a rule needs
+    /// to preemptively exclude a suppressed node from a shared fix.
+    suppressions: &'a Suppressions,
     /// The [`Locator`] for the current file, which enables extraction of source code from byte
     /// offsets.
     locator: &'a Locator<'a>,
@@ -259,6 +264,7 @@ impl<'a> Checker<'a> {
         settings: &'a LinterSettings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
+        suppressions: &'a Suppressions,
         path: &'a Path,
         package: Option<PackageRoot<'a>>,
         module: Module<'a>,
@@ -285,6 +291,7 @@ impl<'a> Checker<'a> {
             parsed_annotations_cache: ParsedAnnotationsCache::new(parsed_annotations_arena),
             noqa_line_for,
             noqa,
+            suppressions,
             path,
             in_init_module: OnceCell::new(),
             package,
@@ -324,13 +331,23 @@ impl<'a> Checker<'a> {
             return false;
         }
 
-        noqa::rule_is_ignored(
+        if noqa::rule_is_ignored(
             code,
             offset,
             self.noqa_line_for,
             self.comment_ranges(),
             self.locator,
-        )
+        ) {
+            return true;
+        }
+
+        // Also honor `# ruff: ignore` suppression comments, which are checked
+        // separately from `noqa` directives. Without this, a member protected
+        // by `# ruff: ignore` could still be removed by a shared fix (e.g. the
+        // combined unused-import fix). The range passed here mirrors the
+        // `noqa` case: an empty range starting at `offset`.
+        self.suppressions
+            .check_rule(code, TextRange::empty(offset), None)
     }
 
     /// Create a [`Generator`] to generate source code based on the current AST state.
@@ -3495,6 +3512,7 @@ pub(crate) fn check_ast(
     noqa_line_for: &NoqaMapping,
     settings: &LinterSettings,
     noqa: flags::Noqa,
+    suppressions: &Suppressions,
     path: &Path,
     package: Option<PackageRoot<'_>>,
     source_type: PySourceType,
@@ -3532,6 +3550,7 @@ pub(crate) fn check_ast(
         settings,
         noqa_line_for,
         noqa,
+        suppressions,
         path,
         package,
         module,
