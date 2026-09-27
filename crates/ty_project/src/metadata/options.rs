@@ -306,6 +306,9 @@ impl Options {
                 python_version,
                 python_platform,
                 search_paths,
+                virtual_environment: python_environment
+                    .filter(PythonEnvironment::is_virtual)
+                    .map(|environment| environment.sys_prefix().to_path_buf()),
             },
             diagnostics,
         ))

@@ -246,29 +246,25 @@ fn run_test(
 
     let configuration = test.configuration();
 
-    let site_packages_paths = if configuration.dependencies().is_some() {
+    let python = if configuration.dependencies().is_some() {
         // If dependencies were specified, use the venv we just set up
-        let environment = PythonEnvironment::new(
-            &venv_for_external_dependencies,
-            SysPrefixPathOrigin::PythonCliFlag,
-            db.system(),
-        )
-        .expect("Python environment to point to a valid path");
-        environment
-            .site_packages_paths(db.system())
-            .expect("Python environment to be valid")
-            .into_vec()
-    } else if let Some(python) = configuration.python() {
-        let environment =
-            PythonEnvironment::new(python, SysPrefixPathOrigin::PythonCliFlag, db.system())
-                .expect("Python environment to point to a valid path");
-        environment
-            .site_packages_paths(db.system())
-            .expect("Python environment to be valid")
-            .into_vec()
+        Some(venv_for_external_dependencies.as_path())
     } else {
-        vec![]
+        configuration.python()
     };
+    let python_environment = python.map(|python| {
+        PythonEnvironment::new(python, SysPrefixPathOrigin::PythonCliFlag, db.system())
+            .expect("Python environment to point to a valid path")
+    });
+    let site_packages_paths = python_environment
+        .as_ref()
+        .map(|environment| {
+            environment
+                .site_packages_paths(db.system())
+                .expect("Python environment to be valid")
+                .into_vec()
+        })
+        .unwrap_or_default();
 
     // Make any relative extra-paths be relative to src_path
     let extra_paths = configuration
@@ -286,6 +282,9 @@ fn run_test(
         .collect();
 
     let settings = ProgramSettings {
+        virtual_environment: python_environment
+            .filter(PythonEnvironment::is_virtual)
+            .map(|environment| environment.sys_prefix().to_path_buf()),
         python_version: PythonVersionWithSource {
             version: python_version,
             source: PythonVersionSource::Cli,

@@ -15,12 +15,11 @@ use ruff_python_ast::PythonVersion;
 use salsa::Database as _;
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
-use ty_python_core::program::{Program, ProgramSettings};
+use ty_python_core::program::Program;
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{
     ProgramFile, TestProgramDb as _, global_scope, place_table, semantic_index, use_def_map,
 };
-use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
 use super::*;
 
@@ -119,39 +118,10 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     db.write_dedented("src/py312_dependency.py", "value: int = 312")?;
 
     let file = system_path_to_file(&db, "src/main.py").expect("file to exist");
-    let default_program = db.program();
-    let search_paths = default_program.search_paths(&db).clone();
-    let python_platform = default_program.python_platform(&db).clone();
-    let py311 = ProgramFile::new(
-        &db,
-        file,
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                python_version: PythonVersionWithSource {
-                    version: PythonVersion::PY311,
-                    source: PythonVersionSource::Default,
-                },
-                python_platform: python_platform.clone(),
-                search_paths: search_paths.clone(),
-            },
-        ),
-    );
-    let py312 = ProgramFile::new(
-        &db,
-        file,
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                python_version: PythonVersionWithSource {
-                    version: PythonVersion::PY312,
-                    source: PythonVersionSource::Default,
-                },
-                python_platform,
-                search_paths,
-            },
-        ),
-    );
+    let py311 = db.program().program_file(&db, file);
+    let mut settings = db.program_settings().clone();
+    settings.python_version.version = PythonVersion::PY312;
+    let py312 = Program::from_settings(&db, &settings).program_file(&db, file);
 
     let check = |file, expected_type, expect_invalid_syntax, expect_unresolved_import| {
         let diagnostics = crate::check_file_unwrap(&db, file);
@@ -204,31 +174,16 @@ fn program_file_changes_with_python_version() -> anyhow::Result<()> {
         (program_file.as_id(), program_file.python_file(&db).as_id())
     };
 
-    let equivalent_program = Program::from_settings(
-        &db,
-        &ProgramSettings {
-            python_version: db.program_settings().python_version.clone(),
-            python_platform: program.python_platform(&db).clone(),
-            search_paths: program.search_paths(&db).clone(),
-        },
-    );
+    let mut settings = db.program_settings().clone();
+    let equivalent_program = Program::from_settings(&db, &settings);
     assert_eq!(program, equivalent_program);
     assert_eq!(
         program_file_id,
         equivalent_program.program_file(&db, file).as_id()
     );
 
-    let py312_program = Program::from_settings(
-        &db,
-        &ProgramSettings {
-            python_version: PythonVersionWithSource {
-                version: PythonVersion::PY312,
-                source: PythonVersionSource::Default,
-            },
-            python_platform: program.python_platform(&db).clone(),
-            search_paths: program.search_paths(&db).clone(),
-        },
-    );
+    settings.python_version.version = PythonVersion::PY312;
+    let py312_program = Program::from_settings(&db, &settings);
 
     let program_file = py312_program.program_file(&db, file);
     assert_ne!(program_file_id, program_file.as_id());
