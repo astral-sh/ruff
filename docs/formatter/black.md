@@ -132,53 +132,49 @@ We agree that Ruff's formatting (that matches Black's 23) is hard to read and ne
 
 ### Call expressions with a single multiline string argument
 
-Unlike Black, Ruff preserves the indentation of a single multiline-string argument in a call expression:
+Both formatters preserve the internal indentation of a single multiline-string argument in a call expression, and neither modifies the string's contents. The remaining deviation is where the argument starts: Black keeps the string on the same line as the call, while Ruff hoists it onto its own line:
 
 ```python
 # Input
 call(
-  """"
+  """
   A multiline
   string
   """
 )
 
-dedent(""""
+dedent("""
     A multiline
     string
 """)
 
 # Black
-call(
-  """"
+call("""
   A multiline
   string
   """
 )
 
-dedent(
-  """"
-  A multiline
-  string
-"""
-)
-
+dedent("""
+    A multiline
+    string
+""")
 
 # Ruff
 call(
-  """"
+    """
   A multiline
   string
   """
 )
 
-dedent(""""
+dedent("""
     A multiline
     string
 """)
 ```
 
-Black intended to ship a similar style change as part of the 2024 style that always removes the indent. It turned out that this change was too disruptive to justify the cases where it improved formatting. Ruff introduced the new heuristic of preserving the indent. We believe it's a good compromise that improves formatting but minimizes disruption for users.
+Black intended to ship a style change as part of the 2024 style that always removes the indent. It turned out that this change was too disruptive to justify the cases where it improved formatting, so the indent is preserved today. Ruff's heuristic additionally hoists the string onto its own line, which keeps the relative indentation between the quotes and the content stable regardless of how the call expression itself is formatted. We believe it's a good compromise that improves formatting but minimizes disruption for users.
 
 ### Blank lines at the start of a block
 
