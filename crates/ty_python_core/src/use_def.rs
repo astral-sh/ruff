@@ -2252,10 +2252,21 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
         );
-        let definitions_at_definition = DefinitionsAtDefinition {
-            bindings: place_state.bindings().clone(),
-            declarations: Some(place_state.declarations().clone()),
-        };
+        // The retained map uses implicit start-of-scope defaults for missing entries.
+        // Avoid cloning and storing those states for the common first binding.
+        if place_state.bindings().is_always_unbound()
+            && place_state.declarations().is_always_undeclared()
+        {
+            self.definitions_by_definition.remove(&binding);
+        } else {
+            self.definitions_by_definition.insert(
+                binding,
+                DefinitionsAtDefinition {
+                    bindings: place_state.bindings().clone(),
+                    declarations: Some(place_state.declarations().clone()),
+                },
+            );
+        }
 
         place_state.record_binding(
             def_id,
@@ -2272,9 +2283,6 @@ impl<'db> UseDefMapBuilder<'db> {
             ImportedQualifierAction::Clear => place_state.clear_imported_qualifiers(),
             ImportedQualifierAction::Preserve => {}
         }
-        self.definitions_by_definition
-            .insert(binding, definitions_at_definition);
-
         let definitions = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.reachable_symbol_definitions[symbol],
             ScopedPlaceId::Member(member) => &mut self.reachable_member_definitions[member],
@@ -2658,13 +2666,17 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut self.reachability_constraints,
         );
 
-        self.definitions_by_definition.insert(
-            declaration,
-            DefinitionsAtDefinition {
-                bindings: place_state.bindings().clone(),
-                declarations: None,
-            },
-        );
+        if place_state.bindings().is_always_unbound() {
+            self.definitions_by_definition.remove(&declaration);
+        } else {
+            self.definitions_by_definition.insert(
+                declaration,
+                DefinitionsAtDefinition {
+                    bindings: place_state.bindings().clone(),
+                    declarations: None,
+                },
+            );
+        }
         place_state.record_declaration(def_id, self.reachability);
 
         let definitions = match place {
@@ -3375,15 +3387,6 @@ impl<'db> UseDefMapBuilder<'db> {
             },
         ) in definitions_by_definition
         {
-            // Lookups use the shared start-of-scope defaults for these omitted entries.
-            if bindings.is_always_unbound()
-                && declarations
-                    .as_ref()
-                    .is_none_or(Declarations::is_always_undeclared)
-            {
-                continue;
-            }
-
             let bindings = place_state_interner.intern_bindings(&bindings);
             let declarations = declarations
                 .map(|declarations| place_state_interner.intern_declarations(declarations));
