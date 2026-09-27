@@ -68,7 +68,7 @@ use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::expression::Expression;
-use ty_python_core::scope::ScopeId;
+use ty_python_core::scope::{ScopeId, ScopeKind};
 use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
 use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, semantic_index};
@@ -519,7 +519,18 @@ pub(crate) fn infer_scope_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
+    cycle_initial=|db: &'db dyn Db, id, input: InferScope<'db>| {
+        let (scope, _) = input.into_inner(db);
+        // Scope inference can be the cycle head when aliases in different modules are checked
+        // concurrently. Preserve the alias marker so cycle detection does not mistake the
+        // provisional result for a non-recursive alias.
+        let ty = if scope.node(db).scope_kind() == ScopeKind::TypeAlias {
+            Type::divergent_alias(id)
+        } else {
+            Type::divergent(id)
+        };
+        ScopeInference::cycle_initial(ty)
+    },
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, input: InferScope<'db>| {
         let (scope, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(scope);
